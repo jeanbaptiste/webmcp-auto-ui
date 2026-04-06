@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { base } from '$app/paths';
   import { listSkills, loadDemoSkills, createSkill, deleteSkill, updateSkill, type Skill } from '@webmcp-auto-ui/sdk';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { McpClient, createToolGroup, textResult, jsonResult } from '@webmcp-auto-ui/core';
@@ -213,7 +214,7 @@
   }
 
   // ── Agent ─────────────────────────────────────────────────────────────────
-  const provider = new AnthropicProvider({ proxyUrl: '/api/chat' });
+  const provider = new AnthropicProvider({ proxyUrl: `${base}/api/chat` });
 
   async function triggerAutoGenerate(client?: McpClient) {
     const c = client ?? mcpClient;

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { base } from '$app/paths';
   import { BlockRenderer } from '@webmcp-auto-ui/ui';
   import {
     loadDemoSkills, listSkills, createSkill, updateSkill, deleteSkill,
@@ -291,7 +292,7 @@
     }
     // Anthropic — key from .env or drawer input
     return new AnthropicProvider({
-      proxyUrl: '/api/chat',
+      proxyUrl: `${base}/api/chat`,
       ...(apiKeyInput.trim() ? { apiKey: apiKeyInput.trim() } : {}),
     });
   }
@@ -402,7 +403,7 @@
 
   <!-- STATUS BAR -->
   <div class="flex items-center justify-between px-5 h-11 flex-shrink-0">
-    <span class="text-[15px] font-medium text-zinc-100 tracking-tight">{clockStr}</span>
+    <span class="text-[15px] font-medium text-text1 tracking-tight">{clockStr}</span>
     <div class="flex items-center gap-1.5">
       <div class="w-2 h-2 rounded-full bg-teal"></div>
       <div class="w-2.5 h-1.5 rounded-sm bg-zinc-500"></div>
@@ -411,13 +412,32 @@
   </div>
 
   <!-- TOPBAR -->
-  <div class="flex items-center gap-2.5 px-4 h-12 border-b border-white/7 flex-shrink-0 bg-[#16161a]">
-    <span class="text-sm font-medium text-zinc-100 flex-1 tracking-tight">Hyper<span class="text-accent">Skills</span></span>
+  <div class="flex items-center gap-2.5 px-4 h-12 border-b border-border flex-shrink-0 bg-surface">
+    <span class="text-sm font-medium text-text1 flex-1 tracking-tight">Hyper<span class="text-accent">Skills</span></span>
     <div class="flex items-center gap-1.5">
       <div class="w-1.5 h-1.5 rounded-full {canvas.mcpConnecting ? 'bg-amber animate-pulse' : canvas.mcpConnected ? 'bg-teal' : 'bg-zinc-700'}"></div>
-      <span class="text-[10px] text-zinc-500 font-mono">{canvas.mcpConnecting ? 'connexion…' : canvas.mcpConnected ? canvas.mcpName : 'non connecté'}</span>
+      <span class="text-[10px] text-text2 font-mono">{canvas.mcpConnecting ? 'connexion…' : canvas.mcpConnected ? canvas.mcpName : 'non connecté'}</span>
     </div>
-    <button class="w-8 h-8 rounded-lg border border-white/12 flex flex-col items-center justify-center gap-1"
+    <button class="w-8 h-8 rounded-lg border border-border2 flex items-center justify-center text-text2 hover:text-text1 text-sm"
+      onclick={() => {
+        const root = document.documentElement;
+        const current = root.dataset.theme;
+        const next = current === 'dark' ? 'light' : 'dark';
+        root.dataset.theme = next;
+        try { localStorage.setItem('webmcp-theme', next); } catch {}
+        import('@webmcp-auto-ui/ui').then(({ THEME_MAP }) => {
+          const tokens = (THEME_MAP as Record<string, Record<string, string>>)[next];
+          if (tokens) {
+            for (const [key, value] of Object.entries(tokens)) {
+              root.style.setProperty(`--${key}`, value);
+            }
+          }
+        });
+      }}
+      aria-label="Toggle theme">
+      ☀
+    </button>
+    <button class="w-8 h-8 rounded-lg border border-border2 flex flex-col items-center justify-center gap-1"
       onclick={() => { drawerOpen = !drawerOpen; drawerView = 'main'; }}
       aria-label="Menu">
       <div class="w-3.5 h-px bg-zinc-500 rounded"></div>
@@ -428,19 +448,19 @@
 
   <!-- GEMMA LOADER BAR -->
   {#if canvas.llm === 'gemma-e2b' && (gemmaStatus === 'loading' || gemmaStatus === 'ready')}
-    <div class="flex flex-col gap-1 px-4 py-2 border-b border-white/7 bg-[#16161a] flex-shrink-0">
+    <div class="flex flex-col gap-1 px-4 py-2 border-b border-border bg-surface flex-shrink-0">
       {#if gemmaStatus === 'loading'}
         <div class="flex items-center justify-between">
-          <span class="text-[10px] font-mono text-zinc-400">Gemma 2B — chargement… {Math.round(gemmaProgress)}%</span>
-          <span class="text-[10px] font-mono text-zinc-600">{gemmaElapsed}s</span>
+          <span class="text-[10px] font-mono text-text2">Gemma 2B — chargement… {Math.round(gemmaProgress)}%</span>
+          <span class="text-[10px] font-mono text-text2">{gemmaElapsed}s</span>
         </div>
-        <div class="w-full h-1 rounded-full bg-white/8 overflow-hidden">
+        <div class="w-full h-1 rounded-full bg-border2 overflow-hidden">
           <div class="h-full rounded-full bg-teal transition-all duration-300" style="width: {gemmaProgress}%"></div>
         </div>
       {:else if gemmaStatus === 'ready'}
         <div class="flex items-center justify-between">
           <span class="text-[10px] font-mono text-teal">Gemma 2B ✓</span>
-          <button class="text-[10px] font-mono text-zinc-600 hover:text-red-400 transition-colors" onclick={unloadGemma}>
+          <button class="text-[10px] font-mono text-text2 hover:text-red-400 transition-colors" onclick={unloadGemma}>
             décharger ✕
           </button>
         </div>
@@ -455,13 +475,13 @@
         <div class="text-xs leading-relaxed max-w-[80%] px-3 py-2 rounded-2xl
           {item.role === 'user'
             ? 'bg-accent text-white rounded-br-sm self-end'
-            : 'bg-[#1e1e28] text-zinc-200 border border-white/8 rounded-bl-sm self-start'}">
+            : 'bg-surface2 text-text1 border border-border rounded-bl-sm self-start'}">
           <!-- eslint-disable-next-line svelte/no-at-html-tags -->
           {@html item.html}
         </div>
       {:else}
-        <div class="block-anim rounded-xl border border-white/8 bg-[#16161a] overflow-hidden">
-          <div class="text-[9px] font-mono text-zinc-700 px-3 pt-2 uppercase tracking-wider">{item.src}</div>
+        <div class="block-anim rounded-xl border border-border bg-surface overflow-hidden">
+          <div class="text-[9px] font-mono text-text2 px-3 pt-2 uppercase tracking-wider">{item.src}</div>
           <BlockRenderer type={item.type} data={item.data} />
         </div>
       {/if}
@@ -469,9 +489,9 @@
   </div>
 
   <!-- CHAT BAR -->
-  <div class="flex items-end gap-2 px-3 py-2 border-t border-white/7 bg-[#16161a] flex-shrink-0">
+  <div class="flex items-end gap-2 px-3 py-2 border-t border-border bg-surface flex-shrink-0">
     <input
-      class="flex-1 bg-[#1e1e28] border border-white/10 rounded-2xl px-4 py-2 text-xs font-mono text-zinc-200 outline-none placeholder-zinc-700 focus:border-accent transition-colors"
+      class="flex-1 bg-surface2 border border-border2 rounded-2xl px-4 py-2 text-xs font-mono text-text1 outline-none placeholder-zinc-700 focus:border-accent transition-colors"
       placeholder="demandez une interface…"
       bind:value={chatInput}
       onkeydown={onKeydown}
@@ -493,18 +513,18 @@
       {#if drawerView === 'main'}
         <!-- Header -->
         <div class="flex items-center justify-between">
-          <span class="text-sm font-medium text-zinc-200">Paramètres</span>
-          <button class="text-zinc-500 hover:text-white text-lg leading-none" onclick={() => { drawerOpen = false; }}>✕</button>
+          <span class="text-sm font-medium text-text1">Paramètres</span>
+          <button class="text-text2 hover:text-white text-lg leading-none" onclick={() => { drawerOpen = false; }}>✕</button>
         </div>
 
         <!-- MCP -->
         <div class="flex flex-col gap-2">
-          <div class="text-[9px] font-mono text-zinc-600 uppercase tracking-wider">Serveur MCP</div>
-          <input class="w-full bg-[#1e1e28] border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-zinc-200 outline-none focus:border-accent"
+          <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Serveur MCP</div>
+          <input class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none focus:border-accent"
             placeholder="https://mcp.example.com/mcp"
             bind:value={canvas.mcpUrl}
             onkeydown={(e) => e.key === 'Enter' && connectMcp()} />
-          <input class="w-full bg-[#1e1e28] border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-zinc-300 outline-none focus:border-accent"
+          <input class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none focus:border-accent"
             placeholder="Bearer token (optionnel)"
             bind:value={mcpToken} />
           <button class="w-full py-2 rounded-lg bg-accent text-white text-xs font-mono hover:opacity-85 disabled:opacity-40"
@@ -515,8 +535,8 @@
 
         <!-- LLM -->
         <div class="flex flex-col gap-2">
-          <div class="text-[9px] font-mono text-zinc-600 uppercase tracking-wider">Modèle LLM</div>
-          <select class="w-full bg-[#1e1e28] border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-zinc-300 outline-none cursor-pointer"
+          <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Modèle LLM</div>
+          <select class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none cursor-pointer"
             value={canvas.llm} onchange={(e) => canvas.setLlm((e.target as HTMLSelectElement).value as 'haiku'|'sonnet'|'gemma-e2b')}>
             <option value="haiku">claude-haiku-4-5</option>
             <option value="sonnet">claude-sonnet-4-6</option>
@@ -526,51 +546,51 @@
 
         <!-- API Key (only if no .env) -->
         <div class="flex flex-col gap-2">
-          <div class="text-[9px] font-mono text-zinc-600 uppercase tracking-wider">Clé API Anthropic</div>
+          <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Clé API Anthropic</div>
           <input
-            class="w-full bg-[#1e1e28] border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-zinc-300 outline-none focus:border-accent"
+            class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none focus:border-accent"
             type="password"
             placeholder="sk-ant-… (si pas de .env)"
             bind:value={apiKeyInput}
           />
-          <div class="text-[9px] font-mono text-zinc-700">Stockée en session, jamais envoyée à un tiers</div>
+          <div class="text-[9px] font-mono text-text2">Stockée en session, jamais envoyée à un tiers</div>
         </div>
 
         <!-- Recettes -->
         <div class="flex flex-col gap-2">
-          <div class="text-[9px] font-mono text-zinc-600 uppercase tracking-wider">Recettes ({skills.length})</div>
+          <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Recettes ({skills.length})</div>
           {#each skills as skill}
-            <div class="flex items-center gap-1 bg-[#1e1e28] border border-white/7 rounded-lg px-2 py-1.5">
+            <div class="flex items-center gap-1 bg-surface2 border border-border rounded-lg px-2 py-1.5">
               <div class="w-1.5 h-1.5 rounded-full bg-teal flex-shrink-0"></div>
               <button class="flex-1 text-left text-xs font-mono text-teal truncate" onclick={() => applySkill(skill)}>
                 {skill.name}
               </button>
               {#if skill.mcp}
-                <span class="text-[9px] font-mono text-zinc-700 truncate max-w-16">{skill.mcpName ?? skill.mcp.split('/').slice(-2)[0]}</span>
+                <span class="text-[9px] font-mono text-text2 truncate max-w-16">{skill.mcpName ?? skill.mcp.split('/').slice(-2)[0]}</span>
               {/if}
-              <button class="text-zinc-600 hover:text-zinc-300 text-xs px-1 flex-shrink-0" onclick={() => openEditSkill(skill)}>✏️</button>
-              <button class="text-zinc-600 hover:text-red-400 text-xs px-1 flex-shrink-0" onclick={() => removeSkill(skill.id)}>✕</button>
+              <button class="text-text2 hover:text-text1 text-xs px-1 flex-shrink-0" onclick={() => openEditSkill(skill)}>✏️</button>
+              <button class="text-text2 hover:text-red-400 text-xs px-1 flex-shrink-0" onclick={() => removeSkill(skill.id)}>✕</button>
             </div>
           {/each}
         </div>
 
         <!-- Actions -->
         <div class="flex flex-col gap-2 mt-auto">
-          <button class="w-full py-2 rounded-lg border border-white/12 text-zinc-400 text-xs font-mono hover:border-teal hover:text-teal transition-colors"
+          <button class="w-full py-2 rounded-lg border border-border2 text-text2 text-xs font-mono hover:border-teal hover:text-teal transition-colors"
             onclick={() => drawerView = 'paste'}>
             📋 Coller une recette HyperSkills
           </button>
-          <button class="w-full py-2 rounded-lg border border-white/12 text-zinc-400 text-xs font-mono hover:border-accent hover:text-accent transition-colors"
+          <button class="w-full py-2 rounded-lg border border-border2 text-text2 text-xs font-mono hover:border-accent hover:text-accent transition-colors"
             onclick={() => { drawerView = 'save'; }}>
             💾 Enregistrer la vue courante
           </button>
-          <button class="w-full py-2 rounded-lg border border-white/12 text-zinc-400 text-xs font-mono hover:border-zinc-400 transition-colors"
+          <button class="w-full py-2 rounded-lg border border-border2 text-text2 text-xs font-mono hover:border-zinc-400 transition-colors"
             onclick={() => { updateHsUrl().then(() => { shareMenuOpen = true; }); }}>
             partager ↗
           </button>
           {#if hsUrlDisplay}
             <!-- URL preview -->
-            <div class="w-full py-2 px-3 rounded-lg border border-white/6 text-[9px] font-mono text-zinc-700 break-all">
+            <div class="w-full py-2 px-3 rounded-lg border border-border text-[9px] font-mono text-text2 break-all">
               {hsUrlDisplay.slice(0, 55)}…
             </div>
             <!-- Share actions -->
@@ -578,29 +598,29 @@
               <div class="flex flex-col gap-1.5">
                 <!-- Native share (shown if available) -->
                 <button
-                  class="w-full py-1.5 rounded-lg border border-white/12 text-zinc-400 text-[10px] font-mono hover:border-accent hover:text-accent transition-colors"
+                  class="w-full py-1.5 rounded-lg border border-border2 text-text2 text-[10px] font-mono hover:border-accent hover:text-accent transition-colors"
                   onclick={shareNative}>
                   📤 Partager (natif)
                 </button>
                 <button
-                  class="w-full py-1.5 rounded-lg border border-white/12 text-zinc-400 text-[10px] font-mono transition-colors
+                  class="w-full py-1.5 rounded-lg border border-border2 text-text2 text-[10px] font-mono transition-colors
                     {urlCopied ? 'border-teal text-teal bg-teal/5' : 'hover:border-teal hover:text-teal'}"
                   onclick={copyHsUrl}>
                   {urlCopied ? '✓ URL copiée !' : '📋 Copier le lien'}
                 </button>
                 <button
-                  class="w-full py-1.5 rounded-lg border border-white/12 text-zinc-400 text-[10px] font-mono hover:border-zinc-300 hover:text-zinc-300 transition-colors"
+                  class="w-full py-1.5 rounded-lg border border-border2 text-text2 text-[10px] font-mono hover:border-zinc-300 hover:text-text1 transition-colors"
                   onclick={shareEmail}>
                   ✉️ Email
                 </button>
                 <div class="flex gap-1.5">
                   <button
-                    class="flex-1 py-1.5 rounded-lg border border-white/12 text-zinc-400 text-[10px] font-mono hover:border-zinc-300 hover:text-zinc-300 transition-colors"
+                    class="flex-1 py-1.5 rounded-lg border border-border2 text-text2 text-[10px] font-mono hover:border-zinc-300 hover:text-text1 transition-colors"
                     onclick={shareTwitter}>
                     𝕏 Twitter
                   </button>
                   <button
-                    class="flex-1 py-1.5 rounded-lg border border-white/12 text-zinc-400 text-[10px] font-mono hover:border-blue-400 hover:text-blue-400 transition-colors"
+                    class="flex-1 py-1.5 rounded-lg border border-border2 text-text2 text-[10px] font-mono hover:border-blue-400 hover:text-blue-400 transition-colors"
                     onclick={shareLinkedIn}>
                     in LinkedIn
                   </button>
@@ -608,7 +628,7 @@
               </div>
             {/if}
           {:else}
-            <div class="w-full py-2 px-3 rounded-lg border border-white/6 text-[9px] font-mono text-zinc-700">
+            <div class="w-full py-2 px-3 rounded-lg border border-border text-[9px] font-mono text-text2">
               HyperSkills URL — générer d'abord une interface
             </div>
           {/if}
@@ -617,12 +637,12 @@
       {:else if drawerView === 'paste'}
         <!-- PASTE VIEW -->
         <div class="flex items-center gap-2 mb-2">
-          <button class="text-zinc-500 hover:text-white text-sm" onclick={() => drawerView = 'main'}>←</button>
-          <span class="text-sm font-medium text-zinc-200">Coller une recette HyperSkills</span>
+          <button class="text-text2 hover:text-white text-sm" onclick={() => drawerView = 'main'}>←</button>
+          <span class="text-sm font-medium text-text1">Coller une recette HyperSkills</span>
         </div>
-        <div class="text-[10px] font-mono text-zinc-600 mb-1">URL ?hs= complète ou base64 brut</div>
+        <div class="text-[10px] font-mono text-text2 mb-1">URL ?hs= complète ou base64 brut</div>
         <textarea
-          class="w-full bg-[#1e1e28] border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-zinc-300 outline-none focus:border-accent resize-none h-32"
+          class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none focus:border-accent resize-none h-32"
           placeholder="https://example.com?hs=…&#10;ou base64 brut"
           bind:value={pasteInput}
         ></textarea>
@@ -634,16 +654,16 @@
       {:else if drawerView === 'save'}
         <!-- SAVE VIEW -->
         <div class="flex items-center gap-2 mb-2">
-          <button class="text-zinc-500 hover:text-white text-sm" onclick={() => drawerView = 'main'}>←</button>
-          <span class="text-sm font-medium text-zinc-200">Enregistrer la vue</span>
+          <button class="text-text2 hover:text-white text-sm" onclick={() => drawerView = 'main'}>←</button>
+          <span class="text-sm font-medium text-text1">Enregistrer la vue</span>
         </div>
-        <div class="text-[10px] font-mono text-zinc-600 mb-1">Nom de la recette</div>
-        <input class="w-full bg-[#1e1e28] border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-zinc-200 outline-none focus:border-accent"
+        <div class="text-[10px] font-mono text-text2 mb-1">Nom de la recette</div>
+        <input class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none focus:border-accent"
           placeholder="ma-recette"
           bind:value={saveName}
           onkeydown={(e) => e.key === 'Enter' && saveCurrentAsSkill()}
         />
-        <div class="text-[10px] font-mono text-zinc-600">
+        <div class="text-[10px] font-mono text-text2">
           {canvas.blockCount} bloc{canvas.blockCount !== 1 ? 's' : ''}
           {canvas.mcpConnected ? ` · MCP: ${canvas.mcpName}` : ''}
         </div>
@@ -655,19 +675,19 @@
       {:else if drawerView === 'editSkill' && editingSkill}
         <!-- EDIT SKILL VIEW -->
         <div class="flex items-center gap-2 mb-2">
-          <button class="text-zinc-500 hover:text-white text-sm" onclick={() => { drawerView = 'main'; editingSkill = null; }}>←</button>
-          <span class="text-sm font-medium text-zinc-200">Modifier recette</span>
+          <button class="text-text2 hover:text-white text-sm" onclick={() => { drawerView = 'main'; editingSkill = null; }}>←</button>
+          <span class="text-sm font-medium text-text1">Modifier recette</span>
         </div>
-        <div class="text-[10px] font-mono text-zinc-600 mb-1">Nom</div>
-        <input class="w-full bg-[#1e1e28] border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-zinc-200 outline-none focus:border-accent"
+        <div class="text-[10px] font-mono text-text2 mb-1">Nom</div>
+        <input class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none focus:border-accent"
           bind:value={editName} />
-        <div class="text-[10px] font-mono text-zinc-600 mb-1 mt-2">Description</div>
-        <input class="w-full bg-[#1e1e28] border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-zinc-200 outline-none focus:border-accent"
+        <div class="text-[10px] font-mono text-text2 mb-1 mt-2">Description</div>
+        <input class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none focus:border-accent"
           bind:value={editDesc} />
         {#if editingSkill.mcp}
-          <div class="text-[10px] font-mono text-zinc-600 mt-2">MCP : {editingSkill.mcpName ?? editingSkill.mcp}</div>
+          <div class="text-[10px] font-mono text-text2 mt-2">MCP : {editingSkill.mcpName ?? editingSkill.mcp}</div>
         {/if}
-        <div class="text-[10px] font-mono text-zinc-600 mt-1">{editingSkill.blocks.length} blocs</div>
+        <div class="text-[10px] font-mono text-text2 mt-1">{editingSkill.blocks.length} blocs</div>
         <button class="w-full py-2 rounded-lg bg-accent text-white text-xs font-mono hover:opacity-85 mt-auto"
           onclick={saveEditSkill}>
           Sauvegarder

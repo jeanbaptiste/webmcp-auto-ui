@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { base } from '$app/paths';
   import { BlockRenderer } from '@webmcp-auto-ui/ui';
   import { decodeHyperSkill, computeHash, diffSkills, type HyperSkill, type HyperSkillVersion } from '@webmcp-auto-ui/sdk';
   import { McpClient, textResult, jsonResult } from '@webmcp-auto-ui/core';
@@ -65,7 +66,7 @@
   }
 
   // Auto-generate from MCP
-  const provider = new AnthropicProvider({ proxyUrl: '/api/chat' });
+  const provider = new AnthropicProvider({ proxyUrl: `${base}/api/chat` });
 
   async function autoGenerate() {
     const mcpUrl = (skill?.meta as Record<string,unknown>)?.mcp as string | undefined;
