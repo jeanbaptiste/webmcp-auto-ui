@@ -1,4 +1,5 @@
 <script lang="ts">
+  declare const __BUILD_TIME__: string;
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import { Button, Input, BlockRenderer } from '@webmcp-auto-ui/ui';
@@ -141,11 +142,11 @@
   });
 </script>
 
-<svelte:head><title>HyperSkills Viewer</title></svelte:head>
+<svelte:head><title>HyperSkill Viewer</title></svelte:head>
 
 <div class="min-h-screen bg-bg font-sans flex flex-col">
   <header class="border-b border-border bg-surface px-6 py-3 flex items-center gap-3 flex-shrink-0">
-    <div class="font-mono text-sm font-bold"><span class="text-white">Hyper</span><span class="text-amber">Skills</span><span class="text-text2 text-xs ml-1">viewer</span></div>
+    <div class="font-mono text-sm font-bold"><span class="text-text1">Hyper</span><span class="text-accent">Skill</span><span class="text-text2 text-xs ml-1">viewer</span></div>
     <div class="w-px h-5 bg-border2"></div>
     <Input class="flex-1 font-mono text-xs max-w-lg h-7"
       placeholder="https://example.com/viewer?hs=… ou coller une URL HyperSkills"

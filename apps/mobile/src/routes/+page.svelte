@@ -1,4 +1,5 @@
 <script lang="ts">
+  declare const __BUILD_TIME__: string;
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import { BlockRenderer } from '@webmcp-auto-ui/ui';

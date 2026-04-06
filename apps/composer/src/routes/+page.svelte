@@ -1,4 +1,5 @@
 <script lang="ts">
+  declare const __BUILD_TIME__: string;
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import { listSkills, loadDemoSkills, createSkill, deleteSkill, updateSkill, type Skill } from '@webmcp-auto-ui/sdk';

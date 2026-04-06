@@ -1,4 +1,5 @@
 <script lang="ts">
+  declare const __BUILD_TIME__: string;
   import { PUBLIC_BASE_URL } from '$env/static/public';
 
   const base = PUBLIC_BASE_URL ?? '';
@@ -77,6 +78,7 @@
     <footer class="mt-16 pt-6 border-t border-border text-xs font-mono text-text2 flex flex-wrap gap-x-4 gap-y-1">
       <span>webmcp-auto-ui</span>
       <span>AGPL-3.0</span>
+      <span>{__BUILD_TIME__?.slice(0, 10)}</span>
     </footer>
   </div>
 </div>

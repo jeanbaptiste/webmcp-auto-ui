@@ -1,4 +1,5 @@
 <script lang="ts">
+  declare const __BUILD_TIME__: string;
   import { onMount } from 'svelte';
   import {
     Card, Panel, GridLayout, List, Window,

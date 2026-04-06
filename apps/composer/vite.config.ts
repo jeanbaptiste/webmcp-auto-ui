@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import path from 'path';
 
 export default defineConfig({
+  define: { '__BUILD_TIME__': JSON.stringify(new Date().toISOString()) },
   plugins: [sveltekit()],
   resolve: {
     alias: {
