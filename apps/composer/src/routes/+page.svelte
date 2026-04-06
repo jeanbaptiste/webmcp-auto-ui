@@ -7,6 +7,7 @@
   import type { GemmaStatus } from '@webmcp-auto-ui/agent';
   import { X, Plus, Zap, Copy, Check, Save, Menu, ChevronLeft, ChevronRight, Settings, Pencil, Trash2 } from 'lucide-svelte';
   import BlockWrap from '$lib/BlockWrap.svelte';
+  import SettingsModal from '$lib/SettingsModal.svelte';
 
   // ── State ─────────────────────────────────────────────────────────────────
   let showExport = $state(false);
@@ -701,40 +702,14 @@
 {/if}
 
 <!-- SETTINGS MODAL (4H) -->
-{#if showSettings}
-  <div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-    <div class="bg-surface border border-border2 rounded-xl w-[500px] max-h-[85vh] flex flex-col shadow-2xl">
-      <div class="flex items-center justify-between px-5 py-4 border-b border-border">
-        <span class="text-sm font-mono text-zinc-300">Settings</span>
-        <button onclick={() => showSettings = false} class="text-zinc-500 hover:text-white"><X size={16} /></button>
-      </div>
-      <div class="flex-1 overflow-auto p-5 flex flex-col gap-4">
-        <div>
-          <label class="text-xs font-mono text-zinc-500 mb-1 block">System prompt</label>
-          <textarea class="w-full font-mono text-xs bg-black/30 border border-border text-zinc-300 rounded-lg p-3 h-24 outline-none resize-vertical leading-relaxed focus:border-accent"
-            placeholder="Instructions personnalisees pour le LLM..."
-            bind:value={systemPrompt}></textarea>
-        </div>
-        <div>
-          <label class="text-xs font-mono text-zinc-500 mb-1 block">Contexte max tokens : {maxTokens}</label>
-          <input type="range" min="1024" max="8192" step="256" class="w-full accent-accent" bind:value={maxTokens} />
-          <div class="flex justify-between text-[10px] font-mono text-zinc-600">
-            <span>1024</span><span>8192</span>
-          </div>
-        </div>
-        <div class="flex items-center gap-3">
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" class="accent-accent" bind:checked={cacheEnabled} />
-            <span class="text-xs font-mono text-zinc-400">KV cache</span>
-          </label>
-        </div>
-      </div>
-      <div class="flex justify-end gap-3 px-5 py-4 border-t border-border">
-        <button class="font-mono text-xs px-4 py-2 rounded border border-border2 text-zinc-400 hover:text-white" onclick={() => showSettings = false}>fermer</button>
-      </div>
-    </div>
-  </div>
-{/if}
+<SettingsModal
+  show={showSettings}
+  {systemPrompt} {maxTokens} {cacheEnabled}
+  onclose={() => showSettings = false}
+  onsystemprompt={(v) => systemPrompt = v}
+  onmaxtokens={(v) => maxTokens = v}
+  oncache={(v) => cacheEnabled = v}
+/>
 
 <!-- SKILL EDIT MODAL (4G) -->
 {#if editingSkillId}

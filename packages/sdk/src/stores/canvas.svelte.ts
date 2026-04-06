@@ -7,7 +7,7 @@ export type BlockType =
   | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
   | 'stat-card' | 'data-table' | 'timeline' | 'profile' | 'trombinoscope' | 'json-viewer'
   | 'hemicycle' | 'chart-rich' | 'cards' | 'grid-data' | 'sankey' | 'map' | 'log'
-  | 'gallery' | 'carousel';
+  | 'gallery' | 'carousel' | 'd3';
 
 export type Mode = 'auto' | 'drag' | 'chat';
 export type LLMId = 'haiku' | 'sonnet' | 'gemma-e2b' | 'gemma-e4b';

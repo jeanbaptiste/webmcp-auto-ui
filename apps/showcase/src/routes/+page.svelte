@@ -7,11 +7,13 @@
     Chart, Cards, GridData, Sankey, MapView, LogViewer,
     Gallery, Carousel,
     Pane, TilingLayout, StackLayout,
+    BlockRenderer, bus,
   } from '@webmcp-auto-ui/ui';
   import {
     INAT_STATS, TOP_SPECIES, TOP_OBSERVERS, MONTHLY_OBS, ICONIC_TAXA, MULTI_SERIES,
     RECENT_OBS, TAXONOMY_TREE, MIGRATION_FLOWS, ALERTS, OBS_TIMELINE, LOG_ENTRIES,
     GRID_DATA, PROFILE_OBSERVER, GALLERY_IMAGES, CAROUSEL_SLIDES,
+    speciesToProfile, observerToProfile, filterSpeciesByGroup,
   } from '$lib/inat-mock.js';
   import type { ManagedWindow } from '@webmcp-auto-ui/ui';
   import { initializeWebMCPPolyfill, listenForAgentCalls, executeToolInternal, jsonResult, registerSkill, unregisterSkill, McpClient } from '@webmcp-auto-ui/core';
@@ -120,6 +122,29 @@
   // Format big numbers
   function fmt(n: number) { return new Intl.NumberFormat('fr-FR').format(n); }
 
+  // ── DAG FONC — reactive specs ────────────────────────────────────
+  let profileSpec = $state(PROFILE_OBSERVER);
+  let jsonViewerData = $state(TAXONOMY_TREE);
+  let speciesTableSpec = $state({
+    title: 'Top espèces observées',
+    striped: true,
+    columns: [
+      { key: 'icon', label: '' },
+      { key: 'common', label: 'Nom commun' },
+      { key: 'name', label: 'Nom scientifique' },
+      { key: 'iconic', label: 'Groupe' },
+      { key: 'count', label: 'Observations', align: 'right' as const, type: 'number' as const },
+    ],
+    rows: TOP_SPECIES.map(s => ({ icon: s.icon, common: s.common, name: s.name, iconic: s.iconic, count: s.count })),
+  });
+
+  const DAG = [
+    { from: 'species-table',   action: 'rowclick',    targets: ['observer-profile', 'species-json'] },
+    { from: 'observers-trombi', action: 'personclick', targets: ['observer-profile'] },
+    { from: 'taxa-hemicycle',  action: 'groupclick',  targets: ['species-table'] },
+    { from: 'species-cards',   action: 'cardclick',   targets: ['observer-profile'] },
+  ];
+
   onMount(() => {
     try {
       initializeWebMCPPolyfill({ allowInsecureContext: true, degradeGracefully: true });
@@ -128,6 +153,28 @@
     // Load demo skills and expose to state
     loadDemoSkills();
     refreshSkills();
+
+    // DAG FONC router
+    const unsubDag = bus.subscribe(['interact'], (msg) => {
+      const { action, payload } = msg.payload as { type: string; action: string; payload: unknown };
+      const row = payload as Record<string, unknown>;
+
+      for (const edge of DAG) {
+        if (msg.from === edge.from && action === edge.action) {
+          for (const target of edge.targets) {
+            if (target === 'observer-profile') {
+              if (action === 'rowclick') profileSpec = speciesToProfile(row);
+              else if (action === 'personclick') profileSpec = observerToProfile(row);
+              else if (action === 'cardclick') profileSpec = speciesToProfile(row);
+            } else if (target === 'species-json') {
+              jsonViewerData = { selected: row } as typeof TAXONOMY_TREE;
+            } else if (target === 'species-table') {
+              speciesTableSpec = filterSpeciesByGroup(row, TOP_SPECIES);
+            }
+          }
+        }
+      }
+    });
 
     const stopListening = listenForAgentCalls((name, args) => executeToolInternal(name, args));
 
@@ -353,6 +400,7 @@
     });
 
     return () => {
+      unsubDag?.();
       stopListening?.();
       toolNames.forEach(n => { try { mc?.unregisterTool(n); } catch {} });
       SKILL_IDS.forEach(id => { try { unregisterSkill(id); } catch {} });
@@ -589,6 +637,12 @@
           <h2 class="text-lg font-bold text-zinc-200">Widgets riches</h2>
           <span class="text-xs font-mono text-zinc-600 border border-border px-2 py-0.5 rounded">13 widgets · Archive</span>
         </div>
+
+        <div class="flex items-center gap-2 mb-4">
+          <span class="text-xs font-mono bg-accent/10 text-accent px-2 py-0.5 rounded">DAG FONC actif</span>
+          <span class="text-xs font-mono text-zinc-500">Cliquez sur un composant pour voir les données circuler</span>
+        </div>
+
         <div class="flex flex-col gap-6">
 
           <!-- Row 1: StatCard x3 -->
@@ -601,21 +655,10 @@
             </div>
           </div>
 
-          <!-- DataTable -->
+          <!-- DataTable (DAG node: species-table) -->
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-3">DataTable — tri par colonne, striped</div>
-            <DataTable spec={{
-              title: 'Top espèces observées',
-              striped: true,
-              columns: [
-                { key: 'icon', label: '' },
-                { key: 'common', label: 'Nom commun' },
-                { key: 'name', label: 'Nom scientifique' },
-                { key: 'iconic', label: 'Groupe' },
-                { key: 'count', label: 'Observations', align: 'right', type: 'number' },
-              ],
-              rows: TOP_SPECIES.map(s => ({ icon: s.icon, common: s.common, name: s.name, iconic: s.iconic, count: s.count })),
-            }} />
+            <div class="text-xs font-mono text-zinc-600 mb-3">DataTable — tri par colonne, striped · <span class="text-accent">DAG: species-table</span></div>
+            <BlockRenderer id="species-table" type="data-table" data={speciesTableSpec} />
           </div>
 
           <!-- Timeline + ProfileCard -->
@@ -625,15 +668,15 @@
               <Timeline spec={{ title: 'Historique iNaturalist', events: OBS_TIMELINE }} />
             </div>
             <div>
-              <div class="text-xs font-mono text-zinc-600 mb-3">ProfileCard — observatrice #1 France</div>
-              <ProfileCard spec={PROFILE_OBSERVER} />
+              <div class="text-xs font-mono text-zinc-600 mb-3">ProfileCard — observatrice #1 France · <span class="text-accent">DAG: observer-profile</span></div>
+              <BlockRenderer id="observer-profile" type="profile" data={profileSpec} />
             </div>
           </div>
 
-          <!-- Trombinoscope -->
+          <!-- Trombinoscope (DAG node: observers-trombi) -->
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-3">Trombinoscope — top observateurs</div>
-            <Trombinoscope spec={{
+            <div class="text-xs font-mono text-zinc-600 mb-3">Trombinoscope — top observateurs · <span class="text-accent">DAG: observers-trombi</span></div>
+            <BlockRenderer id="observers-trombi" type="trombinoscope" data={{
               title: 'Top observateurs France',
               columns: 6,
               people: TOP_OBSERVERS.map(o => ({ name: o.name, subtitle: fmt(o.obs) + ' obs', badge: o.badge, color: o.color })),
@@ -672,22 +715,23 @@
             </div>
           </div>
 
-          <!-- Hemicycle -->
+          <!-- Hemicycle (DAG node: taxa-hemicycle) -->
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-3">Hemicycle — répartition ordres taxonomiques (100 sièges symboliques)</div>
-            <Hemicycle spec={{ title: 'Biodiversité observée en France', groups: ICONIC_TAXA, totalSeats: 100 }} />
+            <div class="text-xs font-mono text-zinc-600 mb-3">Hemicycle — répartition ordres taxonomiques (100 sièges symboliques) · <span class="text-accent">DAG: taxa-hemicycle</span></div>
+            <BlockRenderer id="taxa-hemicycle" type="hemicycle" data={{ title: 'Biodiversité observée en France', groups: ICONIC_TAXA, totalSeats: 100 }} />
           </div>
 
-          <!-- Cards -->
+          <!-- Cards (DAG node: species-cards) -->
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-3">Cards — espèces remarquables</div>
-            <Cards spec={{
+            <div class="text-xs font-mono text-zinc-600 mb-3">Cards — espèces remarquables · <span class="text-accent">DAG: species-cards</span></div>
+            <BlockRenderer id="species-cards" type="cards" data={{
               title: 'Espèces remarquables',
               cards: TOP_SPECIES.slice(0,4).map(s => ({
                 title: s.icon + ' ' + s.common,
                 subtitle: s.name,
                 description: `${fmt(s.count)} observations · ${s.iconic}`,
                 tags: [s.iconic],
+                _raw: s,
               })),
             }} />
           </div>
@@ -695,8 +739,8 @@
           <!-- JsonViewer + GridData -->
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <div class="text-xs font-mono text-zinc-600 mb-3">JsonViewer — réponse API taxon</div>
-              <JsonViewer spec={{ title: '/v1/taxa/14916', data: TAXONOMY_TREE, maxDepth: 2 }} />
+              <div class="text-xs font-mono text-zinc-600 mb-3">JsonViewer — réponse API taxon · <span class="text-accent">DAG: species-json</span></div>
+              <BlockRenderer id="species-json" type="json-viewer" data={{ title: '/v1/taxa/14916', data: jsonViewerData, maxDepth: 2 }} />
             </div>
             <div>
               <div class="text-xs font-mono text-zinc-600 mb-3">GridData — obs par groupe × mois</div>

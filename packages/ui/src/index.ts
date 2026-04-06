@@ -37,6 +37,7 @@ export { default as Cards } from './widgets/rich/Cards.svelte';
 export { default as GridData } from './widgets/rich/GridData.svelte';
 export { default as Sankey } from './widgets/rich/Sankey.svelte';
 export { default as MapView } from './widgets/rich/MapView.svelte';
+export { default as D3Widget } from './widgets/rich/D3Widget.svelte';
 export { default as LogViewer } from './widgets/rich/LogViewer.svelte';
 export { default as Gallery } from './widgets/rich/Gallery.svelte';
 export { default as Carousel } from './widgets/rich/Carousel.svelte';
@@ -49,6 +50,10 @@ export { default as Pane } from './wm/Pane.svelte';
 export { default as TilingLayout } from './wm/TilingLayout.svelte';
 export { default as FloatingLayout } from './wm/FloatingLayout.svelte';
 export { default as StackLayout } from './wm/StackLayout.svelte';
+
+// Base components (shadcn-svelte pattern)
+export { Button, buttonVariants, Input, Badge, badgeVariants, NativeSelect, Tooltip } from './base/index.js';
+export { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from './base/index.js';
 
 // WM types
 export type { ManagedWindow, LayoutWindow, FloatingWindowState } from './lib/wm-layouts.js';

@@ -24,6 +24,7 @@
   import GridData from './rich/GridData.svelte';
   import Sankey from './rich/Sankey.svelte';
   import MapView from './rich/MapView.svelte';
+  import D3Widget from './rich/D3Widget.svelte';
   import LogViewer from './rich/LogViewer.svelte';
   import Gallery from './rich/Gallery.svelte';
   import Carousel from './rich/Carousel.svelte';
@@ -148,6 +149,8 @@
   <Sankey spec={data} />
 {:else if type === 'map'}
   <MapView spec={data} />
+{:else if type === 'd3'}
+  <D3Widget spec={data as import('./rich/D3Widget.svelte').D3Spec} />
 {:else if type === 'log'}
   <LogViewer spec={data} />
 {:else if type === 'gallery'}

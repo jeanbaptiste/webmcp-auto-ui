@@ -154,6 +154,51 @@ export const GALLERY_IMAGES = [
   { src: 'https://picsum.photos/seed/amanita/400/300', alt: 'Amanita muscaria',  caption: 'Amanite tue-mouches · Vosges 2026'     },
 ];
 
+export function speciesToProfile(row: Record<string, unknown>) {
+  return {
+    name: String(row.common ?? row.name ?? ''),
+    subtitle: String(row.name ?? ''),
+    badge: { text: String(row.iconic ?? 'Animalia'), variant: 'default' as const },
+    fields: [
+      { label: 'Taxon', value: String(row.name ?? '') },
+      { label: 'Iconic', value: String(row.iconic ?? '') },
+      { label: 'Observations', value: String(row.count ?? 0) },
+    ],
+    stats: [
+      { label: 'Observations', value: String(row.count ?? 0) },
+    ],
+  };
+}
+
+export function observerToProfile(person: Record<string, unknown>) {
+  return {
+    name: String(person.name ?? ''),
+    subtitle: String(person.subtitle ?? ''),
+    fields: [
+      { label: 'Observations', value: String(person.obs ?? person.count ?? '') },
+    ],
+    stats: [
+      { label: 'Obs', value: String(person.obs ?? '') },
+      { label: 'Espèces', value: String(person.species ?? '') },
+    ],
+  };
+}
+
+export function filterSpeciesByGroup(group: Record<string, unknown>, allSpecies: typeof TOP_SPECIES) {
+  const groupLabel = String(group.label ?? '');
+  return {
+    title: `Espèces — ${groupLabel}`,
+    striped: true,
+    rows: allSpecies.filter(s => s.iconic === groupLabel),
+    columns: [
+      { key: 'icon', label: '' },
+      { key: 'common', label: 'Nom' },
+      { key: 'name', label: 'Espèce' },
+      { key: 'count', label: 'Obs', align: 'right' as const, type: 'number' as const },
+    ],
+  };
+}
+
 export const CAROUSEL_SLIDES = [
   {
     src: 'https://picsum.photos/seed/inat1/800/400',

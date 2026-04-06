@@ -219,6 +219,17 @@ export const UI_TOOLS: AnthropicTool[] = [
       interval: { type: 'number' },
     }, required: ['slides'] },
   },
+  // ── D3 visualization ───────────────────────────────────────────────────
+  {
+    name: 'render_d3',
+    description: 'Render a D3.js visualization (hex-heatmap, radial, treemap, force graph).',
+    input_schema: { type: 'object', properties: {
+      title: { type: 'string' },
+      preset: { type: 'string', enum: ['hex-heatmap', 'radial', 'treemap', 'force'] },
+      data: { type: 'object' },
+      config: { type: 'object' },
+    }, required: ['preset', 'data'] },
+  },
   // ── Canvas actions ──────────────────────────────────────────────────────
   {
     name: 'clear_canvas',
@@ -250,6 +261,7 @@ const TOOL_TO_BLOCK: Record<string, string> = {
   render_log: 'log',
   render_gallery: 'gallery',
   render_carousel: 'carousel',
+  render_d3: 'd3',
 };
 
 export function isUITool(name: string): boolean {
