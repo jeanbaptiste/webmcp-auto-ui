@@ -413,7 +413,7 @@
 
   <!-- TOPBAR -->
   <div class="flex items-center gap-2.5 px-4 h-12 border-b border-border flex-shrink-0 bg-surface">
-    <span class="text-sm font-medium text-text1 flex-1 tracking-tight">Hyper<span class="text-accent">Skills</span></span>
+    <span class="text-sm font-medium text-text1 flex-1 tracking-tight">Auto<span class="text-accent">-UI</span></span>
     <div class="flex items-center gap-1.5">
       <div class="w-1.5 h-1.5 rounded-full {canvas.mcpConnecting ? 'bg-amber animate-pulse' : canvas.mcpConnected ? 'bg-teal' : 'bg-zinc-700'}"></div>
       <span class="text-[10px] text-text2 font-mono">{canvas.mcpConnecting ? 'connexion…' : canvas.mcpConnected ? canvas.mcpName : 'non connecté'}</span>
@@ -524,12 +524,9 @@
             placeholder="https://mcp.example.com/mcp"
             bind:value={canvas.mcpUrl}
             onkeydown={(e) => e.key === 'Enter' && connectMcp()} />
-          <input class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none focus:border-accent"
-            placeholder="Bearer token (optionnel)"
-            bind:value={mcpToken} />
           <button class="w-full py-2 rounded-lg bg-accent text-white text-xs font-mono hover:opacity-85 disabled:opacity-40"
-            onclick={connectMcp} disabled={canvas.mcpConnecting || !canvas.mcpUrl.trim()}>
-            {canvas.mcpConnecting ? 'Connexion…' : 'Connecter'}
+            onclick={() => { connectMcp(); }} disabled={canvas.mcpConnecting || !canvas.mcpUrl.trim()}>
+            {canvas.mcpConnecting ? 'Connexion…' : canvas.mcpConnected ? `✓ ${canvas.mcpName}` : 'Connecter'}
           </button>
         </div>
 
@@ -537,23 +534,12 @@
         <div class="flex flex-col gap-2">
           <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Modèle LLM</div>
           <select class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none cursor-pointer"
-            value={canvas.llm} onchange={(e) => canvas.setLlm((e.target as HTMLSelectElement).value as 'haiku'|'sonnet'|'gemma-e2b')}>
+            value={canvas.llm} onchange={(e) => canvas.setLlm((e.target as HTMLSelectElement).value as 'haiku'|'sonnet'|'gemma-e2b'|'gemma-e4b')}>
             <option value="haiku">claude-haiku-4-5</option>
             <option value="sonnet">claude-sonnet-4-6</option>
-            <option value="gemma-e2b">gemma-e2b (local)</option>
+            <option value="gemma-e2b">Gemma E2B (WASM)</option>
+            <option value="gemma-e4b">Gemma E4B (WASM)</option>
           </select>
-        </div>
-
-        <!-- API Key (only if no .env) -->
-        <div class="flex flex-col gap-2">
-          <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Clé API Anthropic</div>
-          <input
-            class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none focus:border-accent"
-            type="password"
-            placeholder="sk-ant-… (si pas de .env)"
-            bind:value={apiKeyInput}
-          />
-          <div class="text-[9px] font-mono text-text2">Stockée en session, jamais envoyée à un tiers</div>
         </div>
 
         <!-- Recettes -->

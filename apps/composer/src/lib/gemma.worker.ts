@@ -5,7 +5,7 @@ self.onmessage = async (e: MessageEvent) => {
   const { type, id, prompt, model } = e.data;
   if (type === 'init') {
     try {
-      const modelId = model ?? 'onnx-community/gemma-4-E2B-it-ONNX-GQA';
+      const modelId = model ?? 'onnx-community/gemma-3-1b-it-ONNX';
       const device = (navigator as any).gpu ? 'webgpu' : 'wasm';
       generator = await pipeline('text-generation', modelId, {
         dtype: 'q4', device,

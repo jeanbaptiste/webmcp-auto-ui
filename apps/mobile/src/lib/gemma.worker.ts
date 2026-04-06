@@ -18,7 +18,7 @@ import { pipeline, TextStreamer, env } from '@huggingface/transformers';
 // Use ONNX model from HuggingFace hub
 env.allowLocalModels = false;
 
-const DEFAULT_MODEL = 'onnx-community/gemma-4-E2B-it-ONNX-GQA';
+const DEFAULT_MODEL = 'onnx-community/gemma-3-1b-it-ONNX';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let generator: any = null;
