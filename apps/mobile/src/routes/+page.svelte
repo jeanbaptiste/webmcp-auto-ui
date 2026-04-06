@@ -2,7 +2,7 @@
   declare const __BUILD_TIME__: string;
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
-  import { BlockRenderer } from '@webmcp-auto-ui/ui';
+  import { BlockRenderer, AgentProgress } from '@webmcp-auto-ui/ui';
   import {
     loadDemoSkills, listSkills, createSkill, updateSkill, deleteSkill,
     decodeHyperSkill, encodeHyperSkill, type Skill,
@@ -48,6 +48,8 @@
   // Chat generation timer
   let chatTimer = $state(0);
   let chatTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
+  let chatToolCount = $state(0);
+  let chatLastTool = $state('');
 
   // Console
   let consoleOpen = $state(false);
@@ -330,7 +332,7 @@
     addBubble('user', msg);
     const thinking = addBubble('assistant', '<span style="display:inline-flex;gap:3px;align-items:center"><span style="width:4px;height:4px;border-radius:50%;background:#7c6dfa;animation:blink 1.2s ease infinite;display:inline-block"></span><span style="width:4px;height:4px;border-radius:50%;background:#7c6dfa;animation:blink 1.2s ease infinite .2s;display:inline-block"></span><span style="width:4px;height:4px;border-radius:50%;background:#7c6dfa;animation:blink 1.2s ease infinite .4s;display:inline-block"></span></span>');
     canvas.setGenerating(true);
-    chatTimer = 0;
+    chatTimer = 0; chatToolCount = 0; chatLastTool = '';
     chatTimerInterval = setInterval(() => { chatTimer++; }, 1000);
     log('→ ' + canvas.llm + ' | ' + msg.slice(0, 50));
 
@@ -345,6 +347,7 @@
           onClear: clearFeedBlocks,
           onText: (text) => { if (text) updateBubble(thinking.id, text); },
           onToolCall: (call) => {
+            chatToolCount++; chatLastTool = call.name;
             updateBubble(thinking.id, `🔧 <strong>${call.name}</strong>…`);
             const argsStr = JSON.stringify(call.args).slice(0, 200);
             const resultStr = (call.result ?? '').slice(0, 200);
@@ -546,6 +549,9 @@
       {/if}
     {/each}
   </div>
+
+  <!-- AGENT PROGRESS -->
+  <AgentProgress active={canvas.generating} elapsed={chatTimer} toolCalls={chatToolCount} lastTool={chatLastTool} />
 
   <!-- CONSOLE -->
   {#if consoleLogs.length > 0}

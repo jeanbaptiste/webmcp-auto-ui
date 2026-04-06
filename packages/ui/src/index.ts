@@ -66,3 +66,4 @@ export type { BusMessage } from './messaging/bus.svelte.js';
 export { default as LLMSelector } from './agent/LLMSelector.svelte';
 export { default as GemmaLoader } from './agent/GemmaLoader.svelte';
 export { default as McpStatus } from './agent/McpStatus.svelte';
+export { default as AgentProgress } from './agent/AgentProgress.svelte';

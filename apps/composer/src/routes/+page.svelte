@@ -114,6 +114,7 @@
   let mcpConnectElapsed = $state(0);
   let mcpConnectTimer = $state<ReturnType<typeof setInterval> | null>(null);
   let mcpToolCallCount = $state(0);
+  let lastToolName = $state('');
 
   // 4G: Recettes CRUD
   let editingSkillId = $state<string | null>(null);
@@ -277,7 +278,7 @@
           onBlock: (type, data) => canvas.addBlock(type as Parameters<typeof canvas.addBlock>[0], data),
           onClear: () => canvas.clearBlocks(),
           onText: (text) => { if (text) canvas.addMsg('assistant', text); },
-          onToolCall: (call) => { mcpToolCallCount++; canvas.addMsg('system', `🔧 ${call.name}(${JSON.stringify(call.args).slice(0,100)}) → ${(call.result??'').slice(0,100)} [${call.elapsed??0}ms]`); },
+          onToolCall: (call) => { mcpToolCallCount++; lastToolName = call.name; canvas.addMsg('system', `🔧 ${call.name}(${JSON.stringify(call.args).slice(0,100)}) → ${(call.result??'').slice(0,100)} [${call.elapsed??0}ms]`); },
         },
       });
     } catch (e) {
@@ -515,12 +516,18 @@
     {/if}
     {#if canvas.generating}
       <div class="flex items-center gap-2 ml-3">
-        <div class="flex gap-1">
+        <div class="flex gap-0.5">
           {#each [0,1,2] as i}
-            <div class="w-1 h-1 rounded-full bg-accent animate-pulse" style="animation-delay: {i*0.2}s"></div>
+            <div class="w-1 h-1 rounded-full bg-accent animate-pulse" style="animation-delay: {i*0.15}s"></div>
           {/each}
         </div>
         <span class="text-[10px] font-mono text-accent">{autoGenTimer}s</span>
+        {#if mcpToolCallCount > 0}
+          <span class="text-[10px] font-mono text-text2">{mcpToolCallCount} tool{mcpToolCallCount > 1 ? 's' : ''}</span>
+        {/if}
+        {#if lastToolName}
+          <span class="text-[10px] font-mono text-text2 truncate max-w-24">🔧 {lastToolName}</span>
+        {/if}
       </div>
     {/if}
   </nav>
