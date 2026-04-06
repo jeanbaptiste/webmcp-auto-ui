@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
+      id-token: write  # required for OIDC trusted publishing
 
     steps:
       - uses: actions/checkout@v4
@@ -34,16 +34,12 @@ jobs:
           npm run build --workspace=packages/sdk &
           wait
 
-      # Publish in same order
+      # Publish with provenance (OIDC trusted publishing — no token needed)
       - name: Publish core
-        run: npm publish --workspace=packages/core --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --workspace=packages/core --access public --provenance
 
       - name: Publish ui, agent, sdk
         run: |
-          npm publish --workspace=packages/ui --access public
-          npm publish --workspace=packages/agent --access public
-          npm publish --workspace=packages/sdk --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          npm publish --workspace=packages/ui --access public --provenance
+          npm publish --workspace=packages/agent --access public --provenance
+          npm publish --workspace=packages/sdk --access public --provenance
