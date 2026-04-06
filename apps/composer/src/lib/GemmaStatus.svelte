@@ -17,7 +17,7 @@
   </span>
 {:else if status === 'ready'}
   <span class="font-mono text-[10px] text-teal flex-shrink-0 flex items-center gap-1">
-    ✓ Gemma ready
+    Gemma E2B ✓
     <button class="text-zinc-500 hover:text-red-400 ml-1" onclick={onunload}><X size={10} /></button>
   </span>
 {/if}

@@ -127,13 +127,23 @@
   }
 
   // 4H: Settings
-  let systemPrompt = $state('');
+  let systemPrompt = $state('You are a UI composer agent. When asked to create an interface, use the render_* tools to generate UI blocks. Use render_stat for KPIs, render_chart for data visualization, render_table for tabular data, render_kv for key-value pairs. Call only ONE tool at a time. Keep responses concise.');
   let cacheEnabled = $state(true);
   let maxTokens = $state(4096);
   let showSettings = $state(false);
+  let showMcpTools = $state(false);
 
   // Reactive skills list
   $effect(() => { skills = listSkills(); });
+
+  // Auto-initialize Gemma when selected in dropdown
+  $effect(() => {
+    if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
+      const model = canvas.llm === 'gemma-e4b' ? 'onnx-community/gemma-3-1b-it-ONNX' : undefined;
+      const p = getOrCreateGemmaProvider(model);
+      if (gemmaStatus === 'idle') p.initialize();
+    }
+  });
 
   // ── Block defaults ─────────────────────────────────────────────────────────
   const DEFAULTS: Record<string, Record<string, unknown>> = {
@@ -228,6 +238,7 @@
       await runAgentLoop('Génère une interface pour les données disponibles sur ce MCP.', {
         client: c,
         provider: activeProvider(),
+        systemPrompt: systemPrompt || undefined,
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
           onBlock: (type, data) => canvas.addBlock(type as Parameters<typeof canvas.addBlock>[0], data),
@@ -252,6 +263,7 @@
       await runAgentLoop(msg, {
         client: mcpClient ?? undefined,
         provider: activeProvider(),
+        systemPrompt: systemPrompt || undefined,
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
           onBlock: (type, data) => canvas.addBlock(type as Parameters<typeof canvas.addBlock>[0], data),
@@ -367,13 +379,13 @@
     </div>
     <a href="https://hyperskills.net" target="_blank" class="font-mono text-[10px] text-accent hover:underline flex-shrink-0 hidden md:inline">hyperskills.net</a>
     <div class="w-px h-5 bg-border2 hidden md:block"></div>
-    <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-72 text-zinc-300 outline-none focus:border-accent transition-colors placeholder-zinc-700 hidden md:block"
+    <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-72 text-zinc-300 outline-none focus:border-accent transition-colors placeholder:text-text2 hidden md:block"
       placeholder="https://mcp.example.com"
       bind:value={canvas.mcpUrl}
       onkeydown={(e) => e.key === 'Enter' && connectMcp()}
       onchange={onMcpUrlChange} />
     <button class="font-mono text-xs h-7 px-3 rounded border transition-all flex-shrink-0 hidden md:flex items-center
-        {canvas.mcpConnecting ? 'border-border text-zinc-600 cursor-wait' : 'border-border2 text-zinc-400 hover:border-teal hover:text-teal'}"
+        {canvas.mcpConnecting ? 'border-border text-text2 cursor-wait' : 'border-border2 text-zinc-400 hover:border-teal hover:text-teal'}"
       onclick={connectMcp} disabled={canvas.mcpConnecting}>
       {canvas.mcpConnecting ? 'connexion…' : 'connect'}
     </button>
@@ -382,8 +394,8 @@
       value={canvas.llm} onchange={(e) => canvas.setLlm((e.target as HTMLSelectElement).value as 'haiku'|'sonnet'|'gemma-e2b'|'gemma-e4b')}>
       <option value="haiku">claude-haiku-4-5</option>
       <option value="sonnet">claude-sonnet-4-6</option>
-      <option value="gemma-e2b">Gemma 2B (E2B)</option>
-      <option value="gemma-e4b">Gemma 4B (E4B)</option>
+      <option value="gemma-e2b">Gemma E2B (WASM)</option>
+      <option value="gemma-e4b">Gemma E4B (WASM)</option>
     </select>
     <!-- 4D: Gemma loader indicator -->
     <GemmaStatus status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaLoadElapsed} onunload={destroyGemma} />
@@ -397,12 +409,16 @@
     {/if}
     <!-- 4E: Stats (WASM provider active) -->
     {#if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') && cpuCores > 0}
-      <span class="font-mono text-[10px] text-zinc-600 flex-shrink-0 hidden md:inline">
+      <span class="font-mono text-[10px] text-text2 flex-shrink-0 hidden md:inline">
         {cpuCores} cores{ramUsedMB ? ` · ${ramUsedMB}MB` : ''}{gpuAvailable ? ` · GPU: ${gpuAvailable}` : ''}
       </span>
     {/if}
     <div class="flex-1"></div>
-    <span class="font-mono text-[10px] {canvas.statusColor} flex-shrink-0 hidden md:inline">{canvas.statusText}</span>
+    <button class="font-mono text-[10px] {canvas.statusColor} flex-shrink-0 hidden md:inline hover:underline cursor-pointer"
+      onclick={() => { if (canvas.mcpConnected) showMcpTools = true; }}
+      disabled={!canvas.mcpConnected}>
+      {canvas.statusText}
+    </button>
     <div class="w-px h-5 bg-border2 hidden md:block"></div>
     <!-- 4H: Settings button -->
     <button class="font-mono text-xs h-7 px-2 rounded border border-border2 text-zinc-400 hover:border-zinc-500 hover:text-white transition-all flex items-center"
@@ -433,8 +449,8 @@
     {/each}
     <div class="flex-1"></div>
     {#if canvas.blockCount > 0}
-      <span class="font-mono text-[10px] text-zinc-600">{canvas.blockCount} bloc{canvas.blockCount > 1 ? 's' : ''}</span>
-      <button class="font-mono text-[10px] text-zinc-600 hover:text-red-400 ml-2 transition-colors" onclick={() => canvas.clearBlocks()}>effacer</button>
+      <span class="font-mono text-[10px] text-text2">{canvas.blockCount} bloc{canvas.blockCount > 1 ? 's' : ''}</span>
+      <button class="font-mono text-[10px] text-text2 hover:text-red-400 ml-2 transition-colors" onclick={() => canvas.clearBlocks()}>effacer</button>
     {/if}
     {#if canvas.generating}
       <div class="flex gap-1 ml-3">
@@ -450,7 +466,7 @@
 
     <!-- LEFT PALETTE (4C: toggle + 4B: responsive) -->
     {#if !paletteOpen}
-      <button class="hidden md:flex items-center justify-center w-5 border-r border-border bg-surface flex-shrink-0 text-zinc-600 hover:text-zinc-300 transition-colors"
+      <button class="hidden md:flex items-center justify-center w-5 border-r border-border bg-surface flex-shrink-0 text-text2 hover:text-zinc-300 transition-colors"
         onclick={() => { paletteOpen = true; }}>
         <ChevronRight size={14} />
       </button>
@@ -458,8 +474,8 @@
     <aside class="hidden md:flex {paletteOpen ? 'w-52' : 'w-0'} border-r border-border bg-surface flex-col flex-shrink-0 overflow-hidden transition-all duration-200">
       {#if paletteOpen}
         <div class="flex items-center justify-between px-3 pt-3 pb-1">
-          <div class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Blocs</div>
-          <button class="text-zinc-600 hover:text-zinc-300" onclick={() => { paletteOpen = false; }}><ChevronLeft size={12} /></button>
+          <div class="text-[10px] font-mono text-text2 uppercase tracking-widest">Blocs</div>
+          <button class="text-text2 hover:text-zinc-300" onclick={() => { paletteOpen = false; }}><ChevronLeft size={12} /></button>
         </div>
         <div class="px-3 pb-1">
           <div class="flex flex-col gap-0.5 overflow-y-auto max-h-64">
@@ -492,7 +508,7 @@
       <div class="fixed inset-0 bg-black/60 z-40 md:hidden" onclick={() => { mobileMenuOpen = false; }}></div>
       <aside class="fixed left-0 top-12 bottom-0 w-64 bg-surface border-r border-border z-50 md:hidden flex flex-col overflow-y-auto">
         <div class="px-3 pt-3 pb-1">
-          <div class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest mb-2">Blocs</div>
+          <div class="text-[10px] font-mono text-text2 uppercase tracking-widest mb-2">Blocs</div>
           <div class="flex flex-col gap-0.5">
             {#each PALETTE as b}
               <button class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/5 text-left"
@@ -506,14 +522,14 @@
         <div class="h-px bg-border mx-3 my-2"></div>
         <!-- Mobile MCP inputs -->
         <div class="px-3 pb-2 flex flex-col gap-2">
-          <div class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">MCP</div>
-          <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-full text-zinc-300 outline-none focus:border-accent placeholder-zinc-700"
+          <div class="text-[10px] font-mono text-text2 uppercase tracking-widest">MCP</div>
+          <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-full text-zinc-300 outline-none focus:border-accent placeholder:text-text2"
             placeholder="https://mcp.example.com"
             bind:value={canvas.mcpUrl}
             onkeydown={(e) => e.key === 'Enter' && connectMcp()}
             onchange={onMcpUrlChange} />
           <button class="font-mono text-xs h-7 px-3 rounded border flex-shrink-0
-              {canvas.mcpConnecting ? 'border-border text-zinc-600' : 'border-border2 text-zinc-400 hover:border-teal hover:text-teal'}"
+              {canvas.mcpConnecting ? 'border-border text-text2' : 'border-border2 text-zinc-400 hover:border-teal hover:text-teal'}"
             onclick={connectMcp} disabled={canvas.mcpConnecting}>
             {canvas.mcpConnecting ? 'connexion…' : 'connect'}
           </button>
@@ -521,8 +537,8 @@
         <div class="h-px bg-border mx-3 my-2"></div>
         <div class="px-3 pb-3 flex-1 overflow-y-auto">
           <div class="flex items-center justify-between mb-2">
-            <div class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Recettes</div>
-            <button class="text-zinc-600 hover:text-teal" onclick={createEmptySkill}><Plus size={12} /></button>
+            <div class="text-[10px] font-mono text-text2 uppercase tracking-widest">Recettes</div>
+            <button class="text-text2 hover:text-teal" onclick={createEmptySkill}><Plus size={12} /></button>
           </div>
           <div class="flex flex-col gap-0.5">
             {#each skills as skill}
@@ -542,8 +558,8 @@
       {#if canvas.isEmpty}
         <div class="flex-1 flex flex-col items-center justify-center text-center pointer-events-none select-none">
           <div class="text-5xl opacity-10 mb-4">⬡</div>
-          <p class="font-mono text-sm text-zinc-600">connectez un MCP · glissez des blocs · ou chatez</p>
-          <p class="font-mono text-xs text-zinc-700 mt-2">double-cliquez sur un bloc pour l'ajouter directement</p>
+          <p class="font-mono text-sm text-text2">connectez un MCP · glissez des blocs · ou chatez</p>
+          <p class="font-mono text-xs text-text2 mt-2">double-cliquez sur un bloc pour l'ajouter directement</p>
         </div>
       {:else}
         {#each canvas.blocks as block (block.id)}
@@ -560,10 +576,10 @@
     <!-- RIGHT CHAT (mode chat — desktop sidebar) -->
     {#if canvas.mode === 'chat'}
       <aside class="hidden md:flex w-72 border-l border-border bg-surface flex-col flex-shrink-0">
-        <div class="px-4 py-2 border-b border-border text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Chat UI ↗</div>
+        <div class="px-4 py-2 border-b border-border text-[10px] font-mono text-text2 uppercase tracking-widest">Chat UI ↗</div>
         <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
           {#each canvas.messages as msg}
-            <div class="text-xs leading-relaxed {msg.role === 'user' ? 'bg-surface2 border border-border2 rounded px-3 py-2 font-mono text-zinc-300' : msg.role === 'system' ? 'text-zinc-600 font-mono text-[10px] text-center' : 'text-zinc-400 px-1'}">
+            <div class="text-xs leading-relaxed {msg.role === 'user' ? 'bg-surface2 border border-border2 rounded px-3 py-2 font-mono text-zinc-300' : msg.role === 'system' ? 'text-text2 font-mono text-[10px] text-center' : 'text-zinc-400 px-1'}">
               {#if msg.thinking}
                 <span class="inline-flex gap-1">
                   {#each [0,1,2] as i}<span class="w-1 h-1 rounded-full bg-accent animate-pulse inline-block" style="animation-delay:{i*0.2}s"></span>{/each}
@@ -591,12 +607,12 @@
       <div class="fixed inset-0 bg-black/60 z-40 md:hidden" onclick={() => { mobileChatOpen = false; }}></div>
       <aside class="fixed right-0 top-12 bottom-0 w-80 max-w-[90vw] bg-surface border-l border-border z-50 md:hidden flex flex-col">
         <div class="flex items-center justify-between px-4 py-2 border-b border-border">
-          <span class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Chat UI</span>
+          <span class="text-[10px] font-mono text-text2 uppercase tracking-widest">Chat UI</span>
           <button class="text-zinc-500 hover:text-white" onclick={() => { mobileChatOpen = false; }}><X size={14} /></button>
         </div>
         <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
           {#each canvas.messages as msg}
-            <div class="text-xs leading-relaxed {msg.role === 'user' ? 'bg-surface2 border border-border2 rounded px-3 py-2 font-mono text-zinc-300' : msg.role === 'system' ? 'text-zinc-600 font-mono text-[10px] text-center' : 'text-zinc-400 px-1'}">
+            <div class="text-xs leading-relaxed {msg.role === 'user' ? 'bg-surface2 border border-border2 rounded px-3 py-2 font-mono text-zinc-300' : msg.role === 'system' ? 'text-text2 font-mono text-[10px] text-center' : 'text-zinc-400 px-1'}">
               {#if msg.thinking}
                 <span class="inline-flex gap-1">
                   {#each [0,1,2] as i}<span class="w-1 h-1 rounded-full bg-accent animate-pulse inline-block" style="animation-delay:{i*0.2}s"></span>{/each}
@@ -684,6 +700,31 @@
   onmaxtokens={(v) => maxTokens = v}
   oncache={(v) => cacheEnabled = v}
 />
+
+<!-- MCP TOOLS MODAL -->
+{#if showMcpTools}
+  <div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+    <div class="bg-surface border border-border2 rounded-xl w-[600px] max-h-[85vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+        <span class="text-sm font-mono text-text1">MCP Tools — {canvas.mcpName}</span>
+        <button onclick={() => showMcpTools = false} class="text-text2 hover:text-text1"><X size={16} /></button>
+      </div>
+      <div class="flex-1 overflow-auto p-5">
+        <div class="flex flex-col gap-2">
+          {#each canvas.mcpTools as tool}
+            <div class="bg-surface2 border border-border rounded-lg px-4 py-3">
+              <div class="font-mono text-xs text-accent font-semibold">{tool.name}</div>
+              <div class="text-xs text-text2 mt-1">{tool.description}</div>
+            </div>
+          {/each}
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 px-5 py-4 border-t border-border">
+        <button class="font-mono text-xs px-4 py-2 rounded border border-border2 text-text2 hover:text-text1" onclick={() => showMcpTools = false}>fermer</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <!-- SKILL EDIT MODAL (4G) -->
 {#if editingSkillId}
