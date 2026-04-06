@@ -145,7 +145,7 @@
 
 <div class="min-h-screen bg-bg font-sans flex flex-col">
   <header class="border-b border-border bg-surface px-6 py-3 flex items-center gap-3 flex-shrink-0">
-    <div class="font-mono text-sm font-bold"><span class="text-white">Hyper</span><span class="text-amber">Skills</span><span class="text-zinc-700 text-xs ml-1">viewer</span></div>
+    <div class="font-mono text-sm font-bold"><span class="text-white">Hyper</span><span class="text-amber">Skills</span><span class="text-text2 text-xs ml-1">viewer</span></div>
     <div class="w-px h-5 bg-border2"></div>
     <Input class="flex-1 font-mono text-xs max-w-lg h-7"
       placeholder="https://example.com/viewer?hs=… ou coller une URL HyperSkills"
@@ -155,7 +155,7 @@
       {loading ? '…' : 'charger'}
     </Button>
     <div class="flex-1"></div>
-    <span class="font-mono text-xs text-zinc-600 hidden xl:block">Une HyperSkill est un widget UI portable encodé dans une URL</span>
+    <span class="font-mono text-xs text-text2 hidden xl:block">Une HyperSkill est un widget UI portable encodé dans une URL</span>
     <a href="https://hyperskills.net" target="_blank" class="font-mono text-xs text-accent hover:underline hidden xl:inline">hyperskills.net</a>
     <div class="w-px h-5 bg-border2 hidden xl:block"></div>
     {#if skill}
@@ -175,7 +175,7 @@
   </header>
 
   {#if statusMsg}
-    <div class="px-6 py-2 bg-surface border-b border-border text-xs font-mono text-zinc-500 flex items-center gap-2">
+    <div class="px-6 py-2 bg-surface border-b border-border text-xs font-mono text-text2 flex items-center gap-2">
       <span>{statusMsg}</span>
       {#if versions.length > 1}
         <Button variant="ghost" size="sm" class="text-[#7c6dfa] flex items-center gap-1 px-1 h-auto" onclick={()=>showDiff=!showDiff}>
@@ -196,8 +196,8 @@
     {#if !skill && !loading && !error}
       <div class="flex-1 flex flex-col items-center justify-center text-center gap-6 p-8">
         <div class="text-5xl opacity-10">⬡</div>
-        <div class="font-mono text-sm text-zinc-600">Collez une HyperSkills URL dans la barre ci-dessus</div>
-        <div class="font-mono text-xs text-zinc-700">Format : https://example.com/viewer?hs=base64(skill)</div>
+        <div class="font-mono text-sm text-text2">Collez une HyperSkills URL dans la barre ci-dessus</div>
+        <div class="font-mono text-xs text-text2">Format : https://example.com/viewer?hs=base64(skill)</div>
       </div>
     {:else if error}
       <div class="flex-1 flex items-center justify-center">
@@ -205,7 +205,7 @@
       </div>
     {:else if loading}
       <div class="flex-1 flex items-center justify-center">
-        <div class="font-mono text-sm text-zinc-500 animate-pulse">Chargement…</div>
+        <div class="font-mono text-sm text-text2 animate-pulse">Chargement…</div>
       </div>
     {:else}
       <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
@@ -240,8 +240,8 @@
 
         {#if blocks.length === 0 && skill}
           <div class="flex flex-col items-center justify-center py-16 gap-4 text-center">
-            <div class="text-3xl opacity-10">⬡</div>
-            <div class="font-mono text-sm text-zinc-600">Aucun bloc dans cette HyperSkills</div>
+            <div class="text-5xl opacity-20">⬡</div>
+            <div class="font-mono text-sm text-text2">Skill chargée mais vide — aucun bloc à afficher</div>
             <Button variant="outline" size="sm" class="flex items-center gap-1.5 border-amber text-amber hover:bg-amber/10"
               onclick={autoGenerate} disabled={autoGenerating}>
               <RefreshCw size={12} /> Auto-générer depuis le MCP
@@ -253,13 +253,13 @@
       <!-- Versions sidebar -->
       {#if versions.length > 1}
         <aside class="w-64 border-l border-border bg-surface flex flex-col flex-shrink-0">
-          <div class="px-4 py-2 border-b border-border text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Versions ({versions.length})</div>
+          <div class="px-4 py-2 border-b border-border text-[10px] font-mono text-text2 uppercase tracking-widest">Versions ({versions.length})</div>
           <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
             {#each [...versions].reverse() as v, i}
               <div class="text-xs p-2 rounded border {i===0?'border-amber/30 bg-amber/5':'border-border bg-surface2'}">
                 <div class="font-mono text-zinc-400">{new Date(v.timestamp).toLocaleTimeString()}</div>
-                <div class="font-mono text-[10px] text-zinc-600 truncate">{v.hash.slice(0,16)}…</div>
-                {#if v.previousHash}<div class="font-mono text-[10px] text-zinc-700">← {v.previousHash.slice(0,12)}…</div>{/if}
+                <div class="font-mono text-[10px] text-text2 truncate">{v.hash.slice(0,16)}…</div>
+                {#if v.previousHash}<div class="font-mono text-[10px] text-text2">← {v.previousHash.slice(0,12)}…</div>{/if}
               </div>
             {/each}
           </div>
@@ -274,7 +274,7 @@
   <div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
     <div class="bg-surface border border-border2 rounded-xl w-[500px] flex flex-col shadow-2xl">
       <div class="flex items-center justify-between px-5 py-4 border-b border-border">
-        <span class="text-sm font-mono text-zinc-300">Éditer bloc</span>
+        <span class="text-sm font-mono text-text1">Éditer bloc</span>
         <Button variant="ghost" size="icon" class="h-7 w-7" onclick={()=>editingId=null}><X size={16}/></Button>
       </div>
       <div class="p-5">
