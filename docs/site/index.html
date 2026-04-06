@@ -1089,7 +1089,9 @@ const skill = createSkill({
   description: 'Revenue and user metrics',
   mcp: 'https://mcp.example.com/mcp',
   blocks: [
-    { type: 'stat', data: { label: 'Revenue', value: '$142K' } },
+    { type: 'stat', data: { label: 'Revenue', value: '
+  <script>
+42K' } },
     { type: 'stat', data: { label: 'Users', value: '8,204' } },
   ],
 });
@@ -2892,7 +2894,9 @@ A composed UI is a collection of **blocks** arranged in sequence. Each block has
 
 | Type | Description | Minimal data |
 |------|-------------|-------------|
-| `stat` | Single metric with optional trend | `{"label":"Revenue","value":"$142K","trend":"+12%","trendDir":"up"}` |
+| `stat` | Single metric with optional trend | `{"label":"Revenue","value":"
+  <script>
+42K","trend":"+12%","trendDir":"up"}` |
 | `kv` | Key-value pair list | `{"title":"Info","rows":[["Status","Active"],["Uptime","99.9%"]]}` |
 | `list` | Bulleted text list | `{"title":"Tasks","items":["Deploy API","Run tests"]}` |
 | `chart` | Simple bar chart | `{"title":"Sales","bars":[["Q1",80],["Q2",120],["Q3",95]]}` |
@@ -2938,7 +2942,9 @@ A skill is a JSON object combining blocks with metadata:
     "color-accent": "#2563eb"
   },
   "blocks": [
-    { "type": "stat", "data": { "label": "Revenue", "value": "$142K", "trend": "+12%", "trendDir": "up" } },
+    { "type": "stat", "data": { "label": "Revenue", "value": "
+  <script>
+42K", "trend": "+12%", "trendDir": "up" } },
     { "type": "stat", "data": { "label": "Users", "value": "8,204", "trend": "+3.2%", "trendDir": "up" } },
     { "type": "chart", "data": { "title": "Monthly Revenue", "bars": [["Jan",80],["Feb",95],["Mar",120]] } }
   ]
@@ -2984,7 +2990,9 @@ When a designer says "I want a KPI dashboard":
 ```json
 {
   "blocks": [
-    { "type": "stat", "data": { "label": "Revenue", "value": "$142K", "trend": "+12.4%", "trendDir": "up" } },
+    { "type": "stat", "data": { "label": "Revenue", "value": "
+  <script>
+42K", "trend": "+12.4%", "trendDir": "up" } },
     { "type": "stat", "data": { "label": "Users", "value": "8,204", "trend": "+3.2%", "trendDir": "up" } },
     { "type": "stat", "data": { "label": "Churn", "value": "2.1%", "trend": "-0.4%", "trendDir": "down" } },
     { "type": "chart-rich", "data": { "title": "Revenue Trend", "type": "area", "labels": ["Jan","Feb","Mar","Apr"], "data": [{ "label": "2024", "values": [98,112,128,142] }] } }
@@ -3067,7 +3075,9 @@ interface StatBlockData {
 ```
 
 ```json
-{ "type": "stat", "data": { "label": "Revenue", "value": "$142K", "trend": "+12.4%", "trendDir": "up" } }
+{ "type": "stat", "data": { "label": "Revenue", "value": "
+  <script>
+42K", "trend": "+12.4%", "trendDir": "up" } }
 ```
 
 Use when: displaying a single KPI, metric, or counter.
@@ -3763,7 +3773,9 @@ A skill can reference an MCP server via the `mcp` and `mcpName` fields:
   "mcp": "https://mcp.example.com/mcp",
   "mcpName": "sales-api",
   "blocks": [
-    { "type": "stat", "data": { "label": "Revenue", "value": "$142K" } }
+    { "type": "stat", "data": { "label": "Revenue", "value": "
+  <script>
+42K" } }
   ]
 }
 ```
@@ -3952,7 +3964,9 @@ const skill = createSkill({
   tags: ['sales', 'kpi'],
   theme: { 'color-accent': '#2563eb' },
   blocks: [
-    { type: 'stat', data: { label: 'Revenue', value: '$142K', trend: '+12%', trendDir: 'up' } },
+    { type: 'stat', data: { label: 'Revenue', value: '
+  <script>
+42K', trend: '+12%', trendDir: 'up' } },
     { type: 'stat', data: { label: 'Orders', value: '1,204', trend: '+8%', trendDir: 'up' } },
     { type: 'chart', data: { title: 'Monthly Revenue', bars: [['Jan',80],['Feb',95],['Mar',120]] } }
   ]
@@ -4052,7 +4066,9 @@ const skill: HyperSkill = {
     tags: ['sales']
   },
   content: [
-    { type: 'stat', data: { label: 'Revenue', value: '$142K' } },
+    { type: 'stat', data: { label: 'Revenue', value: '
+  <script>
+42K' } },
     { type: 'chart', data: { title: 'Trend', bars: [['Q1',80],['Q2',120]] } }
   ]
 };

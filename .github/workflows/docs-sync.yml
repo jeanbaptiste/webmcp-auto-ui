@@ -1,0 +1,36 @@
+name: Docs Sync Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run docs:sync
+        run: npm run docs:sync
+
+      - name: Check for uncommitted changes
+        run: |
+          if [ -n "$(git diff --name-only)" ]; then
+            echo "::error::Documentation is out of sync with source code."
+            echo ""
+            echo "Changed files:"
+            git diff --name-only
+            echo ""
+            echo "Run 'npm run docs:sync' locally and commit the changes."
+            exit 1
+          fi
+          echo "Documentation is up to date."

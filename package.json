@@ -24,6 +24,7 @@
     "check": "npm -w packages/ui run check && npm -w packages/sdk run check",
     "dev:showcase": "npm -w apps/showcase run dev",
     "dev:mobile": "npm -w apps/mobile run dev",
+    "docs:sync": "node scripts/sync-docs.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
