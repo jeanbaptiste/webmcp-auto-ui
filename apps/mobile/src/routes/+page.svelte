@@ -30,6 +30,7 @@
   let editName = $state('');
   let editDesc = $state('');
   let apiKeyInput = $state('');
+  let mcpToken = $state('');
   let hsUrlDisplay = $state('');
   let urlCopied = $state(false);
 
@@ -179,15 +180,19 @@
     canvas.setMcpConnecting(true);
     addBubble('assistant', `connexion à <strong style="color:#7c6dfa">${url.split('/').slice(-2).join('/')}</strong>…`);
     try {
-      const client = new McpClient(url);
+      const clientOptions = mcpToken.trim()
+        ? { headers: { Authorization: `Bearer ${mcpToken.trim()}` } }
+        : undefined;
+      const client = new McpClient(url, clientOptions);
       const init = await client.connect();
       const tools = await client.listTools();
       mcpClient = client;
       canvas.setMcpConnected(true, init.serverInfo.name, tools as Parameters<typeof canvas.setMcpConnected>[2]);
       addBubble('assistant', `MCP connecté · <strong style="color:#3ecfb2">${tools.length} tools</strong> disponibles`);
     } catch(e) {
-      canvas.setMcpError(e instanceof Error ? e.message : String(e));
-      addBubble('assistant', `<span style="color:#fa6d7c">❌ Connexion échouée</span>`);
+      const errMsg = e instanceof Error ? e.message : String(e);
+      canvas.setMcpError(errMsg);
+      addBubble('assistant', `<span style="color:#fa6d7c">❌ ${errMsg}</span>`);
     } finally {
       canvas.setMcpConnecting(false);
     }
@@ -405,7 +410,11 @@
           <div class="text-[9px] font-mono text-zinc-600 uppercase tracking-wider">Serveur MCP</div>
           <input class="w-full bg-[#1e1e28] border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-zinc-200 outline-none focus:border-accent"
             placeholder="https://mcp.example.com/mcp"
-            bind:value={canvas.mcpUrl} />
+            bind:value={canvas.mcpUrl}
+            onkeydown={(e) => e.key === 'Enter' && connectMcp()} />
+          <input class="w-full bg-[#1e1e28] border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-zinc-300 outline-none focus:border-accent"
+            placeholder="Bearer token (optionnel)"
+            bind:value={mcpToken} />
           <button class="w-full py-2 rounded-lg bg-accent text-white text-xs font-mono hover:opacity-85 disabled:opacity-40"
             onclick={connectMcp} disabled={canvas.mcpConnecting || !canvas.mcpUrl.trim()}>
             {canvas.mcpConnecting ? 'Connexion…' : 'Connecter'}

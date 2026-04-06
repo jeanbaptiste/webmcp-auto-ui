@@ -131,7 +131,7 @@ export class McpClient {
       ...this.options.headers,
     };
     if (this.sessionId) headers['Mcp-Session-Id'] = this.sessionId;
-    await fetch(this.url, { method: 'POST', headers, body: JSON.stringify(body) }).catch(() => {});
+    await fetch(this.url, { method: 'POST', headers, body: JSON.stringify(body) }).catch((e) => console.warn('[McpClient] initialized notification failed:', e));
   }
 
   private async rpc<T>(method: string, params?: Record<string, unknown>, attempt = 0): Promise<T> {
@@ -166,6 +166,10 @@ export class McpClient {
         signal: controller.signal,
       });
     } catch (err) {
+      clearTimeout(timer);
+      if (err instanceof TypeError) {
+        throw new Error(`MCP connection failed (CORS or network): ${(err as Error).message}`);
+      }
       throw err;
     } finally {
       clearTimeout(timer);

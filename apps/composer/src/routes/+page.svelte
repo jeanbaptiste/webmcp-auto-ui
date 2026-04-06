@@ -15,6 +15,7 @@
   let dragOver = $state(false);
   let mcpClient = $state<McpClient | null>(null);
   let skills = $state<Skill[]>([]);
+  let mcpToken = $state('');
 
   // Reactive skills list
   $effect(() => { skills = listSkills(); });
@@ -63,11 +64,22 @@
   ];
 
   // ── MCP ───────────────────────────────────────────────────────────────────
+  let _mcpDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  function onMcpUrlChange() {
+    if (_mcpDebounceTimer) clearTimeout(_mcpDebounceTimer);
+    _mcpDebounceTimer = setTimeout(() => {
+      if (canvas.mcpUrl.startsWith('http')) connectMcp();
+    }, 300);
+  }
+
   async function connectMcp() {
     if (!canvas.mcpUrl || canvas.mcpConnecting) return;
     canvas.setMcpConnecting(true);
     try {
-      const client = new McpClient(canvas.mcpUrl);
+      const clientOptions = mcpToken.trim()
+        ? { headers: { Authorization: `Bearer ${mcpToken.trim()}` } }
+        : undefined;
+      const client = new McpClient(canvas.mcpUrl, clientOptions);
       const init = await client.connect();
       const tools = await client.listTools();
       mcpClient = client;
@@ -75,8 +87,9 @@
       canvas.addMsg('system', `MCP connecté : ${init.serverInfo.name} · ${tools.length} tools`);
       if (canvas.mode === 'auto') triggerAutoGenerate(client);
     } catch (e) {
-      canvas.setMcpError(e instanceof Error ? e.message : String(e));
-      canvas.addMsg('system', `❌ connexion échouée`);
+      const errMsg = e instanceof Error ? e.message : String(e);
+      canvas.setMcpError(errMsg);
+      canvas.addMsg('system', `❌ ${errMsg}`);
     } finally {
       canvas.setMcpConnecting(false);
     }
@@ -231,7 +244,11 @@
     <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-72 text-zinc-300 outline-none focus:border-accent transition-colors placeholder-zinc-700"
       placeholder="https://mcp.example.com"
       bind:value={canvas.mcpUrl}
-      onkeydown={(e) => e.key === 'Enter' && connectMcp()} />
+      onkeydown={(e) => e.key === 'Enter' && connectMcp()}
+      onchange={onMcpUrlChange} />
+    <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-48 text-zinc-300 outline-none focus:border-accent transition-colors placeholder-zinc-700"
+      placeholder="Bearer token (optionnel)"
+      bind:value={mcpToken} />
     <button class="font-mono text-xs h-7 px-3 rounded border transition-all flex-shrink-0
         {canvas.mcpConnecting ? 'border-border text-zinc-600 cursor-wait' : 'border-border2 text-zinc-400 hover:border-teal hover:text-teal'}"
       onclick={connectMcp} disabled={canvas.mcpConnecting}>

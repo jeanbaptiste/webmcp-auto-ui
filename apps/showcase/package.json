@@ -10,10 +10,12 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "@webmcp-auto-ui/core": "file:../../packages/core",
-    "@webmcp-auto-ui/ui": "file:../../packages/ui",
+    "@types/leaflet": "^1.9.21",
     "@webmcp-auto-ui/agent": "file:../../packages/agent",
-    "@webmcp-auto-ui/sdk": "file:../../packages/sdk"
+    "@webmcp-auto-ui/core": "file:../../packages/core",
+    "@webmcp-auto-ui/sdk": "file:../../packages/sdk",
+    "@webmcp-auto-ui/ui": "file:../../packages/ui",
+    "leaflet": "^1.9.4"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.0",

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import {
     Card, Panel, GridLayout, List, Window,
     StatBlock, KVBlock, ListBlock, ChartBlock, AlertBlock, CodeBlock, TextBlock, ActionsBlock, TagsBlock,
@@ -12,6 +13,7 @@
     GRID_DATA, PROFILE_OBSERVER,
   } from '$lib/inat-mock.js';
   import type { ManagedWindow } from '@webmcp-auto-ui/ui';
+  import { initializeWebMCPPolyfill, listenForAgentCalls, executeToolInternal, jsonResult, registerSkill, unregisterSkill } from '@webmcp-auto-ui/core';
 
   // Nav sections
   const SECTIONS = [
@@ -37,6 +39,241 @@
 
   // Format big numbers
   function fmt(n: number) { return new Intl.NumberFormat('fr-FR').format(n); }
+
+  onMount(() => {
+    try {
+      initializeWebMCPPolyfill({ allowInsecureContext: true, degradeGracefully: true });
+    } catch {}
+
+    const stopListening = listenForAgentCalls((name, args) => executeToolInternal(name, args));
+
+    const mc = (navigator as unknown as Record<string, unknown>).modelContext as {
+      registerTool: (t: unknown, opts?: unknown) => void;
+      unregisterTool: (name: string) => void;
+    } | undefined;
+
+    const toolNames: string[] = [];
+
+    function reg(tool: {
+      name: string;
+      description: string;
+      inputSchema: Record<string, unknown>;
+      execute: (args?: Record<string, unknown>) => unknown;
+      annotations?: Record<string, unknown>;
+    }) {
+      if (!mc) return;
+      mc.registerTool(tool, { readOnlyHint: tool.annotations?.readOnlyHint ?? true });
+      toolNames.push(tool.name);
+    }
+
+    // ── DATA TOOLS ──────────────────────────────────────────────────
+
+    reg({
+      name: 'showcase__describe',
+      description: 'Décrit la page showcase complète : sections, composants disponibles, données mockées iNaturalist.',
+      inputSchema: { type: 'object', properties: {} },
+      execute: () => jsonResult({
+        title: 'UI Showcase — webmcp-auto-ui',
+        description: '32 composants Svelte 5 avec données iNaturalist mockées. Offline.',
+        sections: [
+          { id: 'primitives', label: 'Primitives', count: 5, components: ['Card', 'Panel', 'GridLayout', 'Window', 'List'] },
+          { id: 'simple', label: 'Blocs simples', count: 9, components: ['StatBlock', 'KVBlock', 'ListBlock', 'ChartBlock', 'AlertBlock', 'CodeBlock', 'TextBlock', 'ActionsBlock', 'TagsBlock'] },
+          { id: 'rich', label: 'Widgets riches', count: 13, components: ['StatCard', 'DataTable', 'Timeline', 'ProfileCard', 'Trombinoscope', 'Chart', 'Hemicycle', 'Cards', 'JsonViewer', 'GridData', 'Sankey', 'MapView', 'LogViewer'] },
+          { id: 'wm', label: 'Window Manager', count: 4, components: ['TilingLayout', 'StackLayout', 'Pane', 'Window'] },
+        ],
+        data_source: 'iNaturalist mock (offline)',
+        available_tools: ['showcase__describe', 'showcase__get_inat_stats', 'showcase__list_top_species', 'showcase__list_top_observers', 'showcase__list_iconic_taxa', 'showcase__get_monthly_obs', 'showcase__get_recent_obs', 'showcase__get_taxonomy', 'showcase__list_alerts', 'showcase__get_migration_flows', 'showcase__get_observer_profile', 'showcase__get_log_entries', 'showcase__get_grid_data'],
+      }),
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'showcase__get_inat_stats',
+      description: 'Retourne les statistiques globales iNaturalist : total observations, research grade, espèces, observateurs, données France.',
+      inputSchema: { type: 'object', properties: {} },
+      execute: () => jsonResult(INAT_STATS),
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'showcase__list_top_species',
+      description: 'Retourne les espèces les plus observées en France (jusqu\'à 8).',
+      inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 8, description: 'Nombre d\'espèces à retourner (défaut: 8)' } } },
+      execute: (args) => jsonResult(TOP_SPECIES.slice(0, (args?.limit as number) ?? 8)),
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'showcase__list_top_observers',
+      description: 'Retourne les meilleurs observateurs naturalistes français.',
+      inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 6, description: 'Nombre d\'observateurs (défaut: 6)' } } },
+      execute: (args) => jsonResult(TOP_OBSERVERS.slice(0, (args?.limit as number) ?? 6)),
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'showcase__list_iconic_taxa',
+      description: 'Retourne la répartition des observations par groupe taxonomique (Aves, Insecta, Plantae…).',
+      inputSchema: { type: 'object', properties: {} },
+      execute: () => jsonResult(ICONIC_TAXA),
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'showcase__get_monthly_obs',
+      description: 'Retourne les observations mensuelles sur 12 mois et les courbes multi-séries par groupe.',
+      inputSchema: { type: 'object', properties: {} },
+      execute: () => jsonResult({ monthly: MONTHLY_OBS, multi_series: MULTI_SERIES }),
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'showcase__get_recent_obs',
+      description: 'Retourne les observations récentes (taxon, lieu, date, qualité research grade).',
+      inputSchema: { type: 'object', properties: {} },
+      execute: () => jsonResult(RECENT_OBS),
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'showcase__get_taxonomy',
+      description: 'Retourne l\'arbre taxonomique (défaut: Parus major, taxon_id=14916).',
+      inputSchema: { type: 'object', properties: { taxon_id: { type: 'integer', description: 'ID du taxon iNaturalist (défaut: 14916)' } } },
+      execute: () => jsonResult(TAXONOMY_TREE),
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'showcase__list_alerts',
+      description: 'Retourne les alertes biodiversité actives.',
+      inputSchema: { type: 'object', properties: {} },
+      execute: () => jsonResult(ALERTS),
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'showcase__get_migration_flows',
+      description: 'Retourne les flux migratoires observés (noeuds + liens pour Sankey).',
+      inputSchema: { type: 'object', properties: {} },
+      execute: () => jsonResult(MIGRATION_FLOWS),
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'showcase__get_observer_profile',
+      description: 'Retourne le profil détaillé de l\'observatrice #1 France.',
+      inputSchema: { type: 'object', properties: {} },
+      execute: () => jsonResult(PROFILE_OBSERVER),
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'showcase__get_log_entries',
+      description: 'Retourne les entrées de log de l\'API iNaturalist.',
+      inputSchema: { type: 'object', properties: {} },
+      execute: () => jsonResult(LOG_ENTRIES),
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'showcase__get_grid_data',
+      description: 'Retourne les données grille (observations par groupe × mois).',
+      inputSchema: { type: 'object', properties: {} },
+      execute: () => jsonResult(GRID_DATA),
+      annotations: { readOnlyHint: true },
+    });
+
+    // ── SKILLS ──────────────────────────────────────────────────────
+
+    const SKILL_IDS = [
+      'showcase-page',
+      'showcase-inat-overview',
+      'showcase-top-species',
+      'showcase-top-observers',
+      'showcase-monthly-seasonality',
+      'showcase-biodiversity-hemicycle',
+      'showcase-obs-timeline',
+      'showcase-migration-sankey',
+    ];
+
+    registerSkill({
+      id: 'showcase-page',
+      name: 'Showcase Page',
+      description: 'Page globale du showcase webmcp-auto-ui — 32 composants Svelte 5 avec données iNaturalist mockées.',
+      component: 'apps/showcase/src/routes/+page.svelte',
+      presentation: 'Sections: Primitives, Blocs simples, Widgets riches, Window Manager. Données offline.',
+      tags: ['showcase', 'inat', 'overview'],
+    });
+
+    registerSkill({
+      id: 'showcase-inat-overview',
+      name: 'iNaturalist Overview',
+      description: 'Stats globales iNaturalist (148M+ obs, 421k espèces, France 12M). Composants StatBlock + KVBlock.',
+      component: 'StatBlock, KVBlock',
+      presentation: 'section#simple · StatBlock label=Observations France + KVBlock Parus major',
+      tags: ['showcase', 'inat', 'stats'],
+    });
+
+    registerSkill({
+      id: 'showcase-top-species',
+      name: 'Top Species Table',
+      description: 'Tableau des 8 espèces les plus observées en France — DataTable triable par colonne.',
+      component: 'DataTable',
+      presentation: 'section#rich · DataTable striped, colonnes: icon, nom commun, nom scientifique, groupe, observations',
+      tags: ['showcase', 'inat', 'species', 'datatable'],
+    });
+
+    registerSkill({
+      id: 'showcase-top-observers',
+      name: 'Top Observers Trombinoscope',
+      description: 'Trombinoscope des 6 meilleurs naturalistes français avec avatars, badges et compteurs.',
+      component: 'Trombinoscope',
+      presentation: 'section#rich · Trombinoscope 6 colonnes, badges colorés',
+      tags: ['showcase', 'inat', 'observers', 'trombinoscope'],
+    });
+
+    registerSkill({
+      id: 'showcase-monthly-seasonality',
+      name: 'Monthly Seasonality Charts',
+      description: 'Saisonnalité des observations — Chart bar mensuel + Chart line multi-séries (Aves, Insecta, Plantae).',
+      component: 'Chart',
+      presentation: 'section#rich · Chart type=bar (répartition) + Chart type=line (multi-séries 12 mois)',
+      tags: ['showcase', 'inat', 'chart', 'seasonality'],
+    });
+
+    registerSkill({
+      id: 'showcase-biodiversity-hemicycle',
+      name: 'Biodiversity Hemicycle',
+      description: 'Répartition taxonomique en hémicycle — 8 groupes (Plantae 48, Aves 32, Insecta 28…) sur 100 sièges symboliques.',
+      component: 'Hemicycle',
+      presentation: 'section#rich · Hemicycle totalSeats=100, groupes colorés',
+      tags: ['showcase', 'inat', 'hemicycle', 'taxonomy'],
+    });
+
+    registerSkill({
+      id: 'showcase-obs-timeline',
+      name: 'iNaturalist Observations Timeline',
+      description: 'Historique iNaturalist 2024-2026 — jalons done/active/pending (120M, 148M, 200M obs).',
+      component: 'Timeline',
+      presentation: 'section#rich · Timeline 4 événements, statuts done/active/pending',
+      tags: ['showcase', 'inat', 'timeline', 'history'],
+    });
+
+    registerSkill({
+      id: 'showcase-migration-sankey',
+      name: 'Migration Flows Sankey',
+      description: 'Flux migratoires observés (Afrique → Europe → France) — diagramme Sankey avec noeuds et liens.',
+      component: 'Sankey',
+      presentation: 'section#rich · Sankey 5 noeuds (af, eu_s, eu_n, as, fr), 5 liens',
+      tags: ['showcase', 'inat', 'sankey', 'migration'],
+    });
+
+    return () => {
+      stopListening?.();
+      toolNames.forEach(n => { try { mc?.unregisterTool(n); } catch {} });
+      SKILL_IDS.forEach(id => { try { unregisterSkill(id); } catch {} });
+    };
+  });
 </script>
 
 <svelte:head><title>UI Showcase — webmcp-auto-ui × iNaturalist</title></svelte:head>

@@ -134,7 +134,7 @@ function createCanvas() {
   function setMcpError(err: string) {
     mcpConnected = false;
     mcpConnecting = false;
-    statusText = `● erreur: ${err.slice(0, 40)}`;
+    statusText = `● erreur: ${err}`;
     statusColor = 'text-red-400';
   }
 
