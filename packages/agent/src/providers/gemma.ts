@@ -1,0 +1,153 @@
+/**
+ * GemmaProvider — wraps the Gemma E2B Web Worker
+ * Exposes the same LLMProvider interface as AnthropicProvider
+ */
+import type { LLMProvider, LLMResponse, ChatMessage, AnthropicTool, ModelId, ContentBlock } from '../types.js';
+
+export type GemmaStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+export interface GemmaProviderOptions {
+  workerUrl?: string;        // URL to the bundled gemma.worker.js
+  workerFactory?: () => Worker;  // alternative: pass a factory fn
+  model?: string;
+  onProgress?: (progress: number, status: string) => void;
+  onStatusChange?: (status: GemmaStatus) => void;
+}
+
+export class GemmaProvider implements LLMProvider {
+  readonly name = 'gemma';
+  readonly model: ModelId = 'gemma-e2b';
+
+  private worker: Worker | null = null;
+  private status: GemmaStatus = 'idle';
+  private pendingResolvers = new Map<string, { resolve: (v: string) => void; reject: (e: Error) => void }>();
+  private opts: GemmaProviderOptions;
+  private initPromise: Promise<void> | null = null;
+
+  constructor(options: GemmaProviderOptions) {
+    this.opts = options;
+  }
+
+  private setStatus(s: GemmaStatus) {
+    this.status = s;
+    this.opts.onStatusChange?.(s);
+  }
+
+  async initialize(): Promise<void> {
+    if (this.initPromise) return this.initPromise;
+    this.initPromise = this._init();
+    return this.initPromise;
+  }
+
+  private _init(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.setStatus('loading');
+      this.worker = this.opts.workerFactory
+        ? this.opts.workerFactory()
+        : new Worker(this.opts.workerUrl!, { type: 'module' });
+
+      this.worker.onmessage = (e: MessageEvent) => {
+        const { type, id, token, text, message, progress, status } = e.data as {
+          type: string; id?: string; token?: string; text?: string;
+          message?: string; progress?: number; status?: string;
+        };
+
+        if (type === 'progress') {
+          this.opts.onProgress?.(progress ?? 0, status ?? '');
+          return;
+        }
+        if (type === 'ready') { this.setStatus('ready'); resolve(); return; }
+        if (type === 'error' && !id) { this.setStatus('error'); reject(new Error(message)); return; }
+        if (type === 'token' && id) {
+          // streaming — nothing to do here, handled in chat() via partial accumulation
+          return;
+        }
+        if ((type === 'done' || type === 'error') && id) {
+          const r = this.pendingResolvers.get(id);
+          if (!r) return;
+          this.pendingResolvers.delete(id);
+          if (type === 'error') r.reject(new Error(message));
+          else r.resolve(text ?? '');
+        }
+      };
+
+      this.worker.onerror = (e) => {
+        this.setStatus('error');
+        reject(new Error(e.message));
+      };
+
+      this.worker.postMessage({ type: 'init', model: this.opts.model });
+    });
+  }
+
+  async chat(
+    messages: ChatMessage[],
+    tools: AnthropicTool[],
+    options?: { signal?: AbortSignal }
+  ): Promise<LLMResponse> {
+    if (this.status !== 'ready') await this.initialize();
+    if (!this.worker) throw new Error('Worker not available');
+
+    // Build Gemma chat prompt (ChatML format with tool hints)
+    const systemParts: string[] = [];
+    if (tools.length > 0) {
+      systemParts.push('You have access to these tools (respond with JSON { "tool": "name", "args": {...} } to call one):');
+      systemParts.push(tools.map(t => `- ${t.name}: ${t.description}`).join('\n'));
+    }
+
+    const parts: string[] = [];
+    if (systemParts.length > 0) {
+      parts.push(`<start_of_turn>system\n${systemParts.join('\n')}<end_of_turn>`);
+    }
+    for (const msg of messages) {
+      const role = msg.role === 'assistant' ? 'model' : 'user';
+      const text = typeof msg.content === 'string'
+        ? msg.content
+        : (msg.content as ContentBlock[]).filter(b => b.type === 'text').map(b => (b as { type: 'text'; text: string }).text).join('\n');
+      parts.push(`<start_of_turn>${role}\n${text}<end_of_turn>`);
+    }
+    parts.push('<start_of_turn>model\n');
+    const prompt = parts.join('\n');
+
+    const id = `g-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+    const raw = await new Promise<string>((resolve, reject) => {
+      this.pendingResolvers.set(id, { resolve, reject });
+      options?.signal?.addEventListener('abort', () => {
+        this.worker?.postMessage({ type: 'abort', id });
+        reject(new DOMException('Aborted', 'AbortError'));
+      }, { once: true });
+      this.worker!.postMessage({ type: 'chat', id, prompt });
+    });
+
+    // Try to parse as tool call JSON
+    const content: ContentBlock[] = [];
+    try {
+      const parsed = JSON.parse(raw) as { tool?: string; args?: Record<string, unknown> };
+      if (parsed.tool && parsed.args) {
+        content.push({
+          type: 'tool_use',
+          id: `tc-${Date.now()}`,
+          name: parsed.tool,
+          input: parsed.args,
+        });
+      } else {
+        content.push({ type: 'text', text: raw });
+      }
+    } catch {
+      content.push({ type: 'text', text: raw });
+    }
+
+    return {
+      content,
+      stopReason: content.some(b => b.type === 'tool_use') ? 'tool_use' : 'end_turn',
+    };
+  }
+
+  destroy() {
+    this.worker?.terminate();
+    this.worker = null;
+    this.setStatus('idle');
+    this.initPromise = null;
+  }
+}

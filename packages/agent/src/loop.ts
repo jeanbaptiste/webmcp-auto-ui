@@ -1,0 +1,188 @@
+/**
+ * Agent loop — inspired from Archive/agent/src/loop.ts
+ * Runs LLM → tool call → LLM until end_turn or max iterations
+ * UI tools are executed via callbacks (no MCP roundtrip)
+ */
+
+import type { McpClient, McpTool } from '@webmcp-auto-ui/core';
+import { sanitizeSchema } from '@webmcp-auto-ui/core';
+import type {
+  ChatMessage, ContentBlock, ToolCall, AgentMetrics, AgentResult,
+  LLMProvider, AnthropicTool, McpToolDef, AgentCallbacks,
+} from './types.js';
+import { UI_TOOLS, isUITool, executeUITool } from './ui-tools.js';
+
+const MAX_RESULT_LEN = 10_000;
+
+export function buildSystemPrompt(mcpTools: McpToolDef[]): string {
+  const dataTools = mcpTools.filter(t => !isUITool(t.name));
+  const uiTools = UI_TOOLS;
+  return `Tu es un assistant connecté à un serveur MCP distant.
+Tu as accès à ${dataTools.length} outils DATA et ${uiTools.length} outils UI.
+
+OUTILS DATA (pour interroger les données) :
+${dataTools.map(t => `- ${t.name}: ${(t.description ?? t.name).split('\n')[0]}`).join('\n')}
+
+OUTILS UI (pour afficher les résultats visuellement) :
+${uiTools.map(t => `- ${t.name}: ${t.description}`).join('\n')}
+
+WORKFLOW OBLIGATOIRE :
+1. Utilise un outil DATA pour récupérer les données
+2. Puis utilise un outil UI pour afficher les résultats visuellement
+3. Ta réponse texte doit être TRÈS courte (1-2 phrases max)
+
+Choisis le composant UI le plus adapté aux données. Combine plusieurs outils UI si utile.
+Réponds dans la langue de l'utilisateur. Sois très concis.`;
+}
+
+export function mcpToolsToAnthropic(tools: McpToolDef[]): AnthropicTool[] {
+  return tools.map(t => ({
+    name: t.name,
+    description: t.description ?? t.name,
+    input_schema: sanitizeSchema(
+      (t.inputSchema ?? { type: 'object', properties: {} }) as import('@webmcp-auto-ui/core').JsonSchema
+    ) as Record<string, unknown>,
+  }));
+}
+
+function truncateResult(result: string): string {
+  if (result.length <= MAX_RESULT_LEN) return result;
+  try {
+    const parsed: unknown = JSON.parse(result);
+    if (Array.isArray(parsed)) {
+      let sliced = parsed;
+      while (JSON.stringify(sliced).length > MAX_RESULT_LEN && sliced.length > 1) {
+        sliced = sliced.slice(0, Math.ceil(sliced.length / 2));
+      }
+      return JSON.stringify(sliced) + `\n... (tronqué, ${parsed.length} items total)`;
+    }
+  } catch { /* not JSON */ }
+  return result.slice(0, MAX_RESULT_LEN) + '\n... (tronqué)';
+}
+
+export interface AgentLoopOptions {
+  client?: McpClient;           // MCP client — optional if only UI tools used
+  provider: LLMProvider;
+  mcpTools?: McpToolDef[];      // tools from MCP server
+  maxIterations?: number;
+  cacheEnabled?: boolean;
+  systemPrompt?: string;
+  callbacks?: AgentCallbacks;
+  signal?: AbortSignal;
+}
+
+export async function runAgentLoop(
+  userMessage: string,
+  options: AgentLoopOptions
+): Promise<AgentResult> {
+  const {
+    client,
+    provider,
+    mcpTools = [],
+    maxIterations = 5,
+    cacheEnabled = true,
+    callbacks = {},
+    signal,
+  } = options;
+
+  const allTools: AnthropicTool[] = [
+    ...mcpToolsToAnthropic(mcpTools),
+    ...UI_TOOLS,
+  ];
+
+  const systemPrompt = options.systemPrompt ?? buildSystemPrompt(mcpTools);
+
+  const messages: ChatMessage[] = [{ role: 'user', content: userMessage }];
+
+  const metrics: AgentMetrics = {
+    totalTokens: 0, promptTokens: 0, completionTokens: 0,
+    totalLatencyMs: 0, toolCalls: 0, iterations: 0, cacheHits: 0,
+  };
+
+  const allToolCalls: ToolCall[] = [];
+  let lastText = '';
+  let finishedNormally = false;
+
+  for (let i = 0; i < maxIterations; i++) {
+    if (signal?.aborted) break;
+    metrics.iterations++;
+
+    const t0 = performance.now();
+    const response = await provider.chat(messages, allTools, {
+      signal, cacheEnabled, system: systemPrompt,
+    });
+    metrics.totalLatencyMs += performance.now() - t0;
+
+    if (response.usage) {
+      metrics.promptTokens += response.usage.input_tokens;
+      metrics.completionTokens += response.usage.output_tokens;
+      metrics.totalTokens += response.usage.input_tokens + response.usage.output_tokens;
+      metrics.cacheHits += response.usage.cache_read_input_tokens ?? 0;
+    }
+
+    const textBlocks = response.content.filter(b => b.type === 'text') as { type: 'text'; text: string }[];
+    const toolBlocks = response.content.filter(b => b.type === 'tool_use') as {
+      type: 'tool_use'; id: string; name: string; input: Record<string, unknown>;
+    }[];
+
+    lastText = textBlocks.map(b => b.text).join('\n');
+
+    if (toolBlocks.length === 0) {
+      messages.push({ role: 'assistant', content: response.content });
+      callbacks.onText?.(lastText);
+      finishedNormally = true;
+      break;
+    }
+
+    messages.push({ role: 'assistant', content: response.content });
+
+    const toolResults: ContentBlock[] = [];
+    for (const block of toolBlocks) {
+      const call: ToolCall = { id: block.id, name: block.name, args: block.input };
+      const t1 = performance.now();
+
+      try {
+        let result: string;
+
+        if (isUITool(block.name)) {
+          result = executeUITool(block.name, block.input, callbacks);
+        } else if (client) {
+          const mcpResult = await client.callTool(block.name, block.input);
+          const textContent = mcpResult.content?.find((c: { type: string }) => c.type === 'text') as { text?: string } | undefined;
+          result = truncateResult(textContent?.text ?? JSON.stringify(mcpResult));
+        } else {
+          result = `Error: no MCP client available for tool ${block.name}`;
+        }
+
+        call.result = result;
+        toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result });
+      } catch (e) {
+        call.error = e instanceof Error ? e.message : String(e);
+        toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: `Error: ${call.error}` });
+      }
+
+      call.elapsed = Math.round(performance.now() - t1);
+      metrics.toolCalls++;
+      allToolCalls.push(call);
+      callbacks.onToolCall?.(call);
+    }
+
+    messages.push({ role: 'user', content: toolResults });
+  }
+
+  return {
+    text: lastText,
+    toolCalls: allToolCalls,
+    metrics,
+    stopReason: finishedNormally ? 'end_turn' : 'max_iterations',
+  };
+}
+
+// Helper: convert McpTool[] (from core) to McpToolDef[]
+export function fromMcpTools(tools: McpTool[]): McpToolDef[] {
+  return tools.map(t => ({
+    name: t.name,
+    description: t.description ?? '',
+    inputSchema: t.inputSchema as Record<string, unknown> | undefined,
+  }));
+}

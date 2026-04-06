@@ -1,0 +1,33 @@
+{
+  "name": "@webmcp-auto-ui/ui",
+  "version": "0.1.0",
+  "description": "Svelte 5 UI components — primitives, widgets, window manager",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "svelte": "./src/index.ts",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": {
+      "svelte": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "svelte-package -i src",
+    "dev": "svelte-package -w -i src",
+    "check": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "peerDependencies": {
+    "svelte": "^5.0.0"
+  },
+  "devDependencies": {
+    "@sveltejs/package": "^2.3.0",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "typescript": "^5.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": ["webmcp", "svelte", "ui", "widgets", "auto-ui"]
+}

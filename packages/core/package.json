@@ -1,0 +1,44 @@
+{
+  "name": "@webmcp-auto-ui/core",
+  "version": "0.1.0",
+  "description": "W3C WebMCP polyfill + MCP Streamable HTTP client — zero dependencies, framework-agnostic",
+  "license": "AGPL-3.0-or-later",
+  "author": "jb@media.mit.edu",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "webmcp",
+    "mcp",
+    "model-context-protocol",
+    "w3c",
+    "polyfill",
+    "auto-ui"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jeanbaptiste/webmcp-auto-ui.git",
+    "directory": "packages/core"
+  }
+}

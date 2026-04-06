@@ -1,0 +1,27 @@
+{
+  "name": "@webmcp-auto-ui/agent",
+  "version": "0.1.0",
+  "description": "LLM agent loop + Gemma E2B worker + MCP wrapper",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.5.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@webmcp-auto-ui/core": "file:../core"
+  }
+}

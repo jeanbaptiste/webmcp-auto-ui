@@ -1,0 +1,49 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Build in dependency order
+      - name: Build core
+        run: npm run build --workspace=packages/core
+
+      - name: Build ui, agent, sdk
+        run: |
+          npm run build --workspace=packages/ui &
+          npm run build --workspace=packages/agent &
+          npm run build --workspace=packages/sdk &
+          wait
+
+      # Publish in same order
+      - name: Publish core
+        run: npm publish --workspace=packages/core --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish ui, agent, sdk
+        run: |
+          npm publish --workspace=packages/ui --access public
+          npm publish --workspace=packages/agent --access public
+          npm publish --workspace=packages/sdk --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,35 @@
+{
+  "name": "webmcp-auto-ui",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/core",
+    "packages/ui",
+    "packages/agent",
+    "packages/sdk",
+    "apps/home",
+    "apps/composer",
+    "apps/todo",
+    "apps/viewer",
+    "apps/showcase",
+    "apps/mobile"
+  ],
+  "scripts": {
+    "dev": "concurrently -n home,composer,todo,viewer,showcase,mobile -c blue,cyan,yellow,green,magenta,white \"npm -w apps/home run dev\" \"npm -w apps/composer run dev\" \"npm -w apps/todo run dev\" \"npm -w apps/viewer run dev\" \"npm -w apps/showcase run dev\" \"npm -w apps/mobile run dev\"",
+    "dev:home": "npm -w apps/home run dev",
+    "dev:composer": "npm -w apps/composer run dev",
+    "dev:todo": "npm -w apps/todo run dev",
+    "dev:viewer": "npm -w apps/viewer run dev",
+    "build": "npm -w apps/home run build && npm -w apps/composer run build && npm -w apps/todo run build && npm -w apps/viewer run build",
+    "check": "npm -w packages/ui run check && npm -w packages/sdk run check",
+    "dev:showcase": "npm -w apps/showcase run dev",
+    "dev:mobile": "npm -w apps/mobile run dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "vitest": "^4.1.2"
+  }
+}
