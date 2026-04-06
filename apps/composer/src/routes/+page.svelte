@@ -21,6 +21,7 @@
   let mcpClient = $state<McpClient | null>(null);
   let skills = $state<Skill[]>([]);
   let mcpToken = $state('');
+  let mcpUrlInput = $state(canvas.mcpUrl || '');
 
   // 4B: Mobile responsive
   let mobileMenuOpen = $state(false);
@@ -191,14 +192,16 @@
   // ── MCP ───────────────────────────────────────────────────────────────────
   let _mcpDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   function onMcpUrlChange() {
+    canvas.setMcpUrl(mcpUrlInput);
     if (_mcpDebounceTimer) clearTimeout(_mcpDebounceTimer);
     _mcpDebounceTimer = setTimeout(() => {
-      if (canvas.mcpUrl.startsWith('http')) connectMcp();
+      if (mcpUrlInput.startsWith('http')) connectMcp();
     }, 300);
   }
 
   async function connectMcp() {
-    if (!canvas.mcpUrl || canvas.mcpConnecting) return;
+    canvas.setMcpUrl(mcpUrlInput);
+    if (!mcpUrlInput.trim() || canvas.mcpConnecting) return;
     canvas.setMcpConnecting(true);
     mcpConnectStart = Date.now();
     mcpConnectElapsed = 0;
@@ -208,7 +211,7 @@
       const clientOptions = mcpToken.trim()
         ? { headers: { Authorization: `Bearer ${mcpToken.trim()}` } }
         : undefined;
-      const client = new McpClient(canvas.mcpUrl, clientOptions);
+      const client = new McpClient(mcpUrlInput.trim(), clientOptions);
       const init = await client.connect();
       const tools = await client.listTools();
       mcpClient = client;
@@ -381,7 +384,8 @@
     <div class="w-px h-5 bg-border2 hidden md:block"></div>
     <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-72 text-zinc-300 outline-none focus:border-accent transition-colors placeholder:text-text2 hidden md:block"
       placeholder="https://mcp.example.com"
-      bind:value={canvas.mcpUrl}
+      bind:value={mcpUrlInput}
+      oninput={() => canvas.setMcpUrl(mcpUrlInput)}
       onkeydown={(e) => e.key === 'Enter' && connectMcp()}
       onchange={onMcpUrlChange} />
     <button class="font-mono text-xs h-7 px-3 rounded border transition-all flex-shrink-0 hidden md:flex items-center
@@ -525,7 +529,8 @@
           <div class="text-[10px] font-mono text-text2 uppercase tracking-widest">MCP</div>
           <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-full text-zinc-300 outline-none focus:border-accent placeholder:text-text2"
             placeholder="https://mcp.example.com"
-            bind:value={canvas.mcpUrl}
+            bind:value={mcpUrlInput}
+      oninput={() => canvas.setMcpUrl(mcpUrlInput)}
             onkeydown={(e) => e.key === 'Enter' && connectMcp()}
             onchange={onMcpUrlChange} />
           <button class="font-mono text-xs h-7 px-3 rounded border flex-shrink-0

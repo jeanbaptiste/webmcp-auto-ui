@@ -21,6 +21,7 @@
   let drawerOpen = $state(false);
   let chatInput = $state('');
   let mcpClient = $state<McpClient | null>(null);
+  let mcpUrlInput = $state(canvas.mcpUrl || '');
   let skills = $state<Skill[]>([]);
 
   // Drawer sub-views
@@ -220,7 +221,8 @@
 
   // ── MCP ───────────────────────────────────────────────────────────────────
   async function connectMcp() {
-    const url = canvas.mcpUrl.trim();
+    canvas.setMcpUrl(mcpUrlInput);
+    const url = mcpUrlInput.trim();
     if (!url) return;
     drawerOpen = false;
     canvas.setMcpConnecting(true);
@@ -534,7 +536,8 @@
           <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Serveur MCP</div>
           <input class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none focus:border-accent"
             placeholder="https://mcp.example.com/mcp"
-            bind:value={canvas.mcpUrl}
+            bind:value={mcpUrlInput}
+            oninput={() => canvas.setMcpUrl(mcpUrlInput)}
             onkeydown={(e) => e.key === 'Enter' && connectMcp()} />
           <button class="w-full py-2 rounded-lg bg-accent text-white text-xs font-mono hover:opacity-85 disabled:opacity-40"
             onclick={() => { connectMcp(); }} disabled={canvas.mcpConnecting || !canvas.mcpUrl.trim()}>
