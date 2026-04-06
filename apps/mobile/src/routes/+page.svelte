@@ -275,16 +275,18 @@
 
   // ── Agent / Chat ──────────────────────────────────────────────────────────
   function getProvider() {
-    if (canvas.llm === 'gemma-e2b') {
+    if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
       if (!gemmaProvider) {
+        const modelLabel = canvas.llm === 'gemma-e4b' ? 'Gemma 4B' : 'Gemma 2B';
         gemmaProvider = new GemmaProvider({
           workerFactory: () => new GemmaWorker(),
+          model: canvas.llm === 'gemma-e4b' ? 'onnx-community/gemma-3-1b-it-ONNX' : undefined,
           onProgress: (p, _s) => { gemmaProgress = p; },
           onStatusChange: (s) => {
             gemmaStatus = s;
             if (s === 'loading') startGemmaTimer();
-            if (s === 'ready') { stopGemmaTimer(); addBubble('assistant', `✓ Gemma 2B prêt — WebGPU (${gemmaElapsed}s)`); }
-            if (s === 'error') { stopGemmaTimer(); addBubble('assistant', '❌ Gemma E2B indisponible, vérifiez WebGPU'); }
+            if (s === 'ready') { stopGemmaTimer(); addBubble('assistant', `✓ ${modelLabel} prêt — WebGPU (${gemmaElapsed}s)`); }
+            if (s === 'error') { stopGemmaTimer(); addBubble('assistant', `❌ ${modelLabel} indisponible, vérifiez WebGPU`); }
           },
         });
       }
@@ -395,6 +397,16 @@
       }
     };
   });
+
+  // ── Gemma auto-load on selection ────────────────────────────────────────
+  $effect(() => {
+    if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
+      const p = getProvider();
+      if (gemmaStatus === 'idle' && p instanceof GemmaProvider) {
+        p.initialize();
+      }
+    }
+  });
 </script>
 
 <svelte:head><title>HyperSkills Mobile</title></svelte:head>
@@ -447,7 +459,7 @@
   </div>
 
   <!-- GEMMA LOADER BAR -->
-  {#if canvas.llm === 'gemma-e2b' && (gemmaStatus === 'loading' || gemmaStatus === 'ready')}
+  {#if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') && (gemmaStatus === 'loading' || gemmaStatus === 'ready')}
     <div class="flex flex-col gap-1 px-4 py-2 border-b border-border bg-surface flex-shrink-0">
       {#if gemmaStatus === 'loading'}
         <div class="flex items-center justify-between">

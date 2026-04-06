@@ -61,3 +61,8 @@ export type { ManagedWindow, LayoutWindow, FloatingWindowState } from './lib/wm-
 // FONC message bus
 export { bus } from './messaging/bus.svelte.js';
 export type { BusMessage } from './messaging/bus.svelte.js';
+
+// Agent UI components
+export { default as LLMSelector } from './agent/LLMSelector.svelte';
+export { default as GemmaLoader } from './agent/GemmaLoader.svelte';
+export { default as McpStatus } from './agent/McpStatus.svelte';
