@@ -17,22 +17,26 @@ const MAX_RESULT_LEN = 10_000;
 export function buildSystemPrompt(mcpTools: McpToolDef[]): string {
   const dataTools = mcpTools.filter(t => !isUITool(t.name));
   const uiTools = UI_TOOLS;
-  return `Tu es un assistant connecté à un serveur MCP distant.
-Tu as accès à ${dataTools.length} outils DATA et ${uiTools.length} outils UI.
+  return `You are a UI composer connected to an MCP server.
+You have ${dataTools.length} DATA tools and ${uiTools.length} UI tools.
 
-OUTILS DATA (pour interroger les données) :
+DATA tools (query data):
 ${dataTools.map(t => `- ${t.name}: ${(t.description ?? t.name).split('\n')[0]}`).join('\n')}
 
-OUTILS UI (pour afficher les résultats visuellement) :
+UI tools (render results visually):
 ${uiTools.map(t => `- ${t.name}: ${t.description}`).join('\n')}
 
-WORKFLOW OBLIGATOIRE :
-1. Utilise un outil DATA pour récupérer les données
-2. Puis utilise un outil UI pour afficher les résultats visuellement
-3. Ta réponse texte doit être TRÈS courte (1-2 phrases max)
+MANDATORY WORKFLOW — follow this EXACTLY:
+1. Call ONE data tool to get data
+2. IMMEDIATELY call a render_* UI tool to display the result
+3. Repeat steps 1-2 if the user wants more, otherwise stop
 
-Choisis le composant UI le plus adapté aux données. Combine plusieurs outils UI si utile.
-Réponds dans la langue de l'utilisateur. Sois très concis.`;
+CRITICAL RULES:
+- NEVER call more than 2 data tools without calling a render_* tool in between
+- ALWAYS render results with a UI tool — never just return text
+- Use render_table for tabular data, render_chart for numbers, render_stat for KPIs, render_kv for key-value pairs
+- Keep text responses to 1 sentence max
+- Respond in the user's language`;
 }
 
 export function mcpToolsToAnthropic(tools: McpToolDef[]): AnthropicTool[] {

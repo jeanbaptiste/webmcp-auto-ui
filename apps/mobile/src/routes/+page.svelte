@@ -341,7 +341,12 @@
           onBlock: (type, data) => addBlock(type, data, 'agent'),
           onClear: clearFeedBlocks,
           onText: (text) => { if (text) updateBubble(thinking.id, text); },
-          onToolCall: (call) => { updateBubble(thinking.id, `🔧 <strong>${call.name}</strong>…`); log('🔧 ' + call.name); },
+          onToolCall: (call) => {
+            updateBubble(thinking.id, `🔧 <strong>${call.name}</strong>…`);
+            const argsStr = JSON.stringify(call.args).slice(0, 200);
+            const resultStr = (call.result ?? '').slice(0, 200);
+            log(`🔧 ${call.name}(${argsStr}) → ${resultStr}${(call.result?.length ?? 0) > 200 ? '…' : ''} [${call.elapsed ?? 0}ms]`);
+          },
         },
       });
     } catch(e) {

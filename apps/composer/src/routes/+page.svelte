@@ -277,7 +277,7 @@
           onBlock: (type, data) => canvas.addBlock(type as Parameters<typeof canvas.addBlock>[0], data),
           onClear: () => canvas.clearBlocks(),
           onText: (text) => { if (text) canvas.addMsg('assistant', text); },
-          onToolCall: (call) => { mcpToolCallCount++; canvas.addMsg('system', `🔧 ${call.name}…`); },
+          onToolCall: (call) => { mcpToolCallCount++; canvas.addMsg('system', `🔧 ${call.name}(${JSON.stringify(call.args).slice(0,100)}) → ${(call.result??'').slice(0,100)} [${call.elapsed??0}ms]`); },
         },
       });
     } catch (e) {
@@ -304,7 +304,7 @@
           onBlock: (type, data) => canvas.addBlock(type as Parameters<typeof canvas.addBlock>[0], data),
           onClear: () => canvas.clearBlocks(),
           onText: (text) => canvas.updateMsg(thinking.id, text || '…', false),
-          onToolCall: (call) => { mcpToolCallCount++; canvas.updateMsg(thinking.id, `🔧 ${call.name}…`, true); },
+          onToolCall: (call) => { mcpToolCallCount++; canvas.updateMsg(thinking.id, `🔧 ${call.name}…`, true); canvas.addMsg('system', `🔧 ${call.name}(${JSON.stringify(call.args).slice(0,100)}) → ${(call.result??'').slice(0,100)} [${call.elapsed??0}ms]`); },
         },
       });
     } catch (e) {
