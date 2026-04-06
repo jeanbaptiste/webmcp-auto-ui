@@ -169,8 +169,8 @@ function createCanvas() {
 
   function loadFromParam(param: string): boolean {
     try {
-      // Normalize base64url → base64 standard (replace - with +, _ with /, add padding)
-      let b64 = param.replace(/-/g, '+').replace(/_/g, '/');
+      // Normalize: base64url → base64 standard, and repair spaces→+ (URLSearchParams damage)
+      let b64 = param.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/');
       while (b64.length % 4) b64 += '=';
 
       const json = decodeURIComponent(escape(atob(b64)));
