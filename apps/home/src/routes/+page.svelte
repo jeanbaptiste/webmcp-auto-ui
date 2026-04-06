@@ -77,8 +77,6 @@
     <footer class="mt-16 pt-6 border-t border-border text-xs font-mono text-text2 flex flex-wrap gap-x-4 gap-y-1">
       <span>webmcp-auto-ui</span>
       <span>AGPL-3.0</span>
-      <span>Svelte 5 + Tailwind</span>
-      <span>W3C WebMCP Draft 2026-03-27</span>
     </footer>
   </div>
 </div>
