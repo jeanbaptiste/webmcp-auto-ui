@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^4.0.1",
+    "@sveltejs/adapter-node": "^5.5.4",
     "@webmcp-auto-ui/agent": "file:../../packages/agent",
     "@webmcp-auto-ui/core": "file:../../packages/core",
     "@webmcp-auto-ui/sdk": "file:../../packages/sdk",

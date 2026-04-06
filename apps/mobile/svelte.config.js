@@ -1,4 +1,7 @@
-import adapter from '@sveltejs/adapter-static';
+import adapter from '@sveltejs/adapter-node';
 export default {
-  kit: { adapter: adapter({ fallback: 'index.html' }) }
+  kit: {
+    adapter: adapter(),
+    paths: { base: '/mobile' }
+  }
 };
