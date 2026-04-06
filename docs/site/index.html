@@ -333,27 +333,3910 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
 
+
+  <!-- Inlined markdown content -->
+  <script type="text/markdown" data-page="install">
+# Installation Guide
+
+Get WebMCP Auto-UI running locally in under 5 minutes.
+
+## Prerequisites
+
+- **Node.js 22+** (`node -v`)
+- **npm 10+** (`npm -v`)
+- An **Anthropic API key** (for LLM-powered chat features)
+
+## Clone and install
+
+```bash
+git clone https://github.com/jeanbaptiste/webmcp-auto-ui.git
+cd webmcp-auto-ui
+npm install
+```
+
+`npm install` resolves all workspaces automatically (packages + apps).
+
+## Project structure
+
+```
+webmcp-auto-ui/
+  packages/
+    core/       @webmcp-auto-ui/core   — W3C WebMCP polyfill + MCP client
+    sdk/        @webmcp-auto-ui/sdk    — HyperSkill format, skills registry, canvas store
+    agent/      @webmcp-auto-ui/agent  — LLM agent loop + providers + UI tools
+    ui/         @webmcp-auto-ui/ui     — 34+ Svelte 5 components
+  apps/
+    home/       Landing page + app launcher
+    composer/   Visual skill composer with drag-and-drop canvas
+    todo/       Todo app demo (MCP-powered)
+    viewer/     HyperSkill URL viewer / renderer
+    showcase/   Component showcase + WebMCP tool demos
+    mobile/     Mobile-optimized interface
+```
+
+## Build packages
+
+Packages must be built in dependency order:
+
+```bash
+# 1. core (no deps)
+npm -w packages/core run build
+
+# 2. sdk (no package deps, but shares types)
+npm -w packages/sdk run build
+
+# 3. agent (depends on core)
+npm -w packages/agent run build
+
+# 4. ui (standalone, but build last for safety)
+npm -w packages/ui run build
+```
+
+## Run dev servers
+
+Run all apps at once:
+
+```bash
+npm run dev
+```
+
+Or run a single app:
+
+```bash
+npm run dev:home
+npm run dev:composer
+npm run dev:todo
+npm run dev:viewer
+npm run dev:showcase
+npm run dev:mobile
+```
+
+## Port mapping
+
+| App       | Port | URL                    |
+|-----------|------|------------------------|
+| home      | 5173 | http://localhost:5173   |
+| composer  | 5174 | http://localhost:5174   |
+| todo      | 5175 | http://localhost:5175   |
+| viewer    | 5176 | http://localhost:5176   |
+| showcase  | 5177 | http://localhost:5177   |
+| mobile    | 5178 | http://localhost:5178   |
+
+## Environment variables
+
+| Variable           | Used by        | Purpose                                      |
+|--------------------|----------------|----------------------------------------------|
+| `ANTHROPIC_API_KEY`| composer, todo | Server-side proxy for Anthropic Claude API    |
+| `PUBLIC_BASE_URL`  | home           | Base URL for app links (default: localhost)    |
+
+Set them in each app's `.env` file or export in your shell:
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+## Common issues
+
+**`Cannot find module '@webmcp-auto-ui/core'`**
+Build core first: `npm -w packages/core run build`
+
+**Port already in use**
+Kill the process on that port: `lsof -ti:5173 | xargs kill` or change the port in `vite.config.ts`.
+
+**`ERR_MODULE_NOT_FOUND` on agent imports**
+The agent package uses `file:../core` as a dev dependency. Make sure core is built before running agent-dependent apps.
+
+**Svelte check errors in UI package**
+Run `npm -w packages/ui run check` to see detailed type diagnostics. Peer dependencies (`svelte`, `d3`, `leaflet`) must be installed at the root.
+
+  </script>
+  <script type="text/markdown" data-page="architecture">
+# Architecture
+
+Monorepo structure, package dependencies, and key design decisions.
+
+## Monorepo layout
+
+```
+webmcp-auto-ui/
+ |
+ +-- packages/
+ |    +-- core/          W3C WebMCP polyfill + MCP Streamable HTTP client
+ |    +-- sdk/           HyperSkill format, skills CRUD, canvas store (Svelte 5)
+ |    +-- agent/         LLM agent loop, Anthropic + Gemma providers, UI tools
+ |    +-- ui/            34+ Svelte 5 components (primitives, widgets, WM)
+ |
+ +-- apps/
+ |    +-- home/          Landing page, app launcher (port 5173)
+ |    +-- composer/      Visual skill composer with canvas + chat (port 5174)
+ |    +-- todo/          MCP-powered todo demo (port 5175)
+ |    +-- viewer/        HyperSkill URL renderer (port 5176)
+ |    +-- showcase/      Component showcase + WebMCP tool demos (port 5177)
+ |    +-- mobile/        Mobile-optimized interface (port 5178)
+ |
+ +-- docs/               Documentation
+ +-- package.json        Root workspace config
+```
+
+## Package dependency graph
+
+```
+                +----------+
+                |   core   |  (zero deps, framework-agnostic)
+                +----+-----+
+                     |
+              +------+------+
+              |             |
+         +----v----+   +----v----+
+         |   sdk   |   |  agent  |
+         +---------+   +---------+
+              |
+         (Svelte 5 runes)
+
+         +---------+
+         |   ui    |  (standalone — no internal deps)
+         +---------+
+```
+
+- **core** has zero external dependencies. Pure TypeScript.
+- **sdk** depends on Svelte 5 (peer) for the canvas store. No dependency on core.
+- **agent** depends on core (`@webmcp-auto-ui/core`) for `McpClient`, `sanitizeSchema`, and types.
+- **ui** is standalone. Peer dependencies: `svelte ^5`, `d3 ^7`, `leaflet >=1.9`.
+
+## App descriptions
+
+| App | Purpose |
+|-----|---------|
+| **home** | Landing page with links to all other apps. Configurable via `PUBLIC_BASE_URL`. |
+| **composer** | The main app. Connect to an MCP server, chat with an LLM, and compose UI skills on a canvas. Blocks are rendered by `BlockRenderer`. Skills can be saved as HyperSkill URLs. |
+| **todo** | Minimal todo app demonstrating MCP tool integration for CRUD operations. |
+| **viewer** | Decodes a HyperSkill URL (`?hs=...`) and renders the embedded skill read-only. |
+| **showcase** | Interactive catalog of all UI components. Also demonstrates WebMCP tool registration and postMessage bridge. |
+| **mobile** | Responsive mobile-first interface for the composer workflow. |
+
+## Technology stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | SvelteKit (apps), Svelte 5 (components) |
+| Styling | Tailwind CSS 4 + CSS variables theming |
+| UI base | bits-ui (shadcn-svelte pattern), tailwind-variants |
+| Charting | D3.js v7 (Chart, Sankey, Hemicycle, D3Widget) |
+| Maps | Leaflet (MapView) |
+| LLM | Anthropic Claude API (via server proxy), Gemma E2B (in-browser worker) |
+| Protocol | MCP Streamable HTTP (JSON-RPC 2.0) |
+| Build | TypeScript, svelte-package, Vite |
+
+## Key design decisions
+
+### CSS variables theming
+
+Theme tokens (colors, radii, fonts) are defined as CSS custom properties in `ThemeProvider`. Two built-in modes (`light`, `dark`) with full override support via `theme.json` or the canvas store's `themeOverrides`. Components read tokens from CSS variables, making theming work without recompilation.
+
+### FONC message bus
+
+Components never call each other directly. The `bus` singleton implements Alan Kay's "messaging not calling" principle: components register on named channels and exchange `BusMessage` objects. This decouples senders from receivers and enables composition without tight coupling.
+
+### BlockRenderer dispatch
+
+`BlockRenderer` is a single Svelte component that takes a `{ type, data }` block and dispatches rendering to the correct widget. The agent loop emits blocks via callbacks; the canvas store holds them; `BlockRenderer` renders them. This creates a clean pipeline: **LLM -> tool call -> block -> store -> renderer**.
+
+### HyperSkill URL format
+
+A skill (blocks + MCP URL + LLM choice + theme) is serialized to JSON, base64-encoded, and appended as `?hs=...` query parameter. Skills larger than 6KB are gzip-compressed (prefix `gz.`). Each version carries a SHA-256 hash for traceability and chaining.
+
+### Agent loop architecture
+
+The agent loop (`runAgentLoop`) runs an iterative LLM -> tool call -> LLM cycle. UI tools (`render_*`) are executed locally via callbacks (no MCP roundtrip). Data tools are forwarded to the MCP server via `McpClient.callTool()`. The loop stops on `end_turn` or `max_iterations`.
+
+  </script>
+  <script type="text/markdown" data-page="core">
+# @webmcp-auto-ui/core
+
+W3C WebMCP polyfill and MCP Streamable HTTP client. Zero dependencies, framework-agnostic, SSR-safe.
+
+## What it does
+
+- Implements the W3C WebMCP Draft CG Report (2026-03-27) as a polyfill on `navigator.modelContext`
+- Provides `McpClient` for connecting to MCP servers over Streamable HTTP (JSON-RPC 2.0)
+- Includes a postMessage bridge for cross-frame tool invocation
+- Ships result builders and a lightweight skill registry for WebMCP tool registration
+
+## Exports
+
+### Polyfill
+
+```ts
+import {
+  initializeWebMCPPolyfill,
+  cleanupWebMCPPolyfill,
+  hasNativeWebMCP,
+  executeToolInternal,
+} from '@webmcp-auto-ui/core';
+```
+
+**`initializeWebMCPPolyfill(options?)`** — Installs the polyfill on `navigator.modelContext`. Call once at app startup.
+
+```ts
+initializeWebMCPPolyfill({
+  confirmationPolicy: 'auto', // 'auto' | 'always' | 'never'
+});
+```
+
+**`cleanupWebMCPPolyfill()`** — Removes the polyfill and restores previous descriptors.
+
+**`hasNativeWebMCP()`** — Returns `true` if the browser has native WebMCP support.
+
+**`executeToolInternal(name, args)`** — Executes a registered tool by name. Used internally by the polyfill.
+
+### MCP Client
+
+```ts
+import { McpClient } from '@webmcp-auto-ui/core';
+```
+
+Streamable HTTP client for MCP servers. Uses native `fetch`, no dependencies.
+
+```ts
+const client = new McpClient('https://mcp.example.com/mcp', {
+  clientName: 'my-app',
+  clientVersion: '1.0.0',
+  timeout: 30000,
+  headers: { Authorization: 'Bearer ...' },
+});
+
+// Connect (sends initialize + notifications/initialized)
+const info = await client.connect();
+console.log(info.serverInfo.name);
+
+// List available tools
+const tools = await client.listTools();
+
+// Call a tool
+const result = await client.callTool('get_weather', { city: 'Paris' });
+console.log(result.content);
+
+// Disconnect
+await client.disconnect();
+```
+
+#### McpClient API
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `connect()` | `McpInitializeResult` | Initializes the MCP session |
+| `listTools()` | `McpTool[]` | Lists all tools from the server |
+| `callTool(name, args?)` | `McpToolResult` | Calls a tool with optional arguments |
+| `disconnect()` | `void` | Ends the session |
+
+### postMessage bridge
+
+```ts
+import {
+  listenForAgentCalls,
+  stopListening,
+  callToolViaPostMessage,
+  isWebMCPEvent,
+} from '@webmcp-auto-ui/core';
+```
+
+**`listenForAgentCalls(handler)`** — Listens for `webmcp:call-tool` events from iframes or other windows.
+
+```ts
+const cleanup = listenForAgentCalls(async (event) => {
+  const result = await executeToolInternal(event.name, event.args);
+  return result;
+});
+// later: cleanup()
+```
+
+**`callToolViaPostMessage(target, name, args)`** — Sends a tool call to a parent/child window via postMessage.
+
+```ts
+const result = await callToolViaPostMessage(window.parent, 'get_data', { id: 42 });
+```
+
+**`isWebMCPEvent(event)`** — Type guard for WebMCP postMessage events.
+
+### Utilities
+
+```ts
+import {
+  dispatchAndWait,
+  signalCompletion,
+  sanitizeSchema,
+  createToolGroup,
+} from '@webmcp-auto-ui/core';
+```
+
+**`dispatchAndWait(eventName, detail?, options?)`** — Dispatches a CustomEvent and waits for a matching completion event. Solves the "execute must return after UI updates" pattern.
+
+**`signalCompletion(requestId, result?)`** — Fires the completion event for `dispatchAndWait`.
+
+**`sanitizeSchema(schema)`** — Cleans a JSON Schema for Anthropic API compatibility (removes unsupported fields).
+
+**`createToolGroup(prefix, tools)`** — Groups related tools under a common prefix for registration.
+
+### Result builders and skill registry
+
+```ts
+import {
+  textResult,
+  jsonResult,
+  registerSkill,
+  unregisterSkill,
+  getSkill,
+  listSkills,
+  clearSkills,
+} from '@webmcp-auto-ui/core';
+```
+
+**`textResult(text)`** — Creates a `ToolExecuteResult` with a text content block.
+
+```ts
+return textResult('Operation completed successfully');
+```
+
+**`jsonResult(data)`** — Creates a `ToolExecuteResult` with JSON-stringified content.
+
+```ts
+return jsonResult({ count: 42, items: ['a', 'b'] });
+```
+
+**`registerSkill(skill)`** — Registers a skill as a WebMCP tool on `navigator.modelContext`.
+
+```ts
+registerSkill({
+  id: 'weather',
+  name: 'Weather Dashboard',
+  description: 'Shows local weather conditions',
+  component: 'WeatherDash',
+});
+```
+
+### Validation
+
+```ts
+import { validateJsonSchema } from '@webmcp-auto-ui/core';
+
+const result = validateJsonSchema(someSchema);
+if (!result.valid) {
+  console.error(result.errors);
+}
+```
+
+## Types
+
+All types are exported and documented via JSDoc. Key types:
+
+- `ModelContext`, `ModelContextTool` — W3C WebMCP spec types
+- `McpClient`, `McpTool`, `McpToolResult` — MCP protocol types
+- `WebMCPCallToolEvent`, `PostMessageBridgeOptions` — bridge types
+- `JsonSchema`, `JsonSchemaObject` — schema validation types
+- `SkillDef` — skill registry entry
+
+  </script>
+  <script type="text/markdown" data-page="ui">
+# @webmcp-auto-ui/ui
+
+34+ Svelte 5 components: theme system, primitives, block widgets, rich visualizations, and a window manager.
+
+## Component catalog
+
+### Theme
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `ThemeProvider` | Component | Wraps the app, injects CSS variables for theming |
+| `getTheme()` | Function | Returns current theme tokens from context |
+| `DARK_TOKENS` | Object | Dark mode token values |
+| `LIGHT_TOKENS` | Object | Light mode token values |
+| `THEME_MAP` | Object | Maps theme names to token sets |
+
+### Base (shadcn-svelte pattern)
+
+Built on `bits-ui` + `tailwind-variants`. Drop-in accessible primitives.
+
+| Component | Description |
+|-----------|-------------|
+| `Button` | Button with variants (default, destructive, outline, ghost, link) |
+| `Input` | Text input with label/error states |
+| `Badge` | Inline badge with color variants |
+| `NativeSelect` | Native `<select>` wrapper |
+| `Tooltip` | Hover tooltip |
+| `Dialog` | Modal dialog (+ `DialogTrigger`, `DialogContent`, `DialogHeader`, `DialogFooter`, `DialogTitle`, `DialogDescription`) |
+
+### Primitives
+
+Layout and container components.
+
+| Component | Description |
+|-----------|-------------|
+| `Card` | Themed card container with optional header/footer |
+| `GridLayout` | CSS grid wrapper with responsive columns |
+| `List` | Ordered/unordered list renderer |
+| `Panel` | Collapsible panel with title bar |
+| `Window` | Draggable/resizable window chrome |
+
+### Simple blocks
+
+Lightweight data blocks used by `BlockRenderer`. Each maps to a `render_*` agent tool.
+
+| Component | Block type | Agent tool | Description |
+|-----------|-----------|------------|-------------|
+| `StatBlock` | `stat` | `render_stat` | Single KPI with trend indicator |
+| `KVBlock` | `kv` | `render_kv` | Key-value pairs table |
+| `ListBlock` | `list` | `render_list` | Ordered list of items |
+| `ChartBlock` | `chart` | `render_chart` | Simple bar chart |
+| `AlertBlock` | `alert` | `render_alert` | Alert banner (info/warn/error) |
+| `CodeBlock` | `code` | `render_code` | Syntax-highlighted code block |
+| `TextBlock` | `text` | `render_text` | Free-form text paragraph |
+| `ActionsBlock` | `actions` | `render_actions` | Row of action buttons |
+| `TagsBlock` | `tags` | `render_tags` | Group of tags/badges |
+
+### Rich widgets
+
+Complex visualizations for data-heavy use cases.
+
+| Component | Block type | Agent tool | Description |
+|-----------|-----------|------------|-------------|
+| `StatCard` | `stat-card` | -- | Enhanced stat with sparkline |
+| `DataTable` | `data-table` | `render_table` | Sortable data table |
+| `Timeline` | `timeline` | `render_timeline` | Event chronology with statuses |
+| `ProfileCard` | `profile` | `render_profile` | Profile card with avatar, fields, stats |
+| `Trombinoscope` | `trombinoscope` | `render_trombinoscope` | Grid of portrait cards |
+| `JsonViewer` | `json-viewer` | `render_json` | Interactive JSON tree |
+| `Hemicycle` | `hemicycle` | `render_hemicycle` | SVG parliament hemicycle |
+| `Chart` | `chart-rich` | `render_chart_rich` | Multi-series chart (bar/line/area/pie/donut) |
+| `Cards` | `cards` | `render_cards` | Grid of content cards |
+| `GridData` | `grid-data` | -- | Data grid layout |
+| `Sankey` | `sankey` | `render_sankey` | D3 Sankey flow diagram |
+| `MapView` | `map` | -- | Leaflet map with markers |
+| `D3Widget` | `d3` | `render_d3` | D3 presets (hex-heatmap, radial, treemap, force) |
+| `LogViewer` | `log` | `render_log` | Log stream with levels and timestamps |
+| `Gallery` | `gallery` | `render_gallery` | Image gallery with lightbox |
+| `Carousel` | `carousel` | `render_carousel` | Slide carousel with auto-play |
+
+### Window Manager
+
+| Component | Description |
+|-----------|-------------|
+| `Pane` | Window pane with title bar, resize handles, close/minimize |
+| `TilingLayout` | Automatic tiling layout (splits panes horizontally/vertically) |
+| `FloatingLayout` | Free-form floating windows with z-index management |
+| `StackLayout` | Tabbed stack layout (one pane visible at a time) |
+
+### BlockRenderer
+
+```svelte
+<script>
+  import { BlockRenderer } from '@webmcp-auto-ui/ui';
+<\/script>
+
+<BlockRenderer type="stat" data={{ label: 'Users', value: '1,204', trend: '+5%', trendDir: 'up' }} />
+<BlockRenderer type="chart" data={{ title: 'Revenue', bars: [['Q1', 100], ['Q2', 140]] }} />
+```
+
+`BlockRenderer` dispatches `{ type, data }` to the matching widget component. It is the single rendering entry point used by the canvas.
+
+## Theming
+
+### Setup
+
+Wrap your app with `ThemeProvider`:
+
+```svelte
+<script>
+  import { ThemeProvider } from '@webmcp-auto-ui/ui';
+<\/script>
+
+<ThemeProvider mode="dark">
+  <slot />
+</ThemeProvider>
+```
+
+### Token override
+
+Pass a `theme.json` object to override specific tokens:
+
+```svelte
+<ThemeProvider mode="dark" overrides={{ '--color-primary': '#ff6600', '--radius': '0.5rem' }}>
+  <slot />
+</ThemeProvider>
+```
+
+### Accessing tokens
+
+```svelte
+<script>
+  import { getTheme } from '@webmcp-auto-ui/ui';
+  const theme = getTheme();
+<\/script>
+
+<div style:color={theme.primary}>Themed text</div>
+```
+
+## FONC message bus
+
+Inter-component messaging inspired by Alan Kay's FONC/STEPS. Components never call each other directly.
+
+```ts
+import { bus } from '@webmcp-auto-ui/ui';
+import type { BusMessage } from '@webmcp-auto-ui/ui';
+```
+
+### Register a component
+
+```ts
+const unregister = bus.register(
+  'my-chart',        // unique ID
+  'Chart',           // component type
+  ['data', 'theme'], // channels to listen on
+  (msg: BusMessage) => {
+    console.log(`Received ${msg.channel} from ${msg.from}:`, msg.payload);
+  }
+);
+// later: unregister()
+```
+
+### Send a message
+
+```ts
+// To a specific component
+bus.send('my-panel', 'my-chart', 'data', { values: [1, 2, 3] });
+
+// Broadcast to all listeners on a channel
+bus.broadcast('my-panel', 'theme', { mode: 'dark' });
+```
+
+### Subscribe without registering a component
+
+```ts
+const unsub = bus.subscribe(['data'], (msg) => {
+  console.log('Data update:', msg.payload);
+});
+```
+
+### Inspect the bus
+
+```ts
+bus.listPeers();  // [{ id: 'my-chart', type: 'Chart' }, ...]
+bus.peerCount;    // 3
+bus.lastMessage;  // most recent BusMessage or null
+```
+
+### BusMessage shape
+
+```ts
+interface BusMessage {
+  from: string;       // sender ID
+  to: string | '*';   // target ID or broadcast
+  channel: string;    // channel name
+  payload: unknown;   // message data
+  timestamp: number;  // Date.now()
+}
+```
+
+  </script>
+  <script type="text/markdown" data-page="sdk">
+# @webmcp-auto-ui/sdk
+
+HyperSkill encode/decode, skills registry, and Svelte 5 canvas store.
+
+## What it does
+
+- Encodes/decodes HyperSkill URLs (base64 + optional gzip for skills > 6KB)
+- Provides an in-memory skills CRUD registry with change notifications
+- Exposes a reactive canvas store (Svelte 5 runes) for blocks, chat, MCP state, and theme
+
+## HyperSkill format
+
+A HyperSkill URL embeds a complete skill definition in the `?hs=` query parameter.
+
+```ts
+import {
+  encodeHyperSkill,
+  decodeHyperSkill,
+  computeHash,
+  createVersion,
+  getHsParam,
+  diffSkills,
+} from '@webmcp-auto-ui/sdk';
+```
+
+### Types
+
+```ts
+interface HyperSkillMeta {
+  title?: string;
+  description?: string;
+  version?: string;
+  created?: string;
+  mcp?: string;
+  mcpName?: string;
+  llm?: string;
+  tags?: string[];
+  theme?: Record<string, string>;
+  hash?: string;
+  previousHash?: string;
+}
+
+interface HyperSkill {
+  meta: HyperSkillMeta;
+  content: unknown;
+}
+
+interface HyperSkillVersion {
+  hash: string;
+  previousHash?: string;
+  timestamp: number;
+  skill: HyperSkill;
+}
+```
+
+### Encode
+
+```ts
+const skill: HyperSkill = {
+  meta: {
+    title: 'Weather Dashboard',
+    mcp: 'https://mcp.example.com/mcp',
+    llm: 'haiku',
+  },
+  content: [
+    { type: 'stat', data: { label: 'Temp', value: '14C' } },
+    { type: 'chart', data: { title: 'Forecast', bars: [['Mon', 12], ['Tue', 15]] } },
+  ],
+};
+
+const url = await encodeHyperSkill(skill, 'https://app.example.com/viewer');
+// https://app.example.com/viewer?hs=eyJtZXRhIjp7...
+```
+
+Skills larger than 6KB are automatically gzip-compressed (prefix `gz.`).
+
+### Decode
+
+```ts
+const skill = await decodeHyperSkill('https://app.example.com/viewer?hs=eyJtZXRhIjp7...');
+console.log(skill.meta.title);  // "Weather Dashboard"
+console.log(skill.content);     // [{ type: 'stat', ... }, ...]
+```
+
+Also accepts a raw `hs` parameter value (without the full URL).
+
+### Versioning
+
+```ts
+const hash = await computeHash(skill, 'https://app.example.com');
+const version = createVersion(skill, hash, previousHash);
+```
+
+Each version carries a SHA-256 hash for traceability. Versions can be chained via `previousHash`.
+
+### Utilities
+
+- **`getHsParam(url)`** — Extracts the raw `hs` parameter from a URL.
+- **`diffSkills(a, b)`** — Compares two HyperSkill objects and returns differences.
+
+## Skills registry
+
+In-memory CRUD for UI skills (recipes). Each skill describes a composed UI from blocks.
+
+```ts
+import {
+  createSkill,
+  updateSkill,
+  deleteSkill,
+  getSkill,
+  listSkills,
+  clearSkills,
+  loadSkills,
+  loadDemoSkills,
+  onSkillsChange,
+} from '@webmcp-auto-ui/sdk';
+```
+
+### Types
+
+```ts
+interface SkillBlock {
+  type: string;
+  data: Record<string, unknown>;
+}
+
+interface Skill {
+  id: string;
+  name: string;
+  description?: string;
+  mcp?: string;
+  mcpName?: string;
+  llm?: string;
+  tags?: string[];
+  theme?: Record<string, string>;
+  blocks: SkillBlock[];
+  createdAt: number;
+  updatedAt: number;
+}
+```
+
+### CRUD operations
+
+```ts
+// Create
+const skill = createSkill({
+  name: 'kpi-dashboard',
+  description: 'Revenue and user metrics',
+  mcp: 'https://mcp.example.com/mcp',
+  blocks: [
+    { type: 'stat', data: { label: 'Revenue', value: '$142K' } },
+    { type: 'stat', data: { label: 'Users', value: '8,204' } },
+  ],
+});
+
+// Update
+updateSkill(skill.id, { description: 'Updated KPI dashboard' });
+
+// Get
+const s = getSkill(skill.id);
+
+// List (sorted by createdAt descending)
+const all = listSkills();
+
+// Delete
+deleteSkill(skill.id);
+
+// Clear all
+clearSkills();
+
+// Bulk load (replaces all)
+loadSkills(skillArray);
+```
+
+### Demo skills
+
+```ts
+loadDemoSkills();
+// Loads 3 built-in skills: weather-dashboard, kpi-overview, status-monitor
+// No-op if skills already exist
+```
+
+### Change listener
+
+```ts
+const unsubscribe = onSkillsChange(() => {
+  console.log('Skills changed:', listSkills().length);
+});
+// later: unsubscribe()
+```
+
+## Canvas store
+
+Svelte 5 runes-based reactive store. Browser-only (must be imported in Svelte components).
+
+```ts
+import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+```
+
+### Reactive state
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `canvas.blocks` | `Block[]` | All blocks on the canvas |
+| `canvas.mode` | `'auto' \| 'drag' \| 'chat'` | Current interaction mode |
+| `canvas.llm` | `'haiku' \| 'sonnet' \| 'gemma-e2b' \| 'gemma-e4b'` | Selected LLM |
+| `canvas.mcpUrl` | `string` | MCP server URL |
+| `canvas.mcpConnected` | `boolean` | MCP connection status |
+| `canvas.mcpConnecting` | `boolean` | Connection in progress |
+| `canvas.mcpName` | `string` | Connected server name |
+| `canvas.mcpTools` | `McpToolInfo[]` | Available MCP tools |
+| `canvas.messages` | `ChatMsg[]` | Chat message history |
+| `canvas.generating` | `boolean` | LLM is generating |
+| `canvas.statusText` | `string` | Status bar text |
+| `canvas.statusColor` | `string` | Status bar color class |
+| `canvas.blockCount` | `number` | Number of blocks (derived) |
+| `canvas.isEmpty` | `boolean` | No blocks on canvas (derived) |
+| `canvas.themeOverrides` | `Record<string, string>` | Theme CSS variable overrides |
+
+### Block operations
+
+```ts
+canvas.addBlock('stat', { label: 'Users', value: '1,204' });
+canvas.removeBlock('b_abc123');
+canvas.updateBlock('b_abc123', { value: '1,300' });
+canvas.moveBlock('b_abc123', 'b_def456');  // reorder
+canvas.clearBlocks();
+canvas.setBlocks(newBlockArray);
+```
+
+### Chat operations
+
+```ts
+canvas.addMsg('user', 'Show me the revenue data');
+canvas.updateMsg('m_abc123', 'Updated content');
+canvas.clearMessages();
+```
+
+### MCP state
+
+```ts
+canvas.setMcpUrl('https://mcp.example.com/mcp');
+canvas.setMcpConnecting(true);
+canvas.setMcpConnected(true, 'code4code', tools);
+canvas.setMcpError('Connection refused');
+```
+
+### HyperSkill integration
+
+```ts
+// Export current canvas as a skill JSON
+const json = canvas.buildSkillJSON();
+
+// Export as base64 param for URL embedding
+const param = canvas.buildHyperskillParam();
+
+// Load a skill from a base64 param
+canvas.loadFromParam(hsParam);  // returns true on success
+```
+
+  </script>
+  <script type="text/markdown" data-page="agent">
+# @webmcp-auto-ui/agent
+
+LLM agent loop with Anthropic and Gemma providers, plus 22 UI tools for rendering blocks.
+
+## What it does
+
+- Runs an iterative LLM agent loop: prompt -> tool calls -> LLM -> repeat until done
+- Provides two LLM providers: `AnthropicProvider` (cloud) and `GemmaProvider` (in-browser Web Worker)
+- Defines 22 `render_*` UI tools that the LLM calls to compose visual blocks on the canvas
+- Bridges MCP server tools and UI tools into a unified tool set for the LLM
+
+## Providers
+
+### AnthropicProvider
+
+Calls the Anthropic Claude API through a server-side proxy (SvelteKit `+server.ts`).
+
+```ts
+import { AnthropicProvider } from '@webmcp-auto-ui/agent';
+
+const provider = new AnthropicProvider({
+  proxyUrl: '/api/chat',          // your SvelteKit proxy endpoint
+  model: 'claude-haiku-4-5-20251001',  // optional, defaults to Haiku
+  apiKey: 'sk-ant-...',          // optional, injected as __apiKey in body
+});
+
+// Switch model at runtime
+provider.setModel('claude-sonnet');
+```
+
+Built-in model mapping:
+
+| ModelId | Anthropic model |
+|---------|----------------|
+| `claude-haiku` | `claude-haiku-4-5-20251001` |
+| `claude-sonnet` | `claude-sonnet-4-6` |
+
+### GemmaProvider
+
+Runs Gemma locally in a Web Worker via Hugging Face Transformers.js. No API key needed.
+
+```ts
+import { GemmaProvider } from '@webmcp-auto-ui/agent';
+
+const provider = new GemmaProvider({
+  workerUrl: '/gemma.worker.js',
+  onProgress: (pct, status) => console.log(`${pct}% — ${status}`),
+  onStatusChange: (status) => console.log('Status:', status),
+  // status: 'idle' | 'loading' | 'ready' | 'error'
+});
+
+await provider.initialize();  // downloads model weights on first run
+```
+
+### LLMProvider interface
+
+Both providers implement:
+
+```ts
+interface LLMProvider {
+  readonly name: string;
+  readonly model: ModelId;
+  chat(
+    messages: ChatMessage[],
+    tools: AnthropicTool[],
+    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string }
+  ): Promise<LLMResponse>;
+}
+```
+
+## Agent loop
+
+```ts
+import { runAgentLoop, buildSystemPrompt, mcpToolsToAnthropic, fromMcpTools } from '@webmcp-auto-ui/agent';
+```
+
+### runAgentLoop
+
+Runs the LLM -> tool call -> LLM cycle until `end_turn` or `maxIterations`.
+
+```ts
+const result = await runAgentLoop('Show me revenue by quarter', {
+  provider,
+  client: mcpClient,         // optional McpClient instance
+  mcpTools: tools,           // tools from client.listTools()
+  maxIterations: 10,         // default: 10
+  cacheEnabled: true,        // enable prompt caching
+  systemPrompt: customPrompt, // override the default system prompt
+  signal: abortController.signal,
+  callbacks: {
+    onBlock: (type, data) => canvas.addBlock(type, data),
+    onText: (text) => console.log('LLM:', text),
+    onToolCall: (call) => console.log('Tool:', call.name, call.result),
+    onClear: () => canvas.clearBlocks(),
+  },
+});
+
+console.log(result.text);           // final LLM text
+console.log(result.toolCalls);      // all tool calls made
+console.log(result.metrics);        // token usage, latency, iterations
+console.log(result.stopReason);     // 'end_turn' | 'max_iterations' | 'error'
+```
+
+### AgentLoopOptions
+
+```ts
+interface AgentLoopOptions {
+  client?: McpClient;
+  provider: LLMProvider;
+  mcpTools?: McpToolDef[];
+  maxIterations?: number;
+  cacheEnabled?: boolean;
+  systemPrompt?: string;
+  callbacks?: AgentCallbacks;
+  signal?: AbortSignal;
+}
+```
+
+### AgentCallbacks
+
+```ts
+interface AgentCallbacks {
+  onBlock?: (type: string, data: Record<string, unknown>) => void;
+  onText?: (text: string) => void;
+  onToolCall?: (call: ToolCall) => void;
+  onClear?: () => void;
+}
+```
+
+### AgentResult
+
+```ts
+interface AgentResult {
+  text: string;
+  toolCalls: ToolCall[];
+  metrics: AgentMetrics;
+  stopReason: 'end_turn' | 'max_iterations' | 'error';
+}
+
+interface AgentMetrics {
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalLatencyMs: number;
+  toolCalls: number;
+  iterations: number;
+  cacheHits: number;
+}
+```
+
+### Helper functions
+
+**`buildSystemPrompt(mcpTools)`** — Generates the default system prompt listing all DATA and UI tools available to the LLM.
+
+**`mcpToolsToAnthropic(tools)`** — Converts MCP tool definitions to Anthropic API format (sanitizes schemas).
+
+**`fromMcpTools(mcpTools)`** — Alias/helper for converting MCP tools for use in the agent loop.
+
+## UI tools
+
+22 render tools + 1 canvas action, exposed to the LLM. Each `render_*` tool maps to a block type in `@webmcp-auto-ui/ui`.
+
+```ts
+import { UI_TOOLS, isUITool, executeUITool } from '@webmcp-auto-ui/agent';
+```
+
+### Tool list
+
+#### Simple blocks
+
+| Tool | Block type | Required params |
+|------|-----------|-----------------|
+| `render_stat` | `stat` | `label`, `value` |
+| `render_kv` | `kv` | `rows` (array of `[key, value]`) |
+| `render_list` | `list` | `items` (string array) |
+| `render_chart` | `chart` | `bars` (array of `[label, number]`) |
+| `render_alert` | `alert` | `title` |
+| `render_code` | `code` | `content` |
+| `render_text` | `text` | `content` |
+| `render_actions` | `actions` | `buttons` (array of `{ label, primary? }`) |
+| `render_tags` | `tags` | `tags` (array of `{ text, active? }`) |
+
+#### Rich widgets
+
+| Tool | Block type | Required params |
+|------|-----------|-----------------|
+| `render_table` | `data-table` | `rows` |
+| `render_timeline` | `timeline` | `events` (array of `{ title, date?, status? }`) |
+| `render_profile` | `profile` | `name` |
+| `render_trombinoscope` | `trombinoscope` | `people` (array of `{ name, subtitle?, badge? }`) |
+| `render_json` | `json-viewer` | `data` (any JSON) |
+| `render_hemicycle` | `hemicycle` | `groups` (array of `{ id, label, seats, color }`) |
+| `render_chart_rich` | `chart-rich` | `data` (array of `{ values, label?, color? }`) |
+| `render_cards` | `cards` | `cards` (array of `{ title, description? }`) |
+| `render_sankey` | `sankey` | `nodes`, `links` |
+| `render_log` | `log` | `entries` (array of `{ message, level?, timestamp? }`) |
+| `render_gallery` | `gallery` | `images` (array of `{ src, alt?, caption? }`) |
+| `render_carousel` | `carousel` | `slides` |
+| `render_d3` | `d3` | `preset`, `data` |
+
+#### Canvas actions
+
+| Tool | Description |
+|------|-------------|
+| `clear_canvas` | Clears all blocks from the canvas |
+
+### Checking and executing UI tools
+
+```ts
+if (isUITool('render_stat')) {
+  const result = executeUITool('render_stat', { label: 'Users', value: '42' }, {
+    onBlock: (type, data) => canvas.addBlock(type, data),
+  });
+  // result: "Rendered stat block"
+}
+```
+
+## Workflow
+
+The standard agent workflow:
+
+1. User sends a message
+2. `buildSystemPrompt` lists available DATA tools (from MCP) and UI tools
+3. `runAgentLoop` sends the message + tools to the LLM
+4. LLM calls a DATA tool (e.g., `query_sql`) -> forwarded to MCP server via `McpClient`
+5. LLM receives data, calls a UI tool (e.g., `render_chart`) -> executed locally via callbacks
+6. Block appears on the canvas via `onBlock` callback
+7. Loop continues until LLM sends `end_turn`
+
+  </script>
+  <script type="text/markdown" data-page="deploy">
+# Deploy to Production
+
+This tutorial walks through building and deploying the entire webmcp-auto-ui monorepo to `demos.hyperskills.net`.
+
+## Prerequisites
+
+- SSH access to the server (configured as `bot` in `~/.ssh/config`)
+- The server has nginx configured for `demos.hyperskills.net`
+- Node.js 20+ on your local machine
+- `ANTHROPIC_API_KEY` set in `.env` files on the server for Node apps
+
+## Architecture
+
+The deployment target has this layout on the server:
+
+```
+/opt/webmcp-demos/
+  home/              # static — served by nginx
+  todo/              # static — served by nginx
+  showcase/          # static — served by nginx
+  composer/build/    # Node app — systemd service
+  viewer/build/      # Node app — systemd service
+  mobile/build/      # Node app — systemd service
+```
+
+Static apps (home, todo, showcase) are served directly by nginx from their directories. Node apps (composer, viewer, mobile) run as systemd services (`webmcp-composer.service`, `webmcp-viewer.service`, `webmcp-mobile.service`) with nginx as reverse proxy.
+
+---
+
+## Step 1: Build packages
+
+Packages must be built in dependency order. Core has no dependencies, SDK and UI depend on Core, and Agent depends on Core.
+
+```bash
+# From the monorepo root
+npm -w packages/core run build
+npm -w packages/sdk  run build
+npm -w packages/ui   run build
+npm -w packages/agent run build
+```
+
+Or in short, since the dependency chain is core -> sdk/ui -> agent:
+
+```bash
+npm -w packages/core run build && \
+npm -w packages/sdk run build && \
+npm -w packages/ui run build && \
+npm -w packages/agent run build
+```
+
+Verify each package built successfully by checking that `packages/*/dist/` directories exist.
+
+---
+
+## Step 2: Build static apps
+
+Static apps (home, todo, showcase) use `@sveltejs/adapter-static` and produce a `build/` directory. They require `PUBLIC_BASE_URL` to generate correct asset paths and API URLs for production.
+
+```bash
+PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/home run build
+PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/todo run build
+PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/showcase run build
+```
+
+After each build, verify the output exists:
+
+```bash
+ls apps/home/build/index.html
+ls apps/todo/build/index.html
+ls apps/showcase/build/index.html
+```
+
+**Common mistake**: forgetting `PUBLIC_BASE_URL`. Without it, the apps will try to load assets from `localhost` paths and fail in production.
+
+---
+
+## Step 3: Build Node apps
+
+Node apps (composer, viewer, mobile) use `@sveltejs/adapter-node` and produce a `build/` directory with a Node server.
+
+```bash
+npm -w apps/composer run build
+npm -w apps/viewer run build
+npm -w apps/mobile run build
+```
+
+Verify:
+
+```bash
+ls apps/composer/build/index.js
+ls apps/viewer/build/index.js
+ls apps/mobile/build/index.js
+```
+
+---
+
+## Step 4: Deploy static apps
+
+Copy each static app's build output to the server. Use `scp -r` (not rsync).
+
+```bash
+scp -r apps/home/build/* bot:/opt/webmcp-demos/home/
+scp -r apps/todo/build/* bot:/opt/webmcp-demos/todo/
+scp -r apps/showcase/build/* bot:/opt/webmcp-demos/showcase/
+```
+
+These are served immediately by nginx after the copy completes. No restart needed.
+
+---
+
+## Step 5: Deploy Node apps
+
+Copy each Node app's build output to the server:
+
+```bash
+scp -r apps/composer/build/* bot:/opt/webmcp-demos/composer/build/
+scp -r apps/viewer/build/* bot:/opt/webmcp-demos/viewer/build/
+scp -r apps/mobile/build/* bot:/opt/webmcp-demos/mobile/build/
+```
+
+---
+
+## Step 6: Restart Node services
+
+After deploying the Node apps, restart their systemd services:
+
+```bash
+ssh bot "systemctl restart webmcp-composer webmcp-viewer webmcp-mobile"
+```
+
+Verify the services started correctly:
+
+```bash
+ssh bot "systemctl status webmcp-composer webmcp-viewer webmcp-mobile --no-pager"
+```
+
+All three should show `active (running)`.
+
+---
+
+## Step 7: Verify deployment
+
+### Quick curl checks
+
+```bash
+# Static apps — should return 200
+curl -s -o /dev/null -w "%{http_code}" https://demos.hyperskills.net/
+curl -s -o /dev/null -w "%{http_code}" https://demos.hyperskills.net/todo/
+curl -s -o /dev/null -w "%{http_code}" https://demos.hyperskills.net/showcase/
+
+# Node apps — should return 200
+curl -s -o /dev/null -w "%{http_code}" https://demos.hyperskills.net/composer/
+curl -s -o /dev/null -w "%{http_code}" https://demos.hyperskills.net/viewer/
+curl -s -o /dev/null -w "%{http_code}" https://demos.hyperskills.net/mobile/
+```
+
+### Smoke test
+
+1. Open `https://demos.hyperskills.net/` in a browser — the landing page should load with all assets
+2. Open the Composer — it should connect to the Anthropic API and respond to prompts
+3. Open the Showcase — all 32 components should render with mock data
+4. Open the Todo app — WebMCP tools should appear in the browser extension (Chrome 146+)
+
+---
+
+## Troubleshooting
+
+### `.env` file missing on the server
+
+**Symptom**: Composer or Viewer returns 500 errors, logs show `ANTHROPIC_API_KEY is not defined`.
+
+**Fix**: Create the `.env` file on the server:
+
+```bash
+ssh bot "echo 'ANTHROPIC_API_KEY=sk-ant-...' > /opt/webmcp-demos/composer/.env"
+ssh bot "echo 'ANTHROPIC_API_KEY=sk-ant-...' > /opt/webmcp-demos/viewer/.env"
+ssh bot "echo 'ANTHROPIC_API_KEY=sk-ant-...' > /opt/webmcp-demos/mobile/.env"
+```
+
+Then restart the services (Step 6).
+
+### `PUBLIC_BASE_URL` not set during build
+
+**Symptom**: Static apps load but show broken images, missing CSS, or API calls go to `localhost`.
+
+**Fix**: Rebuild the static apps with `PUBLIC_BASE_URL=https://demos.hyperskills.net` (Step 2) and redeploy (Step 4).
+
+### Service fails to start
+
+**Symptom**: `systemctl status` shows `failed` or `inactive`.
+
+**Diagnose**:
+
+```bash
+ssh bot "journalctl -u webmcp-composer -n 50 --no-pager"
+```
+
+Common causes:
+- **Port conflict**: another process is using the port. Check with `ss -tlnp | grep <port>`
+- **Missing `.env`**: see above
+- **Missing `node_modules`**: Node apps built with `adapter-node` bundle their dependencies, but if you see module resolution errors, check that the build completed successfully locally
+- **Wrong Node version**: ensure the server runs Node 20+
+
+### nginx returns 502 Bad Gateway for Node apps
+
+**Symptom**: Static apps work but Composer/Viewer/Mobile return 502.
+
+**Diagnose**:
+
+```bash
+ssh bot "systemctl status webmcp-composer --no-pager"
+ssh bot "journalctl -u webmcp-composer -n 20 --no-pager"
+```
+
+The service may have crashed on startup. Fix the underlying issue (usually `.env` or port) and restart.
+
+---
+
+## Full deploy script
+
+Here is a single script that runs all steps in sequence:
+
+```bash
+#!/bin/bash
+set -e
+
+echo "=== Building packages ==="
+npm -w packages/core run build
+npm -w packages/sdk  run build
+npm -w packages/ui   run build
+npm -w packages/agent run build
+
+echo "=== Building static apps ==="
+PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/home run build
+PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/todo run build
+PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/showcase run build
+
+echo "=== Building Node apps ==="
+npm -w apps/composer run build
+npm -w apps/viewer run build
+npm -w apps/mobile run build
+
+echo "=== Deploying static apps ==="
+scp -r apps/home/build/* bot:/opt/webmcp-demos/home/
+scp -r apps/todo/build/* bot:/opt/webmcp-demos/todo/
+scp -r apps/showcase/build/* bot:/opt/webmcp-demos/showcase/
+
+echo "=== Deploying Node apps ==="
+scp -r apps/composer/build/* bot:/opt/webmcp-demos/composer/build/
+scp -r apps/viewer/build/* bot:/opt/webmcp-demos/viewer/build/
+scp -r apps/mobile/build/* bot:/opt/webmcp-demos/mobile/build/
+
+echo "=== Restarting services ==="
+ssh bot "systemctl restart webmcp-composer webmcp-viewer webmcp-mobile"
+
+echo "=== Verifying ==="
+for path in / /todo/ /showcase/ /composer/ /viewer/ /mobile/; do
+  code=$(curl -s -o /dev/null -w "%{http_code}" "https://demos.hyperskills.net${path}")
+  echo "  ${path} -> ${code}"
+done
+
+echo "=== Done ==="
+```
+
+Save this as `deploy.sh` at the monorepo root, make it executable (`chmod +x deploy.sh`), and run it.
+
+  </script>
+  <script type="text/markdown" data-page="themed-demo">
+# Build a Themed Demo from Scratch
+
+This tutorial walks through creating a complete themed demo using webmcp-auto-ui. We will build a "Nature Observatory" dashboard that displays wildlife sightings with a nature-inspired color palette.
+
+By the end, you will have a working SvelteKit page with themed components, wired together with the FONC event bus, exportable as a shareable HyperSkill URL.
+
+## Prerequisites
+
+- The monorepo is cloned and `npm install` has been run
+- Packages are built (see the [Deploy tutorial](./deploy.md), Step 1)
+- Basic familiarity with Svelte 5 and JSON
+
+---
+
+## Step 1: Create the theme
+
+Create a file `theme.json` at the root of your app (for example, `apps/showcase/theme.json`):
+
+```json
+{
+  "name": "nature-observatory",
+  "tokens": {
+    "color-bg":       "#f4f1eb",
+    "color-surface":  "#ffffff",
+    "color-surface2": "#ede8df",
+    "color-border":   "rgba(101, 78, 50, 0.10)",
+    "color-border2":  "rgba(101, 78, 50, 0.20)",
+    "color-accent":   "#2d6a4f",
+    "color-accent2":  "#bc4749",
+    "color-amber":    "#b07d1e",
+    "color-teal":     "#40916c",
+    "color-text1":    "#2b2118",
+    "color-text2":    "#7a6e5d"
+  },
+  "dark": {
+    "color-bg":       "#1a1612",
+    "color-surface":  "#252019",
+    "color-surface2": "#302a21",
+    "color-border":   "rgba(210, 190, 160, 0.10)",
+    "color-border2":  "rgba(210, 190, 160, 0.20)",
+    "color-accent":   "#52b788",
+    "color-text1":    "#ede8df",
+    "color-text2":    "#a89b88"
+  }
+}
+```
+
+This theme uses earthy greens and browns:
+- **accent** (`#2d6a4f`): deep forest green for primary actions and links
+- **accent2** (`#bc4749`): warm red for alerts (endangered species warnings)
+- **teal** (`#40916c`): lighter green for success states
+- **amber** (`#b07d1e`): golden brown for warnings
+- **bg/surface**: warm off-whites that feel like parchment
+- **text**: dark brown instead of pure black
+
+---
+
+## Step 2: Create a skill (recipe)
+
+A skill defines the blocks (widgets) that make up the dashboard, along with metadata. Create `nature-observatory.skill.json`:
+
+```json
+{
+  "name": "nature-observatory",
+  "description": "Wildlife sighting dashboard for a nature reserve",
+  "tags": ["nature", "wildlife", "dashboard"],
+  "theme": {
+    "color-bg":       "#f4f1eb",
+    "color-surface":  "#ffffff",
+    "color-surface2": "#ede8df",
+    "color-border":   "rgba(101, 78, 50, 0.10)",
+    "color-border2":  "rgba(101, 78, 50, 0.20)",
+    "color-accent":   "#2d6a4f",
+    "color-accent2":  "#bc4749",
+    "color-amber":    "#b07d1e",
+    "color-teal":     "#40916c",
+    "color-text1":    "#2b2118",
+    "color-text2":    "#7a6e5d"
+  },
+  "blocks": [
+    {
+      "type": "stat",
+      "data": {
+        "label": "Species Observed",
+        "value": "347",
+        "trend": "+12",
+        "trendDir": "up"
+      }
+    },
+    {
+      "type": "stat",
+      "data": {
+        "label": "Sightings This Week",
+        "value": "1,204",
+        "trend": "+8.3%",
+        "trendDir": "up"
+      }
+    },
+    {
+      "type": "stat",
+      "data": {
+        "label": "Endangered Alerts",
+        "value": "3",
+        "trend": "+1",
+        "trendDir": "up"
+      }
+    },
+    {
+      "type": "chart-rich",
+      "data": {
+        "title": "Sightings by Month",
+        "type": "area",
+        "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+        "data": [
+          { "label": "Birds", "values": [120, 145, 210, 320, 410, 380], "color": "#2d6a4f" },
+          { "label": "Mammals", "values": [45, 52, 68, 95, 110, 102], "color": "#b07d1e" },
+          { "label": "Reptiles", "values": [15, 18, 35, 55, 72, 68], "color": "#40916c" }
+        ]
+      }
+    },
+    {
+      "type": "data-table",
+      "data": {
+        "title": "Recent Sightings",
+        "columns": [
+          { "key": "species", "label": "Species" },
+          { "key": "location", "label": "Location" },
+          { "key": "date", "label": "Date" },
+          { "key": "observer", "label": "Observer" },
+          { "key": "status", "label": "Status" }
+        ],
+        "rows": [
+          { "species": "Red-tailed Hawk", "location": "North Ridge", "date": "2026-04-05", "observer": "A. Muir", "status": "Confirmed" },
+          { "species": "River Otter", "location": "Willow Creek", "date": "2026-04-05", "observer": "B. Carson", "status": "Confirmed" },
+          { "species": "Timber Rattlesnake", "location": "Rocky Ledge", "date": "2026-04-04", "observer": "C. Leopold", "status": "Pending" },
+          { "species": "Bald Eagle", "location": "Eagle Point", "date": "2026-04-04", "observer": "A. Muir", "status": "Confirmed" },
+          { "species": "Black Bear", "location": "Pine Hollow", "date": "2026-04-03", "observer": "D. Thoreau", "status": "Confirmed" }
+        ]
+      }
+    },
+    {
+      "type": "profile",
+      "data": {
+        "name": "North Ridge Reserve",
+        "subtitle": "Established 1987 -- 12,400 acres",
+        "badge": { "text": "Active", "variant": "success" },
+        "fields": [
+          { "label": "Region", "value": "Appalachian Highlands" },
+          { "label": "Elevation", "value": "800-2,200m" },
+          { "label": "Habitats", "value": "Forest, Wetland, Alpine" }
+        ],
+        "stats": [
+          { "label": "Species", "value": "347" },
+          { "label": "Observers", "value": "24" },
+          { "label": "Sightings", "value": "18.4K" }
+        ]
+      }
+    },
+    {
+      "type": "gallery",
+      "data": {
+        "title": "Recent Photos",
+        "images": [
+          { "src": "https://picsum.photos/seed/hawk/400/300", "caption": "Red-tailed Hawk -- North Ridge" },
+          { "src": "https://picsum.photos/seed/otter/400/300", "caption": "River Otter -- Willow Creek" },
+          { "src": "https://picsum.photos/seed/eagle/400/300", "caption": "Bald Eagle -- Eagle Point" },
+          { "src": "https://picsum.photos/seed/bear/400/300", "caption": "Black Bear -- Pine Hollow" },
+          { "src": "https://picsum.photos/seed/deer/400/300", "caption": "White-tailed Deer -- Meadow" },
+          { "src": "https://picsum.photos/seed/fox/400/300", "caption": "Red Fox -- East Trail" }
+        ],
+        "columns": 3
+      }
+    }
+  ]
+}
+```
+
+This skill uses 7 blocks: 3 stat blocks for KPIs, an area chart for trends, a data table for recent sightings, a profile card for the reserve, and a photo gallery.
+
+---
+
+## Step 3: Set up the SvelteKit page
+
+Create a new route in your app. For this example, we will add a page to the showcase app.
+
+### 3a. Create the route directory
+
+```bash
+mkdir -p apps/showcase/src/routes/nature
+```
+
+### 3b. Create the page
+
+Create `apps/showcase/src/routes/nature/+page.svelte`:
+
+```svelte
+<script lang="ts">
+  import { ThemeProvider, BlockRenderer } from '@webmcp-auto-ui/ui';
+  import themeJson from '../../../theme.json';
+  import skillJson from '../../../nature-observatory.skill.json';
+<\/script>
+
+<ThemeProvider defaultMode="light" overrides={themeJson.tokens}>
+  <div class="min-h-screen bg-bg p-6">
+    <header class="max-w-6xl mx-auto mb-8">
+      <h1 class="text-3xl font-bold text-text1">Nature Observatory</h1>
+      <p class="text-text2 mt-1">Wildlife sighting dashboard for North Ridge Reserve</p>
+    </header>
+
+    <main class="max-w-6xl mx-auto space-y-6">
+      <!-- KPI row: 3 stat blocks side by side -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {#each skillJson.blocks.slice(0, 3) as block}
+          <BlockRenderer type={block.type} data={block.data} />
+        {/each}
+      </div>
+
+      <!-- Chart -->
+      <BlockRenderer
+        type={skillJson.blocks[3].type}
+        data={skillJson.blocks[3].data}
+      />
+
+      <!-- Data table -->
+      <BlockRenderer
+        type={skillJson.blocks[4].type}
+        data={skillJson.blocks[4].data}
+      />
+
+      <!-- Profile + Gallery side by side on desktop -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <BlockRenderer
+          type={skillJson.blocks[5].type}
+          data={skillJson.blocks[5].data}
+        />
+        <BlockRenderer
+          type={skillJson.blocks[6].type}
+          data={skillJson.blocks[6].data}
+        />
+      </div>
+    </main>
+  </div>
+</ThemeProvider>
+```
+
+### 3c. Run the dev server
+
+```bash
+npm -w apps/showcase run dev
+```
+
+Open `http://localhost:5177/nature` in your browser. You should see the full dashboard with the nature theme applied.
+
+---
+
+## Step 4: Add more components
+
+Let us add a map showing sighting locations and a timeline of recent events.
+
+Add these blocks to your skill JSON's `blocks` array:
+
+```json
+{
+  "type": "map",
+  "data": {
+    "title": "Sighting Locations",
+    "center": { "lat": 35.6, "lng": -83.5 },
+    "zoom": 10,
+    "markers": [
+      { "lat": 35.65, "lng": -83.48, "label": "Red-tailed Hawk" },
+      { "lat": 35.58, "lng": -83.52, "label": "River Otter" },
+      { "lat": 35.62, "lng": -83.45, "label": "Bald Eagle" },
+      { "lat": 35.55, "lng": -83.55, "label": "Black Bear" },
+      { "lat": 35.60, "lng": -83.50, "label": "Timber Rattlesnake" }
+    ]
+  }
+}
+```
+
+```json
+{
+  "type": "timeline",
+  "data": {
+    "title": "Observatory Activity",
+    "events": [
+      { "date": "2026-04-05", "title": "Hawk nesting confirmed", "description": "Pair of Red-tailed Hawks building nest at North Ridge", "status": "active" },
+      { "date": "2026-04-03", "title": "Bear sighting near trail", "description": "Black bear spotted at Pine Hollow, trail advisory issued", "status": "done" },
+      { "date": "2026-03-28", "title": "Spring migration begins", "description": "First wave of migratory songbirds arriving at wetland areas", "status": "done" },
+      { "date": "2026-03-15", "title": "Sensor network upgraded", "description": "12 new camera traps installed across the southern sector", "status": "done" }
+    ]
+  }
+}
+```
+
+Then add them to the page layout:
+
+```svelte
+<!-- Map -->
+<BlockRenderer
+  type={skillJson.blocks[7].type}
+  data={skillJson.blocks[7].data}
+/>
+
+<!-- Timeline -->
+<BlockRenderer
+  type={skillJson.blocks[8].type}
+  data={skillJson.blocks[8].data}
+/>
+```
+
+---
+
+## Step 5: Wire the FONC bus between components
+
+FONC (Functions On Named Channels) is the event system built into webmcp-auto-ui. Every block rendered by `BlockRenderer` auto-registers WebMCP tools when `navigator.modelContext` is available. But you can also wire blocks together manually for inter-component communication.
+
+### How it works
+
+Each block rendered via `BlockRenderer` exposes three WebMCP tools:
+- `block_<id>_get` -- read the block's current data
+- `block_<id>_update` -- update the block's data
+- `block_<id>_remove` -- remove the block
+
+To make blocks react to each other, give them explicit IDs and use the update tools:
+
+```svelte
+<script lang="ts">
+  import { BlockRenderer } from '@webmcp-auto-ui/ui';
+  import { onMount } from 'svelte';
+
+  let selectedSpecies = $state('all');
+  let tableData = $state(skillJson.blocks[4].data);
+  let allRows = skillJson.blocks[4].data.rows;
+
+  function filterBySpecies(species: string) {
+    selectedSpecies = species;
+    if (species === 'all') {
+      tableData = { ...skillJson.blocks[4].data, rows: allRows };
+    } else {
+      tableData = {
+        ...skillJson.blocks[4].data,
+        rows: allRows.filter(r => r.species === species)
+      };
+    }
+  }
+<\/script>
+
+<!-- Tags block for filtering -->
+<BlockRenderer
+  type="tags"
+  data={{
+    label: "Filter by species",
+    tags: [
+      { text: "All", active: selectedSpecies === 'all' },
+      { text: "Red-tailed Hawk", active: selectedSpecies === 'Red-tailed Hawk' },
+      { text: "River Otter", active: selectedSpecies === 'River Otter' },
+      { text: "Bald Eagle", active: selectedSpecies === 'Bald Eagle' }
+    ]
+  }}
+  on:tagClick={(e) => filterBySpecies(e.detail.text === 'All' ? 'all' : e.detail.text)}
+/>
+
+<!-- Filtered data table -->
+<BlockRenderer type="data-table" data={tableData} />
+```
+
+This pattern lets you build interactive dashboards where selecting a tag filters the table, clicking a map marker highlights a row, or toggling a stat drills down into the chart.
+
+---
+
+## Step 6: Export as a HyperSkill URL
+
+Once your demo looks right, export it as a portable HyperSkill URL that anyone can open.
+
+### Using the SDK
+
+```typescript
+import { encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+
+const skill = {
+  version: '1.0',
+  name: 'nature-observatory',
+  description: 'Wildlife sighting dashboard for North Ridge Reserve',
+  theme: themeJson.tokens,
+  blocks: skillJson.blocks
+};
+
+const hsParam = encodeHyperSkill(skill);
+const shareUrl = `https://demos.hyperskills.net/viewer?hs=${hsParam}`;
+
+console.log(shareUrl);
+// Copy this URL -- anyone who opens it will see the full themed dashboard
+```
+
+### Using the Composer UI
+
+1. Open the Composer at `http://localhost:5174`
+2. Import the skill JSON (paste or drag-and-drop)
+3. Click "Export" and copy the generated URL
+4. The URL contains the theme + all blocks, base64-encoded (gzip-compressed if > 6 KB)
+
+### How the URL works
+
+```
+https://demos.hyperskills.net/viewer?hs=eyJ2ZXJzaW9uIjoiMS4wI...
+
+                                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+                                        base64(JSON.stringify(skill))
+                                        or gz.base64(gzip(JSON.stringify(skill)))
+                                        if the payload exceeds 6 KB
+```
+
+When someone opens the URL:
+1. The Viewer reads the `hs` query parameter
+2. Decodes base64 (decompresses gzip if `gz.` prefix)
+3. Parses the JSON skill object
+4. ThemeProvider applies the embedded `theme` tokens
+5. BlockRenderer renders each block in sequence
+
+---
+
+## Step 7: Deploy the demo
+
+Follow the [Deploy tutorial](./deploy.md) to push your demo to production. For a quick deploy of just the showcase app:
+
+```bash
+# Build packages (if not already done)
+npm -w packages/core run build
+npm -w packages/sdk  run build
+npm -w packages/ui   run build
+
+# Build showcase with production base URL
+PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/showcase run build
+
+# Deploy
+scp -r apps/showcase/build/* bot:/opt/webmcp-demos/showcase/
+```
+
+Your themed demo is now live at `https://demos.hyperskills.net/showcase/nature`.
+
+---
+
+## Complete page listing
+
+Here is the full `+page.svelte` file for reference:
+
+```svelte
+<script lang="ts">
+  import { ThemeProvider, BlockRenderer } from '@webmcp-auto-ui/ui';
+  import themeJson from '../../../theme.json';
+  import skillJson from '../../../nature-observatory.skill.json';
+<\/script>
+
+<ThemeProvider defaultMode="light" overrides={themeJson.tokens}>
+  <div class="min-h-screen bg-bg p-6">
+    <header class="max-w-6xl mx-auto mb-8">
+      <h1 class="text-3xl font-bold text-text1">Nature Observatory</h1>
+      <p class="text-text2 mt-1">Wildlife sighting dashboard for North Ridge Reserve</p>
+    </header>
+
+    <main class="max-w-6xl mx-auto space-y-6">
+      <!-- KPI stats -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {#each skillJson.blocks.slice(0, 3) as block}
+          <BlockRenderer type={block.type} data={block.data} />
+        {/each}
+      </div>
+
+      <!-- Sightings chart -->
+      <BlockRenderer type={skillJson.blocks[3].type} data={skillJson.blocks[3].data} />
+
+      <!-- Recent sightings table -->
+      <BlockRenderer type={skillJson.blocks[4].type} data={skillJson.blocks[4].data} />
+
+      <!-- Reserve profile + photo gallery -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <BlockRenderer type={skillJson.blocks[5].type} data={skillJson.blocks[5].data} />
+        <BlockRenderer type={skillJson.blocks[6].type} data={skillJson.blocks[6].data} />
+      </div>
+
+      <!-- Sighting map -->
+      <BlockRenderer type={skillJson.blocks[7].type} data={skillJson.blocks[7].data} />
+
+      <!-- Activity timeline -->
+      <BlockRenderer type={skillJson.blocks[8].type} data={skillJson.blocks[8].data} />
+    </main>
+  </div>
+</ThemeProvider>
+```
+
+## Summary
+
+What we built:
+1. A nature-themed color palette in `theme.json`
+2. A skill recipe with 9 blocks (stats, chart, table, profile, gallery, map, timeline)
+3. A SvelteKit page with `ThemeProvider` and `BlockRenderer`
+4. Interactive filtering via the FONC event bus
+5. A shareable HyperSkill URL
+6. A production deployment
+
+The same pattern works for any theme and any combination of the 24 available block types. Change the colors in `theme.json`, swap out the blocks, and you have a completely different dashboard.
+
+  </script>
+  <script type="text/markdown" data-page="theming">
+# Theming Guide
+
+This guide explains how to define and apply a custom design system to any
+webmcp-auto-ui project. No Svelte knowledge is required — you write a single
+JSON file and the entire UI adapts.
+
+---
+
+## How it works
+
+```
+                          theme.json
+                      (you write this)
+                              |
+              +---------------+---------------+
+              |               |               |
+              v               v               v
+        ThemeProvider     Tailwind CSS      Components
+        (runtime)        (build-time)      (auto-adapt)
+              |               |               |
+              v               v               v
+        Sets CSS vars    Generates        Read vars via
+        on :root         utility classes  bg-surface, etc.
+              |               |               |
+              +-------+-------+               |
+                      |                       |
+                      v                       v
+               Every element on the page picks up
+               the same tokens — one change, everything updates
+```
+
+There is **one source of truth**: CSS custom properties on `:root`. The
+`theme.json` file defines what those properties should be. The ThemeProvider
+injects them at runtime. Tailwind reads them at build time. Every component
+— whether it's a simple StatBlock or a complex Hemicycle — consumes them
+automatically.
+
+---
+
+## Quick start
+
+### 1. Create `theme.json` at your project root
+
+```json
+{
+  "name": "my-dashboard",
+  "tokens": {
+    "color-bg":       "#fafafa",
+    "color-surface":  "#ffffff",
+    "color-surface2": "#f5f5f5",
+    "color-border":   "rgba(0,0,0,0.06)",
+    "color-border2":  "rgba(0,0,0,0.12)",
+    "color-accent":   "#6c5ce7",
+    "color-accent2":  "#e84855",
+    "color-amber":    "#d48806",
+    "color-teal":     "#0d9488",
+    "color-text1":    "#1a1a2e",
+    "color-text2":    "#8c8ca0"
+  }
+}
+```
+
+### 2. Pass it to ThemeProvider in your layout
+
+```svelte
+<script>
+  import { ThemeProvider } from '@webmcp-auto-ui/ui';
+  import themeJson from '../theme.json';
+
+  let { children } = $props();
+<\/script>
+
+<ThemeProvider defaultMode="light" overrides={themeJson.tokens}>
+  {@render children()}
+</ThemeProvider>
+```
+
+### 3. Done
+
+Every component in the page now uses your colors, automatically.
+
+---
+
+## Token reference
+
+### Core tokens
+
+Every token maps to a CSS custom property `--{token-name}` and a Tailwind
+utility class.
+
+```
+Token name        CSS variable          Tailwind class     Used for
+─────────────────────────────────────────────────────────────────────
+color-bg          --color-bg            bg-bg              Page background
+color-surface     --color-surface       bg-surface         Card/panel bg
+color-surface2    --color-surface2      bg-surface2        Nested surfaces,
+                                                           table headers,
+                                                           hover states
+color-border      --color-border        border-border      Subtle borders
+color-border2     --color-border2       border-border2     Stronger borders,
+                                                           active states
+color-accent      --color-accent        text-accent        Primary accent,
+                                        bg-accent          links, buttons
+color-accent2     --color-accent2       text-accent2       Destructive/error
+                                        bg-accent2         accent
+color-amber       --color-amber         text-amber         Warnings, trends
+color-teal        --color-teal          text-teal          Success, positive
+                                                           trends
+color-text1       --color-text1         text-text1         Primary text
+color-text2       --color-text2         text-text2         Secondary/muted
+                                                           text
+```
+
+### How tokens flow through the UI
+
+```
+    theme.json                 CSS                    Component
+    ──────────                 ───                    ─────────
+
+    "color-accent":    -->   --color-accent    -->   class="text-accent"
+    "#6c5ce7"                on :root                 |
+                                                      v
+                                                   color: var(--color-accent)
+                                                      |
+                                                      v
+                                                   rendered as #6c5ce7
+```
+
+When you change the token value, **every component** using that token
+updates — buttons, charts, links, stat cards, borders, everything.
+
+---
+
+## Dark mode
+
+Add a `dark` key to override tokens for dark mode:
+
+```json
+{
+  "name": "my-dashboard",
+  "tokens": {
+    "color-bg":      "#fafafa",
+    "color-surface": "#ffffff",
+    "color-text1":   "#1a1a2e"
+  },
+  "dark": {
+    "color-bg":      "#0e0e11",
+    "color-surface": "#16161a",
+    "color-text1":   "#e8e8f0"
+  }
+}
+```
+
+Only override what changes — tokens not listed in `dark` keep their light
+values. The toggle is handled by ThemeProvider:
+
+```
+    User clicks toggle
+           |
+           v
+    ThemeProvider.toggle()
+           |
+           v
+    Swaps token set (light <-> dark)
+           |
+           v
+    Updates CSS variables on :root
+           |
+           v
+    Every component re-renders with new colors
+    (no page reload, instant)
+```
+
+The user's preference is persisted in `localStorage` and restored on next visit.
+
+---
+
+## Designing a theme
+
+### Anatomy of a well-designed token set
+
+```
+    ┌─────────────────────────────────────────────┐
+    │ Page          bg: color-bg                   │
+    │                                              │
+    │   ┌──────────────────────────────────────┐   │
+    │   │ Card       bg: color-surface          │   │
+    │   │            border: color-border       │   │
+    │   │                                      │   │
+    │   │   Title    color: color-text1        │   │
+    │   │   Body     color: color-text2        │   │
+    │   │                                      │   │
+    │   │   ┌──────────────────────────────┐   │   │
+    │   │   │ Nested    bg: color-surface2 │   │   │
+    │   │   │           border: color-border│   │   │
+    │   │   └──────────────────────────────┘   │   │
+    │   │                                      │   │
+    │   │   [ Button ]  bg: color-accent       │   │
+    │   │               text: white            │   │
+    │   │                                      │   │
+    │   │   Link        color: color-accent    │   │
+    │   │   Warning     color: color-amber     │   │
+    │   │   Success     color: color-teal      │   │
+    │   │   Error       color: color-accent2   │   │
+    │   └──────────────────────────────────────┘   │
+    └─────────────────────────────────────────────┘
+```
+
+### Contrast rules
+
+For readability, maintain sufficient contrast between:
+
+```
+    Background layer        Text on it         Minimum contrast
+    ──────────────          ──────────         ────────────────
+    color-bg                color-text1        7:1 (WCAG AAA)
+    color-surface           color-text1        7:1
+    color-surface           color-text2        4.5:1 (WCAG AA)
+    color-accent (bg)       white text         4.5:1
+    color-accent2 (bg)      white text         4.5:1
+```
+
+Use a contrast checker (e.g. webaim.org/resources/contrastchecker) to verify.
+
+### Color relationships
+
+```
+    Semantic meaning        Token              Typical values
+    ────────────────        ─────              ──────────────
+
+    Light mode:
+    ┌─ background ───────── color-bg           #fafafa  (near-white)
+    ├─ card surface ──────── color-surface      #ffffff  (white)
+    ├─ nested/hover ──────── color-surface2     #f0f0f6  (very light gray)
+    ├─ subtle line ───────── color-border       rgba(0,0,0,0.06)
+    ├─ visible line ──────── color-border2      rgba(0,0,0,0.12)
+    ├─ primary action ────── color-accent       #6c5ce7  (vivid)
+    ├─ danger/error ──────── color-accent2      #e84855  (warm red)
+    ├─ warning ───────────── color-amber        #d48806  (orange)
+    ├─ success ───────────── color-teal         #0d9488  (green)
+    ├─ body text ─────────── color-text1        #1a1a2e  (near-black)
+    └─ caption/label ─────── color-text2        #64648c  (mid-gray)
+
+    Dark mode (invert the luminance, keep the hue):
+    ┌─ background ───────── color-bg           #0e0e11  (near-black)
+    ├─ card surface ──────── color-surface      #16161a  (dark gray)
+    ├─ nested/hover ──────── color-surface2     #1e1e24  (slightly lighter)
+    ├─ subtle line ───────── color-border       rgba(255,255,255,0.07)
+    ├─ visible line ──────── color-border2      rgba(255,255,255,0.14)
+    ├─ primary action ────── color-accent       #7c6dfa  (brighter for dark bg)
+    ├─ body text ─────────── color-text1        #e8e8f0  (near-white)
+    └─ caption/label ─────── color-text2        #a0a0b8  (light gray)
+```
+
+---
+
+## Example: Language dashboard theme
+
+To build a dashboard like a language-learning stats page with clean white
+cards, subtle shadows, and colorful charts:
+
+```json
+{
+  "name": "language-dashboard",
+  "tokens": {
+    "color-bg":       "#f7f7f7",
+    "color-surface":  "#ffffff",
+    "color-surface2": "#f0f0f0",
+    "color-border":   "rgba(0,0,0,0.05)",
+    "color-border2":  "rgba(0,0,0,0.10)",
+    "color-accent":   "#58cc02",
+    "color-accent2":  "#ff4b4b",
+    "color-amber":    "#ffc800",
+    "color-teal":     "#49c0b6",
+    "color-text1":    "#3c3c3c",
+    "color-text2":    "#afafaf"
+  },
+  "dark": {
+    "color-bg":       "#131f24",
+    "color-surface":  "#1a2b32",
+    "color-surface2": "#223a44",
+    "color-border":   "rgba(255,255,255,0.08)",
+    "color-border2":  "rgba(255,255,255,0.15)",
+    "color-text1":    "#e5e5e5",
+    "color-text2":    "#8ea0a4"
+  }
+}
+```
+
+This produces:
+
+```
+    Light mode                          Dark mode
+
+    ┌─────────────────────┐             ┌─────────────────────┐
+    │ #f7f7f7 background  │             │ #131f24 background  │
+    │                     │             │                     │
+    │  ┌───────────────┐  │             │  ┌───────────────┐  │
+    │  │ #fff card     │  │             │  │ #1a2b32 card  │  │
+    │  │               │  │             │  │               │  │
+    │  │ #3c3c3c text  │  │             │  │ #e5e5e5 text  │  │
+    │  │ #afafaf label │  │             │  │ #8ea0a4 label │  │
+    │  │               │  │             │  │               │  │
+    │  │ [#58cc02 btn] │  │             │  │ [#58cc02 btn] │  │
+    │  └───────────────┘  │             │  └───────────────┘  │
+    └─────────────────────┘             └─────────────────────┘
+```
+
+---
+
+## Embedding a theme in a HyperSkill
+
+When you export a skill (recipe) from the Composer, the theme is embedded
+in the `?hs=` URL:
+
+```json
+{
+  "version": "1.0",
+  "name": "my-skill",
+  "theme": {
+    "color-accent": "#58cc02",
+    "color-bg": "#f7f7f7"
+  },
+  "blocks": [...]
+}
+```
+
+When someone opens the URL, the ThemeProvider applies the embedded theme
+overrides. This means **every shared skill carries its own look and feel**.
+
+```
+    Designer creates skill         User opens ?hs= URL
+    with custom theme              
+         |                              |
+         v                              v
+    Composer encodes               Viewer/Composer decodes
+    theme + blocks                 theme + blocks
+    into ?hs= param                    |
+         |                              v
+         v                         ThemeProvider applies
+    Shareable URL                  embedded theme overrides
+                                       |
+                                       v
+                                   Components render with
+                                   the designer's colors
+```
+
+---
+
+## Which components use which tokens
+
+Every component in the library reads tokens from CSS variables. Here is the
+mapping:
+
+```
+Component           bg          border       text         accent
+────────────────    ──────────  ───────────  ───────────  ──────────
+Card                surface     border       —            —
+Panel               surface     border       text2 (hdr)  —
+StatBlock           surface     border       text1/text2  teal/accent2
+KVBlock             surface     border       text1/text2  —
+ChartBlock          surface     border       text2        accent
+Chart (rich)        surface     border       text1/text2  palette[0]
+DataTable           surface     border       text1/text2  accent (sort)
+ProfileCard         surface     border       text1/text2  accent (stats)
+Hemicycle           surface     border       text1        per-group
+Timeline            surface     border       text1/text2  teal/amber
+Cards               surface     border       text1/text2  —
+Gallery             surface     border       —            —
+Carousel            surface     border       text1/text2  accent (dots)
+StatCard            surface     border       text1        teal/accent2
+AlertBlock          surface     accent2/amber text1       level-based
+CodeBlock           bg          border       teal         —
+TagsBlock           surface     border/teal  text2/teal   teal (active)
+ActionsBlock        surface     border       text2        accent (primary)
+LogViewer           bg          border       text2        teal/amber/accent2
+JsonViewer          bg          border       accent       —
+MapView             surface     border       text2        accent
+Sankey              surface     border       text1        palette
+GridData            surface     border       text1/text2  surface2 (highlight)
+Trombinoscope       surface     border       text1/text2  per-person
+Pane (WM)           surface     border       text1        accent
+BlockRenderer       —           —            text2        — (fallback)
+```
+
+**Rule of thumb**: change `color-accent` to rebrand everything. Change
+`color-bg` and `color-surface` to shift the overall lightness. Change
+`color-text1` to adjust readability.
+
+---
+
+## Advanced: component-level overrides
+
+Beyond global tokens, individual components accept style overrides through
+their data/spec props. For example, a Chart's color palette:
+
+```json
+{
+  "type": "chart-rich",
+  "data": {
+    "title": "Revenue",
+    "type": "bar",
+    "labels": ["Q1", "Q2", "Q3", "Q4"],
+    "data": [
+      { "label": "2025", "values": [120, 145, 160, 180], "color": "#58cc02" },
+      { "label": "2024", "values": [100, 110, 130, 150], "color": "#afafaf" }
+    ]
+  }
+}
+```
+
+The per-dataset `color` overrides the global palette for that specific chart
+without affecting other components.
+
+---
+
+## Fonts
+
+Fonts are loaded via Google Fonts in the layout. To change fonts:
+
+1. Update the `<link>` tag in your `+layout.svelte`:
+
+```html
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet" />
+```
+
+2. Update your Tailwind config or the `body` rule in `app.css`:
+
+```css
+body { font-family: 'Inter', system-ui, sans-serif; }
+```
+
+The Tailwind preset defines `font-sans` and `font-mono` families. All
+components use `font-sans` for UI text and `font-mono` for code/data.
+
+---
+
+## Checklist for a new theme
+
+```
+[ ] color-bg and color-surface have enough contrast (bg is darker/lighter)
+[ ] color-text1 on color-surface passes WCAG AA (4.5:1 ratio)
+[ ] color-text2 on color-surface passes WCAG AA (4.5:1 ratio)
+[ ] color-accent on white/dark background passes WCAG AA
+[ ] color-accent and color-accent2 are visually distinct
+[ ] color-teal reads as "positive/success"
+[ ] color-amber reads as "warning/attention"
+[ ] color-accent2 reads as "error/danger"
+[ ] Dark mode overrides tested (if provided)
+[ ] Fonts loaded and applied
+```
+
+  </script>
+  <script type="text/markdown" data-page="agents-theming">
+# Theming -- Agent Guide
+
+> This document is designed to be injected into an AI agent's context. It contains everything needed to create a theme.json for webmcp-auto-ui.
+
+## What is theme.json?
+
+A `theme.json` is a JSON object that defines color tokens for a webmcp-auto-ui interface. It is consumed by the `ThemeProvider` Svelte component, which injects the tokens as CSS custom properties (`--color-*`) on the document root element.
+
+The ThemeProvider applies tokens in three layers (highest priority wins):
+1. **Built-in tokens** for the current mode (light/dark)
+2. **theme.json `tokens`** (light base) + `dark` overrides when in dark mode
+3. **Inline `overrides`** prop (runtime overrides)
+
+When you provide a `theme.json`, its `tokens` are applied on top of the built-in defaults. If the user switches to dark mode, the `dark` object is merged on top.
+
+## Format
+
+```json
+{
+  "name": "my-theme",
+  "tokens": {
+    "color-bg": "#ffffff",
+    "color-surface": "#f5f5f5",
+    "color-accent": "#3b82f6"
+  },
+  "dark": {
+    "color-bg": "#0a0a0f",
+    "color-surface": "#141419"
+  }
+}
+```
+
+- `name` (optional): human-readable theme name
+- `tokens` (required): base tokens applied in both light and dark mode
+- `dark` (optional): overrides applied only when dark mode is active
+
+## The 11 Tokens
+
+| Token | Role | Typical usage |
+|-------|------|---------------|
+| `color-bg` | Page background | `<body>` or root container background |
+| `color-surface` | Card/panel background | Primary content areas, cards, modals |
+| `color-surface2` | Secondary surface | Nested panels, table headers, hover states |
+| `color-border` | Primary border | Card outlines, dividers (subtle) |
+| `color-border2` | Secondary border | Stronger borders, active states, separators |
+| `color-accent` | Primary accent | Buttons, links, active indicators, chart bars |
+| `color-accent2` | Secondary accent / danger | Error states, destructive actions, secondary highlights |
+| `color-amber` | Amber / warning | Warning alerts, caution badges, warm highlights |
+| `color-teal` | Teal / success | Success states, positive trends, confirmation |
+| `color-text1` | Primary text | Headings, body text, values |
+| `color-text2` | Secondary text | Labels, captions, muted descriptions |
+
+All tokens are consumed as CSS variables: `var(--color-bg)`, `var(--color-accent)`, etc.
+
+## Workflow
+
+When a designer says "I want a corporate blue theme":
+
+1. Pick a primary blue for `color-accent` (e.g. `#2563eb`)
+2. Set `color-bg` to a clean white/off-white
+3. Set `color-surface` to white, `color-surface2` slightly gray
+4. Set borders using low-opacity black: `rgba(0,0,0,0.08)` and `rgba(0,0,0,0.14)`
+5. Pick `color-accent2` as a contrasting warm color (red/coral)
+6. Keep `color-amber` warm, `color-teal` green/teal
+7. Set `color-text1` dark, `color-text2` medium gray
+8. Add a `dark` section: invert background to dark, surface to dark gray, adjust text to light, keep accent colors vibrant
+
+## Example Themes
+
+### Corporate (blue/white)
+
+```json
+{
+  "name": "corporate",
+  "tokens": {
+    "color-bg": "#f8fafc",
+    "color-surface": "#ffffff",
+    "color-surface2": "#f1f5f9",
+    "color-border": "rgba(0,0,0,0.08)",
+    "color-border2": "rgba(0,0,0,0.16)",
+    "color-accent": "#2563eb",
+    "color-accent2": "#dc2626",
+    "color-amber": "#d97706",
+    "color-teal": "#0d9488",
+    "color-text1": "#0f172a",
+    "color-text2": "#64748b"
+  },
+  "dark": {
+    "color-bg": "#0c1222",
+    "color-surface": "#131c31",
+    "color-surface2": "#1a2540",
+    "color-border": "rgba(255,255,255,0.07)",
+    "color-border2": "rgba(255,255,255,0.14)",
+    "color-accent": "#3b82f6",
+    "color-accent2": "#ef4444",
+    "color-text1": "#e2e8f0",
+    "color-text2": "#94a3b8"
+  }
+}
+```
+
+### Nature (green/beige)
+
+```json
+{
+  "name": "nature",
+  "tokens": {
+    "color-bg": "#faf8f1",
+    "color-surface": "#fffdf7",
+    "color-surface2": "#f0ece2",
+    "color-border": "rgba(90,70,40,0.1)",
+    "color-border2": "rgba(90,70,40,0.2)",
+    "color-accent": "#2d6a4f",
+    "color-accent2": "#c1440e",
+    "color-amber": "#b45309",
+    "color-teal": "#14b8a6",
+    "color-text1": "#1b3a26",
+    "color-text2": "#6b7c6e"
+  },
+  "dark": {
+    "color-bg": "#0d1a12",
+    "color-surface": "#12231a",
+    "color-surface2": "#1a3025",
+    "color-border": "rgba(255,255,255,0.06)",
+    "color-border2": "rgba(255,255,255,0.12)",
+    "color-accent": "#40916c",
+    "color-accent2": "#e85d26",
+    "color-text1": "#d8e8dd",
+    "color-text2": "#8fa898"
+  }
+}
+```
+
+### Neon (purple/black)
+
+```json
+{
+  "name": "neon",
+  "tokens": {
+    "color-bg": "#0a0a12",
+    "color-surface": "#12121e",
+    "color-surface2": "#1a1a2e",
+    "color-border": "rgba(255,255,255,0.06)",
+    "color-border2": "rgba(255,255,255,0.12)",
+    "color-accent": "#a855f7",
+    "color-accent2": "#f43f5e",
+    "color-amber": "#fbbf24",
+    "color-teal": "#22d3ee",
+    "color-text1": "#f0e6ff",
+    "color-text2": "#9d8ab8"
+  },
+  "dark": {
+    "color-bg": "#050508",
+    "color-surface": "#0a0a14",
+    "color-surface2": "#111120",
+    "color-accent": "#c084fc",
+    "color-accent2": "#fb7185",
+    "color-text1": "#f5f0ff",
+    "color-text2": "#a896c4"
+  }
+}
+```
+
+## Dark Mode
+
+Add a `dark` key to your theme.json. It only needs to contain the tokens you want to override -- tokens not listed inherit from `tokens`.
+
+Typically you override:
+- `color-bg`, `color-surface`, `color-surface2` (dark backgrounds)
+- `color-border`, `color-border2` (white-based opacity instead of black-based)
+- `color-text1`, `color-text2` (light text on dark backgrounds)
+
+Accent colors often stay the same or shift slightly brighter for dark mode.
+
+```json
+{
+  "tokens": { "color-accent": "#6c5ce7" },
+  "dark": { "color-accent": "#7c6dfa" }
+}
+```
+
+## Embedding a Theme in a Skill
+
+When creating a skill/recipe, include the theme tokens in the `theme` field:
+
+```json
+{
+  "name": "my-dashboard",
+  "blocks": [...],
+  "theme": {
+    "color-accent": "#2563eb",
+    "color-bg": "#f8fafc"
+  }
+}
+```
+
+The `theme` field in a skill uses the flat token map (same as `tokens`), not the full `theme.json` structure.
+
+## Constraints
+
+- **WCAG contrast**: `color-text1` on `color-bg` must have a contrast ratio of at least 4.5:1. `color-text2` on `color-surface` should be at least 3:1.
+- **All 11 tokens must be defined** in the `tokens` section. Missing tokens fall back to built-in defaults, which may clash with your palette.
+- `color-text2` must be readable on both `color-bg` and `color-surface`.
+- `color-accent` must be visible on `color-surface` (buttons, links).
+- Borders (`color-border`, `color-border2`) should be subtle -- use rgba values.
+
+## Common Mistakes
+
+| Mistake | Consequence | Fix |
+|---------|-------------|-----|
+| No `dark` section | Dark mode falls back to built-in dark tokens, clashing with your custom accent colors | Always provide a `dark` section |
+| `color-border` and `color-border2` too similar | Borders lose their visual hierarchy | Use opacity 0.08 for border and 0.14+ for border2 |
+| `color-text2` too light on light theme | Labels and captions become unreadable | Test text2 on both bg and surface backgrounds |
+| Using hex for borders | No transparency, harsh lines on colored surfaces | Use rgba values for borders |
+| `color-accent` too dark | Buttons and links invisible on dark surfaces | Ensure accent has enough brightness for dark mode |
+| Forgetting `color-amber`/`color-teal` | Alerts and trend indicators use wrong colors | Always define all semantic colors |
+
+  </script>
+  <script type="text/markdown" data-page="agents-composing">
+# Composing UIs -- Agent Guide
+
+> This document is designed to be injected into an AI agent's context. It contains everything needed to compose a UI from blocks using webmcp-auto-ui.
+
+## What is a Composed UI?
+
+A composed UI is a collection of **blocks** arranged in sequence. Each block has a `type` and a `data` object. The `BlockRenderer` component dispatches each block to the appropriate widget based on its type.
+
+## The 24 Block Types
+
+### Simple Blocks (9)
+
+| Type | Description | Minimal data |
+|------|-------------|-------------|
+| `stat` | Single metric with optional trend | `{"label":"Revenue","value":"$142K","trend":"+12%","trendDir":"up"}` |
+| `kv` | Key-value pair list | `{"title":"Info","rows":[["Status","Active"],["Uptime","99.9%"]]}` |
+| `list` | Bulleted text list | `{"title":"Tasks","items":["Deploy API","Run tests"]}` |
+| `chart` | Simple bar chart | `{"title":"Sales","bars":[["Q1",80],["Q2",120],["Q3",95]]}` |
+| `alert` | Alert banner with level | `{"title":"Warning","message":"Disk usage at 90%","level":"warn"}` |
+| `code` | Syntax-highlighted code block | `{"lang":"json","content":"{\"key\": \"value\"}"}` |
+| `text` | Plain text paragraph | `{"content":"This is a description paragraph."}` |
+| `actions` | Row of action buttons | `{"buttons":[{"label":"Approve","primary":true},{"label":"Reject"}]}` |
+| `tags` | Tag/chip collection | `{"label":"Tags","tags":[{"text":"prod","active":true},{"text":"v2.1"}]}` |
+
+### Rich Blocks (15)
+
+| Type | Description | Minimal data |
+|------|-------------|-------------|
+| `stat-card` | Stat with variant color and trend | `{"label":"Users","value":8204,"variant":"success","trend":"up","delta":"+3.2%"}` |
+| `data-table` | Sortable data table | `{"title":"Users","columns":[{"key":"name","label":"Name"},{"key":"email","label":"Email"}],"rows":[{"name":"Alice","email":"a@b.com"}]}` |
+| `timeline` | Vertical timeline | `{"title":"History","events":[{"date":"2024-01","title":"Launch","status":"done"},{"date":"2024-03","title":"v2.0","status":"active"}]}` |
+| `profile` | User profile card | `{"name":"Jane Doe","subtitle":"Engineer","fields":[{"label":"Email","value":"j@co.com"}],"stats":[{"label":"Projects","value":"12"}]}` |
+| `trombinoscope` | People grid with avatars | `{"title":"Team","people":[{"name":"Alice","subtitle":"Lead"},{"name":"Bob","subtitle":"Dev"}],"columns":3}` |
+| `json-viewer` | Interactive JSON tree | `{"title":"Response","data":{"status":"ok","items":[1,2,3]}}` |
+| `hemicycle` | Parliamentary hemicycle chart | `{"title":"Assembly","groups":[{"id":"a","label":"Party A","seats":120,"color":"#3b82f6"},{"id":"b","label":"Party B","seats":80,"color":"#ef4444"}]}` |
+| `chart-rich` | Multi-type chart (bar/line/area/pie/donut) | `{"title":"Revenue","type":"line","labels":["Jan","Feb","Mar"],"data":[{"label":"2024","values":[10,20,30]}]}` |
+| `cards` | Card grid with images | `{"title":"Products","cards":[{"title":"Widget","description":"A useful widget","tags":["new"]}]}` |
+| `grid-data` | Spreadsheet-like grid | `{"title":"Matrix","columns":[{"key":"a","label":"A"},{"key":"b","label":"B"}],"rows":[[1,2],[3,4]]}` |
+| `sankey` | Flow diagram (sankey-style) | `{"title":"Traffic","nodes":[{"id":"a","label":"Google"},{"id":"b","label":"Site"}],"links":[{"source":"a","target":"b","value":500}]}` |
+| `map` | Interactive Leaflet map | `{"title":"Offices","center":{"lat":48.85,"lng":2.35},"zoom":5,"markers":[{"lat":48.85,"lng":2.35,"label":"Paris"}]}` |
+| `log` | Log viewer with levels | `{"title":"Logs","entries":[{"timestamp":"10:30:01","level":"info","message":"Server started"},{"level":"error","message":"Connection refused"}]}` |
+| `gallery` | Image gallery with lightbox | `{"title":"Photos","images":[{"src":"https://picsum.photos/400/300","caption":"Sample"}],"columns":3}` |
+| `carousel` | Slide carousel with autoplay | `{"title":"Slides","slides":[{"src":"https://picsum.photos/800/400","title":"Slide 1"}],"autoPlay":true,"interval":4000}` |
+
+## Composing a Skill (Recipe)
+
+A skill is a JSON object combining blocks with metadata:
+
+```json
+{
+  "name": "kpi-dashboard",
+  "description": "Key metrics overview",
+  "mcp": "https://mcp.example.com/mcp",
+  "mcpName": "my-server",
+  "llm": "claude-sonnet",
+  "tags": ["kpi", "dashboard"],
+  "theme": {
+    "color-accent": "#2563eb"
+  },
+  "blocks": [
+    { "type": "stat", "data": { "label": "Revenue", "value": "$142K", "trend": "+12%", "trendDir": "up" } },
+    { "type": "stat", "data": { "label": "Users", "value": "8,204", "trend": "+3.2%", "trendDir": "up" } },
+    { "type": "chart", "data": { "title": "Monthly Revenue", "bars": [["Jan",80],["Feb",95],["Mar",120]] } }
+  ]
+}
+```
+
+Fields:
+- `name` (required): skill identifier
+- `description` (optional): human-readable description
+- `mcp` (optional): MCP server URL
+- `mcpName` (optional): display name for the MCP server
+- `llm` (optional): preferred LLM model (`claude-haiku`, `claude-sonnet`, `gemma-e2b`, `auto`)
+- `tags` (optional): array of string tags
+- `theme` (optional): flat token overrides (`{"color-accent": "#2563eb"}`)
+- `blocks` (required): array of `{ type, data }` objects
+
+## HyperSkill URL Encoding
+
+Skills can be encoded into a URL parameter `?hs=` for sharing:
+
+- The skill is serialized as JSON
+- If < 6KB: base64 encoded directly
+- If >= 6KB: gzip compressed, then base64 encoded with `gz.` prefix
+
+URL format: `https://domain.com/viewer?hs=<base64>` or `https://domain.com/composer?hs=<base64>`
+
+To decode: read the `hs` query param, check for `gz.` prefix, decompress if needed, base64-decode, JSON.parse.
+
+## Workflow: Building a Dashboard
+
+When a designer says "I want a KPI dashboard":
+
+1. Identify the key metrics -- use `stat` blocks (3-4 max at the top)
+2. Add a chart for trends -- use `chart` (simple) or `chart-rich` (multi-series, pie, line)
+3. Add a data table for details -- use `data-table` for tabular data
+4. Add contextual info -- use `kv` for metadata pairs, `alert` for warnings
+5. Wrap with a theme if branding matters
+
+## Composition Examples
+
+### Dashboard KPI (3 stats + chart)
+
+```json
+{
+  "blocks": [
+    { "type": "stat", "data": { "label": "Revenue", "value": "$142K", "trend": "+12.4%", "trendDir": "up" } },
+    { "type": "stat", "data": { "label": "Users", "value": "8,204", "trend": "+3.2%", "trendDir": "up" } },
+    { "type": "stat", "data": { "label": "Churn", "value": "2.1%", "trend": "-0.4%", "trendDir": "down" } },
+    { "type": "chart-rich", "data": { "title": "Revenue Trend", "type": "area", "labels": ["Jan","Feb","Mar","Apr"], "data": [{ "label": "2024", "values": [98,112,128,142] }] } }
+  ]
+}
+```
+
+### User Profile (profile + timeline + stats)
+
+```json
+{
+  "blocks": [
+    { "type": "profile", "data": { "name": "Jane Doe", "subtitle": "Senior Engineer", "badge": { "text": "Active", "variant": "success" }, "fields": [{ "label": "Email", "value": "jane@example.com" }, { "label": "Team", "value": "Platform" }], "stats": [{ "label": "Projects", "value": "12" }, { "label": "Commits", "value": "847" }] } },
+    { "type": "timeline", "data": { "title": "Activity", "events": [{ "date": "2024-03-15", "title": "Promoted to Senior", "status": "done" }, { "date": "2024-01-10", "title": "Shipped v3.0", "status": "done" }, { "date": "2023-09-01", "title": "Joined team", "status": "done" }] } }
+  ]
+}
+```
+
+### Monitoring (alert + kv + log)
+
+```json
+{
+  "blocks": [
+    { "type": "alert", "data": { "title": "Database degraded", "message": "High latency on primary-eu. Investigating.", "level": "warn" } },
+    { "type": "kv", "data": { "title": "Service Status", "rows": [["API","OK"],["Database","Degraded"],["CDN","OK"],["Queue","Warning"]] } },
+    { "type": "log", "data": { "title": "Recent Logs", "entries": [{ "timestamp": "14:32:01", "level": "error", "source": "db", "message": "Connection timeout after 5000ms" }, { "timestamp": "14:31:45", "level": "warn", "source": "api", "message": "Slow query detected: 3200ms" }, { "timestamp": "14:30:00", "level": "info", "source": "cdn", "message": "Cache purge completed" }] } }
+  ]
+}
+```
+
+## Constraints
+
+- Block `type` must be one of the 24 valid types listed above.
+- Block `data` must match the expected shape for that type (see the ui-widgets.md agent guide for full specs).
+- Blocks are rendered in order, top to bottom.
+- Keep skill size under ~6KB before gzip for HyperSkill URL encoding (browser URL length limits).
+- `stat` blocks work best in groups of 2-4 for visual rhythm.
+- `data-table` supports up to 200 displayed rows (overflow is indicated).
+
+## Common Mistakes
+
+| Mistake | Consequence | Fix |
+|---------|-------------|-----|
+| Using `chart` when you need multiple datasets | `chart` only supports single-series bars | Use `chart-rich` with `data` array for multi-series |
+| Putting too many blocks (10+) in one skill | Overwhelming UI, slow rendering | Split into focused skills or use tabs |
+| Missing `type` field on a block | BlockRenderer shows `[undefined]` placeholder | Always include `type` on every block |
+| Wrong data shape for block type | Widget renders empty or errors silently | Check the expected interface for each type |
+| Using `chart-rich` type as `chart` | Renders as simple bar chart, ignoring pie/line config | Use type `chart-rich` for Chart.svelte, `chart` for ChartBlock.svelte |
+
+  </script>
+  <script type="text/markdown" data-page="agents-ui-widgets">
+# UI Widgets -- Agent Guide
+
+> This document is designed to be injected into an AI agent's context. It is the exhaustive catalogue of all webmcp-auto-ui widgets with their props and data examples.
+
+## How BlockRenderer Works
+
+The `BlockRenderer` component receives `{ type, data }` and dispatches to the correct widget:
+- Simple blocks receive data as the `data` prop
+- Rich blocks receive data as the `spec` prop
+- Unknown types render a `[type]` placeholder
+
+Each block auto-registers WebMCP tools (`block_<id>_get`, `block_<id>_update`, `block_<id>_remove`) when `navigator.modelContext` is available.
+
+---
+
+## Category: Simple Blocks (9)
+
+### stat -- Single Metric
+
+Displays a single metric value with optional trend indicator.
+
+```typescript
+interface StatBlockData {
+  label: string;       // metric name
+  value: string;       // displayed value
+  trend?: string;      // trend text (e.g. "+12%")
+  trendDir?: 'up' | 'down' | 'neutral';
+}
+```
+
+```json
+{ "type": "stat", "data": { "label": "Revenue", "value": "$142K", "trend": "+12.4%", "trendDir": "up" } }
+```
+
+Use when: displaying a single KPI, metric, or counter.
+
+### kv -- Key-Value Pairs
+
+Displays a list of key-value pairs with a divider between each row.
+
+```typescript
+interface KVBlockData {
+  title?: string;
+  rows: [string, string][];  // array of [key, value] tuples
+}
+```
+
+```json
+{ "type": "kv", "data": { "title": "Server Info", "rows": [["Host", "prod-eu-01"], ["CPU", "42%"], ["Memory", "6.2 GB"]] } }
+```
+
+Use when: showing metadata, config values, or property lists.
+
+### list -- Text List
+
+Simple bulleted list of text items.
+
+```typescript
+interface ListBlockData {
+  title?: string;
+  items: string[];
+}
+```
+
+```json
+{ "type": "list", "data": { "title": "Action Items", "items": ["Review PR #42", "Update docs", "Deploy to staging"] } }
+```
+
+Use when: displaying ordered or unordered lists of items.
+
+### chart -- Simple Bar Chart
+
+Minimal bar chart with labeled bars.
+
+```typescript
+interface ChartBlockData {
+  title?: string;
+  bars: [string, number][];  // [label, value] tuples
+}
+```
+
+```json
+{ "type": "chart", "data": { "title": "Monthly Sales", "bars": [["Jan", 80], ["Feb", 95], ["Mar", 120], ["Apr", 110]] } }
+```
+
+Use when: showing a simple single-series bar chart. For multi-series, pie, line, or area charts, use `chart-rich`.
+
+### alert -- Alert Banner
+
+Colored alert with a level indicator (border-left accent).
+
+```typescript
+interface AlertBlockData {
+  title?: string;
+  message?: string;
+  level?: 'info' | 'warn' | 'error';
+}
+```
+
+```json
+{ "type": "alert", "data": { "title": "Deployment failed", "message": "Build step 3 returned exit code 1.", "level": "error" } }
+```
+
+Use when: showing warnings, errors, or informational notices.
+
+### code -- Code Block
+
+Monospaced code display with language label.
+
+```typescript
+interface CodeBlockData {
+  lang?: string;     // language label (display only, no syntax highlighting)
+  content?: string;  // code content
+}
+```
+
+```json
+{ "type": "code", "data": { "lang": "sql", "content": "SELECT * FROM users WHERE active = true LIMIT 10;" } }
+```
+
+Use when: displaying code snippets, SQL queries, or technical output.
+
+### text -- Text Paragraph
+
+Plain text content block.
+
+```typescript
+interface TextBlockData {
+  content?: string;
+}
+```
+
+```json
+{ "type": "text", "data": { "content": "This report summarizes Q1 performance across all regions." } }
+```
+
+Use when: adding descriptive text between other blocks.
+
+### actions -- Action Buttons
+
+Row of buttons (primary and secondary variants).
+
+```typescript
+interface ActionButton { label: string; primary?: boolean; }
+interface ActionsBlockData {
+  buttons: ActionButton[];
+}
+```
+
+```json
+{ "type": "actions", "data": { "buttons": [{ "label": "Approve", "primary": true }, { "label": "Reject" }, { "label": "Skip" }] } }
+```
+
+Use when: presenting action choices to the user.
+
+### tags -- Tag Collection
+
+Horizontal list of tag chips with optional active state.
+
+```typescript
+interface TagItem { text: string; active?: boolean; }
+interface TagsBlockData {
+  label?: string;
+  tags: TagItem[];
+}
+```
+
+```json
+{ "type": "tags", "data": { "label": "Filters", "tags": [{ "text": "production", "active": true }, { "text": "staging" }, { "text": "v3.1", "active": true }] } }
+```
+
+Use when: showing categories, filters, status badges, or labels.
+
+---
+
+## Category: Rich Widgets (15)
+
+### stat-card -- Enhanced Stat Card
+
+Stat with colored variant, trend object, and previous value.
+
+```typescript
+interface StatCardTrend { direction: 'up' | 'down' | 'flat'; value?: string; positive?: boolean; }
+interface StatCardSpec {
+  label?: string;
+  value?: unknown;       // string or number
+  unit?: string;
+  delta?: string;        // fallback trend text when trend is a string
+  trend?: 'up' | 'down' | 'flat' | StatCardTrend;
+  previousValue?: unknown;
+  variant?: 'default' | 'success' | 'warning' | 'error' | 'info';
+}
+```
+
+```json
+{ "type": "stat-card", "data": { "label": "Active Users", "value": 8204, "unit": "users", "trend": { "direction": "up", "value": "+3.2%", "positive": true }, "variant": "success" } }
+```
+
+Use when: you need a visually distinct stat card with color-coded variant.
+
+### data-table -- Sortable Table
+
+Full-featured data table with column definitions, sorting, and row click.
+
+```typescript
+interface DataTableColumn { key: string; label: string; align?: 'left' | 'center' | 'right'; type?: 'text' | 'number' | 'boolean' | 'link'; }
+interface DataTableSpec {
+  title?: string;
+  columns?: DataTableColumn[];   // auto-inferred from rows if omitted
+  rows?: Record<string, unknown>[];
+  compact?: boolean;
+  striped?: boolean;
+  emptyMessage?: string;
+}
+```
+
+```json
+{ "type": "data-table", "data": { "title": "Users", "columns": [{ "key": "name", "label": "Name" }, { "key": "email", "label": "Email" }, { "key": "active", "label": "Active", "type": "boolean" }], "rows": [{ "name": "Alice", "email": "alice@co.com", "active": true }, { "name": "Bob", "email": "bob@co.com", "active": false }] } }
+```
+
+Use when: displaying tabular data. Supports up to 200 displayed rows.
+
+### timeline -- Vertical Timeline
+
+Chronological event list with status indicators.
+
+```typescript
+interface TimelineEvent {
+  date?: string;
+  title?: string;
+  description?: string;
+  status?: 'done' | 'active' | 'pending';
+  color?: string;
+  href?: string;
+  tags?: string[];
+}
+interface TimelineSpec {
+  title?: string;
+  events?: TimelineEvent[];
+}
+```
+
+```json
+{ "type": "timeline", "data": { "title": "Project History", "events": [{ "date": "2024-01-15", "title": "Project started", "status": "done" }, { "date": "2024-03-01", "title": "Beta launch", "status": "active" }, { "date": "2024-06-01", "title": "GA release", "status": "pending" }] } }
+```
+
+Use when: showing chronological events, history, or process steps.
+
+### profile -- Profile Card
+
+User/entity profile with avatar, fields, stats, and actions.
+
+```typescript
+interface ProfileField { label: string; value: string; href?: string; }
+interface ProfileStat { label: string; value: string; }
+interface ProfileAction { label: string; href?: string; variant?: 'primary' | 'secondary' | 'danger'; }
+interface ProfileSpec {
+  name?: string;
+  subtitle?: string;
+  avatar?: { src: string; alt?: string };
+  badge?: { text: string; variant?: 'default' | 'success' | 'warning' | 'error' };
+  fields?: ProfileField[];
+  stats?: ProfileStat[];
+  actions?: ProfileAction[];
+}
+```
+
+```json
+{ "type": "profile", "data": { "name": "Jane Doe", "subtitle": "Senior Engineer", "badge": { "text": "Active", "variant": "success" }, "fields": [{ "label": "Email", "value": "jane@example.com" }, { "label": "Location", "value": "Paris, FR" }], "stats": [{ "label": "Projects", "value": "12" }, { "label": "Commits", "value": "847" }], "actions": [{ "label": "Message", "variant": "primary" }, { "label": "View Profile", "variant": "secondary" }] } }
+```
+
+Use when: displaying a person, user, or entity profile.
+
+### trombinoscope -- People Grid
+
+Grid of people with avatars and badges.
+
+```typescript
+interface TrombinoscopePerson {
+  name: string;
+  subtitle?: string;
+  avatar?: string;      // image URL
+  badge?: string;
+  color?: string;
+  badgeColor?: string;
+}
+interface TrombinoscopeSpec {
+  title?: string;
+  people?: TrombinoscopePerson[];
+  columns?: number;      // default: 4
+  showBadge?: boolean;   // default: true
+}
+```
+
+```json
+{ "type": "trombinoscope", "data": { "title": "Engineering Team", "columns": 4, "people": [{ "name": "Alice Martin", "subtitle": "Lead", "badge": "TL" }, { "name": "Bob Chen", "subtitle": "Backend" }, { "name": "Carol Silva", "subtitle": "Frontend" }] } }
+```
+
+Use when: displaying a team directory, org chart, or people listing.
+
+### json-viewer -- Interactive JSON Tree
+
+Collapsible tree view for JSON data.
+
+```typescript
+interface JsonViewerSpec {
+  title?: string;
+  data?: unknown;       // any JSON-serializable value
+  maxDepth?: number;    // default: 5
+  expanded?: boolean;   // default: true (first 2 levels open)
+}
+```
+
+```json
+{ "type": "json-viewer", "data": { "title": "API Response", "data": { "status": "ok", "users": [{ "id": 1, "name": "Alice" }, { "id": 2, "name": "Bob" }], "meta": { "total": 2, "page": 1 } } } }
+```
+
+Use when: displaying raw JSON data for inspection or debugging.
+
+### hemicycle -- Parliamentary Chart
+
+SVG hemicycle visualization for seat distribution.
+
+```typescript
+interface HemicycleGroup {
+  id: string;
+  label: string;
+  seats: number;
+  color: string;       // hex color
+}
+interface HemicycleSpec {
+  title?: string;
+  groups?: HemicycleGroup[];
+  totalSeats?: number;  // auto-calculated from groups if omitted
+  rows?: number;        // auto-calculated, 3-7 based on total seats
+}
+```
+
+```json
+{ "type": "hemicycle", "data": { "title": "National Assembly", "groups": [{ "id": "left", "label": "Left Coalition", "seats": 150, "color": "#ef4444" }, { "id": "center", "label": "Center", "seats": 120, "color": "#f59e0b" }, { "id": "right", "label": "Right Coalition", "seats": 130, "color": "#3b82f6" }] } }
+```
+
+Use when: visualizing parliamentary seats, vote distribution, or proportional data.
+
+### chart-rich -- Multi-Type Chart
+
+Full-featured chart supporting bar, line, area, pie, and donut types.
+
+```typescript
+interface ChartDataset { label?: string; values: number[]; color?: string; }
+interface ChartSpec {
+  title?: string;
+  type?: 'bar' | 'line' | 'area' | 'pie' | 'donut';  // default: 'bar'
+  labels?: string[];        // x-axis labels
+  data?: ChartDataset[];    // one or more datasets
+  legend?: boolean;         // default: true when multiple datasets
+  xAxis?: { label?: string };
+  yAxis?: { label?: string };
+}
+```
+
+```json
+{ "type": "chart-rich", "data": { "title": "Revenue by Region", "type": "bar", "labels": ["EU", "US", "APAC"], "data": [{ "label": "2023", "values": [80, 120, 60], "color": "#6366f1" }, { "label": "2024", "values": [95, 140, 85], "color": "#22d3ee" }] } }
+```
+
+Pie/donut example:
+```json
+{ "type": "chart-rich", "data": { "title": "Market Share", "type": "donut", "labels": ["Chrome", "Safari", "Firefox", "Other"], "data": [{ "values": [65, 18, 10, 7] }] } }
+```
+
+Use when: you need multi-series, line, area, pie, or donut charts. For single-series bars, `chart` is simpler.
+
+### cards -- Card Grid
+
+Responsive card grid with optional images and tags.
+
+```typescript
+interface CardItem {
+  title: string;
+  description?: string;
+  subtitle?: string;
+  image?: string;       // image URL
+  tags?: string[];
+  href?: string;
+}
+interface CardsSpec {
+  title?: string;
+  cards?: CardItem[];
+  minCardWidth?: string;   // default: '180px'
+  gap?: string;            // default: '1rem'
+  emptyMessage?: string;
+}
+```
+
+```json
+{ "type": "cards", "data": { "title": "Products", "cards": [{ "title": "Pro Plan", "description": "For teams of 5-50", "tags": ["popular"] }, { "title": "Enterprise", "description": "Custom solutions", "subtitle": "Contact sales" }] } }
+```
+
+Use when: displaying collections of items as visual cards (products, articles, features).
+
+### grid-data -- Spreadsheet Grid
+
+Low-level grid with row/column data and optional cell highlights.
+
+```typescript
+interface GridDataColumn { key: string; label: string; width?: string; }
+interface GridDataHighlight { row: number; col: number; color?: string; }
+interface GridDataSpec {
+  title?: string;
+  columns?: GridDataColumn[];
+  rows?: unknown[][];            // 2D array of cell values
+  highlights?: GridDataHighlight[];
+  cellHeight?: number;           // default: 32
+}
+```
+
+```json
+{ "type": "grid-data", "data": { "title": "Correlation Matrix", "columns": [{ "key": "a", "label": "A" }, { "key": "b", "label": "B" }, { "key": "c", "label": "C" }], "rows": [[1.0, 0.8, 0.3], [0.8, 1.0, 0.5], [0.3, 0.5, 1.0]], "highlights": [{ "row": 0, "col": 1, "color": "rgba(59,130,246,0.2)" }] } }
+```
+
+Use when: showing matrix data, heatmaps, or spreadsheet-like grids.
+
+### sankey -- Flow Diagram
+
+Horizontal flow visualization with nodes and links.
+
+```typescript
+interface SankeyNode { id: string; label: string; color?: string; }
+interface SankeyLink { source: string; target: string; value: number; label?: string; }
+interface SankeySpec {
+  title?: string;
+  nodes?: SankeyNode[];
+  links?: SankeyLink[];
+}
+```
+
+```json
+{ "type": "sankey", "data": { "title": "Traffic Flow", "nodes": [{ "id": "google", "label": "Google", "color": "#4285f4" }, { "id": "direct", "label": "Direct", "color": "#34a853" }, { "id": "landing", "label": "Landing Page", "color": "#fbbc05" }, { "id": "signup", "label": "Signup", "color": "#ea4335" }], "links": [{ "source": "google", "target": "landing", "value": 500 }, { "source": "direct", "target": "landing", "value": 300 }, { "source": "landing", "target": "signup", "value": 200 }] } }
+```
+
+Use when: visualizing flows, conversions, or resource distribution.
+
+### map -- Interactive Map
+
+Leaflet-based map with circle markers.
+
+```typescript
+interface LatLng { lat: number; lng: number; }
+interface MapMarker { lat: number; lng: number; label?: string; color?: string; }
+interface MapSpec {
+  title?: string;
+  center?: LatLng;       // default: { lat: 46.6, lng: 2.3 } (France)
+  zoom?: number;         // default: 6
+  height?: string;       // default: '400px'
+  markers?: MapMarker[];
+}
+```
+
+```json
+{ "type": "map", "data": { "title": "Office Locations", "center": { "lat": 48.85, "lng": 2.35 }, "zoom": 5, "markers": [{ "lat": 48.8566, "lng": 2.3522, "label": "Paris HQ" }, { "lat": 51.5074, "lng": -0.1278, "label": "London Office", "color": "#22d3ee" }] } }
+```
+
+Use when: showing geographic data, locations, or spatial information.
+
+### log -- Log Viewer
+
+Monospaced log viewer with level coloring.
+
+```typescript
+interface LogEntry {
+  timestamp?: string;
+  level?: 'debug' | 'info' | 'warn' | 'error';
+  message: string;
+  source?: string;
+}
+interface LogViewerSpec {
+  title?: string;
+  entries?: LogEntry[];
+  maxHeight?: string;    // default: '320px'
+}
+```
+
+```json
+{ "type": "log", "data": { "title": "Application Logs", "entries": [{ "timestamp": "2024-03-15 14:30:01", "level": "info", "source": "api", "message": "Request processed in 42ms" }, { "timestamp": "2024-03-15 14:30:02", "level": "error", "source": "db", "message": "Connection pool exhausted" }] } }
+```
+
+Use when: showing application logs, event streams, or audit trails.
+
+### gallery -- Image Gallery
+
+Responsive image grid with built-in lightbox.
+
+```typescript
+interface GalleryImage {
+  src: string;           // image URL
+  alt?: string;
+  caption?: string;
+  href?: string;
+}
+interface GallerySpec {
+  title?: string;
+  images?: GalleryImage[];
+  columns?: number;       // default: 3
+  gap?: string;
+  emptyMessage?: string;
+}
+```
+
+```json
+{ "type": "gallery", "data": { "title": "Project Screenshots", "columns": 3, "images": [{ "src": "https://picsum.photos/400/300?1", "caption": "Dashboard" }, { "src": "https://picsum.photos/400/300?2", "caption": "Settings" }, { "src": "https://picsum.photos/400/300?3", "caption": "Profile" }] } }
+```
+
+Use when: displaying image collections. Supports keyboard navigation in lightbox (Escape, Arrow keys).
+
+### carousel -- Slide Carousel
+
+Horizontal slider with autoplay and touch/swipe support.
+
+```typescript
+interface CarouselSlide {
+  src?: string;           // image URL
+  content?: string;       // text content
+  title?: string;
+  subtitle?: string;
+}
+interface CarouselSpec {
+  title?: string;
+  slides?: CarouselSlide[];
+  autoPlay?: boolean;      // default: true
+  interval?: number;       // default: 5000 (ms)
+}
+```
+
+```json
+{ "type": "carousel", "data": { "title": "Feature Highlights", "autoPlay": true, "interval": 4000, "slides": [{ "src": "https://picsum.photos/800/400?1", "title": "New Dashboard", "subtitle": "Redesigned for clarity" }, { "src": "https://picsum.photos/800/400?2", "title": "Team View", "content": "See your whole team at a glance" }] } }
+```
+
+Use when: showcasing features, images, or content in a rotating view.
+
+---
+
+## Category: Primitives (5)
+
+These are layout components used internally. They are not block types but can be used when building custom layouts:
+
+| Component | Purpose |
+|-----------|---------|
+| `Window` | Draggable window container with title bar |
+| `Card` | Basic card wrapper |
+| `Panel` | Panel container |
+| `List` | Primitive list |
+| `GridLayout` | Grid layout wrapper |
+
+---
+
+## Category: Base Components (7)
+
+UI primitives exported from `@webmcp-auto-ui/ui/base`:
+
+| Component | Purpose |
+|-----------|---------|
+| `Button` | Styled button with variants |
+| `Input` | Text input field |
+| `Badge` | Status badge with variants |
+| `NativeSelect` | Native select dropdown |
+| `Tooltip` | Tooltip wrapper |
+| `Dialog` | Modal dialog (Dialog, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription) |
+
+---
+
+## Constraints
+
+- Block `type` must exactly match one of the 24 block types (case-sensitive).
+- Simple blocks use `data` prop; rich blocks use `spec` prop. The `BlockRenderer` handles this mapping automatically -- you always pass `data` in the block definition.
+- JSON data must be syntactically valid. All strings must be double-quoted.
+- Image URLs in `gallery`, `carousel`, `cards`, `profile` must be accessible (CORS-friendly).
+- `data-table` renders max 200 rows. Provide the most relevant subset.
+- `map` requires Leaflet (loaded dynamically). First render shows a loading state.
+
+## Common Mistakes
+
+| Mistake | Consequence | Fix |
+|---------|-------------|-----|
+| Using `chart` type for pie/donut | `chart` only renders bars | Use `chart-rich` with `type: "pie"` |
+| Passing `rows` as objects to `grid-data` | Grid expects 2D arrays `unknown[][]` | Use `data-table` for object rows, `grid-data` for arrays |
+| Missing `id` on hemicycle groups | Click events cannot identify the group | Always include `id` on each group |
+| `data-table` columns with wrong `key` | Cells render as empty/null | Column `key` must match the keys in row objects |
+| Gallery images without `src` | Broken image placeholders | Ensure every image has a valid `src` URL |
+| Using `trend` string on `stat-card` without `delta` | Trend arrow shows but no value text | Set `delta` when `trend` is a simple string, or use the object form |
+
+  </script>
+  <script type="text/markdown" data-page="agents-mcp">
+# MCP Integration -- Agent Guide
+
+> This document is designed to be injected into an AI agent's context. It contains everything needed to connect and use MCP (Model Context Protocol) servers with webmcp-auto-ui.
+
+## What is MCP?
+
+MCP (Model Context Protocol) is a JSON-RPC 2.0 protocol that allows AI agents and applications to discover and call tools exposed by remote servers. In webmcp-auto-ui, MCP is the bridge between data sources and the UI: you connect to an MCP server, list its tools, call them to fetch data, and display results using UI blocks.
+
+## Architecture Overview
+
+```
+User prompt --> Agent Loop --> LLM (Claude/Gemma)
+                  |                    |
+                  |              tool_use blocks
+                  |                    |
+                  v                    v
+              MCP Client -------> MCP Server (remote)
+                  |                    |
+              tool results        data/actions
+                  |
+                  v
+              UI Blocks (stat, chart, table, etc.)
+```
+
+## McpClient API
+
+The `McpClient` class (from `@webmcp-auto-ui/core`) handles the full MCP lifecycle.
+
+### Connecting
+
+```typescript
+import { McpClient } from '@webmcp-auto-ui/core';
+
+const client = new McpClient('https://mcp.example.com/mcp', {
+  clientName: 'my-app',
+  clientVersion: '1.0.0',
+  timeout: 30000,
+  headers: {
+    'Authorization': 'Bearer <token>'  // optional
+  },
+  autoReconnect: true,
+  maxReconnectAttempts: 3
+});
+
+// Initialize the connection (required before any other call)
+const initResult = await client.connect();
+// initResult: { protocolVersion, capabilities, serverInfo }
+```
+
+### Listing Tools
+
+```typescript
+const tools = await client.listTools();
+// tools: McpTool[]
+// Each tool: { name, description, inputSchema, outputSchema, annotations }
+```
+
+### Calling a Tool
+
+```typescript
+const result = await client.callTool('query_sql', {
+  sql: 'SELECT name, revenue FROM products ORDER BY revenue DESC LIMIT 5'
+});
+// result: { content: [{ type: 'text', text: '...' }], isError?: boolean }
+```
+
+### Disconnecting
+
+```typescript
+await client.disconnect();
+```
+
+## Transport: Streamable HTTP
+
+The MCP client uses HTTP POST with JSON-RPC 2.0 payloads:
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json, text/event-stream`
+- **Session management**: The server returns an `Mcp-Session-Id` header on first request. The client sends it back on subsequent requests.
+- **Auto-reconnect**: If the server returns 404 (session expired), the client automatically re-initializes with exponential backoff (500ms * attempt).
+- **SSE responses**: The server may respond with `text/event-stream`. The client parses `data:` lines and extracts the last complete JSON-RPC response.
+
+### Request Format
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "query_sql",
+    "arguments": { "sql": "SELECT 1" }
+  }
+}
+```
+
+### Response Format
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [{ "type": "text", "text": "[{\"id\":1}]" }]
+  }
+}
+```
+
+## MCP Tool Shape
+
+```typescript
+interface McpTool {
+  name: string;
+  description?: string;
+  inputSchema?: JsonSchema;   // JSON Schema for parameters
+  outputSchema?: JsonSchema;
+  annotations?: {
+    readOnlyHint?: boolean;
+    destructiveHint?: boolean;
+    idempotentHint?: boolean;
+    openWorldHint?: boolean;
+  };
+}
+```
+
+## Integrating MCP in a Skill
+
+A skill can reference an MCP server via the `mcp` and `mcpName` fields:
+
+```json
+{
+  "name": "sales-dashboard",
+  "mcp": "https://mcp.example.com/mcp",
+  "mcpName": "sales-api",
+  "blocks": [
+    { "type": "stat", "data": { "label": "Revenue", "value": "$142K" } }
+  ]
+}
+```
+
+When a skill has an `mcp` field, the runtime:
+1. Creates an `McpClient` and connects to the URL
+2. Lists available tools
+3. Makes them available to the agent loop alongside UI tools
+
+## The Agent Loop Pattern
+
+The `runAgentLoop` function orchestrates LLM + MCP + UI:
+
+```typescript
+import { McpClient } from '@webmcp-auto-ui/core';
+import { runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
+
+// 1. Connect to MCP
+const client = new McpClient('https://mcp.example.com/mcp');
+await client.connect();
+const tools = await client.listTools();
+
+// 2. Run the agent loop
+const result = await runAgentLoop('Show me top 5 products by revenue', {
+  client,
+  provider: myLLMProvider,    // LLMProvider implementation
+  mcpTools: fromMcpTools(tools),
+  maxIterations: 5,
+  callbacks: {
+    onBlock: (type, data) => { /* add block to UI */ },
+    onText: (text) => { /* display assistant text */ },
+    onToolCall: (call) => { /* log tool call */ }
+  }
+});
+```
+
+The loop works as follows:
+1. Sends user message + system prompt to LLM
+2. LLM returns tool_use blocks (DATA tools or UI tools)
+3. DATA tools are executed via `client.callTool()`
+4. UI tools are executed locally via callbacks (`onBlock`, `onClear`)
+5. Tool results are sent back to LLM
+6. Repeat until LLM returns `end_turn` or max iterations reached
+
+### System Prompt
+
+The auto-generated system prompt tells the LLM:
+- Which DATA tools are available (from MCP server)
+- Which UI tools are available (stat, chart, table, etc.)
+- The mandatory workflow: fetch data first, then display with UI tools
+
+## Auto-Generated UI Pattern
+
+Connect MCP, list tools, and let the agent auto-generate the UI:
+
+1. User connects to an MCP server URL
+2. App calls `client.listTools()` to discover available tools
+3. User types a natural language query
+4. Agent loop calls MCP tools to fetch data, then UI tools to render blocks
+5. Result: a fully generated dashboard without manual block composition
+
+## Example: Connect and Generate
+
+```typescript
+// Connect to code4code MCP server
+const client = new McpClient('https://mcp.code4code.eu/mcp');
+await client.connect();
+
+console.log('Server:', client.getServerInfo());
+// { name: "code4code", version: "1.0.0" }
+
+const tools = await client.listTools();
+console.log('Available tools:', tools.map(t => t.name));
+// ["query_sql", "list_tables", "describe_table", "search_recipes", ...]
+
+// Run agent loop with a user query
+const result = await runAgentLoop('List all recipes with their ratings', {
+  client,
+  provider: claudeProvider,
+  mcpTools: fromMcpTools(tools),
+  callbacks: {
+    onBlock: (type, data) => blocks.push({ type, data }),
+    onText: (text) => console.log('Assistant:', text)
+  }
+});
+
+// result.toolCalls shows what the agent did:
+// 1. Called query_sql to fetch recipes
+// 2. Called ui_data_table to display results
+```
+
+## Authentication
+
+MCP servers can require authentication. Pass a Bearer token in the headers:
+
+```typescript
+const client = new McpClient('https://mcp.example.com/mcp', {
+  headers: {
+    'Authorization': 'Bearer eyJhbGci...'
+  }
+});
+```
+
+The token is sent with every request (initialize, tools/list, tools/call).
+
+## McpClient Options
+
+```typescript
+interface McpClientOptions {
+  clientName?: string;            // default: 'webmcp-auto-ui'
+  clientVersion?: string;         // default: '0.1.0'
+  timeout?: number;               // request timeout in ms, default: 30000
+  headers?: Record<string, string>; // extra headers (auth, etc.)
+  autoReconnect?: boolean;        // reconnect on 404, default: true
+  maxReconnectAttempts?: number;  // default: 3
+}
+```
+
+## Constraints
+
+- The MCP server must support Streamable HTTP transport (POST with JSON-RPC 2.0).
+- `connect()` must be called before `listTools()` or `callTool()`.
+- Tool results are text-based (`content[].type === 'text'`). Parse JSON from `content[0].text` if needed.
+- The agent loop truncates tool results to 10,000 characters to fit LLM context windows.
+- CORS: the MCP server must allow requests from your domain.
+
+## Common Mistakes
+
+| Mistake | Consequence | Fix |
+|---------|-------------|-----|
+| Calling `listTools()` before `connect()` | Error: session not initialized | Always call `connect()` first |
+| Missing `Authorization` header | 401 or 403 from server | Pass Bearer token in `headers` option |
+| Ignoring `isError` on tool results | Silent failures, incorrect data displayed | Check `result.isError` before using content |
+| Not handling SSE responses | Client hangs or parses incorrectly | The McpClient handles SSE automatically -- no action needed |
+| Setting `timeout` too low for slow tools | Request aborted mid-execution | Increase `timeout` for heavy queries (60000+) |
+| Not calling `disconnect()` | Session leaks on server side | Call `disconnect()` when done or on component unmount |
+
+  </script>
+  <script type="text/markdown" data-page="agents-skills">
+# Skills (Recipes) -- Agent Guide
+
+> This document is designed to be injected into an AI agent's context. It contains everything needed to create, manage, encode, and share skills in webmcp-auto-ui.
+
+## What is a Skill?
+
+A skill (also called a recipe) is a reusable UI composition: a named set of blocks with optional metadata (MCP server, LLM preference, theme, tags). Skills are the fundamental unit of saved UI in webmcp-auto-ui.
+
+## Skill Format
+
+```typescript
+interface SkillBlock {
+  type: string;                      // one of the 24 block types
+  data: Record<string, unknown>;     // block-specific data
+}
+
+interface Skill {
+  id: string;                        // auto-generated (e.g. "sk_m1abc2def")
+  name: string;                      // required
+  description?: string;
+  mcp?: string;                      // MCP server URL
+  mcpName?: string;                  // MCP server display name
+  llm?: string;                      // preferred model: "claude-haiku" | "claude-sonnet" | "gemma-e2b" | "auto"
+  tags?: string[];
+  theme?: Record<string, string>;    // flat token overrides (e.g. {"color-accent": "#2563eb"})
+  blocks: SkillBlock[];              // required
+  createdAt: number;                 // auto-set (epoch ms)
+  updatedAt: number;                 // auto-set (epoch ms)
+}
+```
+
+## CRUD Operations
+
+All CRUD functions are available from `@webmcp-auto-ui/sdk`:
+
+### Create
+
+```typescript
+import { createSkill } from '@webmcp-auto-ui/sdk';
+
+const skill = createSkill({
+  name: 'sales-dashboard',
+  description: 'Overview of sales KPIs',
+  mcp: 'https://mcp.example.com/mcp',
+  mcpName: 'sales-api',
+  llm: 'claude-sonnet',
+  tags: ['sales', 'kpi'],
+  theme: { 'color-accent': '#2563eb' },
+  blocks: [
+    { type: 'stat', data: { label: 'Revenue', value: '$142K', trend: '+12%', trendDir: 'up' } },
+    { type: 'stat', data: { label: 'Orders', value: '1,204', trend: '+8%', trendDir: 'up' } },
+    { type: 'chart', data: { title: 'Monthly Revenue', bars: [['Jan',80],['Feb',95],['Mar',120]] } }
+  ]
+});
+// skill.id is auto-generated
+// skill.createdAt and skill.updatedAt are auto-set
+```
+
+### Read
+
+```typescript
+import { getSkill, listSkills } from '@webmcp-auto-ui/sdk';
+
+const skill = getSkill('sk_m1abc2def');   // returns Skill | undefined
+const allSkills = listSkills();            // returns Skill[], sorted by createdAt desc
+```
+
+### Update
+
+```typescript
+import { updateSkill } from '@webmcp-auto-ui/sdk';
+
+const updated = updateSkill('sk_m1abc2def', {
+  name: 'sales-dashboard-v2',
+  blocks: [/* new blocks */]
+});
+// returns updated Skill | null (null if not found)
+// updatedAt is auto-refreshed
+```
+
+### Delete
+
+```typescript
+import { deleteSkill } from '@webmcp-auto-ui/sdk';
+
+const deleted = deleteSkill('sk_m1abc2def');  // returns boolean
+```
+
+### Bulk Operations
+
+```typescript
+import { clearSkills, loadSkills, loadDemoSkills } from '@webmcp-auto-ui/sdk';
+
+clearSkills();              // removes all skills
+loadSkills(skillArray);     // replaces all skills with provided array
+loadDemoSkills();           // loads built-in demo skills (only if registry is empty)
+```
+
+### Change Listener
+
+```typescript
+import { onSkillsChange } from '@webmcp-auto-ui/sdk';
+
+const unsubscribe = onSkillsChange(() => {
+  console.log('Skills changed!');
+});
+// later: unsubscribe();
+```
+
+## HyperSkill Format
+
+HyperSkill is a URL-based encoding for sharing skills. A skill is serialized into a URL parameter `?hs=` that can be pasted, bookmarked, or shared.
+
+### Structure
+
+```typescript
+interface HyperSkillMeta {
+  title?: string;
+  description?: string;
+  version?: string;
+  created?: string;
+  mcp?: string;
+  mcpName?: string;
+  llm?: string;
+  tags?: string[];
+  theme?: Record<string, string>;
+  hash?: string;
+  previousHash?: string;
+}
+
+interface HyperSkill {
+  meta: HyperSkillMeta;
+  content: unknown;       // typically the blocks array or full skill data
+}
+```
+
+### Encoding
+
+```typescript
+import { encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+
+const skill: HyperSkill = {
+  meta: {
+    title: 'Sales Dashboard',
+    description: 'KPI overview',
+    mcp: 'https://mcp.example.com/mcp',
+    tags: ['sales']
+  },
+  content: [
+    { type: 'stat', data: { label: 'Revenue', value: '$142K' } },
+    { type: 'chart', data: { title: 'Trend', bars: [['Q1',80],['Q2',120]] } }
+  ]
+};
+
+const url = await encodeHyperSkill(skill, 'https://app.example.com/viewer');
+// "https://app.example.com/viewer?hs=eyJtZXRhIjp7InRpdGxlIjoi..."
+```
+
+Encoding rules:
+- JSON serialized, then base64-encoded
+- If payload > 6KB: gzip-compressed first, prefixed with `gz.`
+- The URL is built from the provided source URL + `?hs=` parameter
+
+### Decoding
+
+```typescript
+import { decodeHyperSkill } from '@webmcp-auto-ui/sdk';
+
+const skill = await decodeHyperSkill('https://app.example.com/viewer?hs=eyJtZXRh...');
+// or just the param value:
+const skill2 = await decodeHyperSkill('eyJtZXRhIjp7...');
+
+console.log(skill.meta.title);   // "Sales Dashboard"
+console.log(skill.content);      // blocks array
+```
+
+### Reading from Current URL
+
+```typescript
+import { getHsParam } from '@webmcp-auto-ui/sdk';
+
+const param = getHsParam();  // returns the ?hs= value or null
+if (param) {
+  const skill = await decodeHyperSkill(param);
+}
+```
+
+### URL Format
+
+Skills can be shared via two entry points:
+- **Viewer**: `https://domain.com/viewer?hs=<encoded>` -- read-only display
+- **Composer**: `https://domain.com/composer?hs=<encoded>` -- editable view
+
+### Versioning
+
+HyperSkills support content-addressable versioning via SHA-256 hashes:
+
+```typescript
+import { createVersion } from '@webmcp-auto-ui/sdk';
+
+const version = await createVersion(skill, 'https://app.example.com/viewer', previousHash);
+// version: { hash, previousHash, timestamp, skill }
+```
+
+### Diffing
+
+```typescript
+import { diffSkills } from '@webmcp-auto-ui/sdk';
+
+const changed = diffSkills(oldContent, newContent);
+// returns array of changed top-level keys, e.g. ["blocks", "meta"]
+```
+
+## Embedding a Theme
+
+Include theme token overrides in the skill's `theme` field:
+
+```json
+{
+  "name": "branded-dashboard",
+  "theme": {
+    "color-accent": "#2563eb",
+    "color-accent2": "#dc2626",
+    "color-bg": "#f8fafc"
+  },
+  "blocks": [...]
+}
+```
+
+The `theme` field uses flat key-value pairs (same format as `tokens` in theme.json). These are applied as CSS custom property overrides when the skill is loaded.
+
+## Demo Skills
+
+Three built-in demo skills are available via `loadDemoSkills()`:
+
+### weather-dashboard
+- Blocks: `stat` (temperature) + `kv` (conditions) + `chart` (7-day forecast)
+- Tags: `meteo`, `dashboard`
+
+### kpi-overview
+- Blocks: 3x `stat` (revenue, users, churn) + `chart` (quarterly revenue)
+- Tags: `kpi`, `dashboard`
+
+### status-monitor
+- Blocks: `alert` (DB degraded) + `kv` (service status) + `tags` (active filters)
+- Tags: `ops`, `monitoring`
+
+## Workflow: Create a Skill from Scratch
+
+1. **Define the purpose**: What data does this skill display? What user need does it serve?
+2. **Choose blocks**: Pick 2-5 block types that best represent the data (see composing.md)
+3. **Write the data**: Fill in each block's data object with real or placeholder values
+4. **Add metadata**: Set name, description, tags, optional MCP/LLM references
+5. **Add theme** (optional): Override accent colors to match branding
+6. **Create**: Call `createSkill()` with the complete object
+7. **Encode** (optional): Call `encodeHyperSkill()` to generate a shareable URL
+8. **Share**: Send the URL -- recipients load it via `?hs=` parameter
+
+### Example: Full Workflow
+
+```typescript
+import { createSkill } from '@webmcp-auto-ui/sdk';
+import { encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+
+// Step 1-5: Define the skill
+const skill = createSkill({
+  name: 'team-overview',
+  description: 'Team members and recent activity',
+  tags: ['team', 'hr'],
+  theme: { 'color-accent': '#6366f1' },
+  blocks: [
+    {
+      type: 'trombinoscope',
+      data: {
+        title: 'Engineering Team',
+        columns: 4,
+        people: [
+          { name: 'Alice Martin', subtitle: 'Tech Lead', badge: 'TL' },
+          { name: 'Bob Chen', subtitle: 'Backend' },
+          { name: 'Carol Silva', subtitle: 'Frontend' }
+        ]
+      }
+    },
+    {
+      type: 'timeline',
+      data: {
+        title: 'Recent Activity',
+        events: [
+          { date: '2024-03-15', title: 'Sprint 12 completed', status: 'done' },
+          { date: '2024-03-18', title: 'Sprint 13 started', status: 'active' }
+        ]
+      }
+    },
+    {
+      type: 'stat',
+      data: { label: 'Team Size', value: '8', trend: '+2', trendDir: 'up' }
+    }
+  ]
+});
+
+// Step 7: Encode for sharing
+const hsUrl = await encodeHyperSkill(
+  { meta: { title: skill.name, description: skill.description, tags: skill.tags }, content: skill.blocks },
+  'https://app.example.com/viewer'
+);
+console.log('Share this URL:', hsUrl);
+```
+
+## Constraints
+
+- `name` is required. Cannot be empty.
+- `blocks` is required. Must contain at least one block.
+- Block `type` must be one of the 24 valid types (see composing.md or ui-widgets.md).
+- HyperSkill URL size limit: browser URL length is typically ~2KB-8KB depending on the browser. The gzip compression kicks in above 6KB of JSON. For very large skills (many blocks with large data), consider reducing data or splitting into multiple skills.
+- `theme` uses flat token keys (`"color-accent"`, not nested objects).
+- `id`, `createdAt`, `updatedAt` are auto-managed. Do not set them manually in `createSkill()`.
+
+## Common Mistakes
+
+| Mistake | Consequence | Fix |
+|---------|-------------|-----|
+| Setting `id` in `createSkill()` | TypeScript error (id is excluded from input type) | Let the registry auto-generate the id |
+| Huge blocks data (e.g. 1000-row table) | HyperSkill URL exceeds browser limits | Limit data to what fits visually; paginate server-side |
+| Missing `blocks` array | Skill renders empty | Always include at least one block |
+| `theme` with nested `dark` key | Dark overrides ignored (flat format only) | Use flat tokens; for dark mode, use the full theme.json in ThemeProvider |
+| Forgetting to `await` encode/decode | Returns a Promise, not the actual value | Both `encodeHyperSkill` and `decodeHyperSkill` are async |
+| Using wrong block type string | BlockRenderer shows `[unknown-type]` | Check exact type strings: `stat-card` not `statcard`, `chart-rich` not `chartRich` |
+
+  </script>
+
   <script>
+
     (function () {
       'use strict';
-
-      // ---- Page registry: hash -> markdown file path (relative to site/) ----
-      var pages = {
-        'install':          '../install.md',
-        'architecture':     '../architecture.md',
-        'core':             '../packages/core.md',
-        'ui':               '../packages/ui.md',
-        'sdk':              '../packages/sdk.md',
-        'agent':            '../packages/agent.md',
-        'deploy':           '../tutorials/deploy.md',
-        'themed-demo':      '../tutorials/themed-demo.md',
-        'theming':          '../theming.md',
-        'agents-theming':   '../agents/theming.md',
-        'agents-composing': '../agents/composing.md',
-        'agents-ui-widgets':'../agents/ui-widgets.md',
-        'agents-mcp':       '../agents/mcp.md',
-        'agents-skills':    '../agents/skills.md'
-      };
 
       var contentEl = document.getElementById('content');
       var sidebarEl = document.getElementById('sidebar');
@@ -361,25 +4244,29 @@
       var hamburgerEl = document.getElementById('hamburger');
       var navEl = document.getElementById('nav');
       var currentPage = null;
-      var cache = {};
 
-      // ---- Markdown rendering ----
+      // Read inlined markdown from script tags
+      var inlinedPages = {};
+      var mdBlocks = document.querySelectorAll('script[type="text/markdown"]');
+      for (var i = 0; i < mdBlocks.length; i++) {
+        inlinedPages[mdBlocks[i].dataset.page] = mdBlocks[i].textContent;
+      }
+
       marked.setOptions({
         gfm: true,
         breaks: false,
         highlight: function (code, lang) {
           if (lang && hljs.getLanguage(lang)) {
             try { return hljs.highlight(code, { language: lang }).value; }
-            catch (e) { /* fall through */ }
+            catch (e) {}
           }
           return hljs.highlightAuto(code).value;
         }
       });
 
-      // ---- Navigation ----
       function getPageFromHash() {
         var hash = window.location.hash.replace('#', '');
-        return pages[hash] ? hash : 'install';
+        return inlinedPages[hash] ? hash : 'install';
       }
 
       function setActiveLink(page) {
@@ -400,99 +4287,27 @@
         setActiveLink(page);
         closeSidebar();
 
-        // Check cache
-        if (cache[page]) {
-          renderMarkdown(cache[page]);
+        var md = inlinedPages[page];
+        if (!md) {
+          contentEl.innerHTML = '<div class="error"><h2>Page not found</h2><p>The requested page "' + page + '" does not exist.</p></div>';
           return;
         }
-
-        // Show loading
-        contentEl.innerHTML = '<div class="loading">Loading documentation...</div>';
-
-        var url = pages[page];
-        if (!url) {
-          showError('Page not found', 'The requested page "' + page + '" does not exist.');
-          return;
-        }
-
-        fetch(url)
-          .then(function (res) {
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            return res.text();
-          })
-          .then(function (md) {
-            cache[page] = md;
-            // Only render if still the current page (user may have navigated away)
-            if (currentPage === page) {
-              renderMarkdown(md);
-            }
-          })
-          .catch(function (err) {
-            if (currentPage === page) {
-              showError(
-                'Could not load page',
-                'Failed to load <code>' + url + '</code>.<br>' +
-                'If you are viewing this via <code>file://</code>, some browsers block fetch for local files. ' +
-                'Try serving the docs with a local server:<br><br>' +
-                '<code>npx serve docs/</code> or <code>python3 -m http.server -d docs/</code>'
-              );
-            }
-          });
-      }
-
-      function renderMarkdown(md) {
         contentEl.innerHTML = marked.parse(md);
-        // Re-highlight any code blocks that marked did not catch
         var blocks = contentEl.querySelectorAll('pre code');
         for (var i = 0; i < blocks.length; i++) {
           hljs.highlightElement(blocks[i]);
         }
-        // Scroll to top
         window.scrollTo({ top: 0, behavior: 'instant' });
       }
 
-      function showError(title, message) {
-        contentEl.innerHTML =
-          '<div class="error">' +
-          '<h2>' + title + '</h2>' +
-          '<p>' + message + '</p>' +
-          '</div>';
-      }
-
-      // ---- Event listeners ----
-
-      // Hash change
-      window.addEventListener('hashchange', function () {
-        loadPage(getPageFromHash());
-      });
-
-      // Sidebar link clicks
-      navEl.addEventListener('click', function (e) {
-        var link = e.target.closest('a[data-page]');
-        if (!link) return;
-        // Let the hash change handler do the work
-      });
-
-      // Hamburger
+      window.addEventListener('hashchange', function () { loadPage(getPageFromHash()); });
       hamburgerEl.addEventListener('click', function () {
-        var isOpen = sidebarEl.classList.contains('open');
-        if (isOpen) {
-          closeSidebar();
-        } else {
-          sidebarEl.classList.add('open');
-          overlayEl.classList.add('open');
-        }
+        if (sidebarEl.classList.contains('open')) { closeSidebar(); }
+        else { sidebarEl.classList.add('open'); overlayEl.classList.add('open'); }
       });
-
-      // Overlay click closes sidebar
       overlayEl.addEventListener('click', closeSidebar);
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSidebar(); });
 
-      // Keyboard: Escape closes sidebar
-      document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') closeSidebar();
-      });
-
-      // ---- Initial load ----
       loadPage(getPageFromHash());
     })();
   </script>
