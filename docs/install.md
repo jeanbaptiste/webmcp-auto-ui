@@ -110,3 +110,18 @@ The agent package uses `file:../core` as a dev dependency. Make sure core is bui
 
 **Svelte check errors in UI package**
 Run `npm -w packages/ui run check` to see detailed type diagnostics. Peer dependencies (`svelte`, `d3`, `leaflet`) must be installed at the root.
+
+## Deploying to production
+
+Use the deploy script — it handles build order, correct deploy paths, and cleanup:
+
+```bash
+./scripts/deploy.sh              # deploy all apps
+./scripts/deploy.sh composer     # deploy one app
+```
+
+See [Deploy Tutorial](tutorials/deploy.md) for full details.
+
+**Do NOT deploy manually with scp** — the deploy paths differ per app
+(composer/mobile deploy to root, viewer deploys to `build/`). The script
+knows the correct path for each app.

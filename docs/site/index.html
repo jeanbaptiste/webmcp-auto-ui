@@ -449,6 +449,21 @@ The agent package uses `file:../core` as a dev dependency. Make sure core is bui
 **Svelte check errors in UI package**
 Run `npm -w packages/ui run check` to see detailed type diagnostics. Peer dependencies (`svelte`, `d3`, `leaflet`) must be installed at the root.
 
+## Deploying to production
+
+Use the deploy script — it handles build order, correct deploy paths, and cleanup:
+
+```bash
+./scripts/deploy.sh              # deploy all apps
+./scripts/deploy.sh composer     # deploy one app
+```
+
+See [Deploy Tutorial](tutorials/deploy.md) for full details.
+
+**Do NOT deploy manually with scp** — the deploy paths differ per app
+(composer/mobile deploy to root, viewer deploys to `build/`). The script
+knows the correct path for each app.
+
   </script>
   <script type="text/markdown" data-page="architecture">
 # Architecture
@@ -1436,269 +1451,174 @@ The standard agent workflow:
   <script type="text/markdown" data-page="deploy">
 # Deploy to Production
 
-This tutorial walks through building and deploying the entire webmcp-auto-ui monorepo to `demos.hyperskills.net`.
+## Quick deploy (recommended)
 
-## Prerequisites
+```bash
+./scripts/deploy.sh                # deploy all apps
+./scripts/deploy.sh composer       # deploy one app
+./scripts/deploy.sh mobile home    # deploy specific apps
+```
 
-- SSH access to the server (configured as `bot` in `~/.ssh/config`)
-- The server has nginx configured for `demos.hyperskills.net`
-- Node.js 20+ on your local machine
-- `ANTHROPIC_API_KEY` set in `.env` files on the server for Node apps
+The script handles everything: builds packages, builds apps, cleans old
+files on the server, copies to the correct location, restarts services,
+and verifies.
 
-## Architecture
+**Always use this script. Never deploy manually with scp.**
 
-The deployment target has this layout on the server:
+---
+
+## Server architecture
 
 ```
 /opt/webmcp-demos/
-  home/              # static — served by nginx
-  todo/              # static — served by nginx
-  showcase/          # static — served by nginx
-  composer/build/    # Node app — systemd service
-  viewer/build/      # Node app — systemd service
-  mobile/build/      # Node app — systemd service
+  home/              # static — nginx serves directly
+  todo/              # static — nginx serves directly
+  showcase/          # static — nginx serves directly
+  composer/          # Node — systemd runs: node index.js
+  viewer/build/      # Node — systemd runs: node build/index.js
+  mobile/            # Node — systemd runs: node index.js
 ```
 
-Static apps (home, todo, showcase) are served directly by nginx from their directories. Node apps (composer, viewer, mobile) run as systemd services (`webmcp-composer.service`, `webmcp-viewer.service`, `webmcp-mobile.service`) with nginx as reverse proxy.
+### CRITICAL: Deploy paths are NOT the same for all Node apps
+
+| App | systemd ExecStart | Deploy destination | Why |
+|-----|-------------------|--------------------|-----|
+| **composer** | `node index.js` | `/opt/webmcp-demos/composer/` (root) | ExecStart has no `build/` prefix |
+| **mobile** | `node index.js` | `/opt/webmcp-demos/mobile/` (root) | ExecStart has no `build/` prefix |
+| **viewer** | `node build/index.js` | `/opt/webmcp-demos/viewer/build/` | ExecStart includes `build/` |
+| home | static (nginx) | `/opt/webmcp-demos/home/` | — |
+| todo | static (nginx) | `/opt/webmcp-demos/todo/` | — |
+| showcase | static (nginx) | `/opt/webmcp-demos/showcase/` | — |
+
+**If you deploy to the wrong path, the old code keeps running and your
+changes appear to not take effect.** This is the #1 deployment pitfall.
+
+### Why the paths differ
+
+The systemd services were created at different times. Composer and mobile
+use `ExecStart=/usr/bin/node index.js` (working directory is the app root).
+Viewer uses `ExecStart=/usr/bin/node build/index.js`. The deploy script
+abstracts this difference — use the script.
 
 ---
 
-## Step 1: Build packages
+## Manual deploy (if you must)
 
-Packages must be built in dependency order. Core has no dependencies, SDK and UI depend on Core, and Agent depends on Core.
-
-```bash
-# From the monorepo root
-npm -w packages/core run build
-npm -w packages/sdk  run build
-npm -w packages/ui   run build
-npm -w packages/agent run build
-```
-
-Or in short, since the dependency chain is core -> sdk/ui -> agent:
+### Static apps (home, todo, showcase)
 
 ```bash
-npm -w packages/core run build && \
-npm -w packages/sdk run build && \
-npm -w packages/ui run build && \
-npm -w packages/agent run build
-```
-
-Verify each package built successfully by checking that `packages/*/dist/` directories exist.
-
----
-
-## Step 2: Build static apps
-
-Static apps (home, todo, showcase) use `@sveltejs/adapter-static` and produce a `build/` directory. They require `PUBLIC_BASE_URL` to generate correct asset paths and API URLs for production.
-
-```bash
+# Build with production base URL (REQUIRED for home)
 PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/home run build
-PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/todo run build
-PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/showcase run build
+
+# Clean old assets and copy
+ssh bot "rm -rf /opt/webmcp-demos/home/_app"
+scp -r apps/home/build/* bot:/opt/webmcp-demos/home/
 ```
 
-After each build, verify the output exists:
-
-```bash
-ls apps/home/build/index.html
-ls apps/todo/build/index.html
-ls apps/showcase/build/index.html
-```
-
-**Common mistake**: forgetting `PUBLIC_BASE_URL`. Without it, the apps will try to load assets from `localhost` paths and fail in production.
-
----
-
-## Step 3: Build Node apps
-
-Node apps (composer, viewer, mobile) use `@sveltejs/adapter-node` and produce a `build/` directory with a Node server.
+### Node apps — composer and mobile (root deploy)
 
 ```bash
 npm -w apps/composer run build
+
+# MUST clean old files first — stale chunks cause the old version to be served
+ssh bot "cd /opt/webmcp-demos/composer && rm -f index.js handler.js env.js shims.js && rm -rf client server"
+scp -r apps/composer/build/* bot:/opt/webmcp-demos/composer/
+ssh bot "systemctl restart webmcp-composer"
+```
+
+### Node apps — viewer (build/ deploy)
+
+```bash
 npm -w apps/viewer run build
-npm -w apps/mobile run build
-```
 
-Verify:
-
-```bash
-ls apps/composer/build/index.js
-ls apps/viewer/build/index.js
-ls apps/mobile/build/index.js
-```
-
----
-
-## Step 4: Deploy static apps
-
-Copy each static app's build output to the server. Use `scp -r` (not rsync).
-
-```bash
-scp -r apps/home/build/* bot:/opt/webmcp-demos/home/
-scp -r apps/todo/build/* bot:/opt/webmcp-demos/todo/
-scp -r apps/showcase/build/* bot:/opt/webmcp-demos/showcase/
-```
-
-These are served immediately by nginx after the copy completes. No restart needed.
-
----
-
-## Step 5: Deploy Node apps
-
-Copy each Node app's build output to the server:
-
-```bash
-scp -r apps/composer/build/* bot:/opt/webmcp-demos/composer/build/
+ssh bot "rm -rf /opt/webmcp-demos/viewer/build"
+ssh bot "mkdir -p /opt/webmcp-demos/viewer/build"
 scp -r apps/viewer/build/* bot:/opt/webmcp-demos/viewer/build/
-scp -r apps/mobile/build/* bot:/opt/webmcp-demos/mobile/build/
+ssh bot "systemctl restart webmcp-viewer"
 ```
 
 ---
 
-## Step 6: Restart Node services
+## Common mistakes
 
-After deploying the Node apps, restart their systemd services:
+### 1. Deploying to the wrong path
 
+**Symptom**: You deploy, restart the service, but the old version still shows.
+
+**Cause**: You copied files to `composer/build/` but the service runs
+`node index.js` from `composer/` — it uses the old `index.js` at root.
+
+**Fix**: Use `./scripts/deploy.sh` or check the ExecStart path in the
+systemd service file.
+
+### 2. Not cleaning old chunks
+
+**Symptom**: New code is deployed but the browser shows a mix of old and
+new behavior.
+
+**Cause**: SvelteKit produces hashed chunk filenames. `scp` copies new
+chunks but doesn't remove old ones. The browser may load cached old chunks.
+
+**Fix**: Always delete old files before copying:
 ```bash
-ssh bot "systemctl restart webmcp-composer webmcp-viewer webmcp-mobile"
+ssh bot "rm -rf /opt/webmcp-demos/composer/{client,server,index.js,handler.js}"
 ```
 
-Verify the services started correctly:
+### 3. Forgetting PUBLIC_BASE_URL for home
 
+**Symptom**: Home page links point to `localhost:5173`.
+
+**Cause**: SvelteKit adapter-static bakes `PUBLIC_BASE_URL` at build time.
+
+**Fix**: Build with `PUBLIC_BASE_URL=https://demos.hyperskills.net`.
+
+### 4. Missing .env after deploy
+
+**Symptom**: Service crashes with "ANTHROPIC_API_KEY is not defined".
+
+**Cause**: The .env file was in the app root and got deleted during cleanup.
+
+**Fix**: The deploy script preserves .env files. If deploying manually,
+don't delete .env:
 ```bash
-ssh bot "systemctl status webmcp-composer webmcp-viewer webmcp-mobile --no-pager"
+# DO NOT do: rm -rf /opt/webmcp-demos/composer/*
+# DO this instead: rm specific files, keep .env
 ```
 
-All three should show `active (running)`.
+### 5. Using rsync instead of scp
+
+**Never use rsync.** `rsync --delete` has previously wiped `.env` files
+containing API keys from production. Use `scp -r` only.
 
 ---
 
-## Step 7: Verify deployment
-
-### Quick curl checks
+## Verifying a deploy
 
 ```bash
-# Static apps — should return 200
-curl -s -o /dev/null -w "%{http_code}" https://demos.hyperskills.net/
-curl -s -o /dev/null -w "%{http_code}" https://demos.hyperskills.net/todo/
-curl -s -o /dev/null -w "%{http_code}" https://demos.hyperskills.net/showcase/
-
-# Node apps — should return 200
-curl -s -o /dev/null -w "%{http_code}" https://demos.hyperskills.net/composer/
-curl -s -o /dev/null -w "%{http_code}" https://demos.hyperskills.net/viewer/
-curl -s -o /dev/null -w "%{http_code}" https://demos.hyperskills.net/mobile/
-```
-
-### Smoke test
-
-1. Open `https://demos.hyperskills.net/` in a browser — the landing page should load with all assets
-2. Open the Composer — it should connect to the Anthropic API and respond to prompts
-3. Open the Showcase — all 32 components should render with mock data
-4. Open the Todo app — WebMCP tools should appear in the browser extension (Chrome 146+)
-
----
-
-## Troubleshooting
-
-### `.env` file missing on the server
-
-**Symptom**: Composer or Viewer returns 500 errors, logs show `ANTHROPIC_API_KEY is not defined`.
-
-**Fix**: Create the `.env` file on the server:
-
-```bash
-ssh bot "echo 'ANTHROPIC_API_KEY=sk-ant-...' > /opt/webmcp-demos/composer/.env"
-ssh bot "echo 'ANTHROPIC_API_KEY=sk-ant-...' > /opt/webmcp-demos/viewer/.env"
-ssh bot "echo 'ANTHROPIC_API_KEY=sk-ant-...' > /opt/webmcp-demos/mobile/.env"
-```
-
-Then restart the services (Step 6).
-
-### `PUBLIC_BASE_URL` not set during build
-
-**Symptom**: Static apps load but show broken images, missing CSS, or API calls go to `localhost`.
-
-**Fix**: Rebuild the static apps with `PUBLIC_BASE_URL=https://demos.hyperskills.net` (Step 2) and redeploy (Step 4).
-
-### Service fails to start
-
-**Symptom**: `systemctl status` shows `failed` or `inactive`.
-
-**Diagnose**:
-
-```bash
-ssh bot "journalctl -u webmcp-composer -n 50 --no-pager"
-```
-
-Common causes:
-- **Port conflict**: another process is using the port. Check with `ss -tlnp | grep <port>`
-- **Missing `.env`**: see above
-- **Missing `node_modules`**: Node apps built with `adapter-node` bundle their dependencies, but if you see module resolution errors, check that the build completed successfully locally
-- **Wrong Node version**: ensure the server runs Node 20+
-
-### nginx returns 502 Bad Gateway for Node apps
-
-**Symptom**: Static apps work but Composer/Viewer/Mobile return 502.
-
-**Diagnose**:
-
-```bash
-ssh bot "systemctl status webmcp-composer --no-pager"
-ssh bot "journalctl -u webmcp-composer -n 20 --no-pager"
-```
-
-The service may have crashed on startup. Fix the underlying issue (usually `.env` or port) and restart.
-
----
-
-## Full deploy script
-
-Here is a single script that runs all steps in sequence:
-
-```bash
-#!/bin/bash
-set -e
-
-echo "=== Building packages ==="
-npm -w packages/core run build
-npm -w packages/sdk  run build
-npm -w packages/ui   run build
-npm -w packages/agent run build
-
-echo "=== Building static apps ==="
-PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/home run build
-PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/todo run build
-PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/showcase run build
-
-echo "=== Building Node apps ==="
-npm -w apps/composer run build
-npm -w apps/viewer run build
-npm -w apps/mobile run build
-
-echo "=== Deploying static apps ==="
-scp -r apps/home/build/* bot:/opt/webmcp-demos/home/
-scp -r apps/todo/build/* bot:/opt/webmcp-demos/todo/
-scp -r apps/showcase/build/* bot:/opt/webmcp-demos/showcase/
-
-echo "=== Deploying Node apps ==="
-scp -r apps/composer/build/* bot:/opt/webmcp-demos/composer/build/
-scp -r apps/viewer/build/* bot:/opt/webmcp-demos/viewer/build/
-scp -r apps/mobile/build/* bot:/opt/webmcp-demos/mobile/build/
-
-echo "=== Restarting services ==="
-ssh bot "systemctl restart webmcp-composer webmcp-viewer webmcp-mobile"
-
-echo "=== Verifying ==="
-for path in / /todo/ /showcase/ /composer/ /viewer/ /mobile/; do
-  code=$(curl -s -o /dev/null -w "%{http_code}" "https://demos.hyperskills.net${path}")
-  echo "  ${path} -> ${code}"
+# All pages return 200
+for p in / /composer/ /viewer/ /showcase/ /mobile/ /todo/; do
+  echo "$(curl -s -o /dev/null -w '%{http_code}' -L https://demos.hyperskills.net$p) $p"
 done
 
-echo "=== Done ==="
+# Chat API works (Node apps)
+curl -s https://demos.hyperskills.net/composer/api/chat \
+  -X POST -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"hi"}],"model":"claude-haiku-4-5-20251001","max_tokens":5}' \
+  | head -c 50
+
+# Services are active
+ssh bot "systemctl is-active webmcp-composer webmcp-viewer webmcp-mobile"
 ```
 
-Save this as `deploy.sh` at the monorepo root, make it executable (`chmod +x deploy.sh`), and run it.
+---
+
+## Environment
+
+| Variable | Apps | Location on server |
+|----------|------|--------------------|
+| `ANTHROPIC_API_KEY` | composer, viewer, mobile | `/opt/webmcp-demos/{app}/.env` |
+| `PUBLIC_BASE_URL` | home (build-time only) | Set in shell before `npm run build` |
+| `PORT` | composer(3001), viewer(3002), mobile(3003) | systemd `Environment=PORT=...` |
 
   </script>
   <script type="text/markdown" data-page="themed-demo">
