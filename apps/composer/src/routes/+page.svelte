@@ -374,7 +374,14 @@
   onMount(() => {
     // Load from ?hs= param
     const param = new URLSearchParams(window.location.search).get('hs');
-    if (param) canvas.loadFromParam(param);
+    if (param) {
+      canvas.loadFromParam(param);
+      // Sync MCP URL from loaded skill and auto-connect
+      if (canvas.mcpUrl) {
+        mcpUrlInput = canvas.mcpUrl;
+        connectMcp();
+      }
+    }
     refreshStats();
     // Force refresh skills on mount
     skills = listSkills();
