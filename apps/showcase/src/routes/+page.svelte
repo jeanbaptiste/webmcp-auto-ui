@@ -59,12 +59,15 @@
     }
   }
 
+  let mcpTools = $state<{name: string, description: string}[]>([]);
+
   async function autoGenerate() {
     if (!mcpClient || mcpStatus !== 'connected') return;
     try {
       const tools = await mcpClient.listTools();
-      mcpStatusText = `${tools.length} outil(s) détecté(s)`;
-    } catch (e: unknown) {
+      mcpTools = tools.map((t: any) => ({ name: t.name, description: t.description ?? '' }));
+      mcpStatusText = `${tools.length} outils chargés`;
+    } catch {
       mcpStatusText = 'Erreur lors de la récupération des outils';
     }
   }
@@ -138,6 +141,9 @@
     rows: TOP_SPECIES.map(s => ({ icon: s.icon, common: s.common, name: s.name, iconic: s.iconic, count: s.count })),
   });
 
+  let dagLastEvent = $state<{from: string, action: string, to: string} | null>(null);
+  let dagHighlight = $state<string | null>(null);
+
   const DAG = [
     { from: 'species-table',   action: 'rowclick',    targets: ['observer-profile', 'species-json'] },
     { from: 'observers-trombi', action: 'personclick', targets: ['observer-profile'] },
@@ -171,6 +177,9 @@
             } else if (target === 'species-table') {
               speciesTableSpec = filterSpeciesByGroup(row, TOP_SPECIES);
             }
+            dagLastEvent = { from: msg.from as string, action, to: target };
+            dagHighlight = target;
+            setTimeout(() => { if (dagHighlight === target) dagHighlight = null; }, 1500);
           }
         }
       }
@@ -454,7 +463,7 @@
     <div class="border-b border-border bg-surface px-8 py-5 flex items-center gap-6 flex-wrap">
       <div class="flex-1 min-w-0">
         <h1 class="font-bold text-2xl mb-0.5"><span class="text-white">webmcp-auto-ui</span> <span class="text-accent">UI Showcase</span></h1>
-        <p class="text-zinc-500 text-sm font-mono">34 composants Svelte 5 · données iNaturalist mockées · offline</p>
+
       </div>
       <!-- MCP Connector -->
       <div class="flex items-center gap-2 flex-shrink-0">
@@ -489,6 +498,17 @@
         {/if}
       </div>
     </div>
+
+    {#if mcpTools.length > 0}
+      <div class="border-b border-border bg-surface2 px-8 py-4">
+        <div class="text-xs font-mono text-accent mb-2">MCP Tools ({mcpTools.length})</div>
+        <div class="flex flex-wrap gap-2">
+          {#each mcpTools as tool}
+            <span class="text-[10px] font-mono bg-accent/10 text-accent px-2 py-1 rounded" title={tool.description}>{tool.name}</span>
+          {/each}
+        </div>
+      </div>
+    {/if}
 
     <div class="px-8 py-10 flex flex-col gap-20">
 
@@ -640,7 +660,12 @@
 
         <div class="flex items-center gap-2 mb-4">
           <span class="text-xs font-mono bg-accent/10 text-accent px-2 py-0.5 rounded">DAG FONC actif</span>
-          <span class="text-xs font-mono text-zinc-500">Cliquez sur un composant pour voir les données circuler</span>
+          {#if dagLastEvent}
+            <span class="text-xs font-mono text-teal animate-pulse">
+              {dagLastEvent.from} → {dagLastEvent.to}
+            </span>
+          {/if}
+          <span class="text-xs font-mono text-text2">Cliquez sur un composant interactif</span>
         </div>
 
         <div class="flex flex-col gap-6">
@@ -658,7 +683,9 @@
           <!-- DataTable (DAG node: species-table) -->
           <div>
             <div class="text-xs font-mono text-zinc-600 mb-3">DataTable — tri par colonne, striped · <span class="text-accent">DAG: species-table</span></div>
-            <BlockRenderer id="species-table" type="data-table" data={speciesTableSpec} />
+            <div class="transition-all duration-300 rounded-lg {dagHighlight === 'species-table' ? 'ring-2 ring-accent shadow-lg shadow-accent/20' : ''}">
+              <BlockRenderer id="species-table" type="data-table" data={speciesTableSpec} />
+            </div>
           </div>
 
           <!-- Timeline + ProfileCard -->
@@ -669,7 +696,9 @@
             </div>
             <div>
               <div class="text-xs font-mono text-zinc-600 mb-3">ProfileCard — observatrice #1 France · <span class="text-accent">DAG: observer-profile</span></div>
-              <BlockRenderer id="observer-profile" type="profile" data={profileSpec} />
+              <div class="transition-all duration-300 rounded-lg {dagHighlight === 'observer-profile' ? 'ring-2 ring-accent shadow-lg shadow-accent/20' : ''}">
+                <BlockRenderer id="observer-profile" type="profile" data={profileSpec} />
+              </div>
             </div>
           </div>
 
@@ -740,7 +769,9 @@
           <div class="grid grid-cols-2 gap-4">
             <div>
               <div class="text-xs font-mono text-zinc-600 mb-3">JsonViewer — réponse API taxon · <span class="text-accent">DAG: species-json</span></div>
-              <BlockRenderer id="species-json" type="json-viewer" data={{ title: '/v1/taxa/14916', data: jsonViewerData, maxDepth: 2 }} />
+              <div class="transition-all duration-300 rounded-lg {dagHighlight === 'species-json' ? 'ring-2 ring-accent shadow-lg shadow-accent/20' : ''}">
+                <BlockRenderer id="species-json" type="json-viewer" data={{ title: '/v1/taxa/14916', data: jsonViewerData, maxDepth: 2 }} />
+              </div>
             </div>
             <div>
               <div class="text-xs font-mono text-zinc-600 mb-3">GridData — obs par groupe × mois</div>
