@@ -38,7 +38,7 @@
 </script>
 
 <svelte:head>
-  <title>HyperSkills Demos</title>
+  <title>WEBMCP Auto-UI</title>
 </svelte:head>
 
 <div class="min-h-screen bg-bg font-sans">
@@ -46,8 +46,7 @@
 
     <header class="mb-12 md:mb-16">
       <h1 class="text-3xl md:text-4xl font-bold text-text1 mb-3">
-        <span>Hyper</span><span class="text-accent">Skills</span>
-        <span class="text-text2 font-normal text-lg md:text-xl ml-2">Demos</span>
+        <span>WEBMCP</span> <span class="text-accent">Auto-UI</span>
       </h1>
       <p class="text-text2 text-sm md:text-base leading-relaxed max-w-xl">
         Interactive demos of the webmcp-auto-ui framework — Svelte 5 components,
