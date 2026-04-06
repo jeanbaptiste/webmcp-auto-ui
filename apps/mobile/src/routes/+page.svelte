@@ -37,6 +37,8 @@
   let hsUrlDisplay = $state('');
   let urlCopied = $state(false);
   let shareMenuOpen = $state(false);
+  let systemPrompt = $state('');
+  let showPromptEditor = $state(false);
 
   // Gemma load timer
   let gemmaLoadStart = $state(0);
@@ -336,6 +338,7 @@
       await runAgentLoop(msg, {
         client: mcpClient ?? undefined,
         provider: getProvider(),
+        systemPrompt: systemPrompt || undefined,
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
           onBlock: (type, data) => addBlock(type, data, 'agent'),
@@ -618,6 +621,17 @@
             <option value="gemma-e2b">Gemma E2B (WASM)</option>
             <option value="gemma-e4b">Gemma E4B (WASM)</option>
           </select>
+        </div>
+
+        <!-- System Prompt -->
+        <div class="flex flex-col gap-2">
+          <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">System Prompt</div>
+          <textarea
+            class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-[10px] font-mono text-text1 outline-none focus:border-accent resize-none h-20"
+            placeholder="Custom instructions for the LLM agent…"
+            bind:value={systemPrompt}
+          ></textarea>
+          <div class="text-[9px] font-mono text-text2">Leave empty for default prompt</div>
         </div>
 
         <!-- Recettes -->
