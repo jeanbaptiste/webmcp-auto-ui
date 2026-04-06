@@ -34,12 +34,14 @@ self.onmessage = async (e: MessageEvent) => {
       generator = await pipeline('text-generation', model ?? DEFAULT_MODEL, {
         device: typeof navigator !== 'undefined' && 'gpu' in navigator ? 'webgpu' : 'wasm',
         dtype: 'q4',
-        progress_callback: (p: { status: string; progress?: number; name?: string }) => {
+        progress_callback: (p: { status: string; progress?: number; name?: string; loaded?: number; total?: number }) => {
           self.postMessage({
             type: 'progress',
             progress: p.progress ?? 0,
             status: p.status,
             name: p.name ?? '',
+            loaded: p.loaded ?? 0,
+            total: p.total ?? 0,
           });
         },
       });

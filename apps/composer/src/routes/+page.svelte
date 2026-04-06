@@ -38,13 +38,19 @@
   let gemmaLoadStart = $state(0);
   let gemmaLoadElapsed = $state(0);
   let gemmaTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
+  let gemmaLoadedMB = $state(0);
+  let gemmaTotalMB = $state(0);
 
   function getOrCreateGemmaProvider(model?: string): GemmaProvider {
     if (gemmaProvider) return gemmaProvider;
     const p = new GemmaProvider({
       workerFactory: () => new Worker(new URL('$lib/gemma.worker.ts', import.meta.url), { type: 'module' }),
       model,
-      onProgress: (prog) => { gemmaProgress = Math.round(prog); },
+      onProgress: (prog, _s, loaded, total) => {
+        gemmaProgress = Math.round(prog);
+        if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;
+        if (total) gemmaTotalMB = Math.round(total / 1048576 * 100) / 100;
+      },
       onStatusChange: (s) => {
         gemmaStatus = s;
         if (s === 'loading') {
@@ -402,7 +408,7 @@
       <option value="gemma-e4b">Gemma E4B (WASM)</option>
     </select>
     <!-- 4D: Gemma loader indicator -->
-    <GemmaStatus status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaLoadElapsed} onunload={destroyGemma} />
+    <GemmaStatus status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaLoadElapsed} loadedMB={gemmaLoadedMB} totalMB={gemmaTotalMB} onunload={destroyGemma} />
     <!-- 4F: MCP stats -->
     {#if canvas.mcpConnected}
       <span class="font-mono text-[10px] text-zinc-500 flex-shrink-0 hidden md:inline">

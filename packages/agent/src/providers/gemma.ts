@@ -10,7 +10,7 @@ export interface GemmaProviderOptions {
   workerUrl?: string;        // URL to the bundled gemma.worker.js
   workerFactory?: () => Worker;  // alternative: pass a factory fn
   model?: string;
-  onProgress?: (progress: number, status: string) => void;
+  onProgress?: (progress: number, status: string, loaded?: number, total?: number) => void;
   onStatusChange?: (status: GemmaStatus) => void;
 }
 
@@ -47,13 +47,14 @@ export class GemmaProvider implements LLMProvider {
         : new Worker(this.opts.workerUrl!, { type: 'module' });
 
       this.worker.onmessage = (e: MessageEvent) => {
-        const { type, id, token, text, message, progress, status } = e.data as {
+        const { type, id, token, text, message, progress, status, loaded, total } = e.data as {
           type: string; id?: string; token?: string; text?: string;
           message?: string; progress?: number; status?: string;
+          loaded?: number; total?: number;
         };
 
         if (type === 'progress') {
-          this.opts.onProgress?.(progress ?? 0, status ?? '');
+          this.opts.onProgress?.(progress ?? 0, status ?? '', loaded, total);
           return;
         }
         if (type === 'ready') { this.setStatus('ready'); resolve(); return; }

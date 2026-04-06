@@ -250,6 +250,8 @@
   let gemmaProvider = $state<GemmaProvider | null>(null);
   let gemmaStatus = $state<'idle'|'loading'|'ready'|'error'>('idle');
   let gemmaProgress = $state(0);
+  let gemmaLoadedMB = $state(0);
+  let gemmaTotalMB = $state(0);
 
   function startGemmaTimer() {
     gemmaLoadStart = Date.now();
@@ -283,7 +285,11 @@
         gemmaProvider = new GemmaProvider({
           workerFactory: () => new GemmaWorker(),
           model: canvas.llm === 'gemma-e4b' ? 'onnx-community/gemma-3-1b-it-ONNX' : undefined,
-          onProgress: (p, _s) => { gemmaProgress = p; },
+          onProgress: (p, _s, loaded, total) => {
+            gemmaProgress = p;
+            if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;
+            if (total) gemmaTotalMB = Math.round(total / 1048576 * 100) / 100;
+          },
           onStatusChange: (s) => {
             gemmaStatus = s;
             if (s === 'loading') startGemmaTimer();
@@ -461,23 +467,28 @@
   </div>
 
   <!-- GEMMA LOADER BAR -->
-  {#if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') && (gemmaStatus === 'loading' || gemmaStatus === 'ready')}
-    <div class="flex flex-col gap-1 px-4 py-2 border-b border-border bg-surface flex-shrink-0">
+  {#if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') && (gemmaStatus === 'loading' || gemmaStatus === 'ready' || gemmaStatus === 'error')}
+    {@const modelName = canvas.llm === 'gemma-e4b' ? 'Gemma E4B' : 'Gemma E2B'}
+    {@const fmtMB = (mb: number) => mb >= 1000 ? `${(mb / 1000).toFixed(1)}GB` : `${mb.toFixed(0)}MB`}
+    <div class="flex flex-col gap-1 px-4 py-2.5 border-b border-border flex-shrink-0 {gemmaStatus === 'loading' ? 'bg-accent/10' : gemmaStatus === 'ready' ? 'bg-teal/10' : 'bg-accent2/10'}">
       {#if gemmaStatus === 'loading'}
         <div class="flex items-center justify-between">
-          <span class="text-[10px] font-mono text-text2">Gemma 2B — chargement… {Math.round(gemmaProgress)}%</span>
+          <span class="text-xs font-mono text-accent font-medium">
+            Loading {modelName}…
+            {#if gemmaTotalMB > 0}({fmtMB(gemmaLoadedMB)} / {fmtMB(gemmaTotalMB)}){:else}{Math.round(gemmaProgress)}%{/if}
+          </span>
           <span class="text-[10px] font-mono text-text2">{gemmaElapsed}s</span>
         </div>
-        <div class="w-full h-1 rounded-full bg-border2 overflow-hidden">
-          <div class="h-full rounded-full bg-teal transition-all duration-300" style="width: {gemmaProgress}%"></div>
+        <div class="w-full h-2 rounded-full bg-border2 overflow-hidden">
+          <div class="h-full rounded-full bg-accent transition-all duration-300" style="width: {Math.max(gemmaProgress, 2)}%"></div>
         </div>
       {:else if gemmaStatus === 'ready'}
         <div class="flex items-center justify-between">
-          <span class="text-[10px] font-mono text-teal">Gemma 2B ✓</span>
-          <button class="text-[10px] font-mono text-text2 hover:text-red-400 transition-colors" onclick={unloadGemma}>
-            décharger ✕
-          </button>
+          <span class="text-xs font-mono text-teal font-medium">{modelName} ✓ ready</span>
+          <button class="text-[10px] font-mono text-text2 hover:text-accent2 transition-colors" onclick={unloadGemma}>unload ✕</button>
         </div>
+      {:else if gemmaStatus === 'error'}
+        <span class="text-xs font-mono text-accent2">{modelName} — load failed</span>
       {/if}
     </div>
   {/if}
