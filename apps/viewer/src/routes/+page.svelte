@@ -34,10 +34,18 @@
       const decoded = await decodeHyperSkill(url);
       const prev = skill;
       skill = decoded;
-      blocks = ((decoded.content as {blocks?:{type:BlockType;data:Record<string,unknown>}[]})?.blocks ?? []).map(b => ({
-        id: uid(), type: b.type, data: b.data,
-      }));
-      statusMsg = `Chargée : "${decoded?.meta?.title ?? 'sans nom'}" · ${blocks.length} blocs`;
+      // Support both formats:
+      // v1: { version, name, blocks: [...] }  → content IS the whole object, blocks at toplevel
+      // v2: { meta, content: { blocks: [...] } }  → blocks nested in content
+      const content = decoded.content as Record<string, unknown>;
+      const rawBlocks = (
+        (content?.blocks as {type:BlockType;data:Record<string,unknown>}[])  // v2: content.blocks
+        ?? (decoded as unknown as {blocks?:{type:BlockType;data:Record<string,unknown>}[]}).blocks  // v1 fallback
+        ?? []
+      );
+      blocks = rawBlocks.map(b => ({ id: uid(), type: b.type, data: b.data }));
+      const title = decoded?.meta?.title ?? (content?.name as string) ?? 'sans nom';
+      statusMsg = `Chargée : "${title}" · ${blocks.length} blocs`;
 
       // Compute version
       const sourceUrl = url.includes('://') ? url.split('?')[0] : window.location.href.split('?')[0];
@@ -142,11 +150,11 @@
   });
 </script>
 
-<svelte:head><title>HyperSkill Viewer</title></svelte:head>
+<svelte:head><title>HyperSkills Viewer</title></svelte:head>
 
 <div class="min-h-screen bg-bg font-sans flex flex-col">
   <header class="border-b border-border bg-surface px-6 py-3 flex items-center gap-3 flex-shrink-0">
-    <div class="font-mono text-sm font-bold"><span class="text-text1">Hyper</span><span class="text-accent">Skill</span><span class="text-text2 text-xs ml-1">viewer</span></div>
+    <div class="font-mono text-sm font-bold"><span class="text-text1">Hyper</span><span class="text-accent">Skills</span><span class="text-text2 text-xs ml-1">viewer</span></div>
     <div class="w-px h-5 bg-border2"></div>
     <Input class="flex-1 font-mono text-xs max-w-lg h-7"
       placeholder="https://example.com/viewer?hs=… ou coller une URL HyperSkills"
