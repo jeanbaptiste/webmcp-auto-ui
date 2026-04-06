@@ -2,6 +2,7 @@
 
 // Theme
 export { default as ThemeProvider, getTheme } from './theme/ThemeProvider.svelte';
+export type { ThemeJSON } from './theme/ThemeProvider.svelte';
 export { DARK_TOKENS, LIGHT_TOKENS, THEME_MAP } from './theme/tokens.js';
 export type { ThemeMode, ThemeOverrides, ThemeTokens } from './theme/tokens.js';
 

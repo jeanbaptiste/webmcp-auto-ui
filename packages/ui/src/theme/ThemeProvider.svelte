@@ -23,21 +23,46 @@
   import { onMount } from 'svelte';
   import { THEME_MAP } from './tokens.js';
 
+  /**
+   * ThemeJSON is the full theme.json format a designer writes.
+   * Pass it as the `theme` prop and it takes precedence over `overrides`.
+   */
+  export interface ThemeJSON {
+    name?: string;
+    tokens?: Record<string, string>;
+    dark?: Record<string, string>;
+  }
+
   interface Props {
     defaultMode?: ThemeMode;
     overrides?: ThemeOverrides;
+    theme?: ThemeJSON;
     children: import('svelte').Snippet;
   }
 
-  let { defaultMode = 'light', overrides = {}, children }: Props = $props();
+  let { defaultMode = 'light', overrides = {}, theme, children }: Props = $props();
 
   let mode = $state<ThemeMode>(defaultMode);
 
   function applyTokens() {
     if (typeof document === 'undefined') return;
-    const tokens = { ...THEME_MAP[mode], ...overrides };
+
+    // Layer 1: built-in tokens for the current mode
+    let merged: Record<string, string> = { ...THEME_MAP[mode] };
+
+    // Layer 2: theme.json tokens (light base + dark overrides)
+    if (theme?.tokens) {
+      Object.assign(merged, theme.tokens);
+      if (mode === 'dark' && theme.dark) {
+        Object.assign(merged, theme.dark);
+      }
+    }
+
+    // Layer 3: inline overrides (highest priority)
+    if (overrides) Object.assign(merged, overrides);
+
     const root = document.documentElement;
-    for (const [key, value] of Object.entries(tokens)) {
+    for (const [key, value] of Object.entries(merged)) {
       root.style.setProperty(`--${key}`, value);
     }
     root.dataset.theme = mode;
@@ -72,6 +97,7 @@
 
   $effect(() => {
     void overrides;
+    void theme;
     applyTokens();
   });
 </script>
