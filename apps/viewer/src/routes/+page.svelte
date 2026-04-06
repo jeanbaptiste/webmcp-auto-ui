@@ -36,7 +36,7 @@
       blocks = ((decoded.content as {blocks?:{type:BlockType;data:Record<string,unknown>}[]})?.blocks ?? []).map(b => ({
         id: uid(), type: b.type, data: b.data,
       }));
-      statusMsg = `Chargée : "${decoded.meta.title ?? 'sans nom'}" · ${blocks.length} blocs`;
+      statusMsg = `Chargée : "${decoded?.meta?.title ?? 'sans nom'}" · ${blocks.length} blocs`;
 
       // Compute version
       const sourceUrl = url.includes('://') ? url.split('?')[0] : window.location.href.split('?')[0];
@@ -210,13 +210,13 @@
     {:else}
       <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
         <!-- Skill meta -->
-        {#if skill?.meta?.title}
+        {#if skill}
           <div class="border border-border rounded-xl p-4 bg-surface">
-            <div class="font-bold text-zinc-200 mb-1">{skill.meta.title}</div>
-            {#if skill.meta.description}<div class="text-sm text-zinc-500">{skill.meta.description}</div>{/if}
-            <div class="flex gap-4 mt-2 text-xs font-mono text-zinc-600">
-              {#if skill.meta.mcp}<span>MCP: {skill.meta.mcp}</span>{/if}
-              {#if skill.meta.hash}<span>SHA: {skill.meta.hash.slice(0,16)}…</span>{/if}
+            <div class="font-bold text-text1 mb-1">{skill?.meta?.title ?? 'sans nom'}</div>
+            {#if skill?.meta?.description}<div class="text-sm text-text2">{skill.meta.description}</div>{/if}
+            <div class="flex gap-4 mt-2 text-xs font-mono text-text2">
+              {#if skill?.meta?.mcp}<span>MCP: {skill.meta.mcp}</span>{/if}
+              {#if skill?.meta?.hash}<span>SHA: {skill.meta.hash.slice(0,16)}…</span>{/if}
             </div>
           </div>
         {/if}
