@@ -26,6 +26,7 @@ jobs:
       # Build in dependency order
       - name: Build core
         run: npm run build --workspace=packages/core
+        # uses tsc -b (composite mode) to correctly generate .d.ts files
 
       - name: Build ui, agent, sdk
         run: |

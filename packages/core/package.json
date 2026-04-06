@@ -18,8 +18,8 @@
     "src"
   ],
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
+    "build": "tsc -b",
+    "dev": "tsc -b --watch"
   },
   "devDependencies": {
     "@types/node": "^25.5.2",
