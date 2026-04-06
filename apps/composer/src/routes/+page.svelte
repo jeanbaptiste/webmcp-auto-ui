@@ -40,7 +40,7 @@
     const p = new GemmaProvider({
       workerFactory: () => new Worker(new URL('$lib/gemma.worker.ts', import.meta.url), { type: 'module' }),
       model,
-      onProgress: (prog) => { gemmaProgress = Math.round(prog * 100); },
+      onProgress: (prog) => { gemmaProgress = Math.round(prog); },
       onStatusChange: (s) => {
         gemmaStatus = s;
         if (s === 'loading') {
@@ -348,7 +348,7 @@
   }
 </script>
 
-<svelte:head><title>HyperSkills Composer</title></svelte:head>
+<svelte:head><title>Auto-UI Composer</title></svelte:head>
 
 <div class="h-screen flex flex-col overflow-hidden bg-bg">
 
@@ -359,8 +359,8 @@
       <Menu size={18} />
     </button>
     <div class="font-mono text-sm font-bold flex-shrink-0">
-      <span class="text-white">Hyper</span><span class="text-accent">Skills</span>
-      <span class="text-zinc-700 text-xs ml-1">composer</span>
+      <span class="text-text1">Auto</span><span class="text-accent">-UI</span>
+      <span class="text-text2 text-xs ml-1">composer</span>
     </div>
     <a href="https://hyperskills.net" target="_blank" class="font-mono text-[10px] text-accent hover:underline flex-shrink-0 hidden md:inline">hyperskills.net</a>
     <div class="w-px h-5 bg-border2 hidden md:block"></div>
@@ -369,9 +369,6 @@
       bind:value={canvas.mcpUrl}
       onkeydown={(e) => e.key === 'Enter' && connectMcp()}
       onchange={onMcpUrlChange} />
-    <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-48 text-zinc-300 outline-none focus:border-accent transition-colors placeholder-zinc-700 hidden md:block"
-      placeholder="Bearer token (optionnel)"
-      bind:value={mcpToken} />
     <button class="font-mono text-xs h-7 px-3 rounded border transition-all flex-shrink-0 hidden md:flex items-center
         {canvas.mcpConnecting ? 'border-border text-zinc-600 cursor-wait' : 'border-border2 text-zinc-400 hover:border-teal hover:text-teal'}"
       onclick={connectMcp} disabled={canvas.mcpConnecting}>
@@ -422,11 +419,6 @@
     <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-zinc-400 hover:border-zinc-500 hover:text-white transition-all hidden md:flex items-center gap-1.5"
       onclick={() => showExport = true}>
       <Save size={11} /> export
-    </button>
-    <button class="font-mono text-xs h-7 px-3 rounded border transition-all hidden md:flex items-center gap-1.5
-        {copied ? 'border-teal bg-teal/10 text-teal' : 'border-accent bg-accent text-white hover:opacity-85'}"
-      onclick={copyHsUrl}>
-      {#if copied}<Check size={11} /> copié !{:else}<Copy size={11} /> hyperskills URL{/if}
     </button>
     <!-- Mobile chat toggle -->
     {#if canvas.mode === 'chat'}

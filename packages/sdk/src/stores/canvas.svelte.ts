@@ -42,7 +42,7 @@ function msgId() {
 function createCanvas() {
   // ── State ────────────────────────────────────────────────────────────────
   let blocks = $state<Block[]>([]);
-  let mode = $state<Mode>('auto');
+  let mode = $state<Mode>('drag');
   let llm = $state<LLMId>('haiku');
   let mcpUrl = $state('');
   let mcpConnected = $state(false);
