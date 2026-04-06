@@ -1,13 +1,16 @@
 <script lang="ts">
+  import { PUBLIC_BASE_URL } from '$env/static/public';
   import {
     StatCard, Timeline, Cards, DataTable, TagsBlock, AlertBlock,
     Trombinoscope, Chart, ProfileCard,
   } from '@webmcp-auto-ui/ui';
 
+  const base = PUBLIC_BASE_URL ?? '';
+
   const apps = [
     {
       title: 'HyperSkill Composer',
-      url: '/composer',
+      url: `${base}/composer`,
       desc: '3-mode UI composer: auto (LLM), drag & drop, chat. Each canvas block auto-registers 3 WebMCP tools.',
       color: '#7c6dfa',
       tools: ['get_composer_info','list_canvas_blocks','get_hyperskill_url','list_skills','clear_canvas','block_*_get','block_*_update','block_*_remove'],
@@ -15,7 +18,7 @@
     },
     {
       title: 'Todo — WebMCP Demo',
-      url: '/todo',
+      url: `${base}/todo`,
       desc: 'Pure WebMCP todo list — every operation is a callable tool for any agent or Chrome extension.',
       color: '#3ecfb2',
       tools: ['add_todo','list_todos','get_todo','toggle_todo','update_todo','delete_todo','clear_done_todos','get_todo_stats'],
@@ -23,7 +26,7 @@
     },
     {
       title: 'HyperSkill Viewer',
-      url: '/viewer',
+      url: `${base}/viewer`,
       desc: 'Load, display and edit HyperSkills from a ?hs= URL with SHA-256 diff and version chaining.',
       color: '#f0a050',
       tools: ['get_hyperskill_info','load_hyperskill','list_viewer_blocks','auto_generate_ui'],
@@ -31,7 +34,7 @@
     },
     {
       title: 'UI Showcase',
-      url: '/showcase',
+      url: `${base}/showcase`,
       desc: '32 components demonstrated with iNaturalist mock data — works fully offline.',
       color: '#22c55e',
       tools: ['offline · no MCP required'],
@@ -39,7 +42,7 @@
     },
     {
       title: 'HyperSkill Mobile',
-      url: '/mobile',
+      url: `${base}/mobile`,
       desc: 'Phone-frame UI with real MCP connection, agent loop, full skills CRUD and ?hs= URL loading.',
       color: '#fa6d7c',
       tools: ['mobile_get_info','mobile_list_skills','mobile_apply_skill','mobile_get_hyperskill_url'],

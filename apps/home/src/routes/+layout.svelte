@@ -1,6 +1,9 @@
 <script lang="ts">
   import '../app.css';
+  import { PUBLIC_BASE_URL } from '$env/static/public';
   import { onMount, onDestroy } from 'svelte';
+
+  const base = PUBLIC_BASE_URL ?? '';
   import {
     initializeWebMCPPolyfill, cleanupWebMCPPolyfill,
     listenForAgentCalls, executeToolInternal,
@@ -24,9 +27,9 @@
       description: 'List all available HyperSkill apps with their URLs and descriptions.',
       inputSchema: { type: 'object', properties: {} },
       execute: () => jsonResult([
-        { name: 'HyperSkill Composer', url: '/composer', description: '3-mode UI composer: auto (LLM), drag & drop, chat' },
-        { name: 'Todo Demo', url: '/todo', description: 'WebMCP todo list — 8 tools exposed to Chrome extension' },
-        { name: 'HyperSkill Viewer', url: '/viewer', description: 'Load and edit HyperSkill URLs with diff + traceability' },
+        { name: 'HyperSkill Composer', url: `${base}/composer`, description: '3-mode UI composer: auto (LLM), drag & drop, chat' },
+        { name: 'Todo Demo', url: `${base}/todo`, description: 'WebMCP todo list — 8 tools exposed to Chrome extension' },
+        { name: 'HyperSkill Viewer', url: `${base}/viewer`, description: 'Load and edit HyperSkill URLs with diff + traceability' },
       ]),
       annotations: { readOnlyHint: true },
     }, (tool, opts) => (navigator as unknown as { modelContext: { registerTool: (t: unknown, o: unknown) => void } }).modelContext?.registerTool(tool, opts));
