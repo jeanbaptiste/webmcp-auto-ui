@@ -7,7 +7,7 @@
   const apps = [
     {
       title: 'HyperSkill Composer',
-      url: 'http://localhost:5174',
+      url: '/composer',
       desc: '3-mode UI composer: auto (LLM), drag & drop, chat. Each canvas block auto-registers 3 WebMCP tools.',
       color: '#7c6dfa',
       tools: ['get_composer_info','list_canvas_blocks','get_hyperskill_url','list_skills','clear_canvas','block_*_get','block_*_update','block_*_remove'],
@@ -15,7 +15,7 @@
     },
     {
       title: 'Todo — WebMCP Demo',
-      url: 'http://localhost:5175',
+      url: '/todo',
       desc: 'Pure WebMCP todo list — every operation is a callable tool for any agent or Chrome extension.',
       color: '#3ecfb2',
       tools: ['add_todo','list_todos','get_todo','toggle_todo','update_todo','delete_todo','clear_done_todos','get_todo_stats'],
@@ -23,7 +23,7 @@
     },
     {
       title: 'HyperSkill Viewer',
-      url: 'http://localhost:5176',
+      url: '/viewer',
       desc: 'Load, display and edit HyperSkills from a ?hs= URL with SHA-256 diff and version chaining.',
       color: '#f0a050',
       tools: ['get_hyperskill_info','load_hyperskill','list_viewer_blocks','auto_generate_ui'],
@@ -31,7 +31,7 @@
     },
     {
       title: 'UI Showcase',
-      url: 'http://localhost:5177',
+      url: '/showcase',
       desc: '32 components demonstrated with iNaturalist mock data — works fully offline.',
       color: '#22c55e',
       tools: ['offline · no MCP required'],
@@ -39,7 +39,7 @@
     },
     {
       title: 'HyperSkill Mobile',
-      url: 'http://localhost:5178',
+      url: '/mobile',
       desc: 'Phone-frame UI with real MCP connection, agent loop, full skills CRUD and ?hs= URL loading.',
       color: '#fa6d7c',
       tools: ['mobile_get_info','mobile_list_skills','mobile_apply_skill','mobile_get_hyperskill_url'],
@@ -52,7 +52,7 @@
   const timelineEvents = [
     { date: 'Step 1', title: 'Enable WebMCP',        description: 'chrome://flags/#enable-webmcp-testing',              status: 'done'    as const },
     { date: 'Step 2', title: 'Install extension',    description: 'Model Context Tool Inspector — Chrome Web Store',    status: 'active'  as const },
-    { date: 'Step 3', title: 'Open any app',         description: 'localhost:5173–5178',                                status: 'pending' as const },
+    { date: 'Step 3', title: 'Open any app',         description: 'demos.hyperskills.net/composer · /todo · /viewer…', status: 'pending' as const },
     { date: 'Step 4', title: 'Inspect tools',        description: 'Click extension → tools appear live',               status: 'pending' as const },
   ];
 
@@ -125,7 +125,7 @@
     <section class="grid grid-cols-4 gap-4">
       <StatCard spec={{ label: 'npm packages',   value: '4',   variant: 'default', delta: 'core · ui · agent · sdk' }} />
       <StatCard spec={{ label: 'UI components',  value: '32',  variant: 'success', delta: '5 + 9 + 13 + 4 WM' }} />
-      <StatCard spec={{ label: 'Apps',           value: '5',   variant: 'info',    delta: ':5173 → :5177' }} />
+      <StatCard spec={{ label: 'Apps',           value: '5',   variant: 'info',    delta: 'demos.hyperskills.net' }} />
       <StatCard spec={{ label: 'WebMCP tools',   value: `${totalTools}+`, variant: 'default', delta: 'auto-registered per block' }} />
     </section>
 
