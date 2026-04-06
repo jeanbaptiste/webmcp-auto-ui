@@ -431,7 +431,7 @@
       <option value="gemma-e4b">Gemma E4B (WASM)</option>
     </select>
     <!-- 4D: Gemma loader indicator -->
-    <GemmaStatus status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaLoadElapsed} loadedMB={gemmaLoadedMB} totalMB={gemmaTotalMB} onunload={destroyGemma} />
+    <GemmaStatus status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaLoadElapsed} loadedMB={gemmaLoadedMB} totalMB={gemmaTotalMB} modelName={canvas.llm === 'gemma-e4b' ? 'Gemma E4B' : 'Gemma E2B'} onunload={destroyGemma} />
     <!-- 4F: MCP stats -->
     {#if canvas.mcpConnected}
       <span class="font-mono text-[10px] text-text2 flex-shrink-0 hidden md:inline">
@@ -453,8 +453,23 @@
       {canvas.statusText}
     </button>
     <div class="w-px h-5 bg-border2 hidden md:block"></div>
-    <!-- 4H: Settings button -->
-    <button class="font-mono text-xs h-7 px-2 rounded border border-border2 text-text2 hover:border-zinc-500 hover:text-white transition-all flex items-center"
+    <!-- Theme toggle -->
+    <button class="font-mono text-xs h-7 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-all flex items-center"
+      onclick={() => {
+        const root = document.documentElement;
+        const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        root.dataset.theme = next;
+        try { localStorage.setItem('webmcp-theme', next); } catch {}
+        import('@webmcp-auto-ui/ui').then(({ THEME_MAP }) => {
+          const tokens = THEME_MAP[next as 'light'|'dark'];
+          if (tokens) for (const [k, v] of Object.entries(tokens)) root.style.setProperty(`--${k}`, v);
+        });
+      }}
+      aria-label="Toggle theme">
+      ☀
+    </button>
+    <!-- Settings button -->
+    <button class="font-mono text-xs h-7 px-2 rounded border border-border2 text-text2 hover:border-zinc-500 hover:text-text1 transition-all flex items-center"
       onclick={() => showSettings = true}>
       <Settings size={13} />
     </button>
@@ -674,8 +689,8 @@
   </div>
 
   <!-- CONSOLE -->
-  <div class="border-t border-border bg-surface flex-shrink-0 {consoleOpen ? 'h-48' : 'h-7'} transition-all overflow-hidden">
-    <button class="w-full h-7 px-4 flex items-center justify-between text-[10px] font-mono text-text2 hover:text-text1"
+  <div class="border-t border-border flex-shrink-0 {consoleOpen ? 'h-48' : 'h-7'} transition-all overflow-hidden bg-[#0a0a0f]">
+    <button class="w-full h-7 px-4 flex items-center justify-between text-[10px] font-mono text-zinc-500 hover:text-zinc-300 bg-[#0a0a0f]"
       onclick={() => consoleOpen = !consoleOpen}>
       <span>Console ({canvas.messages.length})</span>
       <span>{consoleOpen ? '▼' : '▲'}</span>
@@ -683,8 +698,8 @@
     {#if consoleOpen}
       <div class="overflow-y-auto h-[calc(100%-28px)] px-4 py-1 flex flex-col gap-0.5">
         {#each canvas.messages as msg}
-          <div class="text-[10px] font-mono leading-relaxed {msg.role === 'system' ? 'text-text2' : msg.role === 'user' ? 'text-accent' : 'text-text1'}">
-            <span class="text-text2 mr-1">[{msg.role}]</span> {msg.content}
+          <div class="text-[10px] font-mono leading-relaxed {msg.role === 'system' ? 'text-zinc-500' : msg.role === 'user' ? 'text-cyan-400' : 'text-zinc-200'}">
+            <span class="text-zinc-600 mr-1">[{msg.role}]</span> {msg.content}
           </div>
         {/each}
       </div>
