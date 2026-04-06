@@ -6,10 +6,11 @@
 export type BlockType =
   | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
   | 'stat-card' | 'data-table' | 'timeline' | 'profile' | 'trombinoscope' | 'json-viewer'
-  | 'hemicycle' | 'chart-rich' | 'cards' | 'grid-data' | 'sankey' | 'map' | 'log';
+  | 'hemicycle' | 'chart-rich' | 'cards' | 'grid-data' | 'sankey' | 'map' | 'log'
+  | 'gallery' | 'carousel';
 
 export type Mode = 'auto' | 'drag' | 'chat';
-export type LLMId = 'haiku' | 'sonnet' | 'gemma-e2b';
+export type LLMId = 'haiku' | 'sonnet' | 'gemma-e2b' | 'gemma-e4b';
 
 export interface Block {
   id: string;
@@ -138,9 +139,16 @@ function createCanvas() {
     statusColor = 'text-red-400';
   }
 
+  // ── Theme ────────────────────────────────────────────────────────────────
+  let themeOverrides = $state<Record<string, string>>({});
+
+  function setThemeOverrides(overrides: Record<string, string>) {
+    themeOverrides = overrides;
+  }
+
   // ── HyperSkill ───────────────────────────────────────────────────────────
   function buildSkillJSON() {
-    return {
+    const skill: Record<string, unknown> = {
       version: '1.0',
       name: 'skill-' + Date.now(),
       created: new Date().toISOString(),
@@ -148,6 +156,8 @@ function createCanvas() {
       llm,
       blocks: blocks.map((b) => ({ type: b.type, data: b.data })),
     };
+    if (Object.keys(themeOverrides).length > 0) skill.theme = themeOverrides;
+    return skill;
   }
 
   function buildHyperskillParam(): string {
@@ -160,10 +170,12 @@ function createCanvas() {
       const json = decodeURIComponent(escape(atob(param)));
       const skill = JSON.parse(json) as {
         mcp?: string; llm?: LLMId;
+        theme?: Record<string, string>;
         blocks?: { type: BlockType; data: Record<string, unknown> }[];
       };
       if (skill.mcp) mcpUrl = skill.mcp;
       if (skill.llm) llm = skill.llm;
+      if (skill.theme) themeOverrides = skill.theme;
       if (skill.blocks) {
         blocks = skill.blocks.map((b) => ({ id: uuid(), type: b.type, data: b.data }));
       }
@@ -205,6 +217,10 @@ function createCanvas() {
 
     // MCP
     setMcpConnecting, setMcpConnected, setMcpError,
+
+    // Theme
+    get themeOverrides() { return themeOverrides; },
+    setThemeOverrides,
 
     // HyperSkill
     buildSkillJSON, buildHyperskillParam, loadFromParam,

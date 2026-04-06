@@ -1,6 +1,7 @@
 <script lang="ts">
   import '../app.css';
   import { onMount, onDestroy } from 'svelte';
+  import { ThemeProvider } from '@webmcp-auto-ui/ui';
   import {
     initializeWebMCPPolyfill, cleanupWebMCPPolyfill,
     listenForAgentCalls, executeToolInternal,
@@ -13,18 +14,13 @@
   let stopListening: (() => void) | null = null;
 
   onMount(() => {
-    // Init polyfill
     try {
       initializeWebMCPPolyfill({ allowInsecureContext: true, degradeGracefully: true });
     } catch { /* HTTPS required in prod */ }
 
-    // Bridge for Chrome extension
     stopListening = listenForAgentCalls((name, args) => executeToolInternal(name, args));
-
-    // Load demo skills
     loadDemoSkills();
 
-    // Register composer-level WebMCP tools
     const group = createToolGroup('composer');
     const mc = (navigator as unknown as Record<string, unknown>).modelContext as {
       registerTool: (t: unknown) => void;
@@ -36,12 +32,9 @@
         description: 'Get current composer state: mode, LLM, MCP connection, block count.',
         inputSchema: { type: 'object', properties: {} },
         execute: () => jsonResult({
-          mode: canvas.mode,
-          llm: canvas.llm,
-          mcpConnected: canvas.mcpConnected,
-          mcpName: canvas.mcpName,
-          mcpUrl: canvas.mcpUrl,
-          blockCount: canvas.blockCount,
+          mode: canvas.mode, llm: canvas.llm,
+          mcpConnected: canvas.mcpConnected, mcpName: canvas.mcpName,
+          mcpUrl: canvas.mcpUrl, blockCount: canvas.blockCount,
           generating: canvas.generating,
         }),
         annotations: { readOnlyHint: true },
@@ -57,11 +50,11 @@
 
       mc.registerTool({
         name: 'get_hyperskill_url',
-        description: 'Get the current canvas as a HyperSkill URL (?hs= format).',
+        description: 'Get the current canvas as a HyperSkills URL (?hs= format).',
         inputSchema: { type: 'object', properties: {} },
         execute: () => {
           const param = canvas.buildHyperskillParam();
-          return textResult(`${window.location.origin}?hs=${param}`);
+          return textResult(`${window.location.origin}/composer?hs=${param}`);
         },
         annotations: { readOnlyHint: true },
       });
@@ -102,4 +95,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
 
-{@render children()}
+<ThemeProvider defaultMode="light">
+  {@render children()}
+</ThemeProvider>

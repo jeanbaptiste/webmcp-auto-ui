@@ -10,7 +10,8 @@
     ".": {
       "svelte": "./src/index.ts",
       "import": "./src/index.ts"
-    }
+    },
+    "./tailwind.preset": "./tailwind.preset.js"
   },
   "scripts": {
     "build": "svelte-package -i src",

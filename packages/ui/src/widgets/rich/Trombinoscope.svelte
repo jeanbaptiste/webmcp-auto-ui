@@ -9,31 +9,36 @@
   const people = $derived.by<TrombinoscopePerson[]>(()=>{ if(Array.isArray(spec.people)&&spec.people.length) return spec.people; if(Array.isArray(data)) return data as TrombinoscopePerson[]; return []; });
   const cols = $derived(spec.columns??4);
 </script>
-<div class="bg-[#13131a] border border-white/[0.07] rounded-lg p-4 font-sans">
-  {#if spec.title}<h3 class="text-sm font-semibold text-zinc-300 mb-3">{spec.title}</h3>{/if}
-  {#if people.length===0}<p class="text-zinc-600 text-sm">Aucune personne</p>
+<div class="bg-surface border border-border rounded-lg p-3 md:p-4 font-sans">
+  {#if spec.title}<h3 class="text-sm font-semibold text-text1 mb-3">{spec.title}</h3>{/if}
+  {#if people.length===0}<p class="text-text2 text-sm">Aucune personne</p>
   {:else}
-    <div class="grid gap-3" style="grid-template-columns: repeat({cols}, minmax(0, 1fr));">
+    <div class="grid gap-3 responsive-trombi" style="--trombi-cols: repeat({cols}, minmax(0, 1fr));">
       {#each people as person}
         {@const accent=person.color??nameColor(person.name)}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <!-- svelte-ignore a11y_interactive_supports_focus -->
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-        <div class="flex flex-col items-center text-center p-3 rounded-lg border border-white/[0.07] hover:border-white/20 transition-all {onpersonclick?'cursor-pointer':''}" role={onpersonclick?"button":undefined} tabindex={onpersonclick?0:undefined} onclick={()=>onpersonclick?.(person)}>
+        <div class="flex flex-col items-center text-center p-3 rounded-lg border border-border hover:border-border2 transition-all {onpersonclick?'cursor-pointer':''}" role={onpersonclick?"button":undefined} tabindex={onpersonclick?0:undefined} onclick={()=>onpersonclick?.(person)}>
           {#if person.avatar}
             <img src={person.avatar} alt={person.name} class="w-12 h-12 rounded-full object-cover mb-2 border-2" style="border-color:{accent};" />
           {:else}
             <div class="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base mb-2 flex-shrink-0" style="background:{accent};">{initials(person.name)}</div>
           {/if}
-          <div class="text-xs font-semibold text-zinc-300 leading-tight truncate w-full">{person.name}</div>
-          {#if person.subtitle}<div class="text-xs text-zinc-600 mt-0.5 truncate w-full">{person.subtitle}</div>{/if}
+          <div class="text-xs font-semibold text-text1 leading-tight truncate w-full">{person.name}</div>
+          {#if person.subtitle}<div class="text-xs text-text2 mt-0.5 truncate w-full">{person.subtitle}</div>{/if}
           {#if spec.showBadge!==false&&person.badge}
             <span class="text-xs font-semibold px-2 py-0.5 rounded-full mt-1.5 text-white" style="background:{person.badgeColor??accent};">{person.badge}</span>
           {/if}
         </div>
       {/each}
     </div>
-    <div class="mt-3 text-xs text-zinc-600">{people.length} personne{people.length!==1?'s':''}</div>
+    <div class="mt-3 text-xs text-text2">{people.length} personne{people.length!==1?'s':''}</div>
   {/if}
 </div>
+
+<style>
+  .responsive-trombi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 768px) { .responsive-trombi { grid-template-columns: var(--trombi-cols); } }
+</style>

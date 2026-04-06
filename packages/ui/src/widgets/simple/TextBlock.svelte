@@ -3,4 +3,4 @@
   interface Props { data: Partial<TextBlockData>; }
   let { data }: Props = $props();
 </script>
-<div class="p-5 text-sm text-zinc-400 leading-relaxed">{data.content ?? ''}</div>
+<div class="p-4 md:p-5 text-sm text-text2 leading-relaxed">{data.content ?? ''}</div>

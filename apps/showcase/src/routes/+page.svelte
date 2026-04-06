@@ -5,21 +5,26 @@
     StatBlock, KVBlock, ListBlock, ChartBlock, AlertBlock, CodeBlock, TextBlock, ActionsBlock, TagsBlock,
     StatCard, DataTable, Timeline, ProfileCard, Trombinoscope, JsonViewer, Hemicycle,
     Chart, Cards, GridData, Sankey, MapView, LogViewer,
+    Gallery, Carousel,
     Pane, TilingLayout, StackLayout,
   } from '@webmcp-auto-ui/ui';
   import {
     INAT_STATS, TOP_SPECIES, TOP_OBSERVERS, MONTHLY_OBS, ICONIC_TAXA, MULTI_SERIES,
     RECENT_OBS, TAXONOMY_TREE, MIGRATION_FLOWS, ALERTS, OBS_TIMELINE, LOG_ENTRIES,
-    GRID_DATA, PROFILE_OBSERVER,
+    GRID_DATA, PROFILE_OBSERVER, GALLERY_IMAGES, CAROUSEL_SLIDES,
   } from '$lib/inat-mock.js';
   import type { ManagedWindow } from '@webmcp-auto-ui/ui';
-  import { initializeWebMCPPolyfill, listenForAgentCalls, executeToolInternal, jsonResult, registerSkill, unregisterSkill } from '@webmcp-auto-ui/core';
+  import { initializeWebMCPPolyfill, listenForAgentCalls, executeToolInternal, jsonResult, registerSkill, unregisterSkill, McpClient } from '@webmcp-auto-ui/core';
+  import { listSkills, createSkill, deleteSkill, updateSkill, loadDemoSkills } from '@webmcp-auto-ui/sdk';
+  import type { Skill } from '@webmcp-auto-ui/sdk';
 
   // Nav sections
   const SECTIONS = [
     { id: 'primitives',    label: 'Primitives',      count: 5  },
     { id: 'simple',        label: 'Blocs simples',   count: 9  },
     { id: 'rich',          label: 'Widgets riches',  count: 13 },
+    { id: 'gallery',       label: 'Gallery & Carousel', count: 2 },
+    { id: 'skills',        label: 'Recettes CRUD',   count: 0  },
     { id: 'wm',            label: 'Window Manager',  count: 4  },
   ];
 
@@ -29,6 +34,81 @@
     active = id;
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+
+  // ── MCP Client state ────────────────────────────────────────────
+  let mcpUrl = $state('');
+  let mcpStatus = $state<'idle' | 'connecting' | 'connected' | 'error'>('idle');
+  let mcpStatusText = $state('');
+  let mcpClient: McpClient | null = null;
+
+  async function connectMcp() {
+    if (!mcpUrl.trim()) return;
+    mcpStatus = 'connecting';
+    mcpStatusText = 'Connexion…';
+    try {
+      mcpClient = new McpClient(mcpUrl.trim());
+      const info = await mcpClient.connect();
+      mcpStatus = 'connected';
+      mcpStatusText = info.serverInfo?.name ?? 'Connecté';
+    } catch (e: unknown) {
+      mcpStatus = 'error';
+      mcpStatusText = e instanceof Error ? e.message : 'Erreur de connexion';
+      mcpClient = null;
+    }
+  }
+
+  async function autoGenerate() {
+    if (!mcpClient || mcpStatus !== 'connected') return;
+    try {
+      const tools = await mcpClient.listTools();
+      mcpStatusText = `${tools.length} outil(s) détecté(s)`;
+    } catch (e: unknown) {
+      mcpStatusText = 'Erreur lors de la récupération des outils';
+    }
+  }
+
+  // ── Skills CRUD state ────────────────────────────────────────────
+  let skills = $state<Skill[]>([]);
+  let newSkillName = $state('');
+  let newSkillDesc = $state('');
+  let editingId = $state<string | null>(null);
+  let editingName = $state('');
+  let editingDesc = $state('');
+
+  function refreshSkills() { skills = listSkills(); }
+
+  function handleCreateSkill() {
+    if (!newSkillName.trim()) return;
+    createSkill({
+      name: newSkillName.trim(),
+      description: newSkillDesc.trim() || 'Recette personnalisée',
+      tags: ['custom'],
+      blocks: [],
+    });
+    newSkillName = '';
+    newSkillDesc = '';
+    refreshSkills();
+  }
+
+  function handleDeleteSkill(id: string) {
+    deleteSkill(id);
+    refreshSkills();
+  }
+
+  function startEdit(skill: Skill) {
+    editingId = skill.id;
+    editingName = skill.name;
+    editingDesc = skill.description ?? '';
+  }
+
+  function handleUpdateSkill() {
+    if (!editingId) return;
+    updateSkill(editingId, { name: editingName.trim(), description: editingDesc.trim() });
+    editingId = null;
+    refreshSkills();
+  }
+
+  function cancelEdit() { editingId = null; }
 
   // WM demo state
   const WM_WINDOWS: ManagedWindow[] = [
@@ -44,6 +124,10 @@
     try {
       initializeWebMCPPolyfill({ allowInsecureContext: true, degradeGracefully: true });
     } catch {}
+
+    // Load demo skills and expose to state
+    loadDemoSkills();
+    refreshSkills();
 
     const stopListening = listenForAgentCalls((name, args) => executeToolInternal(name, args));
 
@@ -272,6 +356,7 @@
       stopListening?.();
       toolNames.forEach(n => { try { mc?.unregisterTool(n); } catch {} });
       SKILL_IDS.forEach(id => { try { unregisterSkill(id); } catch {} });
+      mcpClient = null;
     };
   });
 </script>
@@ -309,20 +394,55 @@
 
     <div class="px-4 py-4 border-t border-border text-[9px] font-mono text-zinc-700">
       32 composants · Svelte 5<br/>
-      données : iNaturalist mock
+      données : iNaturalist mock<br/>
+      <a href="https://hyperskills.net" target="_blank" class="text-accent hover:underline">hyperskills.net</a>
     </div>
   </nav>
 
   <!-- MAIN CONTENT -->
   <main class="flex-1 overflow-y-auto">
 
-    <!-- HERO -->
-    <div class="border-b border-border bg-surface px-8 py-6">
-      <h1 class="font-bold text-2xl mb-1"><span class="text-white">webmcp-auto-ui</span> <span class="text-accent">UI Showcase</span></h1>
-      <p class="text-zinc-500 text-sm font-mono">32 composants Svelte 5 · données iNaturalist mockées · offline</p>
+    <!-- HERO / TOPBAR -->
+    <div class="border-b border-border bg-surface px-8 py-5 flex items-center gap-6 flex-wrap">
+      <div class="flex-1 min-w-0">
+        <h1 class="font-bold text-2xl mb-0.5"><span class="text-white">webmcp-auto-ui</span> <span class="text-accent">UI Showcase</span></h1>
+        <p class="text-zinc-500 text-sm font-mono">34 composants Svelte 5 · données iNaturalist mockées · offline</p>
+      </div>
+      <!-- MCP Connector -->
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <input
+          type="text"
+          bind:value={mcpUrl}
+          placeholder="URL serveur MCP…"
+          class="bg-bg border border-border rounded px-3 py-1.5 text-xs font-mono text-zinc-300 w-52 placeholder:text-zinc-700 focus:outline-none focus:border-accent/50 transition-colors"
+        />
+        <button
+          onclick={connectMcp}
+          disabled={mcpStatus === 'connecting'}
+          class="px-3 py-1.5 rounded text-xs font-mono border transition-all
+            {mcpStatus === 'connected'
+              ? 'bg-teal/10 border-teal/30 text-teal'
+              : mcpStatus === 'error'
+                ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                : 'bg-accent/10 border-accent/30 text-accent hover:bg-accent/20'}"
+        >
+          {mcpStatus === 'connecting' ? '…' : mcpStatus === 'connected' ? 'Connecté' : 'Connecter'}
+        </button>
+        {#if mcpStatus === 'connected'}
+          <button
+            onclick={autoGenerate}
+            class="px-3 py-1.5 rounded text-xs font-mono border border-teal/30 bg-teal/10 text-teal hover:bg-teal/20 transition-all"
+          >
+            Auto-générer
+          </button>
+        {/if}
+        {#if mcpStatusText}
+          <span class="text-[10px] font-mono {mcpStatus === 'connected' ? 'text-teal' : mcpStatus === 'error' ? 'text-red-400' : 'text-zinc-500'}">{mcpStatusText}</span>
+        {/if}
+      </div>
     </div>
 
-    <div class="px-8 py-8 flex flex-col gap-16">
+    <div class="px-8 py-10 flex flex-col gap-20">
 
       <!-- ── PRIMITIVES ── -->
       <section id="primitives">
@@ -409,47 +529,47 @@
         </div>
         <div class="grid grid-cols-3 gap-4">
 
-          <div class="bg-surface border border-border rounded-lg overflow-hidden">
+          <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
             <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">StatBlock</div>
             <StatBlock data={{ label: 'Observations France', value: fmt(INAT_STATS.france_observations), trend: '+18% vs 2025', trendDir: 'up' }} />
           </div>
 
-          <div class="bg-surface border border-border rounded-lg overflow-hidden">
+          <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
             <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">KVBlock</div>
             <KVBlock data={{ title: 'Parus major', rows: [['Ordre','Passeriformes'],['Famille','Paridae'],['Statut','LC'],['Obs','4.2M']] }} />
           </div>
 
-          <div class="bg-surface border border-border rounded-lg overflow-hidden">
+          <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
             <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">ListBlock</div>
             <ListBlock data={{ title: 'Espèces récentes', items: RECENT_OBS.map(o => `${o.common} · ${o.place}`) }} />
           </div>
 
-          <div class="bg-surface border border-border rounded-lg overflow-hidden">
+          <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
             <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">ChartBlock</div>
             <ChartBlock data={{ title: 'Obs mensuelles (k)', bars: MONTHLY_OBS.map(([m, v]) => [m, Math.round((v as number)/1000)]) as [string,number][] }} />
           </div>
 
-          <div class="bg-surface border border-border rounded-lg overflow-hidden">
+          <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
             <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">AlertBlock</div>
             <AlertBlock data={ALERTS[0]} />
           </div>
 
-          <div class="bg-surface border border-border rounded-lg overflow-hidden">
+          <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
             <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">CodeBlock</div>
             <CodeBlock data={{ lang: 'json', content: `{\n  "taxon": "Parus major",\n  "count": 4218221,\n  "status": "LC"\n}` }} />
           </div>
 
-          <div class="bg-surface border border-border rounded-lg overflow-hidden">
+          <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
             <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">TextBlock</div>
             <TextBlock data={{ content: 'iNaturalist est un réseau social de naturalistes fondé en 2008. Avec 148M+ observations validées, c\'est la plus grande base de données de biodiversité citoyenne au monde.' }} />
           </div>
 
-          <div class="bg-surface border border-border rounded-lg overflow-hidden">
+          <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
             <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">ActionsBlock</div>
             <ActionsBlock data={{ buttons: [{ label: 'Explorer', primary: true }, { label: 'Exporter CSV' }, { label: 'API docs' }] }} />
           </div>
 
-          <div class="bg-surface border border-border rounded-lg overflow-hidden">
+          <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
             <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">TagsBlock</div>
             <TagsBlock data={{ label: 'Filtres', tags: [
               { text: 'Research Grade', active: true },
@@ -613,6 +733,124 @@
             <LogViewer spec={{ title: 'api.inaturalist.org · logs', entries: LOG_ENTRIES, maxHeight: '180px' }} />
           </div>
 
+        </div>
+      </section>
+
+      <!-- ── GALLERY & CAROUSEL ── -->
+      <section id="gallery">
+        <div class="flex items-center gap-3 mb-6">
+          <h2 class="text-lg font-bold text-zinc-200">Gallery & Carousel</h2>
+          <span class="text-xs font-mono text-zinc-600 border border-border px-2 py-0.5 rounded">2 composants · médias naturalistes</span>
+        </div>
+        <div class="flex flex-col gap-6">
+
+          <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
+            <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2 pb-1">Gallery — observations iNaturalist · lightbox intégré</div>
+            <div class="p-3">
+              <Gallery spec={{
+                title: 'Observations naturalistes récentes',
+                columns: 3,
+                images: GALLERY_IMAGES,
+              }} />
+            </div>
+          </div>
+
+          <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
+            <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2 pb-1">Carousel — faits iNaturalist · défilement auto 5s</div>
+            <div class="p-3">
+              <Carousel spec={{
+                title: 'iNaturalist — Science participative',
+                slides: CAROUSEL_SLIDES,
+                autoPlay: true,
+                interval: 5000,
+              }} />
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ── RECETTES CRUD ── -->
+      <section id="skills">
+        <div class="flex items-center gap-3 mb-6">
+          <h2 class="text-lg font-bold text-zinc-200">Recettes (Skills) CRUD</h2>
+          <span class="text-xs font-mono text-zinc-600 border border-border px-2 py-0.5 rounded">{skills.length} recette{skills.length !== 1 ? 's' : ''} · SDK registry</span>
+        </div>
+
+        <!-- Create form -->
+        <div class="bg-surface border border-border rounded-lg p-4 mb-4 shadow-sm hover:shadow-md transition-all">
+          <div class="text-xs font-mono text-zinc-500 mb-3">Nouvelle recette</div>
+          <div class="flex gap-2 flex-wrap">
+            <input
+              type="text"
+              bind:value={newSkillName}
+              placeholder="Nom de la recette…"
+              class="flex-1 min-w-36 bg-bg border border-border rounded px-3 py-1.5 text-xs font-mono text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-accent/50 transition-colors"
+            />
+            <input
+              type="text"
+              bind:value={newSkillDesc}
+              placeholder="Description (optionnel)…"
+              class="flex-[2] min-w-48 bg-bg border border-border rounded px-3 py-1.5 text-xs font-mono text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-accent/50 transition-colors"
+            />
+            <button
+              onclick={handleCreateSkill}
+              disabled={!newSkillName.trim()}
+              class="px-4 py-1.5 rounded text-xs font-mono bg-accent/20 border border-accent/30 text-accent hover:bg-accent/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              + Créer
+            </button>
+          </div>
+        </div>
+
+        <!-- Skills list -->
+        <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm">
+          {#if skills.length === 0}
+            <div class="p-6 text-center text-zinc-600 text-xs font-mono">Aucune recette enregistrée</div>
+          {:else}
+            <div class="divide-y divide-border">
+              {#each skills as skill (skill.id)}
+                <div class="px-4 py-3 flex items-start gap-3 hover:bg-white/2 transition-all">
+                  {#if editingId === skill.id}
+                    <div class="flex-1 flex gap-2 flex-wrap items-center">
+                      <input
+                        type="text"
+                        bind:value={editingName}
+                        class="flex-1 min-w-32 bg-bg border border-accent/30 rounded px-2 py-1 text-xs font-mono text-zinc-200 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        bind:value={editingDesc}
+                        class="flex-[2] min-w-40 bg-bg border border-border rounded px-2 py-1 text-xs font-mono text-zinc-400 focus:outline-none"
+                      />
+                      <div class="flex gap-1">
+                        <button onclick={handleUpdateSkill} class="px-2 py-1 text-[10px] font-mono bg-teal/10 border border-teal/30 text-teal rounded hover:bg-teal/20 transition-all">Sauver</button>
+                        <button onclick={cancelEdit} class="px-2 py-1 text-[10px] font-mono bg-zinc-800 border border-border text-zinc-500 rounded hover:bg-zinc-700 transition-all">Annuler</button>
+                      </div>
+                    </div>
+                  {:else}
+                    <div class="flex-1 min-w-0">
+                      <div class="text-xs font-mono text-zinc-200 truncate">{skill.name}</div>
+                      {#if skill.description}
+                        <div class="text-[10px] text-zinc-600 mt-0.5 truncate">{skill.description}</div>
+                      {/if}
+                      {#if skill.tags?.length}
+                        <div class="flex gap-1 mt-1 flex-wrap">
+                          {#each skill.tags as tag}
+                            <span class="text-[9px] font-mono bg-accent/10 text-accent/70 px-1.5 py-0.5 rounded">{tag}</span>
+                          {/each}
+                        </div>
+                      {/if}
+                    </div>
+                    <div class="flex gap-1 flex-shrink-0">
+                      <button onclick={() => startEdit(skill)} class="px-2 py-1 text-[10px] font-mono bg-zinc-800 border border-border text-zinc-400 rounded hover:border-accent/30 hover:text-accent transition-all">Éditer</button>
+                      <button onclick={() => handleDeleteSkill(skill.id)} class="px-2 py-1 text-[10px] font-mono bg-zinc-800 border border-border text-zinc-400 rounded hover:border-red-500/30 hover:text-red-400 transition-all">Suppr.</button>
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
         </div>
       </section>
 

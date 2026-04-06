@@ -35,11 +35,11 @@
   }
   let tooltip=$state<string|null>(null);
 </script>
-<div class="bg-[#13131a] border border-white/[0.07] rounded-lg p-4 font-sans">
-  {#if spec.title}<h3 class="text-sm font-semibold text-zinc-300 mb-3">{spec.title}</h3>{/if}
-  {#if !datasets.length}<p class="text-zinc-600 text-sm">Aucune donnée</p>
+<div class="bg-surface border border-border rounded-lg p-3 md:p-4 font-sans">
+  {#if spec.title}<h3 class="text-sm font-semibold text-text1 mb-3">{spec.title}</h3>{/if}
+  {#if !datasets.length}<p class="text-text2 text-sm">Aucune donnée</p>
   {:else if isPie}
-    <div class="relative flex items-center gap-6">
+    <div class="relative flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
       <svg viewBox="-1 -1 2 2" class="w-40 h-40 flex-shrink-0" xmlns="http://www.w3.org/2000/svg">
         {#each slices as s,i}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -54,17 +54,17 @@
         {#each slices as s}
           <div class="flex items-center gap-1.5">
             <div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:{s.color};"></div>
-            <span class="text-zinc-400">{s.label}</span>
-            <span class="text-zinc-600 ml-1">{Math.round(s.pct*100)}%</span>
+            <span class="text-text2">{s.label}</span>
+            <span class="text-text2 ml-1">{Math.round(s.pct*100)}%</span>
           </div>
         {/each}
       </div>
     </div>
-    {#if tooltip}<div class="mt-2 text-xs text-zinc-400 font-mono">{tooltip}</div>{/if}
+    {#if tooltip}<div class="mt-2 text-xs text-text2 font-mono">{tooltip}</div>{/if}
   {:else}
     <div class="relative">
       {#if type==='bar'}
-        <div class="flex items-end gap-1 h-32 mb-1">
+        <div class="flex items-end gap-1 h-24 sm:h-32 mb-1">
           {#each xLabels as lbl, xi}
             <div class="flex-1 flex gap-0.5 items-end h-full">
               {#each datasets as ds, di}
@@ -79,7 +79,7 @@
           {/each}
         </div>
         <div class="flex gap-1 mb-2">
-          {#each xLabels as lbl}<div class="flex-1 text-center text-[9px] font-mono text-zinc-600 truncate">{lbl}</div>{/each}
+          {#each xLabels as lbl}<div class="flex-1 text-center text-[9px] font-mono text-text2 truncate">{lbl}</div>{/each}
         </div>
       {:else}
         {@const W=400}{@const H=120}{@const pad=10}
@@ -93,7 +93,7 @@
           {/each}
         </svg>
         <div class="flex gap-1">
-          {#each xLabels as lbl}<div class="flex-1 text-center text-[9px] font-mono text-zinc-600 truncate">{lbl}</div>{/each}
+          {#each xLabels as lbl}<div class="flex-1 text-center text-[9px] font-mono text-text2 truncate">{lbl}</div>{/each}
         </div>
       {/if}
     </div>
@@ -102,7 +102,7 @@
         {#each datasets as ds,i}
           <div class="flex items-center gap-1 text-xs">
             <div class="w-2.5 h-2.5 rounded-sm flex-shrink-0" style="background:{col(ds,i)};"></div>
-            <span class="text-zinc-500">{ds.label??`Series ${i+1}`}</span>
+            <span class="text-text2">{ds.label??`Series ${i+1}`}</span>
           </div>
         {/each}
       </div>

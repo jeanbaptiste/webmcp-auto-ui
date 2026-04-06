@@ -4,11 +4,11 @@
   interface Props { data: Partial<TagsBlockData>; }
   let { data }: Props = $props();
 </script>
-<div class="p-4 flex gap-2 flex-wrap items-center">
-  {#if data.label}<span class="text-[10px] font-mono text-zinc-600">{data.label}</span>{/if}
+<div class="p-3 md:p-4 flex gap-2 flex-wrap items-center">
+  {#if data.label}<span class="text-[10px] font-mono text-text2">{data.label}</span>{/if}
   {#each (data.tags ?? []) as tag}
     <span class="text-[11px] font-mono px-3 py-1 rounded-full border transition-colors
-      {tag.active ? 'border-[#3ecfb2] text-[#3ecfb2] bg-[#3ecfb2]/10' : 'border-white/[0.13] text-zinc-500'}">
+      {tag.active ? 'border-teal text-teal bg-teal/10' : 'border-border2 text-text2'}">
       {tag.text}
     </span>
   {/each}

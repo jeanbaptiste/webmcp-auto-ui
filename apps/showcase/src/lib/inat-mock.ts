@@ -19,12 +19,12 @@ export const TOP_SPECIES = [
 ];
 
 export const TOP_OBSERVERS = [
-  { login: 'naturalist_fr', name: 'Marie Dupont',   obs: 48_420, species: 4_218, avatar: 'MD', badge: 'Top France',  color: '#7c6dfa' },
-  { login: 'biowatch_eu',   name: 'Jean-Claude M.', obs: 42_110, species: 3_890, avatar: 'JM', badge: 'Expert Aves', color: '#3ecfb2' },
-  { login: 'wildlens',      name: 'Sophie Bernard', obs: 38_904, species: 3_201, avatar: 'SB', badge: 'Botaniste',   color: '#f0a050' },
-  { login: 'botanist_42',   name: 'Pierre Legrand', obs: 34_221, species: 2_940, avatar: 'PL', badge: 'Mycologue',   color: '#fa6d7c' },
-  { login: 'ornitholog',    name: 'Claire Morin',   obs: 29_108, species: 2_780, avatar: 'CM', badge: 'Ornitho',     color: '#a855f7' },
-  { login: 'mycoexplorer',  name: 'Luca Rossi',     obs: 26_440, species: 2_340, avatar: 'LR', badge: 'Fungi',       color: '#22c55e' },
+  { login: 'forestier_bird', name: 'Claire Forestier', obs: 48_420, species: 4_218, avatar: 'CF', badge: 'Top France',  color: '#7c6dfa' },
+  { login: 'biowatch_eu',    name: 'Jean-Claude M.',   obs: 42_110, species: 3_890, avatar: 'JM', badge: 'Expert Aves', color: '#3ecfb2' },
+  { login: 'wildlens',       name: 'Sophie Bernard',   obs: 38_904, species: 3_201, avatar: 'SB', badge: 'Botaniste',   color: '#f0a050' },
+  { login: 'botanist_42',    name: 'Pierre Legrand',   obs: 34_221, species: 2_940, avatar: 'PL', badge: 'Mycologue',   color: '#fa6d7c' },
+  { login: 'ornitholog',     name: 'Claire Morin',     obs: 29_108, species: 2_780, avatar: 'CM', badge: 'Ornitho',     color: '#a855f7' },
+  { login: 'mycoexplorer',   name: 'Luca Rossi',       obs: 26_440, species: 2_340, avatar: 'LR', badge: 'Fungi',       color: '#22c55e' },
 ];
 
 export const MONTHLY_OBS = [
@@ -129,18 +129,54 @@ export const GRID_DATA = {
 };
 
 export const PROFILE_OBSERVER = {
-  name: 'Marie Dupont',
-  subtitle: 'Top observatrice France · depuis 2015',
+  name: 'Claire Forestier',
+  subtitle: 'Top observatrice France · depuis 2014',
   badge: { text: '#1 France', variant: 'success' as const },
   fields: [
-    { label: 'Login',       value: 'naturalist_fr' },
-    { label: 'Localisation', value: 'Paris, Île-de-France' },
-    { label: 'Membre depuis', value: '2015' },
+    { label: 'Login',        value: 'forestier_bird' },
+    { label: 'Localisation', value: 'Strasbourg, Alsace' },
+    { label: 'Membre depuis', value: '2014' },
     { label: 'Spécialité',  value: 'Ornithologie, Botanique' },
   ],
   stats: [
-    { label: 'Observations', value: '48 420' },
-    { label: 'Espèces',      value: '4 218' },
+    { label: 'Observations',    value: '48 420' },
+    { label: 'Espèces',         value: '4 218' },
     { label: 'Identifications', value: '12 840' },
   ],
 };
+
+export const GALLERY_IMAGES = [
+  { src: 'https://picsum.photos/seed/parus/400/300',   alt: 'Parus major',       caption: 'Mésange charbonnière · Paris 2026'   },
+  { src: 'https://picsum.photos/seed/bombus/400/300',  alt: 'Bombus lapidarius', caption: 'Bourdon des pierres · Lyon 2026'       },
+  { src: 'https://picsum.photos/seed/primula/400/300', alt: 'Primula veris',     caption: 'Coucou des prés · Alsace 2026'         },
+  { src: 'https://picsum.photos/seed/vulpes/400/300',  alt: 'Vulpes vulpes',     caption: 'Renard roux · Bretagne 2026'           },
+  { src: 'https://picsum.photos/seed/quercus/400/300', alt: 'Quercus robur',     caption: 'Chêne pédonculé · Normandie 2026'      },
+  { src: 'https://picsum.photos/seed/amanita/400/300', alt: 'Amanita muscaria',  caption: 'Amanite tue-mouches · Vosges 2026'     },
+];
+
+export const CAROUSEL_SLIDES = [
+  {
+    src: 'https://picsum.photos/seed/inat1/800/400',
+    title: 'iNaturalist — 148 millions d\'observations',
+    subtitle: 'Science participative mondiale',
+    content: 'En 2026, iNaturalist dépasse 148 millions d\'observations validées, couvrant 421 847 espèces sur tous les continents.',
+  },
+  {
+    src: 'https://picsum.photos/seed/inat2/800/400',
+    title: 'Biodiversité française en plein essor',
+    subtitle: '12,8 millions d\'obs en France',
+    content: 'La France compte parmi les 5 pays les plus actifs sur iNaturalist. Aves et Plantae dominent avec 80% des observations.',
+  },
+  {
+    src: 'https://picsum.photos/seed/inat3/800/400',
+    title: 'BioBlitz France 2026',
+    subtitle: '8 200 naturalistes · 12-14 avril',
+    content: 'L\'événement annuel mobilise des milliers de citoyens-scientifiques pour documenter la biodiversité locale en 72 heures.',
+  },
+  {
+    src: 'https://picsum.photos/seed/inat4/800/400',
+    title: 'Intelligence artificielle et identification',
+    subtitle: 'Précision > 92% sur les espèces communes',
+    content: 'Le modèle de vision d\'iNaturalist identifie automatiquement les taxons à partir de photos, accélérant la validation research-grade.',
+  },
+];

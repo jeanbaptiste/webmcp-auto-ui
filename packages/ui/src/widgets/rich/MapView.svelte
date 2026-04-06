@@ -25,7 +25,7 @@
   let L: typeof import('leaflet') | undefined;
 
   function markerColor(color?: string): string {
-    return color ?? '#7c6dfa';
+    return color ?? 'var(--color-accent)';
   }
 
   function syncMarkers(markers: MapMarker[]): void {
@@ -97,9 +97,9 @@
 
 <style>
   :global(.mapview-tooltip) {
-    background: #1e1e2e;
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #d4d4e0;
+    background: var(--color-surface2);
+    border: 1px solid var(--color-border);
+    color: var(--color-text1);
     font-size: 11px;
     font-family: ui-monospace, monospace;
     border-radius: 4px;
@@ -107,24 +107,24 @@
     box-shadow: 0 2px 8px rgba(0,0,0,0.4);
   }
   :global(.mapview-tooltip::before) {
-    border-top-color: rgba(255,255,255,0.08);
+    border-top-color: var(--color-border);
   }
   :global(.leaflet-container) {
-    background: #0a0a14;
+    background: var(--color-bg);
   }
 </style>
 
-<div class="bg-[#13131a] border border-white/[0.07] rounded-lg p-4 font-sans">
+<div class="bg-surface border border-border rounded-lg p-3 md:p-4 font-sans">
   {#if spec.title}
-    <h3 class="text-sm font-semibold text-zinc-300 mb-3">{spec.title}</h3>
+    <h3 class="text-sm font-semibold text-text1 mb-3">{spec.title}</h3>
   {/if}
   <div
     bind:this={container}
-    class="rounded overflow-hidden border border-white/[0.05]"
+    class="rounded overflow-hidden border border-border"
     style="height:{spec.height ?? '400px'};"
   >
     {#if !leafletLoaded}
-      <div class="w-full h-full bg-[#0a0a14] flex flex-col items-center justify-center text-zinc-600 text-sm gap-2">
+      <div class="w-full h-full bg-bg flex flex-col items-center justify-center text-text2 text-sm gap-2">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 13l4.553 2.276A1 1 0 0021 21.382V10.618a1 1 0 00-1.447-.894L15 12m0 8V12M9 7l6-2.5"/>
         </svg>
@@ -133,7 +133,7 @@
     {/if}
   </div>
   {#if spec.markers?.length}
-    <div class="mt-2 text-xs text-zinc-700 font-mono">
+    <div class="mt-2 text-xs text-text2 font-mono">
       {spec.markers.length} marqueur{spec.markers.length > 1 ? 's' : ''}
     </div>
   {/if}

@@ -1,5 +1,10 @@
 // @webmcp-auto-ui/ui — public API
 
+// Theme
+export { default as ThemeProvider, getTheme } from './theme/ThemeProvider.svelte';
+export { DARK_TOKENS, LIGHT_TOKENS, THEME_MAP } from './theme/tokens.js';
+export type { ThemeMode, ThemeOverrides, ThemeTokens } from './theme/tokens.js';
+
 // Primitives
 export { default as Card } from './primitives/Card.svelte';
 export { default as GridLayout } from './primitives/GridLayout.svelte';
@@ -32,6 +37,8 @@ export { default as GridData } from './widgets/rich/GridData.svelte';
 export { default as Sankey } from './widgets/rich/Sankey.svelte';
 export { default as MapView } from './widgets/rich/MapView.svelte';
 export { default as LogViewer } from './widgets/rich/LogViewer.svelte';
+export { default as Gallery } from './widgets/rich/Gallery.svelte';
+export { default as Carousel } from './widgets/rich/Carousel.svelte';
 
 // Dispatcher
 export { default as BlockRenderer } from './widgets/BlockRenderer.svelte';
@@ -44,3 +51,7 @@ export { default as StackLayout } from './wm/StackLayout.svelte';
 
 // WM types
 export type { ManagedWindow, LayoutWindow, FloatingWindowState } from './lib/wm-layouts.js';
+
+// FONC message bus
+export { bus } from './messaging/bus.svelte.js';
+export type { BusMessage } from './messaging/bus.svelte.js';

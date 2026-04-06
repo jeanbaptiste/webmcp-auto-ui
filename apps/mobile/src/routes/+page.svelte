@@ -33,6 +33,12 @@
   let mcpToken = $state('');
   let hsUrlDisplay = $state('');
   let urlCopied = $state(false);
+  let shareMenuOpen = $state(false);
+
+  // Gemma load timer
+  let gemmaLoadStart = $state(0);
+  let gemmaElapsed = $state(0);
+  let gemmaTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
 
   // Clock
   let clockStr = $state('');
@@ -81,9 +87,13 @@
     clearFeedBlocks();
     addBubble('assistant', `recette <strong style="color:#7c6dfa">${skill.name}</strong> chargée${skill.mcpName ? ` · serveur: <strong style="color:#3ecfb2">${skill.mcpName}</strong>` : ''}`);
 
-    // Pre-fill MCP URL if defined
+    // Auto-connect MCP if skill requires one
     if (skill.mcp && !canvas.mcpConnected) {
-      addBubble('assistant', `Cette recette nécessite <strong style="color:#f0a050">${skill.mcpName ?? skill.mcp}</strong> — connectez via ≡`);
+      // Pre-fill the URL then connect automatically
+      canvas.setMcpUrl(skill.mcp);
+      addBubble('assistant', `connexion automatique à <strong style="color:#f0a050">${skill.mcpName ?? skill.mcp}</strong>…`);
+      // Kick off connection (don't await — non-blocking)
+      void connectMcp();
     } else if (skill.mcp && canvas.mcpConnected && canvas.mcpUrl !== skill.mcp) {
       addBubble('assistant', `⚠️ Recette conçue pour <strong style="color:#f0a050">${skill.mcpName}</strong>, vous êtes sur <strong>${canvas.mcpUrl.split('/').slice(-2).join('/')}</strong>`);
     }
@@ -129,7 +139,7 @@
       drawerView = 'main';
       updateHsUrl();
     } catch {
-      addBubble('assistant', '<span style="color:#fa6d7c">❌ Format invalide — coller une URL ?hs= ou un base64 HyperSkill</span>');
+      addBubble('assistant', '<span style="color:#fa6d7c">❌ Format invalide — coller une URL ?hs= ou un base64 HyperSkills</span>');
     }
   }
 
@@ -172,6 +182,41 @@
     setTimeout(() => { urlCopied = false; }, 1500);
   }
 
+  async function shareNative() {
+    if (!hsUrlDisplay) { await updateHsUrl(); }
+    if (!hsUrlDisplay) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'HyperSkills', text: 'Interface générée avec HyperSkills', url: hsUrlDisplay });
+      } catch { /* user cancelled */ }
+    } else {
+      shareMenuOpen = !shareMenuOpen;
+    }
+  }
+
+  async function ensureShareUrl(): Promise<string> {
+    if (!hsUrlDisplay) await updateHsUrl();
+    return hsUrlDisplay;
+  }
+
+  async function shareEmail() {
+    const url = await ensureShareUrl();
+    if (!url) return;
+    window.open(`mailto:?subject=HyperSkills&body=${encodeURIComponent(url)}`);
+  }
+
+  async function shareTwitter() {
+    const url = await ensureShareUrl();
+    if (!url) return;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent('Interface générée avec HyperSkills')}&url=${encodeURIComponent(url)}`, '_blank');
+  }
+
+  async function shareLinkedIn() {
+    const url = await ensureShareUrl();
+    if (!url) return;
+    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, '_blank');
+  }
+
   // ── MCP ───────────────────────────────────────────────────────────────────
   async function connectMcp() {
     const url = canvas.mcpUrl.trim();
@@ -203,17 +248,42 @@
   let gemmaStatus = $state<'idle'|'loading'|'ready'|'error'>('idle');
   let gemmaProgress = $state(0);
 
+  function startGemmaTimer() {
+    gemmaLoadStart = Date.now();
+    gemmaElapsed = 0;
+    if (gemmaTimerInterval) clearInterval(gemmaTimerInterval);
+    gemmaTimerInterval = setInterval(() => {
+      gemmaElapsed = Math.floor((Date.now() - gemmaLoadStart) / 1000);
+    }, 1000);
+  }
+
+  function stopGemmaTimer() {
+    if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
+  }
+
+  function unloadGemma() {
+    if (gemmaProvider) {
+      try { (gemmaProvider as unknown as { destroy?: () => void }).destroy?.(); } catch {}
+      gemmaProvider = null;
+    }
+    gemmaStatus = 'idle';
+    gemmaProgress = 0;
+    stopGemmaTimer();
+    addBubble('assistant', 'Gemma déchargé de la mémoire');
+  }
+
   // ── Agent / Chat ──────────────────────────────────────────────────────────
   function getProvider() {
     if (canvas.llm === 'gemma-e2b') {
       if (!gemmaProvider) {
         gemmaProvider = new GemmaProvider({
           workerFactory: () => new GemmaWorker(),
-          onProgress: (p, s) => { gemmaProgress = p; addBubble('assistant', `⏳ Gemma: ${s} (${Math.round(p)}%)`); },
+          onProgress: (p, _s) => { gemmaProgress = p; },
           onStatusChange: (s) => {
             gemmaStatus = s;
-            if (s === 'ready') addBubble('assistant', '✓ Gemma E2B prêt — WebGPU');
-            if (s === 'error') addBubble('assistant', '❌ Gemma E2B indisponible, vérifiez WebGPU');
+            if (s === 'loading') startGemmaTimer();
+            if (s === 'ready') { stopGemmaTimer(); addBubble('assistant', `✓ Gemma 2B prêt — WebGPU (${gemmaElapsed}s)`); }
+            if (s === 'error') { stopGemmaTimer(); addBubble('assistant', '❌ Gemma E2B indisponible, vérifiez WebGPU'); }
           },
         });
       }
@@ -289,7 +359,7 @@
           applySkill(s); return textResult(`Applied: ${s.name}`);
         },
       });
-      mc.registerTool({ name:'mobile_get_hyperskill_url', description:'Get current canvas as HyperSkill URL.',
+      mc.registerTool({ name:'mobile_get_hyperskill_url', description:'Get current canvas as HyperSkills URL.',
         inputSchema:{type:'object',properties:{}},
         execute:()=>{ updateHsUrl(); return textResult(hsUrlDisplay||'No blocks on canvas'); },
         annotations:{readOnlyHint:true},
@@ -305,7 +375,7 @@
           const decoded = await decodeHyperSkill(full);
           const content = decoded.content as { blocks?: { type: string; data: Record<string,unknown> }[] };
           if (decoded.meta?.mcp) canvas.setMcpUrl(decoded.meta.mcp as string);
-          addBubble('assistant', `HyperSkill chargée · ${content.blocks?.length ?? 0} blocs`);
+          addBubble('assistant', `HyperSkills chargée · ${content.blocks?.length ?? 0} blocs`);
           (content.blocks ?? []).forEach((b, i) => {
             setTimeout(() => addBlock(b.type, b.data, (decoded.meta as Record<string,unknown>)?.mcpName as string ?? 'hyperskill'), i * 120);
           });
@@ -326,7 +396,7 @@
   });
 </script>
 
-<svelte:head><title>HyperSkill Mobile</title></svelte:head>
+<svelte:head><title>HyperSkills Mobile</title></svelte:head>
 
 <div class="phone">
 
@@ -342,7 +412,7 @@
 
   <!-- TOPBAR -->
   <div class="flex items-center gap-2.5 px-4 h-12 border-b border-white/7 flex-shrink-0 bg-[#16161a]">
-    <span class="text-sm font-medium text-zinc-100 flex-1 tracking-tight">Hyper<span class="text-accent">Skill</span></span>
+    <span class="text-sm font-medium text-zinc-100 flex-1 tracking-tight">Hyper<span class="text-accent">Skills</span></span>
     <div class="flex items-center gap-1.5">
       <div class="w-1.5 h-1.5 rounded-full {canvas.mcpConnecting ? 'bg-amber animate-pulse' : canvas.mcpConnected ? 'bg-teal' : 'bg-zinc-700'}"></div>
       <span class="text-[10px] text-zinc-500 font-mono">{canvas.mcpConnecting ? 'connexion…' : canvas.mcpConnected ? canvas.mcpName : 'non connecté'}</span>
@@ -355,6 +425,28 @@
       <div class="w-3.5 h-px bg-zinc-500 rounded"></div>
     </button>
   </div>
+
+  <!-- GEMMA LOADER BAR -->
+  {#if canvas.llm === 'gemma-e2b' && (gemmaStatus === 'loading' || gemmaStatus === 'ready')}
+    <div class="flex flex-col gap-1 px-4 py-2 border-b border-white/7 bg-[#16161a] flex-shrink-0">
+      {#if gemmaStatus === 'loading'}
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-mono text-zinc-400">Gemma 2B — chargement… {Math.round(gemmaProgress)}%</span>
+          <span class="text-[10px] font-mono text-zinc-600">{gemmaElapsed}s</span>
+        </div>
+        <div class="w-full h-1 rounded-full bg-white/8 overflow-hidden">
+          <div class="h-full rounded-full bg-teal transition-all duration-300" style="width: {gemmaProgress}%"></div>
+        </div>
+      {:else if gemmaStatus === 'ready'}
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-mono text-teal">Gemma 2B ✓</span>
+          <button class="text-[10px] font-mono text-zinc-600 hover:text-red-400 transition-colors" onclick={unloadGemma}>
+            décharger ✕
+          </button>
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   <!-- FEED -->
   <div id="feed" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
@@ -466,26 +558,58 @@
         <div class="flex flex-col gap-2 mt-auto">
           <button class="w-full py-2 rounded-lg border border-white/12 text-zinc-400 text-xs font-mono hover:border-teal hover:text-teal transition-colors"
             onclick={() => drawerView = 'paste'}>
-            📋 Coller une recette HyperSkill
+            📋 Coller une recette HyperSkills
           </button>
           <button class="w-full py-2 rounded-lg border border-white/12 text-zinc-400 text-xs font-mono hover:border-accent hover:text-accent transition-colors"
             onclick={() => { drawerView = 'save'; }}>
             💾 Enregistrer la vue courante
           </button>
           <button class="w-full py-2 rounded-lg border border-white/12 text-zinc-400 text-xs font-mono hover:border-zinc-400 transition-colors"
-            onclick={() => { drawerOpen = false; updateHsUrl().then(() => {}); }}>
-            export skill ↗
+            onclick={() => { updateHsUrl().then(() => { shareMenuOpen = true; }); }}>
+            partager ↗
           </button>
           {#if hsUrlDisplay}
-            <button
-              class="w-full py-2 px-3 rounded-lg text-[9px] font-mono text-left break-all transition-colors
-                {urlCopied ? 'border border-teal text-teal bg-teal/5' : 'border border-white/6 text-zinc-600 hover:border-accent'}"
-              onclick={copyHsUrl}>
-              {urlCopied ? '✓ URL copiée !' : hsUrlDisplay.slice(0, 55) + '…'}
-            </button>
+            <!-- URL preview -->
+            <div class="w-full py-2 px-3 rounded-lg border border-white/6 text-[9px] font-mono text-zinc-700 break-all">
+              {hsUrlDisplay.slice(0, 55)}…
+            </div>
+            <!-- Share actions -->
+            {#if shareMenuOpen}
+              <div class="flex flex-col gap-1.5">
+                <!-- Native share (shown if available) -->
+                <button
+                  class="w-full py-1.5 rounded-lg border border-white/12 text-zinc-400 text-[10px] font-mono hover:border-accent hover:text-accent transition-colors"
+                  onclick={shareNative}>
+                  📤 Partager (natif)
+                </button>
+                <button
+                  class="w-full py-1.5 rounded-lg border border-white/12 text-zinc-400 text-[10px] font-mono transition-colors
+                    {urlCopied ? 'border-teal text-teal bg-teal/5' : 'hover:border-teal hover:text-teal'}"
+                  onclick={copyHsUrl}>
+                  {urlCopied ? '✓ URL copiée !' : '📋 Copier le lien'}
+                </button>
+                <button
+                  class="w-full py-1.5 rounded-lg border border-white/12 text-zinc-400 text-[10px] font-mono hover:border-zinc-300 hover:text-zinc-300 transition-colors"
+                  onclick={shareEmail}>
+                  ✉️ Email
+                </button>
+                <div class="flex gap-1.5">
+                  <button
+                    class="flex-1 py-1.5 rounded-lg border border-white/12 text-zinc-400 text-[10px] font-mono hover:border-zinc-300 hover:text-zinc-300 transition-colors"
+                    onclick={shareTwitter}>
+                    𝕏 Twitter
+                  </button>
+                  <button
+                    class="flex-1 py-1.5 rounded-lg border border-white/12 text-zinc-400 text-[10px] font-mono hover:border-blue-400 hover:text-blue-400 transition-colors"
+                    onclick={shareLinkedIn}>
+                    in LinkedIn
+                  </button>
+                </div>
+              </div>
+            {/if}
           {:else}
             <div class="w-full py-2 px-3 rounded-lg border border-white/6 text-[9px] font-mono text-zinc-700">
-              HyperSkill URL — générer d'abord une interface
+              HyperSkills URL — générer d'abord une interface
             </div>
           {/if}
         </div>
@@ -494,7 +618,7 @@
         <!-- PASTE VIEW -->
         <div class="flex items-center gap-2 mb-2">
           <button class="text-zinc-500 hover:text-white text-sm" onclick={() => drawerView = 'main'}>←</button>
-          <span class="text-sm font-medium text-zinc-200">Coller une recette</span>
+          <span class="text-sm font-medium text-zinc-200">Coller une recette HyperSkills</span>
         </div>
         <div class="text-[10px] font-mono text-zinc-600 mb-1">URL ?hs= complète ou base64 brut</div>
         <textarea

@@ -114,12 +114,12 @@
     }|undefined;
     if (!mc) return;
 
-    mc.registerTool({ name:'get_hyperskill_info', description:'Get info about the currently loaded HyperSkill.',
+    mc.registerTool({ name:'get_hyperskill_info', description:'Get info about the currently loaded HyperSkills widget.',
       inputSchema:{type:'object',properties:{}},
       execute:()=>jsonResult({loaded:!!skill,title:skill?.meta?.title,blocks:blocks.length,versions:versions.length,hash:versions[versions.length-1]?.hash}),
       annotations:{readOnlyHint:true},
     });
-    mc.registerTool({ name:'load_hyperskill', description:'Load a HyperSkill from a URL or ?hs= parameter.',
+    mc.registerTool({ name:'load_hyperskill', description:'Load a HyperSkills widget from a URL or ?hs= parameter.',
       inputSchema:{type:'object',properties:{url:{type:'string'}},required:['url']},
       execute:(args:Record<string,unknown>)=>{ loadFromUrl(args.url as string); return textResult(`Loading: ${args.url}`); },
     });
@@ -140,20 +140,23 @@
   });
 </script>
 
-<svelte:head><title>HyperSkill Viewer</title></svelte:head>
+<svelte:head><title>HyperSkills Viewer</title></svelte:head>
 
 <div class="min-h-screen bg-bg font-sans flex flex-col">
   <header class="border-b border-border bg-surface px-6 py-3 flex items-center gap-3 flex-shrink-0">
-    <div class="font-mono text-sm font-bold"><span class="text-white">Hyper</span><span class="text-amber">Skill</span><span class="text-zinc-700 text-xs ml-1">viewer</span></div>
+    <div class="font-mono text-sm font-bold"><span class="text-white">Hyper</span><span class="text-amber">Skills</span><span class="text-zinc-700 text-xs ml-1">viewer</span></div>
     <div class="w-px h-5 bg-border2"></div>
     <input class="flex-1 font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 text-zinc-300 outline-none focus:border-accent transition-colors placeholder-zinc-700 max-w-lg"
-      placeholder="https://example.com?hs=… ou coller une URL HyperSkill"
+      placeholder="https://example.com/viewer?hs=… ou coller une URL HyperSkills"
       bind:value={urlInput} onkeydown={(e)=>e.key==='Enter'&&loadFromUrl(urlInput)} />
     <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-zinc-400 hover:border-accent hover:text-accent transition-all"
       onclick={()=>loadFromUrl(urlInput)} disabled={loading}>
       {loading ? '…' : 'charger'}
     </button>
     <div class="flex-1"></div>
+    <span class="font-mono text-xs text-zinc-600 hidden xl:block">Une HyperSkill est un widget UI portable encodé dans une URL</span>
+    <a href="https://hyperskills.net" target="_blank" class="font-mono text-xs text-accent hover:underline hidden xl:inline">hyperskills.net</a>
+    <div class="w-px h-5 bg-border2 hidden xl:block"></div>
     {#if skill}
       <button class="font-mono text-xs h-7 px-3 rounded border transition-all flex items-center gap-1.5
           {autoGenerating ? 'border-amber text-amber' : 'border-border2 text-zinc-400 hover:border-amber hover:text-amber'}"
@@ -194,8 +197,8 @@
     {#if !skill && !loading && !error}
       <div class="flex-1 flex flex-col items-center justify-center text-center gap-6 p-8">
         <div class="text-5xl opacity-10">⬡</div>
-        <div class="font-mono text-sm text-zinc-600">Collez une HyperSkill URL dans la barre ci-dessus</div>
-        <div class="font-mono text-xs text-zinc-700">Format : https://example.com?hs=base64(skill)</div>
+        <div class="font-mono text-sm text-zinc-600">Collez une HyperSkills URL dans la barre ci-dessus</div>
+        <div class="font-mono text-xs text-zinc-700">Format : https://example.com/viewer?hs=base64(skill)</div>
       </div>
     {:else if error}
       <div class="flex-1 flex items-center justify-center">
@@ -239,7 +242,7 @@
         {#if blocks.length === 0 && skill}
           <div class="flex flex-col items-center justify-center py-16 gap-4 text-center">
             <div class="text-3xl opacity-10">⬡</div>
-            <div class="font-mono text-sm text-zinc-600">Aucun bloc dans cette skill</div>
+            <div class="font-mono text-sm text-zinc-600">Aucun bloc dans cette HyperSkills</div>
             <button class="font-mono text-xs px-4 py-2 rounded border border-amber text-amber hover:bg-amber/10 transition-all flex items-center gap-1.5"
               onclick={autoGenerate} disabled={autoGenerating}>
               <RefreshCw size={12} /> Auto-générer depuis le MCP

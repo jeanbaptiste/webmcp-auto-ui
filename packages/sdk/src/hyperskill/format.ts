@@ -14,6 +14,7 @@ export interface HyperSkillMeta {
   mcpName?: string;
   llm?: string;
   tags?: string[];
+  theme?: Record<string, string>;
   hash?: string;
   previousHash?: string;
 }

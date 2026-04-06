@@ -195,6 +195,30 @@ export const UI_TOOLS: AnthropicTool[] = [
       }, required: ['message'] } },
     }, required: ['entries'] },
   },
+  // ── Gallery & Carousel ──────────────────────────────────────────────────
+  {
+    name: 'render_gallery',
+    description: 'Afficher une galerie d\'images avec lightbox.',
+    input_schema: { type: 'object', properties: {
+      title: { type: 'string' },
+      images: { type: 'array', items: { type: 'object', properties: {
+        src: { type: 'string' }, alt: { type: 'string' }, caption: { type: 'string' },
+      }, required: ['src'] } },
+      columns: { type: 'number' },
+    }, required: ['images'] },
+  },
+  {
+    name: 'render_carousel',
+    description: 'Afficher un carousel de slides (images, contenu) avec navigation et auto-play.',
+    input_schema: { type: 'object', properties: {
+      title: { type: 'string' },
+      slides: { type: 'array', items: { type: 'object', properties: {
+        src: { type: 'string' }, title: { type: 'string' }, subtitle: { type: 'string' }, content: { type: 'string' },
+      } } },
+      autoPlay: { type: 'boolean' },
+      interval: { type: 'number' },
+    }, required: ['slides'] },
+  },
   // ── Canvas actions ──────────────────────────────────────────────────────
   {
     name: 'clear_canvas',
@@ -224,6 +248,8 @@ const TOOL_TO_BLOCK: Record<string, string> = {
   render_cards: 'cards',
   render_sankey: 'sankey',
   render_log: 'log',
+  render_gallery: 'gallery',
+  render_carousel: 'carousel',
 };
 
 export function isUITool(name: string): boolean {

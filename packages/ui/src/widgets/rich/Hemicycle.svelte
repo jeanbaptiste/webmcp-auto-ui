@@ -35,13 +35,13 @@
   const legend = $derived([...groups].sort((a,b)=>b.seats-a.seats));
   let tooltip = $state<{label:string;seats:number}|null>(null);
 </script>
-<div class="bg-[#13131a] border border-white/[0.07] rounded-lg p-4 font-sans">
-  {#if spec.title}<h3 class="text-sm font-semibold text-zinc-300 mb-3">{spec.title}</h3>{/if}
-  {#if !groups.length||!total}<p class="text-zinc-600 text-sm">Aucune donnée</p>
+<div class="bg-surface border border-border rounded-lg p-3 md:p-4 font-sans">
+  {#if spec.title}<h3 class="text-sm font-semibold text-text1 mb-3">{spec.title}</h3>{/if}
+  {#if !groups.length||!total}<p class="text-text2 text-sm">Aucune donnée</p>
   {:else}
     <div class="relative">
       <svg viewBox="0 0 {W} {H}" class="block w-full max-h-[220px]" xmlns="http://www.w3.org/2000/svg">
-        <path d="M {cx-rMax-15} {cy} A {rMax+15} {rMax+15} 0 0 1 {cx+rMax+15} {cy}" fill="none" stroke="#1a1a24" stroke-width="2"/>
+        <path d="M {cx-rMax-15} {cy} A {rMax+15} {rMax+15} 0 0 1 {cx+rMax+15} {cy}" fill="none" stroke="var(--color-surface2)" stroke-width="2"/>
         {#each seats as s}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -53,10 +53,10 @@
             onmouseleave={()=>tooltip=null}
             onclick={()=>{const g=groups.find(g=>g.id===s.gid);if(g)ongroupclick?.(g);}}/>
         {/each}
-        <text x={cx} y={cy+18} text-anchor="middle" font-size="11" fill="#444466" font-family="system-ui">{total} sièges</text>
+        <text x={cx} y={cy+18} text-anchor="middle" font-size="11" fill="var(--color-text2)" font-family="system-ui">{total} sièges</text>
       </svg>
       {#if tooltip}
-        <div class="absolute top-0 right-0 bg-[#1a1a24] border border-white/[0.1] rounded px-2 py-1 text-xs text-zinc-300 pointer-events-none">
+        <div class="absolute top-0 right-0 bg-surface2 border border-border2 rounded px-2 py-1 text-xs text-text1 pointer-events-none">
           <span class="font-semibold">{tooltip.label}</span> — {tooltip.seats}
         </div>
       {/if}
@@ -67,8 +67,8 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="flex items-center gap-1.5 text-xs cursor-pointer hover:opacity-80" role="button" tabindex="0" onclick={()=>ongroupclick?.(g)} onkeydown={(e)=>{if(e.key==="Enter")ongroupclick?.(g)}}>
           <div class="w-3 h-3 rounded-full flex-shrink-0" style="background:{g.color};"></div>
-          <span class="text-zinc-400">{g.label}</span>
-          <span class="text-zinc-600">{g.seats}</span>
+          <span class="text-text2">{g.label}</span>
+          <span class="text-text2">{g.seats}</span>
         </div>
       {/each}
     </div>

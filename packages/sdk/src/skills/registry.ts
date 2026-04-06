@@ -8,6 +8,10 @@ export interface SkillBlock {
   data: Record<string, unknown>;
 }
 
+export interface ThemeOverrides {
+  [key: string]: string;
+}
+
 export interface Skill {
   id: string;
   name: string;
@@ -16,6 +20,7 @@ export interface Skill {
   mcpName?: string;
   llm?: string;
   tags?: string[];
+  theme?: ThemeOverrides;
   blocks: SkillBlock[];
   createdAt: number;
   updatedAt: number;

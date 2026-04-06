@@ -9,7 +9,7 @@
 
   const apps = [
     {
-      title: 'HyperSkill Composer',
+      title: 'HyperSkills Composer',
       url: `${base}/composer`,
       desc: '3-mode UI composer: auto (LLM), drag & drop, chat. Each canvas block auto-registers 3 WebMCP tools.',
       color: '#7c6dfa',
@@ -25,7 +25,7 @@
       badge: '8 tools WebMCP',
     },
     {
-      title: 'HyperSkill Viewer',
+      title: 'HyperSkills Viewer',
       url: `${base}/viewer`,
       desc: 'Load, display and edit HyperSkills from a ?hs= URL with SHA-256 diff and version chaining.',
       color: '#f0a050',
@@ -41,7 +41,7 @@
       badge: '32 components',
     },
     {
-      title: 'HyperSkill Mobile',
+      title: 'HyperSkills Mobile',
       url: `${base}/mobile`,
       desc: 'Phone-frame UI with real MCP connection, agent loop, full skills CRUD and ?hs= URL loading.',
       color: '#fa6d7c',
@@ -77,8 +77,8 @@
     },
     {
       title: '@webmcp-auto-ui/sdk',
-      description: 'HyperSkill format (SHA-256, gzip, ?hs=) · Skills CRUD · canvas store (Svelte 5 runes)',
-      tags: ['HyperSkill', 'SHA-256'],
+      description: 'HyperSkills format (SHA-256, gzip, ?hs=) · Skills CRUD · canvas store (Svelte 5 runes)',
+      tags: ['HyperSkills', 'SHA-256'],
     },
   ];
 
@@ -112,9 +112,10 @@
         <span class="text-white">webmcp</span><span class="text-accent">-auto-ui</span>
       </div>
       <div class="text-xs font-mono text-zinc-600 border-l border-border pl-4">
-        Svelte 5 · Tailwind · W3C WebMCP Draft 2026-03-27 · HyperSkill spec
+        Svelte 5 · Tailwind · W3C WebMCP Draft 2026-03-27 · HyperSkills spec
       </div>
       <div class="flex-1"></div>
+      <a href="https://hyperskills.net" target="_blank" class="text-xs font-mono text-accent hover:underline">hyperskills.net</a>
       <div class="flex items-center gap-1.5 text-xs font-mono text-teal">
         <div class="w-1.5 h-1.5 rounded-full bg-teal animate-pulse"></div>
         5 apps · {totalTools}+ tools · 32 components
@@ -199,10 +200,10 @@
       <Cards spec={{ cards: packages, minCardWidth: '280px' }} />
     </section>
 
-    <!-- HyperSkill -->
+    <!-- HyperSkills -->
     <section class="grid grid-cols-2 gap-6">
       <div>
-        <h2 class="text-xs font-mono text-zinc-600 uppercase tracking-widest mb-4">HyperSkill format</h2>
+        <h2 class="text-xs font-mono text-zinc-600 uppercase tracking-widest mb-4">HyperSkills format</h2>
         <AlertBlock data={{
           title: 'Portable skill URL',
           message: 'https://example.com?hs=base64(skill) — auto-compressed with gzip when >6KB. SHA-256 traceability, chainable across versions. Works in Chrome (~32K), Firefox (~65K), Safari (~80K).',
@@ -237,7 +238,7 @@
   <footer class="border-t border-border px-8 py-5 mt-4">
     <div class="max-w-6xl mx-auto flex justify-between text-xs font-mono text-zinc-700">
       <span>webmcp-auto-ui · AGPL-3.0</span>
-      <span>Svelte 5 · W3C WebMCP · HyperSkill spec · api.inaturalist.org (showcase mock)</span>
+      <span>Svelte 5 · W3C WebMCP · HyperSkills spec · api.inaturalist.org (showcase mock)</span>
     </div>
   </footer>
 </div>

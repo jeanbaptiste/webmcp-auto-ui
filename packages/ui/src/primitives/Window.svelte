@@ -9,13 +9,13 @@
   function hmu() { dragging = false; }
 </script>
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="flex flex-col bg-[#13131a] rounded-lg border border-white/[0.07] overflow-hidden {cls}"
+<div class="flex flex-col bg-surface rounded-lg border border-border overflow-hidden {cls}"
   onmousemove={draggable ? hmm : undefined} onmouseup={draggable ? hmu : undefined} onmouseleave={draggable ? hmu : undefined}>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="flex items-center gap-2 px-3 py-2 bg-white/[0.03] border-b border-white/[0.07] shrink-0 select-none {draggable ? 'cursor-move' : ''}"
+  <div class="flex items-center gap-2 px-3 py-2 bg-surface2/50 border-b border-border shrink-0 select-none {draggable ? 'cursor-move' : ''}"
     onmousedown={draggable ? hmd : undefined}>
-    <span class="w-2 h-2 rounded-full bg-white/20 shrink-0"></span>
-    <h3 class="text-xs font-mono text-zinc-400 flex-1 truncate">{title}</h3>
+    <span class="w-2 h-2 rounded-full bg-border2 shrink-0"></span>
+    <h3 class="text-xs font-mono text-text2 flex-1 truncate">{title}</h3>
   </div>
   <div class="flex-1 overflow-auto min-h-0">{@render children()}</div>
 </div>

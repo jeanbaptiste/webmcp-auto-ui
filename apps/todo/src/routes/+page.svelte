@@ -13,7 +13,7 @@
     { id: 't1', text: 'Activer WebMCP dans chrome://flags', done: false, priority: 'high', createdAt: Date.now()-3600000, tags: ['setup'] },
     { id: 't2', text: 'Installer l\'extension Model Context Tool Inspector', done: false, priority: 'high', createdAt: Date.now()-1800000, tags: ['setup'] },
     { id: 't3', text: 'Tester les outils WebMCP dans l\'extension', done: false, priority: 'normal', createdAt: Date.now()-900000, tags: ['test'] },
-    { id: 't4', text: 'Explorer HyperSkill Composer', done: false, priority: 'normal', createdAt: Date.now()-300000, tags: ['explore'] },
+    { id: 't4', text: 'Explorer HyperSkills Composer', done: false, priority: 'normal', createdAt: Date.now()-300000, tags: ['explore'] },
     { id: 't5', text: 'Lire la documentation WebMCP W3C', done: true, priority: 'low', createdAt: Date.now()-7200000, tags: ['docs'] },
   ]);
 

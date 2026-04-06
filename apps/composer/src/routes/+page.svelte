@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { listSkills, loadDemoSkills, type Skill } from '@webmcp-auto-ui/sdk';
+  import { listSkills, loadDemoSkills, createSkill, deleteSkill, updateSkill, type Skill } from '@webmcp-auto-ui/sdk';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { McpClient, createToolGroup, textResult, jsonResult } from '@webmcp-auto-ui/core';
-  import { AnthropicProvider, runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
-  import { X, Plus, Zap, Copy, Check, Save } from 'lucide-svelte';
+  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
+  import type { GemmaStatus } from '@webmcp-auto-ui/agent';
+  import { X, Plus, Zap, Copy, Check, Save, Menu, ChevronLeft, ChevronRight, Settings, Pencil, Trash2 } from 'lucide-svelte';
   import BlockWrap from '$lib/BlockWrap.svelte';
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -16,6 +17,116 @@
   let mcpClient = $state<McpClient | null>(null);
   let skills = $state<Skill[]>([]);
   let mcpToken = $state('');
+
+  // 4B: Mobile responsive
+  let mobileMenuOpen = $state(false);
+  let mobileChatOpen = $state(false);
+
+  // 4C: Palette toggle
+  let paletteOpen = $state(true);
+  $effect(() => { paletteOpen = canvas.mode === 'drag'; });
+
+  // 4D: Gemma provider
+  let gemmaProvider = $state<GemmaProvider | null>(null);
+  let gemmaStatus = $state<GemmaStatus>('idle');
+  let gemmaProgress = $state(0);
+  let gemmaLoadStart = $state(0);
+  let gemmaLoadElapsed = $state(0);
+  let gemmaTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
+
+  function getOrCreateGemmaProvider(model?: string): GemmaProvider {
+    if (gemmaProvider) return gemmaProvider;
+    const p = new GemmaProvider({
+      workerFactory: () => new Worker(new URL('$lib/gemma.worker.ts', import.meta.url), { type: 'module' }),
+      model,
+      onProgress: (prog) => { gemmaProgress = Math.round(prog * 100); },
+      onStatusChange: (s) => {
+        gemmaStatus = s;
+        if (s === 'loading') {
+          gemmaLoadStart = Date.now();
+          gemmaTimerInterval = setInterval(() => { gemmaLoadElapsed = Math.round((Date.now() - gemmaLoadStart) / 1000); }, 500);
+        }
+        if (s === 'ready' || s === 'error') {
+          if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
+        }
+      },
+    });
+    gemmaProvider = p;
+    return p;
+  }
+
+  function destroyGemma() {
+    gemmaProvider?.destroy();
+    gemmaProvider = null;
+    gemmaStatus = 'idle';
+    gemmaProgress = 0;
+    gemmaLoadElapsed = 0;
+    if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
+  }
+
+  function activeProvider() {
+    if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
+      const model = canvas.llm === 'gemma-e4b' ? 'onnx-community/gemma-4-E4B-it-ONNX-GQA' : undefined;
+      return getOrCreateGemmaProvider(model);
+    }
+    return provider;
+  }
+
+  // 4E: Stats
+  let cpuCores = $state(0);
+  let ramUsedMB = $state(0);
+  let gpuAvailable = $state<string | null>(null);
+
+  async function refreshStats() {
+    cpuCores = navigator.hardwareConcurrency ?? 0;
+    const perfMem = (performance as any).memory;
+    if (perfMem) ramUsedMB = Math.round(perfMem.usedJSHeapSize / 1048576);
+    try {
+      const gpu = (navigator as any).gpu;
+      if (gpu) {
+        const adapter = await gpu.requestAdapter();
+        gpuAvailable = adapter?.name ?? '✓';
+      }
+    } catch { /* no WebGPU */ }
+  }
+
+  // 4F: MCP stats
+  let mcpConnectStart = $state(0);
+  let mcpConnectElapsed = $state(0);
+  let mcpConnectTimer = $state<ReturnType<typeof setInterval> | null>(null);
+  let mcpToolCallCount = $state(0);
+
+  // 4G: Recettes CRUD
+  let editingSkillId = $state<string | null>(null);
+  let editingSkillJson = $state('');
+
+  function createEmptySkill() {
+    createSkill({ name: 'nouvelle-recette', blocks: [] });
+    skills = listSkills();
+  }
+  function removeSkill(id: string) {
+    deleteSkill(id);
+    skills = listSkills();
+  }
+  function openSkillEdit(id: string) {
+    const s = skills.find(s => s.id === id);
+    if (s) { editingSkillId = id; editingSkillJson = JSON.stringify({ name: s.name, description: s.description, blocks: s.blocks }, null, 2); }
+  }
+  function saveSkillEdit() {
+    if (!editingSkillId) return;
+    try {
+      const parsed = JSON.parse(editingSkillJson);
+      updateSkill(editingSkillId, parsed);
+      skills = listSkills();
+      editingSkillId = null;
+    } catch { /* invalid JSON */ }
+  }
+
+  // 4H: Settings
+  let systemPrompt = $state('');
+  let cacheEnabled = $state(true);
+  let maxTokens = $state(4096);
+  let showSettings = $state(false);
 
   // Reactive skills list
   $effect(() => { skills = listSkills(); });
@@ -75,6 +186,10 @@
   async function connectMcp() {
     if (!canvas.mcpUrl || canvas.mcpConnecting) return;
     canvas.setMcpConnecting(true);
+    mcpConnectStart = Date.now();
+    mcpConnectElapsed = 0;
+    mcpToolCallCount = 0;
+    mcpConnectTimer = setInterval(() => { mcpConnectElapsed = Math.round((Date.now() - mcpConnectStart) / 1000); }, 500);
     try {
       const clientOptions = mcpToken.trim()
         ? { headers: { Authorization: `Bearer ${mcpToken.trim()}` } }
@@ -92,6 +207,7 @@
       canvas.addMsg('system', `❌ ${errMsg}`);
     } finally {
       canvas.setMcpConnecting(false);
+      if (mcpConnectTimer) { clearInterval(mcpConnectTimer); mcpConnectTimer = null; }
     }
   }
 
@@ -107,13 +223,13 @@
     try {
       await runAgentLoop('Génère une interface pour les données disponibles sur ce MCP.', {
         client: c,
-        provider,
+        provider: activeProvider(),
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
           onBlock: (type, data) => canvas.addBlock(type as Parameters<typeof canvas.addBlock>[0], data),
           onClear: () => canvas.clearBlocks(),
           onText: (text) => { if (text) canvas.addMsg('assistant', text); },
-          onToolCall: (call) => canvas.addMsg('system', `🔧 ${call.name}…`),
+          onToolCall: (call) => { mcpToolCallCount++; canvas.addMsg('system', `🔧 ${call.name}…`); },
         },
       });
     } catch (e) {
@@ -131,13 +247,13 @@
     try {
       await runAgentLoop(msg, {
         client: mcpClient ?? undefined,
-        provider,
+        provider: activeProvider(),
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
           onBlock: (type, data) => canvas.addBlock(type as Parameters<typeof canvas.addBlock>[0], data),
           onClear: () => canvas.clearBlocks(),
           onText: (text) => canvas.updateMsg(thinking.id, text || '…', false),
-          onToolCall: (call) => canvas.updateMsg(thinking.id, `🔧 ${call.name}…`, true),
+          onToolCall: (call) => { mcpToolCallCount++; canvas.updateMsg(thinking.id, `🔧 ${call.name}…`, true); },
         },
       });
     } catch (e) {
@@ -204,7 +320,7 @@
   // ── HyperSkill ────────────────────────────────────────────────────────────
   async function copyHsUrl() {
     const param = canvas.buildHyperskillParam();
-    await navigator.clipboard.writeText(`${window.location.origin}?hs=${param}`);
+    await navigator.clipboard.writeText(`${window.location.origin}/composer?hs=${param}`);
     copied = true; setTimeout(() => { copied = false; }, 2000);
   }
 
@@ -221,6 +337,7 @@
     // Load from ?hs= param
     const param = new URLSearchParams(window.location.search).get('hs');
     if (param) canvas.loadFromParam(param);
+    refreshStats();
   });
 
   // Chat input handler
@@ -230,49 +347,93 @@
   }
 </script>
 
-<svelte:head><title>HyperSkill Composer</title></svelte:head>
+<svelte:head><title>HyperSkills Composer</title></svelte:head>
 
 <div class="h-screen flex flex-col overflow-hidden bg-bg">
 
   <!-- TOPBAR -->
-  <header class="h-12 flex items-center gap-3 px-4 border-b border-border bg-surface flex-shrink-0">
+  <header class="h-12 flex items-center gap-3 px-4 border-b border-border bg-surface flex-shrink-0 overflow-x-auto">
+    <!-- Mobile hamburger -->
+    <button class="md:hidden flex-shrink-0 text-zinc-400 hover:text-white" onclick={() => { mobileMenuOpen = !mobileMenuOpen; }}>
+      <Menu size={18} />
+    </button>
     <div class="font-mono text-sm font-bold flex-shrink-0">
-      <span class="text-white">Hyper</span><span class="text-accent">Skill</span>
+      <span class="text-white">Hyper</span><span class="text-accent">Skills</span>
       <span class="text-zinc-700 text-xs ml-1">composer</span>
     </div>
-    <div class="w-px h-5 bg-border2"></div>
-    <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-72 text-zinc-300 outline-none focus:border-accent transition-colors placeholder-zinc-700"
+    <a href="https://hyperskills.net" target="_blank" class="font-mono text-[10px] text-accent hover:underline flex-shrink-0 hidden md:inline">hyperskills.net</a>
+    <div class="w-px h-5 bg-border2 hidden md:block"></div>
+    <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-72 text-zinc-300 outline-none focus:border-accent transition-colors placeholder-zinc-700 hidden md:block"
       placeholder="https://mcp.example.com"
       bind:value={canvas.mcpUrl}
       onkeydown={(e) => e.key === 'Enter' && connectMcp()}
       onchange={onMcpUrlChange} />
-    <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-48 text-zinc-300 outline-none focus:border-accent transition-colors placeholder-zinc-700"
+    <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-48 text-zinc-300 outline-none focus:border-accent transition-colors placeholder-zinc-700 hidden md:block"
       placeholder="Bearer token (optionnel)"
       bind:value={mcpToken} />
-    <button class="font-mono text-xs h-7 px-3 rounded border transition-all flex-shrink-0
+    <button class="font-mono text-xs h-7 px-3 rounded border transition-all flex-shrink-0 hidden md:flex items-center
         {canvas.mcpConnecting ? 'border-border text-zinc-600 cursor-wait' : 'border-border2 text-zinc-400 hover:border-teal hover:text-teal'}"
       onclick={connectMcp} disabled={canvas.mcpConnecting}>
       {canvas.mcpConnecting ? 'connexion…' : 'connect'}
     </button>
-    <div class="w-px h-5 bg-border2"></div>
+    <div class="w-px h-5 bg-border2 hidden md:block"></div>
     <select class="font-mono text-xs bg-surface2 border border-border2 rounded px-2 h-7 text-zinc-400 outline-none cursor-pointer"
-      value={canvas.llm} onchange={(e) => canvas.setLlm((e.target as HTMLSelectElement).value as 'haiku'|'sonnet'|'gemma-e2b')}>
+      value={canvas.llm} onchange={(e) => canvas.setLlm((e.target as HTMLSelectElement).value as 'haiku'|'sonnet'|'gemma-e2b'|'gemma-e4b')}>
       <option value="haiku">claude-haiku-4-5</option>
       <option value="sonnet">claude-sonnet-4-6</option>
-      <option value="gemma-e2b">gemma-e2b (local)</option>
+      <option value="gemma-e2b">Gemma 2B (E2B)</option>
+      <option value="gemma-e4b">Gemma 4B (E4B)</option>
     </select>
+    <!-- 4D: Gemma loader indicator -->
+    {#if gemmaStatus === 'loading'}
+      <span class="font-mono text-[10px] text-amber-400 flex-shrink-0 flex items-center gap-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+        {gemmaProgress}% · {gemmaLoadElapsed}s
+      </span>
+    {:else if gemmaStatus === 'ready'}
+      <span class="font-mono text-[10px] text-teal flex-shrink-0 flex items-center gap-1">
+        ✓ Gemma ready
+        <button class="text-zinc-500 hover:text-red-400 ml-1" onclick={destroyGemma}><X size={10} /></button>
+      </span>
+    {/if}
+    <!-- 4F: MCP stats -->
+    {#if canvas.mcpConnected}
+      <span class="font-mono text-[10px] text-zinc-500 flex-shrink-0 hidden md:inline">
+        HTTP streamable · {mcpToolCallCount} calls
+      </span>
+    {:else if canvas.mcpConnecting}
+      <span class="font-mono text-[10px] text-zinc-500 flex-shrink-0 hidden md:inline">{mcpConnectElapsed}s…</span>
+    {/if}
+    <!-- 4E: Stats (WASM provider active) -->
+    {#if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') && cpuCores > 0}
+      <span class="font-mono text-[10px] text-zinc-600 flex-shrink-0 hidden md:inline">
+        {cpuCores} cores{ramUsedMB ? ` · ${ramUsedMB}MB` : ''}{gpuAvailable ? ` · GPU: ${gpuAvailable}` : ''}
+      </span>
+    {/if}
     <div class="flex-1"></div>
-    <span class="font-mono text-[10px] {canvas.statusColor} flex-shrink-0">{canvas.statusText}</span>
-    <div class="w-px h-5 bg-border2"></div>
-    <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-zinc-400 hover:border-zinc-500 hover:text-white transition-all flex items-center gap-1.5"
+    <span class="font-mono text-[10px] {canvas.statusColor} flex-shrink-0 hidden md:inline">{canvas.statusText}</span>
+    <div class="w-px h-5 bg-border2 hidden md:block"></div>
+    <!-- 4H: Settings button -->
+    <button class="font-mono text-xs h-7 px-2 rounded border border-border2 text-zinc-400 hover:border-zinc-500 hover:text-white transition-all flex items-center"
+      onclick={() => showSettings = true}>
+      <Settings size={13} />
+    </button>
+    <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-zinc-400 hover:border-zinc-500 hover:text-white transition-all hidden md:flex items-center gap-1.5"
       onclick={() => showExport = true}>
       <Save size={11} /> export
     </button>
-    <button class="font-mono text-xs h-7 px-3 rounded border transition-all flex items-center gap-1.5
+    <button class="font-mono text-xs h-7 px-3 rounded border transition-all hidden md:flex items-center gap-1.5
         {copied ? 'border-teal bg-teal/10 text-teal' : 'border-accent bg-accent text-white hover:opacity-85'}"
       onclick={copyHsUrl}>
-      {#if copied}<Check size={11} /> copié !{:else}<Copy size={11} /> hyperskill URL{/if}
+      {#if copied}<Check size={11} /> copié !{:else}<Copy size={11} /> hyperskills URL{/if}
     </button>
+    <!-- Mobile chat toggle -->
+    {#if canvas.mode === 'chat'}
+      <button class="md:hidden font-mono text-xs h-7 px-2 rounded border border-accent text-accent flex-shrink-0"
+        onclick={() => { mobileChatOpen = !mobileChatOpen; }}>
+        chat
+      </button>
+    {/if}
   </header>
 
   <!-- MODE BAR -->
@@ -301,36 +462,104 @@
   <!-- MAIN -->
   <div class="flex flex-1 overflow-hidden">
 
-    <!-- LEFT PALETTE -->
-    <aside class="w-52 border-r border-border bg-surface flex flex-col flex-shrink-0 overflow-hidden">
-      <div class="px-3 pt-3 pb-1">
-        <div class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest mb-2">Blocs</div>
-        <div class="flex flex-col gap-0.5 overflow-y-auto max-h-64">
-          {#each PALETTE as b}
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div class="flex items-center gap-2 px-2 py-1.5 rounded cursor-grab hover:bg-white/5 border border-transparent hover:border-border2 transition-all select-none"
-              draggable="true"
-              ondragstart={(e) => paletteDragStart(e, b.type)}
-              ondblclick={() => canvas.addBlock(b.type as Parameters<typeof canvas.addBlock>[0], DEFAULTS[b.type] ?? {})}>
-              <div class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:{b.color}"></div>
-              <span class="font-mono text-xs text-zinc-400">{b.label}</span>
-            </div>
-          {/each}
+    <!-- LEFT PALETTE (4C: toggle + 4B: responsive) -->
+    {#if !paletteOpen}
+      <button class="hidden md:flex items-center justify-center w-5 border-r border-border bg-surface flex-shrink-0 text-zinc-600 hover:text-zinc-300 transition-colors"
+        onclick={() => { paletteOpen = true; }}>
+        <ChevronRight size={14} />
+      </button>
+    {/if}
+    <aside class="hidden md:flex {paletteOpen ? 'w-52' : 'w-0'} border-r border-border bg-surface flex-col flex-shrink-0 overflow-hidden transition-all duration-200">
+      {#if paletteOpen}
+        <div class="flex items-center justify-between px-3 pt-3 pb-1">
+          <div class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Blocs</div>
+          <button class="text-zinc-600 hover:text-zinc-300" onclick={() => { paletteOpen = false; }}><ChevronLeft size={12} /></button>
         </div>
-      </div>
-      <div class="h-px bg-border mx-3 my-2"></div>
-      <div class="px-3 pb-3 flex-1 overflow-y-auto">
-        <div class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest mb-2">Recettes</div>
-        <div class="flex flex-col gap-0.5">
-          {#each skills as skill}
-            <button class="text-left px-2 py-1.5 rounded text-xs font-mono text-teal hover:text-teal/80 hover:bg-teal/5 border border-transparent hover:border-teal/20 transition-all"
-              onclick={() => applySkill(skill)}>
-              ⚡ {skill.name}
-            </button>
-          {/each}
+        <div class="px-3 pb-1">
+          <div class="flex flex-col gap-0.5 overflow-y-auto max-h-64">
+            {#each PALETTE as b}
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div class="flex items-center gap-2 px-2 py-1.5 rounded cursor-grab hover:bg-white/5 border border-transparent hover:border-border2 transition-all select-none"
+                draggable="true"
+                ondragstart={(e) => paletteDragStart(e, b.type)}
+                ondblclick={() => canvas.addBlock(b.type as Parameters<typeof canvas.addBlock>[0], DEFAULTS[b.type] ?? {})}>
+                <div class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:{b.color}"></div>
+                <span class="font-mono text-xs text-zinc-400">{b.label}</span>
+              </div>
+            {/each}
+          </div>
         </div>
-      </div>
+        <div class="h-px bg-border mx-3 my-2"></div>
+        <div class="px-3 pb-3 flex-1 overflow-y-auto">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Recettes</div>
+            <button class="text-zinc-600 hover:text-teal transition-colors" onclick={createEmptySkill}><Plus size={12} /></button>
+          </div>
+          <div class="flex flex-col gap-0.5">
+            {#each skills as skill}
+              <div class="group flex items-center gap-1 rounded hover:bg-teal/5 border border-transparent hover:border-teal/20 transition-all">
+                <button class="flex-1 text-left px-2 py-1.5 text-xs font-mono text-teal hover:text-teal/80 truncate"
+                  onclick={() => applySkill(skill)}>
+                  ⚡ {skill.name}
+                </button>
+                <button class="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-300 p-1 transition-opacity" onclick={() => openSkillEdit(skill.id)}><Pencil size={10} /></button>
+                <button class="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 p-1 transition-opacity" onclick={() => removeSkill(skill.id)}><Trash2 size={10} /></button>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
     </aside>
+
+    <!-- Mobile palette overlay (4B) -->
+    {#if mobileMenuOpen}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="fixed inset-0 bg-black/60 z-40 md:hidden" onclick={() => { mobileMenuOpen = false; }}></div>
+      <aside class="fixed left-0 top-12 bottom-0 w-64 bg-surface border-r border-border z-50 md:hidden flex flex-col overflow-y-auto">
+        <div class="px-3 pt-3 pb-1">
+          <div class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest mb-2">Blocs</div>
+          <div class="flex flex-col gap-0.5">
+            {#each PALETTE as b}
+              <button class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/5 text-left"
+                onclick={() => { canvas.addBlock(b.type as Parameters<typeof canvas.addBlock>[0], DEFAULTS[b.type] ?? {}); mobileMenuOpen = false; }}>
+                <div class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background:{b.color}"></div>
+                <span class="font-mono text-xs text-zinc-400">{b.label}</span>
+              </button>
+            {/each}
+          </div>
+        </div>
+        <div class="h-px bg-border mx-3 my-2"></div>
+        <!-- Mobile MCP inputs -->
+        <div class="px-3 pb-2 flex flex-col gap-2">
+          <div class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">MCP</div>
+          <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-full text-zinc-300 outline-none focus:border-accent placeholder-zinc-700"
+            placeholder="https://mcp.example.com"
+            bind:value={canvas.mcpUrl}
+            onkeydown={(e) => e.key === 'Enter' && connectMcp()}
+            onchange={onMcpUrlChange} />
+          <button class="font-mono text-xs h-7 px-3 rounded border flex-shrink-0
+              {canvas.mcpConnecting ? 'border-border text-zinc-600' : 'border-border2 text-zinc-400 hover:border-teal hover:text-teal'}"
+            onclick={connectMcp} disabled={canvas.mcpConnecting}>
+            {canvas.mcpConnecting ? 'connexion…' : 'connect'}
+          </button>
+        </div>
+        <div class="h-px bg-border mx-3 my-2"></div>
+        <div class="px-3 pb-3 flex-1 overflow-y-auto">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Recettes</div>
+            <button class="text-zinc-600 hover:text-teal" onclick={createEmptySkill}><Plus size={12} /></button>
+          </div>
+          <div class="flex flex-col gap-0.5">
+            {#each skills as skill}
+              <button class="text-left px-2 py-1.5 rounded text-xs font-mono text-teal hover:text-teal/80 hover:bg-teal/5 border border-transparent hover:border-teal/20 transition-all"
+                onclick={() => { applySkill(skill); mobileMenuOpen = false; }}>
+                ⚡ {skill.name}
+              </button>
+            {/each}
+          </div>
+        </div>
+      </aside>
+    {/if}
 
     <!-- CANVAS -->
     <main class="flex-1 overflow-y-auto p-5 flex flex-col gap-3 {dragOver ? 'drag-over' : ''}"
@@ -353,10 +582,43 @@
       {/if}
     </main>
 
-    <!-- RIGHT CHAT (mode chat only) -->
+    <!-- RIGHT CHAT (mode chat — desktop sidebar) -->
     {#if canvas.mode === 'chat'}
-      <aside class="w-72 border-l border-border bg-surface flex flex-col flex-shrink-0">
+      <aside class="hidden md:flex w-72 border-l border-border bg-surface flex-col flex-shrink-0">
         <div class="px-4 py-2 border-b border-border text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Chat UI ↗</div>
+        <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+          {#each canvas.messages as msg}
+            <div class="text-xs leading-relaxed {msg.role === 'user' ? 'bg-surface2 border border-border2 rounded px-3 py-2 font-mono text-zinc-300' : msg.role === 'system' ? 'text-zinc-600 font-mono text-[10px] text-center' : 'text-zinc-400 px-1'}">
+              {#if msg.thinking}
+                <span class="inline-flex gap-1">
+                  {#each [0,1,2] as i}<span class="w-1 h-1 rounded-full bg-accent animate-pulse inline-block" style="animation-delay:{i*0.2}s"></span>{/each}
+                </span>
+              {:else}
+                {msg.content}
+              {/if}
+            </div>
+          {/each}
+        </div>
+        <div class="flex gap-2 p-2 border-t border-border">
+          <textarea class="flex-1 font-mono text-xs bg-surface2 border border-border2 text-zinc-300 rounded px-2 py-1.5 outline-none resize-none h-14 focus:border-accent"
+            placeholder="Décrivez l'interface voulue…"
+            bind:value={chatInput}
+            onkeydown={onChatKeydown}></textarea>
+          <button class="font-mono text-xs px-3 rounded border border-accent bg-accent text-white hover:opacity-85 self-end h-8"
+            onclick={() => { sendChat(chatInput); chatInput = ''; }}>↑</button>
+        </div>
+      </aside>
+    {/if}
+
+    <!-- Mobile chat overlay (4B) -->
+    {#if canvas.mode === 'chat' && mobileChatOpen}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="fixed inset-0 bg-black/60 z-40 md:hidden" onclick={() => { mobileChatOpen = false; }}></div>
+      <aside class="fixed right-0 top-12 bottom-0 w-80 max-w-[90vw] bg-surface border-l border-border z-50 md:hidden flex flex-col">
+        <div class="flex items-center justify-between px-4 py-2 border-b border-border">
+          <span class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Chat UI</span>
+          <button class="text-zinc-500 hover:text-white" onclick={() => { mobileChatOpen = false; }}><X size={14} /></button>
+        </div>
         <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
           {#each canvas.messages as msg}
             <div class="text-xs leading-relaxed {msg.role === 'user' ? 'bg-surface2 border border-border2 rounded px-3 py-2 font-mono text-zinc-300' : msg.role === 'system' ? 'text-zinc-600 font-mono text-[10px] text-center' : 'text-zinc-400 px-1'}">
@@ -418,10 +680,10 @@
           <pre class="font-mono text-xs text-teal bg-black/30 border border-border rounded-lg p-4 overflow-x-auto leading-relaxed max-h-48">{JSON.stringify(canvas.buildSkillJSON(), null, 2)}</pre>
         </div>
         <div>
-          <div class="text-xs font-mono text-zinc-500 mb-2">HyperSkill URL</div>
+          <div class="text-xs font-mono text-zinc-500 mb-2">HyperSkills URL</div>
           <div class="flex gap-2">
             <div class="flex-1 font-mono text-xs text-zinc-400 bg-black/20 border border-border rounded-lg p-3 truncate">
-              {window.location.origin}?hs={canvas.buildHyperskillParam()}
+              {window.location.origin}/composer?hs={canvas.buildHyperskillParam()}
             </div>
             <button class="px-3 rounded border transition-all text-xs font-mono flex items-center gap-2
                 {copied ? 'border-teal bg-teal/10 text-teal' : 'border-border2 text-zinc-400 hover:border-accent hover:text-accent'}"
@@ -433,6 +695,62 @@
       </div>
       <div class="flex justify-end gap-3 px-5 py-4 border-t border-border">
         <button class="font-mono text-xs px-4 py-2 rounded border border-border2 text-zinc-400 hover:text-white" onclick={() => showExport = false}>fermer</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- SETTINGS MODAL (4H) -->
+{#if showSettings}
+  <div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+    <div class="bg-surface border border-border2 rounded-xl w-[500px] max-h-[85vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+        <span class="text-sm font-mono text-zinc-300">Settings</span>
+        <button onclick={() => showSettings = false} class="text-zinc-500 hover:text-white"><X size={16} /></button>
+      </div>
+      <div class="flex-1 overflow-auto p-5 flex flex-col gap-4">
+        <div>
+          <label class="text-xs font-mono text-zinc-500 mb-1 block">System prompt</label>
+          <textarea class="w-full font-mono text-xs bg-black/30 border border-border text-zinc-300 rounded-lg p-3 h-24 outline-none resize-vertical leading-relaxed focus:border-accent"
+            placeholder="Instructions personnalisees pour le LLM..."
+            bind:value={systemPrompt}></textarea>
+        </div>
+        <div>
+          <label class="text-xs font-mono text-zinc-500 mb-1 block">Contexte max tokens : {maxTokens}</label>
+          <input type="range" min="1024" max="8192" step="256" class="w-full accent-accent" bind:value={maxTokens} />
+          <div class="flex justify-between text-[10px] font-mono text-zinc-600">
+            <span>1024</span><span>8192</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" class="accent-accent" bind:checked={cacheEnabled} />
+            <span class="text-xs font-mono text-zinc-400">KV cache</span>
+          </label>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 px-5 py-4 border-t border-border">
+        <button class="font-mono text-xs px-4 py-2 rounded border border-border2 text-zinc-400 hover:text-white" onclick={() => showSettings = false}>fermer</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- SKILL EDIT MODAL (4G) -->
+{#if editingSkillId}
+  <div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+    <div class="bg-surface border border-border2 rounded-xl w-[500px] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+        <span class="text-sm font-mono text-zinc-300">Editer recette</span>
+        <button onclick={() => { editingSkillId = null; }} class="text-zinc-500 hover:text-white"><X size={16} /></button>
+      </div>
+      <div class="p-5">
+        <textarea class="w-full font-mono text-xs bg-black/30 border border-border text-teal rounded-lg p-3 h-48 outline-none resize-vertical leading-relaxed"
+          bind:value={editingSkillJson}></textarea>
+      </div>
+      <div class="flex justify-end gap-3 px-5 py-4 border-t border-border">
+        <button class="font-mono text-xs px-4 py-2 rounded border border-border2 text-zinc-400 hover:text-white" onclick={() => { editingSkillId = null; }}>annuler</button>
+        <button class="font-mono text-xs px-4 py-2 rounded bg-accent text-white hover:opacity-85" onclick={saveSkillEdit}>sauvegarder</button>
       </div>
     </div>
   </div>
