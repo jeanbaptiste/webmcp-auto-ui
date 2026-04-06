@@ -43,6 +43,15 @@
   let gemmaElapsed = $state(0);
   let gemmaTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
 
+  // Chat generation timer
+  let chatTimer = $state(0);
+  let chatTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
+
+  // Console
+  let consoleOpen = $state(false);
+  let consoleLogs = $state<string[]>([]);
+  function log(msg: string) { consoleLogs = [...consoleLogs, `[${new Date().toLocaleTimeString()}] ${msg}`]; }
+
   // Clock
   let clockStr = $state('');
   function tick() {
@@ -227,6 +236,7 @@
     if (!url) return;
     drawerOpen = false;
     canvas.setMcpConnecting(true);
+    log('MCP connecting: ' + url);
     addBubble('assistant', `connexion à <strong style="color:#7c6dfa">${url.split('/').slice(-2).join('/')}</strong>…`);
     try {
       const clientOptions = mcpToken.trim()
@@ -237,9 +247,11 @@
       const tools = await client.listTools();
       mcpClient = client;
       canvas.setMcpConnected(true, init.serverInfo.name, tools as Parameters<typeof canvas.setMcpConnected>[2]);
+      log('MCP connected: ' + tools.length + ' tools');
       addBubble('assistant', `MCP connecté · <strong style="color:#3ecfb2">${tools.length} tools</strong> disponibles`);
     } catch(e) {
       const errMsg = e instanceof Error ? e.message : String(e);
+      log('MCP error: ' + errMsg);
       canvas.setMcpError(errMsg);
       addBubble('assistant', `<span style="color:#fa6d7c">❌ ${errMsg}</span>`);
     } finally {
@@ -316,6 +328,9 @@
     addBubble('user', msg);
     const thinking = addBubble('assistant', '<span style="display:inline-flex;gap:3px;align-items:center"><span style="width:4px;height:4px;border-radius:50%;background:#7c6dfa;animation:blink 1.2s ease infinite;display:inline-block"></span><span style="width:4px;height:4px;border-radius:50%;background:#7c6dfa;animation:blink 1.2s ease infinite .2s;display:inline-block"></span><span style="width:4px;height:4px;border-radius:50%;background:#7c6dfa;animation:blink 1.2s ease infinite .4s;display:inline-block"></span></span>');
     canvas.setGenerating(true);
+    chatTimer = 0;
+    chatTimerInterval = setInterval(() => { chatTimer++; }, 1000);
+    log('→ ' + canvas.llm + ' | ' + msg.slice(0, 50));
 
     try {
       await runAgentLoop(msg, {
@@ -326,12 +341,16 @@
           onBlock: (type, data) => addBlock(type, data, 'agent'),
           onClear: clearFeedBlocks,
           onText: (text) => { if (text) updateBubble(thinking.id, text); },
-          onToolCall: (call) => updateBubble(thinking.id, `🔧 <strong>${call.name}</strong>…`),
+          onToolCall: (call) => { updateBubble(thinking.id, `🔧 <strong>${call.name}</strong>…`); log('🔧 ' + call.name); },
         },
       });
     } catch(e) {
-      updateBubble(thinking.id, `<span style="color:#fa6d7c">❌ ${e instanceof Error ? e.message : String(e)}</span>`);
+      const errMsg = e instanceof Error ? e.message : String(e);
+      log('❌ ' + errMsg);
+      updateBubble(thinking.id, `<span style="color:#fa6d7c">❌ ${errMsg}</span>`);
     } finally {
+      if (chatTimerInterval) { clearInterval(chatTimerInterval); chatTimerInterval = null; }
+      log('✓ done in ' + chatTimer + 's');
       canvas.setGenerating(false);
       updateHsUrl();
     }
@@ -347,6 +366,12 @@
     const clockInterval = setInterval(tick, 30000);
     loadDemoSkills();
     refreshSkills();
+
+    const LLM_CONTEXT: Record<string, string> = {
+      haiku: '200K tokens', sonnet: '200K tokens',
+      'gemma-e2b': '~8K tokens (WASM)', 'gemma-e4b': '~8K tokens (WASM)',
+    };
+    log('LLM: ' + canvas.llm + ' · context: ' + (LLM_CONTEXT[canvas.llm] ?? '?'));
 
     // Register WebMCP tools synchronously
     const mc = (navigator as unknown as Record<string,unknown>).modelContext as {
@@ -514,6 +539,24 @@
     {/each}
   </div>
 
+  <!-- CONSOLE -->
+  {#if consoleLogs.length > 0}
+    <div class="flex-shrink-0 {consoleOpen ? 'h-32' : 'h-6'} transition-all overflow-hidden bg-[#0a0a0f] border-t border-border">
+      <button class="w-full h-6 px-3 flex items-center justify-between text-[9px] font-mono text-zinc-500 hover:text-zinc-300"
+        onclick={() => consoleOpen = !consoleOpen}>
+        <span>console ({consoleLogs.length})</span>
+        <span>{consoleOpen ? '▼' : '▲'}</span>
+      </button>
+      {#if consoleOpen}
+        <div class="overflow-y-auto h-[calc(100%-24px)] px-3 py-1 flex flex-col gap-0.5">
+          {#each consoleLogs as line}
+            <div class="text-[9px] font-mono text-zinc-400 leading-relaxed">{line}</div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/if}
+
   <!-- CHAT BAR -->
   <div class="flex items-end gap-2 px-3 py-2 border-t border-border bg-surface flex-shrink-0">
     <input
@@ -523,6 +566,9 @@
       onkeydown={onKeydown}
       disabled={canvas.generating}
     />
+    {#if canvas.generating}
+      <span class="text-[10px] font-mono text-accent animate-pulse">{chatTimer}s</span>
+    {/if}
     <button
       class="w-9 h-9 rounded-full bg-accent flex items-center justify-center flex-shrink-0 hover:opacity-85 disabled:opacity-40"
       onclick={sendChat}
