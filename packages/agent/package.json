@@ -17,9 +17,6 @@
   "publishConfig": {
     "access": "public"
   },
-  "dependencies": {
-    "@huggingface/transformers": "^3.5.0"
-  },
   "devDependencies": {
     "typescript": "^5.0.0",
     "@webmcp-auto-ui/core": "file:../core"
