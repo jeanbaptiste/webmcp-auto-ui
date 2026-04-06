@@ -65,6 +65,7 @@ export interface AgentLoopOptions {
   provider: LLMProvider;
   mcpTools?: McpToolDef[];      // tools from MCP server
   maxIterations?: number;
+  maxTokens?: number;
   cacheEnabled?: boolean;
   systemPrompt?: string;
   callbacks?: AgentCallbacks;
@@ -80,6 +81,7 @@ export async function runAgentLoop(
     provider,
     mcpTools = [],
     maxIterations = 5,
+    maxTokens,
     cacheEnabled = true,
     callbacks = {},
     signal,
@@ -90,7 +92,10 @@ export async function runAgentLoop(
     ...UI_TOOLS,
   ];
 
-  const systemPrompt = options.systemPrompt ?? buildSystemPrompt(mcpTools);
+  const baseSystemPrompt = options.systemPrompt ?? buildSystemPrompt(mcpTools);
+  const systemPrompt = maxTokens
+    ? `${baseSystemPrompt}\n\nIMPORTANT: Keep responses under ${maxTokens} tokens.`
+    : baseSystemPrompt;
 
   const messages: ChatMessage[] = [{ role: 'user', content: userMessage }];
 
