@@ -162,12 +162,18 @@ function createCanvas() {
 
   function buildHyperskillParam(): string {
     const json = JSON.stringify(buildSkillJSON());
-    return btoa(unescape(encodeURIComponent(json)));
+    // Use base64url encoding (URL-safe: no +, /, or = padding issues)
+    return btoa(unescape(encodeURIComponent(json)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
   function loadFromParam(param: string): boolean {
     try {
-      const json = decodeURIComponent(escape(atob(param)));
+      // Normalize base64url → base64 standard (replace - with +, _ with /, add padding)
+      let b64 = param.replace(/-/g, '+').replace(/_/g, '/');
+      while (b64.length % 4) b64 += '=';
+
+      const json = decodeURIComponent(escape(atob(b64)));
       const skill = JSON.parse(json) as {
         mcp?: string; llm?: LLMId;
         theme?: Record<string, string>;
