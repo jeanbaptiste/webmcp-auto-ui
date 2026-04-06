@@ -35,12 +35,15 @@ jobs:
           npm run build --workspace=packages/sdk &
           wait
 
-      # Publish with provenance (OIDC trusted publishing — no token needed)
       - name: Publish core
-        run: npm publish --workspace=packages/core --access public --provenance
+        run: npm publish --workspace=packages/core --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish ui, agent, sdk
         run: |
-          npm publish --workspace=packages/ui --access public --provenance
-          npm publish --workspace=packages/agent --access public --provenance
-          npm publish --workspace=packages/sdk --access public --provenance
+          npm publish --workspace=packages/ui --access public
+          npm publish --workspace=packages/agent --access public
+          npm publish --workspace=packages/sdk --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
