@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { createToolGroup, textResult, jsonResult } from '@webmcp-auto-ui/core';
-  import { StatCard, DataTable } from '@webmcp-auto-ui/ui';
+  import { Button, Input, Badge, NativeSelect, StatCard, DataTable } from '@webmcp-auto-ui/ui';
   import { Check, Trash2, Plus, Circle } from 'lucide-svelte';
 
   interface Todo {
@@ -129,30 +129,29 @@
 
     <!-- Add form -->
     <div class="flex gap-2">
-      <input class="flex-1 font-mono text-sm bg-surface border border-border2 rounded-lg px-4 py-2.5 text-zinc-300 outline-none focus:border-accent transition-colors placeholder-zinc-700"
+      <Input class="flex-1 font-mono text-sm"
         placeholder="Nouvelle tâche…" bind:value={input} onkeydown={(e)=>{if(e.key==='Enter'&&input.trim()){addTodo(input.trim(),newPriority);input='';}}} />
-      <select class="font-mono text-xs bg-surface border border-border2 rounded-lg px-3 text-zinc-400 outline-none cursor-pointer"
-        bind:value={newPriority}>
+      <NativeSelect bind:value={newPriority} class="font-mono text-xs w-24">
         <option value="low">low</option>
         <option value="normal">normal</option>
         <option value="high">high</option>
-      </select>
-      <button class="font-mono text-xs px-4 py-2.5 rounded-lg bg-accent text-white border border-accent hover:opacity-85 flex items-center gap-1.5"
+      </NativeSelect>
+      <Button class="flex items-center gap-1.5"
         onclick={()=>{if(input.trim()){addTodo(input.trim(),newPriority);input='';}}} >
         <Plus size={13} /> Ajouter
-      </button>
+      </Button>
     </div>
 
     <!-- Filter -->
     <div class="flex gap-1">
       {#each [['all','Tous'],['active','Actifs'],['done','Terminés']] as [f, label]}
-        <button class="font-mono text-xs px-3 py-1 rounded border transition-all
-            {filter===f ? 'border-accent bg-accent/10 text-accent' : 'border-border2 text-zinc-500 hover:text-zinc-300'}"
-          onclick={()=>filter=f as 'all'|'active'|'done'}>{label}</button>
+        <Button variant="outline" size="sm"
+          class="font-mono text-xs {filter===f ? 'border-accent bg-accent/10 text-accent' : ''}"
+          onclick={()=>filter=f as 'all'|'active'|'done'}>{label}</Button>
       {/each}
       {#if todos.some(t=>t.done)}
-        <button class="font-mono text-xs px-3 py-1 rounded border border-red-900 text-red-500 hover:bg-red-500/10 transition-all ml-auto"
-          onclick={clearDone}>Effacer terminés</button>
+        <Button variant="destructive" size="sm" class="ml-auto font-mono text-xs"
+          onclick={clearDone}>Effacer terminés</Button>
       {/if}
     </div>
 
@@ -160,22 +159,22 @@
     <div class="flex flex-col gap-1.5">
       {#each filtered as todo (todo.id)}
         <div class="flex items-center gap-3 px-4 py-3 bg-surface border border-border rounded-lg group hover:border-border2 transition-all">
-          <button onclick={()=>toggleTodo(todo.id)} class="flex-shrink-0">
+          <Button variant="ghost" size="icon" class="h-6 w-6 flex-shrink-0" onclick={()=>toggleTodo(todo.id)}>
             {#if todo.done}
               <Check size={16} class="text-teal" />
             {:else}
               <Circle size={16} class="text-zinc-600 group-hover:text-zinc-400" />
             {/if}
-          </button>
+          </Button>
           <div class="w-1.5 h-1.5 rounded-full flex-shrink-0 {PRIORITY_DOT[todo.priority]}"></div>
           <span class="flex-1 text-sm {todo.done ? 'line-through text-zinc-600' : 'text-zinc-200'}">{todo.text}</span>
           {#each todo.tags as tag}
-            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-zinc-500">{tag}</span>
+            <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5">{tag}</Badge>
           {/each}
-          <button class="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all"
+          <Button variant="ghost" size="icon" class="h-6 w-6 opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400"
             onclick={()=>deleteTodo(todo.id)}>
             <Trash2 size={13} />
-          </button>
+          </Button>
         </div>
       {/each}
       {#if filtered.length === 0}

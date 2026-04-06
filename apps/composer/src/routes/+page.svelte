@@ -5,10 +5,12 @@
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { McpClient, createToolGroup, textResult, jsonResult } from '@webmcp-auto-ui/core';
   import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
-  import type { GemmaStatus } from '@webmcp-auto-ui/agent';
-  import { X, Plus, Zap, Copy, Check, Save, Menu, ChevronLeft, ChevronRight, Settings, Pencil, Trash2 } from 'lucide-svelte';
+  import type { GemmaStatus as GemmaStatusType } from '@webmcp-auto-ui/agent';
+  import { X, Plus, Zap, Copy, Check, Save, Menu, ChevronLeft, ChevronRight, Settings } from 'lucide-svelte';
   import BlockWrap from '$lib/BlockWrap.svelte';
   import SettingsModal from '$lib/SettingsModal.svelte';
+  import GemmaStatus from '$lib/GemmaStatus.svelte';
+  import RecipesCRUD from '$lib/RecipesCRUD.svelte';
 
   // ── State ─────────────────────────────────────────────────────────────────
   let showExport = $state(false);
@@ -30,7 +32,7 @@
 
   // 4D: Gemma provider
   let gemmaProvider = $state<GemmaProvider | null>(null);
-  let gemmaStatus = $state<GemmaStatus>('idle');
+  let gemmaStatus = $state<GemmaStatusType>('idle');
   let gemmaProgress = $state(0);
   let gemmaLoadStart = $state(0);
   let gemmaLoadElapsed = $state(0);
@@ -384,17 +386,7 @@
       <option value="gemma-e4b">Gemma 4B (E4B)</option>
     </select>
     <!-- 4D: Gemma loader indicator -->
-    {#if gemmaStatus === 'loading'}
-      <span class="font-mono text-[10px] text-amber-400 flex-shrink-0 flex items-center gap-1">
-        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-        {gemmaProgress}% · {gemmaLoadElapsed}s
-      </span>
-    {:else if gemmaStatus === 'ready'}
-      <span class="font-mono text-[10px] text-teal flex-shrink-0 flex items-center gap-1">
-        ✓ Gemma ready
-        <button class="text-zinc-500 hover:text-red-400 ml-1" onclick={destroyGemma}><X size={10} /></button>
-      </span>
-    {/if}
+    <GemmaStatus status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaLoadElapsed} onunload={destroyGemma} />
     <!-- 4F: MCP stats -->
     {#if canvas.mcpConnected}
       <span class="font-mono text-[10px] text-zinc-500 flex-shrink-0 hidden md:inline">
@@ -484,24 +476,13 @@
           </div>
         </div>
         <div class="h-px bg-border mx-3 my-2"></div>
-        <div class="px-3 pb-3 flex-1 overflow-y-auto">
-          <div class="flex items-center justify-between mb-2">
-            <div class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Recettes</div>
-            <button class="text-zinc-600 hover:text-teal transition-colors" onclick={createEmptySkill}><Plus size={12} /></button>
-          </div>
-          <div class="flex flex-col gap-0.5">
-            {#each skills as skill}
-              <div class="group flex items-center gap-1 rounded hover:bg-teal/5 border border-transparent hover:border-teal/20 transition-all">
-                <button class="flex-1 text-left px-2 py-1.5 text-xs font-mono text-teal hover:text-teal/80 truncate"
-                  onclick={() => applySkill(skill)}>
-                  ⚡ {skill.name}
-                </button>
-                <button class="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-300 p-1 transition-opacity" onclick={() => openSkillEdit(skill.id)}><Pencil size={10} /></button>
-                <button class="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 p-1 transition-opacity" onclick={() => removeSkill(skill.id)}><Trash2 size={10} /></button>
-              </div>
-            {/each}
-          </div>
-        </div>
+        <RecipesCRUD
+          {skills}
+          onapply={applySkill}
+          oncreate={createEmptySkill}
+          ondelete={removeSkill}
+          onedit={(skill) => openSkillEdit(skill.id)}
+        />
       {/if}
     </aside>
 

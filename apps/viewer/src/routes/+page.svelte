@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
-  import { BlockRenderer } from '@webmcp-auto-ui/ui';
+  import { Button, Input, BlockRenderer } from '@webmcp-auto-ui/ui';
   import { decodeHyperSkill, computeHash, diffSkills, type HyperSkill, type HyperSkillVersion } from '@webmcp-auto-ui/sdk';
   import { McpClient, textResult, jsonResult } from '@webmcp-auto-ui/core';
   import { AnthropicProvider, runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
@@ -147,32 +147,30 @@
   <header class="border-b border-border bg-surface px-6 py-3 flex items-center gap-3 flex-shrink-0">
     <div class="font-mono text-sm font-bold"><span class="text-white">Hyper</span><span class="text-amber">Skills</span><span class="text-zinc-700 text-xs ml-1">viewer</span></div>
     <div class="w-px h-5 bg-border2"></div>
-    <input class="flex-1 font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 text-zinc-300 outline-none focus:border-accent transition-colors placeholder-zinc-700 max-w-lg"
+    <Input class="flex-1 font-mono text-xs max-w-lg h-7"
       placeholder="https://example.com/viewer?hs=… ou coller une URL HyperSkills"
       bind:value={urlInput} onkeydown={(e)=>e.key==='Enter'&&loadFromUrl(urlInput)} />
-    <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-zinc-400 hover:border-accent hover:text-accent transition-all"
+    <Button variant="outline" size="sm"
       onclick={()=>loadFromUrl(urlInput)} disabled={loading}>
       {loading ? '…' : 'charger'}
-    </button>
+    </Button>
     <div class="flex-1"></div>
     <span class="font-mono text-xs text-zinc-600 hidden xl:block">Une HyperSkill est un widget UI portable encodé dans une URL</span>
     <a href="https://hyperskills.net" target="_blank" class="font-mono text-xs text-accent hover:underline hidden xl:inline">hyperskills.net</a>
     <div class="w-px h-5 bg-border2 hidden xl:block"></div>
     {#if skill}
-      <button class="font-mono text-xs h-7 px-3 rounded border transition-all flex items-center gap-1.5
-          {autoGenerating ? 'border-amber text-amber' : 'border-border2 text-zinc-400 hover:border-amber hover:text-amber'}"
+      <Button variant="outline" size="sm" class="flex items-center gap-1.5 {autoGenerating ? 'border-amber text-amber' : ''}"
         onclick={autoGenerate} disabled={autoGenerating}>
         <Zap size={11} /> {autoGenerating ? 'génération…' : 'auto-générer'}
-      </button>
-      <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-zinc-400 hover:border-accent hover:text-accent flex items-center gap-1.5"
+      </Button>
+      <Button variant="outline" size="sm" class="flex items-center gap-1.5"
         onclick={generateHsUrl}>
         <Link size={11} /> copier URL
-      </button>
-      <button class="font-mono text-xs h-7 px-3 rounded border transition-all flex items-center gap-1.5
-          {editMode ? 'border-accent bg-accent/10 text-accent' : 'border-border2 text-zinc-400 hover:border-accent hover:text-accent'}"
+      </Button>
+      <Button variant="outline" size="sm" class="flex items-center gap-1.5 {editMode ? 'border-accent bg-accent/10 text-accent' : ''}"
         onclick={()=>editMode=!editMode}>
         <Edit size={11} /> {editMode ? 'lecture' : 'éditer'}
-      </button>
+      </Button>
     {/if}
   </header>
 
@@ -180,9 +178,9 @@
     <div class="px-6 py-2 bg-surface border-b border-border text-xs font-mono text-zinc-500 flex items-center gap-2">
       <span>{statusMsg}</span>
       {#if versions.length > 1}
-        <button class="text-[#7c6dfa] hover:underline flex items-center gap-1" onclick={()=>showDiff=!showDiff}>
+        <Button variant="ghost" size="sm" class="text-[#7c6dfa] flex items-center gap-1 px-1 h-auto" onclick={()=>showDiff=!showDiff}>
           <GitBranch size={10} /> {versions.length} versions
-        </button>
+        </Button>
       {/if}
     </div>
   {/if}
@@ -190,7 +188,7 @@
   {#if showDiff && diffResult.length > 0}
     <div class="px-6 py-2 bg-amber/5 border-b border-amber/20 text-xs font-mono text-amber flex items-center gap-2">
       Diff avec version précédente : {diffResult.join(', ')} modifié(s)
-      <button onclick={()=>showDiff=false} class="ml-auto text-zinc-500 hover:text-white"><X size={12} /></button>
+      <Button variant="ghost" size="icon" class="ml-auto h-5 w-5" onclick={()=>showDiff=false}><X size={12} /></Button>
     </div>
   {/if}
 
@@ -229,12 +227,12 @@
             <BlockRenderer type={block.type} data={block.data} />
             {#if editMode}
               <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button class="p-1 rounded border border-border2 bg-surface2 text-zinc-500 hover:text-white" onclick={()=>openEdit(block.id)}>
+                <Button variant="ghost" size="icon" class="h-6 w-6" onclick={()=>openEdit(block.id)}>
                   <Edit size={11} />
-                </button>
-                <button class="p-1 rounded border border-border2 bg-surface2 text-zinc-500 hover:text-red-400 hover:border-red-800" onclick={()=>blocks=blocks.filter(b=>b.id!==block.id)}>
+                </Button>
+                <Button variant="ghost" size="icon" class="h-6 w-6 hover:text-red-400" onclick={()=>blocks=blocks.filter(b=>b.id!==block.id)}>
                   <X size={11} />
-                </button>
+                </Button>
               </div>
             {/if}
           </div>
@@ -244,10 +242,10 @@
           <div class="flex flex-col items-center justify-center py-16 gap-4 text-center">
             <div class="text-3xl opacity-10">⬡</div>
             <div class="font-mono text-sm text-zinc-600">Aucun bloc dans cette HyperSkills</div>
-            <button class="font-mono text-xs px-4 py-2 rounded border border-amber text-amber hover:bg-amber/10 transition-all flex items-center gap-1.5"
+            <Button variant="outline" size="sm" class="flex items-center gap-1.5 border-amber text-amber hover:bg-amber/10"
               onclick={autoGenerate} disabled={autoGenerating}>
               <RefreshCw size={12} /> Auto-générer depuis le MCP
-            </button>
+            </Button>
           </div>
         {/if}
       </div>
@@ -277,15 +275,15 @@
     <div class="bg-surface border border-border2 rounded-xl w-[500px] flex flex-col shadow-2xl">
       <div class="flex items-center justify-between px-5 py-4 border-b border-border">
         <span class="text-sm font-mono text-zinc-300">Éditer bloc</span>
-        <button onclick={()=>editingId=null} class="text-zinc-500 hover:text-white"><X size={16}/></button>
+        <Button variant="ghost" size="icon" class="h-7 w-7" onclick={()=>editingId=null}><X size={16}/></Button>
       </div>
       <div class="p-5">
         <textarea class="w-full font-mono text-xs bg-black/30 border border-border text-teal rounded-lg p-3 h-48 outline-none resize-vertical leading-relaxed"
           bind:value={editJson}></textarea>
       </div>
       <div class="flex justify-end gap-3 px-5 py-4 border-t border-border">
-        <button class="font-mono text-xs px-4 py-2 rounded border border-border2 text-zinc-400 hover:text-white" onclick={()=>editingId=null}>annuler</button>
-        <button class="font-mono text-xs px-4 py-2 rounded bg-accent text-white hover:opacity-85" onclick={saveEdit}>sauvegarder</button>
+        <Button variant="outline" size="sm" onclick={()=>editingId=null}>annuler</Button>
+        <Button size="sm" onclick={saveEdit}>sauvegarder</Button>
       </div>
     </div>
   </div>

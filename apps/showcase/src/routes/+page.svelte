@@ -26,6 +26,7 @@
     { id: 'simple',        label: 'Blocs simples',   count: 9  },
     { id: 'rich',          label: 'Widgets riches',  count: 13 },
     { id: 'gallery',       label: 'Gallery & Carousel', count: 2 },
+    { id: 'd3',            label: 'D3 Visualizations', count: 3 },
     { id: 'skills',        label: 'Recettes CRUD',   count: 0  },
     { id: 'wm',            label: 'Window Manager',  count: 4  },
   ];
@@ -60,15 +61,51 @@
   }
 
   let mcpTools = $state<{name: string, description: string}[]>([]);
+  let autoBlocks = $state<{id: string, type: string, data: Record<string, unknown>}[]>([]);
+  let autoGenerating = $state(false);
 
   async function autoGenerate() {
-    if (!mcpClient || mcpStatus !== 'connected') return;
+    if (!mcpClient || mcpStatus !== 'connected' || autoGenerating) return;
+    autoGenerating = true;
+    autoBlocks = [];
     try {
       const tools = await mcpClient.listTools();
       mcpTools = tools.map((t: any) => ({ name: t.name, description: t.description ?? '' }));
-      mcpStatusText = `${tools.length} outils chargés`;
-    } catch {
-      mcpStatusText = 'Erreur lors de la récupération des outils';
+      mcpStatusText = `${tools.length} outils — génération…`;
+
+      // Call each tool and generate blocks from results
+      for (const tool of tools.slice(0, 8)) {
+        try {
+          const result = await mcpClient.callTool(tool.name, {});
+          const content = result?.content;
+          if (!content) continue;
+
+          const textContent = Array.isArray(content)
+            ? content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n')
+            : typeof content === 'string' ? content : JSON.stringify(content);
+
+          const id = 'auto_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+
+          try {
+            const parsed = JSON.parse(textContent);
+            if (Array.isArray(parsed)) {
+              autoBlocks = [...autoBlocks, { id, type: 'data-table', data: { title: tool.name, rows: parsed.slice(0, 20) } }];
+            } else if (typeof parsed === 'object') {
+              const rows = Object.entries(parsed).slice(0, 10).map(([k, v]) => [k, String(v)]);
+              autoBlocks = [...autoBlocks, { id, type: 'kv', data: { title: tool.name, rows } }];
+            }
+          } catch {
+            autoBlocks = [...autoBlocks, { id, type: 'text', data: { content: `**${tool.name}**\n${textContent.slice(0, 500)}` } }];
+          }
+        } catch {
+          // Tool call failed, skip
+        }
+      }
+      mcpStatusText = `✓ ${autoBlocks.length} blocs générés depuis ${tools.length} outils`;
+    } catch (e) {
+      mcpStatusText = `Erreur: ${e instanceof Error ? e.message : String(e)}`;
+    } finally {
+      autoGenerating = false;
     }
   }
 
@@ -143,6 +180,7 @@
 
   let dagLastEvent = $state<{from: string, action: string, to: string} | null>(null);
   let dagHighlight = $state<string | null>(null);
+  let dagBorderColor = $state<string | null>(null);
 
   const DAG = [
     { from: 'species-table',   action: 'rowclick',    targets: ['observer-profile', 'species-json'] },
@@ -183,6 +221,10 @@
           }
         }
       }
+    });
+
+    const unsubColor = bus.subscribe(['color-update'], (msg) => {
+      dagBorderColor = msg.payload as string;
     });
 
     const stopListening = listenForAgentCalls((name, args) => executeToolInternal(name, args));
@@ -410,6 +452,7 @@
 
     return () => {
       unsubDag?.();
+      unsubColor?.();
       stopListening?.();
       toolNames.forEach(n => { try { mc?.unregisterTool(n); } catch {} });
       SKILL_IDS.forEach(id => { try { unregisterSkill(id); } catch {} });
@@ -488,9 +531,10 @@
         {#if mcpStatus === 'connected'}
           <button
             onclick={autoGenerate}
-            class="px-3 py-1.5 rounded text-xs font-mono border border-teal/30 bg-teal/10 text-teal hover:bg-teal/20 transition-all"
+            disabled={autoGenerating}
+            class="px-3 py-1.5 rounded text-xs font-mono border border-teal/30 bg-teal/10 text-teal hover:bg-teal/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Auto-générer
+            {autoGenerating ? 'Génération…' : 'Auto-générer'}
           </button>
         {/if}
         {#if mcpStatusText}
@@ -505,6 +549,21 @@
         <div class="flex flex-wrap gap-2">
           {#each mcpTools as tool}
             <span class="text-[10px] font-mono bg-accent/10 text-accent px-2 py-1 rounded" title={tool.description}>{tool.name}</span>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
+    {#if autoBlocks.length > 0}
+      <div class="border-b border-border bg-surface px-8 py-6">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="text-xs font-mono text-accent">Auto-generated UI</span>
+          <span class="text-xs font-mono text-text2">({autoBlocks.length} blocks)</span>
+          <button class="text-xs font-mono text-text2 hover:text-accent2 ml-auto" onclick={() => { autoBlocks = []; }}>clear</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {#each autoBlocks as block (block.id)}
+            <BlockRenderer type={block.type} data={block.data} />
           {/each}
         </div>
       </div>
@@ -666,6 +725,7 @@
             </span>
           {/if}
           <span class="text-xs font-mono text-text2">Cliquez sur un composant interactif</span>
+          <span class="text-xs font-mono text-text2">Cliquez les carr&#233;s de couleur pour propager le style</span>
         </div>
 
         <div class="flex flex-col gap-6">
@@ -683,7 +743,12 @@
           <!-- DataTable (DAG node: species-table) -->
           <div>
             <div class="text-xs font-mono text-zinc-600 mb-3">DataTable — tri par colonne, striped · <span class="text-accent">DAG: species-table</span></div>
-            <div class="transition-all duration-300 rounded-lg {dagHighlight === 'species-table' ? 'ring-2 ring-accent shadow-lg shadow-accent/20' : ''}">
+            <div class="relative transition-all duration-300 rounded-lg {dagHighlight === 'species-table' ? 'ring-2 ring-accent shadow-lg shadow-accent/20' : ''}" style={dagBorderColor ? `border: 2px solid ${dagBorderColor}` : ''}>
+              <div class="absolute top-2 right-2 flex gap-1 z-10">
+                {#each ['#7c6dfa', '#3ecfb2', '#f0a050', '#fa6d7c', '#3b82f6'] as color}
+                  <button class="w-3 h-3 rounded-sm border border-white/20 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
+                {/each}
+              </div>
               <BlockRenderer id="species-table" type="data-table" data={speciesTableSpec} />
             </div>
           </div>
@@ -696,7 +761,12 @@
             </div>
             <div>
               <div class="text-xs font-mono text-zinc-600 mb-3">ProfileCard — observatrice #1 France · <span class="text-accent">DAG: observer-profile</span></div>
-              <div class="transition-all duration-300 rounded-lg {dagHighlight === 'observer-profile' ? 'ring-2 ring-accent shadow-lg shadow-accent/20' : ''}">
+              <div class="relative transition-all duration-300 rounded-lg {dagHighlight === 'observer-profile' ? 'ring-2 ring-accent shadow-lg shadow-accent/20' : ''}" style={dagBorderColor ? `border: 2px solid ${dagBorderColor}` : ''}>
+                <div class="absolute top-2 right-2 flex gap-1 z-10">
+                  {#each ['#7c6dfa', '#3ecfb2', '#f0a050', '#fa6d7c', '#3b82f6'] as color}
+                    <button class="w-3 h-3 rounded-sm border border-white/20 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
+                  {/each}
+                </div>
                 <BlockRenderer id="observer-profile" type="profile" data={profileSpec} />
               </div>
             </div>
@@ -705,11 +775,18 @@
           <!-- Trombinoscope (DAG node: observers-trombi) -->
           <div>
             <div class="text-xs font-mono text-zinc-600 mb-3">Trombinoscope — top observateurs · <span class="text-accent">DAG: observers-trombi</span></div>
-            <BlockRenderer id="observers-trombi" type="trombinoscope" data={{
-              title: 'Top observateurs France',
-              columns: 6,
-              people: TOP_OBSERVERS.map(o => ({ name: o.name, subtitle: fmt(o.obs) + ' obs', badge: o.badge, color: o.color })),
-            }} />
+            <div class="relative transition-all duration-300 rounded-lg" style={dagBorderColor ? `border: 2px solid ${dagBorderColor}` : ''}>
+              <div class="absolute top-2 right-2 flex gap-1 z-10">
+                {#each ['#7c6dfa', '#3ecfb2', '#f0a050', '#fa6d7c', '#3b82f6'] as color}
+                  <button class="w-3 h-3 rounded-sm border border-white/20 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
+                {/each}
+              </div>
+              <BlockRenderer id="observers-trombi" type="trombinoscope" data={{
+                title: 'Top observateurs France',
+                columns: 6,
+                people: TOP_OBSERVERS.map(o => ({ name: o.name, subtitle: fmt(o.obs) + ' obs', badge: o.badge, color: o.color })),
+              }} />
+            </div>
           </div>
 
           <!-- Chart: bar + line + pie -->
@@ -747,29 +824,48 @@
           <!-- Hemicycle (DAG node: taxa-hemicycle) -->
           <div>
             <div class="text-xs font-mono text-zinc-600 mb-3">Hemicycle — répartition ordres taxonomiques (100 sièges symboliques) · <span class="text-accent">DAG: taxa-hemicycle</span></div>
-            <BlockRenderer id="taxa-hemicycle" type="hemicycle" data={{ title: 'Biodiversité observée en France', groups: ICONIC_TAXA, totalSeats: 100 }} />
+            <div class="relative transition-all duration-300 rounded-lg" style={dagBorderColor ? `border: 2px solid ${dagBorderColor}` : ''}>
+              <div class="absolute top-2 right-2 flex gap-1 z-10">
+                {#each ['#7c6dfa', '#3ecfb2', '#f0a050', '#fa6d7c', '#3b82f6'] as color}
+                  <button class="w-3 h-3 rounded-sm border border-white/20 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
+                {/each}
+              </div>
+              <BlockRenderer id="taxa-hemicycle" type="hemicycle" data={{ title: 'Biodiversité observée en France', groups: ICONIC_TAXA, totalSeats: 100 }} />
+            </div>
           </div>
 
           <!-- Cards (DAG node: species-cards) -->
           <div>
             <div class="text-xs font-mono text-zinc-600 mb-3">Cards — espèces remarquables · <span class="text-accent">DAG: species-cards</span></div>
-            <BlockRenderer id="species-cards" type="cards" data={{
-              title: 'Espèces remarquables',
-              cards: TOP_SPECIES.slice(0,4).map(s => ({
-                title: s.icon + ' ' + s.common,
-                subtitle: s.name,
-                description: `${fmt(s.count)} observations · ${s.iconic}`,
-                tags: [s.iconic],
-                _raw: s,
-              })),
-            }} />
+            <div class="relative transition-all duration-300 rounded-lg" style={dagBorderColor ? `border: 2px solid ${dagBorderColor}` : ''}>
+              <div class="absolute top-2 right-2 flex gap-1 z-10">
+                {#each ['#7c6dfa', '#3ecfb2', '#f0a050', '#fa6d7c', '#3b82f6'] as color}
+                  <button class="w-3 h-3 rounded-sm border border-white/20 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
+                {/each}
+              </div>
+              <BlockRenderer id="species-cards" type="cards" data={{
+                title: 'Esp\u00e8ces remarquables',
+                cards: TOP_SPECIES.slice(0,4).map(s => ({
+                  title: s.icon + ' ' + s.common,
+                  subtitle: s.name,
+                  description: `${fmt(s.count)} observations · ${s.iconic}`,
+                  tags: [s.iconic],
+                  _raw: s,
+                })),
+              }} />
+            </div>
           </div>
 
           <!-- JsonViewer + GridData -->
           <div class="grid grid-cols-2 gap-4">
             <div>
               <div class="text-xs font-mono text-zinc-600 mb-3">JsonViewer — réponse API taxon · <span class="text-accent">DAG: species-json</span></div>
-              <div class="transition-all duration-300 rounded-lg {dagHighlight === 'species-json' ? 'ring-2 ring-accent shadow-lg shadow-accent/20' : ''}">
+              <div class="relative transition-all duration-300 rounded-lg {dagHighlight === 'species-json' ? 'ring-2 ring-accent shadow-lg shadow-accent/20' : ''}" style={dagBorderColor ? `border: 2px solid ${dagBorderColor}` : ''}>
+                <div class="absolute top-2 right-2 flex gap-1 z-10">
+                  {#each ['#7c6dfa', '#3ecfb2', '#f0a050', '#fa6d7c', '#3b82f6'] as color}
+                    <button class="w-3 h-3 rounded-sm border border-white/20 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
+                  {/each}
+                </div>
                 <BlockRenderer id="species-json" type="json-viewer" data={{ title: '/v1/taxa/14916', data: jsonViewerData, maxDepth: 2 }} />
               </div>
             </div>
@@ -840,6 +936,77 @@
                 interval: 5000,
               }} />
             </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ── D3 VISUALIZATIONS ── -->
+      <section id="d3">
+        <div class="flex items-center gap-3 mb-6">
+          <h2 class="text-lg font-bold text-zinc-200">D3 Visualizations</h2>
+          <span class="text-xs font-mono text-zinc-600 border border-border px-2 py-0.5 rounded">3 presets</span>
+        </div>
+        <div class="flex flex-col gap-6">
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <div class="text-xs font-mono text-zinc-600 mb-3">Hex Heatmap</div>
+              <BlockRenderer type="d3" data={{
+                title: 'Observation Activity',
+                preset: 'hex-heatmap',
+                data: {
+                  values: [
+                    [0,2,4,1,3,5,2], [1,0,3,2,4,1,5], [3,2,1,4,0,3,2],
+                    [2,5,3,1,2,4,0], [4,1,2,3,5,0,1], [1,3,0,2,1,4,3],
+                    [0,2,4,5,3,1,2]
+                  ]
+                },
+                config: { cellSize: 16, colorScale: ['#f0f0f6', '#6c5ce7'] }
+              }} />
+            </div>
+            <div>
+              <div class="text-xs font-mono text-zinc-600 mb-3">Radial Chart</div>
+              <BlockRenderer type="d3" data={{
+                title: 'Observations by Taxon',
+                preset: 'radial',
+                data: {
+                  segments: [
+                    { label: 'Plantae', value: 48, color: '#22c55e' },
+                    { label: 'Aves', value: 32, color: '#3b82f6' },
+                    { label: 'Insecta', value: 28, color: '#f0a050' },
+                    { label: 'Fungi', value: 15, color: '#a855f7' },
+                    { label: 'Mammalia', value: 12, color: '#fa6d7c' },
+                  ]
+                },
+                config: { innerRadius: 0.4 }
+              }} />
+            </div>
+          </div>
+
+          <div>
+            <div class="text-xs font-mono text-zinc-600 mb-3">Force Graph</div>
+            <BlockRenderer type="d3" data={{
+              title: 'Species Interaction Network',
+              preset: 'force',
+              data: {
+                nodes: [
+                  { id: 'parus', label: 'Parus major', group: 1 },
+                  { id: 'quercus', label: 'Quercus robur', group: 2 },
+                  { id: 'erithacus', label: 'Erithacus rubecula', group: 1 },
+                  { id: 'betula', label: 'Betula pendula', group: 2 },
+                  { id: 'pieris', label: 'Pieris brassicae', group: 3 },
+                  { id: 'brassica', label: 'Brassica napus', group: 2 },
+                ],
+                links: [
+                  { source: 'parus', target: 'quercus', value: 5 },
+                  { source: 'parus', target: 'erithacus', value: 3 },
+                  { source: 'erithacus', target: 'betula', value: 2 },
+                  { source: 'pieris', target: 'brassica', value: 4 },
+                  { source: 'parus', target: 'pieris', value: 1 },
+                ]
+              }
+            }} />
           </div>
 
         </div>
