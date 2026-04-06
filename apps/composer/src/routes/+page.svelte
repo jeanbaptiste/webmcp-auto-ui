@@ -151,13 +151,26 @@
   // Reactive skills list
   $effect(() => { skills = listSkills(); });
 
-  // Auto-initialize Gemma when selected in dropdown
+  // LLM context sizes
+  const LLM_CONTEXT: Record<string, string> = {
+    haiku: '200K tokens', sonnet: '200K tokens',
+    'gemma-e2b': '~8K tokens (WASM)', 'gemma-e4b': '~8K tokens (WASM)',
+  };
+
+  // React to LLM changes
   $effect(() => {
-    if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
-      const model = canvas.llm === 'gemma-e4b' ? 'onnx-community/gemma-3-1b-it-ONNX' : undefined;
+    const llm = canvas.llm;
+    if (llm === 'gemma-e2b' || llm === 'gemma-e4b') {
+      const model = llm === 'gemma-e4b' ? 'onnx-community/gemma-3-1b-it-ONNX' : undefined;
       const p = getOrCreateGemmaProvider(model);
       if (gemmaStatus === 'idle') p.initialize();
+    } else {
+      // Switching away from Gemma — reset status display (but keep provider in memory)
+      if (gemmaStatus === 'ready' || gemmaStatus === 'loading') {
+        gemmaStatus = 'idle';
+      }
     }
+    canvas.addMsg('system', `LLM → ${llm} · contexte: ${LLM_CONTEXT[llm] ?? '?'}`);
   });
 
   // ── Block defaults ─────────────────────────────────────────────────────────
@@ -400,7 +413,7 @@
 <div class="h-screen flex flex-col overflow-hidden bg-bg">
 
   <!-- TOPBAR -->
-  <header class="h-12 flex items-center gap-3 px-4 border-b border-border bg-surface flex-shrink-0 overflow-x-auto">
+  <header class="min-h-12 flex flex-wrap items-center gap-2 md:gap-3 px-3 md:px-4 py-1 border-b border-border bg-surface flex-shrink-0">
     <!-- Mobile hamburger -->
     <button class="md:hidden flex-shrink-0 text-text2 hover:text-white" onclick={() => { mobileMenuOpen = !mobileMenuOpen; }}>
       <Menu size={18} />
