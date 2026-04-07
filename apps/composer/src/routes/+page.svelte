@@ -1,5 +1,4 @@
 <script lang="ts">
-  declare const __BUILD_TIME__: string;
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import { listSkills, loadDemoSkills, createSkill, deleteSkill, updateSkill, type Skill } from '@webmcp-auto-ui/sdk';
@@ -48,8 +47,9 @@
   let gemmaLoadedMB = $state(0);
   let gemmaTotalMB = $state(0);
 
-  function getOrCreateGemmaProvider(model?: string): GemmaProvider {
-    if (gemmaProvider) return gemmaProvider;
+  function getOrCreateGemmaProvider(model: string): GemmaProvider {
+    if (gemmaProvider && gemmaProvider.model === model) return gemmaProvider;
+    if (gemmaProvider) destroyGemma();
     const p = new GemmaProvider({
       workerFactory: () => new Worker(new URL('@webmcp-auto-ui/agent/gemma-worker', import.meta.url), { type: 'module' }),
       model,
@@ -84,8 +84,7 @@
 
   function activeProvider() {
     if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
-      const model = canvas.llm === 'gemma-e4b' ? 'gemma-e4b' : undefined;
-      return getOrCreateGemmaProvider(model);
+      return getOrCreateGemmaProvider(canvas.llm);
     }
     return provider;
   }
@@ -426,7 +425,7 @@
     />
     <div class="w-px h-5 bg-border2 hidden md:block"></div>
     <LLMSelector value={canvas.llm} onchange={(v) => canvas.setLlm(v as 'haiku'|'sonnet'|'gemma-e2b'|'gemma-e4b')} />
-    <GemmaLoader status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaLoadElapsed} loadedMB={gemmaLoadedMB} totalMB={gemmaTotalMB} modelName={canvas.llm === 'gemma-e4b' ? 'Gemma E4B' : 'Gemma E2B'} onunload={destroyGemma} />
+    <GemmaLoader status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaLoadElapsed} loadedMB={gemmaLoadedMB} totalMB={gemmaTotalMB} modelName={({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm} onunload={destroyGemma} />
     <!-- 4F: MCP stats -->
     {#if canvas.mcpConnected}
       <span class="font-mono text-[10px] text-text2 flex-shrink-0 hidden md:inline">

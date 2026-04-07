@@ -1,5 +1,4 @@
 <script lang="ts">
-  declare const __BUILD_TIME__: string;
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import { Button, Input, BlockRenderer } from '@webmcp-auto-ui/ui';
@@ -266,7 +265,7 @@
           <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
             {#each [...versions].reverse() as v, i}
               <div class="text-xs p-2 rounded border {i===0?'border-amber/30 bg-amber/5':'border-border bg-surface2'}">
-                <div class="font-mono text-zinc-400">{new Date(v.timestamp).toLocaleTimeString()}</div>
+                <div class="font-mono text-text2">{new Date(v.timestamp).toLocaleTimeString()}</div>
                 <div class="font-mono text-[10px] text-text2 truncate">{v.hash.slice(0,16)}…</div>
                 {#if v.previousHash}<div class="font-mono text-[10px] text-text2">← {v.previousHash.slice(0,12)}…</div>{/if}
               </div>

@@ -1,5 +1,4 @@
 <script lang="ts">
-  declare const __BUILD_TIME__: string;
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import { BlockRenderer, AgentProgress, GemmaLoader, LLMSelector, McpStatus, McpConnector, AgentConsole, SettingsPanel } from '@webmcp-auto-ui/ui';
@@ -502,7 +501,7 @@
   <!-- GEMMA LOADER BAR -->
   <GemmaLoader status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaElapsed}
     loadedMB={gemmaLoadedMB} totalMB={gemmaTotalMB}
-    modelName={canvas.llm === 'gemma-e4b' ? 'Gemma E4B' : 'Gemma E2B'}
+    modelName={({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}
     onunload={unloadGemma} />
 
   <!-- FEED -->

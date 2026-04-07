@@ -1,5 +1,4 @@
 <script lang="ts">
-  declare const __BUILD_TIME__: string;
   import { onMount } from 'svelte';
   import {
     Card, Panel, GridLayout, List, Window,
@@ -17,6 +16,7 @@
     speciesToProfile, observerToProfile, filterSpeciesByGroup,
   } from '$lib/inat-mock.js';
   import type { ManagedWindow } from '@webmcp-auto-ui/ui';
+  import { McpConnector } from '@webmcp-auto-ui/ui';
   import { initializeWebMCPPolyfill, listenForAgentCalls, executeToolInternal, jsonResult, registerSkill, unregisterSkill, McpClient } from '@webmcp-auto-ui/core';
   import { listSkills, createSkill, deleteSkill, updateSkill, loadDemoSkills } from '@webmcp-auto-ui/sdk';
   import type { Skill } from '@webmcp-auto-ui/sdk';
@@ -41,24 +41,37 @@
 
   // ── MCP Client state ────────────────────────────────────────────
   let mcpUrl = $state('');
-  let mcpStatus = $state<'idle' | 'connecting' | 'connected' | 'error'>('idle');
-  let mcpStatusText = $state('');
+  let mcpConnecting = $state(false);
+  let mcpConnected = $state(false);
+  let mcpServerName = $state('');
+  let mcpError = $state('');
   let mcpClient: McpClient | null = null;
 
   async function connectMcp() {
     if (!mcpUrl.trim()) return;
-    mcpStatus = 'connecting';
-    mcpStatusText = 'Connexion…';
+    mcpConnecting = true;
+    mcpError = '';
     try {
       mcpClient = new McpClient(mcpUrl.trim());
       const info = await mcpClient.connect();
-      mcpStatus = 'connected';
-      mcpStatusText = info.serverInfo?.name ?? 'Connecté';
+      mcpConnected = true;
+      mcpServerName = info.serverInfo?.name ?? 'Connecté';
     } catch (e: unknown) {
-      mcpStatus = 'error';
-      mcpStatusText = e instanceof Error ? e.message : 'Erreur de connexion';
+      mcpError = e instanceof Error ? e.message : 'Erreur de connexion';
+      mcpConnected = false;
       mcpClient = null;
+    } finally {
+      mcpConnecting = false;
     }
+  }
+
+  function disconnectMcp() {
+    try { (mcpClient as unknown as { close?: () => void })?.close?.(); } catch {}
+    mcpClient = null;
+    mcpConnected = false;
+    mcpServerName = '';
+    mcpTools = [];
+    autoBlocks = [];
   }
 
   let mcpTools = $state<{name: string, description: string}[]>([]);
@@ -66,13 +79,13 @@
   let autoGenerating = $state(false);
 
   async function autoGenerate() {
-    if (!mcpClient || mcpStatus !== 'connected' || autoGenerating) return;
+    if (!mcpClient || !mcpConnected || autoGenerating) return;
     autoGenerating = true;
     autoBlocks = [];
     try {
       const tools = await mcpClient.listTools();
       mcpTools = tools.map((t: any) => ({ name: t.name, description: t.description ?? '' }));
-      mcpStatusText = `${tools.length} outils — génération…`;
+      mcpServerName = `${tools.length} outils — génération…`;
 
       // Call each tool and generate blocks from results
       for (const tool of tools.slice(0, 8)) {
@@ -102,9 +115,9 @@
           // Tool call failed, skip
         }
       }
-      mcpStatusText = `✓ ${autoBlocks.length} blocs générés depuis ${tools.length} outils`;
+      mcpServerName = `✓ ${autoBlocks.length} blocs générés depuis ${tools.length} outils`;
     } catch (e) {
-      mcpStatusText = `Erreur: ${e instanceof Error ? e.message : String(e)}`;
+      mcpServerName = `Erreur: ${e instanceof Error ? e.message : String(e)}`;
     } finally {
       autoGenerating = false;
     }
@@ -472,7 +485,7 @@
       <div class="font-mono text-xs font-bold mb-0.5">
         <span class="text-white">webmcp</span><span class="text-accent">-auto-ui</span>
       </div>
-      <div class="font-mono text-[10px] text-zinc-600">UI Showcase</div>
+      <div class="font-mono text-[10px] text-text2">UI Showcase</div>
     </div>
 
     <div class="px-3 py-2">
@@ -485,7 +498,7 @@
     <div class="flex-1 px-2 py-3">
       {#each SECTIONS as s}
         <button class="w-full text-left px-3 py-2 rounded-lg text-xs font-mono transition-all mb-0.5
-            {active === s.id ? 'bg-accent/10 text-accent border border-accent/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}"
+            {active === s.id ? 'bg-accent/10 text-accent border border-accent/20' : 'text-text2 hover:text-text1 hover:bg-white/5'}"
           onclick={() => scrollTo(s.id)}>
           {s.label}
           <span class="float-right text-[10px] opacity-50">{s.count}</span>
@@ -493,7 +506,7 @@
       {/each}
     </div>
 
-    <div class="px-4 py-4 border-t border-border text-[9px] font-mono text-zinc-700">
+    <div class="px-4 py-4 border-t border-border text-[9px] font-mono text-text2">
       32 composants · Svelte 5<br/>
       données : iNaturalist mock<br/>
       <a href="https://hyperskills.net" target="_blank" class="text-accent hover:underline">hyperskills.net</a>
@@ -511,25 +524,18 @@
       </div>
       <!-- MCP Connector -->
       <div class="flex items-center gap-2 flex-shrink-0">
-        <input
-          type="text"
-          bind:value={mcpUrl}
-          placeholder="URL serveur MCP…"
-          class="bg-bg border border-border rounded px-3 py-1.5 text-xs font-mono text-zinc-300 w-52 placeholder:text-zinc-700 focus:outline-none focus:border-accent/50 transition-colors"
+        <McpConnector
+          url={mcpUrl}
+          onurlchange={(v) => mcpUrl = v}
+          connecting={mcpConnecting}
+          connected={mcpConnected}
+          serverName={mcpServerName}
+          error={mcpError}
+          onconnect={connectMcp}
+          ondisconnect={disconnectMcp}
+          compact
         />
-        <button
-          onclick={connectMcp}
-          disabled={mcpStatus === 'connecting'}
-          class="px-3 py-1.5 rounded text-xs font-mono border transition-all
-            {mcpStatus === 'connected'
-              ? 'bg-teal/10 border-teal/30 text-teal'
-              : mcpStatus === 'error'
-                ? 'bg-red-500/10 border-red-500/30 text-red-400'
-                : 'bg-accent/10 border-accent/30 text-accent hover:bg-accent/20'}"
-        >
-          {mcpStatus === 'connecting' ? '…' : mcpStatus === 'connected' ? 'Connecté' : 'Connecter'}
-        </button>
-        {#if mcpStatus === 'connected'}
+        {#if mcpConnected}
           <button
             onclick={autoGenerate}
             disabled={autoGenerating}
@@ -537,9 +543,6 @@
           >
             {autoGenerating ? 'Génération…' : 'Auto-générer'}
           </button>
-        {/if}
-        {#if mcpStatusText}
-          <span class="text-[10px] font-mono {mcpStatus === 'connected' ? 'text-teal' : mcpStatus === 'error' ? 'text-red-400' : 'text-zinc-500'}">{mcpStatusText}</span>
         {/if}
       </div>
     </div>
@@ -575,30 +578,30 @@
       <!-- ── PRIMITIVES ── -->
       <section id="primitives">
         <div class="flex items-center gap-3 mb-6">
-          <h2 class="text-lg font-bold text-zinc-200">Primitives</h2>
-          <span class="text-xs font-mono text-zinc-600 border border-border px-2 py-0.5 rounded">5 composants · briques atomiques</span>
+          <h2 class="text-lg font-bold text-text1">Primitives</h2>
+          <span class="text-xs font-mono text-text2 border border-border px-2 py-0.5 rounded">5 composants · briques atomiques</span>
         </div>
         <div class="grid grid-cols-2 gap-4">
 
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-2">Card · header + body + footer</div>
+            <div class="text-xs font-mono text-text2 mb-2">Card · header + body + footer</div>
             <Card>
-              {#snippet header()}<span class="text-xs font-mono text-zinc-400">🌿 iNaturalist</span>{/snippet}
-              <p class="text-sm text-zinc-300">Observations mondiales : <strong class="text-white">{fmt(INAT_STATS.total_observations)}</strong></p>
-              <p class="text-xs text-zinc-600 mt-1">{fmt(INAT_STATS.species_count)} espèces documentées</p>
-              {#snippet footer()}<span class="text-[10px] font-mono text-zinc-600">Research Grade : {fmt(INAT_STATS.research_grade)}</span>{/snippet}
+              {#snippet header()}<span class="text-xs font-mono text-text2">🌿 iNaturalist</span>{/snippet}
+              <p class="text-sm text-text1">Observations mondiales : <strong class="text-white">{fmt(INAT_STATS.total_observations)}</strong></p>
+              <p class="text-xs text-text2 mt-1">{fmt(INAT_STATS.species_count)} espèces documentées</p>
+              {#snippet footer()}<span class="text-[10px] font-mono text-text2">Research Grade : {fmt(INAT_STATS.research_grade)}</span>{/snippet}
             </Card>
           </div>
 
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-2">Panel · titre + scroll interne</div>
+            <div class="text-xs font-mono text-text2 mb-2">Panel · titre + scroll interne</div>
             <Panel title="TOP ESPÈCES FRANCE">
               <List items={TOP_SPECIES.slice(0,4)} maxHeight="120px">
                 {#snippet item(it)}
                   {@const sp = it as typeof TOP_SPECIES[0]}
                   <div class="flex items-center justify-between py-1.5 px-1 text-xs">
                     <span>{sp.icon} {sp.common}</span>
-                    <span class="font-mono text-zinc-500">{fmt(sp.count)}</span>
+                    <span class="font-mono text-text2">{fmt(sp.count)}</span>
                   </div>
                 {/snippet}
               </List>
@@ -606,12 +609,12 @@
           </div>
 
           <div class="col-span-2">
-            <div class="text-xs font-mono text-zinc-600 mb-2">GridLayout · cols=3 gap=4</div>
+            <div class="text-xs font-mono text-text2 mb-2">GridLayout · cols=3 gap=4</div>
             <GridLayout cols={3} gap={3}>
               {#each ICONIC_TAXA.slice(0,3) as t}
                 <Card>
                   <div class="text-center py-2">
-                    <div class="text-xs font-mono text-zinc-500 mb-1">{t.label}</div>
+                    <div class="text-xs font-mono text-text2 mb-1">{t.label}</div>
                     <div class="text-xl font-bold" style="color:{t.color}">{t.seats}%</div>
                   </div>
                 </Card>
@@ -620,9 +623,9 @@
           </div>
 
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-2">Window · draggable=false</div>
+            <div class="text-xs font-mono text-text2 mb-2">Window · draggable=false</div>
             <Window title="Parus major — Great Tit">
-              <div class="p-3 text-xs text-zinc-400 font-mono space-y-1">
+              <div class="p-3 text-xs text-text2 font-mono space-y-1">
                 <div>Ordre : Passeriformes</div>
                 <div>Famille : Paridae</div>
                 <div>Obs : {fmt(4_218_221)}</div>
@@ -632,17 +635,17 @@
           </div>
 
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-2">List · slot item personnalisé</div>
+            <div class="text-xs font-mono text-text2 mb-2">List · slot item personnalisé</div>
             <List items={TOP_OBSERVERS.slice(0,3)} class="bg-surface border border-border rounded-lg">
               {#snippet item(it)}
                 {@const ob = it as typeof TOP_OBSERVERS[0]}
                 <div class="flex items-center gap-2 px-3 py-2 text-xs">
                   <div class="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-white" style="background:{ob.color}">{ob.avatar}</div>
-                  <span class="text-zinc-300 flex-1">{ob.name}</span>
-                  <span class="font-mono text-zinc-600">{fmt(ob.obs)}</span>
+                  <span class="text-text1 flex-1">{ob.name}</span>
+                  <span class="font-mono text-text2">{fmt(ob.obs)}</span>
                 </div>
               {/snippet}
-              {#snippet empty()}<div class="py-4 text-center text-zinc-600 text-xs">Aucun observateur</div>{/snippet}
+              {#snippet empty()}<div class="py-4 text-center text-text2 text-xs">Aucun observateur</div>{/snippet}
             </List>
           </div>
 
@@ -652,53 +655,53 @@
       <!-- ── BLOCS SIMPLES ── -->
       <section id="simple">
         <div class="flex items-center gap-3 mb-6">
-          <h2 class="text-lg font-bold text-zinc-200">Blocs simples</h2>
-          <span class="text-xs font-mono text-zinc-600 border border-border px-2 py-0.5 rounded">9 blocs · PJ référence</span>
+          <h2 class="text-lg font-bold text-text1">Blocs simples</h2>
+          <span class="text-xs font-mono text-text2 border border-border px-2 py-0.5 rounded">9 blocs · PJ référence</span>
         </div>
         <div class="grid grid-cols-3 gap-4">
 
           <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
-            <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">StatBlock</div>
+            <div class="text-[10px] font-mono text-text2 px-3 pt-2">StatBlock</div>
             <StatBlock data={{ label: 'Observations France', value: fmt(INAT_STATS.france_observations), trend: '+18% vs 2025', trendDir: 'up' }} />
           </div>
 
           <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
-            <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">KVBlock</div>
+            <div class="text-[10px] font-mono text-text2 px-3 pt-2">KVBlock</div>
             <KVBlock data={{ title: 'Parus major', rows: [['Ordre','Passeriformes'],['Famille','Paridae'],['Statut','LC'],['Obs','4.2M']] }} />
           </div>
 
           <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
-            <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">ListBlock</div>
+            <div class="text-[10px] font-mono text-text2 px-3 pt-2">ListBlock</div>
             <ListBlock data={{ title: 'Espèces récentes', items: RECENT_OBS.map(o => `${o.common} · ${o.place}`) }} />
           </div>
 
           <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
-            <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">ChartBlock</div>
+            <div class="text-[10px] font-mono text-text2 px-3 pt-2">ChartBlock</div>
             <ChartBlock data={{ title: 'Obs mensuelles (k)', bars: MONTHLY_OBS.map(([m, v]) => [m, Math.round((v as number)/1000)]) as [string,number][] }} />
           </div>
 
           <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
-            <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">AlertBlock</div>
+            <div class="text-[10px] font-mono text-text2 px-3 pt-2">AlertBlock</div>
             <AlertBlock data={ALERTS[0]} />
           </div>
 
           <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
-            <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">CodeBlock</div>
+            <div class="text-[10px] font-mono text-text2 px-3 pt-2">CodeBlock</div>
             <CodeBlock data={{ lang: 'json', content: `{\n  "taxon": "Parus major",\n  "count": 4218221,\n  "status": "LC"\n}` }} />
           </div>
 
           <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
-            <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">TextBlock</div>
+            <div class="text-[10px] font-mono text-text2 px-3 pt-2">TextBlock</div>
             <TextBlock data={{ content: 'iNaturalist est un réseau social de naturalistes fondé en 2008. Avec 148M+ observations validées, c\'est la plus grande base de données de biodiversité citoyenne au monde.' }} />
           </div>
 
           <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
-            <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">ActionsBlock</div>
+            <div class="text-[10px] font-mono text-text2 px-3 pt-2">ActionsBlock</div>
             <ActionsBlock data={{ buttons: [{ label: 'Explorer', primary: true }, { label: 'Exporter CSV' }, { label: 'API docs' }] }} />
           </div>
 
           <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
-            <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2">TagsBlock</div>
+            <div class="text-[10px] font-mono text-text2 px-3 pt-2">TagsBlock</div>
             <TagsBlock data={{ label: 'Filtres', tags: [
               { text: 'Research Grade', active: true },
               { text: 'France', active: true },
@@ -714,8 +717,8 @@
       <!-- ── WIDGETS RICHES ── -->
       <section id="rich">
         <div class="flex items-center gap-3 mb-6">
-          <h2 class="text-lg font-bold text-zinc-200">Widgets riches</h2>
-          <span class="text-xs font-mono text-zinc-600 border border-border px-2 py-0.5 rounded">13 widgets · Archive</span>
+          <h2 class="text-lg font-bold text-text1">Widgets riches</h2>
+          <span class="text-xs font-mono text-text2 border border-border px-2 py-0.5 rounded">13 widgets · Archive</span>
         </div>
 
         <div class="flex items-center gap-2 mb-4">
@@ -733,7 +736,7 @@
 
           <!-- Row 1: StatCard x3 -->
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-3">StatCard — 3 variants</div>
+            <div class="text-xs font-mono text-text2 mb-3">StatCard — 3 variants</div>
             <div class="grid grid-cols-3 gap-4">
               <StatCard spec={{ label: 'Observations totales', value: '148M+', variant: 'default', trend: 'up', delta: '+12M en 2026' }} />
               <StatCard spec={{ label: 'Research Grade', value: '89.2M', variant: 'success', delta: '60% du total' }} />
@@ -743,11 +746,11 @@
 
           <!-- DataTable (DAG node: species-table) -->
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-3">DataTable — tri par colonne, striped · <span class="text-accent">DAG: species-table</span></div>
+            <div class="text-xs font-mono text-text2 mb-3">DataTable — tri par colonne, striped · <span class="text-accent">DAG: species-table</span></div>
             <div class="relative transition-all duration-300 rounded-lg {dagHighlight === 'species-table' ? 'ring-2 ring-accent shadow-lg shadow-accent/20' : ''}" style={dagBorderColor ? `border: 2px solid ${dagBorderColor}` : ''}>
               <div class="absolute top-2 right-2 flex gap-1 z-10">
                 {#each ['#7c6dfa', '#3ecfb2', '#f0a050', '#fa6d7c', '#3b82f6'] as color}
-                  <button class="w-3 h-3 rounded-sm border border-white/20 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
+                  <button class="w-3 h-3 rounded-sm border border-border2 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
                 {/each}
               </div>
               <BlockRenderer id="species-table" type="data-table" data={speciesTableSpec} />
@@ -757,15 +760,15 @@
           <!-- Timeline + ProfileCard -->
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <div class="text-xs font-mono text-zinc-600 mb-3">Timeline — statuts done/active/pending</div>
+              <div class="text-xs font-mono text-text2 mb-3">Timeline — statuts done/active/pending</div>
               <Timeline spec={{ title: 'Historique iNaturalist', events: OBS_TIMELINE }} />
             </div>
             <div>
-              <div class="text-xs font-mono text-zinc-600 mb-3">ProfileCard — observatrice #1 France · <span class="text-accent">DAG: observer-profile</span></div>
+              <div class="text-xs font-mono text-text2 mb-3">ProfileCard — observatrice #1 France · <span class="text-accent">DAG: observer-profile</span></div>
               <div class="relative transition-all duration-300 rounded-lg {dagHighlight === 'observer-profile' ? 'ring-2 ring-accent shadow-lg shadow-accent/20' : ''}" style={dagBorderColor ? `border: 2px solid ${dagBorderColor}` : ''}>
                 <div class="absolute top-2 right-2 flex gap-1 z-10">
                   {#each ['#7c6dfa', '#3ecfb2', '#f0a050', '#fa6d7c', '#3b82f6'] as color}
-                    <button class="w-3 h-3 rounded-sm border border-white/20 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
+                    <button class="w-3 h-3 rounded-sm border border-border2 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
                   {/each}
                 </div>
                 <BlockRenderer id="observer-profile" type="profile" data={profileSpec} />
@@ -775,11 +778,11 @@
 
           <!-- Trombinoscope (DAG node: observers-trombi) -->
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-3">Trombinoscope — top observateurs · <span class="text-accent">DAG: observers-trombi</span></div>
+            <div class="text-xs font-mono text-text2 mb-3">Trombinoscope — top observateurs · <span class="text-accent">DAG: observers-trombi</span></div>
             <div class="relative transition-all duration-300 rounded-lg" style={dagBorderColor ? `border: 2px solid ${dagBorderColor}` : ''}>
               <div class="absolute top-2 right-2 flex gap-1 z-10">
                 {#each ['#7c6dfa', '#3ecfb2', '#f0a050', '#fa6d7c', '#3b82f6'] as color}
-                  <button class="w-3 h-3 rounded-sm border border-white/20 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
+                  <button class="w-3 h-3 rounded-sm border border-border2 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
                 {/each}
               </div>
               <BlockRenderer id="observers-trombi" type="trombinoscope" data={{
@@ -793,7 +796,7 @@
           <!-- Chart: bar + line + pie -->
           <div class="grid grid-cols-3 gap-4">
             <div>
-              <div class="text-xs font-mono text-zinc-600 mb-3">Chart — bar</div>
+              <div class="text-xs font-mono text-text2 mb-3">Chart — bar</div>
               <Chart spec={{
                 title: 'Répartition par groupe',
                 type: 'bar',
@@ -802,7 +805,7 @@
               }} />
             </div>
             <div>
-              <div class="text-xs font-mono text-zinc-600 mb-3">Chart — line multi-séries</div>
+              <div class="text-xs font-mono text-text2 mb-3">Chart — line multi-séries</div>
               <Chart spec={{
                 title: 'Obs mensuelles par groupe',
                 type: 'line',
@@ -812,7 +815,7 @@
               }} />
             </div>
             <div>
-              <div class="text-xs font-mono text-zinc-600 mb-3">Chart — donut</div>
+              <div class="text-xs font-mono text-text2 mb-3">Chart — donut</div>
               <Chart spec={{
                 title: 'Groupes taxonomiques',
                 type: 'donut',
@@ -824,11 +827,11 @@
 
           <!-- Hemicycle (DAG node: taxa-hemicycle) -->
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-3">Hemicycle — répartition ordres taxonomiques (100 sièges symboliques) · <span class="text-accent">DAG: taxa-hemicycle</span></div>
+            <div class="text-xs font-mono text-text2 mb-3">Hemicycle — répartition ordres taxonomiques (100 sièges symboliques) · <span class="text-accent">DAG: taxa-hemicycle</span></div>
             <div class="relative transition-all duration-300 rounded-lg" style={dagBorderColor ? `border: 2px solid ${dagBorderColor}` : ''}>
               <div class="absolute top-2 right-2 flex gap-1 z-10">
                 {#each ['#7c6dfa', '#3ecfb2', '#f0a050', '#fa6d7c', '#3b82f6'] as color}
-                  <button class="w-3 h-3 rounded-sm border border-white/20 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
+                  <button class="w-3 h-3 rounded-sm border border-border2 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
                 {/each}
               </div>
               <BlockRenderer id="taxa-hemicycle" type="hemicycle" data={{ title: 'Biodiversité observée en France', groups: ICONIC_TAXA, totalSeats: 100 }} />
@@ -837,11 +840,11 @@
 
           <!-- Cards (DAG node: species-cards) -->
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-3">Cards — espèces remarquables · <span class="text-accent">DAG: species-cards</span></div>
+            <div class="text-xs font-mono text-text2 mb-3">Cards — espèces remarquables · <span class="text-accent">DAG: species-cards</span></div>
             <div class="relative transition-all duration-300 rounded-lg" style={dagBorderColor ? `border: 2px solid ${dagBorderColor}` : ''}>
               <div class="absolute top-2 right-2 flex gap-1 z-10">
                 {#each ['#7c6dfa', '#3ecfb2', '#f0a050', '#fa6d7c', '#3b82f6'] as color}
-                  <button class="w-3 h-3 rounded-sm border border-white/20 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
+                  <button class="w-3 h-3 rounded-sm border border-border2 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
                 {/each}
               </div>
               <BlockRenderer id="species-cards" type="cards" data={{
@@ -860,18 +863,18 @@
           <!-- JsonViewer + GridData -->
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <div class="text-xs font-mono text-zinc-600 mb-3">JsonViewer — réponse API taxon · <span class="text-accent">DAG: species-json</span></div>
+              <div class="text-xs font-mono text-text2 mb-3">JsonViewer — réponse API taxon · <span class="text-accent">DAG: species-json</span></div>
               <div class="relative transition-all duration-300 rounded-lg {dagHighlight === 'species-json' ? 'ring-2 ring-accent shadow-lg shadow-accent/20' : ''}" style={dagBorderColor ? `border: 2px solid ${dagBorderColor}` : ''}>
                 <div class="absolute top-2 right-2 flex gap-1 z-10">
                   {#each ['#7c6dfa', '#3ecfb2', '#f0a050', '#fa6d7c', '#3b82f6'] as color}
-                    <button class="w-3 h-3 rounded-sm border border-white/20 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
+                    <button class="w-3 h-3 rounded-sm border border-border2 hover:scale-125 transition-transform cursor-pointer" style="background: {color}" onclick={() => bus.broadcast('showcase', 'color-update', color)}></button>
                   {/each}
                 </div>
                 <BlockRenderer id="species-json" type="json-viewer" data={{ title: '/v1/taxa/14916', data: jsonViewerData, maxDepth: 2 }} />
               </div>
             </div>
             <div>
-              <div class="text-xs font-mono text-zinc-600 mb-3">GridData — obs par groupe × mois</div>
+              <div class="text-xs font-mono text-text2 mb-3">GridData — obs par groupe × mois</div>
               <GridData spec={{
                 title: 'Observations (millions)',
                 columns: GRID_DATA.columns,
@@ -884,11 +887,11 @@
           <!-- Sankey + MapView -->
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <div class="text-xs font-mono text-zinc-600 mb-3">Sankey — flux migratoires (milliers d'obs)</div>
+              <div class="text-xs font-mono text-text2 mb-3">Sankey — flux migratoires (milliers d'obs)</div>
               <Sankey spec={{ title: 'Flux migratoires observés', nodes: MIGRATION_FLOWS.nodes, links: MIGRATION_FLOWS.links }} />
             </div>
             <div>
-              <div class="text-xs font-mono text-zinc-600 mb-3">MapView — placeholder (Leaflet requis)</div>
+              <div class="text-xs font-mono text-text2 mb-3">MapView — placeholder (Leaflet requis)</div>
               <MapView spec={{
                 title: 'Observations en France',
                 center: { lat: 46.6, lng: 2.3 },
@@ -901,7 +904,7 @@
 
           <!-- LogViewer -->
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-3">LogViewer — flux API iNaturalist</div>
+            <div class="text-xs font-mono text-text2 mb-3">LogViewer — flux API iNaturalist</div>
             <LogViewer spec={{ title: 'api.inaturalist.org · logs', entries: LOG_ENTRIES, maxHeight: '180px' }} />
           </div>
 
@@ -911,13 +914,13 @@
       <!-- ── GALLERY & CAROUSEL ── -->
       <section id="gallery">
         <div class="flex items-center gap-3 mb-6">
-          <h2 class="text-lg font-bold text-zinc-200">Gallery & Carousel</h2>
-          <span class="text-xs font-mono text-zinc-600 border border-border px-2 py-0.5 rounded">2 composants · médias naturalistes</span>
+          <h2 class="text-lg font-bold text-text1">Gallery & Carousel</h2>
+          <span class="text-xs font-mono text-text2 border border-border px-2 py-0.5 rounded">2 composants · médias naturalistes</span>
         </div>
         <div class="flex flex-col gap-6">
 
           <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
-            <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2 pb-1">Gallery — observations iNaturalist · lightbox intégré</div>
+            <div class="text-[10px] font-mono text-text2 px-3 pt-2 pb-1">Gallery — observations iNaturalist · lightbox intégré</div>
             <div class="p-3">
               <Gallery spec={{
                 title: 'Observations naturalistes récentes',
@@ -928,7 +931,7 @@
           </div>
 
           <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
-            <div class="text-[10px] font-mono text-zinc-700 px-3 pt-2 pb-1">Carousel — faits iNaturalist · défilement auto 5s</div>
+            <div class="text-[10px] font-mono text-text2 px-3 pt-2 pb-1">Carousel — faits iNaturalist · défilement auto 5s</div>
             <div class="p-3">
               <Carousel spec={{
                 title: 'iNaturalist — Science participative',
@@ -945,14 +948,14 @@
       <!-- ── D3 VISUALIZATIONS ── -->
       <section id="d3">
         <div class="flex items-center gap-3 mb-6">
-          <h2 class="text-lg font-bold text-zinc-200">D3 Visualizations</h2>
-          <span class="text-xs font-mono text-zinc-600 border border-border px-2 py-0.5 rounded">3 presets</span>
+          <h2 class="text-lg font-bold text-text1">D3 Visualizations</h2>
+          <span class="text-xs font-mono text-text2 border border-border px-2 py-0.5 rounded">3 presets</span>
         </div>
         <div class="flex flex-col gap-6">
 
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <div class="text-xs font-mono text-zinc-600 mb-3">Hex Heatmap</div>
+              <div class="text-xs font-mono text-text2 mb-3">Hex Heatmap</div>
               <BlockRenderer type="d3" data={{
                 title: 'Observation Activity',
                 preset: 'hex-heatmap',
@@ -967,7 +970,7 @@
               }} />
             </div>
             <div>
-              <div class="text-xs font-mono text-zinc-600 mb-3">Radial Chart</div>
+              <div class="text-xs font-mono text-text2 mb-3">Radial Chart</div>
               <BlockRenderer type="d3" data={{
                 title: 'Observations by Taxon',
                 preset: 'radial',
@@ -986,7 +989,7 @@
           </div>
 
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-3">Force Graph</div>
+            <div class="text-xs font-mono text-text2 mb-3">Force Graph</div>
             <BlockRenderer type="d3" data={{
               title: 'Species Interaction Network',
               preset: 'force',
@@ -1016,25 +1019,25 @@
       <!-- ── RECETTES CRUD ── -->
       <section id="skills">
         <div class="flex items-center gap-3 mb-6">
-          <h2 class="text-lg font-bold text-zinc-200">Recettes (Skills) CRUD</h2>
-          <span class="text-xs font-mono text-zinc-600 border border-border px-2 py-0.5 rounded">{skills.length} recette{skills.length !== 1 ? 's' : ''} · SDK registry</span>
+          <h2 class="text-lg font-bold text-text1">Recettes (Skills) CRUD</h2>
+          <span class="text-xs font-mono text-text2 border border-border px-2 py-0.5 rounded">{skills.length} recette{skills.length !== 1 ? 's' : ''} · SDK registry</span>
         </div>
 
         <!-- Create form -->
         <div class="bg-surface border border-border rounded-lg p-4 mb-4 shadow-sm hover:shadow-md transition-all">
-          <div class="text-xs font-mono text-zinc-500 mb-3">Nouvelle recette</div>
+          <div class="text-xs font-mono text-text2 mb-3">Nouvelle recette</div>
           <div class="flex gap-2 flex-wrap">
             <input
               type="text"
               bind:value={newSkillName}
               placeholder="Nom de la recette…"
-              class="flex-1 min-w-36 bg-bg border border-border rounded px-3 py-1.5 text-xs font-mono text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-accent/50 transition-colors"
+              class="flex-1 min-w-36 bg-bg border border-border rounded px-3 py-1.5 text-xs font-mono text-text1 placeholder:text-text2 focus:outline-none focus:border-accent/50 transition-colors"
             />
             <input
               type="text"
               bind:value={newSkillDesc}
               placeholder="Description (optionnel)…"
-              class="flex-[2] min-w-48 bg-bg border border-border rounded px-3 py-1.5 text-xs font-mono text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-accent/50 transition-colors"
+              class="flex-[2] min-w-48 bg-bg border border-border rounded px-3 py-1.5 text-xs font-mono text-text1 placeholder:text-text2 focus:outline-none focus:border-accent/50 transition-colors"
             />
             <button
               onclick={handleCreateSkill}
@@ -1049,7 +1052,7 @@
         <!-- Skills list -->
         <div class="bg-surface border border-border rounded-lg overflow-hidden shadow-sm">
           {#if skills.length === 0}
-            <div class="p-6 text-center text-zinc-600 text-xs font-mono">Aucune recette enregistrée</div>
+            <div class="p-6 text-center text-text2 text-xs font-mono">Aucune recette enregistrée</div>
           {:else}
             <div class="divide-y divide-border">
               {#each skills as skill (skill.id)}
@@ -1059,23 +1062,23 @@
                       <input
                         type="text"
                         bind:value={editingName}
-                        class="flex-1 min-w-32 bg-bg border border-accent/30 rounded px-2 py-1 text-xs font-mono text-zinc-200 focus:outline-none"
+                        class="flex-1 min-w-32 bg-bg border border-accent/30 rounded px-2 py-1 text-xs font-mono text-text1 focus:outline-none"
                       />
                       <input
                         type="text"
                         bind:value={editingDesc}
-                        class="flex-[2] min-w-40 bg-bg border border-border rounded px-2 py-1 text-xs font-mono text-zinc-400 focus:outline-none"
+                        class="flex-[2] min-w-40 bg-bg border border-border rounded px-2 py-1 text-xs font-mono text-text2 focus:outline-none"
                       />
                       <div class="flex gap-1">
                         <button onclick={handleUpdateSkill} class="px-2 py-1 text-[10px] font-mono bg-teal/10 border border-teal/30 text-teal rounded hover:bg-teal/20 transition-all">Sauver</button>
-                        <button onclick={cancelEdit} class="px-2 py-1 text-[10px] font-mono bg-zinc-800 border border-border text-zinc-500 rounded hover:bg-zinc-700 transition-all">Annuler</button>
+                        <button onclick={cancelEdit} class="px-2 py-1 text-[10px] font-mono bg-zinc-800 border border-border text-text2 rounded hover:bg-zinc-700 transition-all">Annuler</button>
                       </div>
                     </div>
                   {:else}
                     <div class="flex-1 min-w-0">
-                      <div class="text-xs font-mono text-zinc-200 truncate">{skill.name}</div>
+                      <div class="text-xs font-mono text-text1 truncate">{skill.name}</div>
                       {#if skill.description}
-                        <div class="text-[10px] text-zinc-600 mt-0.5 truncate">{skill.description}</div>
+                        <div class="text-[10px] text-text2 mt-0.5 truncate">{skill.description}</div>
                       {/if}
                       {#if skill.tags?.length}
                         <div class="flex gap-1 mt-1 flex-wrap">
@@ -1086,8 +1089,8 @@
                       {/if}
                     </div>
                     <div class="flex gap-1 flex-shrink-0">
-                      <button onclick={() => startEdit(skill)} class="px-2 py-1 text-[10px] font-mono bg-zinc-800 border border-border text-zinc-400 rounded hover:border-accent/30 hover:text-accent transition-all">Éditer</button>
-                      <button onclick={() => handleDeleteSkill(skill.id)} class="px-2 py-1 text-[10px] font-mono bg-zinc-800 border border-border text-zinc-400 rounded hover:border-red-500/30 hover:text-red-400 transition-all">Suppr.</button>
+                      <button onclick={() => startEdit(skill)} class="px-2 py-1 text-[10px] font-mono bg-zinc-800 border border-border text-text2 rounded hover:border-accent/30 hover:text-accent transition-all">Éditer</button>
+                      <button onclick={() => handleDeleteSkill(skill.id)} class="px-2 py-1 text-[10px] font-mono bg-zinc-800 border border-border text-text2 rounded hover:border-red-500/30 hover:text-red-400 transition-all">Suppr.</button>
                     </div>
                   {/if}
                 </div>
@@ -1100,14 +1103,14 @@
       <!-- ── WINDOW MANAGER ── -->
       <section id="wm">
         <div class="flex items-center gap-3 mb-6">
-          <h2 class="text-lg font-bold text-zinc-200">Window Manager</h2>
-          <span class="text-xs font-mono text-zinc-600 border border-border px-2 py-0.5 rounded">4 layouts · Pane + TilingLayout + StackLayout</span>
+          <h2 class="text-lg font-bold text-text1">Window Manager</h2>
+          <span class="text-xs font-mono text-text2 border border-border px-2 py-0.5 rounded">4 layouts · Pane + TilingLayout + StackLayout</span>
         </div>
         <div class="flex flex-col gap-6">
 
           <!-- TilingLayout -->
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-3">TilingLayout — Fibonacci spiral, 3 panes</div>
+            <div class="text-xs font-mono text-text2 mb-3">TilingLayout — Fibonacci spiral, 3 panes</div>
             <div class="h-64 border border-border rounded-xl overflow-hidden bg-bg">
               <TilingLayout windows={WM_WINDOWS}>
                 {#snippet children(win)}
@@ -1127,7 +1130,7 @@
 
           <!-- StackLayout -->
           <div>
-            <div class="text-xs font-mono text-zinc-600 mb-3">StackLayout — mode scroll, poids proportionnels</div>
+            <div class="text-xs font-mono text-text2 mb-3">StackLayout — mode scroll, poids proportionnels</div>
             <div class="h-64 border border-border rounded-xl overflow-hidden bg-bg">
               <StackLayout windows={WM_WINDOWS} mode="scroll">
                 {#snippet children(win)}

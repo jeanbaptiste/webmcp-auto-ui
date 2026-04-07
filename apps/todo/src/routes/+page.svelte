@@ -1,5 +1,4 @@
 <script lang="ts">
-  declare const __BUILD_TIME__: string;
   import { onMount } from 'svelte';
   import { textResult, jsonResult } from '@webmcp-auto-ui/core';
   import { Button, Input, Badge, NativeSelect, StatCard, DataTable } from '@webmcp-auto-ui/ui';
@@ -33,7 +32,7 @@
   function updateTodo(id: string, patch: Partial<Omit<Todo,'id'|'createdAt'>>) { let found: Todo|null=null; todos=todos.map(t=>{if(t.id===id){found={...t,...patch};return found;}return t;}); return found; }
   function clearDone() { const n=todos.filter(t=>t.done).length; todos=todos.filter(t=>!t.done); return n; }
 
-  const PRIORITY_COLOR: Record<string,string> = { high:'text-red-400', normal:'text-zinc-300', low:'text-zinc-600' };
+  const PRIORITY_COLOR: Record<string,string> = { high:'text-red-400', normal:'text-text1', low:'text-text2' };
   const PRIORITY_DOT: Record<string,string> = { high:'bg-red-400', normal:'bg-zinc-400', low:'bg-zinc-700' };
 
   const filtered = $derived(todos.filter(t =>
@@ -110,7 +109,7 @@
 <div class="min-h-screen bg-bg font-sans">
   <header class="border-b border-border bg-surface px-6 py-3 flex items-center gap-3">
     <div class="font-mono text-sm font-bold"><span class="text-white">Todo</span><span class="text-teal"> WebMCP</span></div>
-    <div class="text-[10px] font-mono text-zinc-600">— 8 tools exposés à l'extension Chrome</div>
+    <div class="text-[10px] font-mono text-text2">— 8 tools exposés à l'extension Chrome</div>
     <div class="flex-1"></div>
     <div class="text-[10px] font-mono text-teal flex items-center gap-1">
       <div class="w-1.5 h-1.5 rounded-full bg-teal animate-pulse"></div>
@@ -164,22 +163,22 @@
             {#if todo.done}
               <Check size={16} class="text-teal" />
             {:else}
-              <Circle size={16} class="text-zinc-600 group-hover:text-zinc-400" />
+              <Circle size={16} class="text-text2 group-hover:text-text2" />
             {/if}
           </Button>
           <div class="w-1.5 h-1.5 rounded-full flex-shrink-0 {PRIORITY_DOT[todo.priority]}"></div>
-          <span class="flex-1 text-sm {todo.done ? 'line-through text-zinc-600' : 'text-zinc-200'}">{todo.text}</span>
+          <span class="flex-1 text-sm {todo.done ? 'line-through text-text2' : 'text-text1'}">{todo.text}</span>
           {#each todo.tags as tag}
             <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5">{tag}</Badge>
           {/each}
-          <Button variant="ghost" size="icon" class="h-6 w-6 opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400"
+          <Button variant="ghost" size="icon" class="h-6 w-6 opacity-0 group-hover:opacity-100 text-text2 hover:text-red-400"
             onclick={()=>deleteTodo(todo.id)}>
             <Trash2 size={13} />
           </Button>
         </div>
       {/each}
       {#if filtered.length === 0}
-        <div class="text-center py-10 text-zinc-700 font-mono text-sm">
+        <div class="text-center py-10 text-text2 font-mono text-sm">
           {filter === 'done' ? 'Aucune tâche terminée.' : filter === 'active' ? 'Aucune tâche active.' : 'Aucune tâche.'}
         </div>
       {/if}
@@ -187,7 +186,7 @@
 
     <!-- WebMCP tools list -->
     <div class="border border-border rounded-xl p-4">
-      <div class="text-xs font-mono text-zinc-600 uppercase tracking-widest mb-3">Tools WebMCP exposés</div>
+      <div class="text-xs font-mono text-text2 uppercase tracking-widest mb-3">Tools WebMCP exposés</div>
       <DataTable spec={{ compact: true, rows: [
         { tool: 'add_todo', type: 'mut', description: 'Ajoute une tâche' },
         { tool: 'list_todos', type: 'ro', description: 'Liste les tâches (filter?)' },
