@@ -122,12 +122,13 @@ deploy_app() {
   case "$app" in
     composer) deploy_node_root "composer" ;;
     mobile)   deploy_node_root "mobile" ;;
+    flex)     deploy_node_root "flex" ;;
     viewer)   deploy_node_build "viewer" ;;
     home)     deploy_static "home" ;;
     todo)     deploy_static "todo" ;;
     showcase) deploy_static "showcase" ;;
     *)
-      echo "  [$app] ✗ unknown app (valid: composer, viewer, mobile, home, todo, showcase)"
+      echo "  [$app] ✗ unknown app (valid: composer, viewer, mobile, flex, home, todo, showcase)"
       return 1
       ;;
   esac
