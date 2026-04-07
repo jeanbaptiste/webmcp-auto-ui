@@ -15,6 +15,29 @@
   let feed = $state<ChatFeedItem[]>([]);
   let conversationHistory = $state<import('@webmcp-auto-ui/agent').ChatMessage[]>([]);
   let maxContextTokens = $state(150_000);
+  let mcpRecipes = $state<{ name: string; description?: string }[]>([]);
+
+  const effectiveSystemPrompt = $derived.by(() => {
+    const sections: string[] = [systemPrompt];
+    if (canvas.mcpConnected) {
+      const dataTools = (canvas.mcpTools as { name: string; description?: string }[])
+        .filter(t => !t.name.startsWith('render_') && t.name !== 'clear_canvas');
+      if (dataTools.length > 0) {
+        sections.push(
+          `\n--- Contexte MCP : ${canvas.mcpName ?? 'serveur connecté'} ---\n` +
+          `Outils DATA disponibles :\n` +
+          dataTools.map(t => `- ${t.name}${t.description ? ' : ' + t.description.split('\n')[0] : ''}`).join('\n')
+        );
+      }
+      if (mcpRecipes.length > 0) {
+        sections.push(
+          `\nRecettes/skills disponibles (${mcpRecipes.length}) :\n` +
+          mcpRecipes.map(r => `- ${r.name}${r.description ? ' : ' + r.description : ''}`).join('\n')
+        );
+      }
+    }
+    return sections.join('');
+  });
   let drawerOpen = $state(false);
   let chatInput = $state('');
   let mcpClient = $state<McpClient | null>(null);
@@ -32,37 +55,49 @@
   let hsUrlDisplay = $state('');
   let urlCopied = $state(false);
   let shareMenuOpen = $state(false);
-  let systemPrompt = $state(`Tu es un assistant spécialisé dans les données parlementaires françaises.
+  let systemPrompt = $state(`Tu es un assistant UI connecté à un serveur MCP.
 
 Tu as accès à deux familles d'outils :
+1. **Outils DATA** (exposés par le serveur MCP connecté) — pour interroger les données
+2. **Outils UI** (render_*) — pour composer l'interface graphique
 
-1. **Outils DATA** (search_*, get_details, summarize) — pour interroger les données parlementaires
-2. **Outils UI** (render_*) — pour afficher les résultats dans l'interface graphique
+Tu as également accès aux **recettes/skills** disponibles dans la page. Ces recettes sont des templates de composants que tu peux instancier et adapter.
+
+CAPACITÉS SUR LE CANVAS :
+- Ajouter des composants avec render_*
+- Effacer tout le canvas avec clear_canvas puis reconstruire
+- Combiner plusieurs render_* pour composer une interface complète
 
 WORKFLOW OBLIGATOIRE :
 1. Utilise un outil DATA pour récupérer les données
 2. Puis utilise un outil UI pour afficher les résultats visuellement
 3. Ta réponse texte doit être TRÈS courte (1-2 phrases max) — l'essentiel est dans l'UI
 
-CHOIX DES OUTILS UI (choisis le plus adapté à la question) :
-- render_table : listes triables (parlementaires, amendements, documents)
-- render_stat : chiffre clé, KPI, compteur
-- render_profile : fiche détaillée (parlementaire, organe)
-- render_timeline : historique chronologique (dossier législatif, étapes)
-- render_chart : comparer des valeurs (barres horizontales/verticales)
-- render_trombinoscope : galerie de portraits (membres d'un groupe, commission)
-- render_hemicycle : hémicycle D3.js (composition AN/Sénat par groupe)
-- render_sankey : diagramme de flux (votes, parcours législatif, co-signatures)
-- render_cards : grille de cartes (résumés de dossiers, questions)
-- render_grid : grille compacte type spreadsheet (matrices, comparaisons)
+CHOIX DES OUTILS UI :
+- render_stat : chiffre clé, KPI, compteur, total
+- render_kv : paires clé-valeur, propriétés, métadonnées
+- render_list : liste ordonnée d'items
+- render_table : tableau triable avec colonnes
+- render_chart : graphique à barres simples
+- render_chart_rich : graphique riche — bar, line, area, pie, donut
+- render_timeline : chronologie d'événements
+- render_profile : fiche détaillée d'une entité
+- render_trombinoscope : galerie de portraits
+- render_hemicycle : hémicycle SVG (composition par groupe)
+- render_sankey : diagramme de flux
+- render_cards : grille de cartes
+- render_json : arbre JSON interactif
+- render_d3 : visualisation D3.js avancée (heatmap, radial, treemap, force graph)
+- render_text : paragraphe texte libre
+- render_alert : alerte ou notification
+- render_code : bloc de code
+- render_tags : tags/badges
+- render_gallery : galerie d'images
+- render_carousel : carousel de slides
+- render_log : flux de logs
+- clear_canvas : effacer le canvas pour repartir de zéro
 
-STRATÉGIE DE VISUALISATION :
-- Propose TOUJOURS la visualisation la plus pertinente pour la question
-- Combine plusieurs render_* quand c'est utile
-- Si la question est vague, PROPOSE une visualisation et explique pourquoi en 1 phrase
-- Si tu penses qu'une meilleure visualisation existe, SUGGÈRE-LA
-
-Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est dans l'UI.`);
+Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_* quand c'est utile. Sois très concis (1-2 phrases max).`);
   let maxTokens = $state(4096);
   let cacheEnabled = $state(true);
 
@@ -276,6 +311,17 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
       canvas.setMcpConnected(true, init.serverInfo.name, tools as Parameters<typeof canvas.setMcpConnected>[2]);
       log('MCP connected: ' + tools.length + ' tools');
       addBubble('assistant', `MCP connecté · <strong style="color:#3ecfb2">${tools.length} tools</strong> disponibles`);
+      // Load recipes from MCP server if available
+      if ((tools as {name:string}[]).some(t => t.name === 'list_recipes')) {
+        try {
+          const r = await client.callTool('list_recipes', {});
+          const txt = r.content?.find((c:{type:string}) => c.type === 'text') as {text?:string}|undefined;
+          if (txt?.text) {
+            const p: unknown = JSON.parse(txt.text);
+            mcpRecipes = Array.isArray(p) ? p : ((p as {recipes?:typeof mcpRecipes})?.recipes ?? []);
+          }
+        } catch { /* no recipes */ }
+      }
     } catch(e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       log('MCP error: ' + errMsg);
@@ -366,7 +412,7 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
       const result = await runAgentLoop(msg, {
         client: mcpClient ?? undefined,
         provider: getProvider(),
-        systemPrompt: systemPrompt || undefined,
+        systemPrompt: effectiveSystemPrompt || undefined,
         maxIterations: 15,
         maxTokens,
         cacheEnabled,
