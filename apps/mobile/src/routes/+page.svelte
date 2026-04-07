@@ -569,7 +569,8 @@
         <div class="flex flex-col gap-2">
           <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Serveur MCP</div>
           <McpConnector
-            bind:url={canvas.mcpUrl}
+            url={canvas.mcpUrl}
+            onurlchange={(v) => canvas.setMcpUrl(v)}
             bind:token={mcpToken}
             connecting={canvas.mcpConnecting}
             connected={canvas.mcpConnected}

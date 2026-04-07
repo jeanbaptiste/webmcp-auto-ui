@@ -416,7 +416,8 @@
     <div class="w-px h-5 bg-border2 hidden md:block"></div>
     <McpConnector
       class="hidden md:flex"
-      bind:url={canvas.mcpUrl}
+      url={canvas.mcpUrl}
+      onurlchange={(v) => canvas.setMcpUrl(v)}
       connecting={canvas.mcpConnecting}
       connected={canvas.mcpConnected}
       serverName={canvas.mcpName ?? ''}
@@ -484,7 +485,7 @@
   <nav class="h-9 flex items-center gap-1 px-4 border-b border-border bg-surface flex-shrink-0">
     {#each [['auto','auto','LLM compose','accent'],['drag','drag & drop','semi-manuel','amber'],['chat','chat','dialogique','accent2']] as [id, label, sub, color]}
       <button class="font-mono text-xs px-3 py-1 rounded border transition-all
-          {canvas.mode === id ? `border-${color}/40 bg-${color}/10 text-${color}` : 'border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}"
+          {canvas.mode === id ? `border-${color}/40 bg-${color}/10 text-${color}` : 'border-transparent text-text2 hover:text-text1 hover:bg-white/5'}"
         onclick={() => { canvas.setMode(id as 'auto'|'drag'|'chat'); if (id === 'auto' && canvas.mcpConnected) triggerAutoGenerate(); }}>
         {label} <span class="text-[9px] opacity-50 ml-1">◆ {sub}</span>
       </button>
@@ -575,7 +576,8 @@
         <div class="px-3 pb-2 flex flex-col gap-2">
           <div class="text-[10px] font-mono text-text2 uppercase tracking-widest">MCP</div>
           <McpConnector
-            bind:url={canvas.mcpUrl}
+            url={canvas.mcpUrl}
+            onurlchange={(v) => canvas.setMcpUrl(v)}
             connecting={canvas.mcpConnecting}
             connected={canvas.mcpConnected}
             serverName={canvas.mcpName ?? ''}

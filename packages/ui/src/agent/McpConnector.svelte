@@ -3,7 +3,9 @@
 
   interface Props {
     url?: string;
+    onurlchange?: (v: string) => void;
     token?: string;
+    onTokenChange?: (v: string) => void;
     connecting?: boolean;
     connected?: boolean;
     serverName?: string;
@@ -15,8 +17,10 @@
   }
 
   let {
-    url = $bindable(''),
+    url = '',
+    onurlchange,
     token = $bindable(''),
+    onTokenChange,
     connecting = false,
     connected = false,
     serverName = '',
@@ -29,10 +33,12 @@
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function handleUrlInput() {
+  function handleUrlInput(e: Event) {
+    const v = (e.target as HTMLInputElement).value;
+    onurlchange?.(v);
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
-      if (url.startsWith('http') && !connected && !connecting) {
+      if (v.startsWith('http') && !connected && !connecting) {
         onconnect?.();
       }
     }, 400);
@@ -50,7 +56,7 @@
   <div class="flex items-center gap-2">
     <input
       type="text"
-      bind:value={url}
+      value={url}
       oninput={handleUrlInput}
       onkeydown={handleKeydown}
       placeholder="https://mcp.example.com/sse"
@@ -78,7 +84,8 @@
   {#if !compact}
     <input
       type="password"
-      bind:value={token}
+      value={token}
+      oninput={(e) => { token = (e.target as HTMLInputElement).value; onTokenChange?.(token); }}
       placeholder="Bearer token (optional)"
       class="font-mono text-xs bg-surface2 border border-border2 rounded px-2 h-7 text-text1 outline-none placeholder:text-text2/40 focus:border-accent/50 transition-colors"
     />
