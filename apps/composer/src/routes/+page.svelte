@@ -161,7 +161,7 @@
   $effect(() => {
     const llm = canvas.llm;
     if (llm === 'gemma-e2b' || llm === 'gemma-e4b') {
-      const model = llm === 'gemma-e4b' ? 'onnx-community/gemma-3-1b-it-ONNX' : undefined;
+      const model = llm;
       const p = getOrCreateGemmaProvider(model);
       if (gemmaStatus === 'idle') p.initialize();
     } else {

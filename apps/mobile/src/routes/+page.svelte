@@ -298,7 +298,7 @@
         const modelLabel = canvas.llm === 'gemma-e4b' ? 'Gemma 4B' : 'Gemma 2B';
         gemmaProvider = new GemmaProvider({
           workerFactory: () => new Worker(new URL('@webmcp-auto-ui/agent/gemma-worker', import.meta.url), { type: 'module' }),
-          model: canvas.llm === 'gemma-e4b' ? 'onnx-community/gemma-3-1b-it-ONNX' : undefined,
+          model: canvas.llm,
           onProgress: (p, _s, loaded, total) => {
             gemmaProgress = p;
             if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;
