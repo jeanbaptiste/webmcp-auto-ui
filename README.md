@@ -2,8 +2,6 @@
 
 A monorepo for building browser UIs that are composed dynamically by LLMs connected to MCP servers.
 
-![Architecture](./diagram.svg)
-
 ## What it does
 
 Connect an MCP server to any of the apps. An LLM reads the available tools, fetches data, then calls `render_*` tools to assemble a UI from typed blocks — stat cards, tables, charts, timelines, etc. Each block auto-registers as a live WebMCP tool that agents can read and update.
