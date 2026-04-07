@@ -2,7 +2,7 @@
   declare const __BUILD_TIME__: string;
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
-  import { BlockRenderer, AgentProgress, GemmaLoader, LLMSelector, McpStatus } from '@webmcp-auto-ui/ui';
+  import { BlockRenderer, AgentProgress, GemmaLoader, LLMSelector, McpStatus, McpConnector, AgentConsole, SettingsPanel } from '@webmcp-auto-ui/ui';
   import {
     loadDemoSkills, listSkills, createSkill, updateSkill, deleteSkill,
     decodeHyperSkill, encodeHyperSkill, type Skill,
@@ -22,7 +22,6 @@
   let drawerOpen = $state(false);
   let chatInput = $state('');
   let mcpClient = $state<McpClient | null>(null);
-  let mcpUrlInput = $state(canvas.mcpUrl || '');
   let skills = $state<Skill[]>([]);
 
   // Drawer sub-views
@@ -38,7 +37,8 @@
   let urlCopied = $state(false);
   let shareMenuOpen = $state(false);
   let systemPrompt = $state('');
-  let showPromptEditor = $state(false);
+  let maxTokens = $state(4096);
+  let cacheEnabled = $state(true);
 
   // Gemma load timer
   let gemmaLoadStart = $state(0);
@@ -235,8 +235,7 @@
 
   // ── MCP ───────────────────────────────────────────────────────────────────
   async function connectMcp() {
-    canvas.setMcpUrl(mcpUrlInput);
-    const url = mcpUrlInput.trim();
+    const url = canvas.mcpUrl.trim();
     if (!url) return;
     drawerOpen = false;
     canvas.setMcpConnecting(true);
@@ -341,6 +340,8 @@
         client: mcpClient ?? undefined,
         provider: getProvider(),
         systemPrompt: systemPrompt || undefined,
+        maxTokens,
+        cacheEnabled,
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
           onBlock: (type, data) => addBlock(type, data, 'agent'),
@@ -530,22 +531,7 @@
   <AgentProgress active={canvas.generating} elapsed={chatTimer} toolCalls={chatToolCount} lastTool={chatLastTool} />
 
   <!-- CONSOLE -->
-  {#if consoleLogs.length > 0}
-    <div class="flex-shrink-0 {consoleOpen ? 'h-32' : 'h-6'} transition-all overflow-hidden bg-[#0a0a0f] border-t border-border">
-      <button class="w-full h-6 px-3 flex items-center justify-between text-[9px] font-mono text-zinc-500 hover:text-zinc-300"
-        onclick={() => consoleOpen = !consoleOpen}>
-        <span>console ({consoleLogs.length})</span>
-        <span>{consoleOpen ? '▼' : '▲'}</span>
-      </button>
-      {#if consoleOpen}
-        <div class="overflow-y-auto h-[calc(100%-24px)] px-3 py-1 flex flex-col gap-0.5">
-          {#each consoleLogs as line}
-            <div class="text-[9px] font-mono text-zinc-400 leading-relaxed">{line}</div>
-          {/each}
-        </div>
-      {/if}
-    </div>
-  {/if}
+  <AgentConsole logs={consoleLogs} bind:open={consoleOpen} />
 
   <!-- CHAT BAR -->
   <div class="flex items-end gap-2 px-3 py-2 border-t border-border bg-surface flex-shrink-0">
@@ -582,15 +568,14 @@
         <!-- MCP -->
         <div class="flex flex-col gap-2">
           <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Serveur MCP</div>
-          <input class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none focus:border-accent"
-            placeholder="https://mcp.example.com/mcp"
-            bind:value={mcpUrlInput}
-            oninput={() => canvas.setMcpUrl(mcpUrlInput)}
-            onkeydown={(e) => e.key === 'Enter' && connectMcp()} />
-          <button class="w-full py-2 rounded-lg bg-accent text-white text-xs font-mono hover:opacity-85 disabled:opacity-40"
-            onclick={() => { connectMcp(); }} disabled={canvas.mcpConnecting || !canvas.mcpUrl.trim()}>
-            {canvas.mcpConnecting ? 'Connexion…' : canvas.mcpConnected ? `✓ ${canvas.mcpName}` : 'Connecter'}
-          </button>
+          <McpConnector
+            bind:url={canvas.mcpUrl}
+            bind:token={mcpToken}
+            connecting={canvas.mcpConnecting}
+            connected={canvas.mcpConnected}
+            serverName={canvas.mcpName ?? ''}
+            onconnect={connectMcp}
+          />
         </div>
 
         <!-- LLM -->
@@ -599,16 +584,8 @@
           <LLMSelector value={canvas.llm} onchange={(v) => canvas.setLlm(v as 'haiku'|'sonnet'|'gemma-e2b'|'gemma-e4b')} class="w-full" />
         </div>
 
-        <!-- System Prompt -->
-        <div class="flex flex-col gap-2">
-          <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">System Prompt</div>
-          <textarea
-            class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-[10px] font-mono text-text1 outline-none focus:border-accent resize-none h-20"
-            placeholder="Custom instructions for the LLM agent…"
-            bind:value={systemPrompt}
-          ></textarea>
-          <div class="text-[9px] font-mono text-text2">Leave empty for default prompt</div>
-        </div>
+        <!-- Settings -->
+        <SettingsPanel bind:systemPrompt bind:maxTokens bind:cacheEnabled />
 
         <!-- Recettes -->
         <div class="flex flex-col gap-2">

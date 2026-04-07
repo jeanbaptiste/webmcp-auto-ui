@@ -10,7 +10,7 @@
   import { X, Plus, Zap, Copy, Check, Save, Menu, ChevronLeft, ChevronRight, Settings } from 'lucide-svelte';
   import BlockWrap from '$lib/BlockWrap.svelte';
   import SettingsModal from '$lib/SettingsModal.svelte';
-  import { GemmaLoader, LLMSelector } from '@webmcp-auto-ui/ui';
+  import { GemmaLoader, LLMSelector, McpConnector, AgentConsole } from '@webmcp-auto-ui/ui';
   import RecipesCRUD from '$lib/RecipesCRUD.svelte';
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -22,7 +22,6 @@
   let mcpClient = $state<McpClient | null>(null);
   let skills = $state<Skill[]>([]);
   let mcpToken = $state('');
-  let mcpUrlInput = $state(canvas.mcpUrl || '');
 
   // Console panel
   let consoleOpen = $state(false);
@@ -217,19 +216,12 @@
     { type: 'log',         label: 'log',         color: '#888' },
   ];
 
-  // ── MCP ───────────────────────────────────────────────────────────────────
-  let _mcpDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-  function onMcpUrlChange() {
-    canvas.setMcpUrl(mcpUrlInput);
-    if (_mcpDebounceTimer) clearTimeout(_mcpDebounceTimer);
-    _mcpDebounceTimer = setTimeout(() => {
-      if (mcpUrlInput.startsWith('http')) connectMcp();
-    }, 300);
-  }
+  // Derived console logs from canvas messages
+  const consoleLogs = $derived(canvas.messages.map(m => `[${m.role}] ${m.content.slice(0, 300)}`));
 
+  // ── MCP ───────────────────────────────────────────────────────────────────
   async function connectMcp() {
-    canvas.setMcpUrl(mcpUrlInput);
-    if (!mcpUrlInput.trim() || canvas.mcpConnecting) return;
+    if (!canvas.mcpUrl.trim() || canvas.mcpConnecting) return;
     canvas.setMcpConnecting(true);
     mcpConnectStart = Date.now();
     mcpConnectElapsed = 0;
@@ -239,7 +231,7 @@
       const clientOptions = mcpToken.trim()
         ? { headers: { Authorization: `Bearer ${mcpToken.trim()}` } }
         : undefined;
-      const client = new McpClient(mcpUrlInput.trim(), clientOptions);
+      const client = new McpClient(canvas.mcpUrl.trim(), clientOptions);
       const init = await client.connect();
       const tools = await client.listTools();
       mcpClient = client;
@@ -389,12 +381,9 @@
     // Load from ?hs= param
     const param = new URLSearchParams(window.location.search).get('hs');
     if (param) {
-      canvas.loadFromParam(param);
-      // Sync MCP URL from loaded skill and auto-connect
-      if (canvas.mcpUrl) {
-        mcpUrlInput = canvas.mcpUrl;
-        connectMcp();
-      }
+      void canvas.loadFromUrl(window.location.href).then(() => {
+        if (canvas.mcpUrl) connectMcp();
+      });
     }
     refreshStats();
     // Force refresh skills on mount
@@ -425,17 +414,15 @@
     </div>
     <a href="https://hyperskills.net" target="_blank" class="font-mono text-[10px] text-accent hover:underline flex-shrink-0 hidden md:inline">hyperskills.net</a>
     <div class="w-px h-5 bg-border2 hidden md:block"></div>
-    <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-72 text-text1 outline-none focus:border-accent transition-colors placeholder:text-text2 hidden md:block"
-      placeholder="https://mcp.example.com"
-      bind:value={mcpUrlInput}
-      oninput={() => canvas.setMcpUrl(mcpUrlInput)}
-      onkeydown={(e) => e.key === 'Enter' && connectMcp()}
-      onchange={onMcpUrlChange} />
-    <button class="font-mono text-xs h-7 px-3 rounded border transition-all flex-shrink-0 hidden md:flex items-center
-        {canvas.mcpConnecting ? 'border-border text-text2 cursor-wait' : 'border-border2 text-text2 hover:border-teal hover:text-teal'}"
-      onclick={connectMcp} disabled={canvas.mcpConnecting}>
-      {canvas.mcpConnecting ? 'connexion…' : 'connect'}
-    </button>
+    <McpConnector
+      class="hidden md:flex"
+      bind:url={canvas.mcpUrl}
+      connecting={canvas.mcpConnecting}
+      connected={canvas.mcpConnected}
+      serverName={canvas.mcpName ?? ''}
+      onconnect={connectMcp}
+      compact
+    />
     <div class="w-px h-5 bg-border2 hidden md:block"></div>
     <LLMSelector value={canvas.llm} onchange={(v) => canvas.setLlm(v as 'haiku'|'sonnet'|'gemma-e2b'|'gemma-e4b')} />
     <GemmaLoader status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaLoadElapsed} loadedMB={gemmaLoadedMB} totalMB={gemmaTotalMB} modelName={canvas.llm === 'gemma-e4b' ? 'Gemma E4B' : 'Gemma E2B'} onunload={destroyGemma} />
@@ -587,17 +574,14 @@
         <!-- Mobile MCP inputs -->
         <div class="px-3 pb-2 flex flex-col gap-2">
           <div class="text-[10px] font-mono text-text2 uppercase tracking-widest">MCP</div>
-          <input class="font-mono text-xs bg-surface2 border border-border2 rounded px-3 h-7 w-full text-text1 outline-none focus:border-accent placeholder:text-text2"
-            placeholder="https://mcp.example.com"
-            bind:value={mcpUrlInput}
-      oninput={() => canvas.setMcpUrl(mcpUrlInput)}
-            onkeydown={(e) => e.key === 'Enter' && connectMcp()}
-            onchange={onMcpUrlChange} />
-          <button class="font-mono text-xs h-7 px-3 rounded border flex-shrink-0
-              {canvas.mcpConnecting ? 'border-border text-text2' : 'border-border2 text-text2 hover:border-teal hover:text-teal'}"
-            onclick={connectMcp} disabled={canvas.mcpConnecting}>
-            {canvas.mcpConnecting ? 'connexion…' : 'connect'}
-          </button>
+          <McpConnector
+            bind:url={canvas.mcpUrl}
+            connecting={canvas.mcpConnecting}
+            connected={canvas.mcpConnected}
+            serverName={canvas.mcpName ?? ''}
+            onconnect={connectMcp}
+            compact
+          />
         </div>
         <div class="h-px bg-border mx-3 my-2"></div>
         <div class="px-3 pb-3 flex-1 overflow-y-auto">
@@ -702,22 +686,7 @@
   </div>
 
   <!-- CONSOLE -->
-  <div class="border-t border-border flex-shrink-0 {consoleOpen ? 'h-48' : 'h-7'} transition-all overflow-hidden bg-[#0a0a0f]">
-    <button class="w-full h-7 px-4 flex items-center justify-between text-[10px] font-mono text-zinc-500 hover:text-zinc-300 bg-[#0a0a0f]"
-      onclick={() => consoleOpen = !consoleOpen}>
-      <span>Console ({canvas.messages.length})</span>
-      <span>{consoleOpen ? '▼' : '▲'}</span>
-    </button>
-    {#if consoleOpen}
-      <div class="overflow-y-auto h-[calc(100%-28px)] px-4 py-1 flex flex-col gap-0.5">
-        {#each canvas.messages as msg}
-          <div class="text-[10px] font-mono leading-relaxed {msg.role === 'system' ? 'text-zinc-500' : msg.role === 'user' ? 'text-cyan-400' : 'text-zinc-200'}">
-            <span class="text-zinc-600 mr-1">[{msg.role}]</span> {msg.content}
-          </div>
-        {/each}
-      </div>
-    {/if}
-  </div>
+  <AgentConsole logs={consoleLogs} bind:open={consoleOpen} />
 </div>
 
 <!-- EDIT MODAL -->
