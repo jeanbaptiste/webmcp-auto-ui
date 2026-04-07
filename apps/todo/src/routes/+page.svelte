@@ -1,7 +1,7 @@
 <script lang="ts">
   declare const __BUILD_TIME__: string;
   import { onMount } from 'svelte';
-  import { createToolGroup, textResult, jsonResult } from '@webmcp-auto-ui/core';
+  import { textResult, jsonResult } from '@webmcp-auto-ui/core';
   import { Button, Input, Badge, NativeSelect, StatCard, DataTable } from '@webmcp-auto-ui/ui';
   import { Check, Trash2, Plus, Circle } from 'lucide-svelte';
 

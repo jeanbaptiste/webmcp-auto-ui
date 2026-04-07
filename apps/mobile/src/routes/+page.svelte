@@ -2,16 +2,16 @@
   declare const __BUILD_TIME__: string;
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
-  import { BlockRenderer, AgentProgress } from '@webmcp-auto-ui/ui';
+  import { BlockRenderer, AgentProgress, GemmaLoader, LLMSelector, McpStatus } from '@webmcp-auto-ui/ui';
   import {
     loadDemoSkills, listSkills, createSkill, updateSkill, deleteSkill,
     decodeHyperSkill, encodeHyperSkill, type Skill,
   } from '@webmcp-auto-ui/sdk';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-  import { McpClient, createToolGroup, jsonResult, textResult } from '@webmcp-auto-ui/core';
+  import { McpClient, jsonResult, textResult } from '@webmcp-auto-ui/core';
   import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
   // Vite bundles the worker and gives us a stable URL
-  import GemmaWorker from '$lib/gemma.worker.ts?worker';
+  import GemmaWorker from '@webmcp-auto-ui/agent/gemma-worker?worker';
 
   // ── State ─────────────────────────────────────────────────────────────────
   type FeedItem =
@@ -471,10 +471,7 @@
   <!-- TOPBAR -->
   <div class="flex items-center gap-2.5 px-4 h-12 border-b border-border flex-shrink-0 bg-surface">
     <span class="text-sm font-medium text-text1 flex-1 tracking-tight">Auto<span class="text-accent">-UI</span></span>
-    <div class="flex items-center gap-1.5">
-      <div class="w-1.5 h-1.5 rounded-full {canvas.mcpConnecting ? 'bg-amber animate-pulse' : canvas.mcpConnected ? 'bg-teal' : 'bg-zinc-700'}"></div>
-      <span class="text-[10px] text-text2 font-mono">{canvas.mcpConnecting ? 'connexion…' : canvas.mcpConnected ? canvas.mcpName : 'non connecté'}</span>
-    </div>
+    <McpStatus connecting={canvas.mcpConnecting} connected={canvas.mcpConnected} name={canvas.mcpName ?? 'non connecté'} />
     <button class="w-8 h-8 rounded-lg border border-border2 flex items-center justify-center text-text2 hover:text-text1 text-sm"
       onclick={() => {
         const root = document.documentElement;
@@ -504,31 +501,10 @@
   </div>
 
   <!-- GEMMA LOADER BAR -->
-  {#if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') && (gemmaStatus === 'loading' || gemmaStatus === 'ready' || gemmaStatus === 'error')}
-    {@const modelName = canvas.llm === 'gemma-e4b' ? 'Gemma E4B' : 'Gemma E2B'}
-    {@const fmtMB = (mb: number) => mb >= 1000 ? `${(mb / 1000).toFixed(1)}GB` : `${mb.toFixed(0)}MB`}
-    <div class="flex flex-col gap-1 px-4 py-2.5 border-b border-border flex-shrink-0 {gemmaStatus === 'loading' ? 'bg-accent/10' : gemmaStatus === 'ready' ? 'bg-teal/10' : 'bg-accent2/10'}">
-      {#if gemmaStatus === 'loading'}
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-mono text-accent font-medium">
-            Loading {modelName}…
-            {#if gemmaTotalMB > 0}({fmtMB(gemmaLoadedMB)} / {fmtMB(gemmaTotalMB)}){:else}{Math.round(gemmaProgress)}%{/if}
-          </span>
-          <span class="text-[10px] font-mono text-text2">{gemmaElapsed}s</span>
-        </div>
-        <div class="w-full h-2 rounded-full bg-border2 overflow-hidden">
-          <div class="h-full rounded-full bg-accent transition-all duration-300" style="width: {Math.max(gemmaProgress, 2)}%"></div>
-        </div>
-      {:else if gemmaStatus === 'ready'}
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-mono text-teal font-medium">{modelName} ✓ ready</span>
-          <button class="text-[10px] font-mono text-text2 hover:text-accent2 transition-colors" onclick={unloadGemma}>unload ✕</button>
-        </div>
-      {:else if gemmaStatus === 'error'}
-        <span class="text-xs font-mono text-accent2">{modelName} — load failed</span>
-      {/if}
-    </div>
-  {/if}
+  <GemmaLoader status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaElapsed}
+    loadedMB={gemmaLoadedMB} totalMB={gemmaTotalMB}
+    modelName={canvas.llm === 'gemma-e4b' ? 'Gemma E4B' : 'Gemma E2B'}
+    onunload={unloadGemma} />
 
   <!-- FEED -->
   <div id="feed" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
@@ -620,13 +596,7 @@
         <!-- LLM -->
         <div class="flex flex-col gap-2">
           <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Modèle LLM</div>
-          <select class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none cursor-pointer"
-            value={canvas.llm} onchange={(e) => canvas.setLlm((e.target as HTMLSelectElement).value as 'haiku'|'sonnet'|'gemma-e2b'|'gemma-e4b')}>
-            <option value="haiku">claude-haiku-4-5</option>
-            <option value="sonnet">claude-sonnet-4-6</option>
-            <option value="gemma-e2b">Gemma E2B (WASM)</option>
-            <option value="gemma-e4b">Gemma E4B (WASM)</option>
-          </select>
+          <LLMSelector value={canvas.llm} onchange={(v) => canvas.setLlm(v as 'haiku'|'sonnet'|'gemma-e2b'|'gemma-e4b')} class="w-full" />
         </div>
 
         <!-- System Prompt -->

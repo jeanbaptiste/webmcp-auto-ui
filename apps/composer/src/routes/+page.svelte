@@ -10,7 +10,7 @@
   import { X, Plus, Zap, Copy, Check, Save, Menu, ChevronLeft, ChevronRight, Settings } from 'lucide-svelte';
   import BlockWrap from '$lib/BlockWrap.svelte';
   import SettingsModal from '$lib/SettingsModal.svelte';
-  import GemmaStatus from '$lib/GemmaStatus.svelte';
+  import { GemmaLoader, LLMSelector } from '@webmcp-auto-ui/ui';
   import RecipesCRUD from '$lib/RecipesCRUD.svelte';
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -52,7 +52,7 @@
   function getOrCreateGemmaProvider(model?: string): GemmaProvider {
     if (gemmaProvider) return gemmaProvider;
     const p = new GemmaProvider({
-      workerFactory: () => new Worker(new URL('$lib/gemma.worker.ts', import.meta.url), { type: 'module' }),
+      workerFactory: () => new Worker(new URL('@webmcp-auto-ui/agent/gemma-worker', import.meta.url), { type: 'module' }),
       model,
       onProgress: (prog, _s, loaded, total) => {
         gemmaProgress = Math.round(prog);
@@ -85,7 +85,7 @@
 
   function activeProvider() {
     if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
-      const model = canvas.llm === 'gemma-e4b' ? 'onnx-community/gemma-4-E4B-it-ONNX-GQA' : undefined;
+      const model = canvas.llm === 'gemma-e4b' ? 'gemma-e4b' : undefined;
       return getOrCreateGemmaProvider(model);
     }
     return provider;
@@ -437,15 +437,8 @@
       {canvas.mcpConnecting ? 'connexion…' : 'connect'}
     </button>
     <div class="w-px h-5 bg-border2 hidden md:block"></div>
-    <select class="font-mono text-xs bg-surface2 border border-border2 rounded px-2 h-7 text-text2 outline-none cursor-pointer"
-      value={canvas.llm} onchange={(e) => canvas.setLlm((e.target as HTMLSelectElement).value as 'haiku'|'sonnet'|'gemma-e2b'|'gemma-e4b')}>
-      <option value="haiku">claude-haiku-4-5</option>
-      <option value="sonnet">claude-sonnet-4-6</option>
-      <option value="gemma-e2b">Gemma E2B (WASM)</option>
-      <option value="gemma-e4b">Gemma E4B (WASM)</option>
-    </select>
-    <!-- 4D: Gemma loader indicator -->
-    <GemmaStatus status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaLoadElapsed} loadedMB={gemmaLoadedMB} totalMB={gemmaTotalMB} modelName={canvas.llm === 'gemma-e4b' ? 'Gemma E4B' : 'Gemma E2B'} onunload={destroyGemma} />
+    <LLMSelector value={canvas.llm} onchange={(v) => canvas.setLlm(v as 'haiku'|'sonnet'|'gemma-e2b'|'gemma-e4b')} />
+    <GemmaLoader status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaLoadElapsed} loadedMB={gemmaLoadedMB} totalMB={gemmaTotalMB} modelName={canvas.llm === 'gemma-e4b' ? 'Gemma E4B' : 'Gemma E2B'} onunload={destroyGemma} />
     <!-- 4F: MCP stats -->
     {#if canvas.mcpConnected}
       <span class="font-mono text-[10px] text-text2 flex-shrink-0 hidden md:inline">
