@@ -1,6 +1,16 @@
 // @webmcp-auto-ui/agent — types
 
-export type ModelId = 'claude-haiku' | 'claude-sonnet' | 'gemma-e2b' | 'auto';
+// Short model IDs for remote (Anthropic-compatible) providers
+export type RemoteModelId = 'haiku' | 'sonnet' | 'opus' | string;
+
+// Model IDs for in-browser WASM providers
+export type WasmModelId = 'gemma-e2b' | 'gemma-e4b' | string;
+
+// Union of all LLM IDs used by canvas.llm and LLMSelector
+export type LLMId = RemoteModelId | WasmModelId;
+
+// Backward compat alias
+export type ModelId = LLMId;
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -32,7 +42,7 @@ export interface LLMResponse {
 
 export interface LLMProvider {
   readonly name: string;
-  readonly model: ModelId;
+  readonly model: string;
   chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
@@ -68,8 +78,12 @@ export interface AgentResult {
 
 // Callbacks for streaming UI updates
 export interface AgentCallbacks {
-  onBlock?: (type: string, data: Record<string, unknown>) => void;
-  onText?: (text: string) => void;
+  onIterationStart?: (iteration: number, maxIterations: number) => void;
+  onLLMRequest?: (messages: ChatMessage[], tools: AnthropicTool[]) => void;
+  onLLMResponse?: (response: LLMResponse, latencyMs: number, tokens?: { input: number; output: number }) => void;
   onToolCall?: (call: ToolCall) => void;
+  onBlock?: (type: string, data: Record<string, unknown>) => void;
   onClear?: () => void;
+  onText?: (text: string) => void;
+  onDone?: (metrics: AgentMetrics) => void;
 }

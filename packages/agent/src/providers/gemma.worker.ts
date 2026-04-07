@@ -52,7 +52,8 @@ self.onmessage = async (e: MessageEvent) => {
 
       processor = await AutoProcessor.from_pretrained(repo, { progress_callback });
       model = await Gemma4ForConditionalGeneration.from_pretrained(repo, {
-        dtype,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        dtype: dtype as any,
         device,
         progress_callback,
       });

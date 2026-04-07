@@ -115,12 +115,15 @@ export async function runAgentLoop(
   for (let i = 0; i < maxIterations; i++) {
     if (signal?.aborted) break;
     metrics.iterations++;
+    callbacks.onIterationStart?.(i + 1, maxIterations);
 
+    callbacks.onLLMRequest?.(messages, allTools);
     const t0 = performance.now();
     const response = await provider.chat(messages, allTools, {
       signal, cacheEnabled, system: systemPrompt,
     });
-    metrics.totalLatencyMs += performance.now() - t0;
+    const latencyMs = performance.now() - t0;
+    metrics.totalLatencyMs += latencyMs;
 
     if (response.usage) {
       metrics.promptTokens += response.usage.input_tokens;
@@ -128,6 +131,11 @@ export async function runAgentLoop(
       metrics.totalTokens += response.usage.input_tokens + response.usage.output_tokens;
       metrics.cacheHits += response.usage.cache_read_input_tokens ?? 0;
     }
+
+    callbacks.onLLMResponse?.(response, latencyMs, response.usage ? {
+      input: response.usage.input_tokens,
+      output: response.usage.output_tokens,
+    } : undefined);
 
     const textBlocks = response.content.filter(b => b.type === 'text') as { type: 'text'; text: string }[];
     const toolBlocks = response.content.filter(b => b.type === 'tool_use') as {
@@ -178,6 +186,8 @@ export async function runAgentLoop(
 
     messages.push({ role: 'user', content: toolResults });
   }
+
+  callbacks.onDone?.(metrics);
 
   return {
     text: lastText,
