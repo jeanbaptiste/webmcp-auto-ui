@@ -9,10 +9,12 @@
   } from '@webmcp-auto-ui/sdk';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { McpClient, jsonResult, textResult } from '@webmcp-auto-ui/core';
-  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
+  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory } from '@webmcp-auto-ui/agent';
 
   // ── State ─────────────────────────────────────────────────────────────────
   let feed = $state<ChatFeedItem[]>([]);
+  let conversationHistory = $state<import('@webmcp-auto-ui/agent').ChatMessage[]>([]);
+  let maxContextTokens = $state(150_000);
   let drawerOpen = $state(false);
   let chatInput = $state('');
   let mcpClient = $state<McpClient | null>(null);
@@ -114,6 +116,7 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
   function clearChat() {
     feed = [];
     canvas.clearBlocks();
+    conversationHistory = [];
   }
 
   // ── Skill management ──────────────────────────────────────────────────────
@@ -360,13 +363,14 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
     log('→ ' + canvas.llm + ' | ' + msg.slice(0, 50));
 
     try {
-      await runAgentLoop(msg, {
+      const result = await runAgentLoop(msg, {
         client: mcpClient ?? undefined,
         provider: getProvider(),
         systemPrompt: systemPrompt || undefined,
         maxIterations: 15,
         maxTokens,
         cacheEnabled,
+        initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
           onBlock: (type, data) => addBlock(type, data, 'agent'),
@@ -381,6 +385,7 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
           },
         },
       });
+      conversationHistory = result.messages; // save for next turn
     } catch(e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       log('❌ ' + errMsg);
@@ -590,7 +595,7 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
         </div>
 
         <!-- Settings -->
-        <SettingsPanel bind:systemPrompt bind:maxTokens bind:cacheEnabled />
+        <SettingsPanel bind:systemPrompt bind:maxTokens bind:maxContextTokens bind:cacheEnabled />
 
         <!-- Recettes -->
         <div class="flex flex-col gap-2">

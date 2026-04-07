@@ -4,7 +4,7 @@
   import { listSkills, loadDemoSkills, createSkill, deleteSkill, updateSkill, type Skill } from '@webmcp-auto-ui/sdk';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { McpClient, createToolGroup, textResult, jsonResult } from '@webmcp-auto-ui/core';
-  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
+  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory } from '@webmcp-auto-ui/agent';
   import type { GemmaStatus as GemmaStatusType } from '@webmcp-auto-ui/agent';
   import { X, Plus, Zap, Copy, Check, Save, Menu, ChevronLeft, ChevronRight, Settings } from 'lucide-svelte';
   import BlockWrap from '$lib/BlockWrap.svelte';
@@ -305,6 +305,10 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
   async function triggerAutoGenerate(client?: McpClient) {
     const c = client ?? mcpClient;
     if (!c || canvas.generating) return;
+    if ((canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') && gemmaStatus !== 'ready') {
+      canvas.addMsg('system', `⏳ Gemma en cours de chargement — auto-generate différé, relancez manuellement une fois le modèle prêt`);
+      return;
+    }
     canvas.setGenerating(true);
     autoGenTimer = 0;
     autoGenTimerInterval = setInterval(() => { autoGenTimer++; }, 1000);
@@ -351,12 +355,13 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
     chatTimerInterval = setInterval(() => { chatTimer++; }, 1000);
     canvas.setGenerating(true);
     try {
-      await runAgentLoop(msg, {
+      const result = await runAgentLoop(msg, {
         client: mcpClient ?? undefined,
         provider: activeProvider(),
         systemPrompt: effectiveSystemPrompt || undefined,
         maxIterations: 15,
         maxTokens,
+        initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
           onBlock: (type, data) => {
@@ -376,6 +381,7 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
           },
         },
       });
+      conversationHistory = result.messages; // save for next turn
     } catch (e) {
       const errMsg = `❌ ${e instanceof Error ? e.message : String(e)}`;
       canvas.updateMsg(thinking.id, errMsg, false);
@@ -457,12 +463,11 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
 
   // ── Init ──────────────────────────────────────────────────────────────────
   onMount(() => {
-    // Load from ?hs= param
+    // Load from ?hs= param (loadFromParam: format natif buildHyperskillParam)
     const param = new URLSearchParams(window.location.search).get('hs');
     if (param) {
-      void canvas.loadFromUrl(window.location.href).then(() => {
-        if (canvas.mcpUrl) connectMcp();
-      });
+      canvas.loadFromParam(param);
+      if (canvas.mcpUrl) connectMcp();
     }
     refreshStats();
     skills = listSkills();
@@ -471,6 +476,8 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
   // Chat input handler
   let chatInput = $state('');
   let chatFeed = $state<ChatFeedItem[]>([]);
+  let conversationHistory = $state<import('@webmcp-auto-ui/agent').ChatMessage[]>([]);
+  let maxContextTokens = $state(150_000);
   let chatTimer = $state(0);
   let chatTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
   let chatToolCount = $state(0);
@@ -556,13 +563,6 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
       onclick={() => showExport = true}>
       <Save size={11} /> export
     </button>
-    <!-- Mobile chat toggle -->
-    {#if canvas.mode === 'chat'}
-      <button class="md:hidden font-mono text-xs h-7 px-2 rounded border border-accent text-accent flex-shrink-0"
-        onclick={() => { mobileChatOpen = !mobileChatOpen; }}>
-        chat
-      </button>
-    {/if}
   </header>
 
   <!-- Gemma loading banner — full width, outside the header flex row -->
@@ -704,8 +704,8 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
       </aside>
     {/if}
 
-    <!-- CANVAS -->
-    <main class="flex-1 overflow-y-auto p-5 flex flex-col gap-3 {dragOver ? 'drag-over' : ''}"
+    <!-- CANVAS — caché sur mobile en mode chat (les blocs sont dans le feed) -->
+    <main class="{canvas.mode === 'chat' ? 'hidden md:flex md:flex-1' : 'flex-1'} overflow-y-auto p-5 flex flex-col gap-3 {dragOver ? 'drag-over' : ''}"
       ondragover={canvasDragover} ondragleave={canvasDragleave} ondrop={canvasDrop} role="list">
       {#if canvas.isEmpty}
         <div class="flex-1 flex flex-col items-center justify-center text-center pointer-events-none select-none">
@@ -725,10 +725,9 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
       {/if}
     </main>
 
-    <!-- RIGHT CHAT (mode chat — desktop sidebar) -->
+    <!-- Mobile inline chat (mode chat, < md) — blocs dans le feed -->
     {#if canvas.mode === 'chat'}
-      <aside class="hidden md:flex w-72 border-l border-border bg-surface flex-col flex-shrink-0">
-        <div class="px-4 py-2 border-b border-border text-[10px] font-mono text-text2 uppercase tracking-widest">Chat UI ↗</div>
+      <div class="flex-1 flex flex-col min-h-0 md:hidden">
         <ChatPanel
           feed={chatFeed}
           bind:input={chatInput}
@@ -740,20 +739,15 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
           placeholder="Décrivez l'interface voulue…"
           class="flex-1 min-h-0"
         />
-      </aside>
+      </div>
     {/if}
 
-    <!-- Mobile chat overlay (4B) -->
-    {#if canvas.mode === 'chat' && mobileChatOpen}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="fixed inset-0 bg-black/60 z-40 md:hidden" onclick={() => { mobileChatOpen = false; }}></div>
-      <aside class="fixed right-0 top-12 bottom-0 w-80 max-w-[90vw] bg-surface border-l border-border z-50 md:hidden flex flex-col">
-        <div class="flex items-center justify-between px-4 py-2 border-b border-border">
-          <span class="text-[10px] font-mono text-text2 uppercase tracking-widest">Chat UI</span>
-          <button class="text-text2 hover:text-white" onclick={() => { mobileChatOpen = false; }}><X size={14} /></button>
-        </div>
+    <!-- Desktop sidebar chat (mode chat, ≥ md) — bulles seulement, blocs dans le canvas -->
+    {#if canvas.mode === 'chat'}
+      <aside class="hidden md:flex w-72 border-l border-border bg-surface flex-col flex-shrink-0">
+        <div class="px-4 py-2 border-b border-border text-[10px] font-mono text-text2 uppercase tracking-widest">Chat UI ↗</div>
         <ChatPanel
-          feed={chatFeed}
+          feed={chatFeed.filter(f => f.kind === 'bubble')}
           bind:input={chatInput}
           generating={canvas.generating}
           timer={chatTimer}
@@ -835,7 +829,7 @@ Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est d
         <button onclick={() => showSettings = false} class="text-text2 hover:text-text1"><X size={16} /></button>
       </div>
       <div class="p-5">
-        <SettingsPanel bind:systemPrompt bind:maxTokens bind:cacheEnabled />
+        <SettingsPanel bind:systemPrompt bind:maxTokens bind:maxContextTokens bind:cacheEnabled />
       </div>
       <div class="flex justify-end gap-3 px-5 py-4 border-t border-border">
         <button class="font-mono text-xs px-4 py-2 rounded border border-border2 text-text2 hover:text-text1" onclick={() => showSettings = false}>fermer</button>

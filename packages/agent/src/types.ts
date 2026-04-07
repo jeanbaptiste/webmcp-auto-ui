@@ -74,6 +74,7 @@ export interface AgentResult {
   toolCalls: ToolCall[];
   metrics: AgentMetrics;
   stopReason: 'end_turn' | 'max_iterations' | 'error';
+  messages: ChatMessage[]; // full conversation including this turn, for history
 }
 
 // Callbacks for streaming UI updates

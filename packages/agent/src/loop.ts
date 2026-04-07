@@ -74,6 +74,7 @@ export interface AgentLoopOptions {
   maxTokens?: number;
   cacheEnabled?: boolean;
   systemPrompt?: string;
+  initialMessages?: ChatMessage[]; // conversation history from previous turns
   callbacks?: AgentCallbacks;
   signal?: AbortSignal;
 }
@@ -89,6 +90,7 @@ export async function runAgentLoop(
     maxIterations = 5,
     maxTokens,
     cacheEnabled = true,
+    initialMessages = [],
     callbacks = {},
     signal,
   } = options;
@@ -103,7 +105,7 @@ export async function runAgentLoop(
     ? `${baseSystemPrompt}\n\nIMPORTANT: Keep responses under ${maxTokens} tokens.`
     : baseSystemPrompt;
 
-  const messages: ChatMessage[] = [{ role: 'user', content: userMessage }];
+  const messages: ChatMessage[] = [...initialMessages, { role: 'user', content: userMessage }];
 
   const metrics: AgentMetrics = {
     totalTokens: 0, promptTokens: 0, completionTokens: 0,
@@ -199,6 +201,7 @@ export async function runAgentLoop(
     toolCalls: allToolCalls,
     metrics,
     stopReason: finishedNormally ? 'end_turn' : 'max_iterations',
+    messages,
   };
 }
 
@@ -209,4 +212,21 @@ export function fromMcpTools(tools: McpTool[]): McpToolDef[] {
     description: t.description ?? '',
     inputSchema: t.inputSchema as Record<string, unknown> | undefined,
   }));
+}
+
+/**
+ * Trim conversation history to fit within a token budget.
+ * Removes oldest message pairs (user+assistant) from the front until under limit.
+ * @param history - Full conversation history
+ * @param maxTokens - Token budget (1 token ≈ 4 chars)
+ */
+export function trimConversationHistory(history: ChatMessage[], maxTokens: number): ChatMessage[] {
+  const maxChars = maxTokens * 4;
+  let total = history.reduce((s, m) => s + JSON.stringify(m).length, 0);
+  const trimmed = [...history];
+  while (total > maxChars && trimmed.length >= 2) {
+    const removed = trimmed.splice(0, 2);
+    total -= removed.reduce((s, m) => s + JSON.stringify(m).length, 0);
+  }
+  return trimmed;
 }
