@@ -28,12 +28,14 @@ ${uiTools.map(t => `- ${t.name}: ${t.description}`).join('\n')}
 
 MANDATORY WORKFLOW — follow this EXACTLY:
 1. Call ONE data tool to get data
-2. IMMEDIATELY call a render_* UI tool to display the result
-3. Repeat steps 1-2 if the user wants more, otherwise stop
+2. IMMEDIATELY call a render_* UI tool to display the result — even if partial or imperfect
+3. Repeat steps 1-2 if the user wants more data, otherwise stop
 
 CRITICAL RULES:
-- NEVER call more than 2 data tools without calling a render_* tool in between
-- ALWAYS render results with a UI tool — never just return text
+- After EVERY data tool call, you MUST call a render_* tool next — no exceptions
+- If a query returns an error or empty data, call render_kv or render_stat to show the status
+- NEVER chain more than 1 data tool call without rendering in between
+- ALWAYS render — never just return text
 - Use render_table for tabular data, render_chart for numbers, render_stat for KPIs, render_kv for key-value pairs
 - Keep text responses to 1 sentence max
 - Respond in the user's language`;
@@ -150,6 +152,9 @@ export async function runAgentLoop(
       finishedNormally = true;
       break;
     }
+
+    // Texte intermédiaire (reasoning/commentary avant les tool_use) — mise à jour live
+    if (lastText) callbacks.onText?.(lastText);
 
     messages.push({ role: 'assistant', content: response.content });
 

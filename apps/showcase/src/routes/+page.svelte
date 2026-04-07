@@ -484,7 +484,7 @@
 <div class="min-h-screen bg-bg font-sans flex">
 
   <!-- SIDEBAR NAV -->
-  <nav class="w-52 border-r border-border bg-surface flex flex-col flex-shrink-0 sticky top-0 h-screen overflow-y-auto">
+  <nav class="w-52 border-r border-border bg-surface hidden md:flex flex-col flex-shrink-0 sticky top-0 h-screen overflow-y-auto">
     <div class="px-4 pt-5 pb-3">
       <div class="font-mono text-xs font-bold mb-0.5">
         <span class="text-white">webmcp</span><span class="text-accent">-auto-ui</span>

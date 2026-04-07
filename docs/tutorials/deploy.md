@@ -8,9 +8,9 @@
 ./scripts/deploy.sh mobile home    # deploy specific apps
 ```
 
-The script handles everything: builds packages, builds apps, cleans old
-files on the server, copies to the correct location, restarts services,
-and verifies.
+The script handles everything: builds packages, **builds apps**, cleans old
+files on the server, copies to the correct location, **verifies sha256
+integrity**, restarts services, and confirms.
 
 **Always use this script. Never deploy manually with scp.**
 
@@ -138,6 +138,28 @@ don't delete .env:
 
 **Never use rsync.** `rsync --delete` has previously wiped `.env` files
 containing API keys from production. Use `scp -r` only.
+
+### 6. Deploying without rebuilding the app (fixed in script)
+
+**Symptom**: You fix a Svelte bug, deploy, the bug is still there. Services
+show `active`. No error anywhere.
+
+**Cause**: The old `deploy.sh` rebuilt packages (`packages/*/dist/`) but
+copied the existing `apps/*/build/` without rebuilding it. Any change to
+`apps/*/src/` was silently ignored.
+
+**Fix applied**: `deploy.sh` now runs `npm run build` inside each app before
+copying. The sha256 check then verifies the deployed file matches the local
+build.
+
+**How to detect manually**:
+```bash
+sha256sum apps/composer/build/index.js
+ssh bot "sha256sum /opt/webmcp-demos/composer/index.js"
+# These must match. If they differ, the wrong file was deployed.
+```
+
+See [contributing.md](../contributing.md) for the full debug checklist.
 
 ---
 

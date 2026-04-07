@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { base } from '$app/paths';
   import { ChatPanel, GemmaLoader, LLMSelector, McpStatus, McpConnector, AgentConsole, SettingsPanel } from '@webmcp-auto-ui/ui';
   import type { ChatFeedItem } from '@webmcp-auto-ui/ui';
@@ -30,7 +30,37 @@
   let hsUrlDisplay = $state('');
   let urlCopied = $state(false);
   let shareMenuOpen = $state(false);
-  let systemPrompt = $state('');
+  let systemPrompt = $state(`Tu es un assistant spécialisé dans les données parlementaires françaises.
+
+Tu as accès à deux familles d'outils :
+
+1. **Outils DATA** (search_*, get_details, summarize) — pour interroger les données parlementaires
+2. **Outils UI** (render_*) — pour afficher les résultats dans l'interface graphique
+
+WORKFLOW OBLIGATOIRE :
+1. Utilise un outil DATA pour récupérer les données
+2. Puis utilise un outil UI pour afficher les résultats visuellement
+3. Ta réponse texte doit être TRÈS courte (1-2 phrases max) — l'essentiel est dans l'UI
+
+CHOIX DES OUTILS UI (choisis le plus adapté à la question) :
+- render_table : listes triables (parlementaires, amendements, documents)
+- render_stat : chiffre clé, KPI, compteur
+- render_profile : fiche détaillée (parlementaire, organe)
+- render_timeline : historique chronologique (dossier législatif, étapes)
+- render_chart : comparer des valeurs (barres horizontales/verticales)
+- render_trombinoscope : galerie de portraits (membres d'un groupe, commission)
+- render_hemicycle : hémicycle D3.js (composition AN/Sénat par groupe)
+- render_sankey : diagramme de flux (votes, parcours législatif, co-signatures)
+- render_cards : grille de cartes (résumés de dossiers, questions)
+- render_grid : grille compacte type spreadsheet (matrices, comparaisons)
+
+STRATÉGIE DE VISUALISATION :
+- Propose TOUJOURS la visualisation la plus pertinente pour la question
+- Combine plusieurs render_* quand c'est utile
+- Si la question est vague, PROPOSE une visualisation et explique pourquoi en 1 phrase
+- Si tu penses qu'une meilleure visualisation existe, SUGGÈRE-LA
+
+Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est dans l'UI.`);
   let maxTokens = $state(4096);
   let cacheEnabled = $state(true);
 
@@ -78,6 +108,11 @@
 
   function clearFeedBlocks() {
     feed = feed.filter(f => f.kind === 'bubble');
+    canvas.clearBlocks();
+  }
+
+  function clearChat() {
+    feed = [];
     canvas.clearBlocks();
   }
 
@@ -305,11 +340,18 @@
     // Anthropic — key from .env or drawer input
     return new AnthropicProvider({
       proxyUrl: `${base}/api/chat`,
+      model: canvas.llm,
       ...(apiKeyInput.trim() ? { apiKey: apiKeyInput.trim() } : {}),
     });
   }
 
   async function sendChat(msg: string) {
+    // Guard: Gemma model must be ready before sending
+    if ((canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') && gemmaStatus !== 'ready') {
+      addBubble('user', msg);
+      addBubble('assistant', `⏳ Gemma est en cours de chargement (${gemmaStatus}) — patientez…`);
+      return;
+    }
     addBubble('user', msg);
     const thinking = addBubble('assistant', '<span style="display:inline-flex;gap:3px;align-items:center"><span style="width:4px;height:4px;border-radius:50%;background:#7c6dfa;animation:blink 1.2s ease infinite;display:inline-block"></span><span style="width:4px;height:4px;border-radius:50%;background:#7c6dfa;animation:blink 1.2s ease infinite .2s;display:inline-block"></span><span style="width:4px;height:4px;border-radius:50%;background:#7c6dfa;animation:blink 1.2s ease infinite .4s;display:inline-block"></span></span>');
     canvas.setGenerating(true);
@@ -322,12 +364,13 @@
         client: mcpClient ?? undefined,
         provider: getProvider(),
         systemPrompt: systemPrompt || undefined,
+        maxIterations: 15,
         maxTokens,
         cacheEnabled,
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
           onBlock: (type, data) => addBlock(type, data, 'agent'),
-          onClear: clearFeedBlocks,
+          onClear: () => canvas.clearBlocks(), // ne pas effacer l'historique du feed en mode chat
           onText: (text) => { if (text) updateBubble(thinking.id, text); },
           onToolCall: (call) => {
             chatToolCount++; chatLastTool = call.name;
@@ -423,13 +466,18 @@
   });
 
   // ── Gemma auto-load on selection ────────────────────────────────────────
+  // untrack() évite la boucle réactive : getProvider() lit+écrit gemmaProvider,
+  // et gemmaStatus est lu ET potentiellement écrit via onStatusChange dans le même cycle.
   $effect(() => {
-    if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
-      const p = getProvider();
-      if (gemmaStatus === 'idle' && p instanceof GemmaProvider) {
-        p.initialize();
+    const llm = canvas.llm;  // seule dépendance trackée
+    untrack(() => {
+      if (llm === 'gemma-e2b' || llm === 'gemma-e4b') {
+        const p = getProvider();
+        if (gemmaStatus === 'idle' && p instanceof GemmaProvider) {
+          p.initialize();
+        }
       }
-    }
+    });
   });
 </script>
 
@@ -451,6 +499,14 @@
   <div class="flex items-center gap-2.5 px-4 h-12 border-b border-border flex-shrink-0 bg-surface">
     <span class="text-sm font-medium text-text1 flex-1 tracking-tight">Auto<span class="text-accent">-UI</span></span>
     <McpStatus connecting={canvas.mcpConnecting} connected={canvas.mcpConnected} name={canvas.mcpName ?? 'non connecté'} />
+    {#if feed.length > 0}
+      <button class="w-8 h-8 rounded-lg border border-border2 flex items-center justify-center text-text2 hover:text-red-400 text-xs transition-colors"
+        onclick={clearChat}
+        aria-label="Effacer le chat"
+        title="Effacer le chat">
+        ✕
+      </button>
+    {/if}
     <button class="w-8 h-8 rounded-lg border border-border2 flex items-center justify-center text-text2 hover:text-text1 text-sm"
       onclick={() => {
         const root = document.documentElement;

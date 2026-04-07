@@ -56,13 +56,23 @@ deploy_node_root() {
     echo "  [$app] ⚠ version $app_version already deployed — continuing anyway"
   fi
   if [ "$DRY_RUN" = "1" ]; then
-    echo "  [$app] DRY RUN: would deploy v$app_version → $REMOTE_BASE/$app/ (node index.js)"
+    echo "  [$app] DRY RUN: would build + deploy v$app_version → $REMOTE_BASE/$app/ (node index.js)"
     return
   fi
+  echo "  [$app] building app..."
+  (cd "$LOCAL_ROOT/apps/$app" && npm run build > /dev/null 2>&1)
   echo "  [$app] cleaning old files on server..."
   ssh "$SSH_HOST" "cd $REMOTE_BASE/$app && rm -f index.js handler.js env.js shims.js && rm -rf client server build"
   echo "  [$app] copying build..."
   scp -r "$LOCAL_ROOT/apps/$app/build/"* "$SSH_HOST:$REMOTE_BASE/$app/"
+  echo "  [$app] verifying deploy integrity..."
+  local expected actual
+  expected=$(sha256sum "$LOCAL_ROOT/apps/$app/build/index.js" | cut -d' ' -f1)
+  actual=$(ssh "$SSH_HOST" "sha256sum $REMOTE_BASE/$app/index.js | cut -d' ' -f1")
+  if [ "$expected" != "$actual" ]; then
+    echo "  [$app] ✗ INTEGRITY ERROR — deployed file ≠ local build (sha256 mismatch)"
+    exit 1
+  fi
   echo "  [$app] restarting service..."
   ssh "$SSH_HOST" "systemctl restart webmcp-$app"
   echo "  [$app] ✓ deployed v$app_version (node index.js at root)"
@@ -73,9 +83,11 @@ deploy_node_build() {
   local app_version
   app_version=$(node -e "console.log(require('$LOCAL_ROOT/apps/$app/package.json').version)" 2>/dev/null || echo "?")
   if [ "$DRY_RUN" = "1" ]; then
-    echo "  [$app] DRY RUN: would deploy v$app_version → $REMOTE_BASE/$app/build/ (node build/index.js)"
+    echo "  [$app] DRY RUN: would build + deploy v$app_version → $REMOTE_BASE/$app/build/ (node build/index.js)"
     return
   fi
+  echo "  [$app] building app..."
+  (cd "$LOCAL_ROOT/apps/$app" && npm run build > /dev/null 2>&1)
   echo "  [$app] cleaning old build..."
   ssh "$SSH_HOST" "rm -rf $REMOTE_BASE/$app/build"
   ssh "$SSH_HOST" "mkdir -p $REMOTE_BASE/$app/build"

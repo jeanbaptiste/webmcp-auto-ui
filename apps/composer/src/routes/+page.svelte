@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { base } from '$app/paths';
   import { listSkills, loadDemoSkills, createSkill, deleteSkill, updateSkill, type Skill } from '@webmcp-auto-ui/sdk';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
@@ -21,6 +21,7 @@
   let mcpClient = $state<McpClient | null>(null);
   let skills = $state<Skill[]>([]);
   let mcpToken = $state('');
+  let mcpRecipes = $state<{ name: string; description?: string; id?: string }[]>([]);
 
   // Console panel
   let consoleOpen = $state(false);
@@ -141,14 +142,50 @@
   }
 
   // 4H: Settings
-  let systemPrompt = $state('You are a UI composer agent. When asked to create an interface, use the render_* tools to generate UI blocks. Use render_stat for KPIs, render_chart for data visualization, render_table for tabular data, render_kv for key-value pairs. Call only ONE tool at a time. Keep responses concise.');
+  let systemPrompt = $state(`Tu es un assistant spécialisé dans les données parlementaires françaises.
+
+Tu as accès à deux familles d'outils :
+
+1. **Outils DATA** (search_*, get_details, summarize) — pour interroger les données parlementaires
+2. **Outils UI** (render_*) — pour afficher les résultats dans l'interface graphique
+
+WORKFLOW OBLIGATOIRE :
+1. Utilise un outil DATA pour récupérer les données
+2. Puis utilise un outil UI pour afficher les résultats visuellement
+3. Ta réponse texte doit être TRÈS courte (1-2 phrases max) — l'essentiel est dans l'UI
+
+CHOIX DES OUTILS UI (choisis le plus adapté à la question) :
+- render_table : listes triables (parlementaires, amendements, documents)
+- render_stat : chiffre clé, KPI, compteur
+- render_profile : fiche détaillée (parlementaire, organe)
+- render_timeline : historique chronologique (dossier législatif, étapes)
+- render_chart : comparer des valeurs (barres horizontales/verticales)
+- render_trombinoscope : galerie de portraits (membres d'un groupe, commission)
+- render_hemicycle : hémicycle D3.js (composition AN/Sénat par groupe)
+- render_sankey : diagramme de flux (votes, parcours législatif, co-signatures)
+- render_cards : grille de cartes (résumés de dossiers, questions)
+- render_grid : grille compacte type spreadsheet (matrices, comparaisons)
+
+STRATÉGIE DE VISUALISATION :
+- Propose TOUJOURS la visualisation la plus pertinente pour la question
+- Combine plusieurs render_* quand c'est utile
+- Si la question est vague, PROPOSE une visualisation et explique pourquoi en 1 phrase
+- Si tu penses qu'une meilleure visualisation existe, SUGGÈRE-LA
+
+Réponds en français. Sois très concis (1-2 phrases max) — l'essentiel est dans l'UI.`);
   let cacheEnabled = $state(true);
   let maxTokens = $state(4096);
   let showSettings = $state(false);
   let showMcpTools = $state(false);
 
-  // Reactive skills list
-  $effect(() => { skills = listSkills(); });
+  // Effective system prompt — injects MCP recipes as context when available
+  const effectiveSystemPrompt = $derived(
+    mcpRecipes.length > 0
+      ? `${systemPrompt}\n\nRecettes disponibles sur ce serveur MCP :\n${mcpRecipes.map(r => `- ${r.name}${r.description ? ' : ' + r.description : ''}`).join('\n')}`
+      : systemPrompt
+  );
+
+  // skills est initialisé dans onMount via listSkills() + onSkillsChange
 
   // LLM context sizes
   const LLM_CONTEXT: Record<string, string> = {
@@ -156,20 +193,23 @@
     'gemma-e2b': '~8K tokens (WASM)', 'gemma-e4b': '~8K tokens (WASM)',
   };
 
-  // React to LLM changes
+  // React to LLM changes — untrack() pour éviter la boucle réactive :
+  // gemmaStatus et gemmaProvider sont lus ET écrits dans cet effet,
+  // ce qui provoque un effect_update_depth_exceeded sans untrack.
   $effect(() => {
-    const llm = canvas.llm;
-    if (llm === 'gemma-e2b' || llm === 'gemma-e4b') {
-      const model = llm;
-      const p = getOrCreateGemmaProvider(model);
-      if (gemmaStatus === 'idle') p.initialize();
-    } else {
-      // Switching away from Gemma — reset status display (but keep provider in memory)
-      if (gemmaStatus === 'ready' || gemmaStatus === 'loading') {
-        gemmaStatus = 'idle';
+    const llm = canvas.llm;  // seule dépendance trackée
+    untrack(() => {
+      if (llm === 'gemma-e2b' || llm === 'gemma-e4b') {
+        const p = getOrCreateGemmaProvider(llm);
+        if (gemmaStatus === 'idle') p.initialize();
+      } else {
+        // Switching away from Gemma — reset status display (but keep provider in memory)
+        if (gemmaStatus === 'ready' || gemmaStatus === 'loading') {
+          gemmaStatus = 'idle';
+        }
       }
-    }
-    canvas.addMsg('system', `LLM → ${llm} · contexte: ${LLM_CONTEXT[llm] ?? '?'}`);
+      canvas.addMsg('system', `LLM → ${llm} · contexte: ${LLM_CONTEXT[llm] ?? '?'}`);
+    });
   });
 
   // ── Block defaults ─────────────────────────────────────────────────────────
@@ -236,6 +276,18 @@
       mcpClient = client;
       canvas.setMcpConnected(true, init.serverInfo.name, tools as { name: string; description: string; inputSchema?: Record<string,unknown> }[]);
       canvas.addMsg('system', `MCP connecté : ${init.serverInfo.name} · ${tools.length} tools`);
+      // Load recipes from MCP server if available
+      if (tools.some((t: { name: string }) => t.name === 'list_recipes')) {
+        try {
+          const recipesResult = await client.callTool('list_recipes', {});
+          const textContent = recipesResult.content?.find((c: { type: string }) => c.type === 'text') as { text?: string } | undefined;
+          if (textContent?.text) {
+            const parsed: unknown = JSON.parse(textContent.text);
+            mcpRecipes = Array.isArray(parsed) ? parsed : ((parsed as { recipes?: typeof mcpRecipes })?.recipes ?? []);
+            canvas.addMsg('system', `📚 ${mcpRecipes.length} recettes chargées depuis le serveur`);
+          }
+        } catch { /* list_recipes not available or parse error */ }
+      }
       if (canvas.mode === 'auto') triggerAutoGenerate(client);
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
@@ -262,7 +314,7 @@
       await runAgentLoop('Génère une interface pour les données disponibles sur ce MCP.', {
         client: c,
         provider: activeProvider(),
-        systemPrompt: systemPrompt || undefined,
+        systemPrompt: effectiveSystemPrompt || undefined,
         maxTokens,
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
@@ -282,6 +334,11 @@
 
   async function sendChat(msg: string) {
     if (!msg.trim() || canvas.generating) return;
+    // Guard: Gemma model must be ready before sending
+    if ((canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') && gemmaStatus !== 'ready') {
+      canvas.addMsg('system', `⏳ Gemma en cours de chargement (${gemmaStatus}) — patientez…`);
+      return;
+    }
     // Canvas messages (for consoleLogs)
     canvas.addMsg('user', msg);
     const thinking = canvas.addMsg('assistant', '', true);
@@ -297,7 +354,8 @@
       await runAgentLoop(msg, {
         client: mcpClient ?? undefined,
         provider: activeProvider(),
-        systemPrompt: systemPrompt || undefined,
+        systemPrompt: effectiveSystemPrompt || undefined,
+        maxIterations: 15,
         maxTokens,
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
@@ -407,9 +465,7 @@
       });
     }
     refreshStats();
-    // Force refresh skills on mount
     skills = listSkills();
-    setTimeout(() => { skills = listSkills(); }, 100);
   });
 
   // Chat input handler
@@ -455,7 +511,6 @@
     />
     <div class="w-px h-5 bg-border2 hidden md:block"></div>
     <LLMSelector value={canvas.llm} onchange={(v) => canvas.setLlm(v as 'haiku'|'sonnet'|'gemma-e2b'|'gemma-e4b')} />
-    <GemmaLoader status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaLoadElapsed} loadedMB={gemmaLoadedMB} totalMB={gemmaTotalMB} modelName={({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm} onunload={destroyGemma} />
     <!-- 4F: MCP stats -->
     {#if canvas.mcpConnected}
       <span class="font-mono text-[10px] text-text2 flex-shrink-0 hidden md:inline">
@@ -509,6 +564,9 @@
       </button>
     {/if}
   </header>
+
+  <!-- Gemma loading banner — full width, outside the header flex row -->
+  <GemmaLoader status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaLoadElapsed} loadedMB={gemmaLoadedMB} totalMB={gemmaTotalMB} modelName={({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm} onunload={destroyGemma} />
 
   <!-- MODE BAR -->
   <nav class="h-9 flex items-center gap-1 px-4 border-b border-border bg-surface flex-shrink-0">
@@ -580,6 +638,20 @@
           ondelete={removeSkill}
           onedit={(skill) => openSkillEdit(skill.id)}
         />
+        {#if mcpRecipes.length > 0}
+          <div class="h-px bg-border mx-3 my-2"></div>
+          <div class="px-3 pb-2">
+            <div class="text-[10px] font-mono text-text2 uppercase tracking-widest mb-1.5">Recettes MCP ({mcpRecipes.length})</div>
+            <div class="flex flex-col gap-0.5">
+              {#each mcpRecipes as recipe}
+                <div class="px-2 py-1.5 rounded text-xs font-mono text-accent2 border border-transparent hover:bg-white/5 hover:border-border2 transition-all">
+                  <div class="font-medium">⚗ {recipe.name}</div>
+                  {#if recipe.description}<div class="text-[10px] text-text2 mt-0.5 truncate">{recipe.description}</div>{/if}
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/if}
       {/if}
     </aside>
 

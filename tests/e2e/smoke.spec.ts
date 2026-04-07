@@ -86,10 +86,19 @@ test.describe('Composer', () => {
 
   test('export modal works', async ({ page }) => {
     await page.goto(`${BASE}/composer/`);
+    // Wait for Svelte hydration: the LLM $effect fires client-side and adds
+    // a system message to canvas, which shows a count badge in AgentConsole.
+    // The export button only exists at md+ viewport (hidden md:flex).
+    await page.waitForFunction(
+      () => document.querySelector('button[disabled][class*="statusColor"], select option') !== null,
+      { timeout: 10000 }
+    );
+    await page.waitForTimeout(500); // extra tick for hydration to settle
     const exportBtn = page.locator('button', { hasText: 'export' });
     if (await exportBtn.isVisible()) {
       await exportBtn.click();
-      await expect(page.locator('text=skill.json')).toBeVisible();
+      await expect(page.locator('text=Export Skill')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('text=skill.json')).toBeVisible({ timeout: 3000 });
     }
   });
 
