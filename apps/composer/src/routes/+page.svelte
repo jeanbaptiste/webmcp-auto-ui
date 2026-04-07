@@ -8,7 +8,8 @@
   import type { GemmaStatus as GemmaStatusType } from '@webmcp-auto-ui/agent';
   import { X, Plus, Zap, Copy, Check, Save, Menu, ChevronLeft, ChevronRight, Settings } from 'lucide-svelte';
   import BlockWrap from '$lib/BlockWrap.svelte';
-  import { GemmaLoader, LLMSelector, McpConnector, AgentConsole, SettingsPanel } from '@webmcp-auto-ui/ui';
+  import { ChatPanel, GemmaLoader, LLMSelector, McpConnector, AgentConsole, SettingsPanel } from '@webmcp-auto-ui/ui';
+  import type { ChatFeedItem } from '@webmcp-auto-ui/ui';
   import RecipesCRUD from '$lib/RecipesCRUD.svelte';
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -281,8 +282,16 @@
 
   async function sendChat(msg: string) {
     if (!msg.trim() || canvas.generating) return;
+    // Canvas messages (for consoleLogs)
     canvas.addMsg('user', msg);
     const thinking = canvas.addMsg('assistant', '', true);
+    // Feed items for ChatPanel
+    chatFeed = [...chatFeed, { kind: 'bubble', role: 'user', html: msg, id: uid() }];
+    const thinkingFeedId = uid();
+    chatFeed = [...chatFeed, { kind: 'bubble', role: 'assistant', html: '…', id: thinkingFeedId }];
+    // Timer / counters
+    chatTimer = 0; chatToolCount = 0; chatLastTool = '';
+    chatTimerInterval = setInterval(() => { chatTimer++; }, 1000);
     canvas.setGenerating(true);
     try {
       await runAgentLoop(msg, {
@@ -292,15 +301,29 @@
         maxTokens,
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
-          onBlock: (type, data) => canvas.addBlock(type as Parameters<typeof canvas.addBlock>[0], data),
+          onBlock: (type, data) => {
+            canvas.addBlock(type as Parameters<typeof canvas.addBlock>[0], data);
+            chatFeed = [...chatFeed, { kind: 'block', id: uid(), type, data: data as Record<string, unknown> }];
+          },
           onClear: () => canvas.clearBlocks(),
-          onText: (text) => canvas.updateMsg(thinking.id, text || '…', false),
-          onToolCall: (call) => { mcpToolCallCount++; canvas.updateMsg(thinking.id, `🔧 ${call.name}…`, true); canvas.addMsg('system', `🔧 ${call.name}(${JSON.stringify(call.args).slice(0,100)}) → ${(call.result??'').slice(0,100)} [${call.elapsed??0}ms]`); },
+          onText: (text) => {
+            canvas.updateMsg(thinking.id, text || '…', false);
+            chatFeed = chatFeed.map(item => item.id === thinkingFeedId ? { ...item, html: text || '…' } as typeof item : item);
+          },
+          onToolCall: (call) => {
+            mcpToolCallCount++; chatToolCount++; chatLastTool = call.name;
+            canvas.updateMsg(thinking.id, `🔧 ${call.name}…`, true);
+            canvas.addMsg('system', `🔧 ${call.name}(${JSON.stringify(call.args).slice(0,100)}) → ${(call.result??'').slice(0,100)} [${call.elapsed??0}ms]`);
+            chatFeed = chatFeed.map(item => item.id === thinkingFeedId ? { ...item, html: `🔧 ${call.name}…` } as typeof item : item);
+          },
         },
       });
     } catch (e) {
-      canvas.updateMsg(thinking.id, `❌ ${e instanceof Error ? e.message : String(e)}`, false);
+      const errMsg = `❌ ${e instanceof Error ? e.message : String(e)}`;
+      canvas.updateMsg(thinking.id, errMsg, false);
+      chatFeed = chatFeed.map(item => item.id === thinkingFeedId ? { ...item, html: errMsg } as typeof item : item);
     } finally {
+      if (chatTimerInterval) { clearInterval(chatTimerInterval); chatTimerInterval = null; }
       canvas.setGenerating(false);
     }
   }
@@ -391,6 +414,14 @@
 
   // Chat input handler
   let chatInput = $state('');
+  let chatFeed = $state<ChatFeedItem[]>([]);
+  let chatTimer = $state(0);
+  let chatTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
+  let chatToolCount = $state(0);
+  let chatLastTool = $state('');
+
+  function uid() { return 'c_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36); }
+
   function onChatKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(chatInput); chatInput = ''; }
   }
@@ -626,27 +657,17 @@
     {#if canvas.mode === 'chat'}
       <aside class="hidden md:flex w-72 border-l border-border bg-surface flex-col flex-shrink-0">
         <div class="px-4 py-2 border-b border-border text-[10px] font-mono text-text2 uppercase tracking-widest">Chat UI ↗</div>
-        <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
-          {#each canvas.messages as msg}
-            <div class="text-xs leading-relaxed {msg.role === 'user' ? 'bg-surface2 border border-border2 rounded px-3 py-2 font-mono text-text1' : msg.role === 'system' ? 'text-text2 font-mono text-[10px] text-center' : 'text-text2 px-1'}">
-              {#if msg.thinking}
-                <span class="inline-flex gap-1">
-                  {#each [0,1,2] as i}<span class="w-1 h-1 rounded-full bg-accent animate-pulse inline-block" style="animation-delay:{i*0.2}s"></span>{/each}
-                </span>
-              {:else}
-                {msg.content}
-              {/if}
-            </div>
-          {/each}
-        </div>
-        <div class="flex gap-2 p-2 border-t border-border">
-          <textarea class="flex-1 font-mono text-xs bg-surface2 border border-border2 text-text1 rounded px-2 py-1.5 outline-none resize-none h-14 focus:border-accent"
-            placeholder="Décrivez l'interface voulue…"
-            bind:value={chatInput}
-            onkeydown={onChatKeydown}></textarea>
-          <button class="font-mono text-xs px-3 rounded border border-accent bg-accent text-white hover:opacity-85 self-end h-8"
-            onclick={() => { sendChat(chatInput); chatInput = ''; }}>↑</button>
-        </div>
+        <ChatPanel
+          feed={chatFeed}
+          bind:input={chatInput}
+          generating={canvas.generating}
+          timer={chatTimer}
+          toolCount={chatToolCount}
+          lastTool={chatLastTool}
+          onsend={sendChat}
+          placeholder="Décrivez l'interface voulue…"
+          class="flex-1 min-h-0"
+        />
       </aside>
     {/if}
 
@@ -659,27 +680,17 @@
           <span class="text-[10px] font-mono text-text2 uppercase tracking-widest">Chat UI</span>
           <button class="text-text2 hover:text-white" onclick={() => { mobileChatOpen = false; }}><X size={14} /></button>
         </div>
-        <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
-          {#each canvas.messages as msg}
-            <div class="text-xs leading-relaxed {msg.role === 'user' ? 'bg-surface2 border border-border2 rounded px-3 py-2 font-mono text-text1' : msg.role === 'system' ? 'text-text2 font-mono text-[10px] text-center' : 'text-text2 px-1'}">
-              {#if msg.thinking}
-                <span class="inline-flex gap-1">
-                  {#each [0,1,2] as i}<span class="w-1 h-1 rounded-full bg-accent animate-pulse inline-block" style="animation-delay:{i*0.2}s"></span>{/each}
-                </span>
-              {:else}
-                {msg.content}
-              {/if}
-            </div>
-          {/each}
-        </div>
-        <div class="flex gap-2 p-2 border-t border-border">
-          <textarea class="flex-1 font-mono text-xs bg-surface2 border border-border2 text-text1 rounded px-2 py-1.5 outline-none resize-none h-14 focus:border-accent"
-            placeholder="Décrivez l'interface voulue…"
-            bind:value={chatInput}
-            onkeydown={onChatKeydown}></textarea>
-          <button class="font-mono text-xs px-3 rounded border border-accent bg-accent text-white hover:opacity-85 self-end h-8"
-            onclick={() => { sendChat(chatInput); chatInput = ''; }}>↑</button>
-        </div>
+        <ChatPanel
+          feed={chatFeed}
+          bind:input={chatInput}
+          generating={canvas.generating}
+          timer={chatTimer}
+          toolCount={chatToolCount}
+          lastTool={chatLastTool}
+          onsend={sendChat}
+          placeholder="Décrivez l'interface voulue…"
+          class="flex-1 min-h-0"
+        />
       </aside>
     {/if}
 

@@ -6,7 +6,8 @@
     StatCard, DataTable, Timeline, ProfileCard, Trombinoscope, JsonViewer, Hemicycle,
     Chart, Cards, GridData, Sankey, MapView, LogViewer,
     Gallery, Carousel,
-    Pane, TilingLayout, StackLayout,
+    Pane, TilingLayout, StackLayout, FloatingLayout,
+    Tooltip, Dialog, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription,
     BlockRenderer, bus,
   } from '@webmcp-auto-ui/ui';
   import {
@@ -23,13 +24,13 @@
 
   // Nav sections
   const SECTIONS = [
-    { id: 'primitives',    label: 'Primitives',      count: 5  },
+    { id: 'primitives',    label: 'Primitives',      count: 7  },
     { id: 'simple',        label: 'Blocs simples',   count: 9  },
     { id: 'rich',          label: 'Widgets riches',  count: 13 },
     { id: 'gallery',       label: 'Gallery & Carousel', count: 2 },
     { id: 'd3',            label: 'D3 Visualizations', count: 3 },
     { id: 'skills',        label: 'Recettes CRUD',   count: 0  },
-    { id: 'wm',            label: 'Window Manager',  count: 4  },
+    { id: 'wm',            label: 'Window Manager',  count: 5  },
   ];
 
   let active = $state('primitives');
@@ -165,6 +166,9 @@
   }
 
   function cancelEdit() { editingId = null; }
+
+  // Dialog demo state
+  let dialogOpen = $state(false);
 
   // WM demo state
   const WM_WINDOWS: ManagedWindow[] = [
@@ -579,7 +583,7 @@
       <section id="primitives">
         <div class="flex items-center gap-3 mb-6">
           <h2 class="text-lg font-bold text-text1">Primitives</h2>
-          <span class="text-xs font-mono text-text2 border border-border px-2 py-0.5 rounded">5 composants · briques atomiques</span>
+          <span class="text-xs font-mono text-text2 border border-border px-2 py-0.5 rounded">7 composants · briques atomiques</span>
         </div>
         <div class="grid grid-cols-2 gap-4">
 
@@ -647,6 +651,49 @@
               {/snippet}
               {#snippet empty()}<div class="py-4 text-center text-text2 text-xs">Aucun observateur</div>{/snippet}
             </List>
+          </div>
+
+          <div>
+            <div class="text-xs font-mono text-text2 mb-2">Tooltip · survol</div>
+            <div class="bg-surface border border-border rounded-lg p-4 flex flex-wrap gap-3 items-center">
+              {#each TOP_SPECIES.slice(0,4) as sp}
+                <Tooltip content="{sp.name} · {fmt(sp.count)} obs">
+                  <button class="flex items-center gap-1.5 px-2 py-1 rounded border border-border2 text-xs font-mono text-text1 hover:border-accent/50 transition-colors">
+                    <span>{sp.icon}</span><span>{sp.common}</span>
+                  </button>
+                </Tooltip>
+              {/each}
+              <span class="text-[10px] text-text2 font-mono ml-2">← survolez</span>
+            </div>
+          </div>
+
+          <div>
+            <div class="text-xs font-mono text-text2 mb-2">Dialog · modale accessible</div>
+            <div class="bg-surface border border-border rounded-lg p-4 flex items-center gap-4">
+              <Dialog bind:open={dialogOpen}>
+                <DialogTrigger>
+                  <button class="px-3 py-1.5 rounded border border-accent text-accent text-xs font-mono hover:bg-accent/10 transition-colors">
+                    Ouvrir dialog
+                  </button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Parus major — Mésange charbonnière</DialogTitle>
+                    <DialogDescription>Passeriformes · Paridae · UICN LC</DialogDescription>
+                  </DialogHeader>
+                  <div class="py-3 text-sm text-text2 space-y-2">
+                    <p>Observations mondiales : <strong class="text-text1">{fmt(4_218_221)}</strong></p>
+                    <p>Principale espèce observée en France sur iNaturalist depuis 2020.</p>
+                  </div>
+                  <DialogFooter>
+                    <button onclick={() => dialogOpen = false} class="px-3 py-1.5 rounded border border-border2 text-xs font-mono text-text2 hover:text-text1 transition-colors">
+                      Fermer
+                    </button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              <span class="text-[10px] text-text2 font-mono">bits-ui Dialog wrappé avec tokens design</span>
+            </div>
           </div>
 
         </div>
@@ -1104,7 +1151,7 @@
       <section id="wm">
         <div class="flex items-center gap-3 mb-6">
           <h2 class="text-lg font-bold text-text1">Window Manager</h2>
-          <span class="text-xs font-mono text-text2 border border-border px-2 py-0.5 rounded">4 layouts · Pane + TilingLayout + StackLayout</span>
+          <span class="text-xs font-mono text-text2 border border-border px-2 py-0.5 rounded">5 layouts · Pane + TilingLayout + StackLayout + FloatingLayout</span>
         </div>
         <div class="flex flex-col gap-6">
 
@@ -1146,6 +1193,27 @@
                 {/snippet}
               </StackLayout>
             </div>
+          </div>
+
+          <!-- FloatingLayout -->
+          <div>
+            <div class="text-xs font-mono text-text2 mb-3">FloatingLayout — fenêtres draggables librement</div>
+            <div class="h-80 border border-border rounded-xl overflow-hidden bg-bg">
+              <FloatingLayout windows={WM_WINDOWS} defaultWidth={220} defaultHeight={140}>
+                {#snippet children(win)}
+                  <Pane id={win.id} title={win.title} onfold={() => {}} onclose={() => {}}>
+                    {#if win.id === 'w1'}
+                      <StatBlock data={{ label: 'Observations', value: '148M+', trend: '+12%', trendDir: 'up' }} />
+                    {:else if win.id === 'w2'}
+                      <ChartBlock data={{ title: 'Mensuel', bars: MONTHLY_OBS.slice(0,6).map(([m,v]) => [m, Math.round((v as number)/1000)]) as [string,number][] }} />
+                    {:else}
+                      <KVBlock data={{ title: 'Parus major', rows: [['Famille','Paridae'],['Statut','LC']] }} />
+                    {/if}
+                  </Pane>
+                {/snippet}
+              </FloatingLayout>
+            </div>
+            <p class="text-[10px] font-mono text-text2 mt-2">← glissez les fenêtres pour les repositionner</p>
           </div>
 
         </div>
