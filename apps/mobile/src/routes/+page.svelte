@@ -10,8 +10,6 @@
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { McpClient, jsonResult, textResult } from '@webmcp-auto-ui/core';
   import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
-  // Vite bundles the worker and gives us a stable URL
-  import GemmaWorker from '@webmcp-auto-ui/agent/gemma-worker?worker';
 
   // ── State ─────────────────────────────────────────────────────────────────
   type FeedItem =
@@ -299,7 +297,7 @@
       if (!gemmaProvider) {
         const modelLabel = canvas.llm === 'gemma-e4b' ? 'Gemma 4B' : 'Gemma 2B';
         gemmaProvider = new GemmaProvider({
-          workerFactory: () => new GemmaWorker(),
+          workerFactory: () => new Worker(new URL('@webmcp-auto-ui/agent/gemma-worker', import.meta.url), { type: 'module' }),
           model: canvas.llm === 'gemma-e4b' ? 'onnx-community/gemma-3-1b-it-ONNX' : undefined,
           onProgress: (p, _s, loaded, total) => {
             gemmaProgress = p;
