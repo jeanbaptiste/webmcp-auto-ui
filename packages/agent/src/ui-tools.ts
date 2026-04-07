@@ -219,6 +219,56 @@ export const UI_TOOLS: AnthropicTool[] = [
       interval: { type: 'number' },
     }, required: ['slides'] },
   },
+  // ── Map (Leaflet) ──────────────────────────────────────────────────────
+  {
+    name: 'render_map',
+    description: 'Afficher une carte Leaflet interactive avec marqueurs. Fond sombre CARTO.',
+    input_schema: { type: 'object', properties: {
+      title:   { type: 'string' },
+      center:  { type: 'object', description: 'Centre de la carte', properties: { lat: { type: 'number' }, lng: { type: 'number' } }, required: ['lat', 'lng'] },
+      zoom:    { type: 'number', description: 'Niveau de zoom (1-18)', default: 6 },
+      height:  { type: 'string', description: 'Hauteur CSS de la carte (ex: "400px")', default: '400px' },
+      markers: { type: 'array', items: { type: 'object', properties: {
+        lat:   { type: 'number' },
+        lng:   { type: 'number' },
+        label: { type: 'string' },
+        color: { type: 'string' },
+      }, required: ['lat', 'lng'] } },
+    } },
+  },
+  // ── Stat card (enriched KPI) ───────────────────────────────────────────
+  {
+    name: 'render_stat_card',
+    description: 'KPI enrichi avec unité, delta et variante colorée (success/warning/error/info).',
+    input_schema: { type: 'object', properties: {
+      label:         { type: 'string' },
+      value:         { type: 'string' },
+      unit:          { type: 'string', description: 'Unité affichée après la valeur (ex: "%", "km")' },
+      delta:         { type: 'string', description: 'Variation affichée (ex: "+12%")' },
+      trend:         { type: 'string', enum: ['up', 'down', 'flat'] },
+      previousValue: { type: 'string' },
+      variant:       { type: 'string', enum: ['default', 'success', 'warning', 'error', 'info'] },
+    }, required: ['label', 'value'] },
+  },
+  // ── Grid data ──────────────────────────────────────────────────────────
+  {
+    name: 'render_grid',
+    description: 'Grille de données tabulaires avec highlights de cellules (heatmap, comparaison).',
+    input_schema: { type: 'object', properties: {
+      title:   { type: 'string' },
+      columns: { type: 'array', items: { type: 'object', properties: {
+        key:   { type: 'string' },
+        label: { type: 'string' },
+        width: { type: 'string' },
+      }, required: ['key', 'label'] } },
+      rows:    { type: 'array', description: 'Tableau de tableaux de valeurs (row-major)', items: { type: 'array' } },
+      highlights: { type: 'array', description: 'Cellules à coloriser', items: { type: 'object', properties: {
+        row:   { type: 'number' },
+        col:   { type: 'number' },
+        color: { type: 'string' },
+      }, required: ['row', 'col'] } },
+    }, required: ['rows'] },
+  },
   // ── D3 visualization ───────────────────────────────────────────────────
   {
     name: 'render_d3',
@@ -229,6 +279,18 @@ export const UI_TOOLS: AnthropicTool[] = [
       data: { type: 'object' },
       config: { type: 'object' },
     }, required: ['preset', 'data'] },
+  },
+  // ── JS Sandbox ─────────────────────────────────────────────────────────
+  {
+    name: 'render_js_sandbox',
+    description: 'Exécuter du code JavaScript arbitraire dans un iframe sandboxé (allow-scripts). Peut manipuler un <div id="root"> et utiliser fetch. Idéal pour des visualisations custom, animations, ou prototypes interactifs.',
+    input_schema: { type: 'object', properties: {
+      title:  { type: 'string', description: 'Titre affiché en haut du bloc' },
+      code:   { type: 'string', description: 'Code JavaScript à exécuter (accès à window, document, fetch)' },
+      html:   { type: 'string', description: 'HTML initial injecté dans <div id="root"> avant exécution du code' },
+      css:    { type: 'string', description: 'CSS injecté dans le <head> de l\'iframe' },
+      height: { type: 'string', description: 'Hauteur CSS de l\'iframe (ex: "400px", "50vh")', default: '300px' },
+    }, required: ['code'] },
   },
   // ── Canvas actions ──────────────────────────────────────────────────────
   {
@@ -301,6 +363,10 @@ const TOOL_TO_BLOCK: Record<string, string> = {
   render_gallery: 'gallery',
   render_carousel: 'carousel',
   render_d3: 'd3',
+  render_map: 'map',
+  render_stat_card: 'stat-card',
+  render_grid: 'grid-data',
+  render_js_sandbox: 'js-sandbox',
 };
 
 const MUTATION_TOOLS = new Set(['clear_canvas', 'update_block', 'move_block', 'resize_block', 'style_block']);

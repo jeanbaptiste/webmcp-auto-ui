@@ -38,6 +38,7 @@ export { default as GridData } from './widgets/rich/GridData.svelte';
 export { default as Sankey } from './widgets/rich/Sankey.svelte';
 export { default as MapView } from './widgets/rich/MapView.svelte';
 export { default as D3Widget } from './widgets/rich/D3Widget.svelte';
+export { default as JsSandbox } from './widgets/rich/JsSandbox.svelte';
 export { default as LogViewer } from './widgets/rich/LogViewer.svelte';
 export { default as Gallery } from './widgets/rich/Gallery.svelte';
 export { default as Carousel } from './widgets/rich/Carousel.svelte';

@@ -25,6 +25,7 @@
   import Sankey from './rich/Sankey.svelte';
   import MapView from './rich/MapView.svelte';
   import D3Widget from './rich/D3Widget.svelte';
+  import JsSandbox from './rich/JsSandbox.svelte';
   import LogViewer from './rich/LogViewer.svelte';
   import Gallery from './rich/Gallery.svelte';
   import Carousel from './rich/Carousel.svelte';
@@ -151,6 +152,8 @@
   <MapView spec={data} />
 {:else if type === 'd3'}
   <D3Widget spec={data as import('./rich/D3Widget.svelte').D3Spec} />
+{:else if type === 'js-sandbox'}
+  <JsSandbox spec={data as import('./rich/JsSandbox.svelte').JsSandboxSpec} />
 {:else if type === 'log'}
   <LogViewer spec={data} />
 {:else if type === 'gallery'}
