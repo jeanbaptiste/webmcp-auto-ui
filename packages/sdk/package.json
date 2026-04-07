@@ -23,6 +23,9 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "build": "svelte-package -i src"
   },
+  "dependencies": {
+    "hyperskills": "^0.1.0"
+  },
   "peerDependencies": {
     "svelte": "^5.0.0"
   },

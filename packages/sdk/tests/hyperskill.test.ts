@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeHash, diffSkills, decodeHyperSkill, encodeHyperSkill } from '../src/hyperskill/format.js';
+import { computeHash, diffSkills, decodeHyperSkill, encodeHyperSkill } from '../src/index.js';
 
 describe('computeHash', () => {
   it('returns a 64-char hex SHA-256', async () => {

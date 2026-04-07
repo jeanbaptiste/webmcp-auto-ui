@@ -3,7 +3,7 @@
  * Manages blocks on the canvas, mode, MCP connection, chat history
  */
 
-import { decodeHyperSkill } from '../hyperskill/format.js';
+import { decode } from 'hyperskills';
 
 export type BlockType =
   | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
@@ -196,12 +196,12 @@ function createCanvas() {
   // ── loadFromUrl ──────────────────────────────────────────────────────────
   async function loadFromUrl(url: string): Promise<boolean> {
     try {
-      const decoded = await decodeHyperSkill(url);
-      const content = decoded.content as { blocks?: { type: BlockType; data: Record<string, unknown> }[] };
+      const { content: raw } = await decode(url);
+      const decoded = JSON.parse(raw) as { meta?: Record<string, unknown>; content?: { blocks?: { type: BlockType; data: Record<string, unknown> }[] } };
       if (decoded.meta?.mcp) mcpUrl = decoded.meta.mcp as string;
       if (decoded.meta?.llm) llm = decoded.meta.llm as LLMId;
       if (decoded.meta?.theme) themeOverrides = decoded.meta.theme as Record<string, string>;
-      if (content?.blocks) blocks = content.blocks.map((b) => ({ id: uuid(), type: b.type, data: b.data }));
+      if (decoded.content?.blocks) blocks = decoded.content.blocks.map((b) => ({ id: uuid(), type: b.type, data: b.data }));
       return true;
     } catch {
       return false;
