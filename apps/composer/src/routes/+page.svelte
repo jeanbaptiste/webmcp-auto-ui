@@ -148,42 +148,13 @@ Tu as accès à deux familles d'outils :
 1. **Outils DATA** (exposés par le serveur MCP connecté) — pour interroger les données
 2. **Outils UI** (render_*) — pour composer l'interface graphique
 
-Tu as également accès aux **recettes/skills** disponibles dans la page (listées dans le panneau gauche). Ces recettes sont des templates de composants que tu peux instancier et adapter.
-
-CAPACITÉS SUR LE CANVAS :
-- Ajouter des composants avec render_*
-- Effacer tout le canvas avec clear_canvas puis reconstruire
-- Combiner plusieurs render_* pour composer une interface complète
-- Adapter les données à chaque composant selon le contexte
-
 WORKFLOW OBLIGATOIRE :
 1. Utilise un outil DATA pour récupérer les données
 2. Puis utilise un outil UI pour afficher les résultats visuellement
 3. Ta réponse texte doit être TRÈS courte (1-2 phrases max) — l'essentiel est dans l'UI
 
 CHOIX DES OUTILS UI :
-- render_stat : chiffre clé, KPI, compteur, total
-- render_kv : paires clé-valeur, propriétés, métadonnées
-- render_list : liste ordonnée d'items
-- render_table : tableau triable avec colonnes
-- render_chart : graphique à barres simples
-- render_chart_rich : graphique riche — bar, line, area, pie, donut
-- render_timeline : chronologie d'événements
-- render_profile : fiche détaillée d'une entité
-- render_trombinoscope : galerie de portraits
-- render_hemicycle : hémicycle SVG (composition par groupe)
-- render_sankey : diagramme de flux
-- render_cards : grille de cartes
-- render_json : arbre JSON interactif
-- render_d3 : visualisation D3.js avancée (heatmap, radial, treemap, force graph)
-- render_text : paragraphe texte libre
-- render_alert : alerte ou notification
-- render_code : bloc de code
-- render_tags : tags/badges
-- render_gallery : galerie d'images
-- render_carousel : carousel de slides
-- render_log : flux de logs
-- clear_canvas : effacer le canvas pour repartir de zéro
+- liste tous les outils MCP et WEBMCP
 
 Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_* quand c'est utile. Sois très concis (1-2 phrases max).`);
   let cacheEnabled = $state(true);
@@ -191,10 +162,23 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   let showSettings = $state(false);
   let showMcpTools = $state(false);
 
+  const WEBMCP_UI_TOOLS = [
+    'render_stat', 'render_kv', 'render_list', 'render_table',
+    'render_chart', 'render_chart_rich', 'render_timeline', 'render_profile',
+    'render_trombinoscope', 'render_hemicycle', 'render_sankey', 'render_cards',
+    'render_json', 'render_d3', 'render_text', 'render_alert', 'render_code',
+    'render_tags', 'render_gallery', 'render_carousel', 'render_log', 'clear_canvas',
+    'update_block', 'move_block', 'resize_block', 'style_block',
+  ];
+
   // Effective system prompt — auto-injects live MCP context (server, tools, recipes)
   // The base (systemPrompt) is user-editable; this section is always auto-appended.
   const effectiveSystemPrompt = $derived.by(() => {
-    const sections: string[] = [systemPrompt];
+    const base = systemPrompt.replace(
+      '- liste tous les outils MCP et WEBMCP',
+      WEBMCP_UI_TOOLS.map((t) => `- ${t}`).join('\n')
+    );
+    const sections: string[] = [base];
     if (canvas.mcpConnected) {
       const dataTools = (canvas.mcpTools as { name: string; description?: string }[])
         .filter((t) => !t.name.startsWith('render_') && t.name !== 'clear_canvas');

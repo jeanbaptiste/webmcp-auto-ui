@@ -14,8 +14,7 @@
     "@webmcp-auto-ui/agent": "file:../../packages/agent",
     "@webmcp-auto-ui/core":  "file:../../packages/core",
     "@webmcp-auto-ui/sdk":   "file:../../packages/sdk",
-    "@webmcp-auto-ui/ui":    "file:../../packages/ui",
-    "gridstack": "^10.3.1"
+    "@webmcp-auto-ui/ui":    "file:../../packages/ui"
   },
   "devDependencies": {
     "@huggingface/transformers": "^4.0.1",

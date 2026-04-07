@@ -83,8 +83,14 @@ export interface AgentCallbacks {
   onLLMRequest?: (messages: ChatMessage[], tools: AnthropicTool[]) => void;
   onLLMResponse?: (response: LLMResponse, latencyMs: number, tokens?: { input: number; output: number }) => void;
   onToolCall?: (call: ToolCall) => void;
-  onBlock?: (type: string, data: Record<string, unknown>) => void;
+  /** Called when a render_* block is created. Return { id } so the LLM knows the block id. */
+  onBlock?: (type: string, data: Record<string, unknown>) => { id: string } | void;
   onClear?: () => void;
   onText?: (text: string) => void;
   onDone?: (metrics: AgentMetrics) => void;
+  // Canvas mutation tools
+  onUpdate?: (id: string, data: Record<string, unknown>) => void;
+  onMove?: (id: string, x: number, y: number) => void;
+  onResize?: (id: string, w: number, h: number) => void;
+  onStyle?: (id: string, styles: Record<string, string>) => void;
 }

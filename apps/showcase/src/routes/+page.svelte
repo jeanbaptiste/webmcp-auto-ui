@@ -1200,8 +1200,8 @@
             <div class="text-xs font-mono text-text2 mb-3">FloatingLayout — fenêtres draggables librement</div>
             <div class="h-80 border border-border rounded-xl overflow-hidden bg-bg">
               <FloatingLayout windows={WM_WINDOWS} defaultWidth={220} defaultHeight={140}>
-                {#snippet children(win)}
-                  <Pane id={win.id} title={win.title} onfold={() => {}} onclose={() => {}}>
+                {#snippet children(win, _lw, ctx)}
+                  <Pane id={win.id} title={win.title} onfold={() => {}} onclose={() => {}} ondragstart={(e) => ctx.ondragstart(e)}>
                     {#if win.id === 'w1'}
                       <StatBlock data={{ label: 'Observations', value: '148M+', trend: '+12%', trendDir: 'up' }} />
                     {:else if win.id === 'w2'}

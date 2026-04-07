@@ -13,7 +13,8 @@
     "apps/viewer",
     "apps/showcase",
     "apps/mobile",
-    "apps/flex"
+    "apps/flex",
+    "apps/template"
   ],
   "scripts": {
     "dev": "concurrently -n home,composer,todo,viewer,showcase,mobile,flex -c blue,cyan,yellow,green,magenta,white,red \"npm -w apps/home run dev\" \"npm -w apps/composer run dev\" \"npm -w apps/todo run dev\" \"npm -w apps/viewer run dev\" \"npm -w apps/showcase run dev\" \"npm -w apps/mobile run dev\" \"npm -w apps/flex run dev\"",
@@ -26,6 +27,7 @@
     "dev:showcase": "npm -w apps/showcase run dev",
     "dev:mobile": "npm -w apps/mobile run dev",
     "dev:flex": "npm -w apps/flex run dev",
+    "dev:template": "npm -w apps/template run dev",
     "deploy": "./scripts/deploy.sh",
     "docs:sync": "node scripts/sync-docs.js",
     "test": "vitest run",

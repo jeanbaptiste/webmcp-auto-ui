@@ -58,6 +58,9 @@ export { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogFooter, Dialo
 // WM types
 export type { ManagedWindow, LayoutWindow, FloatingWindowState } from './lib/wm-layouts.js';
 
+// Layout adapter (for agent tools: move_block, resize_block, style_block)
+export { layoutAdapter } from './wm/layout-adapter.js';
+
 // FONC message bus
 export { bus } from './messaging/bus.svelte.js';
 export type { BusMessage } from './messaging/bus.svelte.js';

@@ -5,7 +5,7 @@
   import { McpClient } from '@webmcp-auto-ui/core';
   import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory } from '@webmcp-auto-ui/agent';
   import type { ChatMessage } from '@webmcp-auto-ui/agent';
-  import { McpStatus, GemmaLoader, AgentProgress } from '@webmcp-auto-ui/ui';
+  import { McpStatus, GemmaLoader, AgentProgress, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
   import { Menu } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
   import EphemeralBubble from '$lib/EphemeralBubble.svelte';
@@ -39,24 +39,7 @@ WORKFLOW OBLIGATOIRE :
 3. Ta réponse texte doit être TRÈS courte (1-2 phrases max) — l'essentiel est dans l'UI
 
 CHOIX DES OUTILS UI :
-- render_stat : chiffre clé, KPI, compteur, total
-- render_kv : paires clé-valeur, propriétés, métadonnées
-- render_list : liste ordonnée d'items
-- render_table : tableau triable avec colonnes
-- render_chart : graphique à barres simples
-- render_chart_rich : graphique riche — bar, line, area, pie, donut
-- render_timeline : chronologie d'événements
-- render_profile : fiche détaillée d'une entité
-- render_cards : grille de cartes
-- render_json : arbre JSON interactif
-- render_d3 : visualisation D3.js avancée
-- render_text : paragraphe texte libre
-- render_alert : alerte ou notification
-- render_code : bloc de code
-- render_tags : tags/badges
-- render_gallery : galerie d'images
-- render_carousel : carousel de slides
-- clear_canvas : effacer le canvas pour repartir de zéro
+- liste tous les outils MCP et WEBMCP
 
 Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_* quand c'est utile. Sois très concis (1-2 phrases max).`);
 
@@ -145,8 +128,21 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   }
 
   // ── Effective prompt ──────────────────────────────────────────────────────
+  const WEBMCP_UI_TOOLS = [
+    'render_stat', 'render_kv', 'render_list', 'render_table',
+    'render_chart', 'render_chart_rich', 'render_timeline', 'render_profile',
+    'render_trombinoscope', 'render_hemicycle', 'render_sankey', 'render_cards',
+    'render_json', 'render_d3', 'render_text', 'render_alert', 'render_code',
+    'render_tags', 'render_gallery', 'render_carousel', 'render_log', 'clear_canvas',
+    'update_block', 'move_block', 'resize_block', 'style_block',
+  ];
+
   const effectivePrompt = $derived.by(() => {
-    const sections = [systemPrompt];
+    const base = systemPrompt.replace(
+      '- liste tous les outils MCP et WEBMCP',
+      WEBMCP_UI_TOOLS.map(t => `- ${t}`).join('\n')
+    );
+    const sections = [base];
     if (canvas.mcpConnected) {
       const dataTools = (canvas.mcpTools as {name:string;description?:string}[])
         .filter(t => !t.name.startsWith('render_') && t.name !== 'clear_canvas');
@@ -201,6 +197,10 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
         callbacks: {
           onBlock:   (type, data) => flexGrid?.addBlock(type, data),
           onClear:   () => flexGrid?.clearBlocks(),
+          onUpdate:  (id, data) => bus.send('agent', id, 'data-update', data),
+          onMove:    (id, x, y) => layoutAdapter.move(id, x, y),
+          onResize:  (id, w, h) => layoutAdapter.resize(id, w, h),
+          onStyle:   (id, styles) => layoutAdapter.style(id, styles),
           onText:    (text) => { if (text) updateEphemeral(assistantId, text); },
           onToolCall: (call) => {
             chatToolCount++; chatLastTool = call.name;

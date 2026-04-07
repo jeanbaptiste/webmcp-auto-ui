@@ -236,6 +236,45 @@ export const UI_TOOLS: AnthropicTool[] = [
     description: 'Effacer tous les blocs du canvas pour repartir de zéro.',
     input_schema: { type: 'object', properties: {} },
   },
+  // ── Block mutation ──────────────────────────────────────────────────────
+  {
+    name: 'update_block',
+    description: 'Mettre à jour les données d\'un bloc existant sur le canvas (modifier son contenu).',
+    input_schema: { type: 'object', properties: {
+      id:   { type: 'string', description: 'ID du bloc retourné lors de sa création.' },
+      data: { type: 'object', description: 'Nouvelles données à fusionner avec les données existantes.' },
+    }, required: ['id', 'data'] },
+  },
+  {
+    name: 'move_block',
+    description: 'Déplacer un bloc vers une nouvelle position en pixels sur le canvas.',
+    input_schema: { type: 'object', properties: {
+      id: { type: 'string' },
+      x:  { type: 'number', description: 'Position horizontale en pixels depuis le bord gauche.' },
+      y:  { type: 'number', description: 'Position verticale en pixels depuis le bord supérieur.' },
+    }, required: ['id', 'x', 'y'] },
+  },
+  {
+    name: 'resize_block',
+    description: 'Redimensionner un bloc existant sur le canvas.',
+    input_schema: { type: 'object', properties: {
+      id:     { type: 'string' },
+      width:  { type: 'number', description: 'Largeur en pixels (min 120).' },
+      height: { type: 'number', description: 'Hauteur en pixels (min 80).' },
+    }, required: ['id', 'width', 'height'] },
+  },
+  {
+    name: 'style_block',
+    description: 'Modifier le style visuel d\'un bloc (couleur d\'accent, fond, texte). Utilise les tokens CSS du thème.',
+    input_schema: { type: 'object', properties: {
+      id:     { type: 'string' },
+      styles: {
+        type: 'object',
+        description: 'Tokens CSS à surcharger (sans le préfixe "--color-"). Clés valides : accent, accent2, bg, surface, surface2, text1, text2, border, teal, amber.',
+        additionalProperties: { type: 'string' },
+      },
+    }, required: ['id', 'styles'] },
+  },
 ];
 
 // Map render_* name → block type for BlockRenderer
@@ -264,8 +303,10 @@ const TOOL_TO_BLOCK: Record<string, string> = {
   render_d3: 'd3',
 };
 
+const MUTATION_TOOLS = new Set(['clear_canvas', 'update_block', 'move_block', 'resize_block', 'style_block']);
+
 export function isUITool(name: string): boolean {
-  return name in TOOL_TO_BLOCK || name === 'clear_canvas';
+  return name in TOOL_TO_BLOCK || MUTATION_TOOLS.has(name);
 }
 
 export function executeUITool(
@@ -275,10 +316,27 @@ export function executeUITool(
 ): string {
   if (name === 'clear_canvas') {
     callbacks.onClear?.();
-    return 'Canvas cleared';
+    return 'Canvas cleared.';
+  }
+  if (name === 'update_block') {
+    callbacks.onUpdate?.(args.id as string, args.data as Record<string, unknown>);
+    return `Block ${args.id} updated.`;
+  }
+  if (name === 'move_block') {
+    callbacks.onMove?.(args.id as string, args.x as number, args.y as number);
+    return `Block ${args.id} moved to (${args.x}, ${args.y}).`;
+  }
+  if (name === 'resize_block') {
+    callbacks.onResize?.(args.id as string, args.width as number, args.height as number);
+    return `Block ${args.id} resized to ${args.width}×${args.height}.`;
+  }
+  if (name === 'style_block') {
+    callbacks.onStyle?.(args.id as string, args.styles as Record<string, string>);
+    return `Block ${args.id} styled.`;
   }
   const blockType = TOOL_TO_BLOCK[name];
   if (!blockType) return `Unknown UI tool: ${name}`;
-  callbacks.onBlock?.(blockType, args);
-  return `Rendered ${blockType} block`;
+  const result = callbacks.onBlock?.(blockType, args);
+  const id = result?.id;
+  return id ? `Rendered ${blockType} block (id: ${id}).` : `Rendered ${blockType} block.`;
 }

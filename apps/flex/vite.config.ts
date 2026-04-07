@@ -10,9 +10,6 @@ export default defineConfig({
       '@webmcp-auto-ui/agent/gemma-worker': path.resolve('../../packages/agent/src/providers/gemma.worker.ts'),
     }
   },
-  ssr: {
-    noExternal: ['gridstack'],
-  },
   server: {
     headers: {
       'Cross-Origin-Opener-Policy':   'same-origin',
