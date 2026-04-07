@@ -8,8 +8,7 @@
   import type { GemmaStatus as GemmaStatusType } from '@webmcp-auto-ui/agent';
   import { X, Plus, Zap, Copy, Check, Save, Menu, ChevronLeft, ChevronRight, Settings } from 'lucide-svelte';
   import BlockWrap from '$lib/BlockWrap.svelte';
-  import SettingsModal from '$lib/SettingsModal.svelte';
-  import { GemmaLoader, LLMSelector, McpConnector, AgentConsole } from '@webmcp-auto-ui/ui';
+  import { GemmaLoader, LLMSelector, McpConnector, AgentConsole, SettingsPanel } from '@webmcp-auto-ui/ui';
   import RecipesCRUD from '$lib/RecipesCRUD.svelte';
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -745,14 +744,22 @@
 {/if}
 
 <!-- SETTINGS MODAL (4H) -->
-<SettingsModal
-  show={showSettings}
-  {systemPrompt} {maxTokens} {cacheEnabled}
-  onclose={() => showSettings = false}
-  onsystemprompt={(v) => systemPrompt = v}
-  onmaxtokens={(v) => maxTokens = v}
-  oncache={(v) => cacheEnabled = v}
-/>
+{#if showSettings}
+  <div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+    <div class="bg-surface border border-border2 rounded-xl w-[500px] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+        <span class="text-sm font-mono text-text1">Paramètres</span>
+        <button onclick={() => showSettings = false} class="text-text2 hover:text-text1"><X size={16} /></button>
+      </div>
+      <div class="p-5">
+        <SettingsPanel bind:systemPrompt bind:maxTokens bind:cacheEnabled />
+      </div>
+      <div class="flex justify-end gap-3 px-5 py-4 border-t border-border">
+        <button class="font-mono text-xs px-4 py-2 rounded border border-border2 text-text2 hover:text-text1" onclick={() => showSettings = false}>fermer</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <!-- MCP TOOLS MODAL -->
 {#if showMcpTools}

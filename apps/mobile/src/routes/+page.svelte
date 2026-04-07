@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
-  import { BlockRenderer, AgentProgress, GemmaLoader, LLMSelector, McpStatus, McpConnector, AgentConsole, SettingsPanel } from '@webmcp-auto-ui/ui';
+  import { ChatPanel, GemmaLoader, LLMSelector, McpStatus, McpConnector, AgentConsole, SettingsPanel } from '@webmcp-auto-ui/ui';
+  import type { ChatFeedItem } from '@webmcp-auto-ui/ui';
   import {
     loadDemoSkills, listSkills, createSkill, updateSkill, deleteSkill,
     decodeHyperSkill, encodeHyperSkill, type Skill,
@@ -11,11 +12,7 @@
   import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
 
   // ── State ─────────────────────────────────────────────────────────────────
-  type FeedItem =
-    | { kind: 'bubble'; role: 'user' | 'assistant'; html: string; id: string }
-    | { kind: 'block';  id: string; type: string; data: Record<string,unknown>; src: string };
-
-  let feed = $state<FeedItem[]>([]);
+  let feed = $state<ChatFeedItem[]>([]);
   let drawerOpen = $state(false);
   let chatInput = $state('');
   let mcpClient = $state<McpClient | null>(null);
@@ -64,12 +61,8 @@
 
   // ── Feed helpers ──────────────────────────────────────────────────────────
   function addBubble(role: 'user'|'assistant', html: string) {
-    const item: FeedItem = { kind: 'bubble', role, html, id: uid() };
+    const item: ChatFeedItem = { kind: 'bubble', role, html, id: uid() };
     feed = [...feed, item];
-    setTimeout(() => {
-      const el = document.getElementById('feed');
-      if (el) el.scrollTop = el.scrollHeight;
-    }, 30);
     return item;
   }
 
@@ -78,13 +71,9 @@
   }
 
   function addBlock(type: string, data: Record<string,unknown>, src: string) {
-    const item: FeedItem = { kind: 'block', id: uid(), type, data, src };
+    const item: ChatFeedItem = { kind: 'block', id: uid(), type, data, src };
     feed = [...feed, item];
     canvas.addBlock(type as Parameters<typeof canvas.addBlock>[0], data);
-    setTimeout(() => {
-      const el = document.getElementById('feed');
-      if (el) el.scrollTop = el.scrollHeight;
-    }, 30);
   }
 
   function clearFeedBlocks() {
@@ -320,11 +309,7 @@
     });
   }
 
-  async function sendChat() {
-    const msg = chatInput.trim();
-    if (!msg || canvas.generating) return;
-    chatInput = '';
-
+  async function sendChat(msg: string) {
     addBubble('user', msg);
     const thinking = addBubble('assistant', '<span style="display:inline-flex;gap:3px;align-items:center"><span style="width:4px;height:4px;border-radius:50%;background:#7c6dfa;animation:blink 1.2s ease infinite;display:inline-block"></span><span style="width:4px;height:4px;border-radius:50%;background:#7c6dfa;animation:blink 1.2s ease infinite .2s;display:inline-block"></span><span style="width:4px;height:4px;border-radius:50%;background:#7c6dfa;animation:blink 1.2s ease infinite .4s;display:inline-block"></span></span>');
     canvas.setGenerating(true);
@@ -363,10 +348,6 @@
       canvas.setGenerating(false);
       updateHsUrl();
     }
-  }
-
-  function onKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') sendChat();
   }
 
   // ── WebMCP tools ──────────────────────────────────────────────────────────
@@ -504,52 +485,22 @@
     modelName={({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}
     onunload={unloadGemma} />
 
-  <!-- FEED -->
-  <div id="feed" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
-    {#each feed as item (item.id)}
-      {#if item.kind === 'bubble'}
-        <div class="text-xs leading-relaxed max-w-[80%] px-3 py-2 rounded-2xl
-          {item.role === 'user'
-            ? 'bg-accent text-white rounded-br-sm self-end'
-            : 'bg-surface2 text-text1 border border-border rounded-bl-sm self-start'}">
-          <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-          {@html item.html}
-        </div>
-      {:else}
-        <div class="block-anim rounded-xl border border-border bg-surface overflow-hidden">
-          <div class="text-[9px] font-mono text-text2 px-3 pt-2 uppercase tracking-wider">{item.src}</div>
-          <BlockRenderer type={item.type} data={item.data} />
-        </div>
-      {/if}
-    {/each}
-  </div>
-
-  <!-- AGENT PROGRESS -->
-  <AgentProgress active={canvas.generating} elapsed={chatTimer} toolCalls={chatToolCount} lastTool={chatLastTool} />
+  <!-- CHAT -->
+  <ChatPanel
+    showSrc
+    feed={feed}
+    bind:input={chatInput}
+    generating={canvas.generating}
+    timer={chatTimer}
+    toolCount={chatToolCount}
+    lastTool={chatLastTool}
+    onsend={sendChat}
+    placeholder="demandez une interface…"
+    class="flex-1 min-h-0"
+  />
 
   <!-- CONSOLE -->
   <AgentConsole logs={consoleLogs} bind:open={consoleOpen} />
-
-  <!-- CHAT BAR -->
-  <div class="flex items-end gap-2 px-3 py-2 border-t border-border bg-surface flex-shrink-0">
-    <input
-      class="flex-1 bg-surface2 border border-border2 rounded-2xl px-4 py-2 text-xs font-mono text-text1 outline-none placeholder-zinc-700 focus:border-accent transition-colors"
-      placeholder="demandez une interface…"
-      bind:value={chatInput}
-      onkeydown={onKeydown}
-      disabled={canvas.generating}
-    />
-    {#if canvas.generating}
-      <span class="text-[10px] font-mono text-accent animate-pulse">{chatTimer}s</span>
-    {/if}
-    <button
-      class="w-9 h-9 rounded-full bg-accent flex items-center justify-center flex-shrink-0 hover:opacity-85 disabled:opacity-40"
-      onclick={sendChat}
-      aria-label="Envoyer"
-      disabled={canvas.generating || !chatInput.trim()}>
-      <div class="w-0 h-0 border-t-[5px] border-b-[5px] border-l-[9px] border-t-transparent border-b-transparent border-l-white ml-0.5"></div>
-    </button>
-  </div>
 
   <!-- DRAWER -->
   <div class="drawer {drawerOpen ? 'open' : ''}">

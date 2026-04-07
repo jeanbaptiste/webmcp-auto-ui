@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import BlockRenderer from '../widgets/BlockRenderer.svelte';
   import AgentProgress from './AgentProgress.svelte';
 
@@ -14,6 +15,7 @@
     toolCount?: number;
     lastTool?: string;
     placeholder?: string;
+    showSrc?: boolean;
     onsend?: (msg: string) => void;
     class?: string;
   }
@@ -26,9 +28,17 @@
     toolCount = 0,
     lastTool = '',
     placeholder = 'Posez une question…',
+    showSrc = false,
     onsend,
     class: cls = '',
   }: Props = $props();
+
+  let feedEl: HTMLDivElement;
+
+  $effect(() => {
+    feed;
+    tick().then(() => { if (feedEl) feedEl.scrollTop = feedEl.scrollHeight; });
+  });
 
   function send() {
     const msg = input.trim();
@@ -47,7 +57,7 @@
 
 <div class="flex flex-col {cls}">
   <!-- Feed -->
-  <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-2 min-h-0">
+  <div bind:this={feedEl} class="flex-1 overflow-y-auto p-3 flex flex-col gap-2 min-h-0">
     {#each feed as item (item.id)}
       {#if item.kind === 'bubble'}
         <div class="flex {item.role === 'user' ? 'justify-end' : 'justify-start'}">
@@ -60,6 +70,9 @@
         </div>
       {:else}
         <div class="rounded-lg border border-border2 overflow-hidden">
+          {#if showSrc && item.src}
+            <div class="text-[9px] font-mono text-text2 px-3 pt-2 uppercase tracking-wider">{item.src}</div>
+          {/if}
           <BlockRenderer type={item.type} data={item.data} />
         </div>
       {/if}
