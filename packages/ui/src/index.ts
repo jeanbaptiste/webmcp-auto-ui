@@ -67,3 +67,8 @@ export { default as LLMSelector } from './agent/LLMSelector.svelte';
 export { default as GemmaLoader } from './agent/GemmaLoader.svelte';
 export { default as McpStatus } from './agent/McpStatus.svelte';
 export { default as AgentProgress } from './agent/AgentProgress.svelte';
+export { default as McpConnector } from './agent/McpConnector.svelte';
+export { default as ChatPanel } from './agent/ChatPanel.svelte';
+export type { ChatFeedItem, ChatBubble, ChatBlock } from './agent/ChatPanel.svelte';
+export { default as AgentConsole } from './agent/AgentConsole.svelte';
+export { default as SettingsPanel } from './agent/SettingsPanel.svelte';

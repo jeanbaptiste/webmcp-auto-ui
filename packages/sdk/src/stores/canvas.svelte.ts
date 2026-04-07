@@ -3,6 +3,8 @@
  * Manages blocks on the canvas, mode, MCP connection, chat history
  */
 
+import { decodeHyperSkill } from '../hyperskill/format.js';
+
 export type BlockType =
   | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
   | 'stat-card' | 'data-table' | 'timeline' | 'profile' | 'trombinoscope' | 'json-viewer'
@@ -191,25 +193,44 @@ function createCanvas() {
     }
   }
 
+  // ── loadFromUrl ──────────────────────────────────────────────────────────
+  async function loadFromUrl(url: string): Promise<boolean> {
+    try {
+      const decoded = await decodeHyperSkill(url);
+      const content = decoded.content as { blocks?: { type: BlockType; data: Record<string, unknown> }[] };
+      if (decoded.meta?.mcp) mcpUrl = decoded.meta.mcp as string;
+      if (decoded.meta?.llm) llm = decoded.meta.llm as LLMId;
+      if (decoded.meta?.theme) themeOverrides = decoded.meta.theme as Record<string, string>;
+      if (content?.blocks) blocks = content.blocks.map((b) => ({ id: uuid(), type: b.type, data: b.data }));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // ── Return public API ────────────────────────────────────────────────────
   return {
-    // State getters (reactive)
+    // State getters + setters (reactive — supports bind:)
     get blocks() { return blocks; },
     get mode() { return mode; },
+    set mode(v: Mode) { mode = v; },
     get llm() { return llm; },
+    set llm(v: LLMId) { llm = v; },
     get mcpUrl() { return mcpUrl; },
+    set mcpUrl(v: string) { mcpUrl = v; },
     get mcpConnected() { return mcpConnected; },
     get mcpConnecting() { return mcpConnecting; },
     get mcpName() { return mcpName; },
     get mcpTools() { return mcpTools; },
     get messages() { return messages; },
     get generating() { return generating; },
+    set generating(v: boolean) { generating = v; },
     get statusText() { return statusText; },
     get statusColor() { return statusColor; },
     get blockCount() { return blockCount; },
     get isEmpty() { return isEmpty; },
 
-    // Setters
+    // Setters (kept for backward compat)
     setMode(m: Mode) { mode = m; },
     setLlm(l: LLMId) { llm = l; },
     setMcpUrl(u: string) { mcpUrl = u; },
@@ -229,7 +250,7 @@ function createCanvas() {
     setThemeOverrides,
 
     // HyperSkill
-    buildSkillJSON, buildHyperskillParam, loadFromParam,
+    buildSkillJSON, buildHyperskillParam, loadFromParam, loadFromUrl,
   };
 }
 
