@@ -135,6 +135,28 @@ When a designer says "I want a KPI dashboard":
 }
 ```
 
+## Unified `component` tool
+
+Instead of calling individual `render_*` tools, you can use the unified `component` tool:
+
+- `component("help")` -- list all available components
+- `component("help", "stat-card")` -- get the schema for a specific component
+- `component("stat-card", { label: "Revenue", value: "$142K" })` -- render a component
+
+Both approaches (individual `render_*` tools and unified `component`) work simultaneously.
+
+The `component` tool also exposes canvas actions under short names:
+
+| Short name | Equivalent tool |
+|------------|-----------------|
+| `clear` | `clear_canvas` |
+| `update` | `update_block` |
+| `move` | `move_block` |
+| `resize` | `resize_block` |
+| `style` | `style_block` |
+
+Component names use dashes instead of underscores (e.g. `stat-card` instead of `render_stat_card`). The original `render_*` names are also accepted for backward compatibility.
+
 ## Constraints
 
 - Block `type` must be one of the 24 valid types listed above.
