@@ -185,6 +185,8 @@ The auto-generated system prompt tells the LLM:
 - Which UI tools are available (stat, chart, table, etc.)
 - The mandatory workflow: fetch data first, then display with UI tools
 
+> **Tip**: In addition to individual `render_*` tools, the unified `component()` tool provides a single entry point for all 56 UI components (31 renderable, 25 non-renderable). The LLM can call `component("help")` to discover available components at runtime. See the [agent package docs](../packages/agent.md#unified-component-tool) for details.
+
 ## Auto-Generated UI Pattern
 
 Connect MCP, list tools, and let the agent auto-generate the UI:

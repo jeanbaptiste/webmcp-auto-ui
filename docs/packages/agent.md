@@ -1,6 +1,6 @@
 # @webmcp-auto-ui/agent
 
-LLM agent loop with Anthropic and Gemma providers, plus 22 UI tools for rendering blocks.
+LLM agent loop with Anthropic and Gemma providers, plus 22 UI tools for rendering blocks and a unified `component()` tool exposing 56 components.
 
 ## What it does
 
@@ -214,6 +214,53 @@ if (isUITool('render_stat')) {
   // result: "Rendered stat block"
 }
 ```
+
+## Unified `component()` tool
+
+In addition to the individual `render_*` tools, the agent package provides a single unified `component()` tool that exposes **56 components** (31 renderable, 25 non-renderable) through a consistent interface.
+
+This approach was inspired by [Emmanuel Raviart](https://www.tricoteuses.fr/mcp), creator of the Moulineuse MCP server, who suggested consolidating the tool surface into a single discoverable entry point.
+
+```ts
+import { COMPONENT_TOOL, executeComponent, componentRegistry } from '@webmcp-auto-ui/agent';
+```
+
+### Three modes
+
+| Mode | Call | Returns |
+|------|------|---------|
+| **List all** | `component("help")` | Array of all 56 components with name, description, and `renderable` flag |
+| **Inspect one** | `component("help", "stat-card")` | Schema, description, and renderability of a single component |
+| **Render** | `component("stat-card", { label: "Revenue", value: "$142K" })` | Renders the component (renderable ones only) |
+
+### Component categories
+
+- **Renderable (31)** -- all `render_*` block types plus canvas actions (`clear`, `update`, `move`, `resize`, `style`). These can be rendered through the agent tool pipeline via `executeComponent`.
+- **Non-renderable (25)** -- primitives, base UI components, layouts, agent UI widgets, and theme provider. These are Svelte components available for direct import from `@webmcp-auto-ui/ui`. Calling render on them returns their schema and a usage hint.
+
+Component names use dashes (e.g., `stat-card`). The original `render_*` names are also accepted for backward compatibility.
+
+### Coexistence with `render_*` tools
+
+Both approaches work simultaneously. The individual `render_*` tools remain available and fully functional. The `component()` tool is an additional entry point that provides discoverability (via `help` mode) and a uniform interface.
+
+### Custom components
+
+The `componentRegistry` is a mutable `Map<string, ComponentEntry>`. Apps can register additional components at runtime:
+
+```ts
+import { componentRegistry, type ComponentEntry } from '@webmcp-auto-ui/agent';
+
+componentRegistry.set('my-widget', {
+  name: 'my-widget',
+  toolName: 'my-widget',
+  description: 'Custom widget for my app.',
+  inputSchema: { type: 'object', properties: { title: { type: 'string' } } },
+  renderable: false,
+});
+```
+
+For the full list of all 56 components and their schemas, see [composing.md](../agents/composing.md#unified-component-tool).
 
 ## Workflow
 

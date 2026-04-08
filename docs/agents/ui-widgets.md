@@ -11,6 +11,8 @@ The `BlockRenderer` component receives `{ type, data }` and dispatches to the co
 
 Each block auto-registers WebMCP tools (`block_<id>_get`, `block_<id>_update`, `block_<id>_remove`) when `navigator.modelContext` is available.
 
+> **Note**: All widgets listed below (plus primitives, base components, layouts, and agent UI) are also accessible via the unified `component()` tool from `@webmcp-auto-ui/agent`. Call `component("help")` to list all 56 components, or `component("help", "stat-card")` to get the schema for a specific one. See [composing.md](composing.md#unified-component-tool) and the [agent package docs](../packages/agent.md#unified-component-tool) for details.
+
 ---
 
 ## Category: Simple Blocks (9)

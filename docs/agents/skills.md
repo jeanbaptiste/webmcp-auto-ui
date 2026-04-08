@@ -256,6 +256,8 @@ Three built-in demo skills are available via `loadDemoSkills()`:
 
 ## Workflow: Create a Skill from Scratch
 
+> **Note**: Skills can reference components via the unified `component()` tool in addition to the individual `render_*` tools. The `component("help")` call lists all 56 available components with their schemas, making it easier for agents to discover what blocks they can use. See [composing.md](composing.md#unified-component-tool) for details.
+
 1. **Define the purpose**: What data does this skill display? What user need does it serve?
 2. **Choose blocks**: Pick 2-5 block types that best represent the data (see composing.md)
 3. **Write the data**: Fill in each block's data object with real or placeholder values

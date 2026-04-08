@@ -14,7 +14,7 @@ The [HyperSkill](https://hyperskills.net/) format lets you snapshot the current 
 |---------|-------------|
 | [`@webmcp-auto-ui/core`](./packages/core/README.md) | W3C WebMCP polyfill, MCP client, McpMultiClient, schema utils — pure TypeScript, zero dependencies |
 | [`@webmcp-auto-ui/ui`](./packages/ui/README.md) | 32 Svelte components: primitives, blocks, rich widgets, window manager layouts |
-| [`@webmcp-auto-ui/agent`](./packages/agent/README.md) | Agent loop, Remote LLM and WASM providers |
+| [`@webmcp-auto-ui/agent`](./packages/agent/README.md) | Agent loop, Remote LLM and WASM providers, unified `component()` tool (56 components) |
 | [`@webmcp-auto-ui/sdk`](./packages/sdk/README.md) | Skills CRUD, canvas state store, HyperSkills encoding (re-exported from [`hyperskills`](https://www.npmjs.com/package/hyperskills) NPM) |
 
 ## Demo Apps

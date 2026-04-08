@@ -51,6 +51,7 @@ export { default as Pane } from './wm/Pane.svelte';
 export { default as TilingLayout } from './wm/TilingLayout.svelte';
 export { default as FloatingLayout } from './wm/FloatingLayout.svelte';
 export { default as StackLayout } from './wm/StackLayout.svelte';
+export { default as FlexLayout } from './wm/FlexLayout.svelte';
 
 // Base components (shadcn-svelte pattern)
 export { Button, buttonVariants, Input, Badge, badgeVariants, NativeSelect, Tooltip } from './base/index.js';
