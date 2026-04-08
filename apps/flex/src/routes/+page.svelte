@@ -374,7 +374,6 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
     <span class="font-mono text-sm font-bold flex-shrink-0">
       <span class="text-text1">Auto-UI</span><span class="text-accent"> flex</span>
     </span>
-    <TokenBubble metrics={tokenMetrics} visible={showTokens} />
     <div class="flex-1"></div>
     <button
       class="font-mono text-[10px] h-6 px-2 rounded border transition-colors flex-shrink-0
@@ -425,6 +424,11 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   <!-- CANVAS + EPHEMERAL WRAPPER -->
   <div class="flex-1 relative overflow-hidden">
     <FlexGrid bind:this={flexGrid} class="w-full h-full" {layoutMode} />
+
+    <!-- Token usage bubble — top left of canvas, flush under topbar -->
+    <div class="absolute top-1 left-2 z-20 pointer-events-none">
+      <TokenBubble metrics={tokenMetrics} visible={showTokens} />
+    </div>
 
     <!-- Ephemeral bubbles — flottent au-dessus de l'input -->
     <div class="absolute bottom-3 left-[50px] right-[50px] flex flex-col gap-2 pointer-events-none z-20">
