@@ -6,7 +6,7 @@
     StatCard, DataTable, Timeline, ProfileCard, Trombinoscope, JsonViewer, Hemicycle,
     Chart, Cards, GridData, Sankey, MapView, LogViewer,
     Gallery, Carousel,
-    Pane, TilingLayout, StackLayout, FloatingLayout,
+    Pane, TilingLayout, StackLayout, FloatingLayout, FlexLayout,
     Tooltip, Dialog, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription,
     BlockRenderer, bus,
   } from '@webmcp-auto-ui/ui';
@@ -30,7 +30,7 @@
     { id: 'gallery',       label: 'Gallery & Carousel', count: 2 },
     { id: 'd3',            label: 'D3 Visualizations', count: 3 },
     { id: 'skills',        label: 'Recettes CRUD',   count: 0  },
-    { id: 'wm',            label: 'Window Manager',  count: 5  },
+    { id: 'wm',            label: 'Window Manager',  count: 6  },
   ];
 
   let active = $state('primitives');
@@ -197,6 +197,15 @@
     { id: 'w3', title: 'KVBlock · Taxon info',      visible: true, focused: false, folded: false, weight: 1, createdAt: 3, lastFocusedAt: 3 },
   ];
 
+  const FLEX_WINDOWS: ManagedWindow[] = [
+    { id: 'fx1', title: 'stat',     visible: true, focused: false, folded: false, weight: 1, createdAt: 1, lastFocusedAt: 1 },
+    { id: 'fx2', title: 'kv',       visible: true, focused: false, folded: false, weight: 1, createdAt: 2, lastFocusedAt: 2 },
+    { id: 'fx3', title: 'chart',    visible: true, focused: false, folded: false, weight: 1, createdAt: 3, lastFocusedAt: 3 },
+    { id: 'fx4', title: 'timeline', visible: true, focused: false, folded: false, weight: 1, createdAt: 4, lastFocusedAt: 4 },
+    { id: 'fx5', title: 'list',     visible: true, focused: false, folded: false, weight: 1, createdAt: 5, lastFocusedAt: 5 },
+    { id: 'fx6', title: 'tags',     visible: true, focused: false, folded: false, weight: 1, createdAt: 6, lastFocusedAt: 6 },
+  ];
+
   // Format big numbers
   function fmt(n: number) { return new Intl.NumberFormat('fr-FR').format(n); }
 
@@ -299,7 +308,7 @@
           { id: 'primitives', label: 'Primitives', count: 5, components: ['Card', 'Panel', 'GridLayout', 'Window', 'List'] },
           { id: 'simple', label: 'Blocs simples', count: 9, components: ['StatBlock', 'KVBlock', 'ListBlock', 'ChartBlock', 'AlertBlock', 'CodeBlock', 'TextBlock', 'ActionsBlock', 'TagsBlock'] },
           { id: 'rich', label: 'Widgets riches', count: 13, components: ['StatCard', 'DataTable', 'Timeline', 'ProfileCard', 'Trombinoscope', 'Chart', 'Hemicycle', 'Cards', 'JsonViewer', 'GridData', 'Sankey', 'MapView', 'LogViewer'] },
-          { id: 'wm', label: 'Window Manager', count: 4, components: ['TilingLayout', 'StackLayout', 'Pane', 'Window'] },
+          { id: 'wm', label: 'Window Manager', count: 5, components: ['TilingLayout', 'StackLayout', 'FloatingLayout', 'FlexLayout', 'Pane'] },
         ],
         data_source: 'iNaturalist mock (offline)',
         available_tools: ['showcase__describe', 'showcase__get_inat_stats', 'showcase__list_top_species', 'showcase__list_top_observers', 'showcase__list_iconic_taxa', 'showcase__get_monthly_obs', 'showcase__get_recent_obs', 'showcase__get_taxonomy', 'showcase__list_alerts', 'showcase__get_migration_flows', 'showcase__get_observer_profile', 'showcase__get_log_entries', 'showcase__get_grid_data'],
@@ -1181,7 +1190,7 @@
       <section id="wm">
         <div class="flex items-center gap-3 mb-6">
           <h2 class="text-lg font-bold text-text1">Window Manager</h2>
-          <span class="text-xs font-mono text-text2 border border-border px-2 py-0.5 rounded">5 layouts · Pane + TilingLayout + StackLayout + FloatingLayout</span>
+          <span class="text-xs font-mono text-text2 border border-border px-2 py-0.5 rounded">6 layouts · Pane + TilingLayout + StackLayout + FloatingLayout + FlexLayout</span>
         </div>
         <div class="flex flex-col gap-6">
 
@@ -1244,6 +1253,34 @@
               </FloatingLayout>
             </div>
             <p class="text-[10px] font-mono text-text2 mt-2">← glissez les fenêtres pour les repositionner</p>
+          </div>
+
+          <!-- FlexLayout -->
+          <div>
+            <div class="text-xs font-mono text-text2 mb-3">FlexLayout — auto-grid responsive avec slider de taille</div>
+            <div class="h-[500px] border border-border rounded-xl overflow-hidden bg-bg">
+              <FlexLayout windows={FLEX_WINDOWS} minWidth={260} maxWidth={600}>
+                {#snippet children(win, _lw, _ctx)}
+                  <div class="bg-surface border border-border rounded-lg p-3 h-full overflow-auto">
+                    <div class="text-xs font-mono text-text2 mb-2">{win.title}</div>
+                    {#if win.id === 'fx1'}
+                      <StatBlock data={{ label: 'Observations France', value: fmt(INAT_STATS.france.total), trend: '+8%', trendDir: 'up' }} />
+                    {:else if win.id === 'fx2'}
+                      <KVBlock data={{ title: 'Parus major', rows: [['Famille','Paridae'],['Ordre','Passeriformes'],['Statut IUCN','LC'],['Obs. France','842 301']] }} />
+                    {:else if win.id === 'fx3'}
+                      <ChartBlock data={{ title: 'Saisonnalité', bars: MONTHLY_OBS.slice(0,6).map(([m,v]) => [m, Math.round((v as number)/1000)]) as [string,number][] }} />
+                    {:else if win.id === 'fx4'}
+                      <Timeline events={OBS_TIMELINE} />
+                    {:else if win.id === 'fx5'}
+                      <ListBlock data={{ title: 'Top espèces', items: TOP_SPECIES.slice(0,5).map(s => `${s.icon} ${s.common} — ${fmt(s.count)} obs`) }} />
+                    {:else}
+                      <TagsBlock data={{ label: 'Groupes taxonomiques', tags: ICONIC_TAXA.slice(0,6).map(t => ({ text: `${t.label} (${t.seats})` })) }} />
+                    {/if}
+                  </div>
+                {/snippet}
+              </FlexLayout>
+            </div>
+            <p class="text-[10px] font-mono text-text2 mt-2">← utilisez le slider en haut à droite pour ajuster la taille des cellules</p>
           </div>
 
         </div>
