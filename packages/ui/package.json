@@ -46,7 +46,7 @@
     "auto-ui"
   ],
   "dependencies": {
-    "@webmcp-auto-ui/sdk": "workspace:*",
+    "@webmcp-auto-ui/sdk": "0.4.0",
     "@types/d3": "^7.4.3",
     "bits-ui": "^2.17.2",
     "clsx": "^2.1.1",
