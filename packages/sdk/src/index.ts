@@ -39,7 +39,7 @@ export interface HyperSkillVersion {
 export { encode, decode, hash, diff, getHsParam } from 'hyperskills';
 
 // Typed convenience wrappers — prefer these in apps:
-import { encode, decode, hash } from 'hyperskills';
+import { encode, decode, hash, diff } from 'hyperskills';
 
 export async function encodeHyperSkill(skill: HyperSkill, sourceUrl?: string): Promise<string> {
   const base = sourceUrl ?? (typeof window !== 'undefined' ? window.location.href.split('?')[0] : 'https://example.com');
