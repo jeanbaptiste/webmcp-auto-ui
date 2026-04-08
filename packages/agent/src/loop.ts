@@ -124,7 +124,7 @@ export async function runAgentLoop(
     callbacks.onLLMRequest?.(messages, allTools);
     const t0 = performance.now();
     const response = await provider.chat(messages, allTools, {
-      signal, cacheEnabled, system: systemPrompt,
+      signal, cacheEnabled, system: systemPrompt, maxTokens,
     });
     const latencyMs = performance.now() - t0;
     metrics.totalLatencyMs += latencyMs;

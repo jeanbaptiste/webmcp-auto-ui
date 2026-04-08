@@ -10,6 +10,7 @@
     maxTokens?: number;
     maxContextTokens?: number;
     cacheEnabled?: boolean;
+    showTokens?: boolean;
     onconnect: () => void;
     connectedUrls?: string[];
     loadingUrls?: string[];
@@ -25,6 +26,7 @@
     maxTokens = $bindable(4096),
     maxContextTokens = $bindable(150_000),
     cacheEnabled = $bindable(true),
+    showTokens = $bindable(true),
     onconnect,
     connectedUrls = [],
     loadingUrls = [],
@@ -97,6 +99,15 @@
         bind:maxContextTokens
         bind:cacheEnabled
       />
+    </section>
+
+    <!-- Display -->
+    <section class="flex flex-col gap-2">
+      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Affichage</div>
+      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+        <input type="checkbox" bind:checked={showTokens} class="accent-accent w-3.5 h-3.5" />
+        Token usage
+      </label>
     </section>
 
   </div>

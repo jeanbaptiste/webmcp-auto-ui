@@ -5,12 +5,11 @@
   import { listSkills } from '@webmcp-auto-ui/sdk';
   import type { Skill } from '@webmcp-auto-ui/sdk';
   import { McpMultiClient } from '@webmcp-auto-ui/core';
-  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory, summarizeChat } from '@webmcp-auto-ui/agent';
+  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory, summarizeChat, TokenTracker } from '@webmcp-auto-ui/agent';
   import type { ChatMessage } from '@webmcp-auto-ui/agent';
-  import { McpStatus, GemmaLoader, AgentProgress, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
+  import { McpStatus, GemmaLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
   import { Menu, ExternalLink } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
-  import EphemeralBubble from '$lib/EphemeralBubble.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
   import SettingsDrawer from '$lib/SettingsDrawer.svelte';
 
@@ -51,6 +50,12 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
 
   // Skills
   let skills = $state<Skill[]>([]);
+
+  // ── Token tracking ────────────────────────────────────────────────────
+  const tokenTracker = new TokenTracker();
+  let tokenMetrics = $state(tokenTracker.metrics);
+  let showTokens = $state(true);
+  tokenTracker.subscribe(m => { tokenMetrics = m; });
 
   // Export clipboard feedback
   let exportCopied = $state(false);
@@ -294,6 +299,9 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
+          onLLMResponse: (response, latencyMs) => {
+            if (response.usage) tokenTracker.record(response.usage, latencyMs);
+          },
           onBlock:   (type, data) => flexGrid?.addBlock(type, data),
           onClear:   () => flexGrid?.clearBlocks(),
           onUpdate:  (id, data) => bus.send('agent', id, 'data-update', data),
@@ -366,6 +374,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
     <span class="font-mono text-sm font-bold flex-shrink-0">
       <span class="text-text1">Auto-UI</span><span class="text-accent"> flex</span>
     </span>
+    <TokenBubble metrics={tokenMetrics} visible={showTokens} />
     <div class="flex-1"></div>
     <button
       class="font-mono text-[10px] h-6 px-2 rounded border transition-colors flex-shrink-0
@@ -457,6 +466,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   bind:maxTokens
   bind:maxContextTokens
   bind:cacheEnabled
+  bind:showTokens
   onconnect={() => addMcpServer(canvas.mcpUrl)}
   {connectedUrls}
   {loadingUrls}

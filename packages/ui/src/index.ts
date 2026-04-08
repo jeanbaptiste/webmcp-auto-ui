@@ -78,3 +78,5 @@ export type { ChatFeedItem, ChatBubble, ChatBlock } from './agent/ChatPanel.svel
 export { default as AgentConsole } from './agent/AgentConsole.svelte';
 export { default as SettingsPanel } from './agent/SettingsPanel.svelte';
 export { default as RemoteMCPserversDemo } from './agent/RemoteMCPserversDemo.svelte';
+export { default as EphemeralBubble } from './agent/EphemeralBubble.svelte';
+export { default as TokenBubble } from './agent/TokenBubble.svelte';

@@ -46,7 +46,7 @@ export interface LLMProvider {
   chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
-    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string }
+    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string; maxTokens?: number }
   ): Promise<LLMResponse>;
 }
 

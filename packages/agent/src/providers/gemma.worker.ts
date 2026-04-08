@@ -4,7 +4,7 @@
  * Requires COOP/COEP headers for SharedArrayBuffer
  *
  * Messages IN:  { type: 'init', model?: string }
- *               { type: 'chat', id: string, prompt: string }
+ *               { type: 'chat', id: string, prompt: string, maxTokens?: number }
  *               { type: 'abort', id: string }
  * Messages OUT: { type: 'progress', progress: number, status: string }
  *               { type: 'ready' }
@@ -65,6 +65,8 @@ self.onmessage = async (e: MessageEvent) => {
     return;
   }
 
+  const maxTokens = (e.data as { maxTokens?: number }).maxTokens;
+
   if (type === 'chat' && id && prompt) {
     if (!model || !processor) {
       self.postMessage({ type: 'error', id, message: 'Model not initialized' });
@@ -93,7 +95,7 @@ self.onmessage = async (e: MessageEvent) => {
 
       await model.generate({
         ...inputs,
-        max_new_tokens: 1024,
+        max_new_tokens: maxTokens ?? 8192,
         do_sample: true,
         temperature: 0.7,
         streamer,

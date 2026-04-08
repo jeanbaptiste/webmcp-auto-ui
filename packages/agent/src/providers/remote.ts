@@ -34,18 +34,30 @@ export class RemoteLLMProvider implements LLMProvider {
   async chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
-    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string }
+    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string; maxTokens?: number }
   ): Promise<LLMResponse> {
+    const cache = options?.cacheEnabled ?? false;
+
+    // Cache tools: mark the last tool with cache_control so the entire tools array is cached
+    let toolsPayload: unknown[] | undefined;
+    if (tools.length > 0) {
+      toolsPayload = cache
+        ? tools.map((t, i) => i === tools.length - 1
+            ? { ...t, cache_control: { type: 'ephemeral' } }
+            : t)
+        : tools;
+    }
+
     const body: Record<string, unknown> = {
       model: this.modelName,
-      max_tokens: 4096,
+      max_tokens: options?.maxTokens ?? 4096,
       messages,
-      tools: tools.length > 0 ? tools : undefined,
+      tools: toolsPayload,
       ...(this.apiKey ? { __apiKey: this.apiKey } : {}),
     };
 
     if (options?.system) {
-      body.system = options.cacheEnabled
+      body.system = cache
         ? [{ type: 'text', text: options.system, cache_control: { type: 'ephemeral' } }]
         : options.system;
     }

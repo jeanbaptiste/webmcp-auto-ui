@@ -90,7 +90,7 @@ export class WasmProvider implements LLMProvider {
   async chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
-    options?: { signal?: AbortSignal }
+    options?: { signal?: AbortSignal; maxTokens?: number }
   ): Promise<LLMResponse> {
     if (this.status !== 'ready') await this.initialize();
     if (!this.worker) throw new Error('Worker not available');
@@ -124,7 +124,7 @@ export class WasmProvider implements LLMProvider {
         this.worker?.postMessage({ type: 'abort', id });
         reject(new DOMException('Aborted', 'AbortError'));
       }, { once: true });
-      this.worker!.postMessage({ type: 'chat', id, prompt });
+      this.worker!.postMessage({ type: 'chat', id, prompt, maxTokens: options?.maxTokens });
     });
 
     // Try to parse as tool call JSON

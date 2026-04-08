@@ -30,6 +30,9 @@ export type { ComponentEntry } from './component-tool.js';
 export { summarizeChat } from './summarize.js';
 export type { SummarizeOptions, ChatSummaryResult } from './summarize.js';
 
+export { TokenTracker } from './token-tracker.js';
+export type { TokenMetrics } from './token-tracker.js';
+
 export type {
   RemoteModelId, WasmModelId, LLMId, ModelId,
   ChatMessage, ContentBlock, McpToolDef, AnthropicTool,
