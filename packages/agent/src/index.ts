@@ -25,6 +25,9 @@ export type { AgentLoopOptions } from './loop.js';
 
 export { UI_TOOLS, isUITool, executeUITool } from './ui-tools.js';
 
+export { summarizeChat } from './summarize.js';
+export type { SummarizeOptions, ChatSummaryResult } from './summarize.js';
+
 export type {
   RemoteModelId, WasmModelId, LLMId, ModelId,
   ChatMessage, ContentBlock, McpToolDef, AnthropicTool,

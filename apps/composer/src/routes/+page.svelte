@@ -4,7 +4,7 @@
   import { listSkills, loadDemoSkills, createSkill, deleteSkill, updateSkill, type Skill } from '@webmcp-auto-ui/sdk';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { McpClient, createToolGroup, textResult, jsonResult } from '@webmcp-auto-ui/core';
-  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory } from '@webmcp-auto-ui/agent';
+  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory, summarizeChat } from '@webmcp-auto-ui/agent';
   import type { GemmaStatus as GemmaStatusType } from '@webmcp-auto-ui/agent';
   import { Plus, Copy, Check, Save, Menu, ChevronLeft, ChevronRight, Settings } from 'lucide-svelte';
   import BlockWrap from '$lib/BlockWrap.svelte';
@@ -14,6 +14,7 @@
 
   // ── State ─────────────────────────────────────────────────────────────────
   let showExport = $state(false);
+  let exportHsUrl = $state('');
   let editingId = $state<string | null>(null);
   let editJson = $state('');
   let copied = $state(false);
@@ -114,6 +115,8 @@
   let mcpConnectTimer = $state<ReturnType<typeof setInterval> | null>(null);
   let mcpToolCallCount = $state(0);
   let lastToolName = $state('');
+  let includeSummary = $state(true);
+  let allToolsUsed = $state<string[]>([]);
 
   // 4G: Skills CRUD
   let editingSkillId = $state<string | null>(null);
@@ -339,7 +342,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
           onBlock: (type, data) => canvas.addBlock(type as Parameters<typeof canvas.addBlock>[0], data),
           onClear: () => canvas.clearBlocks(),
           onText: (text) => { if (text) canvas.addMsg('assistant', text); },
-          onToolCall: (call) => { mcpToolCallCount++; lastToolName = call.name; canvas.addMsg('system', `🔧 ${call.name}(${JSON.stringify(call.args).slice(0,100)}) → ${(call.result??'').slice(0,100)} [${call.elapsed??0}ms]`); },
+          onToolCall: (call) => { mcpToolCallCount++; lastToolName = call.name; allToolsUsed = [...allToolsUsed, call.name]; canvas.addMsg('system', `🔧 ${call.name}(${JSON.stringify(call.args).slice(0,100)}) → ${(call.result??'').slice(0,100)} [${call.elapsed??0}ms]`); },
         },
       });
     } catch (e) {
@@ -388,7 +391,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
             chatFeed = chatFeed.map(item => item.id === thinkingFeedId ? { ...item, html: text || '…' } as typeof item : item);
           },
           onToolCall: (call) => {
-            mcpToolCallCount++; chatToolCount++; chatLastTool = call.name;
+            mcpToolCallCount++; chatToolCount++; chatLastTool = call.name; allToolsUsed = [...allToolsUsed, call.name];
             canvas.updateMsg(thinking.id, `🔧 ${call.name}…`, true);
             canvas.addMsg('system', `🔧 ${call.name}(${JSON.stringify(call.args).slice(0,100)}) → ${(call.result??'').slice(0,100)} [${call.elapsed??0}ms]`);
             chatFeed = chatFeed.map(item => item.id === thinkingFeedId ? { ...item, html: `🔧 ${call.name}…` } as typeof item : item);
@@ -462,7 +465,39 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
 
   // ── HyperSkill ────────────────────────────────────────────────────────────
   async function copyHsUrl() {
-    const param = canvas.buildHyperskillParam();
+    const skill = canvas.buildSkillJSON() as Record<string, unknown>;
+
+    if (includeSummary && conversationHistory.length > 0) {
+      try {
+        const result = await summarizeChat({
+          messages: conversationHistory,
+          provider: activeProvider(),
+          toolsUsed: allToolsUsed,
+          toolCallCount: mcpToolCallCount,
+          mcpServers: mcpClient ? [canvas.mcpName ?? ''] : [],
+          skillsReferenced: skills.map(s => s.name),
+        });
+        skill.chatSummary = result.chatSummary;
+        skill.provenance = result.provenance;
+      } catch { /* don't block export */ }
+    }
+
+    const json = JSON.stringify(skill);
+    const bytes = new TextEncoder().encode(json);
+    let param: string;
+    // Auto-compress with gzip when payload exceeds 6 KB to keep URLs under nginx limits
+    if (bytes.length > 6144) {
+      const cs = new CompressionStream('gzip');
+      const writer = cs.writable.getWriter();
+      writer.write(bytes);
+      writer.close();
+      const compressed = new Uint8Array(await new Response(cs.readable).arrayBuffer());
+      param = 'gz.' + btoa(String.fromCharCode(...compressed))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    } else {
+      param = btoa(unescape(encodeURIComponent(json)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
     await navigator.clipboard.writeText(`${window.location.origin}/composer?hs=${param}`);
     copied = true; setTimeout(() => { copied = false; }, 2000);
   }
@@ -480,8 +515,9 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
     // Load from ?hs= param (loadFromParam: format natif buildHyperskillParam)
     const param = new URLSearchParams(window.location.search).get('hs');
     if (param) {
-      canvas.loadFromParam(param);
-      if (canvas.mcpUrl) connectMcp();
+      canvas.loadFromParam(param).then(() => {
+        if (canvas.mcpUrl) connectMcp();
+      });
     }
     refreshStats();
     skills = listSkills();
@@ -574,7 +610,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
       <Settings size={13} />
     </button>
     <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-text2 hover:border-zinc-500 hover:text-white transition-all hidden md:flex items-center gap-1.5"
-      onclick={() => showExport = true}>
+      onclick={() => { showExport = true; canvas.buildHyperskillParam().then(p => { exportHsUrl = `${window.location.origin}/composer?hs=${p}`; }); }}>
       <Save size={11} /> export
     </button>
   </header>
@@ -812,7 +848,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
         <div class="text-xs font-mono text-text2 mb-2">HyperSkills URL</div>
         <div class="flex gap-2">
           <div class="flex-1 font-mono text-xs text-text2 bg-black/20 border border-border rounded-lg p-3 truncate">
-            {window.location.origin}/composer?hs={canvas.buildHyperskillParam()}
+            {exportHsUrl || 'compression…'}
           </div>
           <Button variant={copied ? 'default' : 'outline'} size="sm" class="flex items-center gap-2 {copied ? 'border-teal bg-teal/10 text-teal' : ''}"
             onclick={copyHsUrl}>
@@ -820,6 +856,10 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
           </Button>
         </div>
       </div>
+      <label class="flex items-center gap-1.5 font-mono text-[10px] text-text2 cursor-pointer">
+        <input type="checkbox" bind:checked={includeSummary} class="accent-accent w-3 h-3" />
+        Inclure une synthèse anonymisée de la conversation
+      </label>
     </div>
     <DialogFooter>
       <Button variant="outline" size="sm" onclick={() => showExport = false}>fermer</Button>

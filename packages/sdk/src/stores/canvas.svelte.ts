@@ -162,20 +162,46 @@ function createCanvas() {
     return skill;
   }
 
-  function buildHyperskillParam(): string {
+  async function buildHyperskillParam(): Promise<string> {
     const json = JSON.stringify(buildSkillJSON());
-    // Use base64url encoding (URL-safe: no +, /, or = padding issues)
+    const bytes = new TextEncoder().encode(json);
+    // Auto-compress with gzip when payload exceeds 6 KB to keep URLs under nginx limits
+    if (bytes.length > 6144) {
+      const cs = new CompressionStream('gzip');
+      const writer = cs.writable.getWriter();
+      writer.write(bytes);
+      writer.close();
+      const compressed = new Uint8Array(await new Response(cs.readable).arrayBuffer());
+      const b64 = btoa(String.fromCharCode(...compressed))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      return 'gz.' + b64;
+    }
+    // Small payloads: plain base64url
     return btoa(unescape(encodeURIComponent(json)))
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
-  function loadFromParam(param: string): boolean {
+  async function loadFromParam(param: string): Promise<boolean> {
     try {
-      // Normalize: base64url → base64 standard, and repair spaces→+ (URLSearchParams damage)
-      let b64 = param.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/');
-      while (b64.length % 4) b64 += '=';
+      let json: string;
 
-      const json = decodeURIComponent(escape(atob(b64)));
+      if (param.startsWith('gz.')) {
+        // Compressed: gz.<base64url-encoded gzip data>
+        let b64 = param.slice(3).replace(/-/g, '+').replace(/_/g, '/');
+        while (b64.length % 4) b64 += '=';
+        const compressed = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        const ds = new DecompressionStream('gzip');
+        const writer = ds.writable.getWriter();
+        writer.write(compressed);
+        writer.close();
+        json = await new Response(ds.readable).text();
+      } else {
+        // Plain base64url
+        let b64 = param.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/');
+        while (b64.length % 4) b64 += '=';
+        json = decodeURIComponent(escape(atob(b64)));
+      }
+
       const skill = JSON.parse(json) as {
         mcp?: string; llm?: LLMId;
         theme?: Record<string, string>;

@@ -5,7 +5,7 @@
   import { listSkills } from '@webmcp-auto-ui/sdk';
   import type { Skill } from '@webmcp-auto-ui/sdk';
   import { McpMultiClient } from '@webmcp-auto-ui/core';
-  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory } from '@webmcp-auto-ui/agent';
+  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory, summarizeChat } from '@webmcp-auto-ui/agent';
   import type { ChatMessage } from '@webmcp-auto-ui/agent';
   import { McpStatus, GemmaLoader, AgentProgress, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
   import { Menu, ExternalLink } from 'lucide-svelte';
@@ -53,6 +53,8 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
 
   // Export clipboard feedback
   let exportCopied = $state(false);
+  let includeSummary = $state(true);
+  let allToolsUsed = $state<string[]>([]);
 
   // ── Multi-MCP ────────────────────────────────────────────────────────────
   let multiClient = $state<McpMultiClient>(new McpMultiClient());
@@ -234,7 +236,26 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
 
   // ── HyperSkill export ────────────────────────────────────────────────────
   async function exportHsUrl() {
-    const param = canvas.buildHyperskillParam();
+    const skill = canvas.buildSkillJSON() as Record<string, unknown>;
+
+    if (includeSummary && conversationHistory.length > 0) {
+      try {
+        const result = await summarizeChat({
+          messages: conversationHistory,
+          provider: getProvider(),
+          toolsUsed: allToolsUsed,
+          toolCallCount: chatToolCount,
+          mcpServers: multiClient.listServers().map(s => s.name),
+          skillsReferenced: skills.map(s => s.name),
+        });
+        skill.chatSummary = result.chatSummary;
+        skill.provenance = result.provenance;
+      } catch { /* don't block export */ }
+    }
+
+    const json = JSON.stringify(skill);
+    const param = btoa(unescape(encodeURIComponent(json)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     const url = `${window.location.origin}/flex?hs=${param}`;
     await navigator.clipboard.writeText(url);
     exportCopied = true;
@@ -277,6 +298,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
           onText:    (text) => { if (text) updateEphemeral(assistantId, text); },
           onToolCall: (call) => {
             chatToolCount++; chatLastTool = call.name;
+            allToolsUsed = [...allToolsUsed, call.name];
             updateEphemeral(assistantId, `🔧 <strong>${call.name}</strong>…`);
           },
         },
@@ -318,8 +340,9 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   onMount(() => {
     const param = new URLSearchParams(window.location.search).get('hs');
     if (param) {
-      canvas.loadFromParam(param);
-      if (canvas.mcpUrl) addMcpServer(canvas.mcpUrl);
+      canvas.loadFromParam(param).then(() => {
+        if (canvas.mcpUrl) addMcpServer(canvas.mcpUrl);
+      });
     }
     skills = listSkills();
   });
@@ -346,6 +369,10 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
               onclick={() => flexGrid?.clearBlocks()}>effacer</button>
     {/if}
     <!-- E — export button -->
+    <label class="hidden md:flex items-center gap-1.5 font-mono text-[10px] text-text2 cursor-pointer flex-shrink-0">
+      <input type="checkbox" bind:checked={includeSummary} class="accent-accent w-3 h-3" />
+      synthèse
+    </label>
     <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-text2 hover:text-text1 transition-colors flex-shrink-0"
             onclick={exportHsUrl}
             title="Copier le lien HyperSkill">

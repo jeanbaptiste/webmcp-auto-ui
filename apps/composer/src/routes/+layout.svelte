@@ -52,8 +52,8 @@
         name: 'get_hyperskill_url',
         description: 'Get the current canvas as a HyperSkills URL (?hs= format).',
         inputSchema: { type: 'object', properties: {} },
-        execute: () => {
-          const param = canvas.buildHyperskillParam();
+        execute: async () => {
+          const param = await canvas.buildHyperskillParam();
           return textResult(`${window.location.origin}/composer?hs=${param}`);
         },
         annotations: { readOnlyHint: true },

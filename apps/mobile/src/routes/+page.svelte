@@ -9,7 +9,7 @@
   } from '@webmcp-auto-ui/sdk';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { McpClient, jsonResult, textResult } from '@webmcp-auto-ui/core';
-  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory } from '@webmcp-auto-ui/agent';
+  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory, summarizeChat } from '@webmcp-auto-ui/agent';
 
   // ── State ─────────────────────────────────────────────────────────────────
   let feed = $state<ChatFeedItem[]>([]);
@@ -68,6 +68,8 @@
   let hsUrlDisplay = $state('');
   let urlCopied = $state(false);
   let shareMenuOpen = $state(false);
+  let includeSummary = $state(true);
+  let allToolsUsed = $state<string[]>([]);
   let systemPrompt = $state(`Tu es un assistant UI connecté à un serveur MCP.
 
 Tu as accès à deux familles d'outils :
@@ -227,8 +229,29 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   // ── HyperSkill URL ────────────────────────────────────────────────────────
   async function updateHsUrl() {
     if (!canvas.blocks.length) { hsUrlDisplay = ''; return; }
+    const meta: Record<string, unknown> = {
+      mcp: canvas.mcpUrl || undefined,
+      mcpName: canvas.mcpName || undefined,
+      llm: canvas.llm,
+    };
+
+    if (includeSummary && conversationHistory.length > 0) {
+      try {
+        const result = await summarizeChat({
+          messages: conversationHistory,
+          provider: getProvider(),
+          toolsUsed: allToolsUsed,
+          toolCallCount: chatToolCount,
+          mcpServers: mcpClient ? [canvas.mcpName ?? ''] : [],
+          skillsReferenced: skills.map(s => s.name),
+        });
+        meta.chatSummary = result.chatSummary;
+        meta.provenance = result.provenance;
+      } catch { /* don't block export */ }
+    }
+
     const skill = {
-      meta: { mcp: canvas.mcpUrl || undefined, mcpName: canvas.mcpName || undefined, llm: canvas.llm },
+      meta,
       content: { blocks: canvas.blocks.map(b => ({ type: b.type, data: b.data })) },
     };
     const url = await encode(window.location.href.split('?')[0], JSON.stringify(skill));
@@ -410,6 +433,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
           onText: (text) => { if (text) updateBubble(thinking.id, text); },
           onToolCall: (call) => {
             chatToolCount++; chatLastTool = call.name;
+            allToolsUsed = [...allToolsUsed, call.name];
             updateBubble(thinking.id, `🔧 <strong>${call.name}</strong>…`);
             const argsStr = JSON.stringify(call.args).slice(0, 200);
             const resultStr = (call.result ?? '').slice(0, 200);
@@ -658,6 +682,10 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
             onclick={() => { drawerView = 'save'; }}>
             💾 Enregistrer la vue courante
           </button>
+          <label class="flex items-center gap-1.5 font-mono text-[10px] text-text2 cursor-pointer">
+            <input type="checkbox" bind:checked={includeSummary} class="accent-accent w-3 h-3" />
+            synthèse anonymisée
+          </label>
           <button class="w-full py-2 rounded-lg border border-border2 text-text2 text-xs font-mono hover:border-zinc-400 transition-colors"
             onclick={() => { updateHsUrl().then(() => { shareMenuOpen = true; }); }}>
             partager ↗

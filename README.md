@@ -17,40 +17,27 @@ The [HyperSkill](https://hyperskills.net/) format lets you snapshot the current 
 | [`@webmcp-auto-ui/agent`](./packages/agent/README.md) | Agent loop, Remote LLM and WASM providers |
 | [`@webmcp-auto-ui/sdk`](./packages/sdk/README.md) | Skills CRUD, canvas state store, HyperSkills encoding (re-exported from [`hyperskills`](https://www.npmjs.com/package/hyperskills) NPM) |
 
-## Apps
+## Demo Apps
 
 | App | Port | Description |
 |-----|------|-------------|
-| `flex` | 5179 | Canvas drag & resize, multi-MCP (7 serveurs), chat éphémère, HyperSkills export |
-| `template` | 5180 | Starter SvelteKit avec tous les composants natifs prêts à l'emploi |
-| `showcase` | 5177 | All 32 components with iNaturalist mock data + any MCP server |
+| `flex` | 5179 | Canvas drag & resize, multi-MCP, ephemeral chat, HyperSkills export |
+| `template` | 5180 | Minimal SvelteKit starter with all native package components ready to use |
+| `showcase` | 5177 | All 32 components with mock data + any MCP server |
 | `todo` | 5175 | TODO List editor — 8 WebMCP tools exposed to the browser extension |
 | `composer` | 5174 | UI composer — auto, drag & drop, or chat |
 | `viewer` | 5176 | Load and edit a HyperSkill URL, with diff and SHA-256 versioning |
-| `mobile` | 5178 | Phone-frame UI with real MCP, Gemma E2B, and skills management |
+| `mobile` | 5178 | Phone-frame UI with MCP, Gemma WASM, and skills management |
 | `home` | 5173 | Landing page |
-
-## MCP Servers
-
-7 MCP servers are available for demos:
-
-| Server | URL |
-|--------|-----|
-| Code4Code | `https://mcp.code4code.eu/mcp` |
-| Hacker News | `https://demos.hyperskills.net/mcp-hackernews/mcp` |
-| Met Museum | `https://demos.hyperskills.net/mcp-metmuseum/mcp` |
-| Open-Meteo | `https://demos.hyperskills.net/mcp-openmeteo/mcp` |
-| Wikipedia | `https://demos.hyperskills.net/mcp-wikipedia/mcp` |
-| iNaturalist | `https://demos.hyperskills.net/mcp-inaturalist/mcp` |
-| data.gouv.fr | `https://demos.hyperskills.net/mcp-datagouv/mcp` |
 
 ## Getting started
 
 ```bash
-# Required for apps with LLM chat
-echo "ANTHROPIC_API_KEY=sk-ant-..." > apps/flex/.env
-echo "ANTHROPIC_API_KEY=sk-ant-..." > apps/composer/.env
-echo "ANTHROPIC_API_KEY=sk-ant-..." > apps/template/.env
+# Apps with LLM chat need an API key in .env
+# Copy the example and add your key (any LLM provider supported by the agent package)
+cp .env.example apps/flex/.env
+cp .env.example apps/composer/.env
+cp .env.example apps/template/.env
 
 npm install
 npm run dev        # all 8 apps in parallel

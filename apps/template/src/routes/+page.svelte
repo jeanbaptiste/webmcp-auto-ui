@@ -4,7 +4,7 @@
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
   import { McpMultiClient } from '@webmcp-auto-ui/core';
-  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory } from '@webmcp-auto-ui/agent';
+  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory, summarizeChat } from '@webmcp-auto-ui/agent';
   import type { ChatMessage } from '@webmcp-auto-ui/agent';
   import {
     McpConnector, LLMSelector, ChatPanel, AgentConsole, BlockRenderer,
@@ -24,6 +24,9 @@
   let toolCount = $state(0);
   let lastTool = $state('');
   let serversOpen = $state(false);
+  let exportCopied = $state(false);
+  let includeSummary = $state(true);
+  let allToolsUsed = $state<string[]>([]);
 
   function uid() { return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 
@@ -178,6 +181,7 @@
           onText: (text) => { feed = feed.map(f => f.id === assistantId ? { ...f, html: text } : f); },
           onToolCall: (call) => {
             toolCount++; lastTool = call.name;
+            allToolsUsed = [...allToolsUsed, call.name];
             consoleLogs = [...consoleLogs, `[tool] ${call.name}`];
           },
         },
@@ -189,12 +193,40 @@
     }
   }
 
+  // ── HyperSkill export ────────────────────────────────────────────────────
+  async function exportHsUrl() {
+    const skill = canvas.buildSkillJSON() as Record<string, unknown>;
+
+    if (includeSummary && conversationHistory.length > 0) {
+      try {
+        const result = await summarizeChat({
+          messages: conversationHistory,
+          provider: getProvider(),
+          toolsUsed: allToolsUsed,
+          toolCallCount: toolCount,
+          mcpServers: multiClient.listServers().map(s => s.name),
+        });
+        skill.chatSummary = result.chatSummary;
+        skill.provenance = result.provenance;
+      } catch { /* don't block export */ }
+    }
+
+    const json = JSON.stringify(skill);
+    const param = btoa(unescape(encodeURIComponent(json)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const url = `${window.location.origin}/template?hs=${param}`;
+    await navigator.clipboard.writeText(url);
+    exportCopied = true;
+    setTimeout(() => { exportCopied = false; }, 2000);
+  }
+
   // ── HyperSkill ?hs= support ───────────────────────────────────────────────
   onMount(() => {
     const param = new URLSearchParams(window.location.search).get('hs');
     if (param) {
-      canvas.loadFromParam(param);
-      if (canvas.mcpUrl) addMcpServer(canvas.mcpUrl);
+      canvas.loadFromParam(param).then(() => {
+        if (canvas.mcpUrl) addMcpServer(canvas.mcpUrl);
+      });
     }
   });
 </script>
@@ -216,6 +248,19 @@
       class="flex-1 min-w-0" />
     <LLMSelector value={canvas.llm} onchange={v => { canvas.llm = v as typeof canvas.llm; }} />
     <McpStatus connecting={canvas.mcpConnecting} connected={canvas.mcpConnected} name={canvas.mcpName ?? 'non connect\u00e9'} />
+    <label class="flex items-center gap-1.5 font-mono text-[10px] text-text2 cursor-pointer flex-shrink-0">
+      <input type="checkbox" bind:checked={includeSummary} class="accent-accent w-3 h-3" />
+      synthèse
+    </label>
+    <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-text2 hover:text-text1 transition-colors flex-shrink-0"
+            onclick={exportHsUrl}
+            title="Copier le lien HyperSkill">
+      {#if exportCopied}
+        <span class="text-teal">copié !</span>
+      {:else}
+        exporter
+      {/if}
+    </button>
     <button class="font-mono text-xs h-7 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
             onclick={() => serversOpen = !serversOpen}>MCP</button>
     <button class="font-mono text-xs h-7 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
