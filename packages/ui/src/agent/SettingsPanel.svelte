@@ -6,6 +6,10 @@
     maxTokens?: number;
     maxContextTokens?: number;
     cacheEnabled?: boolean;
+    temperature?: number;
+    topK?: number;
+    modelType?: 'remote' | 'wasm';
+    modelId?: string;
     class?: string;
   }
 
@@ -14,6 +18,10 @@
     maxTokens = $bindable(4096),
     maxContextTokens = $bindable(150_000),
     cacheEnabled = $bindable(true),
+    temperature = $bindable(0.7),
+    topK = $bindable(10),
+    modelType = 'remote',
+    modelId = '',
     class: cls = '',
   }: Props = $props();
 
@@ -28,6 +36,22 @@
       savedTimer = setTimeout(() => { promptSaved = false; }, 2000);
     });
   });
+
+  // Dynamic ranges based on model type
+  const ranges = $derived({
+    maxTokens: { min: 256, max: 8192, step: 256 },
+    maxContextTokens: modelType === 'wasm'
+      ? { min: 10_000, max: 128_000, step: 10_000 }
+      : { min: 10_000, max: 200_000, step: 10_000 },
+    temperature: { min: 0, max: 2, step: 0.1 },
+    topK: { min: 1, max: 100, step: 1 },
+  });
+
+  function formatNumber(n: number): string {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+    if (n >= 1_000) return (n / 1_000).toFixed(0) + 'K';
+    return String(n);
+  }
 </script>
 
 <div class="flex flex-col gap-4 {cls}">
@@ -47,37 +71,52 @@
     ></textarea>
   </div>
 
-  <!-- Max tokens -->
-  <div class="flex flex-col gap-1.5">
-    <div class="flex items-center justify-between">
-      <label class="text-[9px] font-mono text-text2 uppercase tracking-wider">Max tokens <span class="normal-case opacity-60">(output)</span></label>
-      <span class="text-[10px] font-mono text-text1">{maxTokens.toLocaleString()}</span>
+  <!-- Sliders section -->
+  <section class="flex flex-col gap-4">
+    <!-- Max tokens (output) -->
+    <div>
+      <div class="flex justify-between items-baseline mb-1">
+        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Max tokens (output)</span>
+        <span class="font-mono text-xs text-text1">{formatNumber(maxTokens)}</span>
+      </div>
+      <input type="range" bind:value={maxTokens}
+             min={ranges.maxTokens.min} max={ranges.maxTokens.max} step={ranges.maxTokens.step}
+             class="w-full accent-accent" />
     </div>
-    <input
-      type="range"
-      bind:value={maxTokens}
-      min={256}
-      max={8192}
-      step={256}
-      class="w-full accent-accent"
-    />
-  </div>
 
-  <!-- Max context tokens -->
-  <div class="flex flex-col gap-1.5">
-    <div class="flex items-center justify-between">
-      <label class="text-[9px] font-mono text-text2 uppercase tracking-wider">Max contexte <span class="normal-case opacity-60">(historique, tokens)</span></label>
-      <span class="text-[10px] font-mono text-text1">{(maxContextTokens / 1000).toFixed(0)}K</span>
+    <!-- Max historique (tokens) -->
+    <div>
+      <div class="flex justify-between items-baseline mb-1">
+        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Max historique (tokens)</span>
+        <span class="font-mono text-xs text-text1">{formatNumber(maxContextTokens)}</span>
+      </div>
+      <input type="range" bind:value={maxContextTokens}
+             min={ranges.maxContextTokens.min} max={ranges.maxContextTokens.max} step={ranges.maxContextTokens.step}
+             class="w-full accent-accent" />
     </div>
-    <input
-      type="range"
-      bind:value={maxContextTokens}
-      min={10_000}
-      max={200_000}
-      step={10_000}
-      class="w-full accent-accent"
-    />
-  </div>
+
+    <!-- Temperature -->
+    <div>
+      <div class="flex justify-between items-baseline mb-1">
+        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Temperature</span>
+        <span class="font-mono text-xs text-text1">{temperature.toFixed(1)}</span>
+      </div>
+      <input type="range" bind:value={temperature}
+             min={ranges.temperature.min} max={ranges.temperature.max} step={ranges.temperature.step}
+             class="w-full accent-accent" />
+    </div>
+
+    <!-- Top-K -->
+    <div>
+      <div class="flex justify-between items-baseline mb-1">
+        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Top-K</span>
+        <span class="font-mono text-xs text-text1">{topK}</span>
+      </div>
+      <input type="range" bind:value={topK}
+             min={ranges.topK.min} max={ranges.topK.max} step={ranges.topK.step}
+             class="w-full accent-accent" />
+    </div>
+  </section>
 
   <!-- Cache -->
   <label class="flex items-center gap-2.5 cursor-pointer select-none">

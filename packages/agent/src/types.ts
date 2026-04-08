@@ -38,6 +38,7 @@ export interface LLMResponse {
   content: ContentBlock[];
   stopReason: string;
   usage?: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number };
+  stats?: { tokensPerSec: number; totalTokens: number; latencyMs: number };
 }
 
 export interface LLMProvider {
@@ -46,7 +47,7 @@ export interface LLMProvider {
   chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
-    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string; maxTokens?: number }
+    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string; maxTokens?: number; temperature?: number; topK?: number }
   ): Promise<LLMResponse>;
 }
 

@@ -6,8 +6,8 @@ set -euo pipefail
 #
 # Usage:
 #   ./scripts/deploy.sh              # deploy all apps
-#   ./scripts/deploy.sh composer     # deploy one app
-#   ./scripts/deploy.sh mobile home  # deploy specific apps
+#   ./scripts/deploy.sh viewer       # deploy one app
+#   ./scripts/deploy.sh home flex    # deploy specific apps
 #   ./scripts/deploy.sh --dry-run    # show what would be deployed (no changes)
 #
 # IMPORTANT: This script knows the correct deploy path for each app.
@@ -58,8 +58,7 @@ rollback_app() {
 
 # ── Deploy path mapping ─────────────────────────────────────────────────────
 # Node apps: ExecStart determines where index.js must be
-#   composer → node index.js     → deploy to root
-#   mobile   → node index.js     → deploy to root
+#   flex     → node index.js       → deploy to root
 #   viewer   → node build/index.js → deploy to build/
 #
 # Static apps: served directly by nginx
@@ -142,16 +141,13 @@ deploy_static() {
 deploy_app() {
   local app=$1
   case "$app" in
-    composer) deploy_node_root "composer" ;;
-    mobile)   deploy_node_root "mobile" ;;
     flex)     deploy_node_root "flex" ;;
-    template) deploy_node_root "template" ;;
     viewer)   deploy_node_build "viewer" ;;
     home)     deploy_static "home" ;;
     todo)     deploy_static "todo" ;;
     showcase) deploy_static "showcase" ;;
     *)
-      echo "  [$app] ✗ unknown app (valid: composer, viewer, mobile, flex, template, home, todo, showcase)"
+      echo "  [$app] ✗ unknown app (valid: home, viewer, showcase, todo, flex)"
       return 1
       ;;
   esac
@@ -163,7 +159,7 @@ echo "webmcp-auto-ui deploy"
 echo ""
 
 if [ $# -eq 0 ]; then
-  APPS="home composer viewer showcase mobile todo flex template"
+  APPS="home viewer showcase todo flex"
 else
   APPS="$*"
 fi
@@ -186,7 +182,7 @@ echo ""
 echo "Verifying..."
 for app in $APPS; do
   case "$app" in
-    composer|viewer|mobile|flex|template)
+    viewer|flex)
       status=$(ssh "$SSH_HOST" "systemctl is-active webmcp-$app 2>/dev/null" || echo "inactive")
       echo "  $app: $status"
       ;;

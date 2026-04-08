@@ -6,9 +6,14 @@ import type { LLMProvider, LLMResponse, ChatMessage, AnthropicTool, WasmModelId,
 
 export type WasmStatus = 'idle' | 'loading' | 'ready' | 'error';
 
+interface WorkerResult {
+  text: string;
+  stats?: { tokensPerSec: number; totalTokens: number; latencyMs: number };
+}
+
 export interface WasmProviderOptions {
   model?: WasmModelId;
-  workerUrl?: string;        // URL to the bundled gemma.worker.js
+  workerUrl?: string;        // URL to the bundled litert.worker.js (or legacy gemma.worker.js)
   workerFactory?: () => Worker;  // alternative: pass a factory fn
   onProgress?: (progress: number, status: string, loaded?: number, total?: number) => void;
   onStatusChange?: (status: WasmStatus) => void;
@@ -20,7 +25,7 @@ export class WasmProvider implements LLMProvider {
 
   private worker: Worker | null = null;
   private status: WasmStatus = 'idle';
-  private pendingResolvers = new Map<string, { resolve: (v: string) => void; reject: (e: Error) => void }>();
+  private pendingResolvers = new Map<string, { resolve: (v: WorkerResult) => void; reject: (e: Error) => void }>();
   private opts: WasmProviderOptions;
   private initPromise: Promise<void> | null = null;
 
@@ -74,7 +79,10 @@ export class WasmProvider implements LLMProvider {
           if (!r) return;
           this.pendingResolvers.delete(id);
           if (type === 'error') r.reject(new Error(message));
-          else r.resolve(text ?? '');
+          else {
+            const stats = (e.data as { stats?: { tokensPerSec: number; totalTokens: number; latencyMs: number } }).stats;
+            r.resolve({ text: text ?? '', stats });
+          }
         }
       };
 
@@ -90,7 +98,7 @@ export class WasmProvider implements LLMProvider {
   async chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
-    options?: { signal?: AbortSignal; maxTokens?: number }
+    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number }
   ): Promise<LLMResponse> {
     if (this.status !== 'ready') await this.initialize();
     if (!this.worker) throw new Error('Worker not available');
@@ -118,14 +126,16 @@ export class WasmProvider implements LLMProvider {
 
     const id = `w-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
-    const raw = await new Promise<string>((resolve, reject) => {
+    const result = await new Promise<WorkerResult>((resolve, reject) => {
       this.pendingResolvers.set(id, { resolve, reject });
       options?.signal?.addEventListener('abort', () => {
         this.worker?.postMessage({ type: 'abort', id });
         reject(new DOMException('Aborted', 'AbortError'));
       }, { once: true });
-      this.worker!.postMessage({ type: 'chat', id, prompt, maxTokens: options?.maxTokens });
+      this.worker!.postMessage({ type: 'chat', id, prompt, maxTokens: options?.maxTokens, temperature: options?.temperature, topK: options?.topK });
     });
+
+    const raw = result.text;
 
     // Try to parse as tool call JSON
     const content: ContentBlock[] = [];
@@ -148,6 +158,7 @@ export class WasmProvider implements LLMProvider {
     return {
       content,
       stopReason: content.some(b => b.type === 'tool_use') ? 'tool_use' : 'end_turn',
+      stats: result.stats,
     };
   }
 

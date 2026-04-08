@@ -1223,7 +1223,7 @@ canvas.loadFromParam(hsParam);  // returns true on success
   <script type="text/markdown" data-page="agent">
 # @webmcp-auto-ui/agent
 
-LLM agent loop with Anthropic and Gemma providers, plus 22 UI tools for rendering blocks.
+LLM agent loop with Anthropic and Gemma providers, plus 22 UI tools for rendering blocks and a unified `component()` tool exposing 56 components.
 
 ## What it does
 
@@ -1437,6 +1437,55 @@ if (isUITool('render_stat')) {
   // result: "Rendered stat block"
 }
 ```
+
+## Unified `component()` tool
+
+In addition to the individual `render_*` tools, the agent package provides a single unified `component()` tool that exposes **56 components** (31 renderable, 25 non-renderable) through a consistent interface.
+
+This approach was inspired by [Emmanuel Raviart](https://www.tricoteuses.fr/mcp), creator of the Moulineuse MCP server, who suggested consolidating the tool surface into a single discoverable entry point.
+
+```ts
+import { COMPONENT_TOOL, executeComponent, componentRegistry } from '@webmcp-auto-ui/agent';
+```
+
+### Three modes
+
+| Mode | Call | Returns |
+|------|------|---------|
+| **List all** | `component("help")` | Array of all 56 components with name, description, and `renderable` flag |
+| **Inspect one** | `component("help", "stat-card")` | Schema, description, and renderability of a single component |
+| **Render** | `component("stat-card", { label: "Revenue", value: "
+  <script>
+42K" })` | Renders the component (renderable ones only) |
+
+### Component categories
+
+- **Renderable (31)** -- all `render_*` block types plus canvas actions (`clear`, `update`, `move`, `resize`, `style`). These can be rendered through the agent tool pipeline via `executeComponent`.
+- **Non-renderable (25)** -- primitives, base UI components, layouts, agent UI widgets, and theme provider. These are Svelte components available for direct import from `@webmcp-auto-ui/ui`. Calling render on them returns their schema and a usage hint.
+
+Component names use dashes (e.g., `stat-card`). The original `render_*` names are also accepted for backward compatibility.
+
+### Coexistence with `render_*` tools
+
+Both approaches work simultaneously. The individual `render_*` tools remain available and fully functional. The `component()` tool is an additional entry point that provides discoverability (via `help` mode) and a uniform interface.
+
+### Custom components
+
+The `componentRegistry` is a mutable `Map<string, ComponentEntry>`. Apps can register additional components at runtime:
+
+```ts
+import { componentRegistry, type ComponentEntry } from '@webmcp-auto-ui/agent';
+
+componentRegistry.set('my-widget', {
+  name: 'my-widget',
+  toolName: 'my-widget',
+  description: 'Custom widget for my app.',
+  inputSchema: { type: 'object', properties: { title: { type: 'string' } } },
+  renderable: false,
+});
+```
+
+For the full list of all 56 components and their schemas, see [composing.md](../agents/composing.md#unified-component-tool).
 
 ## Workflow
 
@@ -2980,6 +3029,87 @@ When a designer says "I want a KPI dashboard":
 }
 ```
 
+## Unified `component` tool
+
+Instead of calling individual `render_*` tools, you can use the unified `component` tool:
+
+- `component("help")` -- list all available components
+- `component("help", "stat-card")` -- get the schema for a specific component
+- `component("stat-card", { label: "Revenue", value: "
+  <script>
+42K" })` -- render a component
+
+Both approaches (individual `render_*` tools and unified `component`) work simultaneously.
+
+The `component` tool also exposes canvas actions under short names:
+
+| Short name | Equivalent tool |
+|------------|-----------------|
+| `clear` | `clear_canvas` |
+| `update` | `update_block` |
+| `move` | `move_block` |
+| `resize` | `resize_block` |
+| `style` | `style_block` |
+
+Component names use dashes instead of underscores (e.g. `stat-card` instead of `render_stat_card`). The original `render_*` names are also accepted for backward compatibility.
+
+### All registered components
+
+The `component("help")` response includes **all** components in the system, not just the renderable widgets. Each entry includes a `renderable` flag:
+
+- **renderable: true** — can be rendered via the agent tool pipeline (all `render_*` tools + canvas actions)
+- **renderable: false** — Svelte component available for direct usage via `@webmcp-auto-ui/ui`, but cannot be rendered through `component("name", {...})`. Calling render on these returns their schema and a usage hint instead.
+
+#### Primitives (layout containers)
+
+| Name | Description |
+|------|-------------|
+| `card` | Container card with optional header and footer slots |
+| `grid-layout` | Responsive grid layout (stacks on mobile) |
+| `list-primitive` | Scrollable list container with item snippet |
+| `panel` | Panel with optional title header |
+| `window` | Window with draggable title bar |
+
+#### Base (shadcn-style UI primitives)
+
+| Name | Description |
+|------|-------------|
+| `button` | Button with variants: default, outline, destructive, ghost |
+| `input` | Text input field |
+| `badge` | Badge/tag with variants: default, success, warning, destructive, outline |
+| `select` | Native dropdown select |
+| `tooltip` | Tooltip on hover |
+| `dialog` | Modal dialog overlay |
+
+#### Layouts (window manager)
+
+| Name | Description |
+|------|-------------|
+| `tiling-layout` | Tiling window manager layout |
+| `floating-layout` | Floating drag-and-drop window manager |
+| `stack-layout` | Stacked vertical scroll or single-window layout |
+| `pane` | Window pane with title bar, badge, fold/close actions |
+
+#### Agent UI
+
+| Name | Description |
+|------|-------------|
+| `llm-selector` | LLM model dropdown grouped by type |
+| `mcp-status` | MCP connection status indicator |
+| `mcp-connector` | MCP connection form with URL/token/status |
+| `agent-progress` | Agent progress bar (time, tools, tokens/sec) |
+| `gemma-loader` | Gemma WASM model loader with progress |
+| `chat-panel` | Full chat panel with feed, progress, and input |
+| `agent-console` | Collapsible agent debug console |
+| `settings-panel` | Agent settings (system prompt, tokens, cache) |
+| `remote-mcp-servers` | Remote MCP server list with connect/disconnect |
+
+#### Theme
+
+| Name | Description |
+|------|-------------|
+| `theme-provider` | Theme provider (dark/light) with CSS custom properties |
+
 ## Constraints
 
 - Block `type` must be one of the 24 valid types listed above.
@@ -3013,6 +3143,8 @@ The `BlockRenderer` component receives `{ type, data }` and dispatches to the co
 - Unknown types render a `[type]` placeholder
 
 Each block auto-registers WebMCP tools (`block_<id>_get`, `block_<id>_update`, `block_<id>_remove`) when `navigator.modelContext` is available.
+
+> **Note**: All widgets listed below (plus primitives, base components, layouts, and agent UI) are also accessible via the unified `component()` tool from `@webmcp-auto-ui/agent`. Call `component("help")` to list all 56 components, or `component("help", "stat-card")` to get the schema for a specific one. See [composing.md](composing.md#unified-component-tool) and the [agent package docs](../packages/agent.md#unified-component-tool) for details.
 
 ---
 
@@ -3784,6 +3916,8 @@ The auto-generated system prompt tells the LLM:
 - Which UI tools are available (stat, chart, table, etc.)
 - The mandatory workflow: fetch data first, then display with UI tools
 
+> **Tip**: In addition to individual `render_*` tools, the unified `component()` tool provides a single entry point for all 56 UI components (31 renderable, 25 non-renderable). The LLM can call `component("help")` to discover available components at runtime. See the [agent package docs](../packages/agent.md#unified-component-tool) for details.
+
 ## Auto-Generated UI Pattern
 
 Connect MCP, list tools, and let the agent auto-generate the UI:
@@ -4133,6 +4267,8 @@ Three built-in demo skills are available via `loadDemoSkills()`:
 - Tags: `ops`, `monitoring`
 
 ## Workflow: Create a Skill from Scratch
+
+> **Note**: Skills can reference components via the unified `component()` tool in addition to the individual `render_*` tools. The `component("help")` call lists all 56 available components with their schemas, making it easier for agents to discover what blocks they can use. See [composing.md](composing.md#unified-component-tool) for details.
 
 1. **Define the purpose**: What data does this skill display? What user need does it serve?
 2. **Choose blocks**: Pick 2-5 block types that best represent the data (see composing.md)

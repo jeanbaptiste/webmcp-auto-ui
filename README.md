@@ -22,12 +22,9 @@ The [HyperSkill](https://hyperskills.net/) format lets you snapshot the current 
 | App | Port | Description |
 |-----|------|-------------|
 | `flex` | 5179 | Canvas drag & resize, multi-MCP, ephemeral chat, HyperSkills export |
-| `template` | 5180 | Minimal SvelteKit starter with all native package components ready to use |
 | `showcase` | 5177 | All 32 components with mock data + any MCP server |
 | `todo` | 5175 | TODO List editor — 8 WebMCP tools exposed to the browser extension |
-| `composer` | 5174 | UI composer — auto, drag & drop, or chat |
 | `viewer` | 5176 | Load and edit a HyperSkill URL, with diff and SHA-256 versioning |
-| `mobile` | 5178 | Phone-frame UI with MCP, Gemma WASM, and skills management |
 | `home` | 5173 | Landing page |
 
 ## Getting started
@@ -36,11 +33,9 @@ The [HyperSkill](https://hyperskills.net/) format lets you snapshot the current 
 # Apps with LLM chat need an API key in .env
 # Copy the example and add your key (any LLM provider supported by the agent package)
 cp .env.example apps/flex/.env
-cp .env.example apps/composer/.env
-cp .env.example apps/template/.env
 
 npm install
-npm run dev        # all 8 apps in parallel
+npm run dev        # all 5 apps in parallel
 npm run dev:flex   # single app
 npm test           # vitest
 ```

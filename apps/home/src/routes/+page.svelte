@@ -11,13 +11,7 @@
       url: `${base}/flex`,
       accent: '#06b6d4',
     },
-    {
-      title: 'Template',
-      desc: 'Starter SvelteKit minimal pour créer une nouvelle app webmcp-auto-ui. Chat panel, BlockRenderer, connexion MCP et sélection LLM prêts à l\'emploi.',
-      url: `${base}/template`,
-      accent: '#a78bfa',
-    },
-    {
+{
       title: 'Showcase',
       desc: '34 components demonstrated with iNaturalist data. Interactive DAG wiring via FONC bus — click a table row and watch other components update in real-time. Gallery, Carousel, D3 visualizations.',
       url: `${base}/showcase`,
@@ -29,23 +23,11 @@
       url: `${base}/todo`,
       accent: '#3ecfb2',
     },
-    {
-      title: 'Composer',
-      desc: 'Build UIs with 3 modes: auto (LLM generates from MCP data), drag & drop, or chat. Supports Claude and Gemma (local WASM). Full skill CRUD, theme support, and HyperSkills URL export.',
-      url: `${base}/composer`,
-      accent: '#7c6dfa',
-    },
-    {
+{
       title: 'Viewer',
       desc: 'Load any HyperSkills URL (?hs=), render its blocks, edit inline, diff versions with SHA-256 traceability. Auto-generate UI from a connected MCP server.',
       url: `${base}/viewer`,
       accent: '#f0a050',
-    },
-    {
-      title: 'Mobile',
-      desc: 'Responsive chat agent with MCP integration, Gemma WASM local model, skill management, and native sharing (Web Share API, email, social). Phone frame on desktop, full-screen on mobile.',
-      url: `${base}/mobile`,
-      accent: '#fa6d7c',
     },
   ];
 

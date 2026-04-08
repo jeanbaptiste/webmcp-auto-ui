@@ -8,26 +8,20 @@
     "packages/agent",
     "packages/sdk",
     "apps/home",
-    "apps/composer",
     "apps/todo",
     "apps/viewer",
     "apps/showcase",
-    "apps/mobile",
-    "apps/flex",
-    "apps/template"
+    "apps/flex"
   ],
   "scripts": {
-    "dev": "concurrently -n home,composer,todo,viewer,showcase,mobile,flex -c blue,cyan,yellow,green,magenta,white,red \"npm -w apps/home run dev\" \"npm -w apps/composer run dev\" \"npm -w apps/todo run dev\" \"npm -w apps/viewer run dev\" \"npm -w apps/showcase run dev\" \"npm -w apps/mobile run dev\" \"npm -w apps/flex run dev\"",
+    "dev": "concurrently -n home,todo,viewer,showcase,flex -c blue,yellow,green,magenta,red \"npm -w apps/home run dev\" \"npm -w apps/todo run dev\" \"npm -w apps/viewer run dev\" \"npm -w apps/showcase run dev\" \"npm -w apps/flex run dev\"",
     "dev:home": "npm -w apps/home run dev",
-    "dev:composer": "npm -w apps/composer run dev",
     "dev:todo": "npm -w apps/todo run dev",
     "dev:viewer": "npm -w apps/viewer run dev",
-    "build": "npm -w apps/home run build && npm -w apps/composer run build && npm -w apps/todo run build && npm -w apps/viewer run build",
+    "build": "npm -w apps/home run build && npm -w apps/todo run build && npm -w apps/viewer run build && npm -w apps/flex run build",
     "check": "npm -w packages/ui run check && npm -w packages/sdk run check",
     "dev:showcase": "npm -w apps/showcase run dev",
-    "dev:mobile": "npm -w apps/mobile run dev",
     "dev:flex": "npm -w apps/flex run dev",
-    "dev:template": "npm -w apps/template run dev",
     "deploy": "./scripts/deploy.sh",
     "docs:sync": "node scripts/sync-docs.js",
     "test": "vitest run",
@@ -35,6 +29,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
+    "@mediapipe/tasks-genai": "^0.10.27",
     "@playwright/test": "^1.59.1",
     "concurrently": "^8.2.0",
     "vitest": "^4.1.2"

@@ -15,11 +15,10 @@ webmcp-auto-ui/
  |
  +-- apps/
  |    +-- home/          Landing page, app launcher (port 5173)
- |    +-- composer/      Visual skill composer with canvas + chat (port 5174)
  |    +-- todo/          MCP-powered todo demo (port 5175)
  |    +-- viewer/        HyperSkill URL renderer (port 5176)
  |    +-- showcase/      Component showcase + WebMCP tool demos (port 5177)
- |    +-- mobile/        Mobile-optimized interface (port 5178)
+ |    +-- flex/          Canvas drag & resize, multi-MCP, chat (port 5179)
  |
  +-- docs/               Documentation
  +-- package.json        Root workspace config
@@ -55,11 +54,10 @@ webmcp-auto-ui/
 | App | Purpose |
 |-----|---------|
 | **home** | Landing page with links to all other apps. Configurable via `PUBLIC_BASE_URL`. |
-| **composer** | The main app. Connect to an MCP server, chat with an LLM, and compose UI skills on a canvas. Blocks are rendered by `BlockRenderer`. Skills can be saved as HyperSkill URLs. |
+| **flex** | Canvas drag & resize, multi-MCP, ephemeral chat, HyperSkills export, Gemma WASM local. The most complete demo. |
 | **todo** | Minimal todo app demonstrating MCP tool integration for CRUD operations. |
 | **viewer** | Decodes a HyperSkill URL (`?hs=...`) and renders the embedded skill read-only. |
 | **showcase** | Interactive catalog of all UI components. Also demonstrates WebMCP tool registration and postMessage bridge. |
-| **mobile** | Responsive mobile-first interface for the composer workflow. |
 
 ## Technology stack
 

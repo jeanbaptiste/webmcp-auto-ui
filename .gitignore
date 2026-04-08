@@ -29,3 +29,8 @@ npm-debug.log*
 # Claude Code
 CLAUDE.md
 PLAN.md
+
+# Deprecated apps
+apps/composer/
+apps/mobile/
+apps/template/

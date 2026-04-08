@@ -198,7 +198,7 @@ if (param) {
 
 Skills can be shared via two entry points:
 - **Viewer**: `https://domain.com/viewer?hs=<encoded>` -- read-only display
-- **Composer**: `https://domain.com/composer?hs=<encoded>` -- editable view
+- **Flex**: `https://domain.com/flex?hs=<encoded>` -- editable view
 
 ### Hashing
 

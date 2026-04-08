@@ -29,11 +29,10 @@ webmcp-auto-ui/
     ui/         @webmcp-auto-ui/ui     — 34+ Svelte 5 components
   apps/
     home/       Landing page + app launcher
-    composer/   Visual skill composer with drag-and-drop canvas
+    flex/       Canvas drag & resize, multi-MCP, ephemeral chat
     todo/       Todo app demo (MCP-powered)
     viewer/     HyperSkill URL viewer / renderer
     showcase/   Component showcase + WebMCP tool demos
-    mobile/     Mobile-optimized interface
 ```
 
 ## Build packages
@@ -66,11 +65,10 @@ Or run a single app:
 
 ```bash
 npm run dev:home
-npm run dev:composer
+npm run dev:flex
 npm run dev:todo
 npm run dev:viewer
 npm run dev:showcase
-npm run dev:mobile
 ```
 
 ## Port mapping
@@ -78,17 +76,16 @@ npm run dev:mobile
 | App       | Port | URL                    |
 |-----------|------|------------------------|
 | home      | 5173 | http://localhost:5173   |
-| composer  | 5174 | http://localhost:5174   |
 | todo      | 5175 | http://localhost:5175   |
 | viewer    | 5176 | http://localhost:5176   |
 | showcase  | 5177 | http://localhost:5177   |
-| mobile    | 5178 | http://localhost:5178   |
+| flex      | 5179 | http://localhost:5179   |
 
 ## Environment variables
 
 | Variable           | Used by        | Purpose                                      |
 |--------------------|----------------|----------------------------------------------|
-| `ANTHROPIC_API_KEY`| composer, todo | Server-side proxy for Anthropic Claude API    |
+| `ANTHROPIC_API_KEY`| flex, todo | Server-side proxy for Anthropic Claude API    |
 | `PUBLIC_BASE_URL`  | home           | Base URL for app links (default: localhost)    |
 
 Set them in each app's `.env` file or export in your shell:
@@ -117,11 +114,11 @@ Use the deploy script — it handles build order, correct deploy paths, and clea
 
 ```bash
 ./scripts/deploy.sh              # deploy all apps
-./scripts/deploy.sh composer     # deploy one app
+./scripts/deploy.sh flex         # deploy one app
 ```
 
 See [Deploy Tutorial](tutorials/deploy.md) for full details.
 
 **Do NOT deploy manually with scp** — the deploy paths differ per app
-(composer/mobile deploy to root, viewer deploys to `build/`). The script
+(flex deploys to root, viewer deploys to `build/`). The script
 knows the correct path for each app.

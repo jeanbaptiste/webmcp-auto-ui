@@ -144,7 +144,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
       }
       if (!gemmaProvider) {
         gemmaProvider = new GemmaProvider({
-          workerFactory: () => new Worker(new URL('@webmcp-auto-ui/agent/gemma-worker', import.meta.url), { type: 'module' }),
+          workerFactory: () => new Worker(new URL('@webmcp-auto-ui/agent/litert-worker', import.meta.url), { type: 'module' }),
           model: canvas.llm,
           onProgress: (p, _s, loaded, total) => {
             gemmaProgress = p;

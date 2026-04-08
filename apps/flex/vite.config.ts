@@ -7,7 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@webmcp-auto-ui/sdk/canvas':         path.resolve('../../packages/sdk/src/canvas.ts'),
-      '@webmcp-auto-ui/agent/gemma-worker': path.resolve('../../packages/agent/src/providers/gemma.worker.ts'),
+      '@webmcp-auto-ui/agent/litert-worker': path.resolve('../../packages/agent/src/providers/litert.worker.ts'),
     }
   },
   server: {

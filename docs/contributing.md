@@ -146,7 +146,7 @@ Le deploy script (`deploy_node_root`, `deploy_node_build`) rebuild maintenant
 automatiquement les apps via `npm run build` avant de copier.
 
 **Historique** : avant ce fix, les packages (`@webmcp-auto-ui/*`) étaient
-recompilés par le script, mais les apps (composer, mobile, viewer) étaient
+recompilés par le script, mais les apps (flex, viewer) étaient
 deployées avec leur ancien `build/`. Tous les fixes Svelte appliqués dans
 `apps/*/src/` étaient donc perdus.
 
@@ -162,13 +162,13 @@ scp apps/*/build/*  →  l'ancien code est déployé
 
 1. **Le build local est-il à jour ?**
    ```bash
-   ls -la apps/composer/build/index.js   # date de modification
+   ls -la apps/flex/build/index.js   # date de modification
    ```
 
 2. **Le fichier déployé correspond-il au build local ?**
    ```bash
-   sha256sum apps/composer/build/index.js
-   ssh bot "sha256sum /opt/webmcp-demos/composer/index.js"
+   sha256sum apps/flex/build/index.js
+   ssh bot "sha256sum /opt/webmcp-demos/flex/index.js"
    ```
 
 3. **Y a-t-il des erreurs JS côté client ?**
@@ -180,7 +180,7 @@ scp apps/*/build/*  →  l'ancien code est déployé
      const b = await chromium.launch();
      const p = await b.newPage();
      p.on('pageerror', e => console.error('JS ERROR:', e.message));
-     await p.goto('https://demos.hyperskills.net/composer/');
+     await p.goto('https://demos.hyperskills.net/flex/');
      await p.waitForTimeout(3000);
      await b.close();
    })();"
@@ -188,7 +188,7 @@ scp apps/*/build/*  →  l'ancien code est déployé
 
 4. **Le service a-t-il redémarré avec le bon fichier ?**
    ```bash
-   ssh bot "systemctl status webmcp-composer --no-pager | head -20"
+   ssh bot "systemctl status webmcp-flex --no-pager | head -20"
    ```
 
 ---

@@ -83,7 +83,7 @@ Skills can be encoded into a URL parameter `?hs=` for sharing:
 - If < 6KB: base64 encoded directly
 - If >= 6KB: gzip compressed, then base64 encoded with `gz.` prefix
 
-URL format: `https://domain.com/viewer?hs=<base64>` or `https://domain.com/composer?hs=<base64>`
+URL format: `https://domain.com/viewer?hs=<base64>` or `https://domain.com/flex?hs=<base64>`
 
 To decode: read the `hs` query param, check for `gz.` prefix, decompress if needed, base64-decode, JSON.parse.
 
