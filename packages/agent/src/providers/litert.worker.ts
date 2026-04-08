@@ -41,6 +41,11 @@ if (typeof (globalThis as any).importScripts !== 'function') {
     throw new TypeError('importScripts is not supported in module workers');
   };
 }
+// MediaPipe falls back to `self.import(url)` which doesn't exist in Chrome.
+// Provide it as an alias to dynamic `import()`.
+if (typeof (self as any).import !== 'function') {
+  (self as any).import = (url: string) => import(/* @vite-ignore */ url);
+}
 
 import { FilesetResolver, LlmInference } from '@mediapipe/tasks-genai';
 
