@@ -5,7 +5,7 @@ import { LocalLLMProvider, type LocalBackend } from './local.js';
 
 export type LLMConfig =
   | { type: 'remote'; model?: RemoteModelId; proxyUrl?: string; apiKey?: string }
-  | { type: 'wasm';   model?: WasmModelId;   workerFactory?: () => Worker; onProgress?: (loaded: number, total: number) => void }
+  | { type: 'wasm';   model?: WasmModelId;   onProgress?: (loaded: number, total: number) => void }
   | { type: 'local';  model: string;         baseUrl: string; backend?: LocalBackend };
 
 export function createProvider(config: LLMConfig): LLMProvider {
@@ -21,7 +21,6 @@ export function createProvider(config: LLMConfig): LLMProvider {
     case 'wasm':
       return new WasmProvider({
         model: config.model,
-        workerFactory: config.workerFactory,
         onProgress: config.onProgress ? (progress, _status, loaded, total) => config.onProgress!(loaded ?? 0, total ?? 0) : undefined,
       });
     case 'local':

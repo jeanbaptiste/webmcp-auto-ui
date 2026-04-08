@@ -6,7 +6,7 @@ LLM agent loop that connects an MCP server to a UI. Given a user message and a s
 
 **AnthropicProvider** — proxies to a `+server.ts` endpoint that holds the API key. Supports `claude-haiku-4-5` and `claude-sonnet-4-6`. Prompt caching enabled by default.
 
-**GemmaProvider** — runs `gemma-4-E2B-it` in a Web Worker via `@huggingface/transformers`. Uses WebGPU with WASM fallback. No API key required. Pass a `workerFactory` function that returns a `Worker` instance (use Vite's `?worker` import).
+**GemmaProvider** — runs Gemma 4 models via `@mediapipe/tasks-genai` (LiteRT) directly on the main thread. Uses WebGPU when available. No API key required. Models are cached in OPFS after first download.
 
 ## UI tools
 
@@ -57,17 +57,16 @@ const result = await runAgentLoop('Show me sales data', {
 ## Gemma E2B
 
 ```ts
-import GemmaWorker from '$lib/gemma.worker.ts?worker'; // Vite worker import
 import { GemmaProvider } from '@webmcp-auto-ui/agent';
 
 const provider = new GemmaProvider({
-  workerFactory: () => new GemmaWorker(),
-  onProgress: (pct, status) => console.log(status, pct),
+  model: 'gemma-e2b',
+  onProgress: (pct, status, loaded, total) => console.log(status, pct),
   onStatusChange: (s) => console.log(s), // 'loading' | 'ready' | 'error'
 });
 ```
 
-Requires `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` headers for `SharedArrayBuffer` support.
+Requires `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: credentialless` headers for WebGPU support.
 
 ## API proxy (`+server.ts`)
 
