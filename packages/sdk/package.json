@@ -14,6 +14,9 @@
     "./canvas": {
       "svelte": "./src/canvas.ts",
       "import": "./src/canvas.ts"
+    },
+    "./canvas-vanilla": {
+      "import": "./src/canvas-vanilla.ts"
     }
   },
   "publishConfig": {

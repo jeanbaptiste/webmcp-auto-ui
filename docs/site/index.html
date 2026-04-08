@@ -718,7 +718,7 @@ return textResult('Operation completed successfully');
 return jsonResult({ count: 42, items: ['a', 'b'] });
 ```
 
-**`registerSkill(skill)`** — Registers a skill as a WebMCP tool on `navigator.modelContext`.
+**`registerSkill(skill)`** — Exposes a skill as a WebMCP tool on `navigator.modelContext`, making it discoverable and invocable by an agent.
 
 ```ts
 registerSkill({
@@ -968,14 +968,15 @@ HyperSkill encode/decode, skills registry, and Svelte 5 canvas store.
 
 A HyperSkill URL embeds a complete skill definition in the `?hs=` query parameter.
 
+The SDK re-exports `encode`, `decode`, `hash`, `diff`, and `getHsParam` directly from the [`hyperskills`](https://www.npmjs.com/package/hyperskills) NPM package. Apps should import from `@webmcp-auto-ui/sdk` (not from `hyperskills` directly).
+
 ```ts
 import {
-  encodeHyperSkill,
-  decodeHyperSkill,
-  computeHash,
-  createVersion,
+  encode,
+  decode,
+  hash,
+  diff,
   getHsParam,
-  diffSkills,
 } from '@webmcp-auto-ui/sdk';
 ```
 
@@ -1012,6 +1013,8 @@ interface HyperSkillVersion {
 ### Encode
 
 ```ts
+import type { HyperSkill } from '@webmcp-auto-ui/sdk';
+
 const skill: HyperSkill = {
   meta: {
     title: 'Weather Dashboard',
@@ -1024,7 +1027,7 @@ const skill: HyperSkill = {
   ],
 };
 
-const url = await encodeHyperSkill(skill, 'https://app.example.com/viewer');
+const url = await encode('https://app.example.com/viewer', JSON.stringify(skill));
 // https://app.example.com/viewer?hs=eyJtZXRhIjp7...
 ```
 
@@ -1033,30 +1036,30 @@ Skills larger than 6KB are automatically gzip-compressed (prefix `gz.`).
 ### Decode
 
 ```ts
-const skill = await decodeHyperSkill('https://app.example.com/viewer?hs=eyJtZXRhIjp7...');
+const { content: raw } = await decode('https://app.example.com/viewer?hs=eyJtZXRh...');
+const skill = JSON.parse(raw);
 console.log(skill.meta.title);  // "Weather Dashboard"
 console.log(skill.content);     // [{ type: 'stat', ... }, ...]
 ```
 
 Also accepts a raw `hs` parameter value (without the full URL).
 
-### Versioning
+### Hashing and versioning
 
 ```ts
-const hash = await computeHash(skill, 'https://app.example.com');
-const version = createVersion(skill, hash, previousHash);
+const h = await hash('https://app.example.com', JSON.stringify(skill.content));
 ```
 
 Each version carries a SHA-256 hash for traceability. Versions can be chained via `previousHash`.
 
 ### Utilities
 
-- **`getHsParam(url)`** — Extracts the raw `hs` parameter from a URL.
-- **`diffSkills(a, b)`** — Compares two HyperSkill objects and returns differences.
+- **`getHsParam(url)`** -- Extracts the raw `hs` parameter from a URL.
+- **`diff(a, b)`** -- Compares two objects and returns an array of changed top-level keys.
 
 ## Skills registry
 
-In-memory CRUD for UI skills (recipes). Each skill describes a composed UI from blocks.
+In-memory CRUD for skills. Each skill is a set of instructions that help an agent use tools.
 
 ```ts
 import {
@@ -1701,9 +1704,9 @@ This theme uses earthy greens and browns:
 
 ---
 
-## Step 2: Create a skill (recipe)
+## Step 2: Create a skill
 
-A skill defines the blocks (widgets) that make up the dashboard, along with metadata. Create `nature-observatory.skill.json`:
+A skill defines a set of instructions for the agent, including which blocks to produce and with what metadata. Create `nature-observatory.skill.json`:
 
 ```json
 {
@@ -2018,10 +2021,23 @@ This pattern lets you build interactive dashboards where selecting a tag filters
 
 Once your demo looks right, export it as a portable HyperSkill URL that anyone can open.
 
+The SDK re-exports `encode` and `decode` from the [`hyperskills`](https://www.npmjs.com/package/hyperskills) NPM package:
+
+```typescript
+import { encode, decode } from '@webmcp-auto-ui/sdk';
+
+// Encode a skill into a shareable URL
+const url = await encode('https://app.example.com/viewer', JSON.stringify(skillData));
+
+// Decode from a URL
+const { content } = await decode(url);
+const skill = JSON.parse(content);
+```
+
 ### Using the SDK
 
 ```typescript
-import { encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+import { encode } from '@webmcp-auto-ui/sdk';
 
 const skill = {
   version: '1.0',
@@ -2031,8 +2047,7 @@ const skill = {
   blocks: skillJson.blocks
 };
 
-const hsParam = encodeHyperSkill(skill);
-const shareUrl = `https://demos.hyperskills.net/viewer?hs=${hsParam}`;
+const shareUrl = await encode('https://demos.hyperskills.net/viewer', JSON.stringify(skill));
 
 console.log(shareUrl);
 // Copy this URL -- anyone who opens it will see the full themed dashboard
@@ -2828,7 +2843,7 @@ The `theme` field in a skill uses the flat token map (same as `tokens`), not the
 
 ## What is a Composed UI?
 
-A composed UI is a collection of **blocks** arranged in sequence. Each block has a `type` and a `data` object. The `BlockRenderer` component dispatches each block to the appropriate widget based on its type.
+A composed UI is a collection of **blocks** arranged in sequence. Each block is a set of instructions for specific tools, expressed as a `type` and a `data` object. The `BlockRenderer` component renders each block visually by dispatching it to the appropriate widget based on its type.
 
 ## The 24 Block Types
 
@@ -3857,13 +3872,13 @@ interface McpClientOptions {
 
   </script>
   <script type="text/markdown" data-page="agents-skills">
-# Skills (Recipes) -- Agent Guide
+# Skills -- Agent Guide
 
 > This document is designed to be injected into an AI agent's context. It contains everything needed to create, manage, encode, and share skills in webmcp-auto-ui.
 
 ## What is a Skill?
 
-A skill (also called a recipe) is a reusable UI composition: a named set of blocks with optional metadata (MCP server, LLM preference, theme, tags). Skills are the fundamental unit of saved UI in webmcp-auto-ui.
+A skill is a set of instructions that help an agent use tools. It can define one or more blocks (each block being a set of instructions for specific tools), reference one or more MCP tools, and refer to other skills (composition via natural-language inclusion). Skills are the fundamental unit of saved agent behavior in webmcp-auto-ui. "Recette" (FR) and "recipe" (EN) are exact synonyms of "skill".
 
 ## Skill Format
 
@@ -3972,6 +3987,12 @@ const unsubscribe = onSkillsChange(() => {
 
 HyperSkill is a URL-based encoding for sharing skills. A skill is serialized into a URL parameter `?hs=` that can be pasted, bookmarked, or shared.
 
+The SDK re-exports `encode`, `decode`, `hash`, `diff`, and `getHsParam` directly from the [`hyperskills`](https://www.npmjs.com/package/hyperskills) NPM package. Apps should import from `@webmcp-auto-ui/sdk`:
+
+```typescript
+import { encode, decode, hash, diff, getHsParam } from '@webmcp-auto-ui/sdk';
+```
+
 ### Structure
 
 ```typescript
@@ -3998,7 +4019,7 @@ interface HyperSkill {
 ### Encoding
 
 ```typescript
-import { encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+import { encode, type HyperSkill } from '@webmcp-auto-ui/sdk';
 
 const skill: HyperSkill = {
   meta: {
@@ -4015,7 +4036,7 @@ const skill: HyperSkill = {
   ]
 };
 
-const url = await encodeHyperSkill(skill, 'https://app.example.com/viewer');
+const url = await encode('https://app.example.com/viewer', JSON.stringify(skill));
 // "https://app.example.com/viewer?hs=eyJtZXRhIjp7InRpdGxlIjoi..."
 ```
 
@@ -4027,11 +4048,13 @@ Encoding rules:
 ### Decoding
 
 ```typescript
-import { decodeHyperSkill } from '@webmcp-auto-ui/sdk';
+import { decode } from '@webmcp-auto-ui/sdk';
 
-const skill = await decodeHyperSkill('https://app.example.com/viewer?hs=eyJtZXRh...');
+const { content: raw } = await decode('https://app.example.com/viewer?hs=eyJtZXRh...');
+const skill = JSON.parse(raw);
 // or just the param value:
-const skill2 = await decodeHyperSkill('eyJtZXRhIjp7...');
+const { content: raw2 } = await decode('eyJtZXRhIjp7...');
+const skill2 = JSON.parse(raw2);
 
 console.log(skill.meta.title);   // "Sales Dashboard"
 console.log(skill.content);      // blocks array
@@ -4040,11 +4063,12 @@ console.log(skill.content);      // blocks array
 ### Reading from Current URL
 
 ```typescript
-import { getHsParam } from '@webmcp-auto-ui/sdk';
+import { getHsParam, decode } from '@webmcp-auto-ui/sdk';
 
 const param = getHsParam();  // returns the ?hs= value or null
 if (param) {
-  const skill = await decodeHyperSkill(param);
+  const { content: raw } = await decode(param);
+  const skill = JSON.parse(raw);
 }
 ```
 
@@ -4054,23 +4078,23 @@ Skills can be shared via two entry points:
 - **Viewer**: `https://domain.com/viewer?hs=<encoded>` -- read-only display
 - **Composer**: `https://domain.com/composer?hs=<encoded>` -- editable view
 
-### Versioning
+### Hashing
 
 HyperSkills support content-addressable versioning via SHA-256 hashes:
 
 ```typescript
-import { createVersion } from '@webmcp-auto-ui/sdk';
+import { hash } from '@webmcp-auto-ui/sdk';
 
-const version = await createVersion(skill, 'https://app.example.com/viewer', previousHash);
-// version: { hash, previousHash, timestamp, skill }
+const h = await hash('https://app.example.com/viewer', JSON.stringify(skill.content));
+// h: 64-char hex SHA-256
 ```
 
 ### Diffing
 
 ```typescript
-import { diffSkills } from '@webmcp-auto-ui/sdk';
+import { diff } from '@webmcp-auto-ui/sdk';
 
-const changed = diffSkills(oldContent, newContent);
+const changed = diff(oldContent, newContent);
 // returns array of changed top-level keys, e.g. ["blocks", "meta"]
 ```
 
@@ -4116,14 +4140,13 @@ Three built-in demo skills are available via `loadDemoSkills()`:
 4. **Add metadata**: Set name, description, tags, optional MCP/LLM references
 5. **Add theme** (optional): Override accent colors to match branding
 6. **Create**: Call `createSkill()` with the complete object
-7. **Encode** (optional): Call `encodeHyperSkill()` to generate a shareable URL
+7. **Encode** (optional): Call `encode()` to generate a shareable URL
 8. **Share**: Send the URL -- recipients load it via `?hs=` parameter
 
 ### Example: Full Workflow
 
 ```typescript
-import { createSkill } from '@webmcp-auto-ui/sdk';
-import { encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+import { createSkill, encode, type HyperSkill } from '@webmcp-auto-ui/sdk';
 
 // Step 1-5: Define the skill
 const skill = createSkill({
@@ -4162,10 +4185,11 @@ const skill = createSkill({
 });
 
 // Step 7: Encode for sharing
-const hsUrl = await encodeHyperSkill(
-  { meta: { title: skill.name, description: skill.description, tags: skill.tags }, content: skill.blocks },
-  'https://app.example.com/viewer'
-);
+const hsSkill: HyperSkill = {
+  meta: { title: skill.name, description: skill.description, tags: skill.tags },
+  content: skill.blocks,
+};
+const hsUrl = await encode('https://app.example.com/viewer', JSON.stringify(hsSkill));
 console.log('Share this URL:', hsUrl);
 ```
 
@@ -4186,7 +4210,7 @@ console.log('Share this URL:', hsUrl);
 | Huge blocks data (e.g. 1000-row table) | HyperSkill URL exceeds browser limits | Limit data to what fits visually; paginate server-side |
 | Missing `blocks` array | Skill renders empty | Always include at least one block |
 | `theme` with nested `dark` key | Dark overrides ignored (flat format only) | Use flat tokens; for dark mode, use the full theme.json in ThemeProvider |
-| Forgetting to `await` encode/decode | Returns a Promise, not the actual value | Both `encodeHyperSkill` and `decodeHyperSkill` are async |
+| Forgetting to `await` encode/decode | Returns a Promise, not the actual value | Both `encode` and `decode` are async |
 | Using wrong block type string | BlockRenderer shows `[unknown-type]` | Check exact type strings: `stat-card` not `statcard`, `chart-rich` not `chartRich` |
 
   </script>
