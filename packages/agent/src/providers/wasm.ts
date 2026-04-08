@@ -36,7 +36,11 @@ export class WasmProvider implements LLMProvider {
 
   async initialize(): Promise<void> {
     if (this.initPromise) return this.initPromise;
-    this.initPromise = this._init();
+    this.initPromise = this._init().catch((err) => {
+      // Allow retry on failure by clearing the cached promise
+      this.initPromise = null;
+      throw err;
+    });
     return this.initPromise;
   }
 

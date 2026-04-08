@@ -133,6 +133,10 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
 
   function getProvider() {
     if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
+      // Destroy existing provider if model changed
+      if (gemmaProvider && gemmaProvider.model !== canvas.llm) {
+        unloadGemma();
+      }
       if (!gemmaProvider) {
         gemmaProvider = new GemmaProvider({
           workerFactory: () => new Worker(new URL('@webmcp-auto-ui/agent/gemma-worker', import.meta.url), { type: 'module' }),

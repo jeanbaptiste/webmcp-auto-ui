@@ -375,6 +375,10 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   // ── Agent / Chat ──────────────────────────────────────────────────────────
   function getProvider() {
     if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
+      // Destroy existing provider if model changed
+      if (gemmaProvider && gemmaProvider.model !== canvas.llm) {
+        unloadGemma();
+      }
       if (!gemmaProvider) {
         const modelLabel = canvas.llm === 'gemma-e4b' ? 'Gemma 4B' : 'Gemma 2B';
         gemmaProvider = new GemmaProvider({

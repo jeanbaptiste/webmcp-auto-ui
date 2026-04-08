@@ -78,6 +78,7 @@ self.onmessage = async (e: MessageEvent) => {
     try {
       const conversation = [{ role: 'user', content: [{ type: 'text', text: prompt }] }];
       const inputs = await processor.apply_chat_template(conversation, {
+        tokenize: true,
         add_generation_prompt: true,
         return_dict: true,
       });
