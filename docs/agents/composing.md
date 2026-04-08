@@ -157,6 +157,63 @@ The `component` tool also exposes canvas actions under short names:
 
 Component names use dashes instead of underscores (e.g. `stat-card` instead of `render_stat_card`). The original `render_*` names are also accepted for backward compatibility.
 
+### All registered components
+
+The `component("help")` response includes **all** components in the system, not just the renderable widgets. Each entry includes a `renderable` flag:
+
+- **renderable: true** — can be rendered via the agent tool pipeline (all `render_*` tools + canvas actions)
+- **renderable: false** — Svelte component available for direct usage via `@webmcp-auto-ui/ui`, but cannot be rendered through `component("name", {...})`. Calling render on these returns their schema and a usage hint instead.
+
+#### Primitives (layout containers)
+
+| Name | Description |
+|------|-------------|
+| `card` | Container card with optional header and footer slots |
+| `grid-layout` | Responsive grid layout (stacks on mobile) |
+| `list-primitive` | Scrollable list container with item snippet |
+| `panel` | Panel with optional title header |
+| `window` | Window with draggable title bar |
+
+#### Base (shadcn-style UI primitives)
+
+| Name | Description |
+|------|-------------|
+| `button` | Button with variants: default, outline, destructive, ghost |
+| `input` | Text input field |
+| `badge` | Badge/tag with variants: default, success, warning, destructive, outline |
+| `select` | Native dropdown select |
+| `tooltip` | Tooltip on hover |
+| `dialog` | Modal dialog overlay |
+
+#### Layouts (window manager)
+
+| Name | Description |
+|------|-------------|
+| `tiling-layout` | Tiling window manager layout |
+| `floating-layout` | Floating drag-and-drop window manager |
+| `stack-layout` | Stacked vertical scroll or single-window layout |
+| `pane` | Window pane with title bar, badge, fold/close actions |
+
+#### Agent UI
+
+| Name | Description |
+|------|-------------|
+| `llm-selector` | LLM model dropdown grouped by type |
+| `mcp-status` | MCP connection status indicator |
+| `mcp-connector` | MCP connection form with URL/token/status |
+| `agent-progress` | Agent progress bar (time, tools, tokens/sec) |
+| `gemma-loader` | Gemma WASM model loader with progress |
+| `chat-panel` | Full chat panel with feed, progress, and input |
+| `agent-console` | Collapsible agent debug console |
+| `settings-panel` | Agent settings (system prompt, tokens, cache) |
+| `remote-mcp-servers` | Remote MCP server list with connect/disconnect |
+
+#### Theme
+
+| Name | Description |
+|------|-------------|
+| `theme-provider` | Theme provider (dark/light) with CSS custom properties |
+
 ## Constraints
 
 - Block `type` must be one of the 24 valid types listed above.
