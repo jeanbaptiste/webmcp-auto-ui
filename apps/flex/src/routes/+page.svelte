@@ -47,6 +47,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   // FlexGrid ref
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let flexGrid: any;
+  let layoutMode = $state<'float' | 'grid'>('float');
 
   // Skills
   let skills = $state<Skill[]>([]);
@@ -362,6 +363,12 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
       <span class="text-text1">Auto-UI</span><span class="text-accent"> flex</span>
     </span>
     <div class="flex-1"></div>
+    <button
+      class="font-mono text-[10px] h-6 px-2 rounded border transition-colors flex-shrink-0
+             {layoutMode === 'grid' ? 'border-accent bg-accent/10 text-accent' : 'border-border2 text-text2 hover:text-text1'}"
+      onclick={() => layoutMode = layoutMode === 'float' ? 'grid' : 'float'}>
+      {layoutMode === 'grid' ? '⊞ grid' : '⊞ float'}
+    </button>
     {#if canvas.blockCount > 0}
       <!-- J — hidden on mobile -->
       <span class="hidden md:inline font-mono text-[10px] text-text2">{canvas.blockCount} bloc{canvas.blockCount !== 1 ? 's' : ''}</span>
@@ -404,7 +411,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
 
   <!-- CANVAS + EPHEMERAL WRAPPER -->
   <div class="flex-1 relative overflow-hidden">
-    <FlexGrid bind:this={flexGrid} class="w-full h-full" />
+    <FlexGrid bind:this={flexGrid} class="w-full h-full" {layoutMode} />
 
     <!-- Ephemeral bubbles — flottent au-dessus de l'input -->
     <div class="absolute bottom-3 left-[50px] right-[50px] flex flex-col gap-2 pointer-events-none z-20">
