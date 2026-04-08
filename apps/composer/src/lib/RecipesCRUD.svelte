@@ -14,8 +14,8 @@
 
 <div class="px-3 pb-3 flex-1 overflow-y-auto">
   <div class="flex items-center justify-between mb-2">
-    <div class="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Recettes</div>
-    <button class="text-zinc-600 hover:text-teal transition-colors" onclick={oncreate}><Plus size={12} /></button>
+    <div class="text-[10px] font-mono text-text2 uppercase tracking-widest">Skills</div>
+    <button class="text-text2 hover:text-teal transition-colors" onclick={oncreate}><Plus size={12} /></button>
   </div>
   <div class="flex flex-col gap-0.5">
     {#each skills as skill}
@@ -24,8 +24,8 @@
           onclick={() => onapply(skill)}>
           ⚡ {skill.name}
         </button>
-        <button class="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-300 p-1 transition-opacity" onclick={() => onedit(skill)}><Pencil size={10} /></button>
-        <button class="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 p-1 transition-opacity" onclick={() => ondelete(skill.id)}><Trash2 size={10} /></button>
+        <button class="opacity-0 group-hover:opacity-100 text-text2 hover:text-text1 p-1 transition-opacity" onclick={() => onedit(skill)}><Pencil size={10} /></button>
+        <button class="opacity-0 group-hover:opacity-100 text-text2 hover:text-accent2 p-1 transition-opacity" onclick={() => ondelete(skill.id)}><Trash2 size={10} /></button>
       </div>
     {/each}
   </div>

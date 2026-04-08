@@ -55,9 +55,9 @@ This theme uses earthy greens and browns:
 
 ---
 
-## Step 2: Create a skill (recipe)
+## Step 2: Create a skill
 
-A skill defines the blocks (widgets) that make up the dashboard, along with metadata. Create `nature-observatory.skill.json`:
+A skill defines a set of instructions for the agent, including which blocks to produce and with what metadata. Create `nature-observatory.skill.json`:
 
 ```json
 {
@@ -372,10 +372,23 @@ This pattern lets you build interactive dashboards where selecting a tag filters
 
 Once your demo looks right, export it as a portable HyperSkill URL that anyone can open.
 
+The SDK re-exports `encode` and `decode` from the [`hyperskills`](https://www.npmjs.com/package/hyperskills) NPM package:
+
+```typescript
+import { encode, decode } from '@webmcp-auto-ui/sdk';
+
+// Encode a skill into a shareable URL
+const url = await encode('https://app.example.com/viewer', JSON.stringify(skillData));
+
+// Decode from a URL
+const { content } = await decode(url);
+const skill = JSON.parse(content);
+```
+
 ### Using the SDK
 
 ```typescript
-import { encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+import { encode } from '@webmcp-auto-ui/sdk';
 
 const skill = {
   version: '1.0',
@@ -385,8 +398,7 @@ const skill = {
   blocks: skillJson.blocks
 };
 
-const hsParam = encodeHyperSkill(skill);
-const shareUrl = `https://demos.hyperskills.net/viewer?hs=${hsParam}`;
+const shareUrl = await encode('https://demos.hyperskills.net/viewer', JSON.stringify(skill));
 
 console.log(shareUrl);
 // Copy this URL -- anyone who opens it will see the full themed dashboard

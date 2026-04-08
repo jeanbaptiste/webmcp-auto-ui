@@ -150,7 +150,7 @@ return textResult('Operation completed successfully');
 return jsonResult({ count: 42, items: ['a', 'b'] });
 ```
 
-**`registerSkill(skill)`** — Registers a skill as a WebMCP tool on `navigator.modelContext`.
+**`registerSkill(skill)`** — Exposes a skill as a WebMCP tool on `navigator.modelContext`, making it discoverable and invocable by an agent.
 
 ```ts
 registerSkill({

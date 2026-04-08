@@ -6,8 +6,32 @@
 
   const demos = [
     {
+      title: 'Flex',
+      desc: 'Canvas drag & resize avec multi-MCP (7 serveurs simultanés), chat éphémère, export HyperSkills, et Gemma WASM local. Le plus complet des démos.',
+      url: `${base}/flex`,
+      accent: '#06b6d4',
+    },
+    {
+      title: 'Template',
+      desc: 'Starter SvelteKit minimal pour créer une nouvelle app webmcp-auto-ui. Chat panel, BlockRenderer, connexion MCP et sélection LLM prêts à l\'emploi.',
+      url: `${base}/template`,
+      accent: '#a78bfa',
+    },
+    {
+      title: 'Showcase',
+      desc: '34 components demonstrated with iNaturalist data. Interactive DAG wiring via FONC bus — click a table row and watch other components update in real-time. Gallery, Carousel, D3 visualizations.',
+      url: `${base}/showcase`,
+      accent: '#22c55e',
+    },
+    {
+      title: 'Todo',
+      desc: 'Minimal WebMCP demo — a todo list that exposes 8 tools (add, list, toggle, delete...) callable by any AI agent or Chrome extension via the W3C WebMCP protocol.',
+      url: `${base}/todo`,
+      accent: '#3ecfb2',
+    },
+    {
       title: 'Composer',
-      desc: 'Build UIs with 3 modes: auto (LLM generates from MCP data), drag & drop, or chat. Supports Claude and Gemma (local WASM). Full recipe CRUD, theme support, and HyperSkills URL export.',
+      desc: 'Build UIs with 3 modes: auto (LLM generates from MCP data), drag & drop, or chat. Supports Claude and Gemma (local WASM). Full skill CRUD, theme support, and HyperSkills URL export.',
       url: `${base}/composer`,
       accent: '#7c6dfa',
     },
@@ -18,23 +42,21 @@
       accent: '#f0a050',
     },
     {
-      title: 'Showcase',
-      desc: '34 components demonstrated with iNaturalist data. Interactive DAG wiring via FONC bus — click a table row and watch other components update in real-time. Gallery, Carousel, D3 visualizations.',
-      url: `${base}/showcase`,
-      accent: '#22c55e',
-    },
-    {
       title: 'Mobile',
-      desc: 'Responsive chat agent with MCP integration, Gemma WASM local model, recipe management, and native sharing (Web Share API, email, social). Phone frame on desktop, full-screen on mobile.',
+      desc: 'Responsive chat agent with MCP integration, Gemma WASM local model, skill management, and native sharing (Web Share API, email, social). Phone frame on desktop, full-screen on mobile.',
       url: `${base}/mobile`,
       accent: '#fa6d7c',
     },
-    {
-      title: 'Todo',
-      desc: 'Minimal WebMCP demo — a todo list that exposes 8 tools (add, list, toggle, delete...) callable by any AI agent or Chrome extension via the W3C WebMCP protocol.',
-      url: `${base}/todo`,
-      accent: '#3ecfb2',
-    },
+  ];
+
+  const mcpServers = [
+    { name: 'Code4Code', desc: 'Parlement français' },
+    { name: 'Hacker News', desc: 'Stories & commentaires' },
+    { name: 'Met Museum', desc: 'Collections d\'art' },
+    { name: 'Open-Meteo', desc: 'Données météo' },
+    { name: 'Wikipedia', desc: 'Articles & recherche' },
+    { name: 'iNaturalist', desc: 'Biodiversité' },
+    { name: 'data.gouv.fr', desc: 'Open data FR' },
   ];
 </script>
 
@@ -73,6 +95,18 @@
           </div>
         </a>
       {/each}
+    </div>
+
+    <div class="mt-10 border border-border rounded-xl p-5">
+      <div class="text-[10px] font-mono text-text2 uppercase tracking-wider mb-3">Serveurs MCP disponibles</div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {#each mcpServers as srv}
+          <div class="text-xs font-mono text-text1 bg-surface2 rounded-lg px-3 py-2">
+            <div class="font-medium">{srv.name}</div>
+            <div class="text-[10px] text-text2 truncate">{srv.desc}</div>
+          </div>
+        {/each}
+      </div>
     </div>
 
     <footer class="mt-16 pt-6 border-t border-border text-xs font-mono text-text2 flex flex-wrap gap-x-4 gap-y-1">

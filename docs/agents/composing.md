@@ -4,7 +4,7 @@
 
 ## What is a Composed UI?
 
-A composed UI is a collection of **blocks** arranged in sequence. Each block has a `type` and a `data` object. The `BlockRenderer` component dispatches each block to the appropriate widget based on its type.
+A composed UI is a collection of **blocks** arranged in sequence. Each block is a set of instructions for specific tools, expressed as a `type` and a `data` object. The `BlockRenderer` component renders each block visually by dispatching it to the appropriate widget based on its type.
 
 ## The 24 Block Types
 

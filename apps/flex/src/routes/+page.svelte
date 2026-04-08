@@ -1,12 +1,14 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { base } from '$app/paths';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-  import { McpClient } from '@webmcp-auto-ui/core';
+  import { listSkills } from '@webmcp-auto-ui/sdk';
+  import type { Skill } from '@webmcp-auto-ui/sdk';
+  import { McpMultiClient } from '@webmcp-auto-ui/core';
   import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory } from '@webmcp-auto-ui/agent';
   import type { ChatMessage } from '@webmcp-auto-ui/agent';
   import { McpStatus, GemmaLoader, AgentProgress, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
-  import { Menu } from 'lucide-svelte';
+  import { Menu, ExternalLink } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
   import EphemeralBubble from '$lib/EphemeralBubble.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
@@ -14,7 +16,6 @@
 
   // ── State ─────────────────────────────────────────────────────────────────
   let input = $state('');
-  let mcpClient = $state<McpClient | null>(null);
   let mcpToken = $state('');
   let conversationHistory = $state<ChatMessage[]>([]);
   let historyLog = $state<{id:string; role:string; content:string; ts:Date}[]>([]);
@@ -47,6 +48,73 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let flexGrid: any;
 
+  // Skills
+  let skills = $state<Skill[]>([]);
+
+  // Export clipboard feedback
+  let exportCopied = $state(false);
+
+  // ── Multi-MCP ────────────────────────────────────────────────────────────
+  let multiClient = $state<McpMultiClient>(new McpMultiClient());
+  let connectedUrls = $state<string[]>([]);
+  let loadingUrls = $state<string[]>([]);
+  let mcpRecipes = $state<{name:string; description?:string}[]>([]);
+
+  async function addMcpServer(url: string) {
+    if (!url.trim()) return;
+    settingsOpen = false;
+    loadingUrls = [...loadingUrls, url];
+    canvas.setMcpConnecting(true);
+    try {
+      const opts = mcpToken.trim() ? { headers: { Authorization: `Bearer ${mcpToken.trim()}` } } : undefined;
+      const { name, tools } = await multiClient.addServer(url.trim(), opts);
+      connectedUrls = [...connectedUrls, url];
+      const allTools = multiClient.listAllTools();
+      canvas.setMcpConnected(true, multiClient.listServers().map(s => s.name).join(', '), allTools as Parameters<typeof canvas.setMcpConnected>[2]);
+
+      // G — Load recipes if available
+      if (tools.some(t => t.name === 'list_recipes')) {
+        try {
+          const r = await multiClient.callTool('list_recipes', {});
+          const text = r.content?.find((c: any) => c.type === 'text') as any;
+          if (text?.text) {
+            const parsed = JSON.parse(text.text);
+            const newRecipes: {name:string; description?:string}[] = Array.isArray(parsed) ? parsed : (parsed?.recipes ?? []);
+            // Merge recipes (avoid duplicates by name)
+            const existing = new Set(mcpRecipes.map(r => r.name));
+            mcpRecipes = [...mcpRecipes, ...newRecipes.filter(r => !existing.has(r.name))];
+          }
+        } catch { /* pas de recettes */ }
+      }
+    } catch(e) {
+      canvas.setMcpError(e instanceof Error ? e.message : String(e));
+    } finally {
+      loadingUrls = loadingUrls.filter(u => u !== url);
+      canvas.setMcpConnecting(false);
+    }
+  }
+
+  async function removeMcpServer(url: string) {
+    await multiClient.removeServer(url);
+    connectedUrls = connectedUrls.filter(u => u !== url);
+    if (multiClient.serverCount === 0) {
+      canvas.setMcpConnected(false, '', []);
+      mcpRecipes = [];
+    } else {
+      const allTools = multiClient.listAllTools();
+      canvas.setMcpConnected(true, multiClient.listServers().map(s => s.name).join(', '), allTools as Parameters<typeof canvas.setMcpConnected>[2]);
+    }
+  }
+
+  async function addAllServers() {
+    const { MCP_DEMO_SERVERS } = await import('@webmcp-auto-ui/sdk');
+    for (const server of MCP_DEMO_SERVERS) {
+      if (!connectedUrls.includes(server.url)) {
+        await addMcpServer(server.url);
+      }
+    }
+  }
+
   // ── Gemma ─────────────────────────────────────────────────────────────────
   let gemmaProvider = $state<GemmaProvider | null>(null);
   let gemmaStatus = $state<'idle'|'loading'|'ready'|'error'>('idle');
@@ -56,6 +124,9 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   let gemmaLoadedMB = $state(0);
   let gemmaTotalMB = $state(0);
   let gemmaTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
+
+  // H — Provider singleton
+  const anthropicProvider = new AnthropicProvider({ proxyUrl: `${base}/api/chat` });
 
   function getProvider() {
     if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
@@ -86,7 +157,9 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
       }
       return gemmaProvider;
     }
-    return new AnthropicProvider({ proxyUrl: `${base}/api/chat`, model: canvas.llm });
+    // H — Return singleton, update model via setModel
+    anthropicProvider.setModel(canvas.llm as any);
+    return anthropicProvider;
   }
 
   function unloadGemma() {
@@ -107,27 +180,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
     });
   });
 
-  // ── MCP ───────────────────────────────────────────────────────────────────
-  async function connectMcp() {
-    const url = canvas.mcpUrl.trim();
-    if (!url) return;
-    settingsOpen = false;
-    canvas.setMcpConnecting(true);
-    try {
-      const opts = mcpToken.trim() ? { headers: { Authorization: `Bearer ${mcpToken.trim()}` } } : undefined;
-      const client = new McpClient(url, opts);
-      const init = await client.connect();
-      const tools = await client.listTools();
-      mcpClient = client;
-      canvas.setMcpConnected(true, init.serverInfo.name, tools as Parameters<typeof canvas.setMcpConnected>[2]);
-    } catch(e) {
-      canvas.setMcpError(e instanceof Error ? e.message : String(e));
-    } finally {
-      canvas.setMcpConnecting(false);
-    }
-  }
-
-  // ── Effective prompt ──────────────────────────────────────────────────────
+  // ── Effective prompt (K — structured for cache) ──────────────────────────
   const WEBMCP_UI_TOOLS = [
     'render_stat', 'render_kv', 'render_list', 'render_table',
     'render_chart', 'render_chart_rich', 'render_timeline', 'render_profile',
@@ -138,23 +191,34 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   ];
 
   const effectivePrompt = $derived.by(() => {
-    const base = systemPrompt.replace(
+    // 1. Partie stable (cacheable)
+    const stable = systemPrompt.replace(
       '- liste tous les outils MCP et WEBMCP',
       WEBMCP_UI_TOOLS.map(t => `- ${t}`).join('\n')
     );
-    const sections = [base];
+
+    // 2. Outils UI (stable tant qu'on ne change pas la liste)
+    const uiToolsSection = '\n\n--- Outils UI disponibles ---\n' +
+      WEBMCP_UI_TOOLS.map(t => `- ${t}`).join('\n');
+
+    // 3. Contexte MCP dynamique (change quand on connecte/déconnecte)
+    let mcpSection = '';
     if (canvas.mcpConnected) {
       const dataTools = (canvas.mcpTools as {name:string;description?:string}[])
         .filter(t => !t.name.startsWith('render_') && t.name !== 'clear_canvas');
       if (dataTools.length > 0) {
-        sections.push(
-          `\n--- Contexte MCP : ${canvas.mcpName ?? 'serveur connecté'} ---\n` +
+        mcpSection += `\n--- Contexte MCP : ${canvas.mcpName ?? 'serveur connecté'} ---\n` +
           `Outils DATA disponibles :\n` +
-          dataTools.map(t => `- ${t.name}${t.description ? ' : ' + t.description.split('\n')[0] : ''}`).join('\n')
-        );
+          dataTools.map(t => `- ${t.name}${t.description ? ' : ' + t.description.split('\n')[0] : ''}`).join('\n');
+      }
+      // G — Inject recipes into prompt
+      if (mcpRecipes.length > 0) {
+        mcpSection += `\nRecettes/skills disponibles (${mcpRecipes.length}) :\n` +
+          mcpRecipes.map(r => `- ${r.name}${r.description ? ' : ' + r.description : ''}`).join('\n');
       }
     }
-    return sections.join('');
+
+    return stable + uiToolsSection + mcpSection;
   });
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -166,6 +230,15 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
 
   function updateEphemeral(id: string, html: string) {
     ephemeral = ephemeral.map(e => e.id === id ? { ...e, html } : e);
+  }
+
+  // ── HyperSkill export ────────────────────────────────────────────────────
+  async function exportHsUrl() {
+    const param = canvas.buildHyperskillParam();
+    const url = `${window.location.origin}/flex?hs=${param}`;
+    await navigator.clipboard.writeText(url);
+    exportCopied = true;
+    setTimeout(() => { exportCopied = false; }, 2000);
   }
 
   // ── Agent ─────────────────────────────────────────────────────────────────
@@ -186,7 +259,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
 
     try {
       const result = await runAgentLoop(msg, {
-        client: mcpClient ?? undefined,
+        client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
         maxIterations: 15,
@@ -240,6 +313,16 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
       if (tokens) for (const [k, v] of Object.entries(tokens)) root.style.setProperty(`--${k}`, v);
     });
   }
+
+  // E — Support ?hs= param + skills init
+  onMount(() => {
+    const param = new URLSearchParams(window.location.search).get('hs');
+    if (param) {
+      canvas.loadFromParam(param);
+      if (canvas.mcpUrl) addMcpServer(canvas.mcpUrl);
+    }
+    skills = listSkills();
+  });
 </script>
 
 <svelte:head><title>Auto-UI flex</title></svelte:head>
@@ -257,10 +340,21 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
     </span>
     <div class="flex-1"></div>
     {#if canvas.blockCount > 0}
-      <span class="font-mono text-[10px] text-text2">{canvas.blockCount} bloc{canvas.blockCount !== 1 ? 's' : ''}</span>
-      <button class="font-mono text-[10px] text-text2 hover:text-accent2 transition-colors"
+      <!-- J — hidden on mobile -->
+      <span class="hidden md:inline font-mono text-[10px] text-text2">{canvas.blockCount} bloc{canvas.blockCount !== 1 ? 's' : ''}</span>
+      <button class="hidden md:inline font-mono text-[10px] text-text2 hover:text-accent2 transition-colors"
               onclick={() => flexGrid?.clearBlocks()}>effacer</button>
     {/if}
+    <!-- E — export button -->
+    <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-text2 hover:text-text1 transition-colors flex-shrink-0"
+            onclick={exportHsUrl}
+            title="Copier le lien HyperSkill">
+      {#if exportCopied}
+        <span class="text-teal">copié !</span>
+      {:else}
+        <ExternalLink size={14} class="inline -mt-px" /> <span class="hidden md:inline">exporter</span>
+      {/if}
+    </button>
     <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-text2 hover:text-text1 transition-colors flex-shrink-0"
             onclick={() => historyOpen = true}>
       historique
@@ -325,7 +419,12 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   bind:maxTokens
   bind:maxContextTokens
   bind:cacheEnabled
-  onconnect={connectMcp}
+  onconnect={() => addMcpServer(canvas.mcpUrl)}
+  {connectedUrls}
+  {loadingUrls}
+  onaddserver={addMcpServer}
+  onaddall={addAllServers}
+  onremoveserver={removeMcpServer}
 />
 
 <!-- HISTORY MODAL -->

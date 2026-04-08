@@ -90,3 +90,7 @@ export {
   clearSkills,
 } from './webmcp-helpers.js';
 export type { SkillDef } from './webmcp-helpers.js';
+
+// Multi-MCP client
+export { McpMultiClient } from './multi-client.js';
+export type { ConnectedServer } from './multi-client.js';

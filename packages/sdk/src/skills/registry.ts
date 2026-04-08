@@ -1,6 +1,6 @@
 /**
- * Skills registry — in-memory CRUD for UI recipes/skills.
- * Each skill describes how to compose a UI from a set of blocks.
+ * Skills registry — in-memory CRUD for skills.
+ * Each skill is a set of instructions that help an agent use tools.
  */
 
 export interface SkillBlock {

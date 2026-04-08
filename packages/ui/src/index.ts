@@ -76,3 +76,4 @@ export { default as ChatPanel } from './agent/ChatPanel.svelte';
 export type { ChatFeedItem, ChatBubble, ChatBlock } from './agent/ChatPanel.svelte';
 export { default as AgentConsole } from './agent/AgentConsole.svelte';
 export { default as SettingsPanel } from './agent/SettingsPanel.svelte';
+export { default as RemoteMCPserversDemo } from './agent/RemoteMCPserversDemo.svelte';

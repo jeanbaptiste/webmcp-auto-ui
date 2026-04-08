@@ -6,9 +6,9 @@
   import { McpClient, createToolGroup, textResult, jsonResult } from '@webmcp-auto-ui/core';
   import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory } from '@webmcp-auto-ui/agent';
   import type { GemmaStatus as GemmaStatusType } from '@webmcp-auto-ui/agent';
-  import { X, Plus, Zap, Copy, Check, Save, Menu, ChevronLeft, ChevronRight, Settings } from 'lucide-svelte';
+  import { Plus, Copy, Check, Save, Menu, ChevronLeft, ChevronRight, Settings } from 'lucide-svelte';
   import BlockWrap from '$lib/BlockWrap.svelte';
-  import { ChatPanel, GemmaLoader, LLMSelector, McpConnector, AgentConsole, SettingsPanel } from '@webmcp-auto-ui/ui';
+  import { ChatPanel, GemmaLoader, LLMSelector, McpConnector, AgentConsole, SettingsPanel, Button, Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from '@webmcp-auto-ui/ui';
   import type { ChatFeedItem } from '@webmcp-auto-ui/ui';
   import RecipesCRUD from '$lib/RecipesCRUD.svelte';
 
@@ -115,12 +115,12 @@
   let mcpToolCallCount = $state(0);
   let lastToolName = $state('');
 
-  // 4G: Recettes CRUD
+  // 4G: Skills CRUD
   let editingSkillId = $state<string | null>(null);
   let editingSkillJson = $state('');
 
   function createEmptySkill() {
-    createSkill({ name: 'nouvelle-recette', blocks: [] });
+    createSkill({ name: 'nouveau-skill', blocks: [] });
     skills = listSkills();
   }
   function removeSkill(id: string) {
@@ -191,7 +191,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
       }
       if (mcpRecipes.length > 0) {
         sections.push(
-          `\nRecettes/skills disponibles (${mcpRecipes.length}) :\n` +
+          `\nSkills disponibles (${mcpRecipes.length}) :\n` +
           mcpRecipes.map((r) => `- ${r.name}${r.description ? ' : ' + r.description : ''}`).join('\n')
         );
       }
@@ -298,7 +298,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
           if (textContent?.text) {
             const parsed: unknown = JSON.parse(textContent.text);
             mcpRecipes = Array.isArray(parsed) ? parsed : ((parsed as { recipes?: typeof mcpRecipes })?.recipes ?? []);
-            canvas.addMsg('system', `📚 ${mcpRecipes.length} recettes chargées depuis le serveur`);
+            canvas.addMsg('system', `📚 ${mcpRecipes.length} skills chargés depuis le serveur`);
           }
         } catch { /* list_recipes not available or parse error */ }
       }
@@ -655,7 +655,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
         {#if mcpRecipes.length > 0}
           <div class="h-px bg-border mx-3 my-2"></div>
           <div class="px-3 pb-2">
-            <div class="text-[10px] font-mono text-text2 uppercase tracking-widest mb-1.5">Recettes MCP ({mcpRecipes.length})</div>
+            <div class="text-[10px] font-mono text-text2 uppercase tracking-widest mb-1.5">Skills MCP ({mcpRecipes.length})</div>
             <div class="flex flex-col gap-0.5">
               {#each mcpRecipes as recipe}
                 <div class="px-2 py-1.5 rounded text-xs font-mono text-accent2 border border-transparent hover:bg-white/5 hover:border-border2 transition-all">
@@ -703,7 +703,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
         <div class="h-px bg-border mx-3 my-2"></div>
         <div class="px-3 pb-3 flex-1 overflow-y-auto">
           <div class="flex items-center justify-between mb-2">
-            <div class="text-[10px] font-mono text-text2 uppercase tracking-widest">Recettes</div>
+            <div class="text-[10px] font-mono text-text2 uppercase tracking-widest">Skills</div>
             <button class="text-text2 hover:text-teal" onclick={createEmptySkill}><Plus size={12} /></button>
           </div>
           <div class="flex flex-col gap-0.5">
@@ -781,132 +781,116 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
 </div>
 
 <!-- EDIT MODAL -->
-{#if editingId}
-  <div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-    <div class="bg-surface border border-border2 rounded-xl w-[500px] flex flex-col shadow-2xl">
-      <div class="flex items-center justify-between px-5 py-4 border-b border-border">
-        <span class="text-sm font-mono text-text1">Éditer bloc</span>
-        <button onclick={() => { editingId = null; }} class="text-text2 hover:text-white"><X size={16} /></button>
-      </div>
-      <div class="p-5">
-        <textarea class="w-full font-mono text-xs bg-black/30 border border-border text-teal rounded-lg p-3 h-48 outline-none resize-vertical leading-relaxed"
-          bind:value={editJson}></textarea>
-      </div>
-      <div class="flex justify-end gap-3 px-5 py-4 border-t border-border">
-        <button class="font-mono text-xs px-4 py-2 rounded border border-border2 text-text2 hover:text-white" onclick={() => { editingId = null; }}>annuler</button>
-        <button class="font-mono text-xs px-4 py-2 rounded bg-accent text-white hover:opacity-85" onclick={saveEdit}>sauvegarder</button>
-      </div>
+<Dialog open={!!editingId} onOpenChange={(v) => { if (!v) editingId = null; }}>
+  <DialogContent class="w-[500px]">
+    <DialogHeader>
+      <DialogTitle class="text-sm font-mono">Éditer bloc</DialogTitle>
+    </DialogHeader>
+    <div class="p-5">
+      <textarea class="w-full font-mono text-xs bg-black/30 border border-border text-teal rounded-lg p-3 h-48 outline-none resize-vertical leading-relaxed"
+        bind:value={editJson}></textarea>
     </div>
-  </div>
-{/if}
+    <DialogFooter>
+      <Button variant="outline" size="sm" onclick={() => { editingId = null; }}>annuler</Button>
+      <Button size="sm" onclick={saveEdit}>sauvegarder</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
 <!-- EXPORT MODAL -->
-{#if showExport}
-  <div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-    <div class="bg-surface border border-border2 rounded-xl w-[640px] max-h-[85vh] flex flex-col shadow-2xl">
-      <div class="flex items-center justify-between px-5 py-4 border-b border-border">
-        <span class="text-sm font-mono text-text1">Export Skill</span>
-        <button onclick={() => showExport = false} class="text-text2 hover:text-white"><X size={16} /></button>
+<Dialog bind:open={showExport}>
+  <DialogContent class="w-[640px] max-h-[85vh] flex flex-col">
+    <DialogHeader>
+      <DialogTitle class="text-sm font-mono">Export Skill</DialogTitle>
+    </DialogHeader>
+    <div class="flex-1 overflow-auto p-5 flex flex-col gap-4">
+      <div>
+        <div class="text-xs font-mono text-text2 mb-2">skill.json</div>
+        <pre class="font-mono text-xs text-teal bg-black/30 border border-border rounded-lg p-4 overflow-x-auto leading-relaxed max-h-48">{JSON.stringify(canvas.buildSkillJSON(), null, 2)}</pre>
       </div>
-      <div class="flex-1 overflow-auto p-5 flex flex-col gap-4">
-        <div>
-          <div class="text-xs font-mono text-text2 mb-2">skill.json</div>
-          <pre class="font-mono text-xs text-teal bg-black/30 border border-border rounded-lg p-4 overflow-x-auto leading-relaxed max-h-48">{JSON.stringify(canvas.buildSkillJSON(), null, 2)}</pre>
-        </div>
-        <div>
-          <div class="text-xs font-mono text-text2 mb-2">HyperSkills URL</div>
-          <div class="flex gap-2">
-            <div class="flex-1 font-mono text-xs text-text2 bg-black/20 border border-border rounded-lg p-3 truncate">
-              {window.location.origin}/composer?hs={canvas.buildHyperskillParam()}
-            </div>
-            <button class="px-3 rounded border transition-all text-xs font-mono flex items-center gap-2
-                {copied ? 'border-teal bg-teal/10 text-teal' : 'border-border2 text-text2 hover:border-accent hover:text-accent'}"
-              onclick={copyHsUrl}>
-              {#if copied}<Check size={12} /> copié{:else}<Copy size={12} /> copier{/if}
-            </button>
+      <div>
+        <div class="text-xs font-mono text-text2 mb-2">HyperSkills URL</div>
+        <div class="flex gap-2">
+          <div class="flex-1 font-mono text-xs text-text2 bg-black/20 border border-border rounded-lg p-3 truncate">
+            {window.location.origin}/composer?hs={canvas.buildHyperskillParam()}
           </div>
+          <Button variant={copied ? 'default' : 'outline'} size="sm" class="flex items-center gap-2 {copied ? 'border-teal bg-teal/10 text-teal' : ''}"
+            onclick={copyHsUrl}>
+            {#if copied}<Check size={12} /> copié{:else}<Copy size={12} /> copier{/if}
+          </Button>
         </div>
-      </div>
-      <div class="flex justify-end gap-3 px-5 py-4 border-t border-border">
-        <button class="font-mono text-xs px-4 py-2 rounded border border-border2 text-text2 hover:text-white" onclick={() => showExport = false}>fermer</button>
       </div>
     </div>
-  </div>
-{/if}
+    <DialogFooter>
+      <Button variant="outline" size="sm" onclick={() => showExport = false}>fermer</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
 <!-- SETTINGS MODAL (4H) -->
-{#if showSettings}
-  <div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-    <div class="bg-surface border border-border2 rounded-xl w-[500px] flex flex-col shadow-2xl">
-      <div class="flex items-center justify-between px-5 py-4 border-b border-border">
-        <span class="text-sm font-mono text-text1">Paramètres</span>
-        <button onclick={() => showSettings = false} class="text-text2 hover:text-text1"><X size={16} /></button>
-      </div>
-      <div class="p-5">
-        <SettingsPanel bind:systemPrompt bind:maxTokens bind:maxContextTokens bind:cacheEnabled />
-      </div>
-      <div class="flex justify-end gap-3 px-5 py-4 border-t border-border">
-        <button class="font-mono text-xs px-4 py-2 rounded border border-border2 text-text2 hover:text-text1" onclick={() => showSettings = false}>fermer</button>
-      </div>
+<Dialog bind:open={showSettings}>
+  <DialogContent class="w-[500px]">
+    <DialogHeader>
+      <DialogTitle class="text-sm font-mono">Paramètres</DialogTitle>
+    </DialogHeader>
+    <div class="p-5">
+      <SettingsPanel bind:systemPrompt bind:maxTokens bind:maxContextTokens bind:cacheEnabled />
     </div>
-  </div>
-{/if}
+    <DialogFooter>
+      <Button variant="outline" size="sm" onclick={() => showSettings = false}>fermer</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
 <!-- MCP TOOLS MODAL -->
-{#if showMcpTools}
-  <div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-    <div class="bg-surface border border-border2 rounded-xl w-[600px] max-h-[85vh] flex flex-col shadow-2xl">
-      <div class="flex items-center justify-between px-5 py-4 border-b border-border">
-        <span class="text-sm font-mono text-text1">MCP Tools — {canvas.mcpName}</span>
-        <button onclick={() => showMcpTools = false} class="text-text2 hover:text-text1"><X size={16} /></button>
-      </div>
-      <div class="flex-1 overflow-auto p-5">
-        <div class="flex flex-col gap-2">
-          {#each canvas.mcpTools as tool}
-            <div class="bg-surface2 border border-border rounded-lg px-4 py-3">
-              <div class="font-mono text-xs text-accent font-semibold">{tool.name}</div>
-              <div class="text-xs text-text2 mt-1">{tool.description}</div>
-            </div>
-          {/each}
-        </div>
-        {#if skills.length > 0}
-          <div class="mt-4 pt-4 border-t border-border">
-            <div class="text-xs font-mono text-text2 mb-2 uppercase tracking-wider">Recettes ({skills.length})</div>
-            <div class="flex flex-col gap-2">
-              {#each skills as skill}
-                <div class="bg-surface2 border border-border rounded-lg px-4 py-3">
-                  <div class="font-mono text-xs text-teal font-semibold">{skill.name}</div>
-                  {#if skill.description}<div class="text-xs text-text2 mt-1">{skill.description}</div>{/if}
-                  <div class="text-[10px] text-text2 mt-1">{skill.blocks.length} blocs{skill.mcp ? ` · MCP: ${skill.mcpName ?? skill.mcp}` : ''}</div>
-                </div>
-              {/each}
-            </div>
+<Dialog bind:open={showMcpTools}>
+  <DialogContent class="w-[600px] max-h-[85vh] flex flex-col">
+    <DialogHeader>
+      <DialogTitle class="text-sm font-mono">MCP Tools — {canvas.mcpName}</DialogTitle>
+    </DialogHeader>
+    <div class="flex-1 overflow-auto p-5">
+      <div class="flex flex-col gap-2">
+        {#each canvas.mcpTools as tool}
+          <div class="bg-surface2 border border-border rounded-lg px-4 py-3">
+            <div class="font-mono text-xs text-accent font-semibold">{tool.name}</div>
+            <div class="text-xs text-text2 mt-1">{tool.description}</div>
           </div>
-        {/if}
+        {/each}
       </div>
-      <div class="flex justify-end gap-3 px-5 py-4 border-t border-border">
-        <button class="font-mono text-xs px-4 py-2 rounded border border-border2 text-text2 hover:text-text1" onclick={() => showMcpTools = false}>fermer</button>
-      </div>
+      {#if skills.length > 0}
+        <div class="mt-4 pt-4 border-t border-border">
+          <div class="text-xs font-mono text-text2 mb-2 uppercase tracking-wider">Skills ({skills.length})</div>
+          <div class="flex flex-col gap-2">
+            {#each skills as skill}
+              <div class="bg-surface2 border border-border rounded-lg px-4 py-3">
+                <div class="font-mono text-xs text-teal font-semibold">{skill.name}</div>
+                {#if skill.description}<div class="text-xs text-text2 mt-1">{skill.description}</div>{/if}
+                <div class="text-[10px] text-text2 mt-1">{skill.blocks.length} blocs{skill.mcp ? ` · MCP: ${skill.mcpName ?? skill.mcp}` : ''}</div>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
     </div>
-  </div>
-{/if}
+    <DialogFooter>
+      <Button variant="outline" size="sm" onclick={() => showMcpTools = false}>fermer</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
 <!-- SKILL EDIT MODAL (4G) -->
-{#if editingSkillId}
-  <div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-    <div class="bg-surface border border-border2 rounded-xl w-[500px] flex flex-col shadow-2xl">
-      <div class="flex items-center justify-between px-5 py-4 border-b border-border">
-        <span class="text-sm font-mono text-text1">Editer recette</span>
-        <button onclick={() => { editingSkillId = null; }} class="text-text2 hover:text-white"><X size={16} /></button>
-      </div>
-      <div class="p-5">
-        <textarea class="w-full font-mono text-xs bg-black/30 border border-border text-teal rounded-lg p-3 h-48 outline-none resize-vertical leading-relaxed"
-          bind:value={editingSkillJson}></textarea>
-      </div>
-      <div class="flex justify-end gap-3 px-5 py-4 border-t border-border">
-        <button class="font-mono text-xs px-4 py-2 rounded border border-border2 text-text2 hover:text-white" onclick={() => { editingSkillId = null; }}>annuler</button>
-        <button class="font-mono text-xs px-4 py-2 rounded bg-accent text-white hover:opacity-85" onclick={saveSkillEdit}>sauvegarder</button>
-      </div>
+<Dialog open={!!editingSkillId} onOpenChange={(v) => { if (!v) editingSkillId = null; }}>
+  <DialogContent class="w-[500px]">
+    <DialogHeader>
+      <DialogTitle class="text-sm font-mono">Editer skill</DialogTitle>
+    </DialogHeader>
+    <div class="p-5">
+      <textarea class="w-full font-mono text-xs bg-black/30 border border-border text-teal rounded-lg p-3 h-48 outline-none resize-vertical leading-relaxed"
+        bind:value={editingSkillJson}></textarea>
     </div>
-  </div>
-{/if}
+    <DialogFooter>
+      <Button variant="outline" size="sm" onclick={() => { editingSkillId = null; }}>annuler</Button>
+      <Button size="sm" onclick={saveSkillEdit}>sauvegarder</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>

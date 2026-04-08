@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
-  import { Button, Input, BlockRenderer } from '@webmcp-auto-ui/ui';
-  import { decodeHyperSkill, computeHash, diffSkills, type HyperSkill, type HyperSkillVersion } from '@webmcp-auto-ui/sdk';
+  import { Button, Input, BlockRenderer, Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from '@webmcp-auto-ui/ui';
+  import { encode, decode, hash, diff, type HyperSkill, type HyperSkillVersion } from '@webmcp-auto-ui/sdk';
   import { McpClient, textResult, jsonResult } from '@webmcp-auto-ui/core';
   import { AnthropicProvider, runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
-  import { Link, RefreshCw, Edit, Check, X, GitBranch, Zap } from 'lucide-svelte';
+  import { Link, RefreshCw, Edit, X, GitBranch, Zap } from 'lucide-svelte';
 
   type BlockType = 'stat'|'kv'|'list'|'chart'|'alert'|'code'|'text'|'actions'|'tags'|'stat-card'|'data-table'|'timeline'|'profile'|'hemicycle'|'cards'|'json-viewer'|'sankey'|'log';
   interface Block { id: string; type: BlockType; data: Record<string,unknown>; }
@@ -30,7 +30,8 @@
     if (!url.trim()) { error='URL vide'; return; }
     loading = true; error = '';
     try {
-      const decoded = await decodeHyperSkill(url);
+      const { content: raw } = await decode(url);
+      const decoded = JSON.parse(raw) as HyperSkill;
       const prev = skill;
       skill = decoded;
       // Support both formats:
@@ -48,13 +49,13 @@
 
       // Compute version
       const sourceUrl = url.includes('://') ? url.split('?')[0] : window.location.href.split('?')[0];
-      const hash = await computeHash(sourceUrl, decoded.content);
+      const h = await hash(sourceUrl, JSON.stringify(decoded.content));
       const prevHash = versions[versions.length-1]?.hash;
-      versions = [...versions, { hash, previousHash: prevHash, timestamp: Date.now(), skill: decoded }];
+      versions = [...versions, { hash: h, previousHash: prevHash, timestamp: Date.now(), skill: decoded }];
 
       // Diff with previous version
       if (prev && prev.content) {
-        diffResult = diffSkills(prev.content, decoded.content);
+        diffResult = diff(prev.content, decoded.content);
         if (diffResult.length > 0) showDiff = true;
       }
     } catch (e) {
@@ -63,12 +64,11 @@
   }
 
   async function generateHsUrl() {
-    const { encodeHyperSkill } = await import('@webmcp-auto-ui/sdk');
     const currentSkill: HyperSkill = {
       meta: { ...skill?.meta, title: skill?.meta?.title ?? 'viewer-export', version: new Date().toISOString() },
       content: { blocks: blocks.map(b => ({ type: b.type, data: b.data })) },
     };
-    const url = await encodeHyperSkill(currentSkill);
+    const url = await encode(window.location.href.split('?')[0], JSON.stringify(currentSkill));
     await navigator.clipboard.writeText(url);
     statusMsg = 'URL copiée dans le presse-papiers';
   }
@@ -278,21 +278,18 @@
 </div>
 
 <!-- Edit modal -->
-{#if editingId}
-  <div class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-    <div class="bg-surface border border-border2 rounded-xl w-[500px] flex flex-col shadow-2xl">
-      <div class="flex items-center justify-between px-5 py-4 border-b border-border">
-        <span class="text-sm font-mono text-text1">Éditer bloc</span>
-        <Button variant="ghost" size="icon" class="h-7 w-7" onclick={()=>editingId=null}><X size={16}/></Button>
-      </div>
-      <div class="p-5">
-        <textarea class="w-full font-mono text-xs bg-black/30 border border-border text-teal rounded-lg p-3 h-48 outline-none resize-vertical leading-relaxed"
-          bind:value={editJson}></textarea>
-      </div>
-      <div class="flex justify-end gap-3 px-5 py-4 border-t border-border">
-        <Button variant="outline" size="sm" onclick={()=>editingId=null}>annuler</Button>
-        <Button size="sm" onclick={saveEdit}>sauvegarder</Button>
-      </div>
+<Dialog open={!!editingId} onOpenChange={(v) => { if (!v) editingId = null; }}>
+  <DialogContent class="w-[500px]">
+    <DialogHeader>
+      <DialogTitle class="text-sm font-mono">Éditer bloc</DialogTitle>
+    </DialogHeader>
+    <div class="p-5">
+      <textarea class="w-full font-mono text-xs bg-black/30 border border-border text-teal rounded-lg p-3 h-48 outline-none resize-vertical leading-relaxed"
+        bind:value={editJson}></textarea>
     </div>
-  </div>
-{/if}
+    <DialogFooter>
+      <Button variant="outline" size="sm" onclick={()=>editingId=null}>annuler</Button>
+      <Button size="sm" onclick={saveEdit}>sauvegarder</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>

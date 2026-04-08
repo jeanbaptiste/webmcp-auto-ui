@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { textResult, jsonResult } from '@webmcp-auto-ui/core';
+  import { jsonResult } from '@webmcp-auto-ui/core';
   import { Button, Input, Badge, NativeSelect, StatCard, DataTable } from '@webmcp-auto-ui/ui';
   import { Check, Trash2, Plus, Circle } from 'lucide-svelte';
 
@@ -116,6 +116,11 @@
       navigator.modelContext
     </div>
   </header>
+
+  <div class="text-center py-6">
+    <h1 class="text-2xl md:text-3xl font-bold text-text1">TODO List <span class="text-teal">editor</span></h1>
+    <p class="text-sm text-text2 mt-1 font-mono">8 outils WebMCP exposés à tout agent AI</p>
+  </div>
 
   <main class="max-w-2xl mx-auto px-6 py-8 flex flex-col gap-6">
 

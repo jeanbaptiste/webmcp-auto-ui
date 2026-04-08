@@ -1,10 +1,10 @@
-# Skills (Recipes) -- Agent Guide
+# Skills -- Agent Guide
 
 > This document is designed to be injected into an AI agent's context. It contains everything needed to create, manage, encode, and share skills in webmcp-auto-ui.
 
 ## What is a Skill?
 
-A skill (also called a recipe) is a reusable UI composition: a named set of blocks with optional metadata (MCP server, LLM preference, theme, tags). Skills are the fundamental unit of saved UI in webmcp-auto-ui.
+A skill is a set of instructions that help an agent use tools. It can define one or more blocks (each block being a set of instructions for specific tools), reference one or more MCP tools, and refer to other skills (composition via natural-language inclusion). Skills are the fundamental unit of saved agent behavior in webmcp-auto-ui. "Recette" (FR) and "recipe" (EN) are exact synonyms of "skill".
 
 ## Skill Format
 
@@ -111,6 +111,12 @@ const unsubscribe = onSkillsChange(() => {
 
 HyperSkill is a URL-based encoding for sharing skills. A skill is serialized into a URL parameter `?hs=` that can be pasted, bookmarked, or shared.
 
+The SDK re-exports `encode`, `decode`, `hash`, `diff`, and `getHsParam` directly from the [`hyperskills`](https://www.npmjs.com/package/hyperskills) NPM package. Apps should import from `@webmcp-auto-ui/sdk`:
+
+```typescript
+import { encode, decode, hash, diff, getHsParam } from '@webmcp-auto-ui/sdk';
+```
+
 ### Structure
 
 ```typescript
@@ -137,7 +143,7 @@ interface HyperSkill {
 ### Encoding
 
 ```typescript
-import { encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+import { encode, type HyperSkill } from '@webmcp-auto-ui/sdk';
 
 const skill: HyperSkill = {
   meta: {
@@ -152,7 +158,7 @@ const skill: HyperSkill = {
   ]
 };
 
-const url = await encodeHyperSkill(skill, 'https://app.example.com/viewer');
+const url = await encode('https://app.example.com/viewer', JSON.stringify(skill));
 // "https://app.example.com/viewer?hs=eyJtZXRhIjp7InRpdGxlIjoi..."
 ```
 
@@ -164,11 +170,13 @@ Encoding rules:
 ### Decoding
 
 ```typescript
-import { decodeHyperSkill } from '@webmcp-auto-ui/sdk';
+import { decode } from '@webmcp-auto-ui/sdk';
 
-const skill = await decodeHyperSkill('https://app.example.com/viewer?hs=eyJtZXRh...');
+const { content: raw } = await decode('https://app.example.com/viewer?hs=eyJtZXRh...');
+const skill = JSON.parse(raw);
 // or just the param value:
-const skill2 = await decodeHyperSkill('eyJtZXRhIjp7...');
+const { content: raw2 } = await decode('eyJtZXRhIjp7...');
+const skill2 = JSON.parse(raw2);
 
 console.log(skill.meta.title);   // "Sales Dashboard"
 console.log(skill.content);      // blocks array
@@ -177,11 +185,12 @@ console.log(skill.content);      // blocks array
 ### Reading from Current URL
 
 ```typescript
-import { getHsParam } from '@webmcp-auto-ui/sdk';
+import { getHsParam, decode } from '@webmcp-auto-ui/sdk';
 
 const param = getHsParam();  // returns the ?hs= value or null
 if (param) {
-  const skill = await decodeHyperSkill(param);
+  const { content: raw } = await decode(param);
+  const skill = JSON.parse(raw);
 }
 ```
 
@@ -191,23 +200,23 @@ Skills can be shared via two entry points:
 - **Viewer**: `https://domain.com/viewer?hs=<encoded>` -- read-only display
 - **Composer**: `https://domain.com/composer?hs=<encoded>` -- editable view
 
-### Versioning
+### Hashing
 
 HyperSkills support content-addressable versioning via SHA-256 hashes:
 
 ```typescript
-import { createVersion } from '@webmcp-auto-ui/sdk';
+import { hash } from '@webmcp-auto-ui/sdk';
 
-const version = await createVersion(skill, 'https://app.example.com/viewer', previousHash);
-// version: { hash, previousHash, timestamp, skill }
+const h = await hash('https://app.example.com/viewer', JSON.stringify(skill.content));
+// h: 64-char hex SHA-256
 ```
 
 ### Diffing
 
 ```typescript
-import { diffSkills } from '@webmcp-auto-ui/sdk';
+import { diff } from '@webmcp-auto-ui/sdk';
 
-const changed = diffSkills(oldContent, newContent);
+const changed = diff(oldContent, newContent);
 // returns array of changed top-level keys, e.g. ["blocks", "meta"]
 ```
 
@@ -253,14 +262,13 @@ Three built-in demo skills are available via `loadDemoSkills()`:
 4. **Add metadata**: Set name, description, tags, optional MCP/LLM references
 5. **Add theme** (optional): Override accent colors to match branding
 6. **Create**: Call `createSkill()` with the complete object
-7. **Encode** (optional): Call `encodeHyperSkill()` to generate a shareable URL
+7. **Encode** (optional): Call `encode()` to generate a shareable URL
 8. **Share**: Send the URL -- recipients load it via `?hs=` parameter
 
 ### Example: Full Workflow
 
 ```typescript
-import { createSkill } from '@webmcp-auto-ui/sdk';
-import { encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+import { createSkill, encode, type HyperSkill } from '@webmcp-auto-ui/sdk';
 
 // Step 1-5: Define the skill
 const skill = createSkill({
@@ -299,10 +307,11 @@ const skill = createSkill({
 });
 
 // Step 7: Encode for sharing
-const hsUrl = await encodeHyperSkill(
-  { meta: { title: skill.name, description: skill.description, tags: skill.tags }, content: skill.blocks },
-  'https://app.example.com/viewer'
-);
+const hsSkill: HyperSkill = {
+  meta: { title: skill.name, description: skill.description, tags: skill.tags },
+  content: skill.blocks,
+};
+const hsUrl = await encode('https://app.example.com/viewer', JSON.stringify(hsSkill));
 console.log('Share this URL:', hsUrl);
 ```
 
@@ -323,5 +332,5 @@ console.log('Share this URL:', hsUrl);
 | Huge blocks data (e.g. 1000-row table) | HyperSkill URL exceeds browser limits | Limit data to what fits visually; paginate server-side |
 | Missing `blocks` array | Skill renders empty | Always include at least one block |
 | `theme` with nested `dark` key | Dark overrides ignored (flat format only) | Use flat tokens; for dark mode, use the full theme.json in ThemeProvider |
-| Forgetting to `await` encode/decode | Returns a Promise, not the actual value | Both `encodeHyperSkill` and `decodeHyperSkill` are async |
+| Forgetting to `await` encode/decode | Returns a Promise, not the actual value | Both `encode` and `decode` are async |
 | Using wrong block type string | BlockRenderer shows `[unknown-type]` | Check exact type strings: `stat-card` not `statcard`, `chart-rich` not `chartRich` |

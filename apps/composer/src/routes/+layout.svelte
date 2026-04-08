@@ -61,7 +61,7 @@
 
       mc.registerTool({
         name: 'list_skills',
-        description: 'List all available UI skills/recipes.',
+        description: 'List all available skills.',
         inputSchema: { type: 'object', properties: {} },
         execute: () => jsonResult(listSkills().map(s => ({ id: s.id, name: s.name, description: s.description, tags: s.tags }))),
         annotations: { readOnlyHint: true },

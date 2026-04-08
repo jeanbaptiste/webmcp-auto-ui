@@ -17,9 +17,9 @@
     speciesToProfile, observerToProfile, filterSpeciesByGroup,
   } from '$lib/inat-mock.js';
   import type { ManagedWindow } from '@webmcp-auto-ui/ui';
-  import { McpConnector } from '@webmcp-auto-ui/ui';
+  import { McpConnector, RemoteMCPserversDemo } from '@webmcp-auto-ui/ui';
   import { initializeWebMCPPolyfill, listenForAgentCalls, executeToolInternal, jsonResult, registerSkill, unregisterSkill, McpClient } from '@webmcp-auto-ui/core';
-  import { listSkills, createSkill, deleteSkill, updateSkill, loadDemoSkills } from '@webmcp-auto-ui/sdk';
+  import { listSkills, createSkill, deleteSkill, updateSkill, loadDemoSkills, MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
   import type { Skill } from '@webmcp-auto-ui/sdk';
 
   // Nav sections
@@ -47,6 +47,8 @@
   let mcpServerName = $state('');
   let mcpError = $state('');
   let mcpClient: McpClient | null = null;
+  let connectedUrls = $state<string[]>([]);
+  let loadingUrls = $state<string[]>([]);
 
   async function connectMcp() {
     if (!mcpUrl.trim()) return;
@@ -56,7 +58,9 @@
       mcpClient = new McpClient(mcpUrl.trim());
       const info = await mcpClient.connect();
       mcpConnected = true;
+      connectedUrls = [mcpUrl.trim()];
       mcpServerName = info.serverInfo?.name ?? 'Connecté';
+      await autoGenerate();
     } catch (e: unknown) {
       mcpError = e instanceof Error ? e.message : 'Erreur de connexion';
       mcpConnected = false;
@@ -73,6 +77,22 @@
     mcpServerName = '';
     mcpTools = [];
     autoBlocks = [];
+    connectedUrls = [];
+  }
+
+  async function connectDemoServer(url: string) {
+    if (mcpConnected) disconnectMcp();
+    mcpUrl = url;
+    loadingUrls = [...loadingUrls, url];
+    try {
+      await connectMcp();
+    } finally {
+      loadingUrls = loadingUrls.filter(u => u !== url);
+    }
+  }
+
+  function disconnectDemoServer(url: string) {
+    if (mcpUrl === url) disconnectMcp();
   }
 
   let mcpTools = $state<{name: string, description: string}[]>([]);
@@ -548,6 +568,16 @@
             {autoGenerating ? 'Génération…' : 'Auto-générer'}
           </button>
         {/if}
+      </div>
+      <!-- Demo MCP servers -->
+      <div class="mt-3">
+        <RemoteMCPserversDemo
+          servers={MCP_DEMO_SERVERS}
+          {connectedUrls}
+          loading={loadingUrls}
+          onconnect={connectDemoServer}
+          ondisconnect={disconnectDemoServer}
+        />
       </div>
     </div>
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-  import { McpConnector, LLMSelector, SettingsPanel } from '@webmcp-auto-ui/ui';
+  import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
+  import { McpConnector, LLMSelector, SettingsPanel, RemoteMCPserversDemo } from '@webmcp-auto-ui/ui';
 
   interface Props {
     open: boolean;
@@ -10,6 +11,11 @@
     maxContextTokens?: number;
     cacheEnabled?: boolean;
     onconnect: () => void;
+    connectedUrls?: string[];
+    loadingUrls?: string[];
+    onaddserver?: (url: string) => void;
+    onaddall?: () => void;
+    onremoveserver?: (url: string) => void;
   }
 
   let {
@@ -20,6 +26,11 @@
     maxContextTokens = $bindable(150_000),
     cacheEnabled = $bindable(true),
     onconnect,
+    connectedUrls = [],
+    loadingUrls = [],
+    onaddserver,
+    onaddall,
+    onremoveserver,
   }: Props = $props();
 </script>
 
@@ -41,9 +52,9 @@
 
   <div class="flex flex-col gap-6 p-5 overflow-y-auto flex-1">
 
-    <!-- MCP -->
+    <!-- MCP — custom URL -->
     <section class="flex flex-col gap-2">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Serveur MCP</div>
+      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Serveur MCP (URL manuelle)</div>
       <McpConnector
         url={canvas.mcpUrl}
         onurlchange={(v) => canvas.setMcpUrl(v)}
@@ -52,6 +63,18 @@
         connected={canvas.mcpConnected}
         serverName={canvas.mcpName ?? ''}
         onconnect={onconnect}
+      />
+    </section>
+
+    <!-- I — MCP demo servers -->
+    <section class="flex flex-col gap-2">
+      <RemoteMCPserversDemo
+        servers={MCP_DEMO_SERVERS}
+        {connectedUrls}
+        loading={loadingUrls}
+        onconnect={(url) => onaddserver?.(url)}
+        onconnectall={() => onaddall?.()}
+        ondisconnect={(url) => onremoveserver?.(url)}
       />
     </section>
 

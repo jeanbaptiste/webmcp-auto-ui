@@ -12,14 +12,15 @@ HyperSkill encode/decode, skills registry, and Svelte 5 canvas store.
 
 A HyperSkill URL embeds a complete skill definition in the `?hs=` query parameter.
 
+The SDK re-exports `encode`, `decode`, `hash`, `diff`, and `getHsParam` directly from the [`hyperskills`](https://www.npmjs.com/package/hyperskills) NPM package. Apps should import from `@webmcp-auto-ui/sdk` (not from `hyperskills` directly).
+
 ```ts
 import {
-  encodeHyperSkill,
-  decodeHyperSkill,
-  computeHash,
-  createVersion,
+  encode,
+  decode,
+  hash,
+  diff,
   getHsParam,
-  diffSkills,
 } from '@webmcp-auto-ui/sdk';
 ```
 
@@ -56,6 +57,8 @@ interface HyperSkillVersion {
 ### Encode
 
 ```ts
+import type { HyperSkill } from '@webmcp-auto-ui/sdk';
+
 const skill: HyperSkill = {
   meta: {
     title: 'Weather Dashboard',
@@ -68,7 +71,7 @@ const skill: HyperSkill = {
   ],
 };
 
-const url = await encodeHyperSkill(skill, 'https://app.example.com/viewer');
+const url = await encode('https://app.example.com/viewer', JSON.stringify(skill));
 // https://app.example.com/viewer?hs=eyJtZXRhIjp7...
 ```
 
@@ -77,30 +80,30 @@ Skills larger than 6KB are automatically gzip-compressed (prefix `gz.`).
 ### Decode
 
 ```ts
-const skill = await decodeHyperSkill('https://app.example.com/viewer?hs=eyJtZXRhIjp7...');
+const { content: raw } = await decode('https://app.example.com/viewer?hs=eyJtZXRh...');
+const skill = JSON.parse(raw);
 console.log(skill.meta.title);  // "Weather Dashboard"
 console.log(skill.content);     // [{ type: 'stat', ... }, ...]
 ```
 
 Also accepts a raw `hs` parameter value (without the full URL).
 
-### Versioning
+### Hashing and versioning
 
 ```ts
-const hash = await computeHash(skill, 'https://app.example.com');
-const version = createVersion(skill, hash, previousHash);
+const h = await hash('https://app.example.com', JSON.stringify(skill.content));
 ```
 
 Each version carries a SHA-256 hash for traceability. Versions can be chained via `previousHash`.
 
 ### Utilities
 
-- **`getHsParam(url)`** — Extracts the raw `hs` parameter from a URL.
-- **`diffSkills(a, b)`** — Compares two HyperSkill objects and returns differences.
+- **`getHsParam(url)`** -- Extracts the raw `hs` parameter from a URL.
+- **`diff(a, b)`** -- Compares two objects and returns an array of changed top-level keys.
 
 ## Skills registry
 
-In-memory CRUD for UI skills (recipes). Each skill describes a composed UI from blocks.
+In-memory CRUD for skills. Each skill is a set of instructions that help an agent use tools.
 
 ```ts
 import {

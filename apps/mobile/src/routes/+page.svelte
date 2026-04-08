@@ -5,7 +5,7 @@
   import type { ChatFeedItem } from '@webmcp-auto-ui/ui';
   import {
     loadDemoSkills, listSkills, createSkill, updateSkill, deleteSkill,
-    decodeHyperSkill, encodeHyperSkill, type Skill,
+    encode, decode, type Skill, type HyperSkill,
   } from '@webmcp-auto-ui/sdk';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { McpClient, jsonResult, textResult } from '@webmcp-auto-ui/core';
@@ -44,7 +44,7 @@
       }
       if (mcpRecipes.length > 0) {
         sections.push(
-          `\nRecettes/skills disponibles (${mcpRecipes.length}) :\n` +
+          `\nSkills disponibles (${mcpRecipes.length}) :\n` +
           mcpRecipes.map(r => `- ${r.name}${r.description ? ' : ' + r.description : ''}`).join('\n')
         );
       }
@@ -145,7 +145,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   function applySkill(skill: Skill) {
     drawerOpen = false;
     clearFeedBlocks();
-    addBubble('assistant', `recette <strong style="color:#7c6dfa">${skill.name}</strong> chargée${skill.mcpName ? ` · serveur: <strong style="color:#3ecfb2">${skill.mcpName}</strong>` : ''}`);
+    addBubble('assistant', `skill <strong style="color:#7c6dfa">${skill.name}</strong> chargé${skill.mcpName ? ` · serveur: <strong style="color:#3ecfb2">${skill.mcpName}</strong>` : ''}`);
 
     // Auto-connect MCP if skill requires one
     if (skill.mcp && !canvas.mcpConnected) {
@@ -155,11 +155,11 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
       // Kick off connection (don't await — non-blocking)
       void connectMcp();
     } else if (skill.mcp && canvas.mcpConnected && canvas.mcpUrl !== skill.mcp) {
-      addBubble('assistant', `⚠️ Recette conçue pour <strong style="color:#f0a050">${skill.mcpName}</strong>, vous êtes sur <strong>${canvas.mcpUrl.split('/').slice(-2).join('/')}</strong>`);
+      addBubble('assistant', `⚠️ Skill conçu pour <strong style="color:#f0a050">${skill.mcpName}</strong>, vous êtes sur <strong>${canvas.mcpUrl.split('/').slice(-2).join('/')}</strong>`);
     }
 
     skill.blocks.forEach((b, i) => {
-      setTimeout(() => addBlock(b.type, b.data, skill.mcpName ?? 'recette'), i * 120);
+      setTimeout(() => addBlock(b.type, b.data, skill.mcpName ?? 'skill'), i * 120);
     });
     updateHsUrl();
   }
@@ -176,7 +176,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
       tags: [],
     });
     refreshSkills();
-    addBubble('assistant', `Recette <strong style="color:#7c6dfa">${saveName.trim()}</strong> sauvegardée — ${blocks.length} blocs`);
+    addBubble('assistant', `Skill <strong style="color:#7c6dfa">${saveName.trim()}</strong> sauvegardé — ${blocks.length} blocs`);
     saveName = '';
     drawerView = 'main';
   }
@@ -185,10 +185,11 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
     const raw = pasteInput.trim();
     if (!raw) return;
     try {
-      const decoded = await decodeHyperSkill(raw);
+      const { content: rawContent } = await decode(raw);
+      const decoded = JSON.parse(rawContent) as HyperSkill;
       const content = decoded.content as { blocks?: { type: string; data: Record<string,unknown> }[] };
       clearFeedBlocks();
-      addBubble('assistant', `Recette chargée depuis URL · ${content.blocks?.length ?? 0} blocs`);
+      addBubble('assistant', `Skill chargé depuis URL · ${content.blocks?.length ?? 0} blocs`);
       if (decoded.meta?.mcp && !canvas.mcpConnected) {
         addBubble('assistant', `Serveur requis : <strong style="color:#f0a050">${decoded.meta.mcpName ?? decoded.meta.mcp}</strong>`);
       }
@@ -230,7 +231,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
       meta: { mcp: canvas.mcpUrl || undefined, mcpName: canvas.mcpName || undefined, llm: canvas.llm },
       content: { blocks: canvas.blocks.map(b => ({ type: b.type, data: b.data })) },
     };
-    const url = await encodeHyperSkill(skill);
+    const url = await encode(window.location.href.split('?')[0], JSON.stringify(skill));
     hsUrlDisplay = url;
   }
 
@@ -478,7 +479,8 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
       if (param) {
         try {
           const full = window.location.href;
-          const decoded = await decodeHyperSkill(full);
+          const { content: rawContent } = await decode(full);
+          const decoded = JSON.parse(rawContent) as HyperSkill;
           const content = decoded.content as { blocks?: { type: string; data: Record<string,unknown> }[] };
           if (decoded.meta?.mcp) canvas.setMcpUrl(decoded.meta.mcp as string);
           addBubble('assistant', `HyperSkills chargée · ${content.blocks?.length ?? 0} blocs`);
@@ -628,9 +630,9 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
         <!-- Settings -->
         <SettingsPanel bind:systemPrompt bind:maxTokens bind:maxContextTokens bind:cacheEnabled />
 
-        <!-- Recettes -->
+        <!-- Skills -->
         <div class="flex flex-col gap-2">
-          <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Recettes ({skills.length})</div>
+          <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Skills ({skills.length})</div>
           {#each skills as skill}
             <div class="flex items-center gap-1 bg-surface2 border border-border rounded-lg px-2 py-1.5">
               <div class="w-1.5 h-1.5 rounded-full bg-teal flex-shrink-0"></div>
@@ -650,7 +652,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
         <div class="flex flex-col gap-2 mt-auto">
           <button class="w-full py-2 rounded-lg border border-border2 text-text2 text-xs font-mono hover:border-teal hover:text-teal transition-colors"
             onclick={() => drawerView = 'paste'}>
-            📋 Coller une recette HyperSkills
+            📋 Coller un skill HyperSkills
           </button>
           <button class="w-full py-2 rounded-lg border border-border2 text-text2 text-xs font-mono hover:border-accent hover:text-accent transition-colors"
             onclick={() => { drawerView = 'save'; }}>
@@ -710,7 +712,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
         <!-- PASTE VIEW -->
         <div class="flex items-center gap-2 mb-2">
           <button class="text-text2 hover:text-white text-sm" onclick={() => drawerView = 'main'}>←</button>
-          <span class="text-sm font-medium text-text1">Coller une recette HyperSkills</span>
+          <span class="text-sm font-medium text-text1">Coller un skill HyperSkills</span>
         </div>
         <div class="text-[10px] font-mono text-text2 mb-1">URL ?hs= complète ou base64 brut</div>
         <textarea
@@ -729,9 +731,9 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
           <button class="text-text2 hover:text-white text-sm" onclick={() => drawerView = 'main'}>←</button>
           <span class="text-sm font-medium text-text1">Enregistrer la vue</span>
         </div>
-        <div class="text-[10px] font-mono text-text2 mb-1">Nom de la recette</div>
+        <div class="text-[10px] font-mono text-text2 mb-1">Nom du skill</div>
         <input class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none focus:border-accent"
-          placeholder="ma-recette"
+          placeholder="mon-skill"
           bind:value={saveName}
           onkeydown={(e) => e.key === 'Enter' && saveCurrentAsSkill()}
         />
@@ -748,7 +750,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
         <!-- EDIT SKILL VIEW -->
         <div class="flex items-center gap-2 mb-2">
           <button class="text-text2 hover:text-white text-sm" onclick={() => { drawerView = 'main'; editingSkill = null; }}>←</button>
-          <span class="text-sm font-medium text-text1">Modifier recette</span>
+          <span class="text-sm font-medium text-text1">Modifier skill</span>
         </div>
         <div class="text-[10px] font-mono text-text2 mb-1">Nom</div>
         <input class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none focus:border-accent"
