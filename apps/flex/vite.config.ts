@@ -10,10 +10,13 @@ export default defineConfig({
       '@webmcp-auto-ui/agent/litert-worker': path.resolve('../../packages/agent/src/providers/litert.worker.ts'),
     }
   },
+  worker: {
+    format: 'es',
+  },
   server: {
     headers: {
       'Cross-Origin-Opener-Policy':   'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
     }
   }
 });

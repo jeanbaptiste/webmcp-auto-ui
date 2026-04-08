@@ -277,6 +277,9 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
     if (!msg.trim() || canvas.generating) return;
     input = '';
 
+    // Clear previous bubbles on new message
+    ephemeral = [];
+
     pushHistory('user', msg);
     const userId = uid();
     ephemeral = [...ephemeral, { id: userId, role: 'user', html: msg }];
@@ -321,13 +324,12 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
         updateEphemeral(assistantId, result.text);
         pushHistory('assistant', result.text);
       }
-      setTimeout(() => { ephemeral = ephemeral.filter(e => e.id !== userId); }, 2000);
-      setTimeout(() => { ephemeral = ephemeral.filter(e => e.id !== assistantId); }, 5000);
+      // Bubbles stay visible until next sendMessage clears them
     } catch(e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       updateEphemeral(assistantId, `❌ ${errMsg}`);
       pushHistory('system', `❌ ${errMsg}`);
-      setTimeout(() => { ephemeral = ephemeral.filter(e => e.id !== assistantId); }, 6000);
+      // Error bubble stays visible until next sendMessage clears it
     } finally {
       clearInterval(timerInterval);
       canvas.setGenerating(false);
