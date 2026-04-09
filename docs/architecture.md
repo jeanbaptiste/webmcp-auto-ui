@@ -45,8 +45,8 @@ webmcp-auto-ui/
 ```
 
 - **core** has zero external dependencies. Pure TypeScript.
-- **sdk** depends on Svelte 5 (peer) for the canvas store. No dependency on core.
-- **agent** depends on core (`@webmcp-auto-ui/core`) for `McpClient`, `sanitizeSchema`, and types.
+- **sdk** depends on Svelte 5 (peer) for the canvas store. Also provides a vanilla (framework-agnostic) canvas store at `@webmcp-auto-ui/sdk/canvas-vanilla`. Ships `MCP_DEMO_SERVERS` registry. No dependency on core.
+- **agent** depends on core (`@webmcp-auto-ui/core`) for `McpClient`, `McpMultiClient`, `sanitizeSchema`, and types. Uses `@mediapipe/tasks-genai` for Gemma LiteRT (replaces `@huggingface/transformers` ONNX).
 - **ui** is standalone. Peer dependencies: `svelte ^5`, `d3 ^7`, `leaflet >=1.9`.
 
 ## App descriptions
@@ -68,7 +68,7 @@ webmcp-auto-ui/
 | UI base | bits-ui (shadcn-svelte pattern), tailwind-variants |
 | Charting | D3.js v7 (Chart, Sankey, Hemicycle, D3Widget) |
 | Maps | Leaflet (MapView) |
-| LLM | Anthropic Claude API (via server proxy), Gemma E2B (in-browser worker) |
+| LLM | Anthropic Claude API (via server proxy), Gemma 4 LiteRT (in-browser, main thread, OPFS cache) |
 | Protocol | MCP Streamable HTTP (JSON-RPC 2.0) |
 | Build | TypeScript, svelte-package, Vite |
 
@@ -89,6 +89,14 @@ Components never call each other directly. The `bus` singleton implements Alan K
 ### HyperSkill URL format
 
 A skill (blocks + MCP URL + LLM choice + theme) is serialized to JSON, base64-encoded, and appended as `?hs=...` query parameter. Skills larger than 6KB are gzip-compressed (prefix `gz.`). Each version carries a SHA-256 hash for traceability and chaining.
+
+### LiteRT migration (v0.5.0)
+
+The Gemma WASM provider was migrated from ONNX (`@huggingface/transformers` running in a Web Worker) to LiteRT (`@mediapipe/tasks-genai` running on the main thread). LiteRT is 2-4x faster on WebGPU and provides native Gemma 4 support with the new `<|turn>...<turn|>` prompt format and `<|tool_call>call:name{args}<tool_call|>` tool call parsing. The provider runs on the main thread because MediaPipe is incompatible with ES module workers. Models are cached in OPFS (Origin Private File System) for instant reload after first download.
+
+### Vanilla canvas store
+
+In addition to the Svelte 5 runes-based canvas store (`@webmcp-auto-ui/sdk/canvas`), a framework-agnostic vanilla store is available at `@webmcp-auto-ui/sdk/canvas-vanilla`. Same API but uses plain callbacks instead of Svelte runes, enabling integration with React, Vue, or vanilla JS.
 
 ### Agent loop architecture
 

@@ -190,7 +190,8 @@ The `component("help")` response includes **all** components in the system, not 
 | Name | Description |
 |------|-------------|
 | `tiling-layout` | Tiling window manager layout |
-| `floating-layout` | Floating drag-and-drop window manager |
+| `floating-layout` | Floating drag-and-drop window manager with collapse/expand (double-click) and fit-to-content |
+| `flex-layout` | Auto-grid layout with size slider for adjusting block dimensions |
 | `stack-layout` | Stacked vertical scroll or single-window layout |
 | `pane` | Window pane with title bar, badge, fold/close actions |
 

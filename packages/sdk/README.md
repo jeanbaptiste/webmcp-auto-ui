@@ -61,13 +61,48 @@ const param = canvas.buildHyperskillParam(); // base64 for ?hs=
 
 The canvas store manages blocks, mode (`auto` | `drag` | `chat`), MCP connection state, chat messages, and generating flag.
 
+## MCP Demo Servers
+
+A built-in registry of 7 demo MCP server endpoints for testing and showcasing:
+
+```ts
+import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
+
+// MCP_DEMO_SERVERS: Array<{ url: string; name: string; description: string }>
+// Includes: code4code, weather, finance, etc.
+```
+
+Used by the `RemoteMCPserversDemo` component in `@webmcp-auto-ui/ui` to let users discover and connect to available servers.
+
+## HyperSkillMeta extensions
+
+Two new fields in `HyperSkillMeta`:
+
+- **`chatSummary`** — anonymized summary of the chat that produced the skill (generated via `summarizeChat()` from `@webmcp-auto-ui/agent`)
+- **`provenance`** — records the LLM model, MCP server, and timestamp that created the skill
+
+These fields enable traceability without exposing raw chat history.
+
+## Vanilla canvas store
+
+A framework-agnostic canvas store for non-Svelte environments:
+
+```ts
+import { canvas } from '@webmcp-auto-ui/sdk/canvas-vanilla';
+
+canvas.addBlock('stat', { label: 'Revenue', value: '$142K' });
+canvas.subscribe(() => console.log('state changed'));
+```
+
+Same API as the Svelte 5 store but uses plain callbacks instead of runes. Useful for vanilla JS, React, or Vue integrations.
+
 ## Install
 
 ```bash
 npm install @webmcp-auto-ui/sdk
 ```
 
-Requires Svelte 5 for the canvas store. The HyperSkill utilities and registry are plain TypeScript with no framework dependency.
+The Svelte 5 canvas store requires Svelte 5. The vanilla canvas store, HyperSkill utilities, skills registry, and MCP demo servers are plain TypeScript with no framework dependency.
 
 ## License
 

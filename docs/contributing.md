@@ -95,7 +95,7 @@ return new AnthropicProvider({
 });
 ```
 
-`RemoteLLMProvider` a `model ?? 'haiku'` comme défaut. Si l'utilisateur
+`AnthropicProvider` a `model ?? 'haiku'` comme défaut. Si l'utilisateur
 sélectionne `sonnet`, il recevra quand même `haiku` sans message d'erreur.
 
 ---

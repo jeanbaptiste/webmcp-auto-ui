@@ -84,8 +84,19 @@ Complex visualizations for data-heavy use cases.
 |-----------|-------------|
 | `Pane` | Window pane with title bar, resize handles, close/minimize |
 | `TilingLayout` | Automatic tiling layout (splits panes horizontally/vertically) |
-| `FloatingLayout` | Free-form floating windows with z-index management |
+| `FloatingLayout` | Free-form floating windows with z-index management, collapse/expand (double-click), fit-to-content button |
+| `FlexLayout` | Auto-grid layout with size slider for adjusting block dimensions |
 | `StackLayout` | Tabbed stack layout (one pane visible at a time) |
+
+### Agent UI Widgets
+
+| Component | Description |
+|-----------|-------------|
+| `GemmaLoader` | Floating overlay with progress stream; auto-collapses to a pill once the model is loaded |
+| `TokenBubble` | Real-time metrics display: req/min, input tokens/min, output tokens/min, cached tokens |
+| `EphemeralBubble` | Transient notification bubble (moved from app to package for reuse) |
+| `RemoteMCPserversDemo` | MCP server discovery component listing available demo servers from `MCP_DEMO_SERVERS` |
+| `SettingsPanel` | Sliders with dynamic ranges for temperature, topK, and maxTokens controls |
 
 ### BlockRenderer
 

@@ -132,6 +132,12 @@ interface HyperSkillMeta {
   theme?: Record<string, string>;
   hash?: string;
   previousHash?: string;
+  chatSummary?: string;       // anonymized summary of the chat that produced the skill
+  provenance?: {              // records how the skill was created
+    model?: string;           // LLM model used (e.g. "claude-sonnet", "gemma-e2b")
+    mcp?: string;             // MCP server URL
+    timestamp?: number;       // epoch ms
+  };
 }
 
 interface HyperSkill {
@@ -181,6 +187,29 @@ const skill2 = JSON.parse(raw2);
 console.log(skill.meta.title);   // "Sales Dashboard"
 console.log(skill.content);      // blocks array
 ```
+
+### Chat summary and provenance
+
+When encoding a skill, you can include an anonymized summary of the conversation that produced it, plus provenance metadata:
+
+```typescript
+import { summarizeChat } from '@webmcp-auto-ui/agent';
+
+const skill: HyperSkill = {
+  meta: {
+    title: 'Sales Dashboard',
+    chatSummary: summarizeChat(messages),  // anonymized, no PII
+    provenance: {
+      model: 'claude-sonnet',
+      mcp: 'https://mcp.example.com/mcp',
+      timestamp: Date.now(),
+    },
+  },
+  content: blocks,
+};
+```
+
+These fields enable traceability without exposing raw chat history in shared URLs.
 
 ### Reading from Current URL
 

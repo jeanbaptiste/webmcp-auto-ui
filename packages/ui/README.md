@@ -20,9 +20,14 @@ Compact single-purpose blocks. Each takes a `data` prop.
 Higher-level components with more complex data shapes and interactivity.
 
 ### Window manager
-`Pane` · `TilingLayout` · `FloatingLayout` · `StackLayout`
+`Pane` · `TilingLayout` · `FloatingLayout` · `FlexLayout` · `StackLayout`
 
-Layout containers for multi-pane interfaces. `TilingLayout` uses a Fibonacci spiral.
+Layout containers for multi-pane interfaces. `TilingLayout` uses a Fibonacci spiral. `FlexLayout` provides an auto-grid layout with a size slider for adjusting block dimensions. `FloatingLayout` supports collapse/expand (double-click) and a fit-to-content button.
+
+### Agent UI widgets
+`GemmaLoader` · `TokenBubble` · `EphemeralBubble` · `RemoteMCPserversDemo` · `SettingsPanel`
+
+`GemmaLoader` — floating overlay with progress stream, auto-collapses to a pill once model is loaded. `TokenBubble` — real-time metrics display (req/min, input tokens/min, output tokens/min, cached tokens). `EphemeralBubble` — transient notification bubble (moved from app to package). `RemoteMCPserversDemo` — MCP server discovery component listing available demo servers. `SettingsPanel` — sliders with dynamic ranges for temperature, topK, and maxTokens controls.
 
 ### BlockRenderer
 

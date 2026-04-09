@@ -1,19 +1,24 @@
 # @webmcp-auto-ui/agent
 
-LLM agent loop with Anthropic and Gemma providers, plus 22 UI tools for rendering blocks and a unified `component()` tool exposing 56 components.
+LLM agent loop with Anthropic and Gemma LiteRT providers, plus 22 UI tools for rendering blocks, a unified `component()` tool exposing 56 components, TokenTracker, and summarizeChat.
 
 ## What it does
 
 - Runs an iterative LLM agent loop: prompt -> tool calls -> LLM -> repeat until done
-- Provides two LLM providers: `AnthropicProvider` (cloud) and `GemmaProvider` (in-browser Web Worker)
+- Provides two LLM providers: `AnthropicProvider` (cloud, with retry on 503) and `GemmaProvider` (in-browser via LiteRT/MediaPipe on the main thread)
+- Supports Gemma 4 prompt format (`<|turn>...<turn|>`) and native tool call parsing (`<|tool_call>call:name{args}<tool_call|>`)
 - Defines 22 `render_*` UI tools that the LLM calls to compose visual blocks on the canvas
 - Bridges MCP server tools and UI tools into a unified tool set for the LLM
+- Tracks real-time usage metrics via `TokenTracker` (tok/s, totalTokens, latencyMs)
+- Generates anonymized chat summaries via `summarizeChat()` for HyperSkill exports
+- Supports per-request `temperature`, `topK`, `maxTokens` configuration
+- Clips long prompts via `sizeInTokens()` estimation
 
 ## Providers
 
 ### AnthropicProvider
 
-Calls the Anthropic Claude API through a server-side proxy (SvelteKit `+server.ts`).
+Calls the Anthropic Claude API through a server-side proxy (SvelteKit `+server.ts`). Retries on 503 with exponential backoff.
 
 ```ts
 import { AnthropicProvider } from '@webmcp-auto-ui/agent';
@@ -35,22 +40,26 @@ Built-in model mapping:
 | `claude-haiku` | `claude-haiku-4-5-20251001` |
 | `claude-sonnet` | `claude-sonnet-4-6` |
 
-### GemmaProvider
+### GemmaProvider (LiteRT)
 
-Runs Gemma locally in a Web Worker via Hugging Face Transformers.js. No API key needed.
+Runs Gemma 4 locally on the main thread via `@mediapipe/tasks-genai` (LiteRT). No API key needed. Uses WebGPU when available. Models are cached in OPFS after first download for instant subsequent loads.
+
+> **v0.5.0 migration**: Migrated from ONNX (`@huggingface/transformers` with Web Worker) to LiteRT (`@mediapipe/tasks-genai` on main thread). LiteRT is 2-4x faster on WebGPU. The provider runs on the main thread because MediaPipe is incompatible with ES module workers.
 
 ```ts
 import { GemmaProvider } from '@webmcp-auto-ui/agent';
 
 const provider = new GemmaProvider({
-  workerUrl: '/gemma.worker.js',
-  onProgress: (pct, status) => console.log(`${pct}% — ${status}`),
+  model: 'gemma-e2b',
+  onProgress: (pct, status, loaded, total) => console.log(`${pct}% — ${status}`),
   onStatusChange: (status) => console.log('Status:', status),
   // status: 'idle' | 'loading' | 'ready' | 'error'
 });
-
-await provider.initialize();  // downloads model weights on first run
 ```
+
+**Gemma 4 prompt format**: Uses `<|turn>...<turn|>` delimiters (instead of Gemma 2/3 `<start_of_turn>...<end_of_turn>`).
+
+**Native tool calling**: Tool calls are parsed from `<|tool_call>call:name{args}<tool_call|>` format.
 
 ### LLMProvider interface
 
@@ -63,10 +72,56 @@ interface LLMProvider {
   chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
-    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string }
+    options?: {
+      signal?: AbortSignal;
+      cacheEnabled?: boolean;
+      system?: string;
+      temperature?: number;
+      topK?: number;
+      maxTokens?: number;
+    }
   ): Promise<LLMResponse>;
 }
 ```
+
+`LLMResponse` includes stats: `tokPerSec`, `totalTokens`, `latencyMs` for real-time performance monitoring.
+
+### TokenTracker
+
+Tracks real-time usage metrics across multiple requests:
+
+```ts
+import { TokenTracker } from '@webmcp-auto-ui/agent';
+
+const tracker = new TokenTracker();
+tracker.record({ inputTokens: 500, outputTokens: 120, cached: 400, latencyMs: 850 });
+
+console.log(tracker.stats);
+// { reqPerMin, inputPerMin, outputPerMin, cachedPerMin, totalRequests, totalInput, totalOutput }
+```
+
+Used by the `TokenBubble` UI component for live dashboard metrics.
+
+### summarizeChat
+
+Generates an anonymized summary of a chat conversation for HyperSkill export provenance:
+
+```ts
+import { summarizeChat } from '@webmcp-auto-ui/agent';
+
+const summary = summarizeChat(messages);
+// Short text summary without PII or raw message content
+```
+
+### Prompt clipping
+
+```ts
+import { sizeInTokens } from '@webmcp-auto-ui/agent';
+
+const tokens = sizeInTokens(longPrompt);  // estimated token count
+```
+
+Used internally to clip prompts that exceed the model's context window.
 
 ## Agent loop
 

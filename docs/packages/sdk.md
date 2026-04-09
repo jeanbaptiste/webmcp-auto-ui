@@ -7,6 +7,9 @@ HyperSkill encode/decode, skills registry, and Svelte 5 canvas store.
 - Encodes/decodes HyperSkill URLs (base64 + optional gzip for skills > 6KB)
 - Provides an in-memory skills CRUD registry with change notifications
 - Exposes a reactive canvas store (Svelte 5 runes) for blocks, chat, MCP state, and theme
+- Provides a vanilla (framework-agnostic) canvas store at `@webmcp-auto-ui/sdk/canvas-vanilla`
+- Ships `MCP_DEMO_SERVERS` — a registry of 7 demo MCP server endpoints
+- Supports `chatSummary` and `provenance` fields in `HyperSkillMeta` for traceability
 
 ## HyperSkill format
 
@@ -39,6 +42,12 @@ interface HyperSkillMeta {
   theme?: Record<string, string>;
   hash?: string;
   previousHash?: string;
+  chatSummary?: string;       // anonymized summary of the chat that produced the skill
+  provenance?: {              // records how the skill was created
+    model?: string;
+    mcp?: string;
+    timestamp?: number;
+  };
 }
 
 interface HyperSkill {
@@ -260,3 +269,28 @@ const param = canvas.buildHyperskillParam();
 // Load a skill from a base64 param
 canvas.loadFromParam(hsParam);  // returns true on success
 ```
+
+## Vanilla canvas store
+
+A framework-agnostic canvas store for non-Svelte environments. Same API as the Svelte 5 store but uses plain callbacks instead of runes:
+
+```ts
+import { canvas } from '@webmcp-auto-ui/sdk/canvas-vanilla';
+
+canvas.addBlock('stat', { label: 'Revenue', value: '$142K' });
+canvas.subscribe(() => console.log('state changed'));
+```
+
+Useful for vanilla JS, React, or Vue integrations.
+
+## MCP Demo Servers
+
+A registry of 7 demo MCP server endpoints for testing and showcasing:
+
+```ts
+import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
+
+// MCP_DEMO_SERVERS: Array<{ url: string; name: string; description: string }>
+```
+
+Used by the `RemoteMCPserversDemo` component in `@webmcp-auto-ui/ui`.

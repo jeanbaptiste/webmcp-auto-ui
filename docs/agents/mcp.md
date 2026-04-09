@@ -22,9 +22,31 @@ User prompt --> Agent Loop --> LLM (Claude/Gemma)
               UI Blocks (stat, chart, table, etc.)
 ```
 
-## McpClient API
+## McpClient and McpMultiClient
 
-The `McpClient` class (from `@webmcp-auto-ui/core`) handles the full MCP lifecycle.
+The `McpClient` class (from `@webmcp-auto-ui/core`) handles the full MCP lifecycle for a single server. For multi-server scenarios, use `McpMultiClient`.
+
+### McpMultiClient
+
+Manages simultaneous connections to multiple MCP servers. Aggregates tool lists and routes tool calls to the correct server:
+
+```typescript
+import { McpMultiClient } from '@webmcp-auto-ui/core';
+
+const multi = new McpMultiClient();
+await multi.addServer('https://mcp1.example.com/mcp');
+await multi.addServer('https://mcp2.example.com/mcp');
+
+const allTools = multi.listAllTools();  // aggregated from all servers
+const result = await multi.callTool('query_sql', { sql: 'SELECT 1' });  // routes to correct server
+
+await multi.removeServer('https://mcp1.example.com/mcp');
+await multi.disconnectAll();
+```
+
+The flex app uses `McpMultiClient` to connect to several MCP servers simultaneously and expose all their tools to the agent loop.
+
+## McpClient API
 
 ### Connecting
 

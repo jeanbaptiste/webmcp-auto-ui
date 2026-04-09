@@ -367,11 +367,10 @@ webmcp-auto-ui/
     ui/         @webmcp-auto-ui/ui     — 34+ Svelte 5 components
   apps/
     home/       Landing page + app launcher
-    composer/   Visual skill composer with drag-and-drop canvas
+    flex/       Canvas drag & resize, multi-MCP, ephemeral chat
     todo/       Todo app demo (MCP-powered)
     viewer/     HyperSkill URL viewer / renderer
     showcase/   Component showcase + WebMCP tool demos
-    mobile/     Mobile-optimized interface
 ```
 
 ## Build packages
@@ -404,11 +403,10 @@ Or run a single app:
 
 ```bash
 npm run dev:home
-npm run dev:composer
+npm run dev:flex
 npm run dev:todo
 npm run dev:viewer
 npm run dev:showcase
-npm run dev:mobile
 ```
 
 ## Port mapping
@@ -416,17 +414,16 @@ npm run dev:mobile
 | App       | Port | URL                    |
 |-----------|------|------------------------|
 | home      | 5173 | http://localhost:5173   |
-| composer  | 5174 | http://localhost:5174   |
 | todo      | 5175 | http://localhost:5175   |
 | viewer    | 5176 | http://localhost:5176   |
 | showcase  | 5177 | http://localhost:5177   |
-| mobile    | 5178 | http://localhost:5178   |
+| flex      | 5179 | http://localhost:5179   |
 
 ## Environment variables
 
 | Variable           | Used by        | Purpose                                      |
 |--------------------|----------------|----------------------------------------------|
-| `ANTHROPIC_API_KEY`| composer, todo | Server-side proxy for Anthropic Claude API    |
+| `ANTHROPIC_API_KEY`| flex, todo | Server-side proxy for Anthropic Claude API    |
 | `PUBLIC_BASE_URL`  | home           | Base URL for app links (default: localhost)    |
 
 Set them in each app's `.env` file or export in your shell:
@@ -455,13 +452,13 @@ Use the deploy script — it handles build order, correct deploy paths, and clea
 
 ```bash
 ./scripts/deploy.sh              # deploy all apps
-./scripts/deploy.sh composer     # deploy one app
+./scripts/deploy.sh flex         # deploy one app
 ```
 
 See [Deploy Tutorial](tutorials/deploy.md) for full details.
 
 **Do NOT deploy manually with scp** — the deploy paths differ per app
-(composer/mobile deploy to root, viewer deploys to `build/`). The script
+(flex deploys to root, viewer deploys to `build/`). The script
 knows the correct path for each app.
 
   </script>
@@ -483,11 +480,10 @@ webmcp-auto-ui/
  |
  +-- apps/
  |    +-- home/          Landing page, app launcher (port 5173)
- |    +-- composer/      Visual skill composer with canvas + chat (port 5174)
  |    +-- todo/          MCP-powered todo demo (port 5175)
  |    +-- viewer/        HyperSkill URL renderer (port 5176)
  |    +-- showcase/      Component showcase + WebMCP tool demos (port 5177)
- |    +-- mobile/        Mobile-optimized interface (port 5178)
+ |    +-- flex/          Canvas drag & resize, multi-MCP, chat (port 5179)
  |
  +-- docs/               Documentation
  +-- package.json        Root workspace config
@@ -523,11 +519,10 @@ webmcp-auto-ui/
 | App | Purpose |
 |-----|---------|
 | **home** | Landing page with links to all other apps. Configurable via `PUBLIC_BASE_URL`. |
-| **composer** | The main app. Connect to an MCP server, chat with an LLM, and compose UI skills on a canvas. Blocks are rendered by `BlockRenderer`. Skills can be saved as HyperSkill URLs. |
+| **flex** | Canvas drag & resize, multi-MCP, ephemeral chat, HyperSkills export, Gemma WASM local. The most complete demo. |
 | **todo** | Minimal todo app demonstrating MCP tool integration for CRUD operations. |
 | **viewer** | Decodes a HyperSkill URL (`?hs=...`) and renders the embedded skill read-only. |
 | **showcase** | Interactive catalog of all UI components. Also demonstrates WebMCP tool registration and postMessage bridge. |
-| **mobile** | Responsive mobile-first interface for the composer workflow. |
 
 ## Technology stack
 
@@ -1507,8 +1502,8 @@ The standard agent workflow:
 
 ```bash
 ./scripts/deploy.sh                # deploy all apps
-./scripts/deploy.sh composer       # deploy one app
-./scripts/deploy.sh mobile home    # deploy specific apps
+./scripts/deploy.sh flex           # deploy one app
+./scripts/deploy.sh home viewer    # deploy specific apps
 ```
 
 The script handles everything: builds packages, **builds apps**, cleans old
@@ -1526,17 +1521,15 @@ integrity**, restarts services, and confirms.
   home/              # static — nginx serves directly
   todo/              # static — nginx serves directly
   showcase/          # static — nginx serves directly
-  composer/          # Node — systemd runs: node index.js
+  flex/              # Node — systemd runs: node index.js
   viewer/build/      # Node — systemd runs: node build/index.js
-  mobile/            # Node — systemd runs: node index.js
 ```
 
 ### CRITICAL: Deploy paths are NOT the same for all Node apps
 
 | App | systemd ExecStart | Deploy destination | Why |
 |-----|-------------------|--------------------|-----|
-| **composer** | `node index.js` | `/opt/webmcp-demos/composer/` (root) | ExecStart has no `build/` prefix |
-| **mobile** | `node index.js` | `/opt/webmcp-demos/mobile/` (root) | ExecStart has no `build/` prefix |
+| **flex** | `node index.js` | `/opt/webmcp-demos/flex/` (root) | ExecStart has no `build/` prefix |
 | **viewer** | `node build/index.js` | `/opt/webmcp-demos/viewer/build/` | ExecStart includes `build/` |
 | home | static (nginx) | `/opt/webmcp-demos/home/` | — |
 | todo | static (nginx) | `/opt/webmcp-demos/todo/` | — |
@@ -1547,8 +1540,8 @@ changes appear to not take effect.** This is the #1 deployment pitfall.
 
 ### Why the paths differ
 
-The systemd services were created at different times. Composer and mobile
-use `ExecStart=/usr/bin/node index.js` (working directory is the app root).
+The systemd services were created at different times. Flex
+uses `ExecStart=/usr/bin/node index.js` (working directory is the app root).
 Viewer uses `ExecStart=/usr/bin/node build/index.js`. The deploy script
 abstracts this difference — use the script.
 
@@ -1567,15 +1560,15 @@ ssh bot "rm -rf /opt/webmcp-demos/home/_app"
 scp -r apps/home/build/* bot:/opt/webmcp-demos/home/
 ```
 
-### Node apps — composer and mobile (root deploy)
+### Node apps — flex (root deploy)
 
 ```bash
-npm -w apps/composer run build
+npm -w apps/flex run build
 
 # MUST clean old files first — stale chunks cause the old version to be served
-ssh bot "cd /opt/webmcp-demos/composer && rm -f index.js handler.js env.js shims.js && rm -rf client server"
-scp -r apps/composer/build/* bot:/opt/webmcp-demos/composer/
-ssh bot "systemctl restart webmcp-composer"
+ssh bot "cd /opt/webmcp-demos/flex && rm -f index.js handler.js env.js shims.js && rm -rf client server"
+scp -r apps/flex/build/* bot:/opt/webmcp-demos/flex/
+ssh bot "systemctl restart webmcp-flex"
 ```
 
 ### Node apps — viewer (build/ deploy)
@@ -1597,8 +1590,8 @@ ssh bot "systemctl restart webmcp-viewer"
 
 **Symptom**: You deploy, restart the service, but the old version still shows.
 
-**Cause**: You copied files to `composer/build/` but the service runs
-`node index.js` from `composer/` — it uses the old `index.js` at root.
+**Cause**: You copied files to `flex/build/` but the service runs
+`node index.js` from `flex/` — it uses the old `index.js` at root.
 
 **Fix**: Use `./scripts/deploy.sh` or check the ExecStart path in the
 systemd service file.
@@ -1613,7 +1606,7 @@ chunks but doesn't remove old ones. The browser may load cached old chunks.
 
 **Fix**: Always delete old files before copying:
 ```bash
-ssh bot "rm -rf /opt/webmcp-demos/composer/{client,server,index.js,handler.js}"
+ssh bot "rm -rf /opt/webmcp-demos/flex/{client,server,index.js,handler.js}"
 ```
 
 ### 3. Forgetting PUBLIC_BASE_URL for home
@@ -1633,7 +1626,7 @@ ssh bot "rm -rf /opt/webmcp-demos/composer/{client,server,index.js,handler.js}"
 **Fix**: The deploy script preserves .env files. If deploying manually,
 don't delete .env:
 ```bash
-# DO NOT do: rm -rf /opt/webmcp-demos/composer/*
+# DO NOT do: rm -rf /opt/webmcp-demos/flex/*
 # DO this instead: rm specific files, keep .env
 ```
 
@@ -1657,8 +1650,8 @@ build.
 
 **How to detect manually**:
 ```bash
-sha256sum apps/composer/build/index.js
-ssh bot "sha256sum /opt/webmcp-demos/composer/index.js"
+sha256sum apps/flex/build/index.js
+ssh bot "sha256sum /opt/webmcp-demos/flex/index.js"
 # These must match. If they differ, the wrong file was deployed.
 ```
 
@@ -1670,18 +1663,18 @@ See [contributing.md](../contributing.md) for the full debug checklist.
 
 ```bash
 # All pages return 200
-for p in / /composer/ /viewer/ /showcase/ /mobile/ /todo/; do
+for p in / /flex/ /viewer/ /showcase/ /todo/; do
   echo "$(curl -s -o /dev/null -w '%{http_code}' -L https://demos.hyperskills.net$p) $p"
 done
 
 # Chat API works (Node apps)
-curl -s https://demos.hyperskills.net/composer/api/chat \
+curl -s https://demos.hyperskills.net/flex/api/chat \
   -X POST -H 'Content-Type: application/json' \
   -d '{"messages":[{"role":"user","content":"hi"}],"model":"claude-haiku-4-5-20251001","max_tokens":5}' \
   | head -c 50
 
 # Services are active
-ssh bot "systemctl is-active webmcp-composer webmcp-viewer webmcp-mobile"
+ssh bot "systemctl is-active webmcp-flex webmcp-viewer"
 ```
 
 ---
@@ -1690,9 +1683,9 @@ ssh bot "systemctl is-active webmcp-composer webmcp-viewer webmcp-mobile"
 
 | Variable | Apps | Location on server |
 |----------|------|--------------------|
-| `ANTHROPIC_API_KEY` | composer, viewer, mobile | `/opt/webmcp-demos/{app}/.env` |
+| `ANTHROPIC_API_KEY` | flex, viewer | `/opt/webmcp-demos/{app}/.env` |
 | `PUBLIC_BASE_URL` | home (build-time only) | Set in shell before `npm run build` |
-| `PORT` | composer(3001), viewer(3002), mobile(3003) | systemd `Environment=PORT=...` |
+| `PORT` | flex(3004), viewer(3002) | systemd `Environment=PORT=...` |
 
   </script>
   <script type="text/markdown" data-page="themed-demo">
@@ -2975,7 +2968,7 @@ Skills can be encoded into a URL parameter `?hs=` for sharing:
 - If < 6KB: base64 encoded directly
 - If >= 6KB: gzip compressed, then base64 encoded with `gz.` prefix
 
-URL format: `https://domain.com/viewer?hs=<base64>` or `https://domain.com/composer?hs=<base64>`
+URL format: `https://domain.com/viewer?hs=<base64>` or `https://domain.com/flex?hs=<base64>`
 
 To decode: read the `hs` query param, check for `gz.` prefix, decompress if needed, base64-decode, JSON.parse.
 
@@ -4210,7 +4203,7 @@ if (param) {
 
 Skills can be shared via two entry points:
 - **Viewer**: `https://domain.com/viewer?hs=<encoded>` -- read-only display
-- **Composer**: `https://domain.com/composer?hs=<encoded>` -- editable view
+- **Flex**: `https://domain.com/flex?hs=<encoded>` -- editable view
 
 ### Hashing
 

@@ -570,6 +570,30 @@ UI primitives exported from `@webmcp-auto-ui/ui/base`:
 
 ---
 
+## Category: Agent UI Widgets (5)
+
+Specialized components for agent interactions, exported from `@webmcp-auto-ui/ui`:
+
+| Component | Purpose |
+|-----------|---------|
+| `GemmaLoader` | Floating overlay with progress stream; auto-collapses to a pill once the model is loaded |
+| `TokenBubble` | Real-time metrics display: req/min, input tokens/min, output tokens/min, cached tokens |
+| `EphemeralBubble` | Transient notification bubble for ephemeral messages |
+| `RemoteMCPserversDemo` | MCP server discovery component listing demo servers from `MCP_DEMO_SERVERS` |
+| `SettingsPanel` | Sliders with dynamic ranges for temperature, topK, and maxTokens controls |
+
+---
+
+## Category: Layout Extensions (1)
+
+| Component | Purpose |
+|-----------|---------|
+| `FlexLayout` | Auto-grid layout with size slider for adjusting block dimensions |
+
+`FlexLayout` complements the existing window manager layouts (Tiling, Floating, Stack) with a responsive auto-grid that lets users control block size via a slider.
+
+---
+
 ## Constraints
 
 - Block `type` must exactly match one of the 24 block types (case-sensitive).

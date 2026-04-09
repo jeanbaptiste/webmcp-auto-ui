@@ -12,17 +12,17 @@ The [HyperSkill](https://hyperskills.net/) format lets you snapshot the current 
 
 | Package | Description |
 |---------|-------------|
-| [`@webmcp-auto-ui/core`](./packages/core/README.md) | W3C WebMCP polyfill, MCP client, McpMultiClient, schema utils — pure TypeScript, zero dependencies |
-| [`@webmcp-auto-ui/ui`](./packages/ui/README.md) | 32 Svelte components: primitives, blocks, rich widgets, window manager layouts |
-| [`@webmcp-auto-ui/agent`](./packages/agent/README.md) | Agent loop, Remote LLM and WASM providers, unified `component()` tool (56 components) |
-| [`@webmcp-auto-ui/sdk`](./packages/sdk/README.md) | Skills CRUD, canvas state store, HyperSkills encoding (re-exported from [`hyperskills`](https://www.npmjs.com/package/hyperskills) NPM) |
+| [`@webmcp-auto-ui/core`](./packages/core/README.md) | W3C WebMCP polyfill, MCP client, McpMultiClient, prompt caching, schema utils — pure TypeScript, zero dependencies |
+| [`@webmcp-auto-ui/ui`](./packages/ui/README.md) | 34+ Svelte components: primitives, blocks, rich widgets, window manager layouts, agent UI |
+| [`@webmcp-auto-ui/agent`](./packages/agent/README.md) | Agent loop, Remote LLM (Anthropic) and WASM (Gemma 4 LiteRT) providers, unified `component()` tool (56 components), TokenTracker |
+| [`@webmcp-auto-ui/sdk`](./packages/sdk/README.md) | Skills CRUD, canvas state store (Svelte 5 + vanilla), MCP demo server registry, HyperSkills encoding with gzip (re-exported from [`hyperskills`](https://www.npmjs.com/package/hyperskills) NPM) |
 
 ## Demo Apps
 
 | App | Port | Description |
 |-----|------|-------------|
-| `flex` | 5179 | Canvas drag & resize, multi-MCP, ephemeral chat, HyperSkills export |
-| `showcase` | 5177 | All 32 components with mock data + any MCP server |
+| `flex` | 5179 | Canvas drag & resize, multi-MCP, grid/float toggle, Gemma LiteRT, TokenBubble, HyperSkills export |
+| `showcase` | 5177 | All 34+ components with mock data, RemoteMCPserversDemo, FlexLayout, any MCP server |
 | `todo` | 5175 | TODO List editor — 8 WebMCP tools exposed to the browser extension |
 | `viewer` | 5176 | Load and edit a HyperSkill URL, with diff and SHA-256 versioning |
 | `home` | 5173 | Landing page |

@@ -404,10 +404,10 @@ console.log(shareUrl);
 // Copy this URL -- anyone who opens it will see the full themed dashboard
 ```
 
-### Using the Composer UI
+### Using the Flex app
 
-1. Open the Composer at `http://localhost:5174`
-2. Import the skill JSON (paste or drag-and-drop)
+1. Open Flex at `http://localhost:5179`
+2. Import the skill JSON via the HyperSkill URL (`?hs=...`)
 3. Click "Export" and copy the generated URL
 4. The URL contains the theme + all blocks, base64-encoded (gzip-compressed if > 6 KB)
 
@@ -436,17 +436,10 @@ When someone opens the URL:
 Follow the [Deploy tutorial](./deploy.md) to push your demo to production. For a quick deploy of just the showcase app:
 
 ```bash
-# Build packages (if not already done)
-npm -w packages/core run build
-npm -w packages/sdk  run build
-npm -w packages/ui   run build
-
-# Build showcase with production base URL
-PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/showcase run build
-
-# Deploy
-scp -r apps/showcase/build/* bot:/opt/webmcp-demos/showcase/
+./scripts/deploy.sh showcase
 ```
+
+The deploy script handles building packages, building the app, cleaning old files, copying to the correct path, and verifying integrity.
 
 Your themed demo is now live at `https://demos.hyperskills.net/showcase/nature`.
 

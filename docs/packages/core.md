@@ -36,6 +36,30 @@ initializeWebMCPPolyfill({
 
 **`executeToolInternal(name, args)`** — Executes a registered tool by name. Used internally by the polyfill.
 
+### McpMultiClient
+
+```ts
+import { McpMultiClient } from '@webmcp-auto-ui/core';
+```
+
+Manages simultaneous connections to multiple MCP servers. Aggregates tool lists from all servers and routes `callTool` to the correct server based on tool name.
+
+```ts
+const multi = new McpMultiClient();
+await multi.addServer('https://mcp1.example.com/mcp');
+await multi.addServer('https://mcp2.example.com/mcp');
+
+const allTools = multi.listAllTools();  // tools from both servers
+const result = await multi.callTool('query_sql', { sql: 'SELECT 1' });  // routes automatically
+
+await multi.removeServer('https://mcp1.example.com/mcp');
+await multi.disconnectAll();
+```
+
+### Prompt caching fix
+
+The `cache_control` property is applied on the tools array (not individual tools) to work correctly with Anthropic's prompt caching API. This ensures cache hits when the tool set is stable across consecutive requests, reducing latency and cost.
+
 ### MCP Client
 
 ```ts

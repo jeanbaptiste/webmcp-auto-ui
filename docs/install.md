@@ -25,8 +25,8 @@ webmcp-auto-ui/
   packages/
     core/       @webmcp-auto-ui/core   — W3C WebMCP polyfill + MCP client
     sdk/        @webmcp-auto-ui/sdk    — HyperSkill format, skills registry, canvas store
-    agent/      @webmcp-auto-ui/agent  — LLM agent loop + providers + UI tools
-    ui/         @webmcp-auto-ui/ui     — 34+ Svelte 5 components
+    agent/      @webmcp-auto-ui/agent  — LLM agent loop + Anthropic/Gemma LiteRT providers + UI tools
+    ui/         @webmcp-auto-ui/ui     — 34+ Svelte 5 components + agent UI widgets
   apps/
     home/       Landing page + app launcher
     flex/       Canvas drag & resize, multi-MCP, ephemeral chat
