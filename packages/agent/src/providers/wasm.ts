@@ -376,10 +376,26 @@ Available tools:`);
     }
     for (const msg of messages) {
       const role = msg.role === 'assistant' ? 'model' : 'user';
-      const text = typeof msg.content === 'string'
-        ? msg.content
-        : (msg.content as ContentBlock[]).filter(b => b.type === 'text').map(b => (b as { type: 'text'; text: string }).text).join('\n');
-      parts.push(`<|turn>${role}\n${text}<turn|>`);
+      if (typeof msg.content === 'string') {
+        parts.push(`<|turn>${role}\n${msg.content}<turn|>`);
+      } else {
+        // Serialize all block types so Gemma sees tool calls and results
+        const segments: string[] = [];
+        for (const block of msg.content as ContentBlock[]) {
+          if (block.type === 'text') {
+            segments.push((block as { type: 'text'; text: string }).text);
+          } else if (block.type === 'tool_use') {
+            const b = block as { type: 'tool_use'; name: string; input: Record<string, unknown> };
+            segments.push(`<|tool_call>call:${b.name}${JSON.stringify(b.input)}<tool_call|>`);
+          } else if (block.type === 'tool_result') {
+            const b = block as { type: 'tool_result'; tool_use_id: string; content: string };
+            segments.push(`[Tool result]: ${b.content}`);
+          }
+        }
+        if (segments.length > 0) {
+          parts.push(`<|turn>${role}\n${segments.join('\n')}<turn|>`);
+        }
+      }
     }
     parts.push('<|turn>model\n');
     return parts.join('\n');
