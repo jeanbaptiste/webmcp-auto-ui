@@ -234,22 +234,47 @@ export class WasmProvider implements LLMProvider {
       }
     } catch {}
 
-    // Parse tool calls
+    // Parse tool calls — supports multiple formats:
+    // 1. Gemma 4 native: <|tool_call>call:tool_name{...args}<tool_call|>
+    // 2. JSON format: { "tool": "name", "args": {...} }
     const content: ContentBlock[] = [];
-    try {
-      const parsed = JSON.parse(fullText) as { tool?: string; args?: Record<string, unknown> };
-      if (parsed.tool && parsed.args) {
-        content.push({
-          type: 'tool_use',
-          id: `tc-${Date.now()}`,
-          name: parsed.tool,
-          input: parsed.args,
-        });
-      } else {
-        content.push({ type: 'text', text: fullText });
-      }
-    } catch {
-      content.push({ type: 'text', text: fullText });
+    const gemmaToolCallRe = /<\|tool_call>call:(\w+)(\{[^]*?\})<tool_call\|>/g;
+    let match: RegExpExecArray | null;
+    let foundToolCall = false;
+
+    while ((match = gemmaToolCallRe.exec(fullText)) !== null) {
+      foundToolCall = true;
+      const toolName = match[1];
+      let toolArgs: Record<string, unknown> = {};
+      try { toolArgs = JSON.parse(match[2]); } catch {}
+      content.push({
+        type: 'tool_use',
+        id: `tc-${Date.now()}-${content.length}`,
+        name: toolName,
+        input: toolArgs,
+      });
+    }
+
+    if (!foundToolCall) {
+      // Try JSON format fallback
+      try {
+        const parsed = JSON.parse(fullText) as { tool?: string; args?: Record<string, unknown> };
+        if (parsed.tool && parsed.args) {
+          foundToolCall = true;
+          content.push({
+            type: 'tool_use',
+            id: `tc-${Date.now()}`,
+            name: parsed.tool,
+            input: parsed.args,
+          });
+        }
+      } catch {}
+    }
+
+    if (!foundToolCall) {
+      // Extract text without tool call tags
+      const cleanText = fullText.replace(/<\|tool_call>.*?<tool_call\|>/g, '').trim();
+      content.push({ type: 'text', text: cleanText || fullText });
     }
 
     return {

@@ -302,7 +302,16 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
           onLLMResponse: (response, latencyMs) => {
-            if (response.usage) tokenTracker.record(response.usage, latencyMs);
+            if (response.usage) {
+              tokenTracker.record(response.usage, latencyMs);
+            } else if (response.stats) {
+              // WASM/LiteRT — estimate from stats
+              tokenTracker.recordEstimate(
+                response.stats.totalTokens * 4,  // rough input chars estimate
+                response.stats.totalTokens * 4,  // output chars
+                latencyMs,
+              );
+            }
           },
           onBlock:   (type, data) => flexGrid?.addBlock(type, data),
           onClear:   () => flexGrid?.clearBlocks(),
