@@ -13,9 +13,9 @@ export interface WasmProviderOptions {
   onStatusChange?: (status: WasmStatus) => void;
 }
 
-const LITERT_MODELS: Record<string, { repo: string; file: string }> = {
-  'gemma-e2b': { repo: 'litert-community/gemma-4-E2B-it-litert-lm', file: 'gemma-4-E2B-it-web.task' },
-  'gemma-e4b': { repo: 'litert-community/gemma-4-E4B-it-litert-lm', file: 'gemma-4-E4B-it-web.task' },
+const LITERT_MODELS: Record<string, { repo: string; file: string; size: number }> = {
+  'gemma-e2b': { repo: 'litert-community/gemma-4-E2B-it-litert-lm', file: 'gemma-4-E2B-it-web.task', size: 1_500_000_000 },
+  'gemma-e4b': { repo: 'litert-community/gemma-4-E4B-it-litert-lm', file: 'gemma-4-E4B-it-web.task', size: 2_964_324_352 },
 };
 
 export class WasmProvider implements LLMProvider {
@@ -53,39 +53,33 @@ export class WasmProvider implements LLMProvider {
     // Dynamic import to avoid bundling MediaPipe when not used
     const { FilesetResolver, LlmInference } = await import('@mediapipe/tasks-genai');
 
-    const { repo, file } = LITERT_MODELS[this.model] ?? LITERT_MODELS['gemma-e2b'];
+    const modelInfo = LITERT_MODELS[this.model] ?? LITERT_MODELS['gemma-e2b'];
+    const { repo, file, size: expectedSize } = modelInfo;
     const url = `https://huggingface.co/${repo}/resolve/main/${file}`;
 
-    this.opts.onProgress?.(0, 'downloading', 0, 0);
+    this.opts.onProgress?.(0, 'downloading', 0, expectedSize);
 
-    const modelStream = await this.getModelStream(url, file);
-
-    this.opts.onProgress?.(1, 'initializing', 0, 0);
-
-    // Resolve the GenAI WASM fileset from CDN (pinned version)
-    const genaiFileset = await FilesetResolver.forGenAiTasks(
+    // Launch fileset resolution in parallel with model download
+    const filesetPromise = FilesetResolver.forGenAiTasks(
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai@0.10.27/wasm',
     );
 
-    // WebGPU device (optional — falls back to CPU if unavailable)
-    let gpuDevice: any;
-    try {
-      gpuDevice = await LlmInference.createWebGpuDevice();
-    } catch {
-      // WebGPU not available — will use CPU
-    }
+    const modelStream = await this.getModelStream(url, file, expectedSize);
+
+    this.opts.onProgress?.(1, 'initializing', 0, 0);
+
+    const genaiFileset = await filesetPromise;
 
     // Pass stream reader as modelAssetBuffer — same pattern as the official
     // MediaPipe sample (avoids buffering the entire model in RAM).
+    // GPU device is created automatically by createFromOptions if available.
     this.inference = await LlmInference.createFromOptions(genaiFileset, {
       baseOptions: {
         modelAssetBuffer: modelStream.getReader() as unknown as Uint8Array,
-        ...(gpuDevice ? { delegate: 'GPU' } : {}),
       },
-      ...(gpuDevice ? { gpuOptions: { device: gpuDevice } } : {}),
-      maxTokens: 8192,
-      temperature: 0.7,
-      topK: 40,
+      maxTokens: 1024,
+      temperature: 0.8,
+      topK: 10,
     });
 
     this.setStatus('ready');
@@ -99,9 +93,11 @@ export class WasmProvider implements LLMProvider {
   private async getModelStream(
     url: string,
     filename: string,
+    knownSize: number,
   ): Promise<ReadableStream<Uint8Array>> {
-    const progressCb = (p: number, loaded: number, total: number) => {
-      this.opts.onProgress?.(p, 'downloading', loaded, total);
+    const total = knownSize;
+    const progressCb = (p: number, loaded: number, t: number) => {
+      this.opts.onProgress?.(p, 'downloading', loaded, t);
     };
 
     const root = await navigator.storage.getDirectory();
@@ -111,71 +107,56 @@ export class WasmProvider implements LLMProvider {
     try {
       const cached = await modelsDir.getFileHandle(filename);
       const file = await cached.getFile();
-      // Verify the file is complete (size file stores expected size)
-      try {
-        const sizeHandle = await modelsDir.getFileHandle(filename + '_size');
-        const sizeFile = await sizeHandle.getFile();
-        const expectedSize = parseInt(await sizeFile.text());
-        if (file.size !== expectedSize) {
-          // Corrupt cache — remove and re-download
-          await modelsDir.removeEntry(filename);
-          await modelsDir.removeEntry(filename + '_size');
-          throw new Error('cache size mismatch');
-        }
-      } catch {
-        // No size file but model exists — use it (legacy cache)
+      if (file.size > 1000 && (total === 0 || Math.abs(file.size - total) < total * 0.01)) {
+        progressCb(1, file.size, file.size);
+        this.opts.onProgress?.(1, 'cached', file.size, file.size);
+        return file.stream() as ReadableStream<Uint8Array>;
       }
-      progressCb(1, file.size, file.size);
-      return file.stream() as ReadableStream<Uint8Array>;
+      // Corrupt cache — remove and re-download
+      await modelsDir.removeEntry(filename).catch(() => {});
     } catch {
-      // Cache miss — download from network
+      // Cache miss
     }
 
-    // ── Network download ─────────────────────────────────────────────
-    // HEAD request first to get content-length for progress
-    let expectedSize = 0;
-    try {
-      const head = await fetch(url, { method: 'HEAD' });
-      if (head.ok) expectedSize = parseInt(head.headers.get('content-length') ?? '0', 10);
-    } catch { /* non-fatal */ }
+    // ── Network download (retry on 503) ───────────────────────────────
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      response = await fetch(url);
+      if (response.ok) break;
+      if (response.status === 503 && attempt < 2) {
+        const wait = (attempt + 1) * 5000;
+        this.opts.onProgress?.(0, `retry in ${wait / 1000}s (503)`, 0, total);
+        await new Promise(r => setTimeout(r, wait));
+        continue;
+      }
+      throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+    }
+    if (!response!.ok) throw new Error('Download failed after retries');
+    if (!response!.body) throw new Error('Response body is null');
 
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Download failed: ${response.status} ${response.statusText}`);
-    if (!response.body) throw new Error('Response body is null');
+    const [streamForConsumer, streamForCache] = response!.body!.tee();
 
-    const total = expectedSize || parseInt(response.headers.get('content-length') ?? '0', 10);
-
-    // Tee: one stream for consumer, one for background OPFS caching
-    const [streamForConsumer, streamForCache] = response.body.tee();
-
-    // Background cache (non-blocking, fire-and-forget)
+    // Background OPFS cache (fire-and-forget)
     (async () => {
       try {
-        // Write expected size first
-        const sizeHandle = await modelsDir.getFileHandle(filename + '_size', { create: true });
-        const sizeWritable = await sizeHandle.createWritable();
-        await sizeWritable.write(new TextEncoder().encode(String(total)));
-        await sizeWritable.close();
-
         const handle = await modelsDir.getFileHandle(filename, { create: true });
         const writable = await handle.createWritable();
         await streamForCache.pipeTo(writable);
       } catch {
-        // OPFS write failure is non-fatal — model still usable from stream
-        try {
-          await modelsDir.removeEntry(filename).catch(() => {});
-          await modelsDir.removeEntry(filename + '_size').catch(() => {});
-        } catch { /* ignore cleanup errors */ }
+        try { await modelsDir.removeEntry(filename).catch(() => {}); } catch {}
       }
     })();
 
-    // Wrap with progress reporting
+    // Progress stream using known size
     let loaded = 0;
     const progressTransform = new TransformStream<Uint8Array, Uint8Array>({
       transform(chunk, controller) {
         loaded += chunk.length;
         progressCb(total > 0 ? loaded / total : 0, loaded, total);
         controller.enqueue(chunk);
+      },
+      flush() {
+        progressCb(1, total, total);
       },
     });
 
@@ -203,8 +184,19 @@ export class WasmProvider implements LLMProvider {
       }
     }
 
-    // Build Gemma chat prompt (ChatML format with tool hints)
-    const prompt = this.buildPrompt(messages, tools);
+    // Build Gemma chat prompt (Gemma 4 format with tool hints)
+    let prompt = this.buildPrompt(messages, tools);
+
+    // Clipping: if prompt is too large, drop oldest messages (reserve 384 tokens for response)
+    const maxPromptTokens = 1024 - 384;
+    try {
+      while (this.inference.sizeInTokens(prompt) > maxPromptTokens && messages.length > 1) {
+        messages = messages.slice(1);
+        prompt = this.buildPrompt(messages, tools);
+      }
+    } catch {
+      // sizeInTokens not available — skip clipping
+    }
 
     // Generate
     const t0 = performance.now();
@@ -234,6 +226,14 @@ export class WasmProvider implements LLMProvider {
 
     const latencyMs = performance.now() - t0;
 
+    // Use sizeInTokens for accurate token count if available
+    let realTokenCount = tokenCount;
+    try {
+      if (this.inference?.sizeInTokens) {
+        realTokenCount = this.inference.sizeInTokens(fullText) ?? tokenCount;
+      }
+    } catch {}
+
     // Parse tool calls
     const content: ContentBlock[] = [];
     try {
@@ -256,8 +256,8 @@ export class WasmProvider implements LLMProvider {
       content,
       stopReason: content.some(b => b.type === 'tool_use') ? 'tool_use' : 'end_turn',
       stats: {
-        tokensPerSec: tokenCount > 0 ? tokenCount / (latencyMs / 1000) : 0,
-        totalTokens: tokenCount,
+        tokensPerSec: realTokenCount > 0 ? realTokenCount / (latencyMs / 1000) : 0,
+        totalTokens: realTokenCount,
         latencyMs,
       },
     };
@@ -272,16 +272,17 @@ export class WasmProvider implements LLMProvider {
 
     const parts: string[] = [];
     if (systemParts.length > 0) {
-      parts.push(`<start_of_turn>system\n${systemParts.join('\n')}<end_of_turn>`);
+      // Gemma 4 has no system role — inject system content as a user turn
+      parts.push(`<|turn>user\n${systemParts.join('\n')}<turn|>`);
     }
     for (const msg of messages) {
       const role = msg.role === 'assistant' ? 'model' : 'user';
       const text = typeof msg.content === 'string'
         ? msg.content
         : (msg.content as ContentBlock[]).filter(b => b.type === 'text').map(b => (b as { type: 'text'; text: string }).text).join('\n');
-      parts.push(`<start_of_turn>${role}\n${text}<end_of_turn>`);
+      parts.push(`<|turn>${role}\n${text}<turn|>`);
     }
-    parts.push('<start_of_turn>model\n');
+    parts.push('<|turn>model\n');
     return parts.join('\n');
   }
 
