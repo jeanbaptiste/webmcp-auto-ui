@@ -274,7 +274,7 @@ if (isUITool('render_stat')) {
 
 In addition to the individual `render_*` tools, the agent package provides a single unified `component()` tool that exposes **56 components** (31 renderable, 25 non-renderable) through a consistent interface.
 
-This approach was inspired by [Emmanuel Raviart](https://www.tricoteuses.fr/mcp), creator of the Moulineuse MCP server, who suggested consolidating the tool surface into a single discoverable entry point.
+This approach was inspired by [Emmanuel Raviart](https://www.tricoteuses.fr/mcp), creator of the Tricoteuses MCP server, who suggested consolidating the tool surface into a single discoverable entry point.
 
 ```ts
 import { COMPONENT_TOOL, executeComponent, componentRegistry } from '@webmcp-auto-ui/agent';

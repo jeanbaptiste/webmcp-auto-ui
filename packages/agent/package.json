@@ -14,8 +14,9 @@
     }
   },
   "scripts": {
+    "prebuild": "node ../../scripts/recipes-to-ts.js",
     "check": "tsc --noEmit",
-    "build": "tsc"
+    "build": "node ../../scripts/recipes-to-ts.js && tsc"
   },
   "publishConfig": {
     "access": "public"

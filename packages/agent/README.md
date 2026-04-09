@@ -22,7 +22,7 @@ LLM agent loop that connects an MCP server to a UI. Given a user message and a s
 
 ## Unified `component()` tool
 
-A single tool that exposes **56 components** (31 renderable, 25 non-renderable) through a consistent interface. Inspired by [Emmanuel Raviart](https://www.tricoteuses.fr/mcp), creator of the Moulineuse MCP server.
+A single tool that exposes **56 components** (31 renderable, 25 non-renderable) through a consistent interface. Inspired by [Emmanuel Raviart](https://www.tricoteuses.fr/mcp), creator of the Tricoteuses MCP server.
 
 ```ts
 import { COMPONENT_TOOL, executeComponent, componentRegistry } from '@webmcp-auto-ui/agent';

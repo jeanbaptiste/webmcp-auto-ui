@@ -5,8 +5,8 @@
   import { listSkills } from '@webmcp-auto-ui/sdk';
   import type { Skill } from '@webmcp-auto-ui/sdk';
   import { McpMultiClient } from '@webmcp-auto-ui/core';
-  import { AnthropicProvider, GemmaProvider, runAgentLoop, fromMcpTools, trimConversationHistory, summarizeChat, TokenTracker } from '@webmcp-auto-ui/agent';
-  import type { ChatMessage } from '@webmcp-auto-ui/agent';
+  import { AnthropicProvider, GemmaProvider, runAgentLoop, buildSystemPrompt, fromMcpTools, trimConversationHistory, summarizeChat, TokenTracker, WEBMCP_RECIPES, filterRecipesByServer } from '@webmcp-auto-ui/agent';
+  import type { ChatMessage, ToolLayer, McpLayer, UILayer } from '@webmcp-auto-ui/agent';
   import { McpStatus, GemmaLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
   import { Menu, ExternalLink } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
@@ -30,21 +30,15 @@
   let cacheEnabled = $state(true);
   let temperature = $state(1.0);
   let topK = $state(64);
-  let systemPrompt = $state(`Tu es un assistant UI connecté à un serveur MCP.
-
-Tu as accès à deux familles d'outils :
-1. **Outils DATA** (exposés par le serveur MCP connecté) — pour interroger les données
-2. **Outils UI** (render_*) — pour composer l'interface graphique
+  const defaultSystemPrompt = `Tu es un assistant UI connecté à des serveurs MCP.
 
 WORKFLOW OBLIGATOIRE :
 1. Utilise un outil DATA pour récupérer les données
-2. Puis utilise un outil UI pour afficher les résultats visuellement
-3. Ta réponse texte doit être TRÈS courte (1-2 phrases max) — l'essentiel est dans l'UI
+2. Puis utilise un outil UI (render_*) pour afficher visuellement
+3. Réponds en 1-2 phrases max — l'essentiel est dans l'UI
 
-CHOIX DES OUTILS UI :
-- liste tous les outils MCP et WEBMCP
-
-Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_* quand c'est utile. Sois très concis (1-2 phrases max).`);
+Propose la visualisation la plus pertinente. Combine plusieurs render_* quand c'est utile.`;
+  let systemPrompt = $state(defaultSystemPrompt);
 
   // FlexGrid ref
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -201,45 +195,49 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
     });
   });
 
-  // ── Effective prompt (K — structured for cache) ──────────────────────────
-  const WEBMCP_UI_TOOLS = [
-    'render_stat', 'render_kv', 'render_list', 'render_table',
-    'render_chart', 'render_chart_rich', 'render_timeline', 'render_profile',
-    'render_trombinoscope', 'render_hemicycle', 'render_sankey', 'render_cards',
-    'render_json', 'render_d3', 'render_text', 'render_alert', 'render_code',
-    'render_tags', 'render_gallery', 'render_carousel', 'render_log', 'clear_canvas',
-    'update_block', 'move_block', 'resize_block', 'style_block',
-  ];
+  // ── Effective prompt (K — structured via ToolLayers) ──────────────────────
+  const layers = $derived.by((): ToolLayer[] => {
+    const result: ToolLayer[] = [];
 
-  const effectivePrompt = $derived.by(() => {
-    // 1. Partie stable (cacheable)
-    const stable = systemPrompt.replace(
-      '- liste tous les outils MCP et WEBMCP',
-      WEBMCP_UI_TOOLS.map(t => `- ${t}`).join('\n')
-    );
-
-    // 2. Outils UI (stable tant qu'on ne change pas la liste)
-    const uiToolsSection = '\n\n--- Outils UI disponibles ---\n' +
-      WEBMCP_UI_TOOLS.map(t => `- ${t}`).join('\n');
-
-    // 3. Contexte MCP dynamique (change quand on connecte/déconnecte)
-    let mcpSection = '';
+    // MCP layer (dynamic — changes when connecting/disconnecting)
     if (canvas.mcpConnected) {
-      const dataTools = (canvas.mcpTools as {name:string;description?:string}[])
-        .filter(t => !t.name.startsWith('render_') && t.name !== 'clear_canvas');
-      if (dataTools.length > 0) {
-        mcpSection += `\n--- Contexte MCP : ${canvas.mcpName ?? 'serveur connecté'} ---\n` +
-          `Outils DATA disponibles :\n` +
-          dataTools.map(t => `- ${t.name}${t.description ? ' : ' + t.description.split('\n')[0] : ''}`).join('\n');
-      }
-      // G — Inject recipes into prompt
-      if (mcpRecipes.length > 0) {
-        mcpSection += `\nRecettes/skills disponibles (${mcpRecipes.length}) :\n` +
-          mcpRecipes.map(r => `- ${r.name}${r.description ? ' : ' + r.description : ''}`).join('\n');
-      }
+      const mcpLayer: McpLayer = {
+        source: 'mcp',
+        serverUrl: '',
+        serverName: canvas.mcpName ?? undefined,
+        tools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
+        recipes: mcpRecipes.length > 0 ? mcpRecipes : undefined,
+      };
+      result.push(mcpLayer);
     }
 
-    return stable + uiToolsSection + mcpSection;
+    // UI layer with WebMCP recipes filtered by connected servers
+    const serverNames = canvas.mcpName?.split(', ').filter(Boolean) ?? [];
+    const uiRecipes = filterRecipesByServer(WEBMCP_RECIPES, serverNames);
+    const uiLayer: UILayer = {
+      source: 'ui',
+      recipes: uiRecipes.length > 0 ? uiRecipes : undefined,
+    };
+    result.push(uiLayer);
+
+    return result;
+  });
+
+  const isGemma = $derived(canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b');
+
+  const effectivePrompt = $derived.by(() => {
+    const hasCustomPrompt = systemPrompt !== defaultSystemPrompt;
+    const hasMcp = layers.some(l => l.source === 'mcp');
+
+    if (hasMcp) {
+      // MCP connected: structured prompt with tools, recipes, sections
+      // Prepend custom prompt if user customized it, otherwise use the generated one as-is
+      const structured = buildSystemPrompt(layers, { condensed: isGemma });
+      return hasCustomPrompt ? `${systemPrompt}\n\n${structured}` : structured;
+    }
+
+    // No MCP: use the static prompt (default or custom)
+    return systemPrompt;
   });
 
   // ── Helpers ───────────────────────────────────────────────────────────────

@@ -1,5 +1,8 @@
 // @webmcp-auto-ui/agent — types
 
+// Re-export recipe types
+export type { Recipe, McpRecipe } from './recipes/types.js';
+
 // Short model IDs for remote (Anthropic-compatible) providers
 export type RemoteModelId = 'haiku' | 'sonnet' | 'opus' | string;
 

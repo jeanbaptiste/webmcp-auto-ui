@@ -8,7 +8,7 @@
  *   component("help", "stat-card")        → schema of stat-card
  *   component("stat-card", { label: … })  → render stat-card
  *
- * Inspired by a suggestion from Emmanuel Raviart, creator of Moulineuse MCP server
+ * Inspired by a suggestion from Emmanuel Raviart, creator of Tricoteuses MCP server
  * (https://www.tricoteuses.fr/mcp)
  */
 

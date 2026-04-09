@@ -23,6 +23,9 @@ npm-debug.log*
 # TypeScript incremental build cache
 *.tsbuildinfo
 
+# Auto-generated recipe file
+packages/agent/src/recipes/_generated.ts
+
 # Local
 *.local
 

@@ -10,11 +10,33 @@ import type {
   ChatMessage, ContentBlock, ToolCall, AgentMetrics, AgentResult,
   LLMProvider, AnthropicTool, McpToolDef, AgentCallbacks,
 } from './types.js';
+import type { ToolLayer, McpLayer, UILayer } from './tool-layers.js';
 import { UI_TOOLS, isUITool, executeUITool } from './ui-tools.js';
+import { formatRecipesForPrompt, formatMcpRecipesForPrompt } from './recipe-registry.js';
 
 const MAX_RESULT_LEN = 10_000;
 
-export function buildSystemPrompt(mcpTools: McpToolDef[]): string {
+/** Build system prompt from structured ToolLayers (new API) */
+export function buildSystemPrompt(layers: ToolLayer[], options?: { condensed?: boolean }): string;
+/** Build system prompt from flat McpToolDef[] (backward compat) */
+export function buildSystemPrompt(mcpTools: McpToolDef[]): string;
+export function buildSystemPrompt(
+  input: ToolLayer[] | McpToolDef[],
+  options?: { condensed?: boolean },
+): string {
+  // If options provided, it's the new API (layers path)
+  // Otherwise, detect by checking first element for 'source' property
+  if (options !== undefined) {
+    return buildSystemPromptFromLayers(input as ToolLayer[], options);
+  }
+  if (input.length > 0 && 'source' in input[0]) {
+    return buildSystemPromptFromLayers(input as ToolLayer[]);
+  }
+  // Legacy path — McpToolDef[]
+  return buildSystemPromptLegacy(input as McpToolDef[]);
+}
+
+function buildSystemPromptLegacy(mcpTools: McpToolDef[]): string {
   const dataTools = mcpTools.filter(t => !isUITool(t.name));
   const uiTools = UI_TOOLS;
   return `You are a UI composer connected to an MCP server.
@@ -39,6 +61,70 @@ CRITICAL RULES:
 - Use render_table for tabular data, render_chart for numbers, render_stat for KPIs, render_kv for key-value pairs
 - Keep text responses to 1 sentence max
 - Respond in the user's language`;
+}
+
+function buildSystemPromptFromLayers(layers: ToolLayer[], options?: { condensed?: boolean }): string {
+  let prompt = `You are a UI composer connected to MCP servers.
+
+MANDATORY WORKFLOW:
+1. Call a DATA tool to get data
+2. IMMEDIATELY call a render_* UI tool to display the result
+3. Repeat or stop
+CRITICAL: After EVERY data tool, render next. ALWAYS render. Keep text to 1 sentence.
+Respond in the user's language.
+
+`;
+
+  // ## mcp — from McpLayers
+  const mcpLayers = layers.filter((l): l is McpLayer => l.source === 'mcp');
+  const allMcpTools = mcpLayers.flatMap(l => l.tools).filter(t => !isUITool(t.name));
+  const allMcpRecipes = mcpLayers.flatMap(l => l.recipes ?? []);
+
+  if (allMcpTools.length > 0) {
+    const serverNames = mcpLayers
+      .filter(l => l.serverName)
+      .map(l => l.serverName!);
+    prompt += `## mcp${serverNames.length ? ' (' + serverNames.join(', ') + ')' : ''}\n\n`;
+    prompt += `### tools (${allMcpTools.length} DATA tools)\n`;
+    prompt += allMcpTools.map(t =>
+      `- ${t.name}: ${(t.description ?? t.name).split('\n')[0]}`
+    ).join('\n');
+    prompt += '\n\n';
+
+    if (allMcpRecipes.length > 0) {
+      prompt += `### recipes (${allMcpRecipes.length} server recipes)\n`;
+      prompt += formatMcpRecipesForPrompt(allMcpRecipes);
+      prompt += '\n\n';
+    }
+  }
+
+  // ## webmcp — from UILayer
+  const uiLayer = layers.find((l): l is UILayer => l.source === 'ui');
+  if (uiLayer) {
+    prompt += `## webmcp\n\n`;
+    prompt += `### UI tools (render results visually)\n`;
+    if (options?.condensed) {
+      // Condensed mode: just tool names
+      prompt += UI_TOOLS.map(t => `- ${t.name}`).join('\n');
+    } else {
+      prompt += UI_TOOLS.map(t => `- ${t.name}: ${t.description}`).join('\n');
+    }
+    prompt += '\n\n';
+
+    prompt += `RULES:\n`;
+    prompt += `- After EVERY data tool call, MUST call a render_* tool next\n`;
+    prompt += `- render_table for tabular data, render_chart for numbers, render_stat for KPIs, render_kv for key-value pairs\n`;
+    prompt += `- If error/empty data, call render_kv or render_stat to show the status\n`;
+    prompt += `- NEVER chain >1 data tool without rendering in between\n\n`;
+
+    if (uiLayer.recipes && uiLayer.recipes.length > 0) {
+      prompt += `### recipes (${uiLayer.recipes.length} UI recipes)\n`;
+      prompt += formatRecipesForPrompt(uiLayer.recipes);
+      prompt += '\n';
+    }
+  }
+
+  return prompt.trimEnd();
 }
 
 export function mcpToolsToAnthropic(tools: McpToolDef[]): AnthropicTool[] {
