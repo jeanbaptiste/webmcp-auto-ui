@@ -102,6 +102,10 @@
         bind:maxTokens
         bind:maxContextTokens
         bind:cacheEnabled
+        bind:temperature
+        bind:topK
+        modelType={canvas.llm.startsWith('gemma') ? 'wasm' : 'remote'}
+        modelId={canvas.llm}
       />
     </section>
 

@@ -27,6 +27,8 @@
   let maxContextTokens = $state(150_000);
   let maxTokens = $state(4096);
   let cacheEnabled = $state(true);
+  let temperature = $state(1.0);
+  let topK = $state(64);
   let systemPrompt = $state(`Tu es un assistant UI connecté à un serveur MCP.
 
 Tu as accès à deux familles d'outils :
@@ -297,6 +299,8 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
         systemPrompt: effectivePrompt || undefined,
         maxIterations: 15,
         maxTokens,
+        temperature,
+        topK,
         cacheEnabled,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
@@ -305,10 +309,10 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
             if (response.usage) {
               tokenTracker.record(response.usage, latencyMs);
             } else if (response.stats) {
-              // WASM/LiteRT — estimate from stats
+              // WASM/LiteRT — only output tokens are known
               tokenTracker.recordEstimate(
-                response.stats.totalTokens * 4,  // rough input chars estimate
-                response.stats.totalTokens * 4,  // output chars
+                0,  // input chars unknown in WASM
+                response.stats.totalTokens * 4,  // output chars estimate
                 latencyMs,
               );
             }
@@ -480,6 +484,8 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   bind:maxTokens
   bind:maxContextTokens
   bind:cacheEnabled
+  bind:temperature
+  bind:topK
   bind:showTokens
   onconnect={() => addMcpServer(canvas.mcpUrl)}
   {connectedUrls}

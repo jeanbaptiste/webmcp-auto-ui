@@ -78,8 +78,8 @@ export class WasmProvider implements LLMProvider {
         modelAssetBuffer: modelStream.getReader() as unknown as Uint8Array,
       },
       maxTokens: 4096,
-      temperature: 0.8,
-      topK: 10,
+      temperature: 1.0,
+      topK: 64,
     });
 
     this.setStatus('ready');

@@ -66,11 +66,16 @@
     out:fly={{ y: -8, duration: 150, opacity: 0 }}
   >
     {#if !metrics.isWasm && metrics.totalCacheReadTokens > 0}
-      <span class={metrics.totalCacheReadTokens > 0 ? 'cached-active' : ''}>Cached {fmt(metrics.totalCacheReadTokens)}</span>
+      <span class="cached-active">Cached {fmt(metrics.totalCacheReadTokens)}</span>
     {/if}
-    <span class:warn={metrics.requestsPerMin > LIMITS.reqPerMin * 0.8}>Req {metrics.requestsPerMin}/min</span> <span class="limit">({fmt(LIMITS.reqPerMin)} max)</span>
-    <span class:warn={metrics.inputTokensPerMin > LIMITS.inPerMin * 0.8}>In {fmt(metrics.inputTokensPerMin)}/min</span> <span class="limit">({fmt(LIMITS.inPerMin)} max)</span>
-    <span class:warn={metrics.outputTokensPerMin > LIMITS.outPerMin * 0.8}>Out {fmt(metrics.outputTokensPerMin)}/min</span> <span class="limit">({fmt(LIMITS.outPerMin)} max)</span>
+    {#if metrics.isWasm}
+      <span>Req {metrics.requestsPerMin}/min</span>
+      <span>Out {fmt(metrics.outputTokensPerMin)}/min</span>
+    {:else}
+      <span class:warn={metrics.requestsPerMin > LIMITS.reqPerMin * 0.8}>Req {metrics.requestsPerMin}/min</span> <span class="limit">({fmt(LIMITS.reqPerMin)} max)</span>
+      <span class:warn={metrics.inputTokensPerMin > LIMITS.inPerMin * 0.8}>In {fmt(metrics.inputTokensPerMin)}/min</span> <span class="limit">({fmt(LIMITS.inPerMin)} max)</span>
+      <span class:warn={metrics.outputTokensPerMin > LIMITS.outPerMin * 0.8}>Out {fmt(metrics.outputTokensPerMin)}/min</span> <span class="limit">({fmt(LIMITS.outPerMin)} max)</span>
+    {/if}
   </div>
 {/if}
 

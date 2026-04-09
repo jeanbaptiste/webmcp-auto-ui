@@ -72,6 +72,8 @@ export interface AgentLoopOptions {
   mcpTools?: McpToolDef[];      // tools from MCP server
   maxIterations?: number;
   maxTokens?: number;
+  temperature?: number;
+  topK?: number;
   cacheEnabled?: boolean;
   systemPrompt?: string;
   initialMessages?: ChatMessage[]; // conversation history from previous turns
@@ -89,6 +91,8 @@ export async function runAgentLoop(
     mcpTools = [],
     maxIterations = 5,
     maxTokens,
+    temperature,
+    topK,
     cacheEnabled = true,
     initialMessages = [],
     callbacks = {},
@@ -124,7 +128,7 @@ export async function runAgentLoop(
     callbacks.onLLMRequest?.(messages, allTools);
     const t0 = performance.now();
     const response = await provider.chat(messages, allTools, {
-      signal, cacheEnabled, system: systemPrompt, maxTokens,
+      signal, cacheEnabled, system: systemPrompt, maxTokens, temperature, topK,
     });
     const latencyMs = performance.now() - t0;
     metrics.totalLatencyMs += latencyMs;
