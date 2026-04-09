@@ -57,18 +57,17 @@ CRITICAL RULES:
 }
 
 function buildSystemPromptFromLayers(layers: ToolLayer[]): string {
-  let prompt = `You are a UI composer connected to MCP servers.
+  let prompt = `Tu es un assistant UI connecté à des serveurs MCP.
 
-MANDATORY WORKFLOW:
-1. Call a DATA tool to get data
-2. IMMEDIATELY call a render_* UI tool to display the result
-3. Repeat or stop
-CRITICAL: After EVERY data tool, render next. ALWAYS render. Keep text to 1 sentence.
-Respond in the user's language.
+WORKFLOW OBLIGATOIRE :
+1. Appelle un outil DATA pour récupérer les données
+2. Appelle IMMÉDIATEMENT un outil UI (render_*) pour afficher le résultat
+3. Recommence ou arrête
+CRITIQUE : Après CHAQUE outil DATA, rends visuellement. TOUJOURS rendre. Texte = 1 phrase max.
 
 `;
 
-  // ## mcp — from McpLayers
+  // ## mcp — depuis les McpLayers
   const mcpLayers = layers.filter((l): l is McpLayer => l.source === 'mcp');
   const allMcpTools = mcpLayers.flatMap(l => l.tools).filter(t => !isUITool(t.name));
   const allMcpRecipes = mcpLayers.flatMap(l => l.recipes ?? []);
@@ -78,35 +77,35 @@ Respond in the user's language.
       .filter(l => l.serverName)
       .map(l => l.serverName!);
     prompt += `## mcp${serverNames.length ? ' (' + serverNames.join(', ') + ')' : ''}\n\n`;
-    prompt += `### tools (${allMcpTools.length} DATA tools)\n`;
+    prompt += `### outils DATA (${allMcpTools.length})\n`;
     prompt += allMcpTools.map(t =>
       `- ${t.name}: ${(t.description ?? t.name).split('\n')[0]}`
     ).join('\n');
     prompt += '\n\n';
 
     if (allMcpRecipes.length > 0) {
-      prompt += `### recipes (${allMcpRecipes.length} server recipes)\n`;
+      prompt += `### recettes serveur (${allMcpRecipes.length})\n`;
       prompt += formatMcpRecipesForPrompt(allMcpRecipes);
       prompt += '\n\n';
     }
   }
 
-  // ## webmcp — from UILayer
+  // ## webmcp — depuis UILayer
   const uiLayer = layers.find((l): l is UILayer => l.source === 'ui');
   if (uiLayer) {
     prompt += `## webmcp\n\n`;
-    prompt += `### UI tools (render results visually)\n`;
+    prompt += `### outils UI (affichage visuel)\n`;
     prompt += UI_TOOLS.map(t => `- ${t.name}: ${t.description}`).join('\n');
     prompt += '\n\n';
 
-    prompt += `RULES:\n`;
-    prompt += `- After EVERY data tool call, MUST call a render_* tool next\n`;
-    prompt += `- render_table for tabular data, render_chart for numbers, render_stat for KPIs, render_kv for key-value pairs\n`;
-    prompt += `- If error/empty data, call render_kv or render_stat to show the status\n`;
-    prompt += `- NEVER chain >1 data tool without rendering in between\n\n`;
+    prompt += `RÈGLES :\n`;
+    prompt += `- Après CHAQUE outil DATA, appeler un render_* obligatoirement\n`;
+    prompt += `- render_table pour les tableaux, render_chart pour les chiffres, render_stat pour les KPIs, render_kv pour les paires clé-valeur\n`;
+    prompt += `- Si erreur ou données vides, appeler render_kv ou render_stat pour montrer le statut\n`;
+    prompt += `- JAMAIS enchaîner >1 outil DATA sans rendre entre les deux\n\n`;
 
     if (uiLayer.recipes && uiLayer.recipes.length > 0) {
-      prompt += `### recipes (${uiLayer.recipes.length} UI recipes)\n`;
+      prompt += `### recettes UI (${uiLayer.recipes.length})\n`;
       prompt += formatRecipesForPrompt(uiLayer.recipes);
       prompt += '\n';
     }
