@@ -359,6 +359,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
       clearInterval(timerInterval);
       abortController = null;
       canvas.setGenerating(false);
+      setTimeout(() => { ephemeral = []; }, 5000);
     }
   }
 
@@ -399,13 +400,13 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
 
   <!-- TOPBAR -->
   <header class="h-12 flex items-center gap-3 px-4 border-b border-border bg-surface flex-shrink-0">
-    <button class="text-text2 hover:text-text1 transition-colors flex-shrink-0"
+    <button class="flex items-center gap-2 text-text2 hover:text-text1 transition-colors flex-shrink-0"
             onclick={() => settingsOpen = true} aria-label="Paramètres">
       <Menu size={18} />
+      <span class="font-mono text-sm font-bold">
+        <span class="text-text1">Auto-UI</span> <span class="text-accent">flex</span>
+      </span>
     </button>
-    <span class="font-mono text-sm font-bold flex-shrink-0">
-      <span class="text-text1">Auto-UI</span><span class="text-accent"> flex</span>
-    </span>
     <div class="flex-1"></div>
     <button
       class="font-mono text-[10px] h-6 px-2 rounded border transition-colors flex-shrink-0

@@ -25,9 +25,9 @@
   const LIMITS = { reqPerMin: 1000, inPerMin: 450_000, outPerMin: 90_000 };
 
   function fmt(n: number): string {
-    if (n >= 1_000_000) { const v = n / 1_000_000; return (v % 1 === 0 ? String(v) : v.toFixed(1)) + 'M'; }
-    if (n >= 1_000) { const v = n / 1_000; return (v % 1 === 0 ? String(v) : v.toFixed(1)) + 'K'; }
-    return String(n);
+    if (n >= 1_000_000) return Math.round(n / 1_000_000) + 'M';
+    if (n >= 1_000) return Math.round(n / 1_000) + 'K';
+    return String(Math.round(n));
   }
 
   const cacheRatio = $derived(

@@ -31,6 +31,7 @@
     compact = false,
   }: Props = $props();
 
+  let showToken = $state(false);
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   function handleUrlInput(e: Event) {
@@ -82,13 +83,24 @@
   </div>
 
   {#if !compact}
-    <input
-      type="password"
-      value={token}
-      oninput={(e) => { token = (e.target as HTMLInputElement).value; onTokenChange?.(token); }}
-      placeholder="Bearer token (optional)"
-      class="font-mono text-xs bg-surface2 border border-border2 rounded px-2 h-7 text-text1 outline-none placeholder:text-text2/40 focus:border-accent/50 transition-colors"
-    />
+    <div class="flex items-center gap-2">
+      <button
+        onclick={() => showToken = !showToken}
+        class="text-text2 hover:text-text1 transition-colors flex-shrink-0"
+        title="Bearer token"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+      {#if showToken}
+        <input
+          type="password"
+          value={token}
+          oninput={(e) => { token = (e.target as HTMLInputElement).value; onTokenChange?.(token); }}
+          placeholder="Bearer token (optional)"
+          class="flex-1 font-mono text-xs bg-surface2 border border-border2 rounded px-2 h-7 text-text1 outline-none placeholder:text-text2/40 focus:border-accent/50 transition-colors"
+        />
+      {/if}
+    </div>
   {/if}
 
   {#if error}

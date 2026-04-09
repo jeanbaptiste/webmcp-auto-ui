@@ -65,15 +65,6 @@
         <div class="flex-1 min-w-0 flex flex-col">
           <span class="font-mono text-xs font-medium text-text1">{server.name}</span>
           <span class="text-[10px] text-text2 truncate">{server.description}</span>
-          {#if server.tags?.length}
-            <div class="flex gap-1 mt-0.5">
-              {#each server.tags as tag}
-                <span
-                  class="text-[9px] font-mono px-1 py-px rounded bg-accent/10 text-accent"
-                >{tag}</span>
-              {/each}
-            </div>
-          {/if}
         </div>
 
         <!-- action -->
@@ -83,7 +74,7 @@
           {:else if connected}
             <button
               onclick={() => ondisconnect?.(server.url)}
-              class="text-xs font-mono px-1.5 h-6 rounded text-teal group-hover:text-accent2 group-hover:after:content-['×'] transition-colors"
+              class="text-xs font-mono px-1.5 h-6 rounded text-teal group-hover:text-accent2 transition-colors"
               title="Déconnecter"
             >
               <span class="group-hover:hidden">&#10003;</span>

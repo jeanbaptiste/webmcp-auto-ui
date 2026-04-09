@@ -7,8 +7,6 @@
 
   const DEFAULT_MODELS: ModelOption[] = [
     { value: 'haiku',      label: 'claude-haiku-4-5',  group: 'remote' },
-    { value: 'sonnet',     label: 'claude-sonnet-4-6', group: 'remote' },
-    { value: 'opus',       label: 'claude-opus-4-6',   group: 'remote' },
     { value: 'gemma-e2b',  label: 'Gemma E2B (WASM)',  group: 'wasm'   },
     { value: 'gemma-e4b',  label: 'Gemma E4B (WASM)',  group: 'wasm'   },
   ];
