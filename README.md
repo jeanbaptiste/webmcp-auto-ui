@@ -1,12 +1,12 @@
 # webmcp-auto-ui
 
-A monorepo for building WEBMCP browser UIs that are composed dynamically by humans and LLMs connected to MCP servers.
+Building WEBMCP UIs composed dynamically by humans and LLMs connected to multiple MCP servers.
 
 ## What it does
 
-Connect an MCP server to any of the apps. An LLM reads the available tools and skills / recipes, fetches data, then calls `render_*` tools to assemble a UI from typed blocks — stat cards, tables, charts, timelines, etc. Each block auto-registers as a live WebMCP tool that agents can read and update dynamically.
+Connect or more MCP servers to any of the apps. A distant or local (WASM) LLM reads the available tools and skills / recipes from both MCP and WEBMCP (list_tools, list_skills), fetches data + assemble related UI from typed blocks — stat cards, tables, charts, timelines, etc. Each created block is therefore exposed as a live WebMCP tool that agents can then read and update dynamically.
 
-The [HyperSkill](https://hyperskills.net/) format lets you snapshot the current UI as a portable URL (`?hs=base64`), share it, version it, and reload it later. Hyperskills can be shared on [Skillpedia](https://skillpedia.eu/)
+WEBMCP implements [HyperSkills](https://hyperskills.net/) format which lets you snapshot the current UI + recipes + related mcpservers as a portable URL (`?hs=gzip.base64`), share it, version it, and reload it later. Hyperskills can be shared on [Skillpedia](https://skillpedia.eu/)
 
 ## Packages
 
