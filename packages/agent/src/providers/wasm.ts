@@ -26,6 +26,7 @@ export class WasmProvider implements LLMProvider {
   private status: WasmStatus = 'idle';
   private opts: WasmProviderOptions;
   private initPromise: Promise<void> | null = null;
+  private busy = false;
 
   constructor(options: WasmProviderOptions) {
     this.opts = options;
@@ -170,7 +171,21 @@ export class WasmProvider implements LLMProvider {
   ): Promise<LLMResponse> {
     if (this.status !== 'ready') await this.initialize();
     if (!this.inference) throw new Error('Model not initialized');
+    if (this.busy) throw new Error('Model is busy — wait for current generation to finish');
 
+    this.busy = true;
+    try {
+      return await this._chat(messages, tools, options);
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  private async _chat(
+    messages: ChatMessage[],
+    tools: AnthropicTool[],
+    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string }
+  ): Promise<LLMResponse> {
     // Apply per-request options
     if (options?.maxTokens || options?.temperature || options?.topK) {
       try {
@@ -302,19 +317,26 @@ export class WasmProvider implements LLMProvider {
     }
 
     if (tools.length > 0) {
-      systemParts.push(`You are a tool-calling assistant. RULES:
-1. NEVER ask for confirmation. Execute tools immediately.
-2. NEVER explain what you will do. Just call the tool.
-3. Chain tool calls: use DATA tools first, then render_* tools to display results.
-4. Respond with ONLY the JSON tool call, no markdown, no explanation.
-5. Format: {"tool": "tool_name", "args": {...}}
+      // Gemma small models struggle with too many tools — limit to most relevant
+      const MAX_TOOLS = 15;
+      const limitedTools = tools.length > MAX_TOOLS
+        ? [
+            // Always include render_* tools (UI)
+            ...tools.filter(t => t.name.startsWith('render_') || t.name === 'clear_canvas').slice(0, 8),
+            // Fill with data tools
+            ...tools.filter(t => !t.name.startsWith('render_') && t.name !== 'clear_canvas').slice(0, MAX_TOOLS - 8),
+          ]
+        : tools;
 
-Example:
-User: show bird photos
-You: {"tool": "search_observations", "args": {"query": "birds"}}
+      systemParts.push(`TOOL CALLING FORMAT:
+- To call a tool: {"tool": "tool_name", "args": {...}}
+- Output ONLY the JSON, no markdown, no backticks.
+- Do NOT ask for confirmation. Execute directly.
+- After getting data, always call a render_* tool to display results.
+- When answering the user (no tool needed), respond in natural language.
 
 Available tools:`);
-      systemParts.push(tools.map(t => `- ${t.name}: ${t.description}`).join('\n'));
+      systemParts.push(limitedTools.map(t => `- ${t.name}: ${t.description}`).join('\n'));
     }
 
     const parts: string[] = [];
