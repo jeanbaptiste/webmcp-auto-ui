@@ -46,13 +46,13 @@ npm test           # vitest
 2. Install [Model Context Tool Inspector](https://chromewebstore.google.com/)
 3. Open any app — tools registered by the page appear in the extension
 
-## HyperSkill URL format
+## HyperSkills URL/URI format
 
 ```
 https://example.com?hs=gz.base64(skill)
 ```
 
-Skills are gzip-compressed (`gz.` prefix). Each version carries a SHA-256 hash of `source_url + content`, chainable for traceability. The format is defined at [hyperskills.net](https://hyperskills.net/) and available as [a NPM package](https://www.npmjs.com/package/hyperskills).
+Skills / Recipes are gzip-compressed (`gz.` prefix) and appended to their source url. Each version carries a SHA-256 hash of `source_url + content`, chainable for traceability. The format is defined at [hyperskills.net](https://hyperskills.net/) and available as [a NPM package](https://www.npmjs.com/package/hyperskills).
 
 ## License
 
