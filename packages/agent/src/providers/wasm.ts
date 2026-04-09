@@ -330,14 +330,18 @@ export class WasmProvider implements LLMProvider {
         : tools;
 
       systemParts.push(`TOOL CALLING FORMAT:
-- To call a tool: {"tool": "tool_name", "args": {...}}
-- Output ONLY the JSON, no markdown, no backticks.
+- To call a tool: <|tool_call>call:tool_name{"param": "value"}<tool_call|>
 - Do NOT ask for confirmation. Execute directly.
 - After getting data, always call a render_* tool to display results.
 - When answering the user (no tool needed), respond in natural language.
 
 Available tools:`);
-      systemParts.push(limitedTools.map(t => `- ${t.name}: ${t.description}`).join('\n'));
+      systemParts.push(limitedTools.map(t => {
+        const params = t.input_schema?.properties
+          ? Object.keys(t.input_schema.properties).join(', ')
+          : '';
+        return `<|tool>${t.name}: ${t.description}${params ? ` (params: ${params})` : ''}<tool|>`;
+      }).join('\n'));
     }
 
     const parts: string[] = [];
