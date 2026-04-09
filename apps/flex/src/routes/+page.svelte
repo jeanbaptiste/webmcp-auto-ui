@@ -57,6 +57,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   const tokenTracker = new TokenTracker();
   let tokenMetrics = $state(tokenTracker.metrics);
   let showTokens = $state(true);
+  let showToolJSON = $state(false);
   tokenTracker.subscribe(m => { tokenMetrics = m; });
 
   // Abort controller for stop button
@@ -333,7 +334,12 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
           onToolCall: (call) => {
             chatToolCount++; chatLastTool = call.name;
             allToolsUsed = [...allToolsUsed, call.name];
-            updateEphemeral(assistantId, `🔧 <strong>${call.name}</strong>…`);
+            if (showToolJSON) {
+              const argsJson = JSON.stringify(call.args, null, 2);
+              updateEphemeral(assistantId, `🔧 <strong>${call.name}</strong>\n<pre style="font-size:9px;margin-top:4px;opacity:0.7;white-space:pre-wrap;word-break:break-all">${argsJson}</pre>`);
+            } else {
+              updateEphemeral(assistantId, `🔧 <strong>${call.name}</strong>…`);
+            }
           },
         },
       });
@@ -515,6 +521,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   bind:temperature
   bind:topK
   bind:showTokens
+  bind:showToolJSON
   onconnect={() => addMcpServer(canvas.mcpUrl)}
   {connectedUrls}
   {loadingUrls}

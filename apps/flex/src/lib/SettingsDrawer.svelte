@@ -13,6 +13,7 @@
     temperature?: number;
     topK?: number;
     showTokens?: boolean;
+    showToolJSON?: boolean;
     onconnect: () => void;
     connectedUrls?: string[];
     loadingUrls?: string[];
@@ -31,6 +32,7 @@
     temperature = $bindable(1.0),
     topK = $bindable(64),
     showTokens = $bindable(true),
+    showToolJSON = $bindable(false),
     onconnect,
     connectedUrls = [],
     loadingUrls = [],
@@ -115,6 +117,10 @@
       <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
         <input type="checkbox" bind:checked={showTokens} class="accent-accent w-3.5 h-3.5" />
         Token usage
+      </label>
+      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+        <input type="checkbox" bind:checked={showToolJSON} class="accent-accent w-3.5 h-3.5" />
+        Show tool call JSON
       </label>
     </section>
 
