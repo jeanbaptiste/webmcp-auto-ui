@@ -146,7 +146,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
         gemmaProvider = new GemmaProvider({
           model: canvas.llm,
           onProgress: (p, _s, loaded, total) => {
-            gemmaProgress = p;
+            gemmaProgress = p * 100;
             if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;
             if (total) gemmaTotalMB = Math.round(total / 1048576 * 100) / 100;
           },
