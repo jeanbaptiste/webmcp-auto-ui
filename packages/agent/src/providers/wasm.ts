@@ -166,7 +166,7 @@ export class WasmProvider implements LLMProvider {
   async chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
-    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number }
+    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string }
   ): Promise<LLMResponse> {
     if (this.status !== 'ready') await this.initialize();
     if (!this.inference) throw new Error('Model not initialized');
@@ -185,14 +185,14 @@ export class WasmProvider implements LLMProvider {
     }
 
     // Build Gemma chat prompt (Gemma 4 format with tool hints)
-    let prompt = this.buildPrompt(messages, tools);
+    let prompt = this.buildPrompt(messages, tools, options?.system);
 
     // Clipping: if prompt is too large, drop oldest messages (reserve 384 tokens for response)
     const maxPromptTokens = 4096 - 512;
     try {
       while (this.inference.sizeInTokens(prompt) > maxPromptTokens && messages.length > 1) {
         messages = messages.slice(1);
-        prompt = this.buildPrompt(messages, tools);
+        prompt = this.buildPrompt(messages, tools, options?.system);
       }
     } catch {
       // sizeInTokens not available — skip clipping
@@ -211,6 +211,7 @@ export class WasmProvider implements LLMProvider {
         }
         fullText += partialResult;
         tokenCount++;
+        options?.onToken?.(partialResult);
       });
 
       // Fallback if the streaming callback didn't accumulate
@@ -256,9 +257,13 @@ export class WasmProvider implements LLMProvider {
     }
 
     if (!foundToolCall) {
-      // Try JSON format fallback
+      // Try JSON format fallback — strip markdown code blocks first
+      let cleaned = fullText.trim();
+      const mdMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+      if (mdMatch) cleaned = mdMatch[1].trim();
+
       try {
-        const parsed = JSON.parse(fullText) as { tool?: string; args?: Record<string, unknown> };
+        const parsed = JSON.parse(cleaned) as { tool?: string; args?: Record<string, unknown> };
         if (parsed.tool && parsed.args) {
           foundToolCall = true;
           content.push({
@@ -288,10 +293,27 @@ export class WasmProvider implements LLMProvider {
     };
   }
 
-  private buildPrompt(messages: ChatMessage[], tools: AnthropicTool[]): string {
+  private buildPrompt(messages: ChatMessage[], tools: AnthropicTool[], systemPrompt?: string): string {
     const systemParts: string[] = [];
+
+    // Inject system prompt from settings if provided
+    if (systemPrompt) {
+      systemParts.push(systemPrompt);
+    }
+
     if (tools.length > 0) {
-      systemParts.push('You have access to these tools (respond with JSON { "tool": "name", "args": {...} } to call one):');
+      systemParts.push(`You are a tool-calling assistant. RULES:
+1. NEVER ask for confirmation. Execute tools immediately.
+2. NEVER explain what you will do. Just call the tool.
+3. Chain tool calls: use DATA tools first, then render_* tools to display results.
+4. Respond with ONLY the JSON tool call, no markdown, no explanation.
+5. Format: {"tool": "tool_name", "args": {...}}
+
+Example:
+User: show bird photos
+You: {"tool": "search_observations", "args": {"query": "birds"}}
+
+Available tools:`);
       systemParts.push(tools.map(t => `- ${t.name}: ${t.description}`).join('\n'));
     }
 

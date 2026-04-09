@@ -47,7 +47,7 @@ export interface LLMProvider {
   chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
-    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string; maxTokens?: number; temperature?: number; topK?: number }
+    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void }
   ): Promise<LLMResponse>;
 }
 
@@ -88,6 +88,7 @@ export interface AgentCallbacks {
   onBlock?: (type: string, data: Record<string, unknown>) => { id: string } | void;
   onClear?: () => void;
   onText?: (text: string) => void;
+  onToken?: (token: string) => void;
   onDone?: (metrics: AgentMetrics) => void;
   // Canvas mutation tools
   onUpdate?: (id: string, data: Record<string, unknown>) => void;

@@ -59,6 +59,9 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   let showTokens = $state(true);
   tokenTracker.subscribe(m => { tokenMetrics = m; });
 
+  // Abort controller for stop button
+  let abortController = $state<AbortController | null>(null);
+
   // Export clipboard feedback
   let exportCopied = $state(false);
   let includeSummary = $state(true);
@@ -291,6 +294,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
     canvas.setGenerating(true);
     chatTimer = 0; chatToolCount = 0; chatLastTool = '';
     const timerInterval = setInterval(() => chatTimer++, 1000);
+    abortController = new AbortController();
 
     try {
       const result = await runAgentLoop(msg, {
@@ -302,6 +306,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
         temperature,
         topK,
         cacheEnabled,
+        signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         callbacks: {
@@ -323,6 +328,7 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
           onMove:    (id, x, y) => layoutAdapter.move(id, x, y),
           onResize:  (id, w, h) => layoutAdapter.resize(id, w, h),
           onStyle:   (id, styles) => layoutAdapter.style(id, styles),
+          onToken:   () => { /* streaming handled via onText from loop */ },
           onText:    (text) => { if (text) updateEphemeral(assistantId, text); },
           onToolCall: (call) => {
             chatToolCount++; chatLastTool = call.name;
@@ -344,12 +350,17 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
       // Error bubble stays visible until next sendMessage clears it
     } finally {
       clearInterval(timerInterval);
+      abortController = null;
       canvas.setGenerating(false);
     }
   }
 
   function onKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
+  }
+
+  function stopGeneration() {
+    abortController?.abort();
   }
 
   function toggleTheme() {
@@ -420,20 +431,28 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
       historique
     </button>
     <McpStatus connecting={canvas.mcpConnecting} connected={canvas.mcpConnected} name={canvas.mcpName ?? 'non connecté'} />
+    {#if gemmaStatus === 'ready'}
+      <span class="font-mono text-[10px] text-teal flex items-center gap-1 flex-shrink-0">
+        <span class="w-1.5 h-1.5 rounded-full bg-teal"></span>
+        {({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}
+      </span>
+    {/if}
     <button class="font-mono text-xs h-7 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
             onclick={toggleTheme} aria-label="Toggle theme">☀</button>
   </header>
 
-  <!-- GEMMA LOADER -->
-  <GemmaLoader
-    status={gemmaStatus}
-    progress={gemmaProgress}
-    elapsed={gemmaElapsed}
-    loadedMB={gemmaLoadedMB}
-    totalMB={gemmaTotalMB}
-    modelName={({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}
-    onunload={unloadGemma}
-  />
+  <!-- GEMMA LOADER — only visible during loading/error, badge in topbar when ready -->
+  {#if gemmaStatus === 'loading' || gemmaStatus === 'error'}
+    <GemmaLoader
+      status={gemmaStatus}
+      progress={gemmaProgress}
+      elapsed={gemmaElapsed}
+      loadedMB={gemmaLoadedMB}
+      totalMB={gemmaTotalMB}
+      modelName={({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}
+      onunload={unloadGemma}
+    />
+  {/if}
 
   <!-- CANVAS + EPHEMERAL WRAPPER -->
   <div class="flex-1 relative overflow-hidden">
@@ -460,18 +479,27 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
 
   <!-- INPUT BAR -->
   <div class="flex-shrink-0 px-[50px] py-4 bg-surface border-t border-border">
-    <input
-      type="text"
-      bind:value={input}
-      onkeydown={onKeydown}
-      placeholder={canvas.mcpConnected
-        ? `Demandez une interface sur ${canvas.mcpName}…`
-        : 'Ouvrez ☰ pour connecter un MCP, puis décrivez une interface…'}
-      disabled={canvas.generating}
-      class="w-full bg-surface2 border border-border2 rounded-xl px-5 py-3 text-sm font-mono text-text1
-             outline-none placeholder:text-text2/50 focus:border-accent/60 transition-colors
-             disabled:opacity-50 disabled:cursor-not-allowed"
-    />
+    <div class="flex gap-2">
+      <input
+        type="text"
+        bind:value={input}
+        onkeydown={onKeydown}
+        placeholder={canvas.mcpConnected
+          ? `Demandez une interface sur ${canvas.mcpName}…`
+          : 'Ouvrez ☰ pour connecter un MCP, puis décrivez une interface…'}
+        disabled={canvas.generating}
+        class="flex-1 bg-surface2 border border-border2 rounded-xl px-5 py-3 text-sm font-mono text-text1
+               outline-none placeholder:text-text2/50 focus:border-accent/60 transition-colors
+               disabled:opacity-50 disabled:cursor-not-allowed"
+      />
+      {#if canvas.generating}
+        <button
+          class="px-4 py-3 rounded-xl bg-accent2/10 border border-accent2/30 text-accent2 font-mono text-sm hover:bg-accent2/20 transition-colors flex-shrink-0"
+          onclick={stopGeneration}>
+          Stop
+        </button>
+      {/if}
+    </div>
   </div>
 
 </div>

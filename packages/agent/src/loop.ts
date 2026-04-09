@@ -127,8 +127,15 @@ export async function runAgentLoop(
 
     callbacks.onLLMRequest?.(messages, allTools);
     const t0 = performance.now();
+    let streamingText = '';
     const response = await provider.chat(messages, allTools, {
       signal, cacheEnabled, system: systemPrompt, maxTokens, temperature, topK,
+      onToken: callbacks.onToken ? (token) => {
+        callbacks.onToken!(token);
+        // Stream partial text to UI as tokens arrive
+        streamingText += token;
+        callbacks.onText?.(streamingText);
+      } : undefined,
     });
     const latencyMs = performance.now() - t0;
     metrics.totalLatencyMs += latencyMs;

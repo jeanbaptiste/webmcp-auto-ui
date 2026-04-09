@@ -1,6 +1,6 @@
 {
   "name": "@webmcp-auto-ui/sdk",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Skills CRUD, HyperSkill format, Svelte 5 stores",
   "license": "AGPL-3.0-or-later",
   "type": "module",
