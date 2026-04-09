@@ -12,6 +12,7 @@
   import FlexGrid from '$lib/FlexGrid.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
   import SettingsDrawer from '$lib/SettingsDrawer.svelte';
+  import ServerDetailModal from '$lib/ServerDetailModal.svelte';
 
   // ── State ─────────────────────────────────────────────────────────────────
   let input = $state('');
@@ -73,6 +74,8 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
   let connectedUrls = $state<string[]>([]);
   let loadingUrls = $state<string[]>([]);
   let mcpRecipes = $state<{name:string; description?:string}[]>([]);
+  let selectedServerUrl = $state('');
+  let serverDetailOpen = $state(false);
 
   async function addMcpServer(url: string) {
     if (!url.trim()) return;
@@ -438,7 +441,13 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
             onclick={() => historyOpen = true}>
       historique
     </button>
-    <McpStatus connecting={canvas.mcpConnecting} connected={canvas.mcpConnected} name={canvas.mcpName ?? 'non connecté'} />
+    <McpStatus
+      connecting={canvas.mcpConnecting}
+      connected={canvas.mcpConnected}
+      name={canvas.mcpName ?? 'non connecté'}
+      servers={multiClient.listServers().map(s => ({ url: s.url, name: s.name, toolCount: s.tools.length }))}
+      onserverclick={(url) => { selectedServerUrl = url; serverDetailOpen = true; }}
+    />
     {#if gemmaStatus === 'ready'}
       <span class="font-mono text-[10px] text-teal flex items-center gap-1 flex-shrink-0">
         <span class="w-1.5 h-1.5 rounded-full bg-teal"></span>
@@ -534,3 +543,18 @@ Propose TOUJOURS la visualisation la plus pertinente. Combine plusieurs render_*
 
 <!-- HISTORY MODAL -->
 <HistoryModal bind:open={historyOpen} messages={historyLog} />
+
+<!-- SERVER DETAIL MODAL -->
+{#if serverDetailOpen && selectedServerUrl}
+  {@const serverInfo = multiClient.listServers().find(s => s.url === selectedServerUrl)}
+  {#if serverInfo}
+    <ServerDetailModal
+      bind:open={serverDetailOpen}
+      serverName={serverInfo.name}
+      serverUrl={serverInfo.url}
+      tools={serverInfo.tools.map(t => ({ name: t.name, description: t.description ?? '' }))}
+      recipes={mcpRecipes}
+      ondisconnect={() => { removeMcpServer(selectedServerUrl); serverDetailOpen = false; }}
+    />
+  {/if}
+{/if}

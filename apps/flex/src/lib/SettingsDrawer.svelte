@@ -69,7 +69,7 @@
         bind:token={mcpToken}
         connecting={canvas.mcpConnecting}
         connected={canvas.mcpConnected}
-        serverName={canvas.mcpName ?? ''}
+        serverName={connectedUrls.length > 1 ? `multi-serveurs (${connectedUrls.length})` : canvas.mcpName ?? ''}
         onconnect={onconnect}
       />
     </section>
