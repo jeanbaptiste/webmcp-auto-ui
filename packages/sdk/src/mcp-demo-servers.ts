@@ -64,4 +64,10 @@ export const MCP_DEMO_SERVERS: McpDemoServer[] = [
     url: 'https://demos.hyperskills.net/mcp-datagouv/mcp',
     tags: ['open-data', 'france', 'gouvernement', 'statistiques'],
   },
+  {
+    id: 'nasa',
+    name: 'NASA',
+    description: 'NASA — images spatiales, données astronomiques, rovers Mars, astéroïdes.',
+    url: 'https://demos.hyperskills.net/mcp-nasa/mcp',
+  },
 ];
