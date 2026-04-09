@@ -363,8 +363,8 @@ webmcp-auto-ui/
   packages/
     core/       @webmcp-auto-ui/core   — W3C WebMCP polyfill + MCP client
     sdk/        @webmcp-auto-ui/sdk    — HyperSkill format, skills registry, canvas store
-    agent/      @webmcp-auto-ui/agent  — LLM agent loop + providers + UI tools
-    ui/         @webmcp-auto-ui/ui     — 34+ Svelte 5 components
+    agent/      @webmcp-auto-ui/agent  — LLM agent loop + Anthropic/Gemma LiteRT providers + UI tools
+    ui/         @webmcp-auto-ui/ui     — 34+ Svelte 5 components + agent UI widgets
   apps/
     home/       Landing page + app launcher
     flex/       Canvas drag & resize, multi-MCP, ephemeral chat
@@ -510,8 +510,8 @@ webmcp-auto-ui/
 ```
 
 - **core** has zero external dependencies. Pure TypeScript.
-- **sdk** depends on Svelte 5 (peer) for the canvas store. No dependency on core.
-- **agent** depends on core (`@webmcp-auto-ui/core`) for `McpClient`, `sanitizeSchema`, and types.
+- **sdk** depends on Svelte 5 (peer) for the canvas store. Also provides a vanilla (framework-agnostic) canvas store at `@webmcp-auto-ui/sdk/canvas-vanilla`. Ships `MCP_DEMO_SERVERS` registry. No dependency on core.
+- **agent** depends on core (`@webmcp-auto-ui/core`) for `McpClient`, `McpMultiClient`, `sanitizeSchema`, and types. Uses `@mediapipe/tasks-genai` for Gemma LiteRT (replaces `@huggingface/transformers` ONNX).
 - **ui** is standalone. Peer dependencies: `svelte ^5`, `d3 ^7`, `leaflet >=1.9`.
 
 ## App descriptions
@@ -533,7 +533,7 @@ webmcp-auto-ui/
 | UI base | bits-ui (shadcn-svelte pattern), tailwind-variants |
 | Charting | D3.js v7 (Chart, Sankey, Hemicycle, D3Widget) |
 | Maps | Leaflet (MapView) |
-| LLM | Anthropic Claude API (via server proxy), Gemma E2B (in-browser worker) |
+| LLM | Anthropic Claude API (via server proxy), Gemma 4 LiteRT (in-browser, main thread, OPFS cache) |
 | Protocol | MCP Streamable HTTP (JSON-RPC 2.0) |
 | Build | TypeScript, svelte-package, Vite |
 
@@ -554,6 +554,14 @@ Components never call each other directly. The `bus` singleton implements Alan K
 ### HyperSkill URL format
 
 A skill (blocks + MCP URL + LLM choice + theme) is serialized to JSON, base64-encoded, and appended as `?hs=...` query parameter. Skills larger than 6KB are gzip-compressed (prefix `gz.`). Each version carries a SHA-256 hash for traceability and chaining.
+
+### LiteRT migration (v0.5.0)
+
+The Gemma WASM provider was migrated from ONNX (`@huggingface/transformers` running in a Web Worker) to LiteRT (`@mediapipe/tasks-genai` running on the main thread). LiteRT is 2-4x faster on WebGPU and provides native Gemma 4 support with the new `<|turn>...<turn|>` prompt format and `<|tool_call>call:name{args}<tool_call|>` tool call parsing. The provider runs on the main thread because MediaPipe is incompatible with ES module workers. Models are cached in OPFS (Origin Private File System) for instant reload after first download.
+
+### Vanilla canvas store
+
+In addition to the Svelte 5 runes-based canvas store (`@webmcp-auto-ui/sdk/canvas`), a framework-agnostic vanilla store is available at `@webmcp-auto-ui/sdk/canvas-vanilla`. Same API but uses plain callbacks instead of Svelte runes, enabling integration with React, Vue, or vanilla JS.
 
 ### Agent loop architecture
 
@@ -598,6 +606,30 @@ initializeWebMCPPolyfill({
 **`hasNativeWebMCP()`** — Returns `true` if the browser has native WebMCP support.
 
 **`executeToolInternal(name, args)`** — Executes a registered tool by name. Used internally by the polyfill.
+
+### McpMultiClient
+
+```ts
+import { McpMultiClient } from '@webmcp-auto-ui/core';
+```
+
+Manages simultaneous connections to multiple MCP servers. Aggregates tool lists from all servers and routes `callTool` to the correct server based on tool name.
+
+```ts
+const multi = new McpMultiClient();
+await multi.addServer('https://mcp1.example.com/mcp');
+await multi.addServer('https://mcp2.example.com/mcp');
+
+const allTools = multi.listAllTools();  // tools from both servers
+const result = await multi.callTool('query_sql', { sql: 'SELECT 1' });  // routes automatically
+
+await multi.removeServer('https://mcp1.example.com/mcp');
+await multi.disconnectAll();
+```
+
+### Prompt caching fix
+
+The `cache_control` property is applied on the tools array (not individual tools) to work correctly with Anthropic's prompt caching API. This ensures cache hits when the tool set is stable across consecutive requests, reducing latency and cost.
 
 ### MCP Client
 
@@ -833,8 +865,19 @@ Complex visualizations for data-heavy use cases.
 |-----------|-------------|
 | `Pane` | Window pane with title bar, resize handles, close/minimize |
 | `TilingLayout` | Automatic tiling layout (splits panes horizontally/vertically) |
-| `FloatingLayout` | Free-form floating windows with z-index management |
+| `FloatingLayout` | Free-form floating windows with z-index management, collapse/expand (double-click), fit-to-content button |
+| `FlexLayout` | Auto-grid layout with size slider for adjusting block dimensions |
 | `StackLayout` | Tabbed stack layout (one pane visible at a time) |
+
+### Agent UI Widgets
+
+| Component | Description |
+|-----------|-------------|
+| `GemmaLoader` | Floating overlay with progress stream; auto-collapses to a pill once the model is loaded |
+| `TokenBubble` | Real-time metrics display: req/min, input tokens/min, output tokens/min, cached tokens |
+| `EphemeralBubble` | Transient notification bubble (moved from app to package for reuse) |
+| `RemoteMCPserversDemo` | MCP server discovery component listing available demo servers from `MCP_DEMO_SERVERS` |
+| `SettingsPanel` | Sliders with dynamic ranges for temperature, topK, and maxTokens controls |
 
 ### BlockRenderer
 
@@ -958,6 +1001,9 @@ HyperSkill encode/decode, skills registry, and Svelte 5 canvas store.
 - Encodes/decodes HyperSkill URLs (base64 + optional gzip for skills > 6KB)
 - Provides an in-memory skills CRUD registry with change notifications
 - Exposes a reactive canvas store (Svelte 5 runes) for blocks, chat, MCP state, and theme
+- Provides a vanilla (framework-agnostic) canvas store at `@webmcp-auto-ui/sdk/canvas-vanilla`
+- Ships `MCP_DEMO_SERVERS` — a registry of 7 demo MCP server endpoints
+- Supports `chatSummary` and `provenance` fields in `HyperSkillMeta` for traceability
 
 ## HyperSkill format
 
@@ -990,6 +1036,12 @@ interface HyperSkillMeta {
   theme?: Record<string, string>;
   hash?: string;
   previousHash?: string;
+  chatSummary?: string;       // anonymized summary of the chat that produced the skill
+  provenance?: {              // records how the skill was created
+    model?: string;
+    mcp?: string;
+    timestamp?: number;
+  };
 }
 
 interface HyperSkill {
@@ -1214,24 +1266,56 @@ const param = canvas.buildHyperskillParam();
 canvas.loadFromParam(hsParam);  // returns true on success
 ```
 
+## Vanilla canvas store
+
+A framework-agnostic canvas store for non-Svelte environments. Same API as the Svelte 5 store but uses plain callbacks instead of runes:
+
+```ts
+import { canvas } from '@webmcp-auto-ui/sdk/canvas-vanilla';
+
+canvas.addBlock('stat', { label: 'Revenue', value: '
+  <script>
+42K' });
+canvas.subscribe(() => console.log('state changed'));
+```
+
+Useful for vanilla JS, React, or Vue integrations.
+
+## MCP Demo Servers
+
+A registry of 7 demo MCP server endpoints for testing and showcasing:
+
+```ts
+import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
+
+// MCP_DEMO_SERVERS: Array<{ url: string; name: string; description: string }>
+```
+
+Used by the `RemoteMCPserversDemo` component in `@webmcp-auto-ui/ui`.
+
   </script>
   <script type="text/markdown" data-page="agent">
 # @webmcp-auto-ui/agent
 
-LLM agent loop with Anthropic and Gemma providers, plus 22 UI tools for rendering blocks and a unified `component()` tool exposing 56 components.
+LLM agent loop with Anthropic and Gemma LiteRT providers, plus 22 UI tools for rendering blocks, a unified `component()` tool exposing 56 components, TokenTracker, and summarizeChat.
 
 ## What it does
 
 - Runs an iterative LLM agent loop: prompt -> tool calls -> LLM -> repeat until done
-- Provides two LLM providers: `AnthropicProvider` (cloud) and `GemmaProvider` (in-browser Web Worker)
+- Provides two LLM providers: `AnthropicProvider` (cloud, with retry on 503) and `GemmaProvider` (in-browser via LiteRT/MediaPipe on the main thread)
+- Supports Gemma 4 prompt format (`<|turn>...<turn|>`) and native tool call parsing (`<|tool_call>call:name{args}<tool_call|>`)
 - Defines 22 `render_*` UI tools that the LLM calls to compose visual blocks on the canvas
 - Bridges MCP server tools and UI tools into a unified tool set for the LLM
+- Tracks real-time usage metrics via `TokenTracker` (tok/s, totalTokens, latencyMs)
+- Generates anonymized chat summaries via `summarizeChat()` for HyperSkill exports
+- Supports per-request `temperature`, `topK`, `maxTokens` configuration
+- Clips long prompts via `sizeInTokens()` estimation
 
 ## Providers
 
 ### AnthropicProvider
 
-Calls the Anthropic Claude API through a server-side proxy (SvelteKit `+server.ts`).
+Calls the Anthropic Claude API through a server-side proxy (SvelteKit `+server.ts`). Retries on 503 with exponential backoff.
 
 ```ts
 import { AnthropicProvider } from '@webmcp-auto-ui/agent';
@@ -1253,22 +1337,26 @@ Built-in model mapping:
 | `claude-haiku` | `claude-haiku-4-5-20251001` |
 | `claude-sonnet` | `claude-sonnet-4-6` |
 
-### GemmaProvider
+### GemmaProvider (LiteRT)
 
-Runs Gemma locally in a Web Worker via Hugging Face Transformers.js. No API key needed.
+Runs Gemma 4 locally on the main thread via `@mediapipe/tasks-genai` (LiteRT). No API key needed. Uses WebGPU when available. Models are cached in OPFS after first download for instant subsequent loads.
+
+> **v0.5.0 migration**: Migrated from ONNX (`@huggingface/transformers` with Web Worker) to LiteRT (`@mediapipe/tasks-genai` on main thread). LiteRT is 2-4x faster on WebGPU. The provider runs on the main thread because MediaPipe is incompatible with ES module workers.
 
 ```ts
 import { GemmaProvider } from '@webmcp-auto-ui/agent';
 
 const provider = new GemmaProvider({
-  workerUrl: '/gemma.worker.js',
-  onProgress: (pct, status) => console.log(`${pct}% — ${status}`),
+  model: 'gemma-e2b',
+  onProgress: (pct, status, loaded, total) => console.log(`${pct}% — ${status}`),
   onStatusChange: (status) => console.log('Status:', status),
   // status: 'idle' | 'loading' | 'ready' | 'error'
 });
-
-await provider.initialize();  // downloads model weights on first run
 ```
+
+**Gemma 4 prompt format**: Uses `<|turn>...<turn|>` delimiters (instead of Gemma 2/3 `<start_of_turn>...<end_of_turn>`).
+
+**Native tool calling**: Tool calls are parsed from `<|tool_call>call:name{args}<tool_call|>` format.
 
 ### LLMProvider interface
 
@@ -1281,10 +1369,56 @@ interface LLMProvider {
   chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
-    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string }
+    options?: {
+      signal?: AbortSignal;
+      cacheEnabled?: boolean;
+      system?: string;
+      temperature?: number;
+      topK?: number;
+      maxTokens?: number;
+    }
   ): Promise<LLMResponse>;
 }
 ```
+
+`LLMResponse` includes stats: `tokPerSec`, `totalTokens`, `latencyMs` for real-time performance monitoring.
+
+### TokenTracker
+
+Tracks real-time usage metrics across multiple requests:
+
+```ts
+import { TokenTracker } from '@webmcp-auto-ui/agent';
+
+const tracker = new TokenTracker();
+tracker.record({ inputTokens: 500, outputTokens: 120, cached: 400, latencyMs: 850 });
+
+console.log(tracker.stats);
+// { reqPerMin, inputPerMin, outputPerMin, cachedPerMin, totalRequests, totalInput, totalOutput }
+```
+
+Used by the `TokenBubble` UI component for live dashboard metrics.
+
+### summarizeChat
+
+Generates an anonymized summary of a chat conversation for HyperSkill export provenance:
+
+```ts
+import { summarizeChat } from '@webmcp-auto-ui/agent';
+
+const summary = summarizeChat(messages);
+// Short text summary without PII or raw message content
+```
+
+### Prompt clipping
+
+```ts
+import { sizeInTokens } from '@webmcp-auto-ui/agent';
+
+const tokens = sizeInTokens(longPrompt);  // estimated token count
+```
+
+Used internally to clip prompts that exceed the model's context window.
 
 ## Agent loop
 
@@ -2095,10 +2229,10 @@ console.log(shareUrl);
 // Copy this URL -- anyone who opens it will see the full themed dashboard
 ```
 
-### Using the Composer UI
+### Using the Flex app
 
-1. Open the Composer at `http://localhost:5174`
-2. Import the skill JSON (paste or drag-and-drop)
+1. Open Flex at `http://localhost:5179`
+2. Import the skill JSON via the HyperSkill URL (`?hs=...`)
 3. Click "Export" and copy the generated URL
 4. The URL contains the theme + all blocks, base64-encoded (gzip-compressed if > 6 KB)
 
@@ -2127,17 +2261,10 @@ When someone opens the URL:
 Follow the [Deploy tutorial](./deploy.md) to push your demo to production. For a quick deploy of just the showcase app:
 
 ```bash
-# Build packages (if not already done)
-npm -w packages/core run build
-npm -w packages/sdk  run build
-npm -w packages/ui   run build
-
-# Build showcase with production base URL
-PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/showcase run build
-
-# Deploy
-scp -r apps/showcase/build/* bot:/opt/webmcp-demos/showcase/
+./scripts/deploy.sh showcase
 ```
+
+The deploy script handles building packages, building the app, cleaning old files, copying to the correct path, and verifying integrity.
 
 Your themed demo is now live at `https://demos.hyperskills.net/showcase/nature`.
 
@@ -3079,7 +3206,8 @@ The `component("help")` response includes **all** components in the system, not 
 | Name | Description |
 |------|-------------|
 | `tiling-layout` | Tiling window manager layout |
-| `floating-layout` | Floating drag-and-drop window manager |
+| `floating-layout` | Floating drag-and-drop window manager with collapse/expand (double-click) and fit-to-content |
+| `flex-layout` | Auto-grid layout with size slider for adjusting block dimensions |
 | `stack-layout` | Stacked vertical scroll or single-window layout |
 | `pane` | Window pane with title bar, badge, fold/close actions |
 
@@ -3698,6 +3826,30 @@ UI primitives exported from `@webmcp-auto-ui/ui/base`:
 
 ---
 
+## Category: Agent UI Widgets (5)
+
+Specialized components for agent interactions, exported from `@webmcp-auto-ui/ui`:
+
+| Component | Purpose |
+|-----------|---------|
+| `GemmaLoader` | Floating overlay with progress stream; auto-collapses to a pill once the model is loaded |
+| `TokenBubble` | Real-time metrics display: req/min, input tokens/min, output tokens/min, cached tokens |
+| `EphemeralBubble` | Transient notification bubble for ephemeral messages |
+| `RemoteMCPserversDemo` | MCP server discovery component listing demo servers from `MCP_DEMO_SERVERS` |
+| `SettingsPanel` | Sliders with dynamic ranges for temperature, topK, and maxTokens controls |
+
+---
+
+## Category: Layout Extensions (1)
+
+| Component | Purpose |
+|-----------|---------|
+| `FlexLayout` | Auto-grid layout with size slider for adjusting block dimensions |
+
+`FlexLayout` complements the existing window manager layouts (Tiling, Floating, Stack) with a responsive auto-grid that lets users control block size via a slider.
+
+---
+
 ## Constraints
 
 - Block `type` must exactly match one of the 24 block types (case-sensitive).
@@ -3744,9 +3896,31 @@ User prompt --> Agent Loop --> LLM (Claude/Gemma)
               UI Blocks (stat, chart, table, etc.)
 ```
 
-## McpClient API
+## McpClient and McpMultiClient
 
-The `McpClient` class (from `@webmcp-auto-ui/core`) handles the full MCP lifecycle.
+The `McpClient` class (from `@webmcp-auto-ui/core`) handles the full MCP lifecycle for a single server. For multi-server scenarios, use `McpMultiClient`.
+
+### McpMultiClient
+
+Manages simultaneous connections to multiple MCP servers. Aggregates tool lists and routes tool calls to the correct server:
+
+```typescript
+import { McpMultiClient } from '@webmcp-auto-ui/core';
+
+const multi = new McpMultiClient();
+await multi.addServer('https://mcp1.example.com/mcp');
+await multi.addServer('https://mcp2.example.com/mcp');
+
+const allTools = multi.listAllTools();  // aggregated from all servers
+const result = await multi.callTool('query_sql', { sql: 'SELECT 1' });  // routes to correct server
+
+await multi.removeServer('https://mcp1.example.com/mcp');
+await multi.disconnectAll();
+```
+
+The flex app uses `McpMultiClient` to connect to several MCP servers simultaneously and expose all their tools to the agent loop.
+
+## McpClient API
 
 ### Connecting
 
@@ -4135,6 +4309,12 @@ interface HyperSkillMeta {
   theme?: Record<string, string>;
   hash?: string;
   previousHash?: string;
+  chatSummary?: string;       // anonymized summary of the chat that produced the skill
+  provenance?: {              // records how the skill was created
+    model?: string;           // LLM model used (e.g. "claude-sonnet", "gemma-e2b")
+    mcp?: string;             // MCP server URL
+    timestamp?: number;       // epoch ms
+  };
 }
 
 interface HyperSkill {
@@ -4186,6 +4366,29 @@ const skill2 = JSON.parse(raw2);
 console.log(skill.meta.title);   // "Sales Dashboard"
 console.log(skill.content);      // blocks array
 ```
+
+### Chat summary and provenance
+
+When encoding a skill, you can include an anonymized summary of the conversation that produced it, plus provenance metadata:
+
+```typescript
+import { summarizeChat } from '@webmcp-auto-ui/agent';
+
+const skill: HyperSkill = {
+  meta: {
+    title: 'Sales Dashboard',
+    chatSummary: summarizeChat(messages),  // anonymized, no PII
+    provenance: {
+      model: 'claude-sonnet',
+      mcp: 'https://mcp.example.com/mcp',
+      timestamp: Date.now(),
+    },
+  },
+  content: blocks,
+};
+```
+
+These fields enable traceability without exposing raw chat history in shared URLs.
 
 ### Reading from Current URL
 

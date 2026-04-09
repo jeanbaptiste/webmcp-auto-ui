@@ -10,6 +10,8 @@
     maxTokens?: number;
     maxContextTokens?: number;
     cacheEnabled?: boolean;
+    temperature?: number;
+    topK?: number;
     showTokens?: boolean;
     onconnect: () => void;
     connectedUrls?: string[];
@@ -26,6 +28,8 @@
     maxTokens = $bindable(4096),
     maxContextTokens = $bindable(150_000),
     cacheEnabled = $bindable(true),
+    temperature = $bindable(1.0),
+    topK = $bindable(64),
     showTokens = $bindable(true),
     onconnect,
     connectedUrls = [],
