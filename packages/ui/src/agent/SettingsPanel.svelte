@@ -41,10 +41,17 @@
   const ranges = $derived({
     maxTokens: { min: 256, max: 8192, step: 256 },
     maxContextTokens: modelType === 'wasm'
-      ? { min: 10_000, max: 128_000, step: 10_000 }
+      ? { min: 1024, max: 131072, step: 1024 }
       : { min: 10_000, max: 200_000, step: 10_000 },
     temperature: { min: 0, max: 2, step: 0.1 },
     topK: { min: 1, max: 100, step: 1 },
+  });
+
+  // Clamp maxContextTokens when switching model type
+  $effect(() => {
+    const r = ranges.maxContextTokens;
+    if (maxContextTokens < r.min) maxContextTokens = r.min;
+    if (maxContextTokens > r.max) maxContextTokens = r.max;
   });
 
   function formatNumber(n: number): string {
@@ -73,27 +80,29 @@
 
   <!-- Sliders section -->
   <section class="flex flex-col gap-4">
-    <!-- Max tokens (output) -->
+    <!-- Contexte (input + output) -->
     <div>
       <div class="flex justify-between items-baseline mb-1">
-        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Max tokens (output)</span>
-        <span class="font-mono text-xs text-text1">{formatNumber(maxTokens)}</span>
-      </div>
-      <input type="range" bind:value={maxTokens}
-             min={ranges.maxTokens.min} max={ranges.maxTokens.max} step={ranges.maxTokens.step}
-             class="w-full accent-accent" />
-    </div>
-
-    <!-- Max historique (tokens) -->
-    <div>
-      <div class="flex justify-between items-baseline mb-1">
-        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Max historique (tokens)</span>
+        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Contexte (input + output)</span>
         <span class="font-mono text-xs text-text1">{formatNumber(maxContextTokens)}</span>
       </div>
       <input type="range" bind:value={maxContextTokens}
              min={ranges.maxContextTokens.min} max={ranges.maxContextTokens.max} step={ranges.maxContextTokens.step}
              class="w-full accent-accent" />
     </div>
+
+    <!-- Max output — hidden for WASM (MediaPipe has no separate output control) -->
+    {#if modelType !== 'wasm'}
+    <div>
+      <div class="flex justify-between items-baseline mb-1">
+        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Max output</span>
+        <span class="font-mono text-xs text-text1">{formatNumber(maxTokens)}</span>
+      </div>
+      <input type="range" bind:value={maxTokens}
+             min={ranges.maxTokens.min} max={ranges.maxTokens.max} step={ranges.maxTokens.step}
+             class="w-full accent-accent" />
+    </div>
+    {/if}
 
     <!-- Temperature -->
     <div>
