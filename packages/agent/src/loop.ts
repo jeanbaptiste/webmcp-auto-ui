@@ -17,18 +17,11 @@ import { formatRecipesForPrompt, formatMcpRecipesForPrompt } from './recipe-regi
 const MAX_RESULT_LEN = 10_000;
 
 /** Build system prompt from structured ToolLayers (new API) */
-export function buildSystemPrompt(layers: ToolLayer[], options?: { condensed?: boolean }): string;
+export function buildSystemPrompt(layers: ToolLayer[]): string;
 /** Build system prompt from flat McpToolDef[] (backward compat) */
 export function buildSystemPrompt(mcpTools: McpToolDef[]): string;
-export function buildSystemPrompt(
-  input: ToolLayer[] | McpToolDef[],
-  options?: { condensed?: boolean },
-): string {
-  // If options provided, it's the new API (layers path)
-  // Otherwise, detect by checking first element for 'source' property
-  if (options !== undefined) {
-    return buildSystemPromptFromLayers(input as ToolLayer[], options);
-  }
+export function buildSystemPrompt(input: ToolLayer[] | McpToolDef[]): string {
+  // Detect: is it ToolLayer[] or McpToolDef[]?
   if (input.length > 0 && 'source' in input[0]) {
     return buildSystemPromptFromLayers(input as ToolLayer[]);
   }
@@ -63,7 +56,7 @@ CRITICAL RULES:
 - Respond in the user's language`;
 }
 
-function buildSystemPromptFromLayers(layers: ToolLayer[], options?: { condensed?: boolean }): string {
+function buildSystemPromptFromLayers(layers: ToolLayer[]): string {
   let prompt = `You are a UI composer connected to MCP servers.
 
 MANDATORY WORKFLOW:
@@ -103,12 +96,7 @@ Respond in the user's language.
   if (uiLayer) {
     prompt += `## webmcp\n\n`;
     prompt += `### UI tools (render results visually)\n`;
-    if (options?.condensed) {
-      // Condensed mode: just tool names
-      prompt += UI_TOOLS.map(t => `- ${t.name}`).join('\n');
-    } else {
-      prompt += UI_TOOLS.map(t => `- ${t.name}: ${t.description}`).join('\n');
-    }
+    prompt += UI_TOOLS.map(t => `- ${t.name}: ${t.description}`).join('\n');
     prompt += '\n\n';
 
     prompt += `RULES:\n`;

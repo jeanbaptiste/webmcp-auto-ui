@@ -223,8 +223,6 @@ Propose la visualisation la plus pertinente. Combine plusieurs render_* quand c'
     return result;
   });
 
-  const isGemma = $derived(canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b');
-
   const effectivePrompt = $derived.by(() => {
     const hasCustomPrompt = systemPrompt !== defaultSystemPrompt;
     const hasMcp = layers.some(l => l.source === 'mcp');
@@ -232,7 +230,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs render_* quand c'
     if (hasMcp) {
       // MCP connected: structured prompt with tools, recipes, sections
       // Prepend custom prompt if user customized it, otherwise use the generated one as-is
-      const structured = buildSystemPrompt(layers, { condensed: isGemma });
+      const structured = buildSystemPrompt(layers);
       return hasCustomPrompt ? `${systemPrompt}\n\n${structured}` : structured;
     }
 
