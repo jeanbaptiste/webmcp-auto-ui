@@ -12,18 +12,19 @@ import type {
 } from './types.js';
 import type { ToolLayer, McpLayer, UILayer } from './tool-layers.js';
 import { UI_TOOLS, isUITool, executeUITool } from './ui-tools.js';
+import { COMPONENT_TOOL, executeComponent } from './component-tool.js';
 import { formatRecipesForPrompt, formatMcpRecipesForPrompt } from './recipe-registry.js';
 
 const MAX_RESULT_LEN = 10_000;
 
 /** Build system prompt from structured ToolLayers (new API) */
-export function buildSystemPrompt(layers: ToolLayer[]): string;
+export function buildSystemPrompt(layers: ToolLayer[], options?: { toolMode?: 'smart' | 'explicit' }): string;
 /** Build system prompt from flat McpToolDef[] (backward compat) */
 export function buildSystemPrompt(mcpTools: McpToolDef[]): string;
-export function buildSystemPrompt(input: ToolLayer[] | McpToolDef[]): string {
+export function buildSystemPrompt(input: ToolLayer[] | McpToolDef[], options?: { toolMode?: 'smart' | 'explicit' }): string {
   // Detect: is it ToolLayer[] or McpToolDef[]?
   if (input.length === 0 || 'source' in input[0]) {
-    return buildSystemPromptFromLayers(input as ToolLayer[]);
+    return buildSystemPromptFromLayers(input as ToolLayer[], options?.toolMode ?? 'smart');
   }
   // Legacy path — McpToolDef[]
   return buildSystemPromptLegacy(input as McpToolDef[]);
@@ -56,12 +57,16 @@ CRITICAL RULES:
 - Respond in the user's language`;
 }
 
-function buildSystemPromptFromLayers(layers: ToolLayer[]): string {
+function buildSystemPromptFromLayers(layers: ToolLayer[], toolMode: 'smart' | 'explicit'): string {
+  const componentCall = toolMode === 'smart'
+    ? 'component("nom", {params})'
+    : 'un outil UI (render_* ou component)';
+
   let prompt = `Tu es un assistant UI connecté à des serveurs MCP.
 
 WORKFLOW OBLIGATOIRE :
 1. Appelle un outil DATA pour récupérer les données
-2. Appelle IMMÉDIATEMENT un outil UI (render_*) pour afficher le résultat
+2. Appelle IMMÉDIATEMENT ${componentCall} pour afficher le résultat
 3. Recommence ou arrête
 CRITIQUE : Après CHAQUE outil DATA, rends visuellement. TOUJOURS rendre. Texte = 1 phrase max.
 
@@ -94,14 +99,35 @@ CRITIQUE : Après CHAQUE outil DATA, rends visuellement. TOUJOURS rendre. Texte 
   const uiLayer = layers.find((l): l is UILayer => l.source === 'ui');
   if (uiLayer) {
     prompt += `## webmcp\n\n`;
-    prompt += `### outils UI (affichage visuel)\n`;
-    prompt += UI_TOOLS.map(t => `- ${t.name}: ${t.description}`).join('\n');
-    prompt += '\n\n';
+
+    if (toolMode === 'smart') {
+      // Mode smart : component() est le seul outil UI
+      prompt += `### component() — seul outil UI\n`;
+      prompt += `Appelle component("nom", {params}) pour rendre un composant.\n`;
+      prompt += `Appelle component("help", "nom") pour le schéma détaillé.\n\n`;
+      prompt += `Composants disponibles : `;
+      // Liste compacte des noms + 1 mot
+      const seen = new Set<string>();
+      const names: string[] = [];
+      for (const t of UI_TOOLS) {
+        if (t.name.startsWith('render_')) {
+          const short = t.name.slice(7).replace(/_/g, '-');
+          if (!seen.has(short)) { seen.add(short); names.push(short); }
+        }
+      }
+      prompt += names.join(', ');
+      prompt += `\nCanvas : clear, update, move, resize, style\n\n`;
+    } else {
+      // Mode explicit : 31 outils individuels
+      prompt += `### outils UI (affichage visuel)\n`;
+      prompt += UI_TOOLS.map(t => `- ${t.name}: ${t.description}`).join('\n');
+      prompt += '\n\n';
+    }
 
     prompt += `RÈGLES :\n`;
-    prompt += `- Après CHAQUE outil DATA, appeler un render_* obligatoirement\n`;
-    prompt += `- render_table pour les tableaux, render_chart pour les chiffres, render_stat pour les KPIs, render_kv pour les paires clé-valeur\n`;
-    prompt += `- Si erreur ou données vides, appeler render_kv ou render_stat pour montrer le statut\n`;
+    prompt += `- Après CHAQUE outil DATA, rendre visuellement obligatoirement\n`;
+    prompt += `- table pour les tableaux, chart pour les chiffres, stat pour les KPIs, kv pour les paires clé-valeur\n`;
+    prompt += `- Si erreur ou données vides, rendre kv ou stat pour montrer le statut\n`;
     prompt += `- JAMAIS enchaîner >1 outil DATA sans rendre entre les deux\n\n`;
 
     if (uiLayer.recipes && uiLayer.recipes.length > 0) {
@@ -143,6 +169,8 @@ export interface AgentLoopOptions {
   client?: McpClient;           // MCP client — optional if only UI tools used
   provider: LLMProvider;
   mcpTools?: McpToolDef[];      // tools from MCP server
+  /** 'smart' = 1 tool component() (default), 'explicit' = 31 render_* + component() */
+  toolMode?: 'smart' | 'explicit';
   maxIterations?: number;
   maxTokens?: number;
   temperature?: number;
@@ -162,6 +190,7 @@ export async function runAgentLoop(
     client,
     provider,
     mcpTools = [],
+    toolMode = 'smart',
     maxIterations = 5,
     maxTokens,
     temperature,
@@ -172,10 +201,10 @@ export async function runAgentLoop(
     signal,
   } = options;
 
-  const allTools: AnthropicTool[] = [
-    ...mcpToolsToAnthropic(mcpTools),
-    ...UI_TOOLS,
-  ];
+  const mcpToolsDef = mcpToolsToAnthropic(mcpTools);
+  const allTools: AnthropicTool[] = toolMode === 'smart'
+    ? [...mcpToolsDef, COMPONENT_TOOL]
+    : [...mcpToolsDef, ...UI_TOOLS, COMPONENT_TOOL];
 
   const baseSystemPrompt = options.systemPrompt ?? buildSystemPrompt(mcpTools);
   const systemPrompt = maxTokens
@@ -252,7 +281,9 @@ export async function runAgentLoop(
       try {
         let result: string;
 
-        if (isUITool(block.name)) {
+        if (block.name === 'component') {
+          result = executeComponent(block.input as { name: string; params?: unknown }, callbacks);
+        } else if (isUITool(block.name)) {
           result = executeUITool(block.name, block.input, callbacks);
         } else if (client) {
           const mcpResult = await client.callTool(block.name, block.input);

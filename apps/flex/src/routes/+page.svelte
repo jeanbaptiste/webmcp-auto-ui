@@ -28,6 +28,7 @@
   let maxContextTokens = $state(150_000);
   let maxTokens = $state(4096);
   let cacheEnabled = $state(true);
+  let toolMode = $state<'smart' | 'explicit'>('smart');
   let temperature = $state(1.0);
   let topK = $state(64);
   const defaultSystemPrompt = `Tu es un assistant UI connecté à des serveurs MCP.
@@ -230,7 +231,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs render_* quand c'
     if (hasMcp) {
       // MCP connected: structured prompt with tools, recipes, sections
       // Prepend custom prompt if user customized it, otherwise use the generated one as-is
-      const structured = buildSystemPrompt(layers);
+      const structured = buildSystemPrompt(layers, { toolMode });
       return hasCustomPrompt ? `${systemPrompt}\n\n${structured}` : structured;
     }
 
@@ -302,6 +303,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs render_* quand c'
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
+        toolMode,
         maxIterations: 15,
         maxTokens,
         temperature,
@@ -529,6 +531,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs render_* quand c'
   bind:topK
   bind:showTokens
   bind:showToolJSON
+  bind:toolMode
   onconnect={() => addMcpServer(canvas.mcpUrl)}
   {connectedUrls}
   {loadingUrls}
