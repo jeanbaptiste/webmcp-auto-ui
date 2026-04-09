@@ -49,10 +49,10 @@ npm test           # vitest
 ## HyperSkill URL format
 
 ```
-https://example.com?hs=base64(skill)
+https://example.com?hs=gz.base64(skill)
 ```
 
-Skills above 6 KB are gzip-compressed (`gz.` prefix). Each version carries a SHA-256 hash of `source_url + content`, chainable for traceability. The format is defined at [hyperskills.net](https://hyperskills.net/).
+Skills are gzip-compressed (`gz.` prefix). Each version carries a SHA-256 hash of `source_url + content`, chainable for traceability. The format is defined at [hyperskills.net](https://hyperskills.net/) and available as [a NPM package](https://www.npmjs.com/package/hyperskills).
 
 ## License
 
