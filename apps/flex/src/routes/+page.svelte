@@ -196,6 +196,12 @@ Propose la visualisation la plus pertinente. Combine plusieurs render_* quand c'
     });
   });
 
+  // Reset conversation when toolMode changes (history contains tool calls from the other mode)
+  $effect(() => {
+    toolMode; // track
+    untrack(() => { conversationHistory = []; });
+  });
+
   // ── Effective prompt (K — structured via ToolLayers) ──────────────────────
   const layers = $derived.by((): ToolLayer[] => {
     const result: ToolLayer[] = [];

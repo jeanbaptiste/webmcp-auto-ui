@@ -33,28 +33,27 @@ export function buildSystemPrompt(input: ToolLayer[] | McpToolDef[], options?: {
 function buildSystemPromptLegacy(mcpTools: McpToolDef[]): string {
   const dataTools = mcpTools.filter(t => !isUITool(t.name));
   const uiTools = UI_TOOLS;
-  return `You are a UI composer connected to an MCP server.
-You have ${dataTools.length} DATA tools and ${uiTools.length} UI tools.
+  return `Tu es un assistant UI connecté à un serveur MCP.
+Tu as ${dataTools.length} outils DATA et ${uiTools.length} outils UI.
 
-DATA tools (query data):
+Outils DATA (requêtes) :
 ${dataTools.map(t => `- ${t.name}: ${(t.description ?? t.name).split('\n')[0]}`).join('\n')}
 
-UI tools (render results visually):
+Outils UI (affichage visuel) :
 ${uiTools.map(t => `- ${t.name}: ${t.description}`).join('\n')}
 
-MANDATORY WORKFLOW — follow this EXACTLY:
-1. Call ONE data tool to get data
-2. IMMEDIATELY call a render_* UI tool to display the result — even if partial or imperfect
-3. Repeat steps 1-2 if the user wants more data, otherwise stop
+WORKFLOW OBLIGATOIRE :
+1. Appelle un outil DATA pour récupérer les données
+2. Appelle IMMÉDIATEMENT un outil UI (render_*) pour afficher le résultat
+3. Recommence ou arrête
 
-CRITICAL RULES:
-- After EVERY data tool call, you MUST call a render_* tool next — no exceptions
-- If a query returns an error or empty data, call render_kv or render_stat to show the status
-- NEVER chain more than 1 data tool call without rendering in between
-- ALWAYS render — never just return text
-- Use render_table for tabular data, render_chart for numbers, render_stat for KPIs, render_kv for key-value pairs
-- Keep text responses to 1 sentence max
-- Respond in the user's language`;
+RÈGLES :
+- Après CHAQUE outil DATA, appeler un render_* obligatoirement
+- Si erreur ou données vides, appeler render_kv ou render_stat pour montrer le statut
+- JAMAIS enchaîner >1 outil DATA sans rendre entre les deux
+- TOUJOURS rendre visuellement — jamais que du texte
+- render_table pour les tableaux, render_chart pour les chiffres, render_stat pour les KPIs, render_kv pour les paires clé-valeur
+- Texte = 1 phrase max`;
 }
 
 function buildSystemPromptFromLayers(layers: ToolLayer[], toolMode: 'smart' | 'explicit'): string {
@@ -206,9 +205,9 @@ export async function runAgentLoop(
     ? [...mcpToolsDef, COMPONENT_TOOL]
     : [...mcpToolsDef, ...UI_TOOLS, COMPONENT_TOOL];
 
-  const baseSystemPrompt = options.systemPrompt ?? buildSystemPrompt(mcpTools);
+  const baseSystemPrompt = options.systemPrompt ?? buildSystemPromptLegacy(mcpTools);
   const systemPrompt = maxTokens
-    ? `${baseSystemPrompt}\n\nIMPORTANT: Keep responses under ${maxTokens} tokens.`
+    ? `${baseSystemPrompt}\n\nIMPORTANT : Limite tes réponses à ${maxTokens} tokens.`
     : baseSystemPrompt;
 
   const messages: ChatMessage[] = [...initialMessages, { role: 'user', content: userMessage }];

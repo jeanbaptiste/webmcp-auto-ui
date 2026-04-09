@@ -517,8 +517,13 @@ function buildComponentDescription(): string {
     if (['clear', 'update', 'move', 'resize', 'style'].includes(entry.name)) {
       canvas.push(entry.name);
     } else {
-      // Short description: first sentence or first 60 chars
-      const desc = entry.description.split('.')[0].slice(0, 60);
+      // Short description: first sentence, truncated at last word boundary
+      let desc = entry.description.split('.')[0];
+      if (desc.length > 60) {
+        desc = desc.slice(0, 60);
+        const lastSpace = desc.lastIndexOf(' ');
+        if (lastSpace > 20) desc = desc.slice(0, lastSpace);
+      }
       renderable.push(`${entry.name}: ${desc}`);
     }
   }
@@ -563,6 +568,24 @@ export function executeComponent(
     return helpAll();
   }
 
+  // ── Render mode (composant prioritaire sur recette en cas de collision) ──
+  const comp = componentRegistry.get(args.name);
+  if (comp) {
+    if (!comp.renderable) {
+      return JSON.stringify({
+        info: `"${comp.name}" est un composant Svelte utilisable directement via @webmcp-auto-ui/ui, ` +
+          'pas via le pipeline agent. Utilise les composants renderable (render_*).',
+        name: comp.name,
+        schema: comp.inputSchema,
+      });
+    }
+    return executeUITool(
+      comp.toolName,
+      (args.params as Record<string, unknown>) ?? {},
+      callbacks,
+    );
+  }
+
   // ── Recipe mode — component("recipe-id") ────────────────────────────────
   const recipe = recipeRegistry.get(args.name);
   if (recipe) {
@@ -575,24 +598,7 @@ export function executeComponent(
     });
   }
 
-  // ── Render mode ──────────────────────────────────────────────────────────
-  const comp = componentRegistry.get(args.name);
-  if (!comp) {
-    return JSON.stringify({ error: `Composant inconnu : ${args.name}. Appelle component("help") pour la liste.` });
-  }
-  if (!comp.renderable) {
-    return JSON.stringify({
-      info: `"${comp.name}" est un composant Svelte utilisable directement via @webmcp-auto-ui/ui, ` +
-        'pas via le pipeline agent. Utilise les composants renderable (render_*).',
-      name: comp.name,
-      schema: comp.inputSchema,
-    });
-  }
-  return executeUITool(
-    comp.toolName,
-    (args.params as Record<string, unknown>) ?? {},
-    callbacks,
-  );
+  return JSON.stringify({ error: `Composant inconnu : ${args.name}. Appelle component("help") pour la liste.` });
 }
 
 // ── Help helpers ──────────────────────────────────────────────────────────────
