@@ -228,24 +228,36 @@ export class WasmProvider implements LLMProvider {
     let fullText = '';
     let tokenCount = 0;
 
-    try {
-      const result = await this.inference.generateResponse(prompt, (partialResult: string, _done: boolean) => {
-        if (options?.signal?.aborted) {
-          this.inference?.cancelProcessing();
-          return;
-        }
-        fullText += partialResult;
-        tokenCount++;
-        options?.onToken?.(partialResult);
-      });
+    // Retry loop — MediaPipe may throw "Previous invocation or loading is still ongoing"
+    // even after our busy guard clears, because GPU resources release asynchronously.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const result = await this.inference.generateResponse(prompt, (partialResult: string, _done: boolean) => {
+          if (options?.signal?.aborted) {
+            this.inference?.cancelProcessing();
+            return;
+          }
+          fullText += partialResult;
+          tokenCount++;
+          options?.onToken?.(partialResult);
+        });
 
-      // Fallback if the streaming callback didn't accumulate
-      if (result && !fullText) fullText = result;
-    } catch (err) {
-      const msg = String(err);
-      if (options?.signal?.aborted || msg.includes('cancel')) {
-        // Cancelled — return what we have so far
-      } else {
+        // Fallback if the streaming callback didn't accumulate
+        if (result && !fullText) fullText = result;
+        break; // Success — exit retry loop
+      } catch (err) {
+        const msg = String(err);
+        if (options?.signal?.aborted || msg.includes('cancel')) {
+          // Cancelled — return what we have so far
+          break;
+        }
+        if (msg.includes('Previous invocation') || msg.includes('still ongoing')) {
+          // MediaPipe GPU not ready — wait and retry
+          fullText = '';
+          tokenCount = 0;
+          await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+          continue;
+        }
         throw err;
       }
     }
