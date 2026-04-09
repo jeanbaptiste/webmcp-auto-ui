@@ -86,29 +86,69 @@ export class McpMultiClient {
   /**
    * List ALL tools from ALL connected servers.
    * Each tool is augmented with its origin server URL and name.
-   * Tools with the same name from different servers are all included.
+   * Duplicate tool names across servers are prefixed with the server name
+   * (e.g. "wikipedia__search") to satisfy the Claude API uniqueness constraint.
    */
   listAllTools(): AggregatedTool[] {
+    // First pass: count occurrences of each tool name across all servers
+    const nameCounts = new Map<string, number>();
+    for (const [, entry] of this.servers) {
+      for (const tool of entry.tools) {
+        nameCounts.set(tool.name, (nameCounts.get(tool.name) ?? 0) + 1);
+      }
+    }
+
+    // Second pass: build result, prefixing duplicates with serverName
     const result: AggregatedTool[] = [];
     for (const [url, entry] of this.servers) {
       for (const tool of entry.tools) {
-        result.push({ ...tool, serverUrl: url, serverName: entry.name });
+        const isDuplicate = (nameCounts.get(tool.name) ?? 0) > 1;
+        if (isDuplicate) {
+          const prefix = this.normalizeServerName(entry.name);
+          result.push({
+            ...tool,
+            name: `${prefix}__${tool.name}`,
+            description: `[${entry.name}] ${tool.description ?? ''}`,
+            serverUrl: url,
+            serverName: entry.name,
+          });
+        } else {
+          result.push({ ...tool, serverUrl: url, serverName: entry.name });
+        }
       }
     }
     return result;
   }
 
   /**
-   * Call a tool by name. Automatically routes to the first server (insertion
-   * order) that exposes a tool with the given name.
+   * Call a tool by name. Automatically routes to the correct server.
+   * Supports both plain names ("search") and prefixed names ("wikipedia__search")
+   * for disambiguated duplicates.
    */
   async callTool(name: string, args?: Record<string, unknown>): Promise<McpToolResult> {
+    // 1. Exact match on original tool name (unprefixed)
     for (const [, entry] of this.servers) {
       const match = entry.tools.find((t) => t.name === name);
       if (match) {
         return entry.client.callTool(name, args);
       }
     }
+
+    // 2. Prefixed name: "serverprefix__realToolName"
+    const separatorIdx = name.indexOf('__');
+    if (separatorIdx !== -1) {
+      const prefix = name.slice(0, separatorIdx);
+      const realName = name.slice(separatorIdx + 2);
+      for (const [, entry] of this.servers) {
+        if (this.normalizeServerName(entry.name) === prefix) {
+          const match = entry.tools.find((t) => t.name === realName);
+          if (match) {
+            return entry.client.callTool(realName, args);
+          }
+        }
+      }
+    }
+
     throw new Error(`McpMultiClient: no server exposes tool "${name}"`);
   }
 
@@ -122,6 +162,15 @@ export class McpMultiClient {
     }
     await Promise.all(promises);
     this.servers.clear();
+  }
+
+  // -------------------------------------------------------------------------
+  // Private helpers
+  // -------------------------------------------------------------------------
+
+  /** Convert a server name to a snake_case prefix for tool name disambiguation. */
+  private normalizeServerName(name: string): string {
+    return name.toLowerCase().replace(/[\s\-]+/g, '_');
   }
 
   // -------------------------------------------------------------------------
