@@ -172,12 +172,21 @@ export class WasmProvider implements LLMProvider {
   ): Promise<LLMResponse> {
     if (this.status !== 'ready') await this.initialize();
     if (!this.inference) throw new Error('Model not initialized');
-    if (this.busy) throw new Error('Model is busy — wait for current generation to finish');
+    // Wait for previous MediaPipe generation to fully release GPU resources
+    if (this.busy) {
+      for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 200));
+        if (!this.busy) break;
+      }
+      if (this.busy) throw new Error('Model is busy — wait for current generation to finish');
+    }
 
     this.busy = true;
     try {
       return await this._chat(messages, tools, options);
     } finally {
+      // Small delay to let MediaPipe release internal resources before next call
+      await new Promise(r => setTimeout(r, 100));
       this.busy = false;
     }
   }
@@ -332,8 +341,12 @@ export class WasmProvider implements LLMProvider {
       systemParts.push(`TOOL CALLING FORMAT:
 - To call a tool: <|tool_call>call:tool_name{"param": "value"}<tool_call|>
 - Do NOT ask for confirmation. Execute directly.
-- After getting data, always call a render_* tool to display results.
 - When answering the user (no tool needed), respond in natural language.
+
+IMPORTANT WORKFLOW — always follow these 2 steps:
+1. Call a data tool to fetch information (e.g. search, get, list)
+2. Then IMMEDIATELY call a render_* or component tool to display the results visually
+NEVER just describe the data in text. ALWAYS render it with a UI component.
 
 Available tools:`);
       systemParts.push(limitedTools.map(t => {
