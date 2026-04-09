@@ -77,7 +77,7 @@ export class WasmProvider implements LLMProvider {
       baseOptions: {
         modelAssetBuffer: modelStream.getReader() as unknown as Uint8Array,
       },
-      maxTokens: 1024,
+      maxTokens: 4096,
       temperature: 0.8,
       topK: 10,
     });
@@ -188,7 +188,7 @@ export class WasmProvider implements LLMProvider {
     let prompt = this.buildPrompt(messages, tools);
 
     // Clipping: if prompt is too large, drop oldest messages (reserve 384 tokens for response)
-    const maxPromptTokens = 1024 - 384;
+    const maxPromptTokens = 4096 - 512;
     try {
       while (this.inference.sizeInTokens(prompt) > maxPromptTokens && messages.length > 1) {
         messages = messages.slice(1);
