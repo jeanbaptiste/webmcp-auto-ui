@@ -22,7 +22,7 @@ export function buildSystemPrompt(layers: ToolLayer[]): string;
 export function buildSystemPrompt(mcpTools: McpToolDef[]): string;
 export function buildSystemPrompt(input: ToolLayer[] | McpToolDef[]): string {
   // Detect: is it ToolLayer[] or McpToolDef[]?
-  if (input.length > 0 && 'source' in input[0]) {
+  if (input.length === 0 || 'source' in input[0]) {
     return buildSystemPromptFromLayers(input as ToolLayer[]);
   }
   // Legacy path — McpToolDef[]
