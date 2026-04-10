@@ -5,7 +5,7 @@ import type { Recipe, McpRecipe } from './recipes/types.js';
 import type { ComponentAdapter } from './component-adapter.js';
 import { sanitizeSchema } from '@webmcp-auto-ui/core';
 import { UI_TOOLS } from './ui-tools.js';
-import { COMPONENT_TOOL } from './component-tool.js';
+import { LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL } from './component-tool.js';
 
 /** MCP data layer — tools and recipes from a connected MCP server */
 export interface McpLayer {
@@ -58,8 +58,8 @@ export function buildToolsFromLayers(
             tools.push(...UI_TOOLS);
           }
         }
-        // component() is always included (smart = only tool, explicit = discovery + render)
-        tools.push(COMPONENT_TOOL);
+        // 3 UI tools always included (smart = only these, explicit = render_* + these)
+        tools.push(LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL);
         break;
     }
   }

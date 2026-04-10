@@ -78,8 +78,8 @@ const layers: ToolLayer[] = [mcpLayer1, mcpLayer2, uiLayer];
 
 ## webmcp
 
-### component() -- seul outil UI
-Appelle component("nom", {params}) pour rendre un composant.
+### 3 outils UI (list_components, get_component, component)
+Appelle list_components() pour decouvrir, get_component(nom) pour le schema, component(nom, {params}) pour rendre.
 Composants disponibles : stat, kv, list, chart, alert, ...
 ```
 

@@ -111,7 +111,7 @@ Two types of recipes coexist:
 
 ### Smart vs explicit mode
 
-Smart mode (default) exposes a single `component()` tool to the LLM. The LLM discovers components via `component("help")` and renders via `component("name", {params})`. This saves ~2800 schema tokens compared to explicit mode (31 individual render_* tools).
+Smart mode (default) exposes 3 UI tools to the LLM: `list_components()`, `get_component()` and `component()`. The LLM discovers components via `list_components()`, gets the detailed schema via `get_component(name)`, and renders via `component(name, {params})`. This saves ~2800 schema tokens compared to explicit mode (31 individual render_* tools).
 
 ### ComponentAdapter
 

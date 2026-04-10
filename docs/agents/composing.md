@@ -27,7 +27,7 @@ App                      Agent Package                     LLM
  |  4. runAgentLoop(msg, {layers})                          |
  |  ------------------------------------->  prompt + tools  |
  |                            |             |               |
- |                            |   5. component("help")      |
+ |                            |   5. list_components()      |
  |                            |   <----------------------   |
  |                            |   --- liste composants -->  |
  |                            |             |               |
@@ -48,7 +48,7 @@ App                      Agent Package                     LLM
 3. **`buildToolsFromLayers(layers, toolMode)`** produit les `AnthropicTool[]` selon le mode
 4. **`runAgentLoop(msg, { layers, toolMode })`** lance la boucle iterative
 5. En mode smart : le LLM voit 1 tool `component()` + N tools MCP
-6. Le LLM appelle `component("help")` pour decouvrir, puis `component("nom", {params})` pour rendre
+6. Le LLM appelle `list_components()` pour decouvrir, `get_component(nom)` pour le schema, puis `component(nom, {params})` pour rendre
 7. Les recettes WebMCP guident le LLM sur comment presenter les donnees
 
 ### Exemple concret
@@ -123,11 +123,11 @@ const result = await runAgentLoop('Qui est le depute de Paris 1er ?', {
 
 ## Composer avec component() (mode smart)
 
-En mode smart, le LLM n'a qu'un seul outil UI : `component()`. Trois modes d'appel :
+En mode smart, le LLM dispose de 3 outils UI :
 
 ```
-component("help")                        -> liste de tous les composants
-component("help", "stat-card")           -> schema detaille d'un composant
+list_components()                        -> liste de tous les composants
+get_component("stat-card")               -> schema detaille d'un composant
 component("stat-card", {label, value})   -> rend le composant
 ```
 
@@ -145,7 +145,7 @@ Les noms utilisent des tirets (`stat-card`). Les noms `render_*` sont acceptes e
 
 ### Tous les composants enregistres
 
-`component("help")` retourne **tous** les composants (56), pas seulement les widgets renderables :
+`list_components()` retourne **tous** les composants (56), pas seulement les widgets renderables :
 
 - **renderable: true** -- tous les block types `render_*` + actions canvas. Renderables via `executeComponent`.
 - **renderable: false** -- composants Svelte (primitives, base UI, layouts, agent UI, theme). Retournent leur schema et un hint d'usage.

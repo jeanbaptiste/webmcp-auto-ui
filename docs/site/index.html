@@ -583,7 +583,7 @@ Les outils ne sont plus passes en tableau plat (`mcpTools[]`). Ils sont structur
 
 ### Mode smart vs explicit
 
-Le mode `smart` (defaut) n'expose qu'un seul tool `component()` au LLM. Le LLM decouvre les composants via `component("help")` et les rend via `component("nom", {params})`. Cela economise ~2800 tokens de schema par rapport au mode `explicit` (31 render_* individuels).
+Le mode `smart` (defaut) expose 3 outils UI au LLM : `list_components()`, `get_component()` et `component()`. Le LLM decouvre les composants via `list_components()`, obtient le schema via `get_component(nom)`, et rend via `component(nom, {params})`. Cela economise ~2800 tokens de schema par rapport au mode `explicit` (31 render_* individuels).
 
 ### Recettes WebMCP
 
@@ -829,7 +829,7 @@ All types are exported and documented via JSDoc. Key types:
 - `McpClient`, `McpTool`, `McpToolResult` — MCP protocol types
 - `WebMCPCallToolEvent`, `PostMessageBridgeOptions` — bridge types
 - `JsonSchema`, `JsonSchemaObject` — schema validation types
-- `SkillDef` — skill registry entry
+- ~~`SkillDef`~~ — removed, skill types now live in `@webmcp-auto-ui/sdk` (`Skill`)
 
   </script>
   <script type="text/markdown" data-page="ui">
@@ -1358,7 +1358,7 @@ Boucle agent LLM avec providers Anthropic, Gemma LiteRT et locaux (Ollama/Llamaf
 
 - Boucle agent itérative : prompt -> tool calls -> LLM -> repeat jusqu'à `end_turn`
 - **ToolLayers** : structuration des outils en couches `McpLayer` (données) et `UILayer` (affichage)
-- **Mode smart/explicit** : `toolMode: 'smart'` = 1 seul tool `component()`, `'explicit'` = 31 `render_*`
+- **Mode smart/explicit** : `toolMode: 'smart'` = 3 outils UI (`list_components`, `get_component`, `component`), `'explicit'` = 31 `render_*`
 - **Recettes WebMCP** : fichiers `.md` avec frontmatter, parsées et injectées dans le prompt
 - **ComponentAdapter** : filtrage/personnalisation des composants UI exposés au LLM
 - 4 providers LLM : `RemoteLLMProvider`, `WasmProvider`, `LocalLLMProvider`, + legacy `AnthropicProvider`/`GemmaProvider`
@@ -1499,7 +1499,7 @@ Convertit les layers en `AnthropicTool[]` envoyés au LLM :
 import { buildToolsFromLayers } from '@webmcp-auto-ui/agent';
 
 const tools = buildToolsFromLayers(layers, 'smart');
-// Mode smart : tools MCP + 1 seul tool component()
+// Mode smart : tools MCP + 3 outils UI (list_components, get_component, component)
 // Mode explicit : tools MCP + 31 render_* + component()
 ```
 
@@ -1525,12 +1525,12 @@ Le prompt généré contient :
 
 | | Smart (defaut) | Explicit |
 |--|---------------|----------|
-| **Outils UI** | 1 seul : `component()` | 31 `render_*` + `component()` |
-| **Discovery** | `component("help")` pour lister | Le LLM voit tous les tools |
+| **Outils UI** | 3 : `list_components()`, `get_component()`, `component()` | 31 `render_*` + `component()` |
+| **Discovery** | `list_components()` pour lister, `get_component(nom)` pour le schema | Le LLM voit tous les tools |
 | **Tokens** | Economique (~200 tokens schema) | Couteux (~3000 tokens) |
 | **Recommandation** | Cloud (Claude) | WASM (Gemma) ou debug |
 
-En mode smart, le LLM appelle `component("help")` pour decouvrir les composants disponibles, puis `component("nom", {params})` pour rendre.
+En mode smart, le LLM appelle `list_components()` pour decouvrir les composants disponibles, `get_component(nom)` pour le schema detaille, puis `component(nom, {params})` pour rendre.
 
 ## Agent loop
 
@@ -1655,18 +1655,18 @@ import { UI_TOOLS, isUITool, executeUITool } from '@webmcp-auto-ui/agent';
 
 ## component() unifie
 
-Tool unique qui expose 56 composants (31 renderable, 25 non-renderable). En mode smart, c'est le seul outil UI visible par le LLM.
+Trois outils qui exposent 56 composants (31 renderable, 25 non-renderable) au LLM : `list_components()`, `get_component()`, `component()`.
 
 ```ts
 import { COMPONENT_TOOL, executeComponent, componentRegistry } from '@webmcp-auto-ui/agent';
 ```
 
-### Trois modes d'appel
+### Trois outils
 
-| Appel | Retour |
+| Outil | Retour |
 |-------|--------|
-| `component("help")` | Liste des 56 composants avec nom, description, flag `renderable` |
-| `component("help", "stat-card")` | Schema + description + renderability d'un composant |
+| `list_components()` | Liste des 56 composants avec nom, description, flag `renderable` |
+| `get_component("stat-card")` | Schema JSON detaille + description + renderability d'un composant |
 | `component("stat-card", { label: "Revenue", value: "
   <script>
 42K" })` | Rend le composant |
@@ -1823,7 +1823,8 @@ Les recettes MCP viennent du serveur via `list_recipes` / `get_recipe`. Elles de
    -> boucle LLM iterative
 
 5. En mode smart:
-   LLM appelle component("help") -> decouverte
+   LLM appelle list_components() -> decouverte
+   LLM appelle get_component("stat-card") -> schema
    LLM appelle component("stat-card", {params}) -> rendu
    LLM appelle query_sql({sql}) -> donnees MCP
    LLM appelle component("table", {rows}) -> affichage
@@ -3243,7 +3244,7 @@ App                      Agent Package                     LLM
  |  4. runAgentLoop(msg, {layers})                          |
  |  ------------------------------------->  prompt + tools  |
  |                            |             |               |
- |                            |   5. component("help")      |
+ |                            |   5. list_components()      |
  |                            |   <----------------------   |
  |                            |   --- liste composants -->  |
  |                            |             |               |
@@ -3263,8 +3264,8 @@ App                      Agent Package                     LLM
 2. **`buildSystemPrompt(layers, { toolMode })`** genere le prompt francais structure en `## mcp` / `## webmcp`
 3. **`buildToolsFromLayers(layers, toolMode)`** produit les `AnthropicTool[]` selon le mode
 4. **`runAgentLoop(msg, { layers, toolMode })`** lance la boucle iterative
-5. En mode smart : le LLM voit 1 tool `component()` + N tools MCP
-6. Le LLM appelle `component("help")` pour decouvrir, puis `component("nom", {params})` pour rendre
+5. En mode smart : le LLM voit 3 outils UI (`list_components()`, `get_component()`, `component()`) + N tools MCP
+6. Le LLM appelle `list_components()` pour decouvrir, `get_component(nom)` pour le schema, puis `component(nom, {params})` pour rendre
 7. Les recettes WebMCP guident le LLM sur comment presenter les donnees
 
 ### Exemple concret
@@ -3341,11 +3342,11 @@ const result = await runAgentLoop('Qui est le depute de Paris 1er ?', {
 
 ## Composer avec component() (mode smart)
 
-En mode smart, le LLM n'a qu'un seul outil UI : `component()`. Trois modes d'appel :
+En mode smart, le LLM dispose de 3 outils UI :
 
 ```
-component("help")                        -> liste de tous les composants
-component("help", "stat-card")           -> schema detaille d'un composant
+list_components()                        -> liste de tous les composants
+get_component("stat-card")               -> schema detaille d'un composant
 component("stat-card", {label, value})   -> rend le composant
 ```
 
@@ -3363,7 +3364,7 @@ Les noms utilisent des tirets (`stat-card`). Les noms `render_*` sont acceptes e
 
 ### Tous les composants enregistres
 
-`component("help")` retourne **tous** les composants (56), pas seulement les widgets renderables :
+`list_components()` retourne **tous** les composants (56), pas seulement les widgets renderables :
 
 - **renderable: true** -- tous les block types `render_*` + actions canvas. Renderables via `executeComponent`.
 - **renderable: false** -- composants Svelte (primitives, base UI, layouts, agent UI, theme). Retournent leur schema et un hint d'usage.
@@ -3465,11 +3466,14 @@ Les skills sont encodees en `?hs=` pour le partage :
 
 ### Mode smart (defaut v0.8)
 
-En mode smart, le LLM n'a qu'un seul outil UI : **`component()`**. Il decouvre les composants via `component("help")` et les rend via `component("nom", {params})`.
+En mode smart, le LLM dispose de 3 outils UI : **`list_components()`**, **`get_component()`** et **`component()`**.
 
 ```
-LLM appelle component("help")
-  -> liste de 56 composants avec schemas
+LLM appelle list_components()
+  -> liste de 56 composants avec descriptions
+
+LLM appelle get_component("stat-card")
+  -> schema JSON detaille
 
 LLM appelle component("stat-card", {label: "Users", value: 8204})
   -> bloc rendu sur le canvas
@@ -4003,7 +4007,7 @@ const layers: ToolLayer[] = [mcpLayer1, mcpLayer2, uiLayer];
 
 ## webmcp
 
-### component() -- seul outil UI
+### 3 outils UI (list_components, get_component, component)
 Appelle component("nom", {params}) pour rendre un composant.
 Composants disponibles : stat, kv, list, chart, alert, ...
 ```
@@ -4305,11 +4309,11 @@ Connexion MCP                  buildSystemPrompt()              Agent loop (LLM)
      |          ## webmcp : component() + "recettes UI (N)"         |
      |          (resumes courts — pas le body)                       |
      |                              |                               |
-     |                              |   4. component("help")        |
+     |                              |   4. list_components()        |
      |                              |   <- composants + recettes    |
      |                              |                               |
-     |                              |   5. component("help","id")   |
-     |                              |   <- body complet recette     |
+     |                              |   5. get_component("id")      |
+     |                              |   <- schema ou body recette   |
      |                              |                               |
      |                              |   6. component("recipe-id")   |
      |                              |   <- body comme guide         |
@@ -4326,8 +4330,8 @@ Connexion MCP                  buildSystemPrompt()              Agent loop (LLM)
 Le body complet des recettes n'est PAS dans le prompt initial. Le LLM ne voit que les resumes (name + when/description). Il charge le detail a la demande :
 
 **Recettes WebMCP :**
-- `component("help")` -> liste composants + recettes (id, when, components)
-- `component("help", "recipe-id")` -> body complet d'une recette
+- `list_components()` -> liste composants + recettes (id, when, components)
+- `get_component("recipe-id")` -> body complet d'une recette
 - `component("recipe-id")` -> retourne le body comme guide de composition
 
 **Recettes MCP (serveur) :**
@@ -4339,7 +4343,7 @@ Le body complet des recettes n'est PAS dans le prompt initial. Le LLM ne voit qu
 |--|---------------------|----------------------|
 | Source | Package agent (fichiers .md) | Serveur MCP (`list_recipes`) |
 | Guide quoi | Le **View** (comment afficher) | Le **Model/Data** (quoi demander) |
-| Lazy loading | `component("help","id")` | `get_recipe(name)` |
+| Lazy loading | `get_component("id")` | `get_recipe(name)` |
 | Section prompt | `## webmcp > recettes UI` | `## mcp > recettes serveur` |
 
 L'agent utilise les deux ensemble : une recette MCP lui dit comment obtenir les donnees, une recette WebMCP lui dit comment les presenter.
@@ -4475,7 +4479,7 @@ const changed = diff(oldContent, newContent); // ["blocks", "meta"]
 
 ## Workflow : Creer une skill
 
-> Avec `component()`, l'agent decouvre les composants via `component("help")` puis rend via `component("nom", {params})`.
+> L'agent decouvre les composants via `list_components()`, obtient le schema via `get_component(nom)`, puis rend via `component(nom, {params})`.
 
 1. **Definir l'objectif** : quelles donnees, quel besoin
 2. **Choisir les blocs** : 2-5 types (voir composing.md)

@@ -30,11 +30,11 @@ Connexion MCP                  buildSystemPrompt()              Agent loop (LLM)
      |          ## webmcp : component() + "recettes UI (N)"         |
      |          (resumes courts uniquement — pas le body)            |
      |                              |                               |
-     |                              |   4. component("help")        |
+     |                              |   4. list_components()        |
      |                              |   <- composants + recettes    |
      |                              |                               |
-     |                              |   5. component("help","id")   |
-     |                              |   <- body complet recette     |
+     |                              |   5. get_component("id")      |
+     |                              |   <- schema ou body recette   |
      |                              |                               |
      |                              |   6. component("recipe-id")   |
      |                              |   <- body comme guide         |
@@ -72,7 +72,7 @@ Le prompt systeme est structure en sections :
 - scrutin-detail: Analyse detaillee d'un scrutin public
 
 ## webmcp
-### component() — seul outil UI
+### 3 outils UI (list_components, get_component, component)
 Composants disponibles : stat-card, chart, table, ...
 ### recettes UI (3)
 - Composer un tableau de bord KPI: metriques numeriques [stat-card, chart, table, kv]
@@ -85,7 +85,7 @@ Le body detaille des recettes n'est **PAS** dans le prompt. Seuls `name`, `when`
 
 En mode smart (defaut), le LLM recoit :
 - Les outils MCP (DATA) — `query_sql`, `search_deputes`, etc.
-- Un seul outil UI : `component()`
+- 3 outils UI : `list_components()`, `get_component()`, `component()`
 
 Ni `list_recipes` ni `get_recipe` ne sont envoyes comme outils au LLM. Le LLM decouvre les recettes MCP via le prompt, et leurs details via `get_recipe` (outil MCP du serveur).
 
@@ -96,8 +96,8 @@ Le body complet des recettes est charge a la demande, pas au demarrage. C'est le
 **Recettes WebMCP :**
 
 ```
-component("help")              -> liste composants + recettes WebMCP (id, when, components)
-component("help", "recipe-id") -> body complet d'une recette WebMCP
+list_components()              -> liste composants + recettes WebMCP (id, when, components)
+get_component("recipe-id")    -> body complet d'une recette WebMCP
 component("recipe-id")         -> retourne le body comme guide de composition
 ```
 
@@ -257,7 +257,7 @@ C'est le serveur qui decide du contenu de `body` — workflow, exemples, paramet
 | **Section prompt** | `## webmcp > recettes UI` | `## mcp > recettes serveur` |
 | **Type** | `Recipe` | `McpRecipe` |
 | **Porte par** | `UILayer.recipes` | `McpLayer.recipes` |
-| **Lazy loading** | `component("help","id")` ou `component("id")` | `get_recipe(name)` (outil MCP) |
+| **Lazy loading** | `get_component("id")` ou `component("id")` | `get_recipe(name)` (outil MCP) |
 | **Guide quoi** | Le **View** (comment afficher) | Le **Model/Data** (quoi demander) |
 | **Body dans le prompt** | Non (resumes uniquement) | Non (resumes uniquement) |
 

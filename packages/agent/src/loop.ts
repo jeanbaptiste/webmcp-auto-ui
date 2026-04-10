@@ -13,7 +13,10 @@ import type {
 import type { ToolLayer, McpLayer, UILayer } from './tool-layers.js';
 import { buildToolsFromLayers } from './tool-layers.js';
 import { UI_TOOLS, isUITool, executeUITool } from './ui-tools.js';
-import { COMPONENT_TOOL, executeComponent } from './component-tool.js';
+import {
+  LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL,
+  executeListComponents, executeGetComponent, executeComponent,
+} from './component-tool.js';
 import { formatRecipesForPrompt, formatMcpRecipesForPrompt } from './recipe-registry.js';
 
 const MAX_RESULT_LEN = 10_000;
@@ -101,22 +104,11 @@ CRITIQUE : Après CHAQUE outil DATA, rends visuellement. TOUJOURS rendre. Texte 
     prompt += `## webmcp\n\n`;
 
     if (toolMode === 'smart') {
-      // Mode smart : component() est le seul outil UI
-      prompt += `### component() — seul outil UI\n`;
-      prompt += `Appelle component("nom", {params}) pour rendre un composant.\n`;
-      prompt += `Appelle component("help", "nom") pour le schéma détaillé.\n\n`;
-      prompt += `Composants disponibles : `;
-      // Liste compacte des noms + 1 mot
-      const seen = new Set<string>();
-      const names: string[] = [];
-      for (const t of UI_TOOLS) {
-        if (t.name.startsWith('render_')) {
-          const short = t.name.slice(7).replace(/_/g, '-');
-          if (!seen.has(short)) { seen.add(short); names.push(short); }
-        }
-      }
-      prompt += names.join(', ');
-      prompt += `\nCanvas : clear, update, move, resize, style\n\n`;
+      // Mode smart : 3 outils UI (list_components, get_component, component)
+      prompt += `### composants UI\n`;
+      prompt += `Appelle list_components() pour découvrir les composants disponibles.\n`;
+      prompt += `Appelle get_component(nom) pour le schéma détaillé.\n`;
+      prompt += `Appelle component(nom, {params}) pour rendre.\n\n`;
     } else {
       // Mode explicit : 31 outils individuels
       prompt += `### outils UI (affichage visuel)\n`;
@@ -216,8 +208,8 @@ export async function runAgentLoop(
     // Legacy path — mcpTools flat array
     const mcpToolsDef = mcpToolsToAnthropic(mcpTools);
     allTools = toolMode === 'smart'
-      ? [...mcpToolsDef, COMPONENT_TOOL]
-      : [...mcpToolsDef, ...UI_TOOLS, COMPONENT_TOOL];
+      ? [...mcpToolsDef, LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL]
+      : [...mcpToolsDef, ...UI_TOOLS, LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL];
     baseSystemPrompt = options.systemPrompt ?? buildSystemPromptLegacy(mcpTools);
   }
 
@@ -295,7 +287,11 @@ export async function runAgentLoop(
       try {
         let result: string;
 
-        if (block.name === 'component') {
+        if (block.name === 'list_components') {
+          result = executeListComponents();
+        } else if (block.name === 'get_component') {
+          result = executeGetComponent((block.input as { name: string }).name);
+        } else if (block.name === 'component') {
           result = executeComponent(block.input as { name: string; params?: unknown }, callbacks);
         } else if (isUITool(block.name)) {
           result = executeUITool(block.name, block.input, callbacks);

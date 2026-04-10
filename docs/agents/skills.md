@@ -120,11 +120,11 @@ Connexion MCP                  buildSystemPrompt()              Agent loop (LLM)
      |          ## webmcp : component() + "recettes UI (N)"         |
      |          (resumes courts — pas le body)                       |
      |                              |                               |
-     |                              |   4. component("help")        |
+     |                              |   4. list_components()        |
      |                              |   <- composants + recettes    |
      |                              |                               |
-     |                              |   5. component("help","id")   |
-     |                              |   <- body complet recette     |
+     |                              |   5. get_component("id")      |
+     |                              |   <- schema ou body recette   |
      |                              |                               |
      |                              |   6. component("recipe-id")   |
      |                              |   <- body comme guide         |
@@ -141,8 +141,8 @@ Connexion MCP                  buildSystemPrompt()              Agent loop (LLM)
 Le body complet des recettes n'est PAS dans le prompt initial. Le LLM ne voit que les resumes (name + when/description). Il charge le detail a la demande :
 
 **Recettes WebMCP :**
-- `component("help")` -> liste composants + recettes (id, when, components)
-- `component("help", "recipe-id")` -> body complet d'une recette
+- `list_components()` -> liste composants + recettes (id, when, components)
+- `get_component("recipe-id")` -> body complet d'une recette
 - `component("recipe-id")` -> retourne le body comme guide de composition
 
 **Recettes MCP (serveur) :**
@@ -154,7 +154,7 @@ Le body complet des recettes n'est PAS dans le prompt initial. Le LLM ne voit qu
 |--|---------------------|----------------------|
 | Source | Package agent (fichiers .md) | Serveur MCP (`list_recipes`) |
 | Guide quoi | Le **View** (comment afficher) | Le **Model/Data** (quoi demander) |
-| Lazy loading | `component("help","id")` | `get_recipe(name)` |
+| Lazy loading | `get_component("id")` | `get_recipe(name)` |
 | Section prompt | `## webmcp > recettes UI` | `## mcp > recettes serveur` |
 
 L'agent utilise les deux ensemble : une recette MCP lui dit comment obtenir les donnees, une recette WebMCP lui dit comment les presenter.
@@ -290,7 +290,7 @@ const changed = diff(oldContent, newContent); // ["blocks", "meta"]
 
 ## Workflow : Creer une skill
 
-> Avec `component()`, l'agent decouvre les composants via `component("help")` puis rend via `component("nom", {params})`.
+> L'agent decouvre les composants via `list_components()`, obtient le schema via `get_component(nom)`, puis rend via `component(nom, {params})`.
 
 1. **Definir l'objectif** : quelles donnees, quel besoin
 2. **Choisir les blocs** : 2-5 types (voir composing.md)

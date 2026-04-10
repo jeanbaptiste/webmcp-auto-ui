@@ -79,17 +79,11 @@ export {
   createToolGroup,
 } from './utils.js';
 
-// WebMCP helpers (skill registry + result builders)
+// WebMCP helpers (result builders)
 export {
   textResult,
   jsonResult,
-  registerSkill,
-  unregisterSkill,
-  getSkill,
-  listSkills,
-  clearSkills,
 } from './webmcp-helpers.js';
-export type { SkillDef } from './webmcp-helpers.js';
 
 // Multi-MCP client
 export { McpMultiClient } from './multi-client.js';

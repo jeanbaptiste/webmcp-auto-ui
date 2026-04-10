@@ -28,9 +28,9 @@ A single tool that exposes **56 components** (31 renderable, 25 non-renderable) 
 import { COMPONENT_TOOL, executeComponent, componentRegistry } from '@webmcp-auto-ui/agent';
 ```
 
-Three modes:
-- `component("help")` -- list all 56 components
-- `component("help", "stat-card")` -- get the schema for one component
+Three tools:
+- `list_components()` -- list all 56 components + recipes
+- `get_component("stat-card")` -- get the detailed JSON schema
 - `component("stat-card", { label: "Revenue", value: "$142K" })` -- render it
 
 Coexists with the individual `render_*` tools -- both work simultaneously. For the full component catalogue, see `docs/agents/composing.md`.

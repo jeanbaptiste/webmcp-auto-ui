@@ -115,7 +115,7 @@ Le prompt genere par `buildSystemPrompt(layers)` contient :
 
 ## webmcp
 
-### component() -- seul outil UI
+### 3 outils UI (list_components, get_component, component)
 Composants disponibles : stat, kv, list, chart, ...
 ```
 

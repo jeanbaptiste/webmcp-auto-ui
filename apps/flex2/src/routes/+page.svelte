@@ -41,11 +41,11 @@
 
 WORKFLOW OBLIGATOIRE :
 1. Utilise un outil DATA pour récupérer les données
-2. Appelle component("nom", {params}) pour afficher visuellement
-3. Réponds en 1-2 phrases max — l'essentiel est dans l'UI
+2. Appelle list_components() si tu ne connais pas les composants
+3. Appelle get_component(nom) pour le schéma
+4. Appelle component(nom, {params}) pour afficher visuellement
+5. Réponds en 1-2 phrases max — l'essentiel est dans l'UI
 
-component("help") pour découvrir les composants disponibles.
-component("help", "nom") pour le schéma détaillé.
 Propose la visualisation la plus pertinente. Combine plusieurs composants quand c'est utile.`;
   let systemPrompt = $state(defaultSystemPrompt);
   let composerMode = $state(true); // true = composer, false = consumer

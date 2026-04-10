@@ -195,12 +195,12 @@ Tool unique exposant 56 composants (31 renderable, 25 non-renderable).
 import { COMPONENT_TOOL, executeComponent, componentRegistry } from '@webmcp-auto-ui/agent';
 ```
 
-### Trois modes d'appel
+### Trois outils
 
-| Appel | Retour |
+| Outil | Retour |
 |-------|--------|
-| `component("help")` | Liste des 56 composants |
-| `component("help", "stat-card")` | Schema + description d'un composant |
+| `list_components()` | Liste des 56 composants + recettes |
+| `get_component("stat-card")` | Schema JSON detaille + description |
 | `component("stat-card", { label: "Revenue", value: "$142K" })` | Rend le composant |
 
 ## ComponentAdapter

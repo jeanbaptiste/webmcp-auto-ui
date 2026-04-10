@@ -30,11 +30,11 @@ MCP Connection                 buildSystemPrompt()              Agent loop (LLM)
      |          ## webmcp: component() + "UI recipes (N)"           |
      |          (short summaries only — no body)                     |
      |                              |                               |
-     |                              |   4. component("help")        |
+     |                              |   4. list_components()        |
      |                              |   <- components + recipes     |
      |                              |                               |
-     |                              |   5. component("help","id")   |
-     |                              |   <- full recipe body         |
+     |                              |   5. get_component("id")      |
+     |                              |   <- schema or recipe body    |
      |                              |                               |
      |                              |   6. component("recipe-id")   |
      |                              |   <- body as composition guide|
@@ -85,7 +85,7 @@ The detailed recipe body is **NOT** in the prompt. Only `name`, `when` and `comp
 
 In smart mode (default), the LLM receives:
 - MCP tools (DATA) — `query_sql`, `search_deputes`, etc.
-- A single UI tool: `component()`
+- 3 UI tools: `list_components()`, `get_component()`, `component()`
 
 Neither `list_recipes` nor `get_recipe` are sent as tools to the LLM. The LLM discovers MCP recipes via the prompt, and their details via `get_recipe` (MCP server tool).
 
@@ -96,8 +96,8 @@ The full recipe body is loaded on demand, not at startup. The LLM decides when i
 **WebMCP recipes:**
 
 ```
-component("help")              -> list components + WebMCP recipes (id, when, components)
-component("help", "recipe-id") -> full body of a WebMCP recipe
+list_components()              -> list components + WebMCP recipes (id, when, components)
+get_component("recipe-id")    -> full body of a WebMCP recipe
 component("recipe-id")         -> returns the body as a composition guide
 ```
 
@@ -257,7 +257,7 @@ The server decides the content of `body` — workflow, examples, recommended par
 | **Prompt section** | `## webmcp > UI recipes` | `## mcp > server recipes` |
 | **Type** | `Recipe` | `McpRecipe` |
 | **Carried by** | `UILayer.recipes` | `McpLayer.recipes` |
-| **Lazy loading** | `component("help","id")` or `component("id")` | `get_recipe(name)` (MCP tool) |
+| **Lazy loading** | `get_component("id")` or `component("id")` | `get_recipe(name)` (MCP tool) |
 | **Guides what** | The **View** (how to display) | The **Model/Data** (what to request) |
 | **Body in prompt** | No (summaries only) | No (summaries only) |
 

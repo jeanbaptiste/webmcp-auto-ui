@@ -1,6 +1,6 @@
 ---
 title: Flex
-description: AI canvas with ToolLayers, single component(), LogDrawer, RecipeModal and composer/consumer mode
+description: AI canvas with ToolLayers, 3 UI tools (list_components, get_component, component), LogDrawer, RecipeModal and composer/consumer mode
 sidebar:
   order: 1
 ---

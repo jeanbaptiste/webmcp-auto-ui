@@ -1,12 +1,11 @@
 /**
- * Unified `component` tool — discovery + render via a single tool.
+ * Three separate tools for component discovery and rendering:
+ *
+ *   list_components()                     → list all components + recipes
+ *   get_component("stat-card")            → detailed JSON schema
+ *   component("stat-card", { label: … })  → render stat-card
  *
  * Coexists with the individual render_* tools; both are valid.
- *
- * Usage (from the LLM side):
- *   component("help")                     → list all components
- *   component("help", "stat-card")        → schema of stat-card
- *   component("stat-card", { label: … })  → render stat-card
  *
  * Inspired by a suggestion from Emmanuel Raviart, creator of Tricoteuses MCP server
  * (https://www.tricoteuses.fr/mcp)
@@ -68,101 +67,54 @@ for (const tool of UI_TOOLS) {
   }
 }
 
-// ── Tool definition ──────────────────────────────────────────────────────────
+// ── Tool definitions ─────────────────────────────────────────────────────────
 
-// Build a rich description listing all renderable components
-function buildComponentDescription(): string {
-  const seen = new Set<ComponentEntry>();
-  const renderable: string[] = [];
-  const canvas: string[] = [];
+export const LIST_COMPONENTS_TOOL: AnthropicTool = {
+  name: 'list_components',
+  description: 'Liste tous les composants UI disponibles et les recettes WebMCP.',
+  input_schema: {
+    type: 'object',
+    properties: {},
+  },
+};
 
-  for (const entry of componentRegistry.values()) {
-    if (seen.has(entry) || !entry.renderable) continue;
-    seen.add(entry);
-    // Canvas actions
-    if (['clear', 'update', 'move', 'resize', 'style'].includes(entry.name)) {
-      canvas.push(entry.name);
-    } else {
-      // Short description: first sentence, truncated at last word boundary
-      let desc = entry.description.split('.')[0];
-      if (desc.length > 60) {
-        desc = desc.slice(0, 60);
-        const lastSpace = desc.lastIndexOf(' ');
-        if (lastSpace > 20) desc = desc.slice(0, lastSpace);
-      }
-      renderable.push(`${entry.name}: ${desc}`);
-    }
-  }
-
-  return `Outil UI unifié — rend des composants visuels.
-Composants : ${renderable.join(' | ')}
-Canvas : ${canvas.join(', ')}
-→ component("help", "nom") pour le schéma détaillé
-→ component("nom", {params}) pour rendre`;
-}
-
-export const COMPONENT_TOOL: AnthropicTool = {
-  name: 'component',
-  description: buildComponentDescription(),
+export const GET_COMPONENT_TOOL: AnthropicTool = {
+  name: 'get_component',
+  description: "Retourne le schéma JSON détaillé d'un composant ou d'une recette. Appelle list_components d'abord pour voir les noms disponibles.",
   input_schema: {
     type: 'object',
     properties: {
       name: {
         type: 'string',
-        description: "Nom du composant (ex: 'stat', 'chart', 'table') ou 'help'.",
-      },
-      params: {
-        description:
-          "Paramètres du composant (objet) pour le rendu, ou nom du composant (string) pour obtenir l'aide d'un composant spécifique.",
+        description: "Nom du composant (ex: 'stat-card', 'table', 'chart') ou d'une recette.",
       },
     },
     required: ['name'],
   },
 };
 
-// ── Execution ────────────────────────────────────────────────────────────────
+export const COMPONENT_TOOL: AnthropicTool = {
+  name: 'component',
+  description: "Rend un composant UI. Appelle get_component(nom) d'abord pour connaître les paramètres attendus.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      name: {
+        type: 'string',
+        description: "Nom du composant (ex: 'stat-card', 'table', 'chart').",
+      },
+      params: {
+        type: 'object',
+        description: "Paramètres du composant (selon le schéma retourné par get_component).",
+      },
+    },
+    required: ['name'],
+  },
+};
 
-export function executeComponent(
-  args: { name: string; params?: unknown },
-  callbacks: AgentCallbacks,
-): string {
-  // ── Help mode ────────────────────────────────────────────────────────────
-  if (args.name === 'help') {
-    if (typeof args.params === 'string') {
-      return helpForComponent(args.params);
-    }
-    return helpAll();
-  }
+// ── Execution — list_components ───────────────────────────────────────────────
 
-  // ── Render mode (composant prioritaire sur recette en cas de collision) ──
-  const comp = componentRegistry.get(args.name);
-  if (comp) {
-    return executeUITool(
-      comp.toolName,
-      (args.params as Record<string, unknown>) ?? {},
-      callbacks,
-    );
-  }
-
-  // ── Recipe mode — component("recipe-id") ────────────────────────────────
-  const recipe = recipeRegistry.get(args.name);
-  if (recipe) {
-    return JSON.stringify({
-      recipe: recipe.name,
-      description: recipe.body,
-      components_used: recipe.components_used,
-      layout: recipe.layout,
-      hint: 'Utilise les composants listés pour composer cette vue.',
-    });
-  }
-
-  return JSON.stringify({ error: `Composant inconnu : ${args.name}. Appelle component("help") pour la liste.` });
-}
-
-// ── Help helpers ──────────────────────────────────────────────────────────────
-
-function helpAll(): string {
-  // Composants renderable
+export function executeListComponents(): string {
   const seen = new Set<ComponentEntry>();
   const components: { name: string; description: string }[] = [];
   for (const entry of componentRegistry.values()) {
@@ -171,7 +123,6 @@ function helpAll(): string {
     components.push({ name: entry.name, description: entry.description.split('.')[0] });
   }
 
-  // Recettes WebMCP
   const recipes = recipeRegistry.getAll().map(r => ({
     name: r.id,
     when: r.when,
@@ -181,15 +132,16 @@ function helpAll(): string {
   return JSON.stringify({
     components,
     recipes: recipes.length > 0 ? recipes : undefined,
-    hint: 'component("help", "nom") pour le schéma détaillé. component("nom", {params}) pour rendre.',
+    hint: 'get_component(nom) pour le schéma détaillé. component(nom, {params}) pour rendre.',
   });
 }
 
-function helpForComponent(name: string): string {
+// ── Execution — get_component ────────────────────────────────────────────────
+
+export function executeGetComponent(name: string): string {
   // Check component
   const comp = componentRegistry.get(name);
   if (comp) {
-    // Find recipes that use this component
     const relatedRecipes = recipeRegistry.getAll().filter(r =>
       r.components_used?.includes(comp.name)
     );
@@ -216,5 +168,23 @@ function helpForComponent(name: string): string {
     });
   }
 
-  return JSON.stringify({ error: `Inconnu : ${name}. Appelle component("help") pour la liste.` });
+  return JSON.stringify({ error: `Inconnu : ${name}. Appelle list_components() pour la liste.` });
+}
+
+// ── Execution — component (render only) ──────────────────────────────────────
+
+export function executeComponent(
+  args: { name: string; params?: unknown },
+  callbacks: AgentCallbacks,
+): string {
+  const comp = componentRegistry.get(args.name);
+  if (comp) {
+    return executeUITool(
+      comp.toolName,
+      (args.params as Record<string, unknown>) ?? {},
+      callbacks,
+    );
+  }
+
+  return JSON.stringify({ error: `Composant inconnu : ${args.name}. Appelle list_components() pour la liste.` });
 }

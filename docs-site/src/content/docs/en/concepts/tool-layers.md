@@ -56,7 +56,7 @@ interface McpLayer {
 
 ## UILayer
 
-A single `UILayer` per app. Carries `component()`, the optional `ComponentAdapter`, and WebMCP recipes.
+A single `UILayer` per app. Carries the 3 UI tools (`list_components`, `get_component`, `component`), the optional `ComponentAdapter`, and WebMCP recipes.
 
 ```ts
 import type { UILayer } from '@webmcp-auto-ui/agent';
@@ -137,7 +137,7 @@ Converts layers to `AnthropicTool[]`:
 import { buildToolsFromLayers } from '@webmcp-auto-ui/agent';
 
 const tools = buildToolsFromLayers(layers, 'smart');
-// Smart mode: MCP tools + 1 single component() tool
+// Smart mode: MCP tools + 3 UI tools (list_components, get_component, component)
 // Explicit mode: MCP tools + 31 render_* + component()
 ```
 

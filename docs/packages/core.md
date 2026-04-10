@@ -204,4 +204,4 @@ All types are exported and documented via JSDoc. Key types:
 - `McpClient`, `McpTool`, `McpToolResult` — MCP protocol types
 - `WebMCPCallToolEvent`, `PostMessageBridgeOptions` — bridge types
 - `JsonSchema`, `JsonSchemaObject` — schema validation types
-- `SkillDef` — skill registry entry
+- ~~`SkillDef`~~ — removed, skill types now live in `@webmcp-auto-ui/sdk` (`Skill`)

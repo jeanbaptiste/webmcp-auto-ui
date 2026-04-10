@@ -146,7 +146,7 @@
               role="button" tabindex="0">
           (?)
           <span class="tooltip-content">
-            <strong>Mode Smart</strong> : 1 seul outil component(). L'agent appelle component("help") pour decouvrir les composants, component("help","nom") pour le schema, et component("nom",{'{params}'}) pour rendre. ~300 tokens.<br/><br/>
+            <strong>Mode Smart</strong> : 3 outils UI. L'agent appelle list_components() pour decouvrir les composants, get_component(nom) pour le schema, et component(nom, {'{params}'}) pour rendre. ~300 tokens.<br/><br/>
             <strong>Mode Explicit</strong> : 31 outils render_* individuels + component(). Utile pour le debug ou si l'agent a du mal avec le mode smart. ~4000 tokens.
           </span>
         </span>

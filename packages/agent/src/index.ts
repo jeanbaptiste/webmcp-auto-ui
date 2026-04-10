@@ -24,7 +24,10 @@ export { runAgentLoop, buildSystemPrompt, mcpToolsToAnthropic, fromMcpTools, tri
 export type { AgentLoopOptions } from './loop.js';
 
 export { UI_TOOLS, isUITool, executeUITool } from './ui-tools.js';
-export { COMPONENT_TOOL, componentRegistry, executeComponent } from './component-tool.js';
+export {
+  LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL,
+  componentRegistry, executeListComponents, executeGetComponent, executeComponent,
+} from './component-tool.js';
 export type { ComponentEntry } from './component-tool.js';
 
 export { summarizeChat } from './summarize.js';

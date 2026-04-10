@@ -6,11 +6,14 @@
 
 ### Mode smart (defaut v0.8)
 
-En mode smart, le LLM n'a qu'un seul outil UI : **`component()`**. Il decouvre les composants via `component("help")` et les rend via `component("nom", {params})`.
+En mode smart, le LLM dispose de 3 outils UI : **`list_components()`**, **`get_component()`** et **`component()`**.
 
 ```
-LLM appelle component("help")
-  -> liste de 56 composants avec schemas
+LLM appelle list_components()
+  -> liste de 56 composants avec descriptions
+
+LLM appelle get_component("stat-card")
+  -> schema JSON detaille
 
 LLM appelle component("stat-card", {label: "Users", value: 8204})
   -> bloc rendu sur le canvas

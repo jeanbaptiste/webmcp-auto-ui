@@ -125,7 +125,7 @@ Resultat :
 
 ## webmcp
 
-### component() -- seul outil UI
+### 3 outils UI (list_components, get_component, component)
 Composants disponibles : stat, kv, list, chart, alert, ...
 ```
 
@@ -137,7 +137,7 @@ Convertit les layers en `AnthropicTool[]` :
 import { buildToolsFromLayers } from '@webmcp-auto-ui/agent';
 
 const tools = buildToolsFromLayers(layers, 'smart');
-// Mode smart : tools MCP + 1 seul tool component()
+// Mode smart : tools MCP + 3 outils UI (list_components, get_component, component)
 // Mode explicit : tools MCP + 31 render_* + component()
 ```
 

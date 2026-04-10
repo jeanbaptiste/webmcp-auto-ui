@@ -5,42 +5,42 @@ sidebar:
   order: 2
 ---
 
-`component()` is the unified tool that exposes 56 components (31 renderable, 25 non-renderable) to the LLM. In smart mode, it is the only visible UI tool.
+Three separate tools expose 56 components (31 renderable, 25 non-renderable) to the LLM. In smart mode, these are the only visible UI tools.
 
 ## Smart vs explicit mode
 
 | | Smart (default) | Explicit |
 |--|---------------|----------|
-| **UI tools** | 1 single: `component()` | 31 `render_*` + `component()` |
-| **Discovery** | `component("help")` to list | LLM sees all tools |
+| **UI tools** | 3: `list_components()`, `get_component()`, `component()` | 31 `render_*` + `component()` |
+| **Discovery** | `list_components()` + `get_component(name)` | LLM sees all tools |
 | **Schema tokens** | ~200 tokens | ~3000 tokens |
 | **Recommended for** | Cloud (Claude) | WASM (Gemma) or debug |
 
-## Three call modes
+## Three tools
 
-### Global discovery
-
-```
-component("help")
-```
-
-Returns the list of 56 components with name, description, and `renderable` flag.
-
-### Targeted discovery
+### list_components() -- Global discovery
 
 ```
-component("help", "stat-card")
+list_components()
 ```
 
-Returns the detailed schema, description and renderability of a specific component.
+Returns the list of 56 components with name, description, and `renderable` flag, plus available recipes.
 
-### Rendering
+### get_component(name) -- Detailed schema
+
+```
+get_component("stat-card")
+```
+
+Returns the detailed JSON schema, description and renderability of a specific component. Call `list_components()` first to see available names.
+
+### component(name, params) -- Rendering
 
 ```
 component("stat-card", { label: "Revenue", value: "$142K" })
 ```
 
-Renders the component on the canvas via the `onBlock` callback.
+Renders the component on the canvas via the `onBlock` callback. Call `get_component(name)` first for the expected parameters.
 
 ## Component names
 
@@ -95,7 +95,7 @@ All block types used by `BlockRenderer`:
 
 ## Non-renderable components (25)
 
-Svelte components (primitives, base UI, layouts, agent UI, theme). They return their schema and a usage hint via `component("help", "name")`.
+Svelte components (primitives, base UI, layouts, agent UI, theme). They return their schema and a usage hint via `get_component("name")`.
 
 ## API
 
@@ -148,8 +148,9 @@ adapter.registerAll(allNativePreset());
 ```
 1. App creates UILayer with or without ComponentAdapter
 2. buildToolsFromLayers() generates AnthropicTool[]
-3. LLM receives component() as the single UI tool (smart mode)
-4. LLM calls component("help") -> discovery
-5. LLM calls component("stat-card", {label, value}) -> render
-6. onBlock callback -> canvas displays the block
+3. LLM receives list_components(), get_component(), component() (smart mode)
+4. LLM calls list_components() -> discovery
+5. LLM calls get_component("stat-card") -> detailed schema
+6. LLM calls component("stat-card", {label, value}) -> render
+7. onBlock callback -> canvas displays the block
 ```

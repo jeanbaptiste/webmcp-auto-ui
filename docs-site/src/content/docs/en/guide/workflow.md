@@ -28,7 +28,7 @@ App                      Agent Package                     LLM
  |  4. runAgentLoop(msg, {layers})                          |
  |  ------------------------------------->  prompt + tools  |
  |                            |             |               |
- |                            |   5. component("help")      |
+ |                            |   5. list_components()      |
  |                            |   <----------------------   |
  |                            |   --- component list --->   |
  |                            |             |               |
@@ -90,7 +90,7 @@ The generated prompt contains:
 import { buildToolsFromLayers } from '@webmcp-auto-ui/agent';
 
 const tools = buildToolsFromLayers(layers, 'smart');
-// Smart mode: MCP tools + 1 single component() tool
+// Smart mode: MCP tools + 3 UI tools (list_components, get_component, component)
 // Explicit mode: MCP tools + 31 render_* + component()
 ```
 
@@ -115,11 +115,14 @@ const result = await runAgentLoop('Show me revenue by quarter', {
 
 ### 5. Discovery (smart mode)
 
-In smart mode, the LLM has a single UI tool. It calls `component("help")` to discover the 56 available components:
+In smart mode, the LLM has 3 UI tools. It calls `list_components()` to discover the 56 available components, then `get_component(name)` for the detailed schema:
 
 ```
-LLM -> component("help")
+LLM -> list_components()
     <- list of 56 components with name, description, renderable flag
+
+LLM -> get_component("stat-card")
+    <- detailed JSON schema for stat-card
 ```
 
 ### 6. DATA calls (MCP)
@@ -145,8 +148,8 @@ LLM -> component("profile", { name: "Jean Dupont", subtitle: "Deputy for Paris 1
 
 | | Smart (default) | Explicit |
 |--|---------------|----------|
-| **UI tools** | 1 single: `component()` | 31 `render_*` + `component()` |
-| **Discovery** | `component("help")` | LLM sees all tools |
+| **UI tools** | 3: `list_components()`, `get_component()`, `component()` | 31 `render_*` + `component()` |
+| **Discovery** | `list_components()` + `get_component(name)` | LLM sees all tools |
 | **Schema tokens** | ~200 tokens | ~3000 tokens |
 | **Recommended for** | Cloud (Claude) | WASM (Gemma) or debug |
 
@@ -204,8 +207,8 @@ const uiLayer: UILayer = { source: 'ui', recipes: uiRecipes };
 The LLM discovers details on demand (lazy loading):
 
 ```
-LLM -> component("help")               <- list components + WebMCP recipes
-LLM -> component("help", "weather-viz") <- full WebMCP recipe body
+LLM -> list_components()               <- list components + WebMCP recipes
+LLM -> get_component("weather-viz")    <- full WebMCP recipe body
 LLM -> get_recipe("profil-depute")      <- full MCP server recipe body
 LLM -> component("stat-card", {label: "Temperature", value: "22C"})
     -> onBlock -> Canvas

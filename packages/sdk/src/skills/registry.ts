@@ -22,6 +22,12 @@ export interface Skill {
   tags?: string[];
   theme?: ThemeOverrides;
   blocks: SkillBlock[];
+  /** Target Svelte component (from former Core SkillDef) */
+  component?: string;
+  /** Presentation hints for the component */
+  presentation?: string;
+  /** Expected block types this skill can produce */
+  expectedBlockTypes?: string[];
   createdAt: number;
   updatedAt: number;
 }

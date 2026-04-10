@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { type Component, onMount, onDestroy } from 'svelte';
   import { bus } from '../messaging/bus.svelte.js';
   // Simple widgets
   import StatBlock from './simple/StatBlock.svelte';
@@ -30,13 +30,76 @@
   import Gallery from './rich/Gallery.svelte';
   import Carousel from './rich/Carousel.svelte';
 
+  type Emit = (action: string, payload: unknown) => void;
+
+  /** Native block entry: component + prop builder */
+  type NativeEntry = {
+    component: Component<any>;
+    props: (data: Record<string, unknown>, emit: Emit) => Record<string, unknown>;
+  };
+
+  /** Simple helper: passes { data } */
+  const d = (c: Component<any>): NativeEntry => ({
+    component: c,
+    props: (data) => ({ data }),
+  });
+
+  /** Spec helper: passes { spec } */
+  const s = (c: Component<any>): NativeEntry => ({
+    component: c,
+    props: (data) => ({ spec: data }),
+  });
+
+  /** Spec + events helper */
+  const se = (
+    c: Component<any>,
+    events: (emit: Emit) => Record<string, unknown>,
+  ): NativeEntry => ({
+    component: c,
+    props: (data, emit) => ({ spec: data, ...events(emit) }),
+  });
+
+  /** Static map of all native block types → component + props */
+  const NATIVE_MAP: Record<string, NativeEntry> = {
+    // Simple widgets (data prop)
+    'stat':           d(StatBlock),
+    'kv':             d(KVBlock),
+    'list':           d(ListBlock),
+    'chart':          d(ChartBlock),
+    'alert':          d(AlertBlock),
+    'code':           d(CodeBlock),
+    'text':           d(TextBlock),
+    'actions':        d(ActionsBlock),
+    'tags':           d(TagsBlock),
+    // Rich widgets (spec prop)
+    'stat-card':      s(StatCard),
+    'profile':        s(ProfileCard),
+    'json-viewer':    s(JsonViewer),
+    'chart-rich':     s(Chart),
+    'sankey':         s(Sankey),
+    'map':            s(MapView),
+    'd3':             s(D3Widget),
+    'js-sandbox':     s(JsSandbox),
+    'log':            s(LogViewer),
+    // Rich widgets (spec prop + event callbacks)
+    'data-table':     se(DataTable,     (emit) => ({ onrowclick: (row: unknown) => emit('rowclick', row) })),
+    'timeline':       se(Timeline,      (emit) => ({ oneventclick: (e: unknown) => emit('eventclick', e) })),
+    'trombinoscope':  se(Trombinoscope, (emit) => ({ onpersonclick: (p: unknown) => emit('personclick', p) })),
+    'hemicycle':      se(Hemicycle,     (emit) => ({ ongroupclick: (g: unknown) => emit('groupclick', g) })),
+    'cards':          se(Cards,         (emit) => ({ oncardclick: (c: unknown) => emit('cardclick', c) })),
+    'grid-data':      se(GridData,      (emit) => ({ oncellclick: (r: unknown, c: unknown, v: unknown) => emit('cellclick', { row: r, col: c, value: v }) })),
+    'gallery':        se(Gallery,       (emit) => ({ onimageclick: (img: unknown, i: unknown) => emit('imageclick', { image: img, index: i }) })),
+    'carousel':       se(Carousel,      (emit) => ({ onslidechange: (slide: unknown, i: unknown) => emit('slidechange', { slide, index: i }) })),
+  };
+
   interface Props {
     id?: string;
     type: string;
     data: Record<string, unknown>;
+    adapter?: any;
     oninteract?: (type: string, action: string, payload: unknown) => void;
   }
-  let { id, type, data, oninteract }: Props = $props();
+  let { id, type, data, adapter, oninteract }: Props = $props();
 
   // Auto-register on the FONC message bus
   const busId = id ?? `block_${type}_${Date.now().toString(36)}`;
@@ -51,6 +114,14 @@
     oninteract?.(type, action, payload);
     bus.broadcast(busId, 'interact', { type, action, payload });
   }
+
+  // ── Renderer resolution: adapter > native > fallback ────────────
+  const adapterRenderer: Component<any> | null = $derived(
+    adapter?.getRenderer?.(type) ?? null,
+  );
+  const nativeEntry: NativeEntry | undefined = $derived(
+    adapterRenderer ? undefined : NATIVE_MAP[type],
+  );
 
   // ── Auto-register WebMCP tools when modelContext is available ────────────
   type ModelContext = {
@@ -108,58 +179,10 @@
   });
 </script>
 
-{#if type === 'stat'}
-  <StatBlock data={data} />
-{:else if type === 'kv'}
-  <KVBlock data={data} />
-{:else if type === 'list'}
-  <ListBlock data={data} />
-{:else if type === 'chart'}
-  <ChartBlock data={data} />
-{:else if type === 'alert'}
-  <AlertBlock data={data} />
-{:else if type === 'code'}
-  <CodeBlock data={data} />
-{:else if type === 'text'}
-  <TextBlock data={data} />
-{:else if type === 'actions'}
-  <ActionsBlock data={data} />
-{:else if type === 'tags'}
-  <TagsBlock data={data} />
-{:else if type === 'stat-card'}
-  <StatCard spec={data} />
-{:else if type === 'data-table'}
-  <DataTable spec={data} onrowclick={(row) => emit('rowclick', row)} />
-{:else if type === 'timeline'}
-  <Timeline spec={data} oneventclick={(e) => emit('eventclick', e)} />
-{:else if type === 'profile'}
-  <ProfileCard spec={data} />
-{:else if type === 'trombinoscope'}
-  <Trombinoscope spec={data} onpersonclick={(p) => emit('personclick', p)} />
-{:else if type === 'json-viewer'}
-  <JsonViewer spec={data} />
-{:else if type === 'hemicycle'}
-  <Hemicycle spec={data} ongroupclick={(g) => emit('groupclick', g)} />
-{:else if type === 'chart-rich'}
-  <Chart spec={data} />
-{:else if type === 'cards'}
-  <Cards spec={data} oncardclick={(c) => emit('cardclick', c)} />
-{:else if type === 'grid-data'}
-  <GridData spec={data} oncellclick={(r,c,v) => emit('cellclick', {row:r,col:c,value:v})} />
-{:else if type === 'sankey'}
-  <Sankey spec={data} />
-{:else if type === 'map'}
-  <MapView spec={data} />
-{:else if type === 'd3'}
-  <D3Widget spec={data as import('./rich/D3Widget.svelte').D3Spec} />
-{:else if type === 'js-sandbox'}
-  <JsSandbox spec={data as import('./rich/JsSandbox.svelte').JsSandboxSpec} />
-{:else if type === 'log'}
-  <LogViewer spec={data} />
-{:else if type === 'gallery'}
-  <Gallery spec={data} onimageclick={(img, i) => emit('imageclick', { image: img, index: i })} />
-{:else if type === 'carousel'}
-  <Carousel spec={data} onslidechange={(slide, i) => emit('slidechange', { slide, index: i })} />
+{#if adapterRenderer}
+  <svelte:component this={adapterRenderer} {data} {id} />
+{:else if nativeEntry}
+  <svelte:component this={nativeEntry.component} {...nativeEntry.props(data, emit)} />
 {:else}
   <div class="p-3 font-mono text-xs text-text2">[{type}]</div>
 {/if}
