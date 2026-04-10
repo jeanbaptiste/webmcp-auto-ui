@@ -1,9 +1,9 @@
 <script lang="ts">
   declare const __BUILD_TIME__: string;
   import { PUBLIC_BASE_URL } from '$env/static/public';
-  import { getContext } from 'svelte';
+  import { getTheme } from '@webmcp-auto-ui/ui';
 
-  const theme = getContext<{ mode: string; toggle: () => void }>('theme');
+  const theme = getTheme();
 
   const base = PUBLIC_BASE_URL ?? '';
 
