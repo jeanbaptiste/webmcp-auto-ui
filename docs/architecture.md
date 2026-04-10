@@ -1,6 +1,6 @@
 # Architecture
 
-Structure monorepo, dependances entre packages, et decisions de design (v0.7.0).
+Structure monorepo, dependances entre packages, et decisions de design (v0.8).
 
 ## Structure monorepo
 
@@ -15,15 +15,11 @@ webmcp-auto-ui/
  |
  +-- apps/
  |    +-- home/          Landing page, app launcher (port 5173)
- |    +-- todo/          MCP-powered todo demo (port 5175)
- |    +-- viewer/        HyperSkill URL renderer (port 5176)
- |    +-- showcase/      Component showcase + WebMCP tool demos (port 5177)
- |    +-- flex/          Canvas drag & resize, multi-MCP, chat (port 5179)
- |    +-- flex2/         Layers, component() unique, debug panel, mode composeur/consommateur
- |    +-- viewer2/       Lecteur HyperSkills read-only avec CRUD, DAG, paste URI
- |    +-- showcase2/     Demo dynamique avec agent + MCP + 3 themes
- |    +-- todo2/         Todo WebMCP, template minimal
- |    +-- recipes/       Explorateur de recettes MCP + WebMCP avec test live
+ |    +-- flex2/         Flex -- canvas IA, ToolLayers, component(), LogDrawer, RecipeModal
+ |    +-- viewer2/       Viewer -- lecteur HyperSkills read-only avec CRUD, DAG, paste URI
+ |    +-- showcase2/     Showcase -- demo dynamique avec agent + MCP + 3 themes
+ |    +-- todo2/         Todo -- todo WebMCP, template minimal
+ |    +-- recipes/       Recipes -- explorateur de recettes, layout 3 colonnes, chat input, test live
  |
  +-- docs/               Documentation
  +-- package.json        Root workspace config
@@ -54,9 +50,9 @@ webmcp-auto-ui/
 - **agent** : depend de core (`McpClient`, `sanitizeSchema`, types). 4 providers LLM. ToolLayers. Recettes. ComponentAdapter.
 - **ui** : standalone. Peer deps : `svelte ^5`, `d3 ^7`, `leaflet >=1.9`.
 
-## Les 3 couches (v0.7.0)
+## Les 3 couches
 
-L'architecture v0.7.0 structure les outils en 3 couches via les `ToolLayer[]` :
+L'architecture structure les outils en 3 couches via les `ToolLayer[]` :
 
 ```
 +--------------------------------------------------+
@@ -96,18 +92,14 @@ Deux types de recettes cohabitent :
 
 ## Description des apps
 
-| App | Description |
-|-----|------------|
-| **home** | Landing page avec liens vers toutes les apps. Configurable via `PUBLIC_BASE_URL`. |
-| **flex** | Canvas drag & resize, multi-MCP, ephemeral chat, HyperSkills export, Gemma WASM. |
-| **flex2** | Version layers : component() unique, debug panel, badges provenance, mode composeur/consommateur, panneau recettes, agent logs. |
-| **todo** | Todo app demontrant l'integration MCP CRUD. |
-| **todo2** | Todo WebMCP, template minimal avec la nouvelle architecture layers. |
-| **viewer** | Decode une HyperSkill URL (`?hs=...`) et rend le skill en read-only. |
-| **viewer2** | Lecteur HyperSkills read-only avec CRUD, DAG de versions, paste URI. |
-| **showcase** | Catalogue interactif des composants UI + demo WebMCP tools. |
-| **showcase2** | Demo dynamique avec agent + MCP + 3 themes. |
-| **recipes** | Explorateur de recettes MCP + WebMCP avec test live. |
+| App | Chemin | Description |
+|-----|--------|------------|
+| **Home** | `apps/home/` | Landing page avec liens vers toutes les apps. Configurable via `PUBLIC_BASE_URL`. |
+| **Flex** | `apps/flex2/` | Canvas IA avec ToolLayers, component() unique, debug panel, badges provenance, mode composeur/consommateur, LogDrawer (AgentConsole), RecipeModal, export HyperSkill gzip. |
+| **Viewer** | `apps/viewer2/` | Lecteur HyperSkills read-only avec CRUD, DAG de versions, paste URI. |
+| **Showcase** | `apps/showcase2/` | Demo dynamique avec agent + MCP + 3 themes. |
+| **Todo** | `apps/todo2/` | Todo WebMCP, template minimal avec architecture layers. |
+| **Recipes** | `apps/recipes/` | Explorateur de recettes MCP + WebMCP, layout 3 colonnes, chat input, test live, sync recettes par serveur. |
 
 ## Stack technique
 
@@ -124,7 +116,7 @@ Deux types de recettes cohabitent :
 
 ## Decisions de design
 
-### ToolLayers (v0.7.0)
+### ToolLayers
 
 Les outils ne sont plus passes en tableau plat (`mcpTools[]`). Ils sont structures en couches typees (`McpLayer`, `UILayer`) qui portent chacune leurs outils et recettes. `buildSystemPrompt()` et `buildToolsFromLayers()` consomment ces layers pour produire le prompt et les outils.
 

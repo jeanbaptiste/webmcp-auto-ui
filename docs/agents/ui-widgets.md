@@ -4,7 +4,7 @@
 
 ## Comment ca marche
 
-### Mode smart (defaut v0.7.0)
+### Mode smart (defaut v0.8)
 
 En mode smart, le LLM n'a qu'un seul outil UI : **`component()`**. Il decouvre les composants via `component("help")` et les rend via `component("nom", {params})`.
 

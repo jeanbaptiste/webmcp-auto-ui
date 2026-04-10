@@ -6,7 +6,7 @@
 
 Une UI composee est une collection de **blocs** arranges en sequence. Chaque bloc a un `type` et un objet `data`. Le `BlockRenderer` rend chaque bloc visuellement en dispatchant vers le widget correspondant.
 
-## Workflow complet (v0.7.0) : Layers -> Prompt -> Tools -> LLM -> component() -> Render
+## Workflow complet (v0.8) : Layers -> Prompt -> Tools -> LLM -> component() -> Render
 
 ```
 App                      Agent Package                     LLM

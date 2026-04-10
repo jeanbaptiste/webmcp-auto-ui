@@ -115,7 +115,7 @@ const summary = summarizeChat(messages);
 
 ## ToolLayers
 
-Les ToolLayers structurent les outils en couches typées. C'est la nouvelle API (v0.7.0) qui remplace le passage plat de `mcpTools[]`.
+Les ToolLayers structurent les outils en couches typées. C'est la nouvelle API (v0.8) qui remplace le passage plat de `mcpTools[]`.
 
 ### Types
 
@@ -452,7 +452,7 @@ const text = formatRecipesForPrompt(relevant);
 
 Les recettes MCP viennent du serveur via `list_recipes` / `get_recipe`. Elles decrivent ce que les outils retournent et comment les combiner. Elles sont portees par `McpLayer.recipes` et injectees dans la section `## mcp` du prompt.
 
-## Workflow complet (v0.7.0)
+## Workflow complet (v0.8)
 
 ```
 1. L'app construit des ToolLayer[]

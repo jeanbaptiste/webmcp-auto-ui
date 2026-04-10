@@ -1,11 +1,11 @@
 ---
 title: ToolLayers
-description: Structuration des outils en couches McpLayer et UILayer (v0.7.0)
+description: Structuration des outils en couches McpLayer et UILayer (v0.8)
 sidebar:
   order: 1
 ---
 
-Les ToolLayers sont l'API v0.7.0 qui structure les outils en couches typees. Ils remplacent le passage plat de `mcpTools[]`.
+Les ToolLayers sont l'API v0.8 qui structure les outils en couches typees. Ils remplacent le passage plat de `mcpTools[]`.
 
 ## Architecture
 

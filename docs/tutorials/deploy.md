@@ -19,33 +19,31 @@ Le script gere tout : build des packages, **build des apps**, nettoyage des anci
 ```
 /opt/webmcp-demos/
   home/              # static -- nginx sert directement
-  todo/              # static -- nginx sert directement
-  showcase/          # static -- nginx sert directement
-  flex/              # Node -- systemd : node index.js
-  viewer/build/      # Node -- systemd : node build/index.js
+  flex2/             # Node -- systemd : node index.js
+  viewer2/build/     # Node -- systemd : node build/index.js
+  showcase2/         # static -- nginx sert directement
+  todo2/             # static -- nginx sert directement
+  recipes/           # Node -- systemd : node index.js
 ```
 
 ### CRITIQUE : Les chemins de deploy ne sont PAS les memes pour toutes les apps Node
 
 | App | systemd ExecStart | Destination deploy | Pourquoi |
 |-----|-------------------|--------------------|----------|
-| **flex** | `node index.js` | `/opt/webmcp-demos/flex/` (racine) | ExecStart sans prefix `build/` |
-| **viewer** | `node build/index.js` | `/opt/webmcp-demos/viewer/build/` | ExecStart inclut `build/` |
-| home | static (nginx) | `/opt/webmcp-demos/home/` | -- |
-| todo | static (nginx) | `/opt/webmcp-demos/todo/` | -- |
-| showcase | static (nginx) | `/opt/webmcp-demos/showcase/` | -- |
+| **Flex** | `node index.js` | `/opt/webmcp-demos/flex2/` (racine) | ExecStart sans prefix `build/` |
+| **Viewer** | `node build/index.js` | `/opt/webmcp-demos/viewer2/build/` | ExecStart inclut `build/` |
+| **Recipes** | `node index.js` | `/opt/webmcp-demos/recipes/` (racine) | ExecStart sans prefix `build/` |
+| Home | static (nginx) | `/opt/webmcp-demos/home/` | -- |
+| Showcase | static (nginx) | `/opt/webmcp-demos/showcase2/` | -- |
+| Todo | static (nginx) | `/opt/webmcp-demos/todo2/` | -- |
 
 **Si vous deployez au mauvais chemin, l'ancien code continue de tourner.**
-
-### Nouvelles apps (v2)
-
-Les nouvelles apps (flex2, viewer2, todo2, showcase2, recipes) ne sont pas encore deployees en production. Quand elles le seront, elles seront ajoutees au script `deploy.sh` avec leurs chemins specifiques.
 
 ---
 
 ## Deploy manuel (si absolument necessaire)
 
-### Apps statiques (home, todo, showcase)
+### Apps statiques (home)
 
 ```bash
 # Builder avec l'URL de production (REQUIS pour home)
@@ -56,26 +54,26 @@ ssh bot "rm -rf /opt/webmcp-demos/home/_app"
 scp -r apps/home/build/* bot:/opt/webmcp-demos/home/
 ```
 
-### Apps Node -- flex (deploy racine)
+### Apps Node -- Flex (deploy racine)
 
 ```bash
-npm -w apps/flex run build
+npm -w apps/flex2 run build
 
 # OBLIGATOIRE : nettoyer les anciens fichiers d'abord
-ssh bot "cd /opt/webmcp-demos/flex && rm -f index.js handler.js env.js shims.js && rm -rf client server"
-scp -r apps/flex/build/* bot:/opt/webmcp-demos/flex/
-ssh bot "systemctl restart webmcp-flex"
+ssh bot "cd /opt/webmcp-demos/flex2 && rm -f index.js handler.js env.js shims.js && rm -rf client server"
+scp -r apps/flex2/build/* bot:/opt/webmcp-demos/flex2/
+ssh bot "systemctl restart webmcp-flex2"
 ```
 
-### Apps Node -- viewer (deploy build/)
+### Apps Node -- Viewer (deploy build/)
 
 ```bash
-npm -w apps/viewer run build
+npm -w apps/viewer2 run build
 
-ssh bot "rm -rf /opt/webmcp-demos/viewer/build"
-ssh bot "mkdir -p /opt/webmcp-demos/viewer/build"
-scp -r apps/viewer/build/* bot:/opt/webmcp-demos/viewer/build/
-ssh bot "systemctl restart webmcp-viewer"
+ssh bot "rm -rf /opt/webmcp-demos/viewer2/build"
+ssh bot "mkdir -p /opt/webmcp-demos/viewer2/build"
+scp -r apps/viewer2/build/* bot:/opt/webmcp-demos/viewer2/build/
+ssh bot "systemctl restart webmcp-viewer2"
 ```
 
 ---
@@ -98,7 +96,7 @@ ssh bot "systemctl restart webmcp-viewer"
 
 **Fix** : Toujours supprimer les anciens fichiers avant de copier :
 ```bash
-ssh bot "rm -rf /opt/webmcp-demos/flex/{client,server,index.js,handler.js}"
+ssh bot "rm -rf /opt/webmcp-demos/flex2/{client,server,index.js,handler.js}"
 ```
 
 ### 3. PUBLIC_BASE_URL oublie pour home
@@ -133,18 +131,18 @@ ssh bot "rm -rf /opt/webmcp-demos/flex/{client,server,index.js,handler.js}"
 
 ```bash
 # Toutes les pages retournent 200
-for p in / /flex/ /viewer/ /showcase/ /todo/; do
+for p in / /flex2/ /viewer2/ /showcase2/ /todo2/ /recipes/; do
   echo "$(curl -s -o /dev/null -w '%{http_code}' -L https://demos.hyperskills.net$p) $p"
 done
 
 # L'API chat fonctionne (apps Node)
-curl -s https://demos.hyperskills.net/flex/api/chat \
+curl -s https://demos.hyperskills.net/flex2/api/chat \
   -X POST -H 'Content-Type: application/json' \
   -d '{"messages":[{"role":"user","content":"hi"}],"model":"claude-haiku-4-5-20251001","max_tokens":5}' \
   | head -c 50
 
 # Services actifs
-ssh bot "systemctl is-active webmcp-flex webmcp-viewer"
+ssh bot "systemctl is-active webmcp-flex2 webmcp-viewer2 webmcp-recipes"
 ```
 
 ---
@@ -153,6 +151,6 @@ ssh bot "systemctl is-active webmcp-flex webmcp-viewer"
 
 | Variable | Apps | Localisation serveur |
 |----------|------|--------------------|
-| `ANTHROPIC_API_KEY` | flex, viewer | `/opt/webmcp-demos/{app}/.env` |
+| `ANTHROPIC_API_KEY` | flex2, viewer2, recipes | `/opt/webmcp-demos/{app}/.env` |
 | `PUBLIC_BASE_URL` | home (build-time) | Variable shell avant `npm run build` |
-| `PORT` | flex(3004), viewer(3002) | systemd `Environment=PORT=...` |
+| `PORT` | flex2(3004), viewer2(3002), recipes(3006) | systemd `Environment=PORT=...` |

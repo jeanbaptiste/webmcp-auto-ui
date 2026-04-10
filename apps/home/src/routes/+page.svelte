@@ -7,48 +7,24 @@
   const demos = [
     {
       title: 'Flex',
-      desc: 'Canvas drag & resize avec multi-MCP (7 serveurs simultanés), chat éphémère, export HyperSkills, et Gemma WASM local. Le plus complet des démos.',
-      url: `${base}/flex`,
-      accent: '#06b6d4',
-    },
-{
-      title: 'Showcase',
-      desc: '34 components demonstrated with iNaturalist data. Interactive DAG wiring via FONC bus — click a table row and watch other components update in real-time. Gallery, Carousel, D3 visualizations.',
-      url: `${base}/showcase`,
-      accent: '#22c55e',
-    },
-    {
-      title: 'Todo',
-      desc: 'Minimal WebMCP demo — a todo list that exposes 8 tools (add, list, toggle, delete...) callable by any AI agent or Chrome extension via the W3C WebMCP protocol.',
-      url: `${base}/todo`,
-      accent: '#3ecfb2',
-    },
-{
-      title: 'Viewer',
-      desc: 'Load any HyperSkills URL (?hs=), render its blocks, edit inline, diff versions with SHA-256 traceability. Auto-generate UI from a connected MCP server.',
-      url: `${base}/viewer`,
-      accent: '#f0a050',
-    },
-    {
-      title: 'Flex 2',
       desc: 'Nouvelle architecture : layers, component() unique, recettes, debug panel, mode composeur/consommateur.',
       url: `${base}/flex2`,
       accent: '#8b5cf6',
     },
     {
-      title: 'Viewer 2',
-      desc: 'Lecteur HyperSkills read-only. Décode et affiche les blocs, bouton Modifier vers Flex 2.',
+      title: 'Viewer',
+      desc: 'Lecteur HyperSkills read-only. Décode et affiche les blocs, bouton Modifier vers Flex.',
       url: `${base}/viewer2`,
       accent: '#f59e0b',
     },
     {
-      title: 'Showcase 2',
+      title: 'Showcase',
       desc: 'Démo dynamique de tous les composants UI avec 3 thèmes (corporate, pastel, cyberpunk).',
       url: `${base}/showcase2`,
       accent: '#10b981',
     },
     {
-      title: 'Todo 2',
+      title: 'Todo',
       desc: 'Template minimal de référence pour démarrer une app webmcp-auto-ui.',
       url: `${base}/todo2`,
       accent: '#14b8a6',

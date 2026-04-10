@@ -96,7 +96,8 @@ Complex visualizations for data-heavy use cases.
 | `TokenBubble` | Real-time metrics display: req/min, input tokens/min, output tokens/min, cached tokens |
 | `EphemeralBubble` | Transient notification bubble (moved from app to package for reuse) |
 | `RemoteMCPserversDemo` | MCP server discovery component listing available demo servers from `MCP_DEMO_SERVERS` |
-| `SettingsPanel` | Sliders with dynamic ranges for temperature, topK, and maxTokens controls |
+| `SettingsPanel` | Sliders with dynamic ranges for temperature, topK, maxTokens; displays effectivePrompt in readonly |
+| `AgentConsole` | Scrollable agent log panel with iteration markers, tool calls, text output and token metrics |
 
 ### BlockRenderer
 

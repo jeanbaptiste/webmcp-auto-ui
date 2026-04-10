@@ -1,11 +1,11 @@
 ---
 title: ToolLayers
-description: Structuring tools into McpLayer and UILayer layers (v0.7.0)
+description: Structuring tools into McpLayer and UILayer layers (v0.8)
 sidebar:
   order: 1
 ---
 
-ToolLayers are the v0.7.0 API that structures tools into typed layers. They replace the flat `mcpTools[]` passing pattern.
+ToolLayers are the v0.8 API that structures tools into typed layers. They replace the flat `mcpTools[]` passing pattern.
 
 ## Architecture
 

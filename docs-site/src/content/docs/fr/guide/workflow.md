@@ -7,7 +7,7 @@ sidebar:
 
 ## Vue d'ensemble
 
-Le workflow v0.7.0 suit un flux lineaire en 7 etapes :
+Le workflow v0.8 suit un flux lineaire en 7 etapes :
 
 ```
 App                      Agent Package                     LLM

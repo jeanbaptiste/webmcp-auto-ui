@@ -1,11 +1,11 @@
 ---
-title: viewer2
+title: Viewer
 description: Lecteur HyperSkills read-only avec CRUD, DAG de versions, et paste URI
 sidebar:
   order: 2
 ---
 
-viewer2 est un lecteur de HyperSkills en mode read-only. Il decode les URLs `?hs=` et affiche les skills avec l'ensemble des composants UI disponibles.
+Viewer (`apps/viewer2/`) est un lecteur de HyperSkills en mode read-only. Il decode les URLs `?hs=` et affiche les skills avec l'ensemble des composants UI disponibles.
 
 ## Fonctionnalites
 

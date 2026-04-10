@@ -1,11 +1,11 @@
 ---
-title: showcase2
+title: Showcase
 description: Demo dynamique avec agent IA, connexion MCP et 3 themes
 sidebar:
   order: 3
 ---
 
-showcase2 est une vitrine interactive des composants UI pilotee par un agent IA. Elle demontre les capacites de l'architecture v0.7.0 avec theming dynamique.
+Showcase (`apps/showcase2/`) est une vitrine interactive des composants UI pilotee par un agent IA. Elle demontre les capacites de l'architecture v0.8 avec theming dynamique.
 
 ## Fonctionnalites
 

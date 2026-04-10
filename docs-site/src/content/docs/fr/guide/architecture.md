@@ -1,6 +1,6 @@
 ---
 title: Architecture
-description: Structure monorepo, dependances entre packages, et architecture 3 couches (v0.7.0)
+description: Structure monorepo, dependances entre packages, et architecture 3 couches (v0.8)
 sidebar:
   order: 2
 ---
@@ -18,15 +18,11 @@ webmcp-auto-ui/
  |
  +-- apps/
  |    +-- home/          Landing page, app launcher (port 5173)
- |    +-- todo/          MCP-powered todo demo (port 5175)
- |    +-- viewer/        HyperSkill URL renderer (port 5176)
- |    +-- showcase/      Component showcase + WebMCP tool demos (port 5177)
- |    +-- flex/          Canvas drag & resize, multi-MCP, chat (port 5179)
- |    +-- flex2/         Layers, component() unique, debug panel
- |    +-- viewer2/       Lecteur HyperSkills read-only avec CRUD, DAG
- |    +-- showcase2/     Demo dynamique avec agent + MCP + 3 themes
- |    +-- todo2/         Todo WebMCP, template minimal
- |    +-- recipes/       Explorateur de recettes MCP + WebMCP
+ |    +-- flex2/         Flex -- canvas IA, ToolLayers, component(), LogDrawer, RecipeModal
+ |    +-- viewer2/       Viewer -- lecteur HyperSkills read-only avec CRUD, DAG, paste URI
+ |    +-- showcase2/     Showcase -- demo dynamique avec agent + MCP + 3 themes
+ |    +-- todo2/         Todo -- todo WebMCP, template minimal
+ |    +-- recipes/       Recipes -- explorateur de recettes, layout 3 colonnes, test live
  |
  +-- docs/               Documentation source
  +-- docs-site/          Site Starlight (cette doc)
@@ -58,9 +54,9 @@ webmcp-auto-ui/
 - **agent** : depend de core (`McpClient`, `sanitizeSchema`, types). 4 providers LLM. ToolLayers. Recettes. ComponentAdapter.
 - **ui** : standalone. Peer deps : `svelte ^5`, `d3 ^7`, `leaflet >=1.9`.
 
-## Les 3 couches (v0.7.0)
+## Les 3 couches
 
-L'architecture v0.7.0 structure les outils en 3 couches via les `ToolLayer[]` :
+L'architecture structure les outils en 3 couches via les `ToolLayer[]` :
 
 ```
 +--------------------------------------------------+

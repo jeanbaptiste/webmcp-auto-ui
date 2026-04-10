@@ -7,7 +7,7 @@
  * or @webmcp-auto-ui/ui/canvas (adapter).
  */
 
-import { decode } from 'hyperskills';
+import { encode, decode } from 'hyperskills';
 
 export type BlockType =
   | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
@@ -200,21 +200,9 @@ function createCanvasVanilla() {
 
   async function buildHyperskillParam(): Promise<string> {
     const json = JSON.stringify(buildSkillJSON());
-    const bytes = new TextEncoder().encode(json);
-    // Auto-compress with gzip when payload exceeds 6 KB to keep URLs under nginx limits
-    if (bytes.length > 6144) {
-      const cs = new CompressionStream('gzip');
-      const writer = cs.writable.getWriter();
-      writer.write(bytes);
-      writer.close();
-      const compressed = new Uint8Array(await new Response(cs.readable).arrayBuffer());
-      const b64 = btoa(String.fromCharCode(...compressed))
-        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-      return 'gz.' + b64;
-    }
-    // Small payloads: plain base64url
-    return btoa(unescape(encodeURIComponent(json)))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const compress = json.length > 6144 ? 'gz' as const : undefined;
+    const url = await encode('https://x.local', json, compress ? { compress } : {});
+    return new URL(url).searchParams.get('hs')!;
   }
 
   async function loadFromParam(param: string): Promise<boolean> {

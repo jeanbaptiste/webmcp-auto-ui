@@ -1,11 +1,11 @@
 ---
-title: todo2
+title: Todo
 description: Todo app WebMCP avec la nouvelle architecture layers, template minimal
 sidebar:
   order: 5
 ---
 
-todo2 est une app todo minimale qui sert de template pour demarrer un projet avec l'architecture v0.7.0. Elle demontre l'integration MCP CRUD dans un contexte simple.
+Todo (`apps/todo2/`) est une app todo minimale qui sert de template pour demarrer un projet avec l'architecture v0.8. Elle demontre l'integration MCP CRUD dans un contexte simple.
 
 ## Fonctionnalites
 

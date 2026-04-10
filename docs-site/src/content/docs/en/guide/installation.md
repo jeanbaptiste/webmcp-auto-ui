@@ -32,15 +32,11 @@ webmcp-auto-ui/
     ui/         @webmcp-auto-ui/ui     -- 34+ Svelte 5 components + agent UI widgets
   apps/
     home/       Landing page + app launcher
-    flex/       Canvas drag & resize, multi-MCP, ephemeral chat
-    flex2/      Layers, single component(), debug panel, composer/consumer mode
-    todo/       Todo app demo (MCP-powered)
-    todo2/      WebMCP todo, minimal template
-    viewer/     HyperSkill URL viewer / renderer
-    viewer2/    Read-only HyperSkills reader with CRUD, DAG, paste URI
-    showcase/   Component showcase + WebMCP tool demos
-    showcase2/  Dynamic demo with agent + MCP + 3 themes
-    recipes/    MCP + WebMCP recipe explorer with live testing
+    flex2/      Flex -- AI canvas, ToolLayers, component(), LogDrawer, RecipeModal
+    viewer2/    Viewer -- read-only HyperSkills reader with CRUD, DAG, paste URI
+    showcase2/  Showcase -- dynamic demo with agent + MCP + 3 themes
+    todo2/      Todo -- WebMCP todo, minimal template
+    recipes/    Recipes -- recipe explorer, 3-column layout, chat input, live testing
 ```
 
 ## Build the packages
@@ -63,7 +59,7 @@ npm -w packages/ui run build
 
 ## Start dev servers
 
-All v1 apps in parallel:
+All apps in parallel:
 
 ```bash
 npm run dev
@@ -73,15 +69,6 @@ Or a specific app:
 
 ```bash
 npm run dev:home
-npm run dev:flex
-npm run dev:todo
-npm run dev:viewer
-npm run dev:showcase
-```
-
-For v2 apps, start individually:
-
-```bash
 npm -w apps/flex2 run dev
 npm -w apps/viewer2 run dev
 npm -w apps/todo2 run dev
@@ -94,18 +81,14 @@ npm -w apps/recipes run dev
 | App       | Port | URL                    |
 |-----------|------|------------------------|
 | home      | 5173 | http://localhost:5173   |
-| todo      | 5175 | http://localhost:5175   |
-| viewer    | 5176 | http://localhost:5176   |
-| showcase  | 5177 | http://localhost:5177   |
-| flex      | 5179 | http://localhost:5179   |
 
-The v2 apps (flex2, viewer2, todo2, showcase2, recipes) are assigned ports by Vite at startup.
+The other apps (flex2, viewer2, todo2, showcase2, recipes) are assigned ports by Vite at startup.
 
 ## Environment variables
 
 | Variable           | Apps                    | Role                                          |
 |--------------------|-------------------------|-----------------------------------------------|
-| `ANTHROPIC_API_KEY`| flex, flex2, todo, todo2 | Server-side proxy for the Anthropic Claude API |
+| `ANTHROPIC_API_KEY`| flex2, todo2              | Server-side proxy for the Anthropic Claude API |
 | `PUBLIC_BASE_URL`  | home                    | Base URL for links (default: localhost)         |
 
 ```bash

@@ -7,7 +7,7 @@ sidebar:
 
 ## Overview
 
-The v0.7.0 workflow follows a linear flow in 7 steps:
+The v0.8 workflow follows a linear flow in 7 steps:
 
 ```
 App                      Agent Package                     LLM

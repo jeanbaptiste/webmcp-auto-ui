@@ -1,16 +1,19 @@
 ---
-title: recipes
-description: Explorateur de recettes MCP et WebMCP avec test live
+title: Recipes
+description: Explorateur de recettes MCP et WebMCP avec layout 3 colonnes, chat input et test live
 sidebar:
   order: 4
 ---
 
-L'app recipes est un explorateur interactif pour les recettes WebMCP (UI) et MCP (serveur). Elle permet de parcourir, filtrer et tester les recettes en temps reel.
+Recipes (`apps/recipes/`) est un explorateur interactif pour les recettes WebMCP (UI) et MCP (serveur). Elle permet de parcourir, filtrer et tester les recettes en temps reel.
 
 ## Fonctionnalites
 
+- **Layout 3 colonnes** : catalogue a gauche, detail au centre, preview a droite
+- **Chat input** : interaction en langage naturel pour tester les recettes avec un agent
 - **Catalogue complet** : liste toutes les recettes WebMCP built-in
 - **Filtrage par serveur** : filtrer les recettes par nom de serveur MCP
+- **Sync recettes MCP** : synchronisation automatique des recettes par serveur connecte
 - **Test live** : connecter un serveur MCP et tester une recette avec des donnees reelles
 - **Preview** : apercu du rendu des composants associes a chaque recette
 - **Inspection** : visualiser le frontmatter YAML et le corps markdown de chaque recette

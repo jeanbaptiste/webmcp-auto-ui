@@ -109,7 +109,8 @@ sidebar:
 | `TokenBubble` | Metriques temps reel : req/min, tokens input/output |
 | `EphemeralBubble` | Notification ephemere |
 | `RemoteMCPserversDemo` | Decouverte serveurs MCP demo |
-| `SettingsPanel` | Sliders temperature, topK, maxTokens |
+| `SettingsPanel` | Sliders temperature, topK, maxTokens; affiche effectivePrompt en readonly |
+| `AgentConsole` | Panneau scrollable de logs agent avec marqueurs d'iteration, tool calls, texte et metriques tokens |
 
 ## BlockRenderer
 

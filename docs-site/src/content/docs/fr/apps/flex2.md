@@ -1,11 +1,11 @@
 ---
-title: flex2
-description: Canvas IA avec ToolLayers, component() unique, debug panel et mode composeur/consommateur
+title: Flex
+description: Canvas IA avec ToolLayers, component() unique, LogDrawer, RecipeModal et mode composeur/consommateur
 sidebar:
   order: 1
 ---
 
-flex2 est l'app principale de demonstration de l'architecture v0.7.0. Elle combine un canvas interactif, un agent LLM, et la connexion multi-MCP dans une interface unifiee.
+Flex (`apps/flex2/`) est l'app principale de demonstration de l'architecture v0.8. Elle combine un canvas interactif, un agent LLM, et la connexion multi-MCP dans une interface unifiee.
 
 ## Fonctionnalites
 
@@ -14,8 +14,10 @@ flex2 est l'app principale de demonstration de l'architecture v0.7.0. Elle combi
 - **Debug panel** : visualisation en temps reel du prompt genere, des tool calls, et des metriques
 - **Badges provenance** : chaque bloc affiche son origine (quel outil, quel serveur)
 - **Mode composeur/consommateur** : basculer entre l'edition et la lecture seule
-- **Panneau recettes** : liste les recettes WebMCP et MCP disponibles
-- **Agent logs** : historique detaille des iterations de la boucle agent
+- **RecipeModal** : panneau modal listant les recettes WebMCP et MCP disponibles
+- **LogDrawer** : tiroir lateral utilisant `AgentConsole` du package UI pour afficher les logs agent en temps reel
+- **Export HyperSkill** : export gzip via SDK encode
+- **SettingsPanel** : affiche le prompt effectif (effectivePrompt) en readonly
 - **Multi-MCP** : connexion simultanee a plusieurs serveurs
 
 ## Architecture

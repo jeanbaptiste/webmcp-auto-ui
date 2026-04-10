@@ -1,11 +1,11 @@
 ---
-title: showcase2
+title: Showcase
 description: Dynamic demo with AI agent, MCP connection and 3 themes
 sidebar:
   order: 3
 ---
 
-showcase2 is an interactive showcase of UI components driven by an AI agent. It demonstrates the capabilities of the v0.7.0 architecture with dynamic theming.
+Showcase (`apps/showcase2/`) is an interactive showcase of UI components driven by an AI agent. It demonstrates the capabilities of the v0.8 architecture with dynamic theming.
 
 ## Features
 

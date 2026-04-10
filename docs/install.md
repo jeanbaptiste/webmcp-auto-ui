@@ -29,15 +29,11 @@ webmcp-auto-ui/
     ui/         @webmcp-auto-ui/ui     -- 34+ Svelte 5 components + agent UI widgets
   apps/
     home/       Landing page + app launcher
-    flex/       Canvas drag & resize, multi-MCP, ephemeral chat
-    flex2/      Layers, component() unique, debug panel, mode composeur/consommateur
-    todo/       Todo app demo (MCP-powered)
-    todo2/      Todo WebMCP, template minimal
-    viewer/     HyperSkill URL viewer / renderer
-    viewer2/    Lecteur HyperSkills read-only avec CRUD, DAG, paste URI
-    showcase/   Component showcase + WebMCP tool demos
-    showcase2/  Demo dynamique avec agent + MCP + 3 themes
-    recipes/    Explorateur de recettes MCP + WebMCP avec test live
+    flex2/      Flex -- canvas IA, ToolLayers, component(), LogDrawer, RecipeModal
+    viewer2/    Viewer -- lecteur HyperSkills read-only avec CRUD, DAG, paste URI
+    showcase2/  Showcase -- demo dynamique avec agent + MCP + 3 themes
+    todo2/      Todo -- todo WebMCP, template minimal
+    recipes/    Recipes -- explorateur de recettes, layout 3 colonnes, chat input, test live
 ```
 
 ## Builder les packages
@@ -60,7 +56,7 @@ npm -w packages/ui run build
 
 ## Lancer les serveurs dev
 
-Toutes les apps v1 en parallele :
+Toutes les apps en parallele :
 
 ```bash
 npm run dev
@@ -70,15 +66,6 @@ Ou une app specifique :
 
 ```bash
 npm run dev:home
-npm run dev:flex
-npm run dev:todo
-npm run dev:viewer
-npm run dev:showcase
-```
-
-Pour les nouvelles apps (v2), lancer individuellement :
-
-```bash
 npm -w apps/flex2 run dev
 npm -w apps/viewer2 run dev
 npm -w apps/todo2 run dev
@@ -91,18 +78,14 @@ npm -w apps/recipes run dev
 | App       | Port | URL                    |
 |-----------|------|------------------------|
 | home      | 5173 | http://localhost:5173   |
-| todo      | 5175 | http://localhost:5175   |
-| viewer    | 5176 | http://localhost:5176   |
-| showcase  | 5177 | http://localhost:5177   |
-| flex      | 5179 | http://localhost:5179   |
 
-Les apps v2 (flex2, viewer2, todo2, showcase2, recipes) sont assignees a des ports par Vite au lancement.
+Les autres apps (flex2, viewer2, todo2, showcase2, recipes) sont assignees a des ports par Vite au lancement.
 
 ## Variables d'environnement
 
 | Variable           | Apps                    | Role                                          |
 |--------------------|-------------------------|-----------------------------------------------|
-| `ANTHROPIC_API_KEY`| flex, flex2, todo, todo2 | Proxy server-side pour l'API Anthropic Claude |
+| `ANTHROPIC_API_KEY`| flex2, todo2              | Proxy server-side pour l'API Anthropic Claude |
 | `PUBLIC_BASE_URL`  | home                    | Base URL pour les liens (default: localhost)   |
 
 ```bash

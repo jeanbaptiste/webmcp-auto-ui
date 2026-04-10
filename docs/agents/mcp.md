@@ -6,7 +6,7 @@
 
 MCP (Model Context Protocol) est un protocole JSON-RPC 2.0 qui permet aux agents IA de decouvrir et appeler des outils exposes par des serveurs distants. Dans webmcp-auto-ui, MCP est le pont entre les sources de donnees et l'UI.
 
-## Architecture v0.7.0 : ToolLayers
+## Architecture v0.8 : ToolLayers
 
 ```
 User prompt --> Agent Loop --> LLM (Claude/Gemma/Ollama)
