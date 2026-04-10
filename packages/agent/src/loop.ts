@@ -21,9 +21,10 @@ import { formatRecipesForPrompt, formatMcpRecipesForPrompt } from './recipe-regi
 
 const MAX_RESULT_LEN = 10_000;
 
-/** Tools that indicate the agent is discovering/consulting recipes or components */
+/** Tools that indicate the agent is discovering/exploring rather than acting */
 const DISCOVERY_TOOLS = new Set([
-  'get_recipe', 'search_recipes', 'get_component', 'list_components', 'recall',
+  'get_recipe', 'search_recipes', 'list_recipes', 'get_component', 'list_components', 'recall',
+  'list_tables', 'describe_table', 'get_json_schemas', 'get_typescript_types',
 ]);
 
 function isDiscoveryTool(name: string): boolean {
@@ -128,7 +129,15 @@ WORKFLOW OBLIGATOIRE :
 1. Appelle un outil DATA pour récupérer les données
 2. Appelle IMMÉDIATEMENT ${componentCall} pour afficher le résultat
 3. Recommence ou arrête
-CRITIQUE : Après CHAQUE outil DATA, rends visuellement. TOUJOURS rendre. Texte = 1 phrase max.
+
+RÈGLE ABSOLUE : après CHAQUE outil DATA, appelle immédiatement ${componentCall} pour afficher le résultat. Si tu ne sais pas quel composant utiliser, appelle list_components() puis get_component(nom) puis ${componentCall}.
+Maximum 3 appels DATA avant de rendre visuellement. JAMAIS plus de 3.
+TOUJOURS rendre visuellement — JAMAIS terminer avec du texte seul.
+
+CHOIX DU SCHÉMA : Ne liste PAS tous les schémas. Choisis directement le bon :
+- Assemblée nationale → schéma 'assemblee'
+- Sénat → schéma 'senat'
+- Textes de loi → schéma 'legifrance'
 
 `;
 
@@ -174,10 +183,11 @@ CRITIQUE : Après CHAQUE outil DATA, rends visuellement. TOUJOURS rendre. Texte 
     }
 
     prompt += `RÈGLES :\n`;
-    prompt += `- Après CHAQUE outil DATA, rendre visuellement obligatoirement\n`;
+    prompt += `- RÈGLE ABSOLUE : après CHAQUE outil DATA, rendre visuellement avec component()\n`;
+    prompt += `- Maximum 3 outils DATA avant de rendre. Au-delà, tes outils de découverte seront désactivés.\n`;
     prompt += `- table pour les tableaux, chart pour les chiffres, stat pour les KPIs, kv pour les paires clé-valeur\n`;
     prompt += `- Si erreur ou données vides, rendre kv ou stat pour montrer le statut\n`;
-    prompt += `- JAMAIS enchaîner >1 outil DATA sans rendre entre les deux\n\n`;
+    prompt += `- JAMAIS terminer avec du texte seul — TOUJOURS appeler component()\n\n`;
 
     if (uiLayer.recipes && uiLayer.recipes.length > 0) {
       prompt += `### recettes UI (${uiLayer.recipes.length})\n`;
@@ -288,16 +298,25 @@ export async function runAgentLoop(
   let lastText = '';
   let finishedNormally = false;
   let discoveryPhase = false;
+  let consecutiveDiscovery = 0;
+  let nudgedOnce = false;
+  let hasRendered = false;
 
   for (let i = 0; i < maxIterations; i++) {
     if (signal?.aborted) break;
     metrics.iterations++;
     callbacks.onIterationStart?.(i + 1, maxIterations);
 
-    callbacks.onLLMRequest?.(messages, allTools);
+    // Fix 3: after 3+ consecutive discovery iterations, strip discovery tools to force action
+    let iterationTools = allTools;
+    if (consecutiveDiscovery >= 3) {
+      iterationTools = allTools.filter(t => !isDiscoveryTool(t.name));
+    }
+
+    callbacks.onLLMRequest?.(messages, iterationTools);
     const t0 = performance.now();
     let streamingText = '';
-    const response = await provider.chat(messages, allTools, {
+    const response = await provider.chat(messages, iterationTools, {
       signal, cacheEnabled, system: systemPrompt, maxTokens, maxTools, temperature, topK,
       onToken: callbacks.onToken ? (token) => {
         callbacks.onToken!(token);
@@ -329,6 +348,13 @@ export async function runAgentLoop(
     lastText = textBlocks.map(b => b.text).join('\n');
 
     if (toolBlocks.length === 0) {
+      // Fix 5: if no tool calls and nothing rendered yet, nudge the LLM to render (once)
+      if (!hasRendered && !nudgedOnce && metrics.toolCalls > 0) {
+        nudgedOnce = true;
+        messages.push({ role: 'assistant', content: response.content });
+        messages.push({ role: 'user', content: 'Tu n\'as pas encore affiché de résultat visuel. Appelle component() avec les données que tu as récoltées.' });
+        continue; // Force another iteration instead of ending
+      }
       messages.push({ role: 'assistant', content: response.content });
       callbacks.onText?.(lastText);
       finishedNormally = true;
@@ -391,6 +417,15 @@ export async function runAgentLoop(
     }
 
     messages.push({ role: 'user', content: toolResults });
+
+    // Fix 3: track consecutive discovery iterations
+    const allDiscovery = toolBlocks.every(b => isDiscoveryTool(b.name));
+    consecutiveDiscovery = allDiscovery ? consecutiveDiscovery + 1 : 0;
+
+    // Track whether any render has happened (component or render_* tool)
+    if (toolBlocks.some(b => b.name === 'component' || b.name.startsWith('render_'))) {
+      hasRendered = true;
+    }
 
     // Compress old tool results to save context window (benefits both WASM and remote)
     compressOldToolResults(messages, resultBuffer);

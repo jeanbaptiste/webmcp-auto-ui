@@ -334,25 +334,31 @@ export class WasmProvider implements LLMProvider {
       foundToolCall = true;
       const toolName = match[1];
       let toolArgs: Record<string, unknown> = {};
-      // Replace Gemma 4 native <|"|> string delimiters with standard quotes before parsing
-      const argsStr = match[2].replace(/<\|"\|>/g, '"');
-      try { toolArgs = JSON.parse(argsStr); } catch {
-        // If JSON parse fails, try to extract key:value pairs from Gemma native format
-        // e.g. {location:<|"|>London<|"|>,count:5}
-        try {
-          const obj: Record<string, unknown> = {};
-          // Already replaced <|"|> with " above, so try simple key:"value" and key:number
-          const kvRe = /(\w+)\s*:\s*(?:"([^"]*)"|([\d.]+(?:e[+-]?\d+)?)|(\[.*?\])|(true|false|null))/g;
-          let kv: RegExpExecArray | null;
-          while ((kv = kvRe.exec(argsStr)) !== null) {
-            const [, k, strVal, numVal, arrVal, litVal] = kv;
-            if (strVal !== undefined) obj[k] = strVal;
-            else if (numVal !== undefined) obj[k] = Number(numVal);
-            else if (arrVal !== undefined) { try { obj[k] = JSON.parse(arrVal); } catch { obj[k] = arrVal; } }
-            else if (litVal !== undefined) obj[k] = JSON.parse(litVal);
-          }
-          if (Object.keys(obj).length > 0) toolArgs = obj;
-        } catch {}
+      const rawArgs = match[2];
+
+      // Strategy 1: Extract key-value pairs using <|"|> delimiters BEFORE replacing them.
+      // This correctly handles internal quotes like: query:<|"|>SELECT data."date"<|"|>
+      toolArgs = WasmProvider.parseGemmaArgs(rawArgs);
+
+      // Strategy 2: If no pairs found, try simple replacement + JSON.parse
+      if (Object.keys(toolArgs).length === 0) {
+        const argsStr = rawArgs.replace(/<\|"\|>/g, '"');
+        try { toolArgs = JSON.parse(argsStr); } catch {
+          // Strategy 3: regex key:value extraction on replaced string
+          try {
+            const obj: Record<string, unknown> = {};
+            const kvRe = /(\w+)\s*:\s*(?:"([^"]*)"|([\d.]+(?:e[+-]?\d+)?)|(\[.*?\])|(true|false|null))/g;
+            let kv: RegExpExecArray | null;
+            while ((kv = kvRe.exec(argsStr)) !== null) {
+              const [, k, strVal, numVal, arrVal, litVal] = kv;
+              if (strVal !== undefined) obj[k] = strVal;
+              else if (numVal !== undefined) obj[k] = Number(numVal);
+              else if (arrVal !== undefined) { try { obj[k] = JSON.parse(arrVal); } catch { obj[k] = arrVal; } }
+              else if (litVal !== undefined) obj[k] = JSON.parse(litVal);
+            }
+            if (Object.keys(obj).length > 0) toolArgs = obj;
+          } catch {}
+        }
       }
 
       // P4 fix: recursively parse string fields that look like JSON objects/arrays.
@@ -441,6 +447,44 @@ export class WasmProvider implements LLMProvider {
         latencyMs,
       },
     };
+  }
+
+  /**
+   * Parse Gemma native tool call args, handling internal quotes in values.
+   * Extracts key-value pairs using <|"|> delimiters before any replacement,
+   * so internal quotes like data."date" are preserved correctly.
+   * Example: {schema:<|"|>assemblee<|"|>,query:<|"|>SELECT data."date"<|"|>}
+   */
+  private static parseGemmaArgs(raw: string): Record<string, unknown> {
+    const pairs: Record<string, unknown> = {};
+
+    // Extract string values delimited by <|"|>
+    const kvRegex = /(\w+)\s*:\s*<\|"\|>([\s\S]*?)<\|"\|>/g;
+    let m: RegExpExecArray | null;
+    while ((m = kvRegex.exec(raw)) !== null) {
+      pairs[m[1]] = m[2];
+    }
+
+    // Extract numeric values (no delimiters)
+    const numRegex = /(\w+)\s*:\s*(\d+(?:\.\d+)?(?:e[+-]?\d+)?)\s*(?:[,}]|$)/g;
+    while ((m = numRegex.exec(raw)) !== null) {
+      if (!(m[1] in pairs)) pairs[m[1]] = Number(m[2]);
+    }
+
+    // Extract boolean/null literals
+    const litRegex = /(\w+)\s*:\s*(true|false|null)\s*(?:[,}]|$)/g;
+    while ((m = litRegex.exec(raw)) !== null) {
+      if (!(m[1] in pairs)) pairs[m[1]] = JSON.parse(m[2]);
+    }
+
+    // Try to parse string values that look like JSON objects/arrays
+    for (const [k, v] of Object.entries(pairs)) {
+      if (typeof v === 'string' && (v.startsWith('{') || v.startsWith('['))) {
+        try { pairs[k] = JSON.parse(v); } catch { /* keep as string */ }
+      }
+    }
+
+    return pairs;
   }
 
   /**
