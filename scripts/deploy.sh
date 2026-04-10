@@ -113,6 +113,15 @@ deploy_node_build() {
   ssh "$SSH_HOST" "mkdir -p $REMOTE_BASE/$app/build"
   echo "  [$app] copying build..."
   scp -r "$LOCAL_ROOT/apps/$app/build/"* "$SSH_HOST:$REMOTE_BASE/$app/build/"
+  echo "  [$app] verifying deploy integrity..."
+  local expected actual
+  expected=$(sha256sum "$LOCAL_ROOT/apps/$app/build/index.js" | cut -d' ' -f1)
+  actual=$(ssh "$SSH_HOST" "sha256sum $REMOTE_BASE/$app/build/index.js | cut -d' ' -f1")
+  if [ "$expected" != "$actual" ]; then
+    echo "  [$app] ✗ INTEGRITY ERROR — sha256 mismatch, rolling back"
+    rollback_app "$app"
+    return 1
+  fi
   echo "  [$app] restarting service..."
   ssh "$SSH_HOST" "systemctl restart webmcp-$app"
   echo "  [$app] ✓ deployed v$app_version (node build/index.js)"
@@ -135,6 +144,15 @@ deploy_static() {
   ssh "$SSH_HOST" "rm -rf $REMOTE_BASE/$app/_app"
   echo "  [$app] copying build..."
   scp -r "$LOCAL_ROOT/apps/$app/build/"* "$SSH_HOST:$REMOTE_BASE/$app/"
+  echo "  [$app] verifying deploy integrity..."
+  local expected actual
+  expected=$(sha256sum "$LOCAL_ROOT/apps/$app/build/index.html" | cut -d' ' -f1)
+  actual=$(ssh "$SSH_HOST" "sha256sum $REMOTE_BASE/$app/index.html | cut -d' ' -f1")
+  if [ "$expected" != "$actual" ]; then
+    echo "  [$app] ✗ INTEGRITY ERROR — sha256 mismatch, rolling back"
+    rollback_app "$app"
+    return 1
+  fi
   echo "  [$app] ✓ deployed (static)"
 }
 

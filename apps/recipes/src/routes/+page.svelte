@@ -142,6 +142,7 @@
 
   async function testRecipe() {
     if (testing) return;
+    conversationHistory = []; // Reset between recipe tests
 
     // Build the prompt for the recipe
     let prompt = '';
@@ -257,7 +258,7 @@
       </button>
     {/if}
 
-    <LLMSelector value={canvas.llm} onchange={(v) => canvas.setLLM(v)} />
+    <LLMSelector value={canvas.llm} onchange={(v) => canvas.setLlm(v)} />
 
     <McpStatus
       connecting={canvas.mcpConnecting}

@@ -5,8 +5,7 @@
   import { decodeHyperSkill, getHsParam, type HyperSkill } from '@webmcp-auto-ui/sdk';
   import { ExternalLink, Pencil } from 'lucide-svelte';
 
-  type BlockType = 'stat'|'kv'|'list'|'chart'|'alert'|'code'|'text'|'actions'|'tags'|'stat-card'|'data-table'|'timeline'|'profile'|'hemicycle'|'cards'|'json-viewer'|'sankey'|'log';
-  interface Block { id: string; type: BlockType; data: Record<string,unknown>; }
+  interface Block { id: string; type: string; data: Record<string,unknown>; }
 
   let skill = $state<HyperSkill | null>(null);
   let blocks = $state<Block[]>([]);
@@ -16,9 +15,11 @@
   function uid() { return 'b'+Math.random().toString(36).slice(2,8)+Date.now().toString(36); }
 
   function editUrl(): string {
+    // Use base path for production (e.g. https://demos.hyperskills.net/flex2)
+    const prefix = base.replace(/\/viewer2$/, '');
     const hs = getHsParam(window.location.href);
-    if (!hs) return '/flex2';
-    return `/flex2?hs=${encodeURIComponent(hs)}`;
+    if (!hs) return `${prefix}/flex2`;
+    return `${prefix}/flex2?hs=${encodeURIComponent(hs)}`;
   }
 
   onMount(async () => {

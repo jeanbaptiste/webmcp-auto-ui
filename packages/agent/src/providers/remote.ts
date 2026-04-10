@@ -14,7 +14,7 @@ export const REMOTE_MODELS: Record<string, string> = {
 
 export class RemoteLLMProvider implements LLMProvider {
   readonly name = 'remote';
-  readonly model: string;
+  model: string;
   private proxyUrl: string;
   private modelName: string;
   private apiKey?: string;
@@ -28,13 +28,14 @@ export class RemoteLLMProvider implements LLMProvider {
   }
 
   setModel(id: RemoteModelId) {
+    this.model = id;
     this.modelName = REMOTE_MODELS[id] ?? id;
   }
 
   async chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
-    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string; maxTokens?: number }
+    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string; maxTokens?: number; temperature?: number; topK?: number }
   ): Promise<LLMResponse> {
     const cache = options?.cacheEnabled ?? false;
 
@@ -53,6 +54,8 @@ export class RemoteLLMProvider implements LLMProvider {
       max_tokens: options?.maxTokens ?? 4096,
       messages,
       tools: toolsPayload,
+      ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
+      ...(options?.topK !== undefined ? { top_k: options.topK } : {}),
       ...(this.apiKey ? { __apiKey: this.apiKey } : {}),
     };
 

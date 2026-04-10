@@ -352,7 +352,10 @@ export function trimConversationHistory(history: ChatMessage[], maxTokens: numbe
   let total = history.reduce((s, m) => s + JSON.stringify(m).length, 0);
   const trimmed = [...history];
   while (total > maxChars && trimmed.length >= 2) {
-    const removed = trimmed.splice(0, 2);
+    // Skip system messages — only remove user/assistant pairs from the front
+    const firstNonSystem = trimmed.findIndex(m => m.role !== 'system');
+    if (firstNonSystem < 0 || firstNonSystem + 1 >= trimmed.length) break;
+    const removed = trimmed.splice(firstNonSystem, 2);
     total -= removed.reduce((s, m) => s + JSON.stringify(m).length, 0);
   }
   return trimmed;

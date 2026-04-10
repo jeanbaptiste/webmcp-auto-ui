@@ -242,6 +242,7 @@
     if (!msg.trim() || canvas.generating) return;
     input = '';
     ephemeral = [];
+    allToolsUsed = [];
     pushHistory('user', msg);
     const userId = uid();
     ephemeral = [...ephemeral, { id: userId, role: 'user', html: msg }];
@@ -255,9 +256,10 @@
 
     // Resolve server name for provenance
     const currentServerName = canvas.mcpName ?? '';
+    let result: Awaited<ReturnType<typeof runAgentLoop>> | null = null;
 
     try {
-      const result = await runAgentLoop(msg, {
+      result = await runAgentLoop(msg, {
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
@@ -293,8 +295,10 @@
           },
         },
       });
-      conversationHistory = result.messages;
-      if (result.text) { updateEphemeral(assistantId, result.text); pushHistory('assistant', result.text); }
+      if (result) {
+        conversationHistory = result.messages;
+        if (result.text) { updateEphemeral(assistantId, result.text); pushHistory('assistant', result.text); }
+      }
     } catch(e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       updateEphemeral(assistantId, errMsg);
@@ -303,7 +307,9 @@
       clearInterval(timerInterval);
       abortController = null;
       canvas.setGenerating(false);
-      setTimeout(() => { ephemeral = []; }, 5000);
+      // Keep ephemeral visible longer if no blocks were rendered (text-only response)
+      const hasBlocks = result?.toolCalls?.some(c => c.name === 'component' || c.name?.startsWith('render_'));
+      setTimeout(() => { ephemeral = []; }, hasBlocks ? 3000 : 15000);
     }
   }
 
