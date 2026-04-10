@@ -242,6 +242,9 @@ export class WasmProvider implements LLMProvider {
         let lastToken = '';
         let repeatCount = 0;
         const MAX_REPEATS = 20;
+        // P2 fix: track if we have a complete tool call to enable early cancellation
+        let hasCompleteToolCall = false;
+        const TOOL_CALL_MAX_CHARS = 3000;
 
         const result = await this.inference.generateResponse(prompt, (partialResult: string, _done: boolean) => {
           if (options?.signal?.aborted) {
@@ -262,6 +265,17 @@ export class WasmProvider implements LLMProvider {
           fullText += partialResult;
           tokenCount++;
           options?.onToken?.(partialResult);
+
+          // P2: once we have a complete tool call (<|tool_call>...<tool_call|>),
+          // if the response keeps growing beyond limit, cancel early.
+          // This prevents 60s+ generations where Gemma dumps all data into params.
+          if (!hasCompleteToolCall && fullText.includes('<tool_call|>')) {
+            hasCompleteToolCall = true;
+          }
+          if (hasCompleteToolCall && fullText.length > TOOL_CALL_MAX_CHARS) {
+            this.inference?.cancelProcessing();
+            return;
+          }
         });
 
         // Fallback if the streaming callback didn't accumulate
@@ -338,6 +352,15 @@ export class WasmProvider implements LLMProvider {
           if (Object.keys(obj).length > 0) toolArgs = obj;
         } catch {}
       }
+
+      // P4 fix: recursively parse string fields that look like JSON objects/arrays.
+      // Gemma wraps params in <|"|>{...}<|"|> which after replacement becomes "{...}" — a string.
+      for (const [k, v] of Object.entries(toolArgs)) {
+        if (typeof v === 'string' && (v.startsWith('{') || v.startsWith('['))) {
+          try { toolArgs[k] = JSON.parse(v); } catch { /* keep as string */ }
+        }
+      }
+
       content.push({
         type: 'tool_use',
         id: `tc-${Date.now()}-${content.length}`,
@@ -419,7 +442,18 @@ export class WasmProvider implements LLMProvider {
         decl += `      ${key}:{`;
         const parts: string[] = [];
         if (val.description) parts.push(`description:${q}${val.description}${q}`);
-        parts.push(`type:${q}${(val.type ?? 'string').toUpperCase()}${q}`);
+        // P1 fix: if no type specified, infer OBJECT for params-like fields to avoid
+        // Gemma wrapping the value in <|"|>...<|"|> (treating it as a string)
+        let inferredType = val.type;
+        if (!inferredType) {
+          const descLower = (val.description ?? '').toLowerCase();
+          if (descLower.includes('objet') || descLower.includes('object') || descLower.includes('paramètre') || key === 'params') {
+            inferredType = 'object';
+          } else {
+            inferredType = 'string';
+          }
+        }
+        parts.push(`type:${q}${inferredType.toUpperCase()}${q}`);
         if (val.enum) parts.push(`enum:[${val.enum.map(e => `${q}${e}${q}`).join(',')}]`);
         decl += parts.join(',');
         decl += `}${i < propEntries.length - 1 ? ',' : ''}\n`;

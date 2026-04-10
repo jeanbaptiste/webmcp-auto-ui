@@ -45,10 +45,11 @@ export function formatRecipesForPrompt(recipes: Recipe[]): string {
   ).join('\n');
 }
 
-/** Format MCP server recipes for the prompt */
+/** Format MCP server recipes for the prompt.
+ * Uses [name] prefix so LLMs know the exact ID to pass to get_recipe(). */
 export function formatMcpRecipesForPrompt(recipes: McpRecipe[]): string {
   if (recipes.length === 0) return '';
   return recipes.map(r =>
-    `- ${r.name}${r.description ? ': ' + r.description : ''}`
+    `- [${r.name}]${r.description ? ' ' + r.description : ''}`
   ).join('\n');
 }
