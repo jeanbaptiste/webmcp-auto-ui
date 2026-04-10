@@ -170,37 +170,32 @@ function createCanvas() {
   }
 
   async function loadFromParam(param: string): Promise<boolean> {
-    try {
-      let json: string;
-
-      if (param.startsWith('gz.')) {
-        // Compressed: gz.<base64url-encoded gzip data>
-        let b64 = param.slice(3).replace(/-/g, '+').replace(/_/g, '/');
-        while (b64.length % 4) b64 += '=';
-        const compressed = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-        const ds = new DecompressionStream('gzip');
-        const writer = ds.writable.getWriter();
-        writer.write(compressed);
-        writer.close();
-        json = await new Response(ds.readable).text();
-      } else {
-        // Plain base64url
-        let b64 = param.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/');
-        while (b64.length % 4) b64 += '=';
-        json = decodeURIComponent(escape(atob(b64)));
-      }
-
-      const skill = JSON.parse(json) as {
-        mcp?: string; llm?: LLMId;
-        theme?: Record<string, string>;
-        blocks?: { type: BlockType; data: Record<string, unknown> }[];
-      };
+    function applySkill(skill: {
+      mcp?: string; llm?: LLMId;
+      theme?: Record<string, string>;
+      blocks?: { type: BlockType; data: Record<string, unknown> }[];
+    }) {
       if (skill.mcp) mcpUrl = skill.mcp;
       if (skill.llm) llm = skill.llm;
       if (skill.theme) themeOverrides = skill.theme;
       if (skill.blocks) {
         blocks = skill.blocks.map((b) => ({ id: uuid(), type: b.type, data: b.data }));
       }
+    }
+
+    // Try hyperskills NPM decode (handles gz., br., and plain base64)
+    try {
+      const { content: json } = await decode(param);
+      applySkill(JSON.parse(json));
+      return true;
+    } catch { /* fall through to legacy */ }
+
+    // Fallback: legacy format (plain base64 with escape/unescape)
+    try {
+      let b64 = param.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/');
+      while (b64.length % 4) b64 += '=';
+      const json = decodeURIComponent(escape(atob(b64)));
+      applySkill(JSON.parse(json));
       return true;
     } catch {
       return false;
