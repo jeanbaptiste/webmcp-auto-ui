@@ -190,6 +190,17 @@ function coerceParams(name: string, params: Record<string, unknown>): Record<str
     return { ...rest, ...first };
   }
 
+  // KV: {items: [{key, value}]} → {rows: [[key, val]]}
+  if (name === 'kv' && Array.isArray(params.items) && !params.rows) {
+    const rows = (params.items as Record<string, unknown>[]).map(item => {
+      const k = String(item.key ?? item.label ?? item.name ?? '');
+      const v = String(item.value ?? item.description ?? '');
+      return [k, v];
+    });
+    const { items, ...rest } = params;
+    return { ...rest, rows };
+  }
+
   // KV: {data: {key: val}} → {rows: [[key, val]]}
   if (name === 'kv' && params.data && typeof params.data === 'object' && !Array.isArray(params.data) && !params.rows) {
     const rows = Object.entries(params.data as Record<string, unknown>).map(([k, v]) => [k, String(v ?? '')]);
@@ -201,6 +212,17 @@ function coerceParams(name: string, params: Record<string, unknown>): Record<str
   if (name === 'kv' && Array.isArray(params.data) && !params.rows) {
     const { data, ...rest } = params;
     return { ...rest, rows: data };
+  }
+
+  // Chart: {items: [{label, value}]} → {bars: [[label, value]]}
+  if (name === 'chart' && Array.isArray(params.items) && params.items.length > 0 && typeof params.items[0] === 'object' && !params.bars && !params.data) {
+    const bars = (params.items as Record<string, unknown>[]).map(d => {
+      const label = String(d.label ?? d.name ?? d.key ?? '');
+      const value = Number(d.value ?? d.count ?? 0);
+      return [label, value];
+    });
+    const { items, ...rest } = params;
+    return { ...rest, bars };
   }
 
   // Chart: {data: [{label, value}]} → {bars: [[label, value]]}
