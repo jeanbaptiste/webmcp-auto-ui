@@ -171,9 +171,10 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
     if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
       if (gemmaProvider && gemmaProvider.model !== canvas.llm) unloadGemma();
       if (!gemmaProvider) {
+        const wasmContext = Math.min(maxContextTokens, 32768);
         gemmaProvider = new GemmaProvider({
           model: canvas.llm,
-          contextSize: maxContextTokens,
+          contextSize: wasmContext,
           onProgress: (p, _s, loaded, total) => {
             gemmaProgress = p * 100;
             if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;

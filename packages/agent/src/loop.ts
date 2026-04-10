@@ -21,6 +21,28 @@ import { formatRecipesForPrompt, formatMcpRecipesForPrompt } from './recipe-regi
 
 const MAX_RESULT_LEN = 10_000;
 
+/**
+ * Compress old tool_result blocks in conversation history.
+ * Once the LLM has read a tool_result and produced a response, the full result
+ * is no longer needed — replace it with a truncated preview to save context.
+ * Only compresses messages before the last 2 (current iteration).
+ */
+function compressOldToolResults(messages: ChatMessage[]): void {
+  for (let i = 0; i < messages.length - 2; i++) {
+    const msg = messages[i];
+    if (typeof msg.content !== 'string' && Array.isArray(msg.content)) {
+      for (let j = 0; j < msg.content.length; j++) {
+        const block = msg.content[j];
+        if (block.type === 'tool_result' && typeof block.content === 'string' && block.content.length > 300) {
+          const preview = block.content.slice(0, 200);
+          const totalLen = block.content.length;
+          (block as any).content = `${preview}... [compressed, ${totalLen} chars original]`;
+        }
+      }
+    }
+  }
+}
+
 /** Build system prompt from structured ToolLayers (new API) */
 export function buildSystemPrompt(layers: ToolLayer[], options?: { toolMode?: 'smart' | 'explicit' }): string;
 /** Build system prompt from flat McpToolDef[] (backward compat) */
@@ -317,6 +339,9 @@ export async function runAgentLoop(
     }
 
     messages.push({ role: 'user', content: toolResults });
+
+    // Compress old tool results to save context window (benefits both WASM and remote)
+    compressOldToolResults(messages);
   }
 
   callbacks.onDone?.(metrics);

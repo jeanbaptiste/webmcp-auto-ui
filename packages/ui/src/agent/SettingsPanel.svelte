@@ -67,7 +67,7 @@
   const ranges = $derived({
     maxTokens: { min: 256, max: 8192, step: 256 },
     maxContextTokens: modelType === 'wasm'
-      ? { min: 1024, max: 131072, step: 1024 }
+      ? { min: 1024, max: 32768, step: 1024 }  // WASM cap: 32K tokens
       : { min: 10_000, max: 200_000, step: 10_000 },
     temperature: { min: 0, max: 2, step: 0.1 },
     topK: { min: 1, max: 100, step: 1 },

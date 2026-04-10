@@ -112,9 +112,10 @@
         unloadGemma();
       }
       if (!gemmaProvider) {
+        const wasmContext = Math.min(150_000, 32768);
         gemmaProvider = new GemmaProvider({
           model: canvas.llm,
-          contextSize: 150_000,
+          contextSize: wasmContext,
           onProgress: (p, _s, loaded, total) => {
             gemmaProgress = p * 100;
             if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;
