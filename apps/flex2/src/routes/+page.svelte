@@ -58,6 +58,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
   let showToolJSON = $state(false);
   tokenTracker.subscribe(m => { tokenMetrics = m; });
 
+  let agentLogs = $state<{ ts: number; type: string; detail: string }[]>([]);
   let abortController = $state<AbortController | null>(null);
   let exportCopied = $state(false);
   let includeSummary = $state(true);
@@ -252,6 +253,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
     input = '';
     ephemeral = [];
     allToolsUsed = [];
+    agentLogs = [];
     pushHistory('user', msg);
     const userId = uid();
     ephemeral = [...ephemeral, { id: userId, role: 'user', html: msg }];
@@ -277,7 +279,14 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         layers,
         callbacks: {
-          onLLMResponse: (response, latencyMs) => {
+          onIterationStart: (i, max) => {
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'iteration', detail: `Iteration ${i}/${max}` }];
+          },
+          onLLMRequest: (messages, tools) => {
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'request', detail: `${messages.length} messages, ${tools.length} tools` }];
+          },
+          onLLMResponse: (response, latencyMs, tokens) => {
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'response', detail: `${tokens?.input ?? '?'}in ${tokens?.output ?? '?'}out, ${Math.round(latencyMs)}ms, ${response.stopReason}` }];
             if (response.usage) tokenTracker.record(response.usage, latencyMs);
             else if (response.stats) tokenTracker.recordEstimate(0, response.stats.totalTokens * 4, latencyMs);
           },
@@ -291,16 +300,27 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
           onResize: (id, w, h) => layoutAdapter.resize(id, w, h),
           onStyle: (id, styles) => layoutAdapter.style(id, styles),
           onToken: () => {},
-          onText: (text) => { if (text) updateEphemeral(assistantId, text); },
+          onText: (text) => {
+            if (text) {
+              agentLogs = [...agentLogs, { ts: Date.now(), type: 'text', detail: text.slice(0, 100) }];
+              updateEphemeral(assistantId, text);
+            }
+          },
           onToolCall: (call) => {
             chatToolCount++; chatLastTool = call.name;
             allToolsUsed = [...allToolsUsed, call.name];
+            const argsPreview = JSON.stringify(call.args).slice(0, 200);
+            const resultPreview = (call.result ?? call.error ?? '').slice(0, 200);
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'tool', detail: `${call.name}(${argsPreview}) -> ${resultPreview} [${call.elapsed ?? '?'}ms]` }];
             if (showToolJSON) {
               const argsJson = JSON.stringify(call.args, null, 2);
               updateEphemeral(assistantId, `<strong>${call.name}</strong>\n<pre style="font-size:9px;margin-top:4px;opacity:0.7;white-space:pre-wrap;word-break:break-all">${argsJson}</pre>`);
             } else {
               updateEphemeral(assistantId, `<strong>${call.name}</strong>...`);
             }
+          },
+          onDone: (metrics) => {
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'done', detail: `${metrics.iterations} iter, ${metrics.toolCalls} tools, ${metrics.totalTokens} tokens, ${Math.round(metrics.totalLatencyMs)}ms` }];
           },
         },
       });
@@ -483,6 +503,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
   bind:open={settingsOpen}
   bind:mcpToken bind:systemPrompt bind:maxTokens bind:maxContextTokens
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:toolMode
+  bind:agentLogs
   onconnect={() => addMcpServer(canvas.mcpUrl)}
   {connectedUrls} {loadingUrls}
   onaddserver={addMcpServer} onaddall={addAllServers} onremoveserver={removeMcpServer}
