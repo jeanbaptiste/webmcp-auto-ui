@@ -2,14 +2,21 @@
   import { fade, fly } from 'svelte/transition';
 
   interface RecipeData {
-    name: string;
+    id?: string;
+    name?: string;
     description?: string;
     when?: string;
     components_used?: string[];
     servers?: string[];
+    serverName?: string;
     layout?: { type: string; columns?: number; arrangement?: string };
     body?: string;
   }
+
+  /** True when the recipe is an MCP recipe (no body/when/layout — only name+description) */
+  const isMcpRecipe = $derived(
+    recipe != null && !recipe.body && !recipe.when && !recipe.layout
+  );
 
   interface Props {
     open: boolean;
@@ -66,7 +73,7 @@
     >
       <!-- Header -->
       <div class="flex items-center gap-4 px-6 py-4 border-b border-border flex-shrink-0">
-        <span class="font-mono text-sm font-bold text-text1 flex-1 truncate">{recipe.name}</span>
+        <span class="font-mono text-sm font-bold text-text1 flex-1 truncate">{recipe.name ?? recipe.id ?? 'Sans nom'}</span>
         <button class="text-text2 hover:text-text1 font-mono text-base leading-none transition-colors"
                 onclick={close}>x</button>
       </div>
@@ -122,6 +129,14 @@
             <div class="recipe-body font-mono text-xs text-text1 leading-relaxed">
               {@html renderMarkdown(recipe.body)}
             </div>
+          </div>
+        {/if}
+
+        {#if isMcpRecipe}
+          <div class="mt-2 px-3 py-2 rounded border border-accent/20 bg-accent/5">
+            <p class="font-mono text-[10px] text-text2 leading-relaxed">
+              Recette MCP distante. Appelle <code class="text-accent">get_recipe('{recipe.name ?? recipe.id ?? ''}')</code> dans le chat pour obtenir les instructions completes.
+            </p>
           </div>
         {/if}
       </div>

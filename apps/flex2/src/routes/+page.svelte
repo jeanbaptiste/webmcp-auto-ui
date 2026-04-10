@@ -335,7 +335,12 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
           onToken: () => {},
           onText: (text) => {
             if (text) {
-              agentLogs = [...agentLogs, { ts: Date.now(), type: 'text', detail: text.slice(0, 100) }];
+              // Only log every ~50 chars to avoid spam
+              const textLogs = agentLogs.filter(l => l.type === 'text');
+              const prevLen = textLogs.length > 0 ? textLogs[textLogs.length - 1].detail.length : 0;
+              if (text.length < 50 || text.slice(-100).length - prevLen > 50) {
+                agentLogs = [...agentLogs, { ts: Date.now(), type: 'text', detail: text.slice(-100) }];
+              }
               updateEphemeral(assistantId, text);
             }
           },

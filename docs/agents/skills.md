@@ -104,6 +104,61 @@ Les recettes sont injectees dans la section `## webmcp` du prompt via `formatRec
 - Parlementaire profile: profil depute [profile, hemicycle, timeline]
 ```
 
+## Flow complet des recettes
+
+```
+Connexion MCP                  buildSystemPrompt()              Agent loop (LLM)
+     |                              |                               |
+     |  1. list_recipes(server)     |                               |
+     |  -> {name, description}[]    |                               |
+     |                              |                               |
+     |  2. Charge WEBMCP_RECIPES    |                               |
+     |     (fichiers .md locaux)    |                               |
+     |                              |                               |
+     |          3. Injection prompt |                               |
+     |          ## mcp : outils DATA + "recettes serveur (N)"       |
+     |          ## webmcp : component() + "recettes UI (N)"         |
+     |          (resumes courts — pas le body)                       |
+     |                              |                               |
+     |                              |   4. component("help")        |
+     |                              |   <- composants + recettes    |
+     |                              |                               |
+     |                              |   5. component("help","id")   |
+     |                              |   <- body complet recette     |
+     |                              |                               |
+     |                              |   6. component("recipe-id")   |
+     |                              |   <- body comme guide         |
+     |                              |                               |
+     |                              |   7. get_recipe("name")       |
+     |                              |   <- body recette MCP serveur |
+     |                              |                               |
+     |                              |   8. component("table",{...}) |
+     |                              |   -> onBlock -> Canvas        |
+```
+
+### Lazy loading
+
+Le body complet des recettes n'est PAS dans le prompt initial. Le LLM ne voit que les resumes (name + when/description). Il charge le detail a la demande :
+
+**Recettes WebMCP :**
+- `component("help")` -> liste composants + recettes (id, when, components)
+- `component("help", "recipe-id")` -> body complet d'une recette
+- `component("recipe-id")` -> retourne le body comme guide de composition
+
+**Recettes MCP (serveur) :**
+- `get_recipe("name")` -> body complet de la recette serveur
+
+### Difference WebMCP vs MCP
+
+| | Recette WebMCP (UI) | Recette MCP (serveur) |
+|--|---------------------|----------------------|
+| Source | Package agent (fichiers .md) | Serveur MCP (`list_recipes`) |
+| Guide quoi | Le **View** (comment afficher) | Le **Model/Data** (quoi demander) |
+| Lazy loading | `component("help","id")` | `get_recipe(name)` |
+| Section prompt | `## webmcp > recettes UI` | `## mcp > recettes serveur` |
+
+L'agent utilise les deux ensemble : une recette MCP lui dit comment obtenir les donnees, une recette WebMCP lui dit comment les presenter.
+
 ## Recettes MCP (serveur)
 
 Les recettes MCP viennent du serveur connecte via les outils `list_recipes` et `get_recipe`. Elles decrivent ce que les outils retournent et comment les combiner.
@@ -143,11 +198,18 @@ Elles apparaissent dans le prompt sous :
 
 ### Comment les obtenir
 
-Beaucoup de serveurs MCP exposent les outils `list_recipes` et `get_recipe`. L'app peut les appeler au moment de la connexion :
+L'app appelle `list_recipes` a la connexion pour les resumes :
 
 ```ts
 const recipesResult = await client.callTool('list_recipes', {});
 const mcpRecipes: McpRecipe[] = JSON.parse(recipesResult.content[0].text);
+```
+
+Le LLM appelle `get_recipe` pendant la boucle agent pour le body complet :
+
+```
+LLM -> get_recipe({ name: "profil-depute" })
+    <- { body: "1. Appeler search_deputes(...)\n2. ..." }
 ```
 
 ## Skills (format HyperSkill)

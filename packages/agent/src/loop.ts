@@ -91,7 +91,7 @@ CRITIQUE : Après CHAQUE outil DATA, rends visuellement. TOUJOURS rendre. Texte 
     if (allMcpRecipes.length > 0) {
       prompt += `### recettes serveur (${allMcpRecipes.length})\n`;
       prompt += formatMcpRecipesForPrompt(allMcpRecipes);
-      prompt += '\n\n';
+      prompt += '\n→ Appelle get_recipe(nom) pour obtenir les instructions détaillées avant d\'exécuter une recette serveur.\n\n';
     }
   }
 

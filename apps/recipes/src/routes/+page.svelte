@@ -327,7 +327,12 @@
           onText: (text: string) => {
             if (text) {
               previewText = text;
-              pushLog('text', text.slice(0, 100));
+              // Only log every ~50 chars to avoid spam
+              const textLogs = agentLogs.filter(l => l.type === 'text');
+              const prevLen = textLogs.length > 0 ? textLogs[textLogs.length - 1].detail.length : 0;
+              if (text.length < 50 || text.slice(-100).length - prevLen > 50) {
+                pushLog('text', text.slice(-100));
+              }
             }
           },
           onToolCall: (call: any) => {

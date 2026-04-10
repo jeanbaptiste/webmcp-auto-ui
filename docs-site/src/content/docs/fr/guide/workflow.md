@@ -160,6 +160,61 @@ console.log(result.stopReason); // 'end_turn' | 'max_iterations' | 'error'
 console.log(result.messages);   // conversation complete pour reprise
 ```
 
+## Recettes dans le workflow
+
+Les recettes s'integrent dans le flow layers -> prompt -> LLM -> component() a trois niveaux :
+
+### Au moment de la connexion (etape 1)
+
+L'app collecte les recettes des deux cotes :
+
+```ts
+// Recettes MCP : du serveur
+const mcpRecipes = JSON.parse(
+  (await client.callTool('list_recipes', {})).content[0].text
+);
+
+// Recettes WebMCP : fichiers .md locaux, filtrees par serveur
+const uiRecipes = filterRecipesByServer(WEBMCP_RECIPES, ['Tricoteuses']);
+```
+
+Les deux sont injectees dans les layers :
+
+```ts
+const mcpLayer: McpLayer = { source: 'mcp', ..., recipes: mcpRecipes };
+const uiLayer: UILayer = { source: 'ui', recipes: uiRecipes };
+```
+
+### Dans le prompt (etape 2)
+
+`buildSystemPrompt()` injecte des resumes compacts — pas le body :
+
+```
+## mcp (Tricoteuses)
+### recettes serveur (2)
+- profil-depute: Fiche complete avec votes et mandats
+
+## webmcp
+### recettes UI (3)
+- Composer un tableau de bord KPI: metriques numeriques [stat-card, chart, table, kv]
+```
+
+### Pendant la boucle agent (etapes 5-7)
+
+Le LLM decouvre les details a la demande (lazy loading) :
+
+```
+LLM -> component("help")               <- liste composants + recettes WebMCP
+LLM -> component("help", "weather-viz") <- body complet recette WebMCP
+LLM -> get_recipe("profil-depute")      <- body complet recette MCP serveur
+LLM -> component("stat-card", {label: "Temperature", value: "22°C"})
+    -> onBlock -> Canvas
+```
+
+Les recettes WebMCP guident le **View** (comment afficher), les recettes MCP guident le **Model/Data** (quoi demander). L'agent utilise les deux ensemble.
+
+Voir [Recettes](/fr/concepts/recipes/) pour le detail complet des types et du lazy loading.
+
 ## Pattern generation auto d'UI
 
 ```

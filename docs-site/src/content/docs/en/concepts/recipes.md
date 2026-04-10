@@ -14,6 +14,101 @@ The system has two types of recipes that guide the LLM in composing interfaces.
 | **WebMCP Recipe** | Agent package (`.md` files) | Guides the LLM on how to present data with UI components |
 | **MCP Recipe** | MCP Server (`list_recipes`/`get_recipe`) | Describes what tools return and how to combine them |
 
+## Complete recipe flow
+
+```
+MCP Connection                 buildSystemPrompt()              Agent loop (LLM)
+     |                              |                               |
+     |  1. list_recipes(server)     |                               |
+     |  -> {name, description}[]    |                               |
+     |                              |                               |
+     |  2. Load WEBMCP_RECIPES      |                               |
+     |     (local .md files)        |                               |
+     |                              |                               |
+     |          3. Prompt injection |                               |
+     |          ## mcp: DATA tools + "server recipes (N)"           |
+     |          ## webmcp: component() + "UI recipes (N)"           |
+     |          (short summaries only — no body)                     |
+     |                              |                               |
+     |                              |   4. component("help")        |
+     |                              |   <- components + recipes     |
+     |                              |                               |
+     |                              |   5. component("help","id")   |
+     |                              |   <- full recipe body         |
+     |                              |                               |
+     |                              |   6. component("recipe-id")   |
+     |                              |   <- body as composition guide|
+     |                              |                               |
+     |                              |   7. get_recipe("name")       |
+     |                              |   <- full MCP server recipe   |
+     |                              |                               |
+     |                              |   8. component("table",{...}) |
+     |                              |   -> onBlock -> Canvas        |
+```
+
+### Step 1: Connection and collection
+
+On MCP connection, the app calls `list_recipes` on each server. It receives a `{name, description}[]` array — short summaries, not the full body.
+
+```ts
+const recipesResult = await client.callTool('list_recipes', {});
+const mcpRecipes: McpRecipe[] = JSON.parse(recipesResult.content[0].text);
+// [{ name: 'profil-depute', description: 'Full profile with votes and mandates' }, ...]
+```
+
+In parallel, built-in WebMCP recipes (`WEBMCP_RECIPES`) are loaded from `.md` files in the agent package.
+
+### Step 2: Prompt construction (buildSystemPrompt)
+
+The system prompt is structured in sections:
+
+```
+## mcp (Tricoteuses)
+### DATA tools (12)
+- query_sql: Execute an SQL query...
+- search_deputes: Search for a deputy...
+### server recipes (2)
+- profil-depute: Full profile with votes and mandates
+- scrutin-detail: Detailed public vote analysis
+
+## webmcp
+### component() — single UI tool
+Available components: stat-card, chart, table, ...
+### UI recipes (3)
+- Compose a KPI dashboard: numeric metrics [stat-card, chart, table, kv]
+- Parliamentary profile: deputy profile [profile, hemicycle, timeline]
+```
+
+The detailed recipe body is **NOT** in the prompt. Only `name`, `when` and `components_used` are injected. Cost: ~500 tokens for 5 recipes.
+
+### Step 3: Tools sent to the LLM
+
+In smart mode (default), the LLM receives:
+- MCP tools (DATA) — `query_sql`, `search_deputes`, etc.
+- A single UI tool: `component()`
+
+Neither `list_recipes` nor `get_recipe` are sent as tools to the LLM. The LLM discovers MCP recipes via the prompt, and their details via `get_recipe` (MCP server tool).
+
+### Step 4: Lazy loading (agent discovery)
+
+The full recipe body is loaded on demand, not at startup. The LLM decides when it needs the detail:
+
+**WebMCP recipes:**
+
+```
+component("help")              -> list components + WebMCP recipes (id, when, components)
+component("help", "recipe-id") -> full body of a WebMCP recipe
+component("recipe-id")         -> returns the body as a composition guide
+```
+
+**MCP recipes (server):**
+
+```
+get_recipe("profil-depute")    -> full body of the server recipe
+```
+
+The LLM sees names and descriptions in the prompt, then requests the detail only when needed. This avoids bloating the initial context.
+
 ## WebMCP Recipes (UI)
 
 WebMCP recipes guide the LLM on component selection. They are `.md` files with YAML frontmatter, parsed at build time and injected into the prompt via `UILayer.recipes`.
@@ -142,12 +237,35 @@ They appear in the prompt under:
 - scrutin-detail: Detailed public vote analysis
 ```
 
+### Detail via get_recipe
+
+The LLM sees summaries in the prompt. When it needs the detail, it calls `get_recipe` (MCP server tool):
+
+```
+LLM -> get_recipe({ name: "profil-depute" })
+    <- { body: "1. Call search_deputes(...)\n2. Call get_votes(...)\n..." }
+```
+
+The server decides the content of `body` — workflow, examples, recommended parameters.
+
 ## WebMCP vs MCP comparison
 
 | | WebMCP Recipe (UI) | MCP Recipe (server) |
 |--|---------------------|----------------------|
-| Source | Agent package (.md files) | MCP Server (`list_recipes`) |
-| Content | How to present with component() | What the tools return |
-| Prompt section | `## webmcp > UI recipes` | `## mcp > server recipes` |
-| Type | `Recipe` | `McpRecipe` |
-| Carried by | `UILayer.recipes` | `McpLayer.recipes` |
+| **Source** | Agent package (.md files) | MCP Server (`list_recipes`) |
+| **Content** | How to present with component() | What tools return, how to combine them |
+| **Prompt section** | `## webmcp > UI recipes` | `## mcp > server recipes` |
+| **Type** | `Recipe` | `McpRecipe` |
+| **Carried by** | `UILayer.recipes` | `McpLayer.recipes` |
+| **Lazy loading** | `component("help","id")` or `component("id")` | `get_recipe(name)` (MCP tool) |
+| **Guides what** | The **View** (how to display) | The **Model/Data** (what to request) |
+| **Body in prompt** | No (summaries only) | No (summaries only) |
+
+### Two complementary axes
+
+WebMCP and MCP recipes serve different purposes:
+
+- **WebMCP** guides the "how to display": which components to use, in what layout, with what parameters. This is the **View** layer.
+- **MCP** guides the "what to request": which tools to call, in what order, with what parameters. This is the **Model/Data** layer.
+
+The agent uses both together: an MCP recipe tells it how to get the data, a WebMCP recipe tells it how to present it.

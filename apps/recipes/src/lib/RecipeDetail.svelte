@@ -104,7 +104,7 @@
   <div class="flex flex-col h-full overflow-y-auto p-4 gap-4">
     <div class="flex items-start justify-between gap-3">
       <div>
-        <h2 class="font-mono text-lg font-medium text-text1">{mcpRecipe.name}</h2>
+        <h2 class="font-mono text-lg font-medium text-text1">{mcpRecipe.name ?? 'Sans nom'}</h2>
         {#if mcpRecipe.description}
           <p class="text-sm text-text2 mt-1">{mcpRecipe.description}</p>
         {/if}
@@ -118,7 +118,7 @@
         {testing ? 'en cours...' : 'Tester'}
       </button>
     </div>
-    <p class="text-xs text-text2 font-mono">Recette MCP distante. Cliquez Tester pour l'executer via l'agent.</p>
+    <p class="text-xs text-text2 font-mono">Recette MCP distante. Appelle <code class="text-accent">get_recipe('{mcpRecipe.name ?? ''}')</code> dans le chat pour obtenir les instructions completes.</p>
   </div>
 {:else}
   <div class="flex items-center justify-center h-full text-text2 font-mono text-sm">
