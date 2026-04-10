@@ -1,74 +1,82 @@
 # @webmcp-auto-ui/agent
 
-LLM agent loop with Anthropic and Gemma LiteRT providers, plus 22 UI tools for rendering blocks, a unified `component()` tool exposing 56 components, TokenTracker, and summarizeChat.
+Boucle agent LLM avec providers Anthropic, Gemma LiteRT et locaux (Ollama/Llamafile), ToolLayers structurés, recettes WebMCP, `component()` unifié (56 composants), TokenTracker et summarizeChat.
 
-## What it does
+## Ce que fait le package
 
-- Runs an iterative LLM agent loop: prompt -> tool calls -> LLM -> repeat until done
-- Provides two LLM providers: `AnthropicProvider` (cloud, with retry on 503) and `GemmaProvider` (in-browser via LiteRT/MediaPipe on the main thread)
-- Supports Gemma 4 prompt format (`<|turn>...<turn|>`) and native tool call parsing (`<|tool_call>call:name{args}<tool_call|>`)
-- Defines 22 `render_*` UI tools that the LLM calls to compose visual blocks on the canvas
-- Bridges MCP server tools and UI tools into a unified tool set for the LLM
-- Tracks real-time usage metrics via `TokenTracker` (tok/s, totalTokens, latencyMs)
-- Generates anonymized chat summaries via `summarizeChat()` for HyperSkill exports
-- Supports per-request `temperature`, `topK`, `maxTokens` configuration
-- Clips long prompts via `sizeInTokens()` estimation
+- Boucle agent itérative : prompt -> tool calls -> LLM -> repeat jusqu'à `end_turn`
+- **ToolLayers** : structuration des outils en couches `McpLayer` (données) et `UILayer` (affichage)
+- **Mode smart/explicit** : `toolMode: 'smart'` = 1 seul tool `component()`, `'explicit'` = 31 `render_*`
+- **Recettes WebMCP** : fichiers `.md` avec frontmatter, parsées et injectées dans le prompt
+- **ComponentAdapter** : filtrage/personnalisation des composants UI exposés au LLM
+- 4 providers LLM : `RemoteLLMProvider`, `WasmProvider`, `LocalLLMProvider`, + legacy `AnthropicProvider`/`GemmaProvider`
+- TokenTracker temps réel + summarizeChat pour la provenance HyperSkill
 
 ## Providers
 
-### AnthropicProvider
+### RemoteLLMProvider (nouveau)
 
-Calls the Anthropic Claude API through a server-side proxy (SvelteKit `+server.ts`). Retries on 503 with exponential backoff.
-
-```ts
-import { AnthropicProvider } from '@webmcp-auto-ui/agent';
-
-const provider = new AnthropicProvider({
-  proxyUrl: '/api/chat',          // your SvelteKit proxy endpoint
-  model: 'claude-haiku-4-5-20251001',  // optional, defaults to Haiku
-  apiKey: 'sk-ant-...',          // optional, injected as __apiKey in body
-});
-
-// Switch model at runtime
-provider.setModel('claude-sonnet');
-```
-
-Built-in model mapping:
-
-| ModelId | Anthropic model |
-|---------|----------------|
-| `claude-haiku` | `claude-haiku-4-5-20251001` |
-| `claude-sonnet` | `claude-sonnet-4-6` |
-
-### GemmaProvider (LiteRT)
-
-Runs Gemma 4 locally on the main thread via `@mediapipe/tasks-genai` (LiteRT). No API key needed. Uses WebGPU when available. Models are cached in OPFS after first download for instant subsequent loads.
-
-> **v0.5.0 migration**: Migrated from ONNX (`@huggingface/transformers` with Web Worker) to LiteRT (`@mediapipe/tasks-genai` on main thread). LiteRT is 2-4x faster on WebGPU. The provider runs on the main thread because MediaPipe is incompatible with ES module workers.
+Provider unifié pour les API cloud (Anthropic et compatibles). Remplace `AnthropicProvider` (qui reste disponible en alias).
 
 ```ts
-import { GemmaProvider } from '@webmcp-auto-ui/agent';
+import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
 
-const provider = new GemmaProvider({
-  model: 'gemma-e2b',
-  onProgress: (pct, status, loaded, total) => console.log(`${pct}% — ${status}`),
-  onStatusChange: (status) => console.log('Status:', status),
-  // status: 'idle' | 'loading' | 'ready' | 'error'
+const provider = new RemoteLLMProvider({
+  proxyUrl: '/api/chat',
+  model: 'haiku',          // 'haiku' | 'sonnet' | 'opus' | string
+  apiKey: 'sk-ant-...',    // optionnel
 });
 ```
 
-**Gemma 4 prompt format**: Uses `<|turn>...<turn|>` delimiters (instead of Gemma 2/3 `<start_of_turn>...<end_of_turn>`).
+### WasmProvider (nouveau)
 
-**Native tool calling**: Tool calls are parsed from `<|tool_call>call:name{args}<tool_call|>` format.
+Provider unifié pour les modèles WASM in-browser. Remplace `GemmaProvider` (qui reste disponible en alias).
+
+```ts
+import { WasmProvider } from '@webmcp-auto-ui/agent';
+
+const provider = new WasmProvider({
+  model: 'gemma-e2b',      // 'gemma-e2b' | 'gemma-e4b' | string
+  onProgress: (pct, status, loaded, total) => console.log(`${pct}%`),
+  onStatusChange: (status) => console.log(status),
+});
+```
+
+Tourne sur le main thread via `@mediapipe/tasks-genai` (LiteRT). WebGPU si disponible. Cache OPFS.
+
+### LocalLLMProvider (nouveau)
+
+Provider pour les LLM locaux via API OpenAI-compatible (Ollama, Llamafile, LM Studio).
+
+```ts
+import { LocalLLMProvider } from '@webmcp-auto-ui/agent';
+
+const provider = new LocalLLMProvider({
+  baseUrl: 'http://localhost:11434',  // Ollama
+  model: 'llama3.2',
+  backend: 'ollama',                  // 'ollama' | 'llamafile' | 'lm-studio' | string
+});
+```
+
+### createProvider (factory)
+
+Crée un provider à partir d'un objet de configuration :
+
+```ts
+import { createProvider, type LLMConfig } from '@webmcp-auto-ui/agent';
+
+const config: LLMConfig = { type: 'remote', model: 'sonnet', proxyUrl: '/api/chat' };
+const provider = createProvider(config);
+```
+
+Types de config : `{ type: 'remote' }`, `{ type: 'wasm' }`, `{ type: 'local' }`.
 
 ### LLMProvider interface
-
-Both providers implement:
 
 ```ts
 interface LLMProvider {
   readonly name: string;
-  readonly model: ModelId;
+  readonly model: string;
   chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
@@ -79,93 +87,145 @@ interface LLMProvider {
       temperature?: number;
       topK?: number;
       maxTokens?: number;
+      onToken?: (token: string) => void;
     }
   ): Promise<LLMResponse>;
 }
 ```
 
-`LLMResponse` includes stats: `tokPerSec`, `totalTokens`, `latencyMs` for real-time performance monitoring.
-
 ### TokenTracker
-
-Tracks real-time usage metrics across multiple requests:
 
 ```ts
 import { TokenTracker } from '@webmcp-auto-ui/agent';
 
 const tracker = new TokenTracker();
 tracker.record({ inputTokens: 500, outputTokens: 120, cached: 400, latencyMs: 850 });
-
 console.log(tracker.stats);
 // { reqPerMin, inputPerMin, outputPerMin, cachedPerMin, totalRequests, totalInput, totalOutput }
 ```
 
-Used by the `TokenBubble` UI component for live dashboard metrics.
-
 ### summarizeChat
-
-Generates an anonymized summary of a chat conversation for HyperSkill export provenance:
 
 ```ts
 import { summarizeChat } from '@webmcp-auto-ui/agent';
 
 const summary = summarizeChat(messages);
-// Short text summary without PII or raw message content
+// Résumé anonymisé sans PII pour la provenance HyperSkill
 ```
 
-### Prompt clipping
+## ToolLayers
+
+Les ToolLayers structurent les outils en couches typées. C'est la nouvelle API (v0.7.0) qui remplace le passage plat de `mcpTools[]`.
+
+### Types
 
 ```ts
-import { sizeInTokens } from '@webmcp-auto-ui/agent';
+/** Couche MCP — outils et recettes d'un serveur connecté */
+interface McpLayer {
+  source: 'mcp';
+  serverUrl: string;
+  serverName?: string;
+  tools: McpToolDef[];
+  recipes?: McpRecipe[];
+}
 
-const tokens = sizeInTokens(longPrompt);  // estimated token count
+/** Couche UI — component() + recettes WebMCP */
+interface UILayer {
+  source: 'ui';
+  adapter?: ComponentAdapter;  // filtrage des composants (mode explicit uniquement)
+  recipes?: Recipe[];
+}
+
+type ToolLayer = McpLayer | UILayer;
 ```
 
-Used internally to clip prompts that exceed the model's context window.
+### buildToolsFromLayers
+
+Convertit les layers en `AnthropicTool[]` envoyés au LLM :
+
+```ts
+import { buildToolsFromLayers } from '@webmcp-auto-ui/agent';
+
+const tools = buildToolsFromLayers(layers, 'smart');
+// Mode smart : tools MCP + 1 seul tool component()
+// Mode explicit : tools MCP + 31 render_* + component()
+```
+
+### buildSystemPrompt
+
+Génère le prompt système structuré en sections markdown `## mcp` et `## webmcp` :
+
+```ts
+import { buildSystemPrompt } from '@webmcp-auto-ui/agent';
+
+// Nouvelle API — depuis les layers
+const prompt = buildSystemPrompt(layers, { toolMode: 'smart' });
+
+// Legacy — depuis un tableau plat de McpToolDef[]
+const prompt2 = buildSystemPrompt(mcpTools);
+```
+
+Le prompt généré contient :
+- `## mcp (serverName)` — liste des outils DATA + recettes serveur
+- `## webmcp` — instructions pour `component()` (mode smart) ou liste des `render_*` (mode explicit) + recettes UI
+
+## Mode smart vs explicit
+
+| | Smart (defaut) | Explicit |
+|--|---------------|----------|
+| **Outils UI** | 1 seul : `component()` | 31 `render_*` + `component()` |
+| **Discovery** | `component("help")` pour lister | Le LLM voit tous les tools |
+| **Tokens** | Economique (~200 tokens schema) | Couteux (~3000 tokens) |
+| **Recommandation** | Cloud (Claude) | WASM (Gemma) ou debug |
+
+En mode smart, le LLM appelle `component("help")` pour decouvrir les composants disponibles, puis `component("nom", {params})` pour rendre.
 
 ## Agent loop
 
-```ts
-import { runAgentLoop, buildSystemPrompt, mcpToolsToAnthropic, fromMcpTools } from '@webmcp-auto-ui/agent';
-```
-
 ### runAgentLoop
 
-Runs the LLM -> tool call -> LLM cycle until `end_turn` or `maxIterations`.
-
 ```ts
-const result = await runAgentLoop('Show me revenue by quarter', {
+import { runAgentLoop } from '@webmcp-auto-ui/agent';
+
+const result = await runAgentLoop('Montre-moi le CA par trimestre', {
   provider,
-  client: mcpClient,         // optional McpClient instance
-  mcpTools: tools,           // tools from client.listTools()
-  maxIterations: 10,         // default: 10
-  cacheEnabled: true,        // enable prompt caching
-  systemPrompt: customPrompt, // override the default system prompt
-  signal: abortController.signal,
+  layers: [mcpLayer, uiLayer],   // nouvelle API
+  toolMode: 'smart',
+  maxIterations: 5,
+  cacheEnabled: true,
+  initialMessages: history,       // historique conversation
   callbacks: {
     onBlock: (type, data) => canvas.addBlock(type, data),
     onText: (text) => console.log('LLM:', text),
-    onToolCall: (call) => console.log('Tool:', call.name, call.result),
-    onClear: () => canvas.clearBlocks(),
+    onToolCall: (call) => console.log('Tool:', call.name),
+    onToken: (token) => process.stdout.write(token),
   },
+  signal: abortController.signal,
 });
 
-console.log(result.text);           // final LLM text
-console.log(result.toolCalls);      // all tool calls made
-console.log(result.metrics);        // token usage, latency, iterations
-console.log(result.stopReason);     // 'end_turn' | 'max_iterations' | 'error'
+console.log(result.text);
+console.log(result.toolCalls);
+console.log(result.metrics);
+console.log(result.stopReason);  // 'end_turn' | 'max_iterations' | 'error'
+console.log(result.messages);    // conversation complete pour reprise
 ```
 
 ### AgentLoopOptions
 
 ```ts
 interface AgentLoopOptions {
-  client?: McpClient;
   provider: LLMProvider;
-  mcpTools?: McpToolDef[];
-  maxIterations?: number;
+  client?: McpClient;
+  mcpTools?: McpToolDef[];       // legacy — prefer layers
+  layers?: ToolLayer[];          // nouvelle API
+  toolMode?: 'smart' | 'explicit';
+  maxIterations?: number;        // default: 5
+  maxTokens?: number;
+  temperature?: number;
+  topK?: number;
   cacheEnabled?: boolean;
-  systemPrompt?: string;
+  systemPrompt?: string;         // override le prompt auto-genere
+  initialMessages?: ChatMessage[];
   callbacks?: AgentCallbacks;
   signal?: AbortSignal;
 }
@@ -175,156 +235,283 @@ interface AgentLoopOptions {
 
 ```ts
 interface AgentCallbacks {
-  onBlock?: (type: string, data: Record<string, unknown>) => void;
-  onText?: (text: string) => void;
+  onIterationStart?: (iteration: number, maxIterations: number) => void;
+  onLLMRequest?: (messages: ChatMessage[], tools: AnthropicTool[]) => void;
+  onLLMResponse?: (response: LLMResponse, latencyMs: number, tokens?: { input: number; output: number }) => void;
   onToolCall?: (call: ToolCall) => void;
+  onBlock?: (type: string, data: Record<string, unknown>) => { id: string } | void;
   onClear?: () => void;
+  onText?: (text: string) => void;
+  onToken?: (token: string) => void;
+  onDone?: (metrics: AgentMetrics) => void;
+  onUpdate?: (id: string, data: Record<string, unknown>) => void;
+  onMove?: (id: string, x: number, y: number) => void;
+  onResize?: (id: string, w: number, h: number) => void;
+  onStyle?: (id: string, styles: Record<string, string>) => void;
 }
 ```
 
-### AgentResult
+### trimConversationHistory
+
+Tronque l'historique pour respecter un budget de tokens :
 
 ```ts
-interface AgentResult {
-  text: string;
-  toolCalls: ToolCall[];
-  metrics: AgentMetrics;
-  stopReason: 'end_turn' | 'max_iterations' | 'error';
-}
+import { trimConversationHistory } from '@webmcp-auto-ui/agent';
 
-interface AgentMetrics {
-  totalTokens: number;
-  promptTokens: number;
-  completionTokens: number;
-  totalLatencyMs: number;
-  toolCalls: number;
-  iterations: number;
-  cacheHits: number;
-}
+const trimmed = trimConversationHistory(messages, 4096);
+// Supprime les paires user/assistant les plus anciennes en preservant les system messages
 ```
 
-### Helper functions
+### Helpers
 
-**`buildSystemPrompt(mcpTools)`** — Generates the default system prompt listing all DATA and UI tools available to the LLM.
+- **`mcpToolsToAnthropic(tools)`** — Convertit `McpToolDef[]` en `AnthropicTool[]`
+- **`fromMcpTools(mcpTools)`** — Convertit `McpTool[]` (from core) en `McpToolDef[]`
 
-**`mcpToolsToAnthropic(tools)`** — Converts MCP tool definitions to Anthropic API format (sanitizes schemas).
+## Outils UI
 
-**`fromMcpTools(mcpTools)`** — Alias/helper for converting MCP tools for use in the agent loop.
-
-## UI tools
-
-22 render tools + 1 canvas action, exposed to the LLM. Each `render_*` tool maps to a block type in `@webmcp-auto-ui/ui`.
+22 tools render + actions canvas. Chaque `render_*` mappe vers un block type dans `@webmcp-auto-ui/ui`.
 
 ```ts
 import { UI_TOOLS, isUITool, executeUITool } from '@webmcp-auto-ui/agent';
 ```
 
-### Tool list
+| Tool | Block type |
+|------|-----------|
+| `render_stat` | `stat` |
+| `render_kv` | `kv` |
+| `render_list` | `list` |
+| `render_chart` | `chart` |
+| `render_alert` | `alert` |
+| `render_code` | `code` |
+| `render_text` | `text` |
+| `render_actions` | `actions` |
+| `render_tags` | `tags` |
+| `render_table` | `data-table` |
+| `render_timeline` | `timeline` |
+| `render_profile` | `profile` |
+| `render_trombinoscope` | `trombinoscope` |
+| `render_json` | `json-viewer` |
+| `render_hemicycle` | `hemicycle` |
+| `render_chart_rich` | `chart-rich` |
+| `render_cards` | `cards` |
+| `render_sankey` | `sankey` |
+| `render_log` | `log` |
+| `render_gallery` | `gallery` |
+| `render_carousel` | `carousel` |
+| `render_d3` | `d3` |
+| `clear_canvas` | (action) |
 
-#### Simple blocks
+## component() unifie
 
-| Tool | Block type | Required params |
-|------|-----------|-----------------|
-| `render_stat` | `stat` | `label`, `value` |
-| `render_kv` | `kv` | `rows` (array of `[key, value]`) |
-| `render_list` | `list` | `items` (string array) |
-| `render_chart` | `chart` | `bars` (array of `[label, number]`) |
-| `render_alert` | `alert` | `title` |
-| `render_code` | `code` | `content` |
-| `render_text` | `text` | `content` |
-| `render_actions` | `actions` | `buttons` (array of `{ label, primary? }`) |
-| `render_tags` | `tags` | `tags` (array of `{ text, active? }`) |
-
-#### Rich widgets
-
-| Tool | Block type | Required params |
-|------|-----------|-----------------|
-| `render_table` | `data-table` | `rows` |
-| `render_timeline` | `timeline` | `events` (array of `{ title, date?, status? }`) |
-| `render_profile` | `profile` | `name` |
-| `render_trombinoscope` | `trombinoscope` | `people` (array of `{ name, subtitle?, badge? }`) |
-| `render_json` | `json-viewer` | `data` (any JSON) |
-| `render_hemicycle` | `hemicycle` | `groups` (array of `{ id, label, seats, color }`) |
-| `render_chart_rich` | `chart-rich` | `data` (array of `{ values, label?, color? }`) |
-| `render_cards` | `cards` | `cards` (array of `{ title, description? }`) |
-| `render_sankey` | `sankey` | `nodes`, `links` |
-| `render_log` | `log` | `entries` (array of `{ message, level?, timestamp? }`) |
-| `render_gallery` | `gallery` | `images` (array of `{ src, alt?, caption? }`) |
-| `render_carousel` | `carousel` | `slides` |
-| `render_d3` | `d3` | `preset`, `data` |
-
-#### Canvas actions
-
-| Tool | Description |
-|------|-------------|
-| `clear_canvas` | Clears all blocks from the canvas |
-
-### Checking and executing UI tools
-
-```ts
-if (isUITool('render_stat')) {
-  const result = executeUITool('render_stat', { label: 'Users', value: '42' }, {
-    onBlock: (type, data) => canvas.addBlock(type, data),
-  });
-  // result: "Rendered stat block"
-}
-```
-
-## Unified `component()` tool
-
-In addition to the individual `render_*` tools, the agent package provides a single unified `component()` tool that exposes **56 components** (31 renderable, 25 non-renderable) through a consistent interface.
-
-This approach was inspired by [Emmanuel Raviart](https://www.tricoteuses.fr/mcp), creator of the Tricoteuses MCP server, who suggested consolidating the tool surface into a single discoverable entry point.
+Tool unique qui expose 56 composants (31 renderable, 25 non-renderable). En mode smart, c'est le seul outil UI visible par le LLM.
 
 ```ts
 import { COMPONENT_TOOL, executeComponent, componentRegistry } from '@webmcp-auto-ui/agent';
 ```
 
-### Three modes
+### Trois modes d'appel
 
-| Mode | Call | Returns |
-|------|------|---------|
-| **List all** | `component("help")` | Array of all 56 components with name, description, and `renderable` flag |
-| **Inspect one** | `component("help", "stat-card")` | Schema, description, and renderability of a single component |
-| **Render** | `component("stat-card", { label: "Revenue", value: "$142K" })` | Renders the component (renderable ones only) |
+| Appel | Retour |
+|-------|--------|
+| `component("help")` | Liste des 56 composants avec nom, description, flag `renderable` |
+| `component("help", "stat-card")` | Schema + description + renderability d'un composant |
+| `component("stat-card", { label: "Revenue", value: "$142K" })` | Rend le composant |
 
-### Component categories
+Les noms utilisent des tirets (`stat-card`). Les noms `render_*` sont acceptes en backward compat.
 
-- **Renderable (31)** -- all `render_*` block types plus canvas actions (`clear`, `update`, `move`, `resize`, `style`). These can be rendered through the agent tool pipeline via `executeComponent`.
-- **Non-renderable (25)** -- primitives, base UI components, layouts, agent UI widgets, and theme provider. These are Svelte components available for direct import from `@webmcp-auto-ui/ui`. Calling render on them returns their schema and a usage hint.
-
-Component names use dashes (e.g., `stat-card`). The original `render_*` names are also accepted for backward compatibility.
-
-### Coexistence with `render_*` tools
-
-Both approaches work simultaneously. The individual `render_*` tools remain available and fully functional. The `component()` tool is an additional entry point that provides discoverability (via `help` mode) and a uniform interface.
-
-### Custom components
-
-The `componentRegistry` is a mutable `Map<string, ComponentEntry>`. Apps can register additional components at runtime:
+### Composants custom
 
 ```ts
-import { componentRegistry, type ComponentEntry } from '@webmcp-auto-ui/agent';
-
 componentRegistry.set('my-widget', {
   name: 'my-widget',
   toolName: 'my-widget',
-  description: 'Custom widget for my app.',
+  description: 'Widget custom.',
   inputSchema: { type: 'object', properties: { title: { type: 'string' } } },
   renderable: false,
 });
 ```
 
-For the full list of all 56 components and their schemas, see [composing.md](../agents/composing.md#unified-component-tool).
+## ComponentAdapter
 
-## Workflow
+Filtre et personnalise les composants UI exposes au LLM. Utile en mode explicit pour limiter les tools envoyes.
 
-The standard agent workflow:
+```ts
+import { ComponentAdapter, nativePreset, allNativePreset, minimalPreset } from '@webmcp-auto-ui/agent';
 
-1. User sends a message
-2. `buildSystemPrompt` lists available DATA tools (from MCP) and UI tools
-3. `runAgentLoop` sends the message + tools to the LLM
-4. LLM calls a DATA tool (e.g., `query_sql`) -> forwarded to MCP server via `McpClient`
-5. LLM receives data, calls a UI tool (e.g., `render_chart`) -> executed locally via callbacks
-6. Block appears on the canvas via `onBlock` callback
-7. Loop continues until LLM sends `end_turn`
+// Preset minimal : stat, kv, chart, table, text + clear, update
+const adapter = new ComponentAdapter();
+adapter.registerAll(minimalPreset());
+
+// Preset complet
+adapter.registerAll(allNativePreset());
+
+// Preset par groupes
+adapter.registerAll(nativePreset('simple', 'rich', 'canvas'));
+
+// Utilisation dans un UILayer
+const uiLayer: UILayer = { source: 'ui', adapter, recipes: myRecipes };
+```
+
+### Groupes disponibles
+
+| Groupe | Composants |
+|--------|-----------|
+| `simple` | stat, kv, list, chart, alert, code, text, actions, tags |
+| `rich` | table, timeline, profile, trombinoscope, json, hemicycle, chart-rich, cards, sankey, log, stat-card, grid |
+| `media` | gallery, carousel, map |
+| `advanced` | d3, js-sandbox |
+| `canvas` | clear, update, move, resize, style |
+
+### API
+
+```ts
+class ComponentAdapter {
+  register(def: ComponentDef): this;
+  registerAll(defs: ComponentDef[]): this;
+  unregister(type: string): this;
+  tools(): AnthropicTool[];         // definitions a envoyer au LLM
+  types(): string[];
+  get(type: string): ComponentDef | undefined;
+  getRenderer(type: string): unknown | undefined;
+  byGroup(group: string): ComponentDef[];
+  get size(): number;
+}
+```
+
+## Recettes WebMCP
+
+Les recettes guident le LLM sur comment presenter les donnees. Ce sont des fichiers `.md` avec un frontmatter YAML.
+
+### Format d'une recette
+
+```markdown
+---
+id: composer-tableau-de-bord-kpi
+name: Composer un tableau de bord KPI
+components_used: [stat-card, chart, table, kv]
+when: les donnees contiennent des metriques numeriques
+servers: []
+layout:
+  type: grid
+  columns: 3
+---
+
+## Quand utiliser
+Les resultats MCP contiennent des metriques numeriques...
+
+## Comment
+1. Identifier les 3-5 KPIs principaux
+2. Afficher chaque KPI en stat-card
+3. Ajouter un chart pour les series temporelles
+```
+
+### Types
+
+```ts
+interface Recipe {
+  id: string;
+  name: string;
+  description?: string;
+  components_used?: string[];
+  layout?: { type: string; columns?: number; arrangement?: string };
+  when: string;
+  servers?: string[];
+  body: string;
+}
+
+interface McpRecipe {
+  name: string;
+  description?: string;
+}
+```
+
+### API
+
+```ts
+import {
+  WEBMCP_RECIPES,        // recettes built-in parsees
+  parseRecipe,            // parser une recette .md brute
+  parseRecipes,           // parser un lot de recettes
+  recipeRegistry,         // registre singleton (read-only)
+  registerRecipes,        // populer le registre
+  filterRecipesByServer,  // filtrer par nom de serveur connecte
+  formatRecipesForPrompt, // formater pour injection dans le prompt
+} from '@webmcp-auto-ui/agent';
+
+// Les recettes built-in sont auto-enregistrees a l'import
+console.log(WEBMCP_RECIPES.length); // 8+ recettes
+
+// Filtrer par serveur connecte
+const relevant = filterRecipesByServer(WEBMCP_RECIPES, ['tricoteuses']);
+
+// Formater pour le prompt (compact, <500 tokens pour 5 recettes)
+const text = formatRecipesForPrompt(relevant);
+```
+
+### Recettes MCP (serveur)
+
+Les recettes MCP viennent du serveur via `list_recipes` / `get_recipe`. Elles decrivent ce que les outils retournent et comment les combiner. Elles sont portees par `McpLayer.recipes` et injectees dans la section `## mcp` du prompt.
+
+## Workflow complet (v0.7.0)
+
+```
+1. L'app construit des ToolLayer[]
+   - McpLayer pour chaque serveur MCP connecte
+   - UILayer avec adapter optionnel + recettes WebMCP
+
+2. buildSystemPrompt(layers, { toolMode })
+   -> prompt francais structure: ## mcp / ## webmcp
+
+3. buildToolsFromLayers(layers, toolMode)
+   -> AnthropicTool[] (smart: MCP + component(), explicit: MCP + 31 render_* + component())
+
+4. runAgentLoop(msg, { layers, toolMode, ... })
+   -> boucle LLM iterative
+
+5. En mode smart:
+   LLM appelle component("help") -> decouverte
+   LLM appelle component("stat-card", {params}) -> rendu
+   LLM appelle query_sql({sql}) -> donnees MCP
+   LLM appelle component("table", {rows}) -> affichage
+
+6. Les recettes WebMCP guident le LLM sur le choix des composants
+7. Les recettes MCP decrivent les donnees retournees par les outils
+```
+
+## Exports complets
+
+```ts
+// Providers
+export { RemoteLLMProvider, WasmProvider, LocalLLMProvider, createProvider };
+export { AnthropicProvider, GemmaProvider };  // backward compat
+
+// Agent loop
+export { runAgentLoop, buildSystemPrompt, mcpToolsToAnthropic, fromMcpTools, trimConversationHistory };
+
+// UI tools
+export { UI_TOOLS, isUITool, executeUITool };
+export { COMPONENT_TOOL, executeComponent, componentRegistry };
+
+// Recettes
+export { WEBMCP_RECIPES, parseRecipe, parseRecipes };
+export { recipeRegistry, registerRecipes, filterRecipesByServer, formatRecipesForPrompt, formatMcpRecipesForPrompt };
+
+// Tool layers
+export { buildToolsFromLayers };
+export type { ToolLayer, McpLayer, UILayer };
+
+// Component adapter
+export { ComponentAdapter, nativePreset, allNativePreset, minimalPreset };
+export type { ComponentDef };
+
+// Utilitaires
+export { TokenTracker, summarizeChat };
+
+// Types
+export type {
+  RemoteModelId, WasmModelId, LLMId, ModelId,
+  ChatMessage, ContentBlock, McpToolDef, AnthropicTool,
+  LLMProvider, LLMResponse, ToolCall, AgentMetrics, AgentResult, AgentCallbacks,
+  Recipe, McpRecipe, AgentLoopOptions, ComponentEntry,
+};
+```

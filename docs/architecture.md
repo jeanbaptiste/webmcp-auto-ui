@@ -1,8 +1,8 @@
 # Architecture
 
-Monorepo structure, package dependencies, and key design decisions.
+Structure monorepo, dependances entre packages, et decisions de design (v0.7.0).
 
-## Monorepo layout
+## Structure monorepo
 
 ```
 webmcp-auto-ui/
@@ -10,7 +10,7 @@ webmcp-auto-ui/
  +-- packages/
  |    +-- core/          W3C WebMCP polyfill + MCP Streamable HTTP client
  |    +-- sdk/           HyperSkill format, skills CRUD, canvas store (Svelte 5)
- |    +-- agent/         LLM agent loop, Anthropic + Gemma providers, UI tools
+ |    +-- agent/         LLM agent loop, 4 providers, ToolLayers, recettes, component()
  |    +-- ui/            34+ Svelte 5 components (primitives, widgets, WM)
  |
  +-- apps/
@@ -19,12 +19,17 @@ webmcp-auto-ui/
  |    +-- viewer/        HyperSkill URL renderer (port 5176)
  |    +-- showcase/      Component showcase + WebMCP tool demos (port 5177)
  |    +-- flex/          Canvas drag & resize, multi-MCP, chat (port 5179)
+ |    +-- flex2/         Layers, component() unique, debug panel, mode composeur/consommateur
+ |    +-- viewer2/       Lecteur HyperSkills read-only avec CRUD, DAG, paste URI
+ |    +-- showcase2/     Demo dynamique avec agent + MCP + 3 themes
+ |    +-- todo2/         Todo WebMCP, template minimal
+ |    +-- recipes/       Explorateur de recettes MCP + WebMCP avec test live
  |
  +-- docs/               Documentation
  +-- package.json        Root workspace config
 ```
 
-## Package dependency graph
+## Graphe de dependances
 
 ```
                 +----------+
@@ -40,64 +45,125 @@ webmcp-auto-ui/
          (Svelte 5 runes)
 
          +---------+
-         |   ui    |  (standalone — no internal deps)
+         |   ui    |  (standalone -- pas de deps internes)
          +---------+
 ```
 
-- **core** has zero external dependencies. Pure TypeScript.
-- **sdk** depends on Svelte 5 (peer) for the canvas store. Also provides a vanilla (framework-agnostic) canvas store at `@webmcp-auto-ui/sdk/canvas-vanilla`. Ships `MCP_DEMO_SERVERS` registry. No dependency on core.
-- **agent** depends on core (`@webmcp-auto-ui/core`) for `McpClient`, `McpMultiClient`, `sanitizeSchema`, and types. Uses `@mediapipe/tasks-genai` for Gemma LiteRT (replaces `@huggingface/transformers` ONNX).
-- **ui** is standalone. Peer dependencies: `svelte ^5`, `d3 ^7`, `leaflet >=1.9`.
+- **core** : zero dependances externes. TypeScript pur.
+- **sdk** : depend de Svelte 5 (peer) pour le canvas store. Fournit aussi un store vanilla a `@webmcp-auto-ui/sdk/canvas-vanilla`. Shippe `MCP_DEMO_SERVERS`.
+- **agent** : depend de core (`McpClient`, `sanitizeSchema`, types). 4 providers LLM. ToolLayers. Recettes. ComponentAdapter.
+- **ui** : standalone. Peer deps : `svelte ^5`, `d3 ^7`, `leaflet >=1.9`.
 
-## App descriptions
+## Les 3 couches (v0.7.0)
 
-| App | Purpose |
-|-----|---------|
-| **home** | Landing page with links to all other apps. Configurable via `PUBLIC_BASE_URL`. |
-| **flex** | Canvas drag & resize, multi-MCP, ephemeral chat, HyperSkills export, Gemma WASM local. The most complete demo. |
-| **todo** | Minimal todo app demonstrating MCP tool integration for CRUD operations. |
-| **viewer** | Decodes a HyperSkill URL (`?hs=...`) and renders the embedded skill read-only. |
-| **showcase** | Interactive catalog of all UI components. Also demonstrates WebMCP tool registration and postMessage bridge. |
+L'architecture v0.7.0 structure les outils en 3 couches via les `ToolLayer[]` :
 
-## Technology stack
+```
++--------------------------------------------------+
+|                    ToolLayer[]                     |
+|                                                    |
+|  +-- McpLayer (par serveur) ---+  +-- UILayer --+ |
+|  |  tools: MCP tools           |  | component() | |
+|  |  recipes: MCP recipes       |  | adapter?    | |
+|  |  serverName, serverUrl      |  | recipes: UI | |
+|  +-----------------------------+  +-------------+ |
++--------------------------------------------------+
+         |                               |
+    buildSystemPrompt()          buildToolsFromLayers()
+         |                               |
+    Prompt structure:            AnthropicTool[]:
+    ## mcp (servers)             - MCP tools
+    ## webmcp                    - component() (smart)
+                                 - ou render_* (explicit)
+```
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | SvelteKit (apps), Svelte 5 (components) |
+### McpLayer
+
+Un par serveur MCP connecte. Porte les outils DATA (query, fetch) et les recettes serveur (ce que les outils retournent).
+
+### UILayer
+
+Un seul par app. Porte `component()`, le `ComponentAdapter` optionnel (pour filtrer les composants en mode explicit), et les recettes WebMCP (comment presenter les donnees).
+
+### Recettes
+
+Deux types de recettes cohabitent :
+
+| Type | Source | Role | Section prompt |
+|------|--------|------|---------------|
+| **Recette MCP** | Serveur (`list_recipes`) | Decrit les donnees retournees | `## mcp > recettes serveur` |
+| **Recette WebMCP** | Package agent (fichiers .md) | Guide la presentation UI | `## webmcp > recettes UI` |
+
+## Description des apps
+
+| App | Description |
+|-----|------------|
+| **home** | Landing page avec liens vers toutes les apps. Configurable via `PUBLIC_BASE_URL`. |
+| **flex** | Canvas drag & resize, multi-MCP, ephemeral chat, HyperSkills export, Gemma WASM. |
+| **flex2** | Version layers : component() unique, debug panel, badges provenance, mode composeur/consommateur, panneau recettes, agent logs. |
+| **todo** | Todo app demontrant l'integration MCP CRUD. |
+| **todo2** | Todo WebMCP, template minimal avec la nouvelle architecture layers. |
+| **viewer** | Decode une HyperSkill URL (`?hs=...`) et rend le skill en read-only. |
+| **viewer2** | Lecteur HyperSkills read-only avec CRUD, DAG de versions, paste URI. |
+| **showcase** | Catalogue interactif des composants UI + demo WebMCP tools. |
+| **showcase2** | Demo dynamique avec agent + MCP + 3 themes. |
+| **recipes** | Explorateur de recettes MCP + WebMCP avec test live. |
+
+## Stack technique
+
+| Couche | Technologie |
+|--------|-----------|
+| Framework | SvelteKit (apps), Svelte 5 (composants) |
 | Styling | Tailwind CSS 4 + CSS variables theming |
 | UI base | bits-ui (shadcn-svelte pattern), tailwind-variants |
 | Charting | D3.js v7 (Chart, Sankey, Hemicycle, D3Widget) |
 | Maps | Leaflet (MapView) |
-| LLM | Anthropic Claude API (via server proxy), Gemma 4 LiteRT (in-browser, main thread, OPFS cache) |
+| LLM | Anthropic Claude API (via server proxy), Gemma 4 LiteRT (in-browser, OPFS), Ollama/Llamafile (local) |
 | Protocol | MCP Streamable HTTP (JSON-RPC 2.0) |
 | Build | TypeScript, svelte-package, Vite |
 
-## Key design decisions
+## Decisions de design
+
+### ToolLayers (v0.7.0)
+
+Les outils ne sont plus passes en tableau plat (`mcpTools[]`). Ils sont structures en couches typees (`McpLayer`, `UILayer`) qui portent chacune leurs outils et recettes. `buildSystemPrompt()` et `buildToolsFromLayers()` consomment ces layers pour produire le prompt et les outils.
+
+### Mode smart vs explicit
+
+Le mode `smart` (defaut) n'expose qu'un seul tool `component()` au LLM. Le LLM decouvre les composants via `component("help")` et les rend via `component("nom", {params})`. Cela economise ~2800 tokens de schema par rapport au mode `explicit` (31 render_* individuels).
+
+### Recettes WebMCP
+
+Les recettes sont des fichiers `.md` avec frontmatter YAML. Elles guident le LLM sur le choix des composants en fonction des donnees retournees par le serveur MCP. Le parser est tolerant : il accepte aussi les fichiers sans frontmatter (freeform).
+
+### ComponentAdapter
+
+Decouple les definitions d'outils (ce que le LLM voit) des renderers (ce que l'utilisateur voit). Les apps enregistrent uniquement les composants dont elles ont besoin via des presets (`minimalPreset`, `nativePreset`, `allNativePreset`).
 
 ### CSS variables theming
 
-Theme tokens (colors, radii, fonts) are defined as CSS custom properties in `ThemeProvider`. Two built-in modes (`light`, `dark`) with full override support via `theme.json` or the canvas store's `themeOverrides`. Components read tokens from CSS variables, making theming work without recompilation.
+Tokens (couleurs, radii, fonts) en CSS custom properties dans `ThemeProvider`. Deux modes built-in (`light`, `dark`) avec override complet via `theme.json` ou le canvas store.
 
 ### FONC message bus
 
-Components never call each other directly. The `bus` singleton implements Alan Kay's "messaging not calling" principle: components register on named channels and exchange `BusMessage` objects. This decouples senders from receivers and enables composition without tight coupling.
+Les composants ne s'appellent jamais directement. Le bus `bus` singleton implemente le principe "messaging not calling" d'Alan Kay.
 
 ### BlockRenderer dispatch
 
-`BlockRenderer` is a single Svelte component that takes a `{ type, data }` block and dispatches rendering to the correct widget. The agent loop emits blocks via callbacks; the canvas store holds them; `BlockRenderer` renders them. This creates a clean pipeline: **LLM -> tool call -> block -> store -> renderer**.
+`BlockRenderer` recoit `{ type, data }` et dispatche vers le widget. Pipeline : **LLM -> tool call -> block -> store -> renderer**.
 
 ### HyperSkill URL format
 
-A skill (blocks + MCP URL + LLM choice + theme) is serialized to JSON, base64-encoded, and appended as `?hs=...` query parameter. Skills larger than 6KB are gzip-compressed (prefix `gz.`). Each version carries a SHA-256 hash for traceability and chaining.
+Skill serialisee en JSON -> base64 -> `?hs=`. Gzip au-dela de 6KB. SHA-256 pour tracabilite.
 
 ### LiteRT migration (v0.5.0)
 
-The Gemma WASM provider was migrated from ONNX (`@huggingface/transformers` running in a Web Worker) to LiteRT (`@mediapipe/tasks-genai` running on the main thread). LiteRT is 2-4x faster on WebGPU and provides native Gemma 4 support with the new `<|turn>...<turn|>` prompt format and `<|tool_call>call:name{args}<tool_call|>` tool call parsing. The provider runs on the main thread because MediaPipe is incompatible with ES module workers. Models are cached in OPFS (Origin Private File System) for instant reload after first download.
+Le provider Gemma WASM a migre de ONNX (`@huggingface/transformers` + Web Worker) a LiteRT (`@mediapipe/tasks-genai` main thread). 2-4x plus rapide sur WebGPU. Cache OPFS.
 
 ### Vanilla canvas store
 
-In addition to the Svelte 5 runes-based canvas store (`@webmcp-auto-ui/sdk/canvas`), a framework-agnostic vanilla store is available at `@webmcp-auto-ui/sdk/canvas-vanilla`. Same API but uses plain callbacks instead of Svelte runes, enabling integration with React, Vue, or vanilla JS.
+En plus du store Svelte 5 runes (`@webmcp-auto-ui/sdk/canvas`), un store vanilla framework-agnostic a `@webmcp-auto-ui/sdk/canvas-vanilla` pour React/Vue/vanilla.
 
 ### Agent loop architecture
 
-The agent loop (`runAgentLoop`) runs an iterative LLM -> tool call -> LLM cycle. UI tools (`render_*`) are executed locally via callbacks (no MCP roundtrip). Data tools are forwarded to the MCP server via `McpClient.callTool()`. The loop stops on `end_turn` or `max_iterations`.
+`runAgentLoop` accepte soit `layers` (nouvelle API) soit `mcpTools` (legacy). Les UI tools sont executes localement via callbacks. Les DATA tools sont forwards au serveur MCP via `McpClient.callTool()`. Arret sur `end_turn` ou `max_iterations`.

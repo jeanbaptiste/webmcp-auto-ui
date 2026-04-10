@@ -2,8 +2,8 @@
   import { onMount, untrack } from 'svelte';
   import { base } from '$app/paths';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-  import { listSkills } from '@webmcp-auto-ui/sdk';
-  import type { Skill } from '@webmcp-auto-ui/sdk';
+  import { listSkills, encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+  import type { Skill, HyperSkill } from '@webmcp-auto-ui/sdk';
   import { McpMultiClient } from '@webmcp-auto-ui/core';
   import { AnthropicProvider, GemmaProvider, runAgentLoop, buildSystemPrompt, fromMcpTools, trimConversationHistory, summarizeChat, TokenTracker, WEBMCP_RECIPES, filterRecipesByServer } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer, UILayer } from '@webmcp-auto-ui/agent';
@@ -275,10 +275,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs render_* quand c'
       } catch { /* don't block export */ }
     }
 
-    const json = JSON.stringify(skill);
-    const param = btoa(unescape(encodeURIComponent(json)))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    const url = `${window.location.origin}/flex?hs=${param}`;
+    const url = await encodeHyperSkill(skill as HyperSkill, window.location.origin + base + '/flex');
     await navigator.clipboard.writeText(url);
     exportCopied = true;
     setTimeout(() => { exportCopied = false; }, 2000);

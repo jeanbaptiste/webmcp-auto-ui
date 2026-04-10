@@ -2,8 +2,8 @@
   import { onMount, onDestroy, untrack } from 'svelte';
   import { base } from '$app/paths';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-  import { listSkills } from '@webmcp-auto-ui/sdk';
-  import type { Skill } from '@webmcp-auto-ui/sdk';
+  import { listSkills, encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+  import type { Skill, HyperSkill } from '@webmcp-auto-ui/sdk';
   import { McpMultiClient } from '@webmcp-auto-ui/core';
   import {
     AnthropicProvider, GemmaProvider, runAgentLoop, buildSystemPrompt,
@@ -16,6 +16,7 @@
   import FlexGrid from '$lib/FlexGrid.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
   import SettingsDrawer from '$lib/SettingsDrawer.svelte';
+  import LogDrawer from '$lib/LogDrawer.svelte';
   import DebugPanel from '$lib/DebugPanel.svelte';
 
   // ── State ─────────────────────────────────────────────────────────────
@@ -68,7 +69,32 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
   let multiClient = $state<McpMultiClient>(new McpMultiClient());
   let connectedUrls = $state<string[]>([]);
   let loadingUrls = $state<string[]>([]);
-  let mcpRecipes = $state<{name:string; description?:string}[]>([]);
+  /** Recipes indexed by server URL for proper cleanup on disconnect */
+  let mcpRecipesByServer = $state<Map<string, {name:string; description?:string; serverName?:string}[]>>(new Map());
+  /** Merged recipes with duplicate-name prefixing across servers */
+  let mcpRecipes = $derived.by(() => {
+    const all: {name:string; description?:string; serverName?:string}[] = [];
+    for (const recipes of mcpRecipesByServer.values()) all.push(...recipes);
+    // Detect duplicate names across servers and prefix them
+    const nameCounts = new Map<string, number>();
+    for (const r of all) nameCounts.set(r.name, (nameCounts.get(r.name) ?? 0) + 1);
+    return all.map(r => {
+      if ((nameCounts.get(r.name) ?? 0) > 1 && r.serverName) {
+        return { ...r, name: `${r.serverName}: ${r.name}` };
+      }
+      return r;
+    });
+  });
+
+  // ── Tool call details for tooltips ──────────────────────────────────
+  interface ToolCallDetail {
+    name: string;
+    args: Record<string, unknown>;
+    result?: string;
+    error?: string;
+    elapsed?: number;
+  }
+  let toolCallDetails = $state<Map<string, ToolCallDetail>>(new Map());
 
   async function addMcpServer(url: string) {
     if (!url.trim()) return;
@@ -88,8 +114,11 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
           if (text?.text) {
             const parsed = JSON.parse(text.text);
             const newRecipes: {name:string; description?:string}[] = Array.isArray(parsed) ? parsed : (parsed?.recipes ?? []);
-            const existing = new Set(mcpRecipes.map(r => r.name));
-            mcpRecipes = [...mcpRecipes, ...newRecipes.filter(r => !existing.has(r.name))];
+            const serverName = multiClient.listServers().find(s => s.url === url.trim())?.name;
+            const tagged = newRecipes.map(rec => ({ ...rec, serverName }));
+            const next = new Map(mcpRecipesByServer);
+            next.set(url.trim(), tagged);
+            mcpRecipesByServer = next;
           }
         } catch { /* no recipes */ }
       }
@@ -104,9 +133,12 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
   async function removeMcpServer(url: string) {
     await multiClient.removeServer(url);
     connectedUrls = connectedUrls.filter(u => u !== url);
+    // Remove recipes for the disconnected server
+    const next = new Map(mcpRecipesByServer);
+    next.delete(url);
+    mcpRecipesByServer = next;
     if (multiClient.serverCount === 0) {
       canvas.setMcpConnected(false, '', []);
-      mcpRecipes = [];
     } else {
       const allTools = multiClient.listAllTools();
       canvas.setMcpConnected(true, multiClient.listServers().map(s => s.name).join(', '), allTools as Parameters<typeof canvas.setMcpConnected>[2]);
@@ -238,10 +270,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
         skill.provenance = result.provenance;
       } catch { /* don't block export */ }
     }
-    const json = JSON.stringify(skill);
-    const param = btoa(unescape(encodeURIComponent(json)))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    const url = `${window.location.origin}/flex2?hs=${param}`;
+    const url = await encodeHyperSkill(skill as HyperSkill, window.location.origin + base + '/flex2');
     await navigator.clipboard.writeText(url);
     exportCopied = true;
     setTimeout(() => { exportCopied = false; }, 2000);
@@ -254,6 +283,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
     ephemeral = [];
     allToolsUsed = [];
     agentLogs = [];
+    toolCallDetails = new Map();
     pushHistory('user', msg);
     const userId = uid();
     ephemeral = [...ephemeral, { id: userId, role: 'user', html: msg }];
@@ -312,11 +342,30 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
             const argsPreview = JSON.stringify(call.args).slice(0, 200);
             const resultPreview = (call.result ?? call.error ?? '').slice(0, 200);
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'tool', detail: `${call.name}(${argsPreview}) -> ${resultPreview} [${call.elapsed ?? '?'}ms]` }];
+            // Store full details for tooltip
+            const callId = `tc_${Date.now()}_${chatToolCount}`;
+            const detail: ToolCallDetail = {
+              name: call.name,
+              args: call.args ?? {},
+              result: call.result,
+              error: call.error,
+              elapsed: call.elapsed,
+            };
+            const nextDetails = new Map(toolCallDetails);
+            nextDetails.set(callId, detail);
+            toolCallDetails = nextDetails;
+            // Build tooltip content
+            const tooltipArgs = JSON.stringify(call.args, null, 2).slice(0, 500);
+            const tooltipResult = (call.result ?? call.error ?? '').slice(0, 500);
+            const tooltipElapsed = call.elapsed != null ? `${call.elapsed}ms` : '?';
+            const tooltipSize = `${(call.result ?? '').length} chars`;
+            const tooltipText = `${call.name}\n\nArgs:\n${tooltipArgs}\n\nResult:\n${tooltipResult}\n\nDuration: ${tooltipElapsed}\nSize: ${tooltipSize}`;
+            const escapedTooltip = tooltipText.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
             if (showToolJSON) {
               const argsJson = JSON.stringify(call.args, null, 2);
-              updateEphemeral(assistantId, `<strong>${call.name}</strong>\n<pre style="font-size:9px;margin-top:4px;opacity:0.7;white-space:pre-wrap;word-break:break-all">${argsJson}</pre>`);
+              updateEphemeral(assistantId, `<span class="tool-call-tip" title="${escapedTooltip}"><strong>${call.name}</strong></span>\n<pre style="font-size:9px;margin-top:4px;opacity:0.7;white-space:pre-wrap;word-break:break-all">${argsJson}</pre>`);
             } else {
-              updateEphemeral(assistantId, `<strong>${call.name}</strong>...`);
+              updateEphemeral(assistantId, `<span class="tool-call-tip" title="${escapedTooltip}"><strong>${call.name}</strong>...</span>`);
             }
           },
           onDone: (metrics) => {
@@ -472,6 +521,11 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
     {/if}
   </div>
 
+  <!-- LOG DRAWER (bottom, resizable) -->
+  {#if composerMode}
+    <LogDrawer open={showToolJSON} logs={agentLogs} onclear={() => agentLogs = []} />
+  {/if}
+
   <!-- AGENT PROGRESS -->
   {#if composerMode}
     <AgentProgress active={canvas.generating} elapsed={chatTimer} toolCalls={chatToolCount} lastTool={chatLastTool} />
@@ -503,7 +557,6 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
   bind:open={settingsOpen}
   bind:mcpToken bind:systemPrompt bind:maxTokens bind:maxContextTokens
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:toolMode
-  bind:agentLogs
   onconnect={() => addMcpServer(canvas.mcpUrl)}
   {connectedUrls} {loadingUrls}
   onaddserver={addMcpServer} onaddall={addAllServers} onremoveserver={removeMcpServer}

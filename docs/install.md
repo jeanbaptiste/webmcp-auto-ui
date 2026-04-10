@@ -1,14 +1,14 @@
-# Installation Guide
+# Guide d'installation
 
-Get WebMCP Auto-UI running locally in under 5 minutes.
+WebMCP Auto-UI en local en moins de 5 minutes.
 
-## Prerequisites
+## Prerequis
 
 - **Node.js 22+** (`node -v`)
 - **npm 10+** (`npm -v`)
-- An **Anthropic API key** (for LLM-powered chat features)
+- Une **cle API Anthropic** (pour les features LLM)
 
-## Clone and install
+## Cloner et installer
 
 ```bash
 git clone https://github.com/jeanbaptiste/webmcp-auto-ui.git
@@ -16,52 +16,57 @@ cd webmcp-auto-ui
 npm install
 ```
 
-`npm install` resolves all workspaces automatically (packages + apps).
+`npm install` resout tous les workspaces automatiquement (packages + apps).
 
-## Project structure
+## Structure du projet
 
 ```
 webmcp-auto-ui/
   packages/
-    core/       @webmcp-auto-ui/core   — W3C WebMCP polyfill + MCP client
-    sdk/        @webmcp-auto-ui/sdk    — HyperSkill format, skills registry, canvas store
-    agent/      @webmcp-auto-ui/agent  — LLM agent loop + Anthropic/Gemma LiteRT providers + UI tools
-    ui/         @webmcp-auto-ui/ui     — 34+ Svelte 5 components + agent UI widgets
+    core/       @webmcp-auto-ui/core   -- W3C WebMCP polyfill + MCP client
+    sdk/        @webmcp-auto-ui/sdk    -- HyperSkill format, skills registry, canvas store
+    agent/      @webmcp-auto-ui/agent  -- Agent loop + 4 providers + ToolLayers + recettes
+    ui/         @webmcp-auto-ui/ui     -- 34+ Svelte 5 components + agent UI widgets
   apps/
     home/       Landing page + app launcher
     flex/       Canvas drag & resize, multi-MCP, ephemeral chat
+    flex2/      Layers, component() unique, debug panel, mode composeur/consommateur
     todo/       Todo app demo (MCP-powered)
+    todo2/      Todo WebMCP, template minimal
     viewer/     HyperSkill URL viewer / renderer
+    viewer2/    Lecteur HyperSkills read-only avec CRUD, DAG, paste URI
     showcase/   Component showcase + WebMCP tool demos
+    showcase2/  Demo dynamique avec agent + MCP + 3 themes
+    recipes/    Explorateur de recettes MCP + WebMCP avec test live
 ```
 
-## Build packages
+## Builder les packages
 
-Packages must be built in dependency order:
+Les packages doivent etre buildes dans l'ordre de dependance :
 
 ```bash
-# 1. core (no deps)
+# 1. core (pas de deps)
 npm -w packages/core run build
 
-# 2. sdk (no package deps, but shares types)
+# 2. sdk (pas de deps package, partage des types)
 npm -w packages/sdk run build
 
-# 3. agent (depends on core)
+# 3. agent (depend de core)
 npm -w packages/agent run build
 
-# 4. ui (standalone, but build last for safety)
+# 4. ui (standalone, builder en dernier par securite)
 npm -w packages/ui run build
 ```
 
-## Run dev servers
+## Lancer les serveurs dev
 
-Run all apps at once:
+Toutes les apps v1 en parallele :
 
 ```bash
 npm run dev
 ```
 
-Or run a single app:
+Ou une app specifique :
 
 ```bash
 npm run dev:home
@@ -71,7 +76,17 @@ npm run dev:viewer
 npm run dev:showcase
 ```
 
-## Port mapping
+Pour les nouvelles apps (v2), lancer individuellement :
+
+```bash
+npm -w apps/flex2 run dev
+npm -w apps/viewer2 run dev
+npm -w apps/todo2 run dev
+npm -w apps/showcase2 run dev
+npm -w apps/recipes run dev
+```
+
+## Ports
 
 | App       | Port | URL                    |
 |-----------|------|------------------------|
@@ -81,44 +96,42 @@ npm run dev:showcase
 | showcase  | 5177 | http://localhost:5177   |
 | flex      | 5179 | http://localhost:5179   |
 
-## Environment variables
+Les apps v2 (flex2, viewer2, todo2, showcase2, recipes) sont assignees a des ports par Vite au lancement.
 
-| Variable           | Used by        | Purpose                                      |
-|--------------------|----------------|----------------------------------------------|
-| `ANTHROPIC_API_KEY`| flex, todo | Server-side proxy for Anthropic Claude API    |
-| `PUBLIC_BASE_URL`  | home           | Base URL for app links (default: localhost)    |
+## Variables d'environnement
 
-Set them in each app's `.env` file or export in your shell:
+| Variable           | Apps                    | Role                                          |
+|--------------------|-------------------------|-----------------------------------------------|
+| `ANTHROPIC_API_KEY`| flex, flex2, todo, todo2 | Proxy server-side pour l'API Anthropic Claude |
+| `PUBLIC_BASE_URL`  | home                    | Base URL pour les liens (default: localhost)   |
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-## Common issues
+## Problemes courants
 
 **`Cannot find module '@webmcp-auto-ui/core'`**
-Build core first: `npm -w packages/core run build`
+Builder core d'abord : `npm -w packages/core run build`
 
-**Port already in use**
-Kill the process on that port: `lsof -ti:5173 | xargs kill` or change the port in `vite.config.ts`.
+**Port deja utilise**
+`lsof -ti:5173 | xargs kill` ou changer le port dans `vite.config.ts`.
 
-**`ERR_MODULE_NOT_FOUND` on agent imports**
-The agent package uses `file:../core` as a dev dependency. Make sure core is built before running agent-dependent apps.
+**`ERR_MODULE_NOT_FOUND` sur les imports agent**
+Le package agent depend de core via `file:../core`. Builder core avant.
 
-**Svelte check errors in UI package**
-Run `npm -w packages/ui run check` to see detailed type diagnostics. Peer dependencies (`svelte`, `d3`, `leaflet`) must be installed at the root.
+**Svelte check errors dans le package UI**
+`npm -w packages/ui run check` pour les diagnostics. Les peer deps (`svelte`, `d3`, `leaflet`) doivent etre installees a la racine.
 
-## Deploying to production
+## Deployer en production
 
-Use the deploy script — it handles build order, correct deploy paths, and cleanup:
+Utiliser le script deploy -- il gere l'ordre de build, les chemins corrects, et le nettoyage :
 
 ```bash
-./scripts/deploy.sh              # deploy all apps
-./scripts/deploy.sh flex         # deploy one app
+./scripts/deploy.sh              # deployer toutes les apps
+./scripts/deploy.sh flex         # deployer une app
 ```
 
-See [Deploy Tutorial](tutorials/deploy.md) for full details.
+Voir le [tutoriel deploy](tutorials/deploy.md) pour les details.
 
-**Do NOT deploy manually with scp** — the deploy paths differ per app
-(flex deploys to root, viewer deploys to `build/`). The script
-knows the correct path for each app.
+**Ne JAMAIS deployer manuellement avec scp** -- les chemins de deploy different par app (flex = racine, viewer = `build/`).

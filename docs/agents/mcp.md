@@ -1,296 +1,257 @@
-# MCP Integration -- Agent Guide
+# Integration MCP -- Guide Agent
 
-> This document is designed to be injected into an AI agent's context. It contains everything needed to connect and use MCP (Model Context Protocol) servers with webmcp-auto-ui.
+> Ce document est concu pour etre injecte dans le contexte d'un agent IA. Il couvre la connexion multi-MCP, les ToolLayers, et les recettes serveur.
 
-## What is MCP?
+## Qu'est-ce que MCP ?
 
-MCP (Model Context Protocol) is a JSON-RPC 2.0 protocol that allows AI agents and applications to discover and call tools exposed by remote servers. In webmcp-auto-ui, MCP is the bridge between data sources and the UI: you connect to an MCP server, list its tools, call them to fetch data, and display results using UI blocks.
+MCP (Model Context Protocol) est un protocole JSON-RPC 2.0 qui permet aux agents IA de decouvrir et appeler des outils exposes par des serveurs distants. Dans webmcp-auto-ui, MCP est le pont entre les sources de donnees et l'UI.
 
-## Architecture Overview
+## Architecture v0.7.0 : ToolLayers
 
 ```
-User prompt --> Agent Loop --> LLM (Claude/Gemma)
+User prompt --> Agent Loop --> LLM (Claude/Gemma/Ollama)
                   |                    |
                   |              tool_use blocks
                   |                    |
-                  v                    v
-              MCP Client -------> MCP Server (remote)
-                  |                    |
-              tool results        data/actions
-                  |
-                  v
-              UI Blocks (stat, chart, table, etc.)
+         +--------+--------+          |
+         |                  |          v
+    McpLayer 1         McpLayer 2     UILayer
+    (Tricoteuses)      (iNaturalist)  (component())
+         |                  |
+    MCP Client 1       MCP Client 2
+         |                  |
+    MCP Server 1       MCP Server 2
 ```
 
-## McpClient and McpMultiClient
+Chaque serveur MCP connecte produit un `McpLayer` avec ses outils et ses recettes serveur. Le tout est agrege dans un `ToolLayer[]` passe a `runAgentLoop`.
 
-The `McpClient` class (from `@webmcp-auto-ui/core`) handles the full MCP lifecycle for a single server. For multi-server scenarios, use `McpMultiClient`.
+### Construction des layers
 
-### McpMultiClient
+```ts
+import type { McpLayer, UILayer, ToolLayer } from '@webmcp-auto-ui/agent';
+import { WEBMCP_RECIPES, filterRecipesByServer } from '@webmcp-auto-ui/agent';
 
-Manages simultaneous connections to multiple MCP servers. Aggregates tool lists and routes tool calls to the correct server:
+// Layer MCP pour chaque serveur connecte
+const mcpLayer1: McpLayer = {
+  source: 'mcp',
+  serverUrl: 'https://mcp.code4code.eu/mcp',
+  serverName: 'Tricoteuses',
+  tools: await client1.listTools(),
+  recipes: [
+    { name: 'profil-depute', description: 'Fiche complete depute' },
+    { name: 'scrutin-detail', description: 'Analyse scrutin public' },
+  ],
+};
 
-```typescript
-import { McpMultiClient } from '@webmcp-auto-ui/core';
+const mcpLayer2: McpLayer = {
+  source: 'mcp',
+  serverUrl: 'https://other-mcp.example.com/mcp',
+  serverName: 'iNaturalist',
+  tools: await client2.listTools(),
+};
 
-const multi = new McpMultiClient();
-await multi.addServer('https://mcp1.example.com/mcp');
-await multi.addServer('https://mcp2.example.com/mcp');
+// Layer UI avec recettes filtrees par serveurs connectes
+const serverNames = ['Tricoteuses', 'iNaturalist'];
+const uiLayer: UILayer = {
+  source: 'ui',
+  recipes: filterRecipesByServer(WEBMCP_RECIPES, serverNames),
+};
 
-const allTools = multi.listAllTools();  // aggregated from all servers
-const result = await multi.callTool('query_sql', { sql: 'SELECT 1' });  // routes to correct server
-
-await multi.removeServer('https://mcp1.example.com/mcp');
-await multi.disconnectAll();
+const layers: ToolLayer[] = [mcpLayer1, mcpLayer2, uiLayer];
 ```
 
-The flex app uses `McpMultiClient` to connect to several MCP servers simultaneously and expose all their tools to the agent loop.
+### Ce que le LLM voit (prompt genere)
 
-## McpClient API
+```
+## mcp (Tricoteuses, iNaturalist)
 
-### Connecting
+### outils DATA (12)
+- query_sql: Execute une requete SQL
+- list_tables: Liste les tables disponibles
+- describe_table: Schema d'une table
+- search_recipes: Recherche des recettes
+...
 
-```typescript
+### recettes serveur (2)
+- profil-depute: Fiche complete depute
+- scrutin-detail: Analyse scrutin public
+
+## webmcp
+
+### component() -- seul outil UI
+Appelle component("nom", {params}) pour rendre un composant.
+Composants disponibles : stat, kv, list, chart, alert, ...
+```
+
+## McpClient et McpMultiClient
+
+### McpClient (connexion simple)
+
+```ts
 import { McpClient } from '@webmcp-auto-ui/core';
 
 const client = new McpClient('https://mcp.example.com/mcp', {
   clientName: 'my-app',
   clientVersion: '1.0.0',
   timeout: 30000,
-  headers: {
-    'Authorization': 'Bearer <token>'  // optional
-  },
+  headers: { 'Authorization': 'Bearer <token>' },
   autoReconnect: true,
-  maxReconnectAttempts: 3
+  maxReconnectAttempts: 3,
 });
 
-// Initialize the connection (required before any other call)
-const initResult = await client.connect();
-// initResult: { protocolVersion, capabilities, serverInfo }
-```
-
-### Listing Tools
-
-```typescript
+await client.connect();
 const tools = await client.listTools();
-// tools: McpTool[]
-// Each tool: { name, description, inputSchema, outputSchema, annotations }
-```
-
-### Calling a Tool
-
-```typescript
-const result = await client.callTool('query_sql', {
-  sql: 'SELECT name, revenue FROM products ORDER BY revenue DESC LIMIT 5'
-});
-// result: { content: [{ type: 'text', text: '...' }], isError?: boolean }
-```
-
-### Disconnecting
-
-```typescript
+const result = await client.callTool('query_sql', { sql: 'SELECT 1' });
 await client.disconnect();
 ```
 
-## Transport: Streamable HTTP
+### McpMultiClient (multi-serveur)
 
-The MCP client uses HTTP POST with JSON-RPC 2.0 payloads:
+Gere les connexions simultanees a plusieurs serveurs MCP. Agrege les listes d'outils et route les appels vers le bon serveur :
 
-- **Content-Type**: `application/json`
-- **Accept**: `application/json, text/event-stream`
-- **Session management**: The server returns an `Mcp-Session-Id` header on first request. The client sends it back on subsequent requests.
-- **Auto-reconnect**: If the server returns 404 (session expired), the client automatically re-initializes with exponential backoff (500ms * attempt).
-- **SSE responses**: The server may respond with `text/event-stream`. The client parses `data:` lines and extracts the last complete JSON-RPC response.
+```ts
+import { McpMultiClient } from '@webmcp-auto-ui/core';
 
-### Request Format
+const multi = new McpMultiClient();
+await multi.addServer('https://mcp1.example.com/mcp');
+await multi.addServer('https://mcp2.example.com/mcp');
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "tools/call",
-  "params": {
-    "name": "query_sql",
-    "arguments": { "sql": "SELECT 1" }
-  }
-}
+const allTools = multi.listAllTools();
+const result = await multi.callTool('query_sql', { sql: 'SELECT 1' });
+
+await multi.removeServer('https://mcp1.example.com/mcp');
+await multi.disconnectAll();
 ```
 
-### Response Format
+## Recettes serveur (MCP recipes)
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "content": [{ "type": "text", "text": "[{\"id\":1}]" }]
-  }
-}
+Les recettes MCP viennent du serveur et decrivent ce que les outils retournent et comment les combiner. Elles sont distinctes des recettes WebMCP (UI) qui guident le LLM sur la presentation.
+
+### Obtenir les recettes
+
+```ts
+// Certains serveurs exposent list_recipes / get_recipe
+const recipesResult = await client.callTool('list_recipes', {});
+const mcpRecipes: McpRecipe[] = JSON.parse(recipesResult.content[0].text);
+
+// Ajouter au McpLayer
+const mcpLayer: McpLayer = {
+  source: 'mcp',
+  serverUrl: client.url,
+  serverName: 'Tricoteuses',
+  tools: await client.listTools(),
+  recipes: mcpRecipes,
+};
 ```
 
-## MCP Tool Shape
+### Difference WebMCP vs MCP recipes
 
-```typescript
-interface McpTool {
-  name: string;
-  description?: string;
-  inputSchema?: JsonSchema;   // JSON Schema for parameters
-  outputSchema?: JsonSchema;
-  annotations?: {
-    readOnlyHint?: boolean;
-    destructiveHint?: boolean;
-    idempotentHint?: boolean;
-    openWorldHint?: boolean;
-  };
-}
+| | Recette WebMCP (UI) | Recette MCP (serveur) |
+|--|---------------------|----------------------|
+| Source | Package agent (fichiers .md) | Serveur MCP (`list_recipes`) |
+| Contenu | Comment presenter avec component() | Ce que les outils retournent |
+| Section prompt | `## webmcp > recettes UI` | `## mcp > recettes serveur` |
+| Type | `Recipe` | `McpRecipe` |
+| Porte par | `UILayer.recipes` | `McpLayer.recipes` |
+
+## Transport : Streamable HTTP
+
+Le client MCP utilise HTTP POST avec JSON-RPC 2.0 :
+
+- **Content-Type** : `application/json`
+- **Accept** : `application/json, text/event-stream`
+- **Session** : header `Mcp-Session-Id` gere automatiquement
+- **Auto-reconnect** : re-initialise sur 404 (session expiree), backoff exponentiel
+- **SSE** : le client parse les reponses `text/event-stream`
+
+## Pattern : generation auto d'UI
+
+```
+1. L'utilisateur connecte un serveur MCP
+2. L'app appelle client.listTools() -> decouverte des outils
+3. L'app construit les ToolLayers (McpLayer + UILayer)
+4. L'utilisateur pose une question en langage naturel
+5. runAgentLoop:
+   - LLM appelle un outil MCP (donnees)
+   - LLM appelle component() (affichage)
+   - Repete jusqu'a end_turn
+6. Resultat : dashboard genere sans composition manuelle
 ```
 
-## Integrating MCP in a Skill
+### Exemple complet
 
-A skill can reference an MCP server via the `mcp` and `mcpName` fields:
-
-```json
-{
-  "name": "sales-dashboard",
-  "mcp": "https://mcp.example.com/mcp",
-  "mcpName": "sales-api",
-  "blocks": [
-    { "type": "stat", "data": { "label": "Revenue", "value": "$142K" } }
-  ]
-}
-```
-
-When a skill has an `mcp` field, the runtime:
-1. Creates an `McpClient` and connects to the URL
-2. Lists available tools
-3. Makes them available to the agent loop alongside UI tools
-
-## The Agent Loop Pattern
-
-The `runAgentLoop` function orchestrates LLM + MCP + UI:
-
-```typescript
+```ts
 import { McpClient } from '@webmcp-auto-ui/core';
-import { runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
+import { runAgentLoop, WEBMCP_RECIPES, filterRecipesByServer } from '@webmcp-auto-ui/agent';
+import type { McpLayer, UILayer } from '@webmcp-auto-ui/agent';
 
-// 1. Connect to MCP
-const client = new McpClient('https://mcp.example.com/mcp');
-await client.connect();
-const tools = await client.listTools();
-
-// 2. Run the agent loop
-const result = await runAgentLoop('Show me top 5 products by revenue', {
-  client,
-  provider: myLLMProvider,    // LLMProvider implementation
-  mcpTools: fromMcpTools(tools),
-  maxIterations: 5,
-  callbacks: {
-    onBlock: (type, data) => { /* add block to UI */ },
-    onText: (text) => { /* display assistant text */ },
-    onToolCall: (call) => { /* log tool call */ }
-  }
-});
-```
-
-The loop works as follows:
-1. Sends user message + system prompt to LLM
-2. LLM returns tool_use blocks (DATA tools or UI tools)
-3. DATA tools are executed via `client.callTool()`
-4. UI tools are executed locally via callbacks (`onBlock`, `onClear`)
-5. Tool results are sent back to LLM
-6. Repeat until LLM returns `end_turn` or max iterations reached
-
-### System Prompt
-
-The auto-generated system prompt tells the LLM:
-- Which DATA tools are available (from MCP server)
-- Which UI tools are available (stat, chart, table, etc.)
-- The mandatory workflow: fetch data first, then display with UI tools
-
-> **Tip**: In addition to individual `render_*` tools, the unified `component()` tool provides a single entry point for all 56 UI components (31 renderable, 25 non-renderable). The LLM can call `component("help")` to discover available components at runtime. See the [agent package docs](../packages/agent.md#unified-component-tool) for details.
-
-## Auto-Generated UI Pattern
-
-Connect MCP, list tools, and let the agent auto-generate the UI:
-
-1. User connects to an MCP server URL
-2. App calls `client.listTools()` to discover available tools
-3. User types a natural language query
-4. Agent loop calls MCP tools to fetch data, then UI tools to render blocks
-5. Result: a fully generated dashboard without manual block composition
-
-## Example: Connect and Generate
-
-```typescript
-// Connect to Tricoteuses MCP server
+// 1. Connecter
 const client = new McpClient('https://mcp.code4code.eu/mcp');
 await client.connect();
-
-console.log('Server:', client.getServerInfo());
-// { name: "tricoteuses", version: "1.0.0" }
-
 const tools = await client.listTools();
-console.log('Available tools:', tools.map(t => t.name));
-// ["query_sql", "list_tables", "describe_table", "search_recipes", ...]
 
-// Run agent loop with a user query
-const result = await runAgentLoop('List all recipes with their ratings', {
-  client,
+// 2. Construire les layers
+const mcpLayer: McpLayer = {
+  source: 'mcp',
+  serverUrl: 'https://mcp.code4code.eu/mcp',
+  serverName: 'Tricoteuses',
+  tools,
+};
+
+const uiLayer: UILayer = {
+  source: 'ui',
+  recipes: filterRecipesByServer(WEBMCP_RECIPES, ['Tricoteuses']),
+};
+
+// 3. Lancer
+const result = await runAgentLoop('Liste les deputes du groupe Ecologiste', {
   provider: claudeProvider,
-  mcpTools: fromMcpTools(tools),
+  layers: [mcpLayer, uiLayer],
+  toolMode: 'smart',
   callbacks: {
     onBlock: (type, data) => blocks.push({ type, data }),
-    onText: (text) => console.log('Assistant:', text)
-  }
+    onText: (text) => console.log('Assistant:', text),
+  },
 });
-
-// result.toolCalls shows what the agent did:
-// 1. Called query_sql to fetch recipes
-// 2. Called ui_data_table to display results
 ```
 
-## Authentication
+## Authentification
 
-MCP servers can require authentication. Pass a Bearer token in the headers:
-
-```typescript
+```ts
 const client = new McpClient('https://mcp.example.com/mcp', {
-  headers: {
-    'Authorization': 'Bearer eyJhbGci...'
-  }
+  headers: { 'Authorization': 'Bearer eyJhbGci...' },
 });
 ```
 
-The token is sent with every request (initialize, tools/list, tools/call).
+Le token est envoye avec chaque requete (initialize, tools/list, tools/call).
 
-## McpClient Options
+## Options McpClient
 
-```typescript
+```ts
 interface McpClientOptions {
-  clientName?: string;            // default: 'webmcp-auto-ui'
-  clientVersion?: string;         // default: '0.1.0'
-  timeout?: number;               // request timeout in ms, default: 30000
-  headers?: Record<string, string>; // extra headers (auth, etc.)
-  autoReconnect?: boolean;        // reconnect on 404, default: true
+  clientName?: string;
+  clientVersion?: string;
+  timeout?: number;               // default: 30000
+  headers?: Record<string, string>;
+  autoReconnect?: boolean;        // default: true
   maxReconnectAttempts?: number;  // default: 3
 }
 ```
 
-## Constraints
+## Contraintes
 
-- The MCP server must support Streamable HTTP transport (POST with JSON-RPC 2.0).
-- `connect()` must be called before `listTools()` or `callTool()`.
-- Tool results are text-based (`content[].type === 'text'`). Parse JSON from `content[0].text` if needed.
-- The agent loop truncates tool results to 10,000 characters to fit LLM context windows.
-- CORS: the MCP server must allow requests from your domain.
+- Le serveur MCP doit supporter Streamable HTTP (POST JSON-RPC 2.0).
+- `connect()` obligatoire avant `listTools()` ou `callTool()`.
+- Les resultats sont text-based : parser le JSON depuis `content[0].text`.
+- La boucle agent tronque les resultats a 10 000 caracteres.
+- CORS : le serveur doit autoriser les requetes depuis votre domaine.
 
-## Common Mistakes
+## Erreurs courantes
 
-| Mistake | Consequence | Fix |
-|---------|-------------|-----|
-| Calling `listTools()` before `connect()` | Error: session not initialized | Always call `connect()` first |
-| Missing `Authorization` header | 401 or 403 from server | Pass Bearer token in `headers` option |
-| Ignoring `isError` on tool results | Silent failures, incorrect data displayed | Check `result.isError` before using content |
-| Not handling SSE responses | Client hangs or parses incorrectly | The McpClient handles SSE automatically -- no action needed |
-| Setting `timeout` too low for slow tools | Request aborted mid-execution | Increase `timeout` for heavy queries (60000+) |
-| Not calling `disconnect()` | Session leaks on server side | Call `disconnect()` when done or on component unmount |
+| Erreur | Consequence | Correction |
+|--------|-------------|-----------|
+| `listTools()` avant `connect()` | Erreur session | Toujours `connect()` d'abord |
+| Header `Authorization` manquant | 401/403 | Passer le Bearer token |
+| Ignorer `isError` sur les resultats | Donnees incorrectes affichees | Verifier `result.isError` |
+| `timeout` trop bas | Requete abortee | Augmenter pour les queries lourdes (60000+) |
+| Pas de `disconnect()` | Fuite de session serveur | Appeler au unmount |

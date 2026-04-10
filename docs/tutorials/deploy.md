@@ -1,79 +1,73 @@
-# Deploy to Production
+# Deployer en production
 
-## Quick deploy (recommended)
+## Deploy rapide (recommande)
 
 ```bash
-./scripts/deploy.sh                # deploy all apps
-./scripts/deploy.sh flex           # deploy one app
-./scripts/deploy.sh home viewer    # deploy specific apps
+./scripts/deploy.sh                # deployer toutes les apps
+./scripts/deploy.sh flex           # deployer une app
+./scripts/deploy.sh home viewer    # deployer certaines apps
 ```
 
-The script handles everything: builds packages, **builds apps**, cleans old
-files on the server, copies to the correct location, **verifies sha256
-integrity**, restarts services, and confirms.
+Le script gere tout : build des packages, **build des apps**, nettoyage des anciens fichiers sur le serveur, copie au bon endroit, **verification sha256**, restart services, confirmation.
 
-**Always use this script. Never deploy manually with scp.**
+**Toujours utiliser ce script. Jamais de deploy manuel avec scp.**
 
 ---
 
-## Server architecture
+## Architecture serveur
 
 ```
 /opt/webmcp-demos/
-  home/              # static — nginx serves directly
-  todo/              # static — nginx serves directly
-  showcase/          # static — nginx serves directly
-  flex/              # Node — systemd runs: node index.js
-  viewer/build/      # Node — systemd runs: node build/index.js
+  home/              # static -- nginx sert directement
+  todo/              # static -- nginx sert directement
+  showcase/          # static -- nginx sert directement
+  flex/              # Node -- systemd : node index.js
+  viewer/build/      # Node -- systemd : node build/index.js
 ```
 
-### CRITICAL: Deploy paths are NOT the same for all Node apps
+### CRITIQUE : Les chemins de deploy ne sont PAS les memes pour toutes les apps Node
 
-| App | systemd ExecStart | Deploy destination | Why |
-|-----|-------------------|--------------------|-----|
-| **flex** | `node index.js` | `/opt/webmcp-demos/flex/` (root) | ExecStart has no `build/` prefix |
-| **viewer** | `node build/index.js` | `/opt/webmcp-demos/viewer/build/` | ExecStart includes `build/` |
-| home | static (nginx) | `/opt/webmcp-demos/home/` | — |
-| todo | static (nginx) | `/opt/webmcp-demos/todo/` | — |
-| showcase | static (nginx) | `/opt/webmcp-demos/showcase/` | — |
+| App | systemd ExecStart | Destination deploy | Pourquoi |
+|-----|-------------------|--------------------|----------|
+| **flex** | `node index.js` | `/opt/webmcp-demos/flex/` (racine) | ExecStart sans prefix `build/` |
+| **viewer** | `node build/index.js` | `/opt/webmcp-demos/viewer/build/` | ExecStart inclut `build/` |
+| home | static (nginx) | `/opt/webmcp-demos/home/` | -- |
+| todo | static (nginx) | `/opt/webmcp-demos/todo/` | -- |
+| showcase | static (nginx) | `/opt/webmcp-demos/showcase/` | -- |
 
-**If you deploy to the wrong path, the old code keeps running and your
-changes appear to not take effect.** This is the #1 deployment pitfall.
+**Si vous deployez au mauvais chemin, l'ancien code continue de tourner.**
 
-### Why the paths differ
+### Nouvelles apps (v2)
 
-The systemd services were created at different times. Flex
-uses `ExecStart=/usr/bin/node index.js` (working directory is the app root).
-Viewer uses `ExecStart=/usr/bin/node build/index.js`. The deploy script
-abstracts this difference — use the script.
+Les nouvelles apps (flex2, viewer2, todo2, showcase2, recipes) ne sont pas encore deployees en production. Quand elles le seront, elles seront ajoutees au script `deploy.sh` avec leurs chemins specifiques.
 
 ---
 
-## Manual deploy (if you must)
+## Deploy manuel (si absolument necessaire)
 
-### Static apps (home, todo, showcase)
+### Apps statiques (home, todo, showcase)
 
 ```bash
-# Build with production base URL (REQUIRED for home)
+# Builder avec l'URL de production (REQUIS pour home)
 PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/home run build
 
-# Clean old assets and copy
+# Nettoyer et copier
 ssh bot "rm -rf /opt/webmcp-demos/home/_app"
 scp -r apps/home/build/* bot:/opt/webmcp-demos/home/
 ```
 
-### Node apps — flex (root deploy)
+### Apps Node -- flex (deploy racine)
 
 ```bash
 npm -w apps/flex run build
 
-# MUST clean old files first — stale chunks cause the old version to be served
+# OBLIGATOIRE : nettoyer les anciens fichiers d'abord
 ssh bot "cd /opt/webmcp-demos/flex && rm -f index.js handler.js env.js shims.js && rm -rf client server"
 scp -r apps/flex/build/* bot:/opt/webmcp-demos/flex/
 ssh bot "systemctl restart webmcp-flex"
 ```
 
-### Node apps — viewer (build/ deploy)
+### Apps Node -- viewer (deploy build/)
 
 ```bash
 npm -w apps/viewer run build
@@ -86,105 +80,79 @@ ssh bot "systemctl restart webmcp-viewer"
 
 ---
 
-## Common mistakes
+## Erreurs courantes
 
-### 1. Deploying to the wrong path
+### 1. Deploy au mauvais chemin
 
-**Symptom**: You deploy, restart the service, but the old version still shows.
+**Symptome** : Deploy + restart, mais l'ancienne version persiste.
 
-**Cause**: You copied files to `flex/build/` but the service runs
-`node index.js` from `flex/` — it uses the old `index.js` at root.
+**Cause** : Fichiers copies dans `flex/build/` mais le service execute `node index.js` depuis `flex/`.
 
-**Fix**: Use `./scripts/deploy.sh` or check the ExecStart path in the
-systemd service file.
+**Fix** : `./scripts/deploy.sh` ou verifier le ExecStart du service systemd.
 
-### 2. Not cleaning old chunks
+### 2. Anciens chunks non nettoyes
 
-**Symptom**: New code is deployed but the browser shows a mix of old and
-new behavior.
+**Symptome** : Nouveau code deploye mais le navigateur montre un mix ancien/nouveau.
 
-**Cause**: SvelteKit produces hashed chunk filenames. `scp` copies new
-chunks but doesn't remove old ones. The browser may load cached old chunks.
+**Cause** : SvelteKit produit des fichiers hasches. `scp` ajoute sans supprimer. Le navigateur charge les anciens chunks caches.
 
-**Fix**: Always delete old files before copying:
+**Fix** : Toujours supprimer les anciens fichiers avant de copier :
 ```bash
 ssh bot "rm -rf /opt/webmcp-demos/flex/{client,server,index.js,handler.js}"
 ```
 
-### 3. Forgetting PUBLIC_BASE_URL for home
+### 3. PUBLIC_BASE_URL oublie pour home
 
-**Symptom**: Home page links point to `localhost:5173`.
+**Symptome** : Les liens de home pointent vers `localhost:5173`.
 
-**Cause**: SvelteKit adapter-static bakes `PUBLIC_BASE_URL` at build time.
+**Fix** : Builder avec `PUBLIC_BASE_URL=https://demos.hyperskills.net`.
 
-**Fix**: Build with `PUBLIC_BASE_URL=https://demos.hyperskills.net`.
+### 4. .env manquant apres deploy
 
-### 4. Missing .env after deploy
+**Symptome** : Service crash "ANTHROPIC_API_KEY is not defined".
 
-**Symptom**: Service crashes with "ANTHROPIC_API_KEY is not defined".
+**Cause** : Le .env a ete supprime pendant le nettoyage.
 
-**Cause**: The .env file was in the app root and got deleted during cleanup.
+**Fix** : Le script deploy preserve les .env. En manual, ne pas `rm -rf *`.
 
-**Fix**: The deploy script preserves .env files. If deploying manually,
-don't delete .env:
-```bash
-# DO NOT do: rm -rf /opt/webmcp-demos/flex/*
-# DO this instead: rm specific files, keep .env
-```
+### 5. rsync au lieu de scp
 
-### 5. Using rsync instead of scp
+**Jamais rsync.** `rsync --delete` a deja supprime les `.env` de production.
 
-**Never use rsync.** `rsync --delete` has previously wiped `.env` files
-containing API keys from production. Use `scp -r` only.
+### 6. Deploy sans rebuild de l'app
 
-### 6. Deploying without rebuilding the app (fixed in script)
+**Symptome** : Bug fixe dans le code, deploye, bug toujours la.
 
-**Symptom**: You fix a Svelte bug, deploy, the bug is still there. Services
-show `active`. No error anywhere.
+**Cause** : L'ancien deploy.sh rebuildait les packages mais pas les apps. Tout changement dans `apps/*/src/` etait ignore.
 
-**Cause**: The old `deploy.sh` rebuilt packages (`packages/*/dist/`) but
-copied the existing `apps/*/build/` without rebuilding it. Any change to
-`apps/*/src/` was silently ignored.
-
-**Fix applied**: `deploy.sh` now runs `npm run build` inside each app before
-copying. The sha256 check then verifies the deployed file matches the local
-build.
-
-**How to detect manually**:
-```bash
-sha256sum apps/flex/build/index.js
-ssh bot "sha256sum /opt/webmcp-demos/flex/index.js"
-# These must match. If they differ, the wrong file was deployed.
-```
-
-See [contributing.md](../contributing.md) for the full debug checklist.
+**Fix applique** : `deploy.sh` rebuild chaque app avant de copier. La verification sha256 confirme.
 
 ---
 
-## Verifying a deploy
+## Verifier un deploy
 
 ```bash
-# All pages return 200
+# Toutes les pages retournent 200
 for p in / /flex/ /viewer/ /showcase/ /todo/; do
   echo "$(curl -s -o /dev/null -w '%{http_code}' -L https://demos.hyperskills.net$p) $p"
 done
 
-# Chat API works (Node apps)
+# L'API chat fonctionne (apps Node)
 curl -s https://demos.hyperskills.net/flex/api/chat \
   -X POST -H 'Content-Type: application/json' \
   -d '{"messages":[{"role":"user","content":"hi"}],"model":"claude-haiku-4-5-20251001","max_tokens":5}' \
   | head -c 50
 
-# Services are active
+# Services actifs
 ssh bot "systemctl is-active webmcp-flex webmcp-viewer"
 ```
 
 ---
 
-## Environment
+## Environnement
 
-| Variable | Apps | Location on server |
+| Variable | Apps | Localisation serveur |
 |----------|------|--------------------|
 | `ANTHROPIC_API_KEY` | flex, viewer | `/opt/webmcp-demos/{app}/.env` |
-| `PUBLIC_BASE_URL` | home (build-time only) | Set in shell before `npm run build` |
+| `PUBLIC_BASE_URL` | home (build-time) | Variable shell avant `npm run build` |
 | `PORT` | flex(3004), viewer(3002) | systemd `Environment=PORT=...` |

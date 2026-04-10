@@ -2,19 +2,10 @@
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
   import { McpConnector, LLMSelector, SettingsPanel, RemoteMCPserversDemo } from '@webmcp-auto-ui/ui';
+  import RecipeModal from './RecipeModal.svelte';
 
-  let logsPanel: HTMLDivElement | undefined = $state(undefined);
-
-  $effect(() => {
-    if (logsPanel && agentLogs.length > 0) {
-      // tick-deferred scroll to bottom
-      requestAnimationFrame(() => {
-        if (logsPanel) logsPanel.scrollTop = logsPanel.scrollHeight;
-      });
-    }
-  });
-
-  interface Recipe { name: string; description?: string; }
+  interface McpRecipe { name: string; description?: string; }
+  interface WebmcpRecipe { name: string; description?: string; when?: string; components_used?: string[]; servers?: string[]; layout?: { type: string; columns?: number; arrangement?: string }; body?: string; }
 
   interface Props {
     open: boolean;
@@ -28,15 +19,14 @@
     showTokens?: boolean;
     showToolJSON?: boolean;
     toolMode?: 'smart' | 'explicit';
-    agentLogs?: { ts: number; type: string; detail: string }[];
     onconnect: () => void;
     connectedUrls?: string[];
     loadingUrls?: string[];
     onaddserver?: (url: string) => void;
     onaddall?: () => void;
     onremoveserver?: (url: string) => void;
-    mcpRecipes?: Recipe[];
-    webmcpRecipes?: Recipe[];
+    mcpRecipes?: McpRecipe[];
+    webmcpRecipes?: WebmcpRecipe[];
   }
 
   let {
@@ -51,7 +41,6 @@
     showTokens = $bindable(true),
     showToolJSON = $bindable(false),
     toolMode = $bindable<'smart' | 'explicit'>('smart'),
-    agentLogs = $bindable<{ ts: number; type: string; detail: string }[]>([]),
     onconnect,
     connectedUrls = [],
     loadingUrls = [],
@@ -61,6 +50,14 @@
     mcpRecipes = [],
     webmcpRecipes = [],
   }: Props = $props();
+
+  let selectedRecipe = $state<McpRecipe | WebmcpRecipe | null>(null);
+  let recipeModalOpen = $state(false);
+
+  function openRecipe(recipe: McpRecipe | WebmcpRecipe) {
+    selectedRecipe = recipe;
+    recipeModalOpen = true;
+  }
 </script>
 
 <!-- Backdrop -->
@@ -160,31 +157,10 @@
         <input type="checkbox" bind:checked={showTokens} class="accent-accent w-3.5 h-3.5" />
         Token usage
       </label>
-      <div class="flex items-center justify-between">
-        <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
-          <input type="checkbox" bind:checked={showToolJSON} class="accent-accent w-3.5 h-3.5" />
-          Agent logs
-        </label>
-        {#if agentLogs.length > 0}
-          <button class="font-mono text-[9px] text-text2 hover:text-accent transition-colors"
-                  onclick={() => agentLogs = []}>clear</button>
-        {/if}
-      </div>
-      {#if showToolJSON}
-        <div class="agent-logs-panel" bind:this={logsPanel}>
-          {#if agentLogs.length === 0}
-            <div class="font-mono text-[9px] text-text2/40 italic py-2 text-center">en attente...</div>
-          {:else}
-            {#each agentLogs as log}
-              <div class="log-entry log-{log.type}">
-                <span class="log-ts">{new Date(log.ts).toLocaleTimeString('fr', {hour:'2-digit',minute:'2-digit',second:'2-digit'})}</span>
-                <span class="log-type">{log.type}</span>
-                <span class="log-detail">{log.detail}</span>
-              </div>
-            {/each}
-          {/if}
-        </div>
-      {/if}
+      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+        <input type="checkbox" bind:checked={showToolJSON} class="accent-accent w-3.5 h-3.5" />
+        Agent logs (panneau bas)
+      </label>
     </section>
 
     <!-- Recipes -->
@@ -196,12 +172,13 @@
           <div class="text-[9px] font-mono text-text2 mt-1">MCP ({mcpRecipes.length})</div>
           <div class="flex flex-col gap-1 max-h-[150px] overflow-y-auto">
             {#each mcpRecipes as recipe}
-              <div class="px-2 py-1.5 bg-surface2/50 rounded">
+              <button class="px-2 py-1.5 bg-surface2/50 rounded text-left w-full cursor-pointer hover:bg-surface2 transition-colors"
+                      onclick={() => openRecipe(recipe)}>
                 <div class="font-mono text-[11px] text-text1">{recipe.name}</div>
                 {#if recipe.description}
                   <div class="font-mono text-[9px] text-text2 line-clamp-2">{recipe.description}</div>
                 {/if}
-              </div>
+              </button>
             {/each}
           </div>
         {/if}
@@ -210,12 +187,13 @@
           <div class="text-[9px] font-mono text-text2 mt-1">WebMCP ({webmcpRecipes.length})</div>
           <div class="flex flex-col gap-1 max-h-[150px] overflow-y-auto">
             {#each webmcpRecipes as recipe}
-              <div class="px-2 py-1.5 bg-surface2/50 rounded">
+              <button class="px-2 py-1.5 bg-surface2/50 rounded text-left w-full cursor-pointer hover:bg-surface2 transition-colors"
+                      onclick={() => openRecipe(recipe)}>
                 <div class="font-mono text-[11px] text-text1">{recipe.name}</div>
                 {#if recipe.description}
                   <div class="font-mono text-[9px] text-text2 line-clamp-2">{recipe.description}</div>
                 {/if}
-              </div>
+              </button>
             {/each}
           </div>
         {/if}
@@ -224,6 +202,8 @@
 
   </div>
 </aside>
+
+<RecipeModal bind:open={recipeModalOpen} recipe={selectedRecipe} onclose={() => { selectedRecipe = null; }} />
 
 <style>
   .settings-drawer {
@@ -270,45 +250,4 @@
     display: block;
   }
 
-  /* Agent logs panel */
-  .agent-logs-panel {
-    max-height: 300px;
-    overflow-y: auto;
-    background: var(--color-bg, #0e0e16);
-    border: 1px solid var(--color-border2, #333);
-    border-radius: 6px;
-    padding: 4px 6px;
-    font-family: monospace;
-    font-size: 9px;
-    line-height: 1.5;
-  }
-  .log-entry {
-    display: flex;
-    gap: 6px;
-    padding: 1px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.03);
-    word-break: break-all;
-  }
-  .log-ts {
-    flex-shrink: 0;
-    color: var(--color-text2, #666);
-    opacity: 0.5;
-  }
-  .log-type {
-    flex-shrink: 0;
-    font-weight: 600;
-    min-width: 52px;
-    text-transform: uppercase;
-    font-size: 8px;
-  }
-  .log-detail {
-    color: var(--color-text2, #aaa);
-  }
-  /* Type colors */
-  .log-request .log-type { color: #7aa2f7; }
-  .log-response .log-type { color: #9ece6a; }
-  .log-tool .log-type { color: #e0af68; }
-  .log-text .log-type { color: #737aa2; }
-  .log-done .log-type { color: #73daca; }
-  .log-iteration .log-type { color: #bb9af7; }
 </style>
