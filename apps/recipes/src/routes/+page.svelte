@@ -338,6 +338,11 @@
         callbacks: {
           onIterationStart: (i: number, max: number) => {
             pushLog('iteration', `Iteration ${i}/${max}`);
+            if (i === 1) {
+              // Log the system prompt on first iteration
+              const promptPreview = systemPrompt?.slice(0, 300) ?? '(none)';
+              pushLog('prompt', promptPreview);
+            }
           },
           onLLMRequest: (messages: unknown[], tools: unknown[]) => {
             pushLog('request', `${(messages as unknown[]).length} messages, ${(tools as unknown[]).length} tools`);

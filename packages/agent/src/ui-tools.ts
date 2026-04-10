@@ -514,6 +514,10 @@ export function executeUITool(
   const blockType = TOOL_TO_BLOCK[name];
   if (!blockType) return `Unknown UI tool: ${name}`;
   const coerced = coerceParams(blockType, args);
+  if (coerced !== args) {
+    console.debug(`[coercion] ${blockType}: `, { before: Object.keys(args), after: Object.keys(coerced), changed: true });
+  }
+  console.debug(`[render] ${blockType}:`, coerced);
   const result = callbacks.onBlock?.(blockType, coerced);
   const id = result?.id;
   return id ? `Rendered ${blockType} block (id: ${id}).` : `Rendered ${blockType} block.`;

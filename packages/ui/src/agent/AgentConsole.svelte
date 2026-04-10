@@ -8,6 +8,7 @@
   let { logs, onclear, class: cls = '' }: Props = $props();
 
   let logsEnd: HTMLDivElement | undefined = $state(undefined);
+  let modalContent = $state<string | null>(null);
 
   $effect(() => {
     if (logsEnd && logs.length > 0) {
@@ -23,6 +24,7 @@
     text: 'var(--color-text2, #888)',
     done: '#14b8a6',
     error: '#ef4444',
+    prompt: '#6366f1',
   };
 
   function fmtTime(ts: number): string {
@@ -48,16 +50,34 @@
       <div class="ac-empty">en attente...</div>
     {:else}
       {#each logs as log}
-        <div class="ac-entry">
+        <div class="ac-entry" class:ac-clickable={log.detail.length > 80}
+             onclick={() => { if (log.detail.length > 80) modalContent = log.detail; }}
+             role={log.detail.length > 80 ? 'button' : undefined}
+             tabindex={log.detail.length > 80 ? 0 : undefined}>
           <span class="ac-ts">{fmtTime(log.ts)}</span>
           <span class="ac-type" style="color:{typeColor[log.type] ?? 'var(--color-text2, #888)'}">{log.type}</span>
-          <span class="ac-detail">{log.detail}</span>
+          <span class="ac-detail">{log.detail.length > 120 ? log.detail.slice(0, 120) + '…' : log.detail}</span>
         </div>
       {/each}
       <div bind:this={logsEnd}></div>
     {/if}
   </div>
 </div>
+
+<!-- Detail modal -->
+{#if modalContent}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="ac-modal-overlay" onclick={() => modalContent = null}>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="ac-modal" onclick={(e) => e.stopPropagation()}>
+      <div class="ac-modal-header">
+        <span class="ac-title">Détail</span>
+        <button class="ac-clear" onclick={() => modalContent = null}>✕</button>
+      </div>
+      <pre class="ac-modal-content">{modalContent}</pre>
+    </div>
+  </div>
+{/if}
 
 <style>
   .agent-console {
@@ -151,5 +171,57 @@
 
   .ac-detail {
     color: var(--color-text2, #aaa);
+  }
+
+  .ac-clickable {
+    cursor: pointer;
+  }
+  .ac-clickable:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .ac-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .ac-modal {
+    background: var(--color-surface, #1a1a1e);
+    border: 1px solid var(--color-border2, #333);
+    border-radius: 8px;
+    max-width: 720px;
+    width: 100%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  }
+
+  .ac-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-border, #222);
+    flex-shrink: 0;
+  }
+
+  .ac-modal-content {
+    padding: 12px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 10px;
+    line-height: 1.6;
+    color: var(--color-text1, #ddd);
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
   }
 </style>

@@ -321,6 +321,11 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
         callbacks: {
           onIterationStart: (i, max) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'iteration', detail: `Iteration ${i}/${max}` }];
+            if (i === 1) {
+              // Log the system prompt on first iteration
+              const promptPreview = effectivePrompt?.slice(0, 300) ?? '(none)';
+              agentLogs = [...agentLogs, { ts: Date.now(), type: 'prompt', detail: promptPreview }];
+            }
           },
           onLLMRequest: (messages, tools) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'request', detail: `${messages.length} messages, ${tools.length} tools` }];
