@@ -1,14 +1,12 @@
 /**
- * Three separate tools for component discovery and rendering:
+ * Component discovery and rendering tools:
  *
- *   list_components()                     → list all components + recipes
- *   get_component("stat-card")            → detailed JSON schema
- *   component("stat-card", { label: … })  → render stat-card
+ *   list_components()                     → list all available components + recipes
+ *   get_component("stat-card")            → detailed JSON schema for a component
+ *   component("stat-card", { label: … })  → render a component by name
  *
- * Coexists with the individual render_* tools; both are valid.
- *
- * Inspired by a suggestion from Emmanuel Raviart, creator of Tricoteuses MCP server
- * (https://www.tricoteuses.fr/mcp)
+ * These tools complement the individual render_* tools.
+ * The LLM can use either render_stat({...}) directly or component("stat", {...}).
  */
 
 import { UI_TOOLS, executeUITool } from './ui-tools.js';
@@ -115,11 +113,11 @@ export const COMPONENT_TOOL: AnthropicTool = {
 // ── Execution — list_components ───────────────────────────────────────────────
 
 export function executeListComponents(): string {
-  const seen = new Set<ComponentEntry>();
+  const seen = new Set<string>();
   const components: { name: string; description: string }[] = [];
   for (const entry of componentRegistry.values()) {
-    if (seen.has(entry) || !entry.renderable) continue;
-    seen.add(entry);
+    if (seen.has(entry.name) || !entry.renderable) continue;
+    seen.add(entry.name);
     components.push({ name: entry.name, description: entry.description.split('.')[0] });
   }
 
@@ -171,15 +169,145 @@ export function executeGetComponent(name: string): string {
   return JSON.stringify({ error: `Inconnu : ${name}. Appelle list_components() pour la liste.` });
 }
 
+// ── Schema validation (Option C) ────────────────────────────────────────────
+
+export interface ValidationResult {
+  valid: boolean;
+  issues: string[];
+}
+
+/**
+ * Validate params against a component's JSON schema.
+ * Checks required fields, unknown keys, and basic type mismatches.
+ * Does NOT recurse deeply or validate enums/formats.
+ */
+export function validateParams(
+  params: Record<string, unknown>,
+  schema: Record<string, unknown>,
+): ValidationResult {
+  const issues: string[] = [];
+  const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+  const required = (schema.required ?? []) as string[];
+  const schemaKeys = new Set(Object.keys(properties));
+  const paramKeys = new Set(Object.keys(params));
+
+  // 1. Required fields
+  const missingRequired: string[] = [];
+  for (const key of required) {
+    if (!(key in params) || params[key] === undefined) {
+      missingRequired.push(key);
+    }
+  }
+
+  // 2. Unknown keys — detect probable field name mismatches
+  const unknownKeys: string[] = [];
+  for (const key of paramKeys) {
+    if (!schemaKeys.has(key)) {
+      unknownKeys.push(key);
+    }
+  }
+
+  // Cross-reference unknown keys with missing required fields for hints
+  if (missingRequired.length > 0 && unknownKeys.length > 0) {
+    for (const missing of missingRequired) {
+      for (const unknown of unknownKeys) {
+        issues.push(
+          `Missing required field "${missing}" — you passed "${unknown}" instead. Rename "${unknown}" to "${missing}".`,
+        );
+      }
+    }
+  } else {
+    for (const key of missingRequired) {
+      issues.push(`Missing required field "${key}".`);
+    }
+    for (const key of unknownKeys) {
+      issues.push(`Unknown field "${key}" — not in schema. Valid fields: ${[...schemaKeys].join(', ')}.`);
+    }
+  }
+
+  // 3. Basic type checks for known fields
+  for (const key of paramKeys) {
+    if (!schemaKeys.has(key)) continue;
+    const value = params[key];
+    if (value === undefined || value === null) continue;
+    const propSchema = properties[key];
+    const expectedType = propSchema?.type as string | undefined;
+    if (!expectedType) continue;
+
+    const actualType = Array.isArray(value) ? 'array' : typeof value;
+
+    if (expectedType === 'array' && actualType !== 'array') {
+      issues.push(`Field "${key}" should be an array, got ${actualType}.`);
+    } else if (expectedType === 'string' && actualType !== 'string') {
+      issues.push(`Field "${key}" should be a string, got ${actualType}.`);
+    } else if (expectedType === 'number' && actualType !== 'number') {
+      issues.push(`Field "${key}" should be a number, got ${actualType}.`);
+    } else if (expectedType === 'object' && (actualType !== 'object' || Array.isArray(value))) {
+      issues.push(`Field "${key}" should be an object, got ${actualType}.`);
+    }
+  }
+
+  // 4. Array items structure — check first element matches expected shape
+  for (const key of paramKeys) {
+    if (!schemaKeys.has(key)) continue;
+    const value = params[key];
+    if (!Array.isArray(value) || value.length === 0) continue;
+    const propSchema = properties[key];
+    if (propSchema?.type !== 'array') continue;
+    const itemsSchema = propSchema.items as Record<string, unknown> | undefined;
+    if (!itemsSchema) continue;
+
+    const firstItem = value[0];
+    const itemType = itemsSchema.type as string | undefined;
+
+    if (itemType === 'object' && (typeof firstItem !== 'object' || firstItem === null || Array.isArray(firstItem))) {
+      const actualItemType = Array.isArray(firstItem) ? 'array' : typeof firstItem;
+      issues.push(
+        `Field "${key}" items should be objects, but first item is ${actualItemType}. Expected shape: ${JSON.stringify(Object.keys((itemsSchema.properties ?? {}) as object))}.`,
+      );
+    } else if (itemType === 'string' && typeof firstItem !== 'string') {
+      issues.push(`Field "${key}" items should be strings, but first item is ${typeof firstItem}.`);
+    } else if (itemType === 'array' && !Array.isArray(firstItem)) {
+      issues.push(`Field "${key}" items should be arrays, but first item is ${typeof firstItem}.`);
+    }
+  }
+
+  return { valid: issues.length === 0, issues };
+}
+
 // ── Execution — component (render only) ──────────────────────────────────────
 
 export function executeComponent(
   args: { name: string; params?: unknown },
   callbacks: AgentCallbacks,
+  options?: { schemaValidation?: boolean },
 ): string {
+  if (!args.name) {
+    return JSON.stringify({
+      error: 'Missing component name. Call list_components() to see available components.',
+    });
+  }
+
   const comp = componentRegistry.get(args.name);
   if (comp) {
     const rawParams = (args.params as Record<string, unknown>) ?? {};
+
+    // Option C: validate params against schema before executing
+    if (options?.schemaValidation) {
+      const validation = validateParams(rawParams, comp.inputSchema);
+      if (!validation.valid) {
+        return JSON.stringify({
+          error: 'Invalid params — review the schema and re-call component() with corrected params.',
+          component: comp.name,
+          issues: validation.issues,
+          schema: comp.inputSchema,
+        });
+      }
+      // Valid params → execute directly (skip coercion path)
+      return executeUITool(comp.toolName, rawParams, callbacks);
+    }
+
+    // Default path: execute with coercion (backward compat)
     return executeUITool(
       comp.toolName,
       rawParams,

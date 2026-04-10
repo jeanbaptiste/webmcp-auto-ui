@@ -13,6 +13,7 @@
     "apps/todo2",
     "apps/showcase2",
     "apps/recipes",
+    "apps/wasm",
     "docs-site"
   ],
   "scripts": {
@@ -23,6 +24,7 @@
     "dev:showcase2": "npm -w apps/showcase2 run dev",
     "dev:todo2": "npm -w apps/todo2 run dev",
     "dev:recipes": "npm -w apps/recipes run dev",
+    "dev:wasm": "npm -w apps/wasm run dev",
     "build": "npm -w apps/home run build && npm -w apps/flex2 run build && npm -w apps/viewer2 run build && npm -w apps/showcase2 run build && npm -w apps/todo2 run build && npm -w apps/recipes run build",
     "check": "npm -w packages/ui run check && npm -w packages/sdk run check",
     "deploy": "./scripts/deploy.sh",

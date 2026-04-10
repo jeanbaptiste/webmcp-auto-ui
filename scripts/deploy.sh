@@ -58,7 +58,7 @@ rollback_app() {
 
 # ── Deploy path mapping ─────────────────────────────────────────────────────
 # Node apps: ExecStart determines where index.js must be
-#   flex2, viewer2, showcase2, recipes → node index.js → deploy to root
+#   flex2, viewer2, showcase2, recipes, wasm → node index.js → deploy to root
 #
 # Static apps: served directly by nginx
 #   home, todo2 → deploy to root
@@ -164,8 +164,9 @@ deploy_app() {
     home)      deploy_static "home" ;;
     todo2)     deploy_static "todo2" ;;
     showcase2) deploy_node_root "showcase2" ;;
+    wasm)      deploy_node_root "wasm" ;;
     *)
-      echo "  [$app] ✗ unknown app (valid: home, flex2, viewer2, showcase2, todo2, recipes)"
+      echo "  [$app] ✗ unknown app (valid: home, flex2, viewer2, showcase2, todo2, recipes, wasm)"
       return 1
       ;;
   esac
@@ -177,7 +178,7 @@ echo "webmcp-auto-ui deploy"
 echo ""
 
 if [ $# -eq 0 ]; then
-  APPS="home flex2 viewer2 showcase2 todo2 recipes"
+  APPS="home flex2 viewer2 showcase2 todo2 recipes wasm"
 else
   APPS="$*"
 fi
@@ -200,7 +201,7 @@ echo ""
 echo "Verifying..."
 for app in $APPS; do
   case "$app" in
-    flex2|viewer2|recipes|showcase2)
+    flex2|viewer2|recipes|showcase2|wasm)
       status=$(ssh "$SSH_HOST" "systemctl is-active webmcp-$app 2>/dev/null" || echo "inactive")
       echo "  $app: $status"
       ;;

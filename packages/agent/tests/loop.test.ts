@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { buildSystemPrompt, mcpToolsToAnthropic, fromMcpTools } from '../src/loop.js';
+import { validateParams } from '../src/component-tool.js';
+import type { ValidationResult } from '../src/component-tool.js';
 import type { McpToolDef, LLMProvider, LLMResponse, AnthropicTool, ChatMessage } from '../src/types.js';
 
 const TOOLS: McpToolDef[] = [
@@ -8,14 +10,19 @@ const TOOLS: McpToolDef[] = [
 ];
 
 describe('buildSystemPrompt', () => {
-  it('includes tool names', () => {
-    const prompt = buildSystemPrompt(TOOLS);
+  it('includes tool names when passed as layers', () => {
+    const layers = [{ source: 'mcp' as const, serverUrl: 'test', tools: TOOLS }];
+    const prompt = buildSystemPrompt(layers);
     expect(prompt).toContain('search');
     expect(prompt).toContain('get_item');
   });
 
   it('mentions DATA and UI tools', () => {
-    const prompt = buildSystemPrompt(TOOLS);
+    const layers = [
+      { source: 'mcp' as const, serverUrl: 'test', tools: TOOLS },
+      { source: 'ui' as const },
+    ];
+    const prompt = buildSystemPrompt(layers);
     expect(prompt.toUpperCase()).toContain('DATA');
     expect(prompt.toUpperCase()).toContain('UI');
   });
@@ -69,7 +76,7 @@ describe('runAgentLoop', () => {
       } satisfies LLMResponse),
     };
 
-    const result = await runAgentLoop('test query', { provider, mcpTools: TOOLS });
+    const result = await runAgentLoop('test query', { provider, layers: [{ source: 'mcp', serverUrl: 'test', tools: TOOLS }] });
     expect(result.stopReason).toBe('end_turn');
     expect(result.text).toBe('Done.');
     expect(result.toolCalls.length).toBe(0);
@@ -156,5 +163,182 @@ describe('runAgentLoop', () => {
     const result = await runAgentLoop('abort me', { provider, signal: ac.signal, maxIterations: 5 });
     // Aborted during second iteration — loop exits without normal end_turn
     expect(result.metrics.iterations).toBeLessThan(5);
+  });
+});
+
+// ── Option C — schema validation ──────────────────────────────────────────────
+
+describe('Option C — schema validation', () => {
+  // Schema for render_table (from UI_TOOLS)
+  const tableSchema: Record<string, unknown> = {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      columns: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            key: { type: 'string' },
+            label: { type: 'string' },
+            align: { type: 'string', enum: ['left', 'center', 'right'] },
+          },
+          required: ['key', 'label'],
+        },
+      },
+      rows: { type: 'array', items: { type: 'object' } },
+    },
+    required: ['rows'],
+  };
+
+  // Schema for render_stat
+  const statSchema: Record<string, unknown> = {
+    type: 'object',
+    properties: {
+      label: { type: 'string' },
+      value: { type: 'string' },
+      trend: { type: 'string' },
+      trendDir: { type: 'string', enum: ['up', 'down', 'neutral'] },
+    },
+    required: ['label', 'value'],
+  };
+
+  it('valid params — returns valid', () => {
+    const result = validateParams(
+      { rows: [{ name: 'Alice', age: 30 }], columns: [{ key: 'name', label: 'Name' }] },
+      tableSchema,
+    );
+    expect(result.valid).toBe(true);
+    expect(result.issues).toHaveLength(0);
+  });
+
+  it('missing required field — returns issues', () => {
+    const result = validateParams(
+      { title: 'My Table' },  // missing 'rows'
+      tableSchema,
+    );
+    expect(result.valid).toBe(false);
+    expect(result.issues.length).toBeGreaterThan(0);
+    expect(result.issues.some(i => i.includes('"rows"'))).toBe(true);
+  });
+
+  it('wrong field name (items vs rows) — returns hint', () => {
+    const result = validateParams(
+      { items: [{ name: 'Alice' }] },  // 'items' instead of 'rows'
+      tableSchema,
+    );
+    expect(result.valid).toBe(false);
+    // Should mention both the missing 'rows' and the unknown 'items'
+    expect(result.issues.some(i => i.includes('"rows"') && i.includes('"items"'))).toBe(true);
+  });
+
+  it('wrong type (string[] vs object[]) — returns hint', () => {
+    const result = validateParams(
+      {
+        rows: [{ name: 'Alice' }],
+        columns: ['Name', 'Age'],  // string[] instead of object[]
+      },
+      tableSchema,
+    );
+    expect(result.valid).toBe(false);
+    expect(result.issues.some(i => i.includes('"columns"') && i.includes('object'))).toBe(true);
+  });
+
+  it('wrong basic type — string vs number', () => {
+    const result = validateParams(
+      { label: 42, value: 'ok' },  // label should be string
+      statSchema,
+    );
+    expect(result.valid).toBe(false);
+    expect(result.issues.some(i => i.includes('"label"') && i.includes('string'))).toBe(true);
+  });
+
+  it('array field receives non-array — returns issue', () => {
+    const result = validateParams(
+      { rows: 'not an array' },
+      tableSchema,
+    );
+    expect(result.valid).toBe(false);
+    expect(result.issues.some(i => i.includes('"rows"') && i.includes('array'))).toBe(true);
+  });
+
+  // Coercion test removed — coercion was deleted in the Phase 7 simplification.
+  // Schema validation is now always on (schemaValidation defaults to true).
+
+  it('schemaValidation=true with invalid params — returns schema instead of rendering', async () => {
+    const { runAgentLoop } = await import('../src/loop.js');
+
+    const blocks: { type: string; data: Record<string, unknown> }[] = [];
+    let lastToolResult = '';
+
+    const provider: LLMProvider = {
+      name: 'mock', model: 'claude-haiku',
+      chat: vi.fn()
+        .mockResolvedValueOnce({
+          content: [{
+            type: 'tool_use', id: 'tc1',
+            name: 'component',
+            // 'items' is wrong — table expects 'rows'
+            input: { name: 'table', params: { items: [{ name: 'Alice' }] } },
+          }],
+          stopReason: 'tool_use',
+        } satisfies LLMResponse)
+        .mockResolvedValueOnce({
+          content: [{ type: 'text', text: 'Got it.' }],
+          stopReason: 'end_turn',
+        } satisfies LLMResponse),
+    };
+
+    const result = await runAgentLoop('show table', {
+      provider,
+      schemaValidation: true,
+      callbacks: {
+        onBlock: (type, data) => { blocks.push({ type, data }); },
+        onToolCall: (call) => { if (call.result) lastToolResult = call.result; },
+      },
+    });
+
+    // No block should have been rendered
+    expect(blocks.length).toBe(0);
+    // The tool result should contain schema and issues
+    const parsed = JSON.parse(lastToolResult);
+    expect(parsed.error).toContain('Invalid params');
+    expect(parsed.issues.length).toBeGreaterThan(0);
+    expect(parsed.schema).toBeDefined();
+  });
+
+  it('schemaValidation=true with valid params — renders directly', async () => {
+    const { runAgentLoop } = await import('../src/loop.js');
+
+    const blocks: { type: string; data: Record<string, unknown> }[] = [];
+
+    const provider: LLMProvider = {
+      name: 'mock', model: 'claude-haiku',
+      chat: vi.fn()
+        .mockResolvedValueOnce({
+          content: [{
+            type: 'tool_use', id: 'tc1',
+            name: 'component',
+            input: { name: 'stat', params: { label: 'Users', value: '1234' } },
+          }],
+          stopReason: 'tool_use',
+        } satisfies LLMResponse)
+        .mockResolvedValueOnce({
+          content: [{ type: 'text', text: 'Done.' }],
+          stopReason: 'end_turn',
+        } satisfies LLMResponse),
+    };
+
+    const result = await runAgentLoop('show stat', {
+      provider,
+      schemaValidation: true,
+      callbacks: {
+        onBlock: (type, data) => { blocks.push({ type, data }); },
+      },
+    });
+
+    expect(blocks.length).toBe(1);
+    expect(blocks[0].type).toBe('stat');
+    expect(blocks[0].data).toMatchObject({ label: 'Users', value: '1234' });
   });
 });

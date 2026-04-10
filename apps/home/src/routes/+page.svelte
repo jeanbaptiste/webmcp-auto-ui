@@ -39,6 +39,12 @@
       url: `${base}/recipes`,
       accent: '#ec4899',
     },
+    {
+      title: 'WASM Bench',
+      desc: 'Benchmark smart vs explicit avec Gemma WASM',
+      url: `${base}/wasm`,
+      accent: '#06b6d4',
+    },
   ];
 
   const mcpServers = [

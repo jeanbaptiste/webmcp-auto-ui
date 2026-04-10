@@ -33,7 +33,7 @@
   let maxContextTokens = $state(150_000);
   let maxTokens = $state(4096);
   let cacheEnabled = $state(true);
-  let toolMode = $state<'smart' | 'explicit'>('smart');
+  let schemaValidation = $state(true);
   let temperature = $state(1.0);
   let topK = $state(64);
   let maxTools = $state(8);
@@ -218,13 +218,6 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
     });
   });
 
-  // Auto-switch toolMode based on model: explicit for Claude, smart for Gemma
-  $effect(() => {
-    const isWasm = canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b';
-    toolMode = isWasm ? 'smart' : 'explicit';
-  });
-
-  $effect(() => { toolMode; untrack(() => { conversationHistory = []; }); });
 
   // ── Layers & prompt ────────────────────────────────────────────────
   const layers = $derived.by((): ToolLayer[] => {
@@ -250,7 +243,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
     const hasCustomPrompt = systemPrompt !== defaultSystemPrompt;
     const hasMcp = layers.some(l => l.source === 'mcp');
     if (hasMcp) {
-      const structured = buildSystemPrompt(layers, { toolMode });
+      const structured = buildSystemPrompt(layers);
       return hasCustomPrompt ? `${systemPrompt}\n\n${structured}` : structured;
     }
     return systemPrompt;
@@ -314,7 +307,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
-        toolMode, maxIterations: 15, maxTokens, maxTools, temperature, topK, cacheEnabled,
+        schemaValidation, maxIterations: 15, maxTokens, maxTools, temperature, topK, cacheEnabled,
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         layers,
@@ -582,7 +575,8 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
 <SettingsDrawer
   bind:open={settingsOpen}
   bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools
-  bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:toolMode
+  bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON
+  bind:schemaValidation
   onconnect={() => addMcpServer(canvas.mcpUrl)}
   {connectedUrls} {loadingUrls}
   onaddserver={addMcpServer} onaddall={addAllServers} onremoveserver={removeMcpServer}
@@ -594,4 +588,4 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
 <HistoryModal bind:open={historyOpen} messages={historyLog} />
 
 <!-- DEBUG PANEL (Ctrl+Shift+D) -->
-<DebugPanel prompt={effectivePrompt} {layers} {toolMode} />
+<DebugPanel prompt={effectivePrompt} {layers} />

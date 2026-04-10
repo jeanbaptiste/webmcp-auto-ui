@@ -6,6 +6,7 @@ import type { ComponentAdapter } from './component-adapter.js';
 import { sanitizeSchema } from '@webmcp-auto-ui/core';
 import { UI_TOOLS } from './ui-tools.js';
 import { LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL } from './component-tool.js';
+import { buildSkillTool } from './skill-executor.js';
 
 /** MCP data layer — tools and recipes from a connected MCP server */
 export interface McpLayer {
@@ -19,12 +20,28 @@ export interface McpLayer {
 /** UI layer — component tool + WebMCP recipes */
 export interface UILayer {
   source: 'ui';
-  /** Optional adapter to filter/customize UI tools (explicit mode only) */
+  /** Optional adapter to filter/customize UI tools */
   adapter?: ComponentAdapter;
   recipes?: Recipe[];
 }
 
-export type ToolLayer = McpLayer | UILayer;
+/** Skill layer — predefined workflows/skills */
+export interface SkillLayer {
+  source: 'skill';
+  skills: SkillEntry[];
+}
+
+export interface SkillEntry {
+  id: string;
+  name: string;
+  description: string;
+  mcpUrl?: string;
+  mcpName?: string;
+  expectedBlocks?: string[];
+  tags?: string[];
+}
+
+export type ToolLayer = McpLayer | UILayer | SkillLayer;
 
 /** Convert McpToolDef[] to AnthropicTool[] (duplicated from loop.ts to avoid circular import) */
 function mcpToolsToAnthropic(tools: McpToolDef[]): AnthropicTool[] {
@@ -40,7 +57,6 @@ function mcpToolsToAnthropic(tools: McpToolDef[]): AnthropicTool[] {
 /** Build AnthropicTool[] from structured layers */
 export function buildToolsFromLayers(
   layers: ToolLayer[],
-  toolMode: 'smart' | 'explicit' = 'smart',
 ): AnthropicTool[] {
   const tools: AnthropicTool[] = [];
 
@@ -50,17 +66,21 @@ export function buildToolsFromLayers(
         tools.push(...mcpToolsToAnthropic(layer.tools));
         break;
       case 'ui':
-        if (toolMode === 'explicit') {
-          // In explicit mode, use adapter's tools if provided, otherwise all UI_TOOLS
-          if (layer.adapter) {
-            tools.push(...layer.adapter.tools());
-          } else {
-            tools.push(...UI_TOOLS);
-          }
+        // Always include adapter tools (if provided) or all UI_TOOLS
+        if (layer.adapter) {
+          tools.push(...layer.adapter.tools());
+        } else {
+          tools.push(...UI_TOOLS);
         }
-        // 3 UI tools always included (smart = only these, explicit = render_* + these)
+        // Discovery + unified component tools always included
         tools.push(LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL);
         break;
+      case 'skill': {
+        if (layer.skills.length > 0) {
+          tools.push(buildSkillTool(layer.skills));
+        }
+        break;
+      }
     }
   }
 

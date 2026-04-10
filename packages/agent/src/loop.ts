@@ -10,14 +10,15 @@ import type {
   ChatMessage, ContentBlock, ToolCall, AgentMetrics, AgentResult,
   LLMProvider, AnthropicTool, McpToolDef, AgentCallbacks,
 } from './types.js';
-import type { ToolLayer, McpLayer, UILayer } from './tool-layers.js';
+import type { ToolLayer, McpLayer, UILayer, SkillLayer } from './tool-layers.js';
 import { buildToolsFromLayers } from './tool-layers.js';
-import { UI_TOOLS, isUITool, executeUITool } from './ui-tools.js';
+import { isUITool, executeUITool } from './ui-tools.js';
 import {
   LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL,
   executeListComponents, executeGetComponent, executeComponent,
 } from './component-tool.js';
 import { formatRecipesForPrompt, formatMcpRecipesForPrompt } from './recipe-registry.js';
+import { executeSkill } from './skill-executor.js';
 
 const MAX_RESULT_LEN = 10_000;
 
@@ -79,64 +80,19 @@ function compressOldToolResults(messages: ChatMessage[], resultBuffer?: Map<stri
   }
 }
 
-/** Build system prompt from structured ToolLayers (new API) */
-export function buildSystemPrompt(layers: ToolLayer[], options?: { toolMode?: 'smart' | 'explicit' }): string;
-/** Build system prompt from flat McpToolDef[] (backward compat) */
-export function buildSystemPrompt(mcpTools: McpToolDef[]): string;
-export function buildSystemPrompt(input: ToolLayer[] | McpToolDef[], options?: { toolMode?: 'smart' | 'explicit' }): string {
-  // Detect: is it ToolLayer[] or McpToolDef[]?
-  if (input.length === 0 || 'source' in input[0]) {
-    return buildSystemPromptFromLayers(input as ToolLayer[], options?.toolMode ?? 'smart');
-  }
-  // Legacy path — McpToolDef[]
-  return buildSystemPromptLegacy(input as McpToolDef[]);
-}
-
-function buildSystemPromptLegacy(mcpTools: McpToolDef[]): string {
-  const dataTools = mcpTools.filter(t => !isUITool(t.name));
-  const uiTools = UI_TOOLS;
-  return `Tu es un assistant UI connecté à un serveur MCP.
-Tu as ${dataTools.length} outils DATA et ${uiTools.length} outils UI.
-
-Outils DATA (requêtes) :
-${dataTools.map(t => `- ${t.name}: ${(t.description ?? t.name).split('\n')[0]}`).join('\n')}
-
-Outils UI (affichage visuel) :
-${uiTools.map(t => `- ${t.name}: ${t.description}`).join('\n')}
-
-WORKFLOW OBLIGATOIRE :
-1. Appelle un outil DATA pour récupérer les données
-2. Appelle IMMÉDIATEMENT un outil UI (render_*) pour afficher le résultat
-3. Recommence ou arrête
-
-RECETTES : avant d'agir, consulte les recettes disponibles (search_recipes ou get_recipe). Si une recette correspond, suis ses instructions. Sinon, improvise.
-IMAGES : ne JAMAIS inventer d'URLs. Utilise UNIQUEMENT les URLs retournées par les outils DATA.
-
-RÈGLES :
-- Après CHAQUE outil DATA, appeler un render_* obligatoirement
-- Si erreur ou données vides, appeler render_kv ou render_stat pour montrer le statut
-- JAMAIS enchaîner >1 outil DATA sans rendre entre les deux
-- TOUJOURS rendre visuellement — jamais que du texte
-- render_table pour les tableaux, render_chart pour les chiffres, render_stat pour les KPIs, render_kv pour les paires clé-valeur
-- Texte = 1 phrase max`;
-}
-
-function buildSystemPromptFromLayers(layers: ToolLayer[], toolMode: 'smart' | 'explicit'): string {
-  const componentCall = toolMode === 'smart'
-    ? 'component("nom", {params})'
-    : 'un outil UI (render_* ou component)';
-
+/** Build system prompt from structured ToolLayers */
+export function buildSystemPrompt(layers: ToolLayer[]): string {
   let prompt = `Tu es un assistant UI connecté à des serveurs MCP.
 
 WORKFLOW OBLIGATOIRE :
 1. Appelle un outil DATA pour récupérer les données
-2. Appelle IMMÉDIATEMENT ${componentCall} pour afficher le résultat
+2. Appelle IMMÉDIATEMENT un outil UI (render_* ou component) pour afficher le résultat
 3. Recommence ou arrête
 
 RECETTES : avant d'agir, consulte les recettes disponibles (search_recipes ou get_recipe). Si une recette correspond à la demande, suis ses instructions. Sinon, improvise.
 IMAGES : ne JAMAIS inventer d'URLs. Utilise UNIQUEMENT les URLs retournées par les outils DATA.
 
-RÈGLE ABSOLUE : après CHAQUE outil DATA, appelle immédiatement ${componentCall} pour afficher le résultat. Si tu ne sais pas quel composant utiliser, appelle list_components() puis get_component(nom) puis ${componentCall}.
+RÈGLE ABSOLUE : après CHAQUE outil DATA, appelle immédiatement un outil UI (render_* ou component) pour afficher le résultat. Si tu ne sais pas quel composant utiliser, appelle list_components() puis get_component(nom) puis component(nom, {params}).
 Maximum 3 appels DATA avant de rendre visuellement. JAMAIS plus de 3.
 TOUJOURS rendre visuellement — JAMAIS terminer avec du texte seul.
 
@@ -175,31 +131,36 @@ CHOIX DU SCHÉMA : Ne liste PAS tous les schémas. Choisis directement le bon :
   if (uiLayer) {
     prompt += `## webmcp\n\n`;
 
-    if (toolMode === 'smart') {
-      // Mode smart : 3 outils UI (list_components, get_component, component)
-      prompt += `### composants UI\n`;
-      prompt += `Appelle list_components() pour découvrir les composants disponibles.\n`;
-      prompt += `Appelle get_component(nom) pour le schéma détaillé.\n`;
-      prompt += `Appelle component(nom, {params}) pour rendre.\n\n`;
-    } else {
-      // Mode explicit : 31 outils individuels
-      prompt += `### outils UI (affichage visuel)\n`;
-      prompt += UI_TOOLS.map(t => `- ${t.name}: ${t.description}`).join('\n');
-      prompt += '\n\n';
-    }
+    prompt += `### outils UI (affichage visuel)\n`;
+    prompt += `Appelle list_components() pour découvrir les composants disponibles.\n`;
+    prompt += `Appelle get_component(nom) pour le schéma détaillé.\n`;
+    prompt += `Appelle component(nom, {params}) pour rendre.\n`;
+    prompt += `Les outils render_* individuels sont aussi disponibles.\n\n`;
 
     prompt += `RÈGLES :\n`;
-    prompt += `- RÈGLE ABSOLUE : après CHAQUE outil DATA, rendre visuellement avec component()\n`;
+    prompt += `- RÈGLE ABSOLUE : après CHAQUE outil DATA, rendre visuellement avec un outil UI\n`;
     prompt += `- Maximum 3 outils DATA avant de rendre. Au-delà, tes outils de découverte seront désactivés.\n`;
     prompt += `- table pour les tableaux, chart pour les chiffres, stat pour les KPIs, kv pour les paires clé-valeur\n`;
     prompt += `- Si erreur ou données vides, rendre kv ou stat pour montrer le statut\n`;
-    prompt += `- JAMAIS terminer avec du texte seul — TOUJOURS appeler component()\n\n`;
+    prompt += `- JAMAIS terminer avec du texte seul — TOUJOURS appeler un outil UI\n\n`;
 
     if (uiLayer.recipes && uiLayer.recipes.length > 0) {
       prompt += `### recettes UI (${uiLayer.recipes.length})\n`;
       prompt += formatRecipesForPrompt(uiLayer.recipes);
       prompt += '\n';
     }
+  }
+
+  // ## skills — depuis SkillLayers
+  const skillLayers = layers.filter((l): l is SkillLayer => l.source === 'skill');
+  const allSkills = skillLayers.flatMap(l => l.skills);
+  if (allSkills.length > 0) {
+    prompt += `## skills (${allSkills.length})\n\n`;
+    prompt += `Appelle use_skill(name) pour activer un workflow prédéfini.\n`;
+    prompt += allSkills.map(s =>
+      `- ${s.name}: ${s.description}${s.expectedBlocks?.length ? ` → produit: ${s.expectedBlocks.join(', ')}` : ''}`
+    ).join('\n');
+    prompt += '\n\n';
   }
 
   return prompt.trimEnd();
@@ -233,11 +194,8 @@ function truncateResult(result: string): string {
 export interface AgentLoopOptions {
   client?: McpClient;           // MCP client — optional if only UI tools used
   provider: LLMProvider;
-  mcpTools?: McpToolDef[];      // tools from MCP server (legacy — prefer layers)
-  /** Structured tool layers (new API — replaces mcpTools) */
+  /** Structured tool layers (replaces legacy mcpTools) */
   layers?: ToolLayer[];
-  /** 'smart' = 1 tool component() (default), 'explicit' = 31 render_* + component() */
-  toolMode?: 'smart' | 'explicit';
   maxIterations?: number;
   maxTokens?: number;
   maxTools?: number;
@@ -248,6 +206,8 @@ export interface AgentLoopOptions {
   initialMessages?: ChatMessage[]; // conversation history from previous turns
   callbacks?: AgentCallbacks;
   signal?: AbortSignal;
+  /** Enable schema validation for component() calls (default: true) */
+  schemaValidation?: boolean;
 }
 
 export async function runAgentLoop(
@@ -257,8 +217,6 @@ export async function runAgentLoop(
   const {
     client,
     provider,
-    mcpTools = [],
-    toolMode = 'smart',
     maxIterations = 5,
     maxTokens,
     maxTools,
@@ -268,26 +226,15 @@ export async function runAgentLoop(
     initialMessages = [],
     callbacks = {},
     signal,
+    schemaValidation = true,
   } = options;
 
   // Buffer for recall — stores full tool results keyed by tool_use_id
   const resultBuffer = new Map<string, string>();
 
-  // Build tools and prompt from layers (new API) or mcpTools (legacy)
-  let allTools: AnthropicTool[];
-  let baseSystemPrompt: string;
-
-  if (options.layers) {
-    allTools = [...buildToolsFromLayers(options.layers, toolMode), RECALL_TOOL];
-    baseSystemPrompt = options.systemPrompt ?? buildSystemPrompt(options.layers, { toolMode });
-  } else {
-    // Legacy path — mcpTools flat array
-    const mcpToolsDef = mcpToolsToAnthropic(mcpTools);
-    allTools = toolMode === 'smart'
-      ? [...mcpToolsDef, LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL, RECALL_TOOL]
-      : [...mcpToolsDef, ...UI_TOOLS, LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL, RECALL_TOOL];
-    baseSystemPrompt = options.systemPrompt ?? buildSystemPromptLegacy(mcpTools);
-  }
+  // Build tools and prompt from layers
+  const allTools: AnthropicTool[] = [...buildToolsFromLayers(options.layers ?? []), RECALL_TOOL];
+  const baseSystemPrompt: string = options.systemPrompt ?? buildSystemPrompt(options.layers ?? []);
 
   const systemPrompt = maxTokens
     ? `${baseSystemPrompt}\n\nIMPORTANT : Limite tes réponses à ${maxTokens} tokens.`
@@ -403,12 +350,26 @@ export async function runAgentLoop(
           result = executeListComponents();
         } else if (block.name === 'get_component') {
           const gcInput = block.input as Record<string, unknown>;
-          const gcName = (gcInput.name ?? gcInput.nom ?? gcInput.component) as string;
-          result = executeGetComponent(gcName ?? '');
+          const gcName = String(gcInput.name ?? gcInput.nom ?? gcInput.component ?? '');
+          result = executeGetComponent(gcName);
         } else if (block.name === 'component') {
           const cInput = block.input as Record<string, unknown>;
-          const cName = (cInput.name ?? cInput.nom ?? cInput.component) as string;
-          result = executeComponent({ name: cName ?? '', params: cInput.params as unknown }, callbacks);
+          const cName = String(cInput.name ?? cInput.nom ?? cInput.component ?? '');
+          result = executeComponent(
+            { name: cName, params: cInput.params as unknown },
+            callbacks,
+            { schemaValidation },
+          );
+        } else if (block.name === 'use_skill') {
+          const skillInput = block.input as Record<string, unknown>;
+          const skillLayers = (options.layers ?? []).filter((l): l is SkillLayer => l.source === 'skill');
+          const allSkills = skillLayers.flatMap(l => l.skills);
+          result = executeSkill(
+            String(skillInput.skill ?? ''),
+            (skillInput.params as Record<string, unknown>) ?? {},
+            allSkills,
+            callbacks,
+          );
         } else if (isUITool(block.name)) {
           result = executeUITool(block.name, block.input, callbacks);
         } else if (client) {

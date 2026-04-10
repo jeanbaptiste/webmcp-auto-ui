@@ -224,7 +224,7 @@ WORKFLOW :
 
 Réponds en 1-2 phrases max entre les composants. L'essentiel est dans l'UI.
 
-${buildSystemPrompt(layers, { toolMode: 'smart' })}`;
+${buildSystemPrompt(layers)}`;
 
     try {
       const result = await runAgentLoop(
@@ -233,7 +233,6 @@ ${buildSystemPrompt(layers, { toolMode: 'smart' })}`;
           client: multiClient as Parameters<typeof runAgentLoop>[1]['client'],
           provider: getProvider(),
           systemPrompt,
-          toolMode: 'smart',
           maxIterations: 15,
           maxTokens: 4096,
           cacheEnabled: true,

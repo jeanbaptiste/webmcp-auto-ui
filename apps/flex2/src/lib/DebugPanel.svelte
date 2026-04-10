@@ -5,9 +5,8 @@
   interface Props {
     prompt: string;
     layers: ToolLayer[];
-    toolMode: 'smart' | 'explicit';
   }
-  let { prompt, layers, toolMode }: Props = $props();
+  let { prompt, layers }: Props = $props();
 
   let visible = $state(false);
 
@@ -43,8 +42,6 @@
     </div>
 
     <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] mb-3">
-      <span class="text-text2">Mode</span>
-      <span class="text-text1">{toolMode}</span>
       <span class="text-text2">Prompt tokens (est.)</span>
       <span class="text-text1">{estimatedTokens.toLocaleString()}</span>
       <span class="text-text2">Active layers</span>

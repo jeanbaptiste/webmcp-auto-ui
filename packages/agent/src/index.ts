@@ -23,12 +23,13 @@ export type { GemmaProviderOptions, GemmaStatus } from './providers/gemma.js';
 export { runAgentLoop, buildSystemPrompt, mcpToolsToAnthropic, fromMcpTools, trimConversationHistory, RECALL_TOOL } from './loop.js';
 export type { AgentLoopOptions } from './loop.js';
 
-export { UI_TOOLS, isUITool, executeUITool, registerCoercion } from './ui-tools.js';
+export { UI_TOOLS, isUITool, executeUITool, TOOL_TO_BLOCK } from './ui-tools.js';
 export {
   LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL,
   componentRegistry, executeListComponents, executeGetComponent, executeComponent,
+  validateParams,
 } from './component-tool.js';
-export type { ComponentEntry } from './component-tool.js';
+export type { ComponentEntry, ValidationResult } from './component-tool.js';
 
 export { summarizeChat } from './summarize.js';
 export type { SummarizeOptions, ChatSummaryResult } from './summarize.js';
@@ -42,7 +43,10 @@ export { recipeRegistry, registerRecipes, filterRecipesByServer, formatRecipesFo
 
 // Tool layers
 export { buildToolsFromLayers } from './tool-layers.js';
-export type { ToolLayer, McpLayer, UILayer } from './tool-layers.js';
+export type { ToolLayer, McpLayer, UILayer, SkillLayer, SkillEntry } from './tool-layers.js';
+
+// Skill executor
+export { buildSkillTool, executeSkill } from './skill-executor.js';
 
 // Component adapter
 export { ComponentAdapter, nativePreset, allNativePreset, minimalPreset } from './component-adapter.js';

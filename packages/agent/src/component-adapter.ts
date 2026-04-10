@@ -7,7 +7,7 @@
  */
 
 import type { AnthropicTool } from './types.js';
-import { UI_TOOLS } from './ui-tools.js';
+import { UI_TOOLS, TOOL_TO_BLOCK } from './ui-tools.js';
 
 export interface ComponentDef {
   /** Block type: "stat", "chart", "table", etc. */
@@ -87,8 +87,11 @@ const TOOL_GROUPS: Record<string, string[]> = {
   ],
 };
 
+/** Convert tool name to block type, using the canonical TOOL_TO_BLOCK mapping */
 function toolNameToType(name: string): string {
-  if (name.startsWith('render_')) return name.slice(7).replace(/_/g, '-');
+  // Use the canonical mapping from ui-tools (matches BlockRenderer's NATIVE_MAP)
+  if (name in TOOL_TO_BLOCK) return TOOL_TO_BLOCK[name];
+  // Canvas actions
   if (name === 'clear_canvas') return 'clear';
   if (name.endsWith('_block')) return name.replace('_block', '');
   return name;

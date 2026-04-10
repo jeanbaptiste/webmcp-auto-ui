@@ -321,13 +321,12 @@
     try {
       const isWasm = canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b';
       const mode = isWasm ? 'smart' : 'explicit';
-      const systemPrompt = buildSystemPrompt(layers, { toolMode: mode });
+      const systemPrompt = buildSystemPrompt(layers);
 
       const result = await runAgentLoop(prompt, {
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: systemPrompt || undefined,
-        toolMode: mode,
         maxIterations: 15,
         maxTokens: 4096,
         temperature: 1.0,

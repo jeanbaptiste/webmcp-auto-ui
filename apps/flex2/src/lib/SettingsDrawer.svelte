@@ -27,7 +27,7 @@
     topK?: number;
     showTokens?: boolean;
     showToolJSON?: boolean;
-    toolMode?: 'smart' | 'explicit';
+    schemaValidation?: boolean;
     onconnect: () => void;
     connectedUrls?: string[];
     loadingUrls?: string[];
@@ -51,7 +51,7 @@
     topK = $bindable(64),
     showTokens = $bindable(true),
     showToolJSON = $bindable(false),
-    toolMode = $bindable<'smart' | 'explicit'>('smart'),
+    schemaValidation = $bindable(true),
     onconnect,
     connectedUrls = [],
     loadingUrls = [],
@@ -144,22 +144,15 @@
     <!-- Tools -->
     <section class="flex flex-col gap-2">
       <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Outils UI</div>
-      <div class="flex items-center gap-2">
-        <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
-          <input type="checkbox" checked={toolMode === 'smart'} onchange={() => toolMode = toolMode === 'smart' ? 'explicit' : 'smart'} class="accent-accent w-3.5 h-3.5" />
-          Smart (1 tool component)
-        </label>
-        <span class="tooltip-trigger relative cursor-help text-text2/60 text-[10px] font-mono leading-none select-none"
-              role="button" tabindex="0">
-          (?)
-          <span class="tooltip-content">
-            <strong>Mode Smart</strong> : 3 outils UI. L'agent appelle list_components() pour decouvrir les composants, get_component(nom) pour le schema, et component(nom, {'{params}'}) pour rendre. ~300 tokens.<br/><br/>
-            <strong>Mode Explicit</strong> : 31 outils render_* individuels + component(). Utile pour le debug ou si l'agent a du mal avec le mode smart. ~4000 tokens.
-          </span>
-        </span>
+      <div class="text-[9px] font-mono text-text2/60">
+        render_* + component() + list_components() + get_component()
       </div>
+      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+        <input type="checkbox" bind:checked={schemaValidation} class="accent-teal w-3.5 h-3.5" />
+        Schema validation
+      </label>
       <div class="text-[9px] font-mono text-text2/60 pl-5">
-        {toolMode === 'smart' ? '1 tool component() — ~300 tokens' : '31 render_* + component() — ~4000 tokens'}
+        {schemaValidation ? 'Valide les params contre le schema — pas de coercion' : 'Coercion classique — devine les params'}
       </div>
     </section>
 
