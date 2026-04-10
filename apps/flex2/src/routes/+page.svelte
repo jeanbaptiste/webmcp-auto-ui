@@ -352,7 +352,9 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
               if (text.length < 50 || text.slice(-100).length - prevLen > 50) {
                 agentLogs = [...agentLogs, { ts: Date.now(), type: 'text', detail: text }];
               }
-              updateEphemeral(assistantId, text);
+              // Strip Gemma tool call tags from ephemeral display
+              const clean = text.replace(/<\|tool_call>[\s\S]*?(<tool_call\|>)?/g, '').replace(/<\|tool_response>[\s\S]*?(<tool_response\|>)?/g, '').replace(/<\|"\|>/g, '').trim();
+              if (clean) updateEphemeral(assistantId, clean);
             }
           },
           onToolCall: (call) => {
