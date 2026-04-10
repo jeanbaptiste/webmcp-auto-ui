@@ -1,19 +1,23 @@
 {
   "name": "@webmcp-auto-ui/showcase2",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 5178",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "PORT=3010 node build/index.js",
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "@webmcp-auto-ui/ui": "file:../../packages/ui"
+    "@sveltejs/adapter-node": "^5.5.4",
+    "@webmcp-auto-ui/agent": "file:../../packages/agent",
+    "@webmcp-auto-ui/core":  "file:../../packages/core",
+    "@webmcp-auto-ui/sdk":   "file:../../packages/sdk",
+    "@webmcp-auto-ui/ui":    "file:../../packages/ui"
   },
   "devDependencies": {
-    "@sveltejs/adapter-static": "^3.0.0",
+    "@huggingface/transformers": "^4.0.1",
     "@sveltejs/kit": "^2.0.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "autoprefixer": "^10.4.0",

@@ -1,16 +1,16 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { base } from '$app/paths';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { McpMultiClient } from '@webmcp-auto-ui/core';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
   import {
-    AnthropicProvider, runAgentLoop, buildSystemPrompt,
+    AnthropicProvider, GemmaProvider, runAgentLoop, buildSystemPrompt,
     WEBMCP_RECIPES, recipeRegistry, filterRecipesByServer,
     fromMcpTools, trimConversationHistory, TokenTracker,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, Recipe, McpRecipe, ToolLayer, McpLayer, UILayer } from '@webmcp-auto-ui/agent';
-  import { McpStatus, LLMSelector, RemoteMCPserversDemo, THEME_MAP } from '@webmcp-auto-ui/ui';
+  import { McpStatus, LLMSelector, GemmaLoader, RemoteMCPserversDemo, THEME_MAP } from '@webmcp-auto-ui/ui';
   import RecipeList from '$lib/RecipeList.svelte';
   import RecipeDetail from '$lib/RecipeDetail.svelte';
   import RecipePreview from '$lib/RecipePreview.svelte';
@@ -44,10 +44,69 @@
   const anthropicProvider = new AnthropicProvider({ proxyUrl: `${base}/api/chat` });
   const tokenTracker = new TokenTracker();
 
+  // Gemma WASM state
+  let gemmaProvider = $state<GemmaProvider | null>(null);
+  let gemmaStatus = $state<'idle'|'loading'|'ready'|'error'>('idle');
+  let gemmaProgress = $state(0);
+  let gemmaElapsed = $state(0);
+  let gemmaLoadStart = $state(0);
+  let gemmaLoadedMB = $state(0);
+  let gemmaTotalMB = $state(0);
+  let gemmaTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
+
   function getProvider() {
+    if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
+      if (gemmaProvider && gemmaProvider.model !== canvas.llm) {
+        unloadGemma();
+      }
+      if (!gemmaProvider) {
+        gemmaProvider = new GemmaProvider({
+          model: canvas.llm,
+          contextSize: 150_000,
+          onProgress: (p, _s, loaded, total) => {
+            gemmaProgress = p * 100;
+            if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;
+            if (total) gemmaTotalMB = Math.round(total / 1048576 * 100) / 100;
+          },
+          onStatusChange: (s) => {
+            gemmaStatus = s;
+            if (s === 'loading') {
+              gemmaLoadStart = Date.now();
+              gemmaElapsed = 0;
+              if (gemmaTimerInterval) clearInterval(gemmaTimerInterval);
+              gemmaTimerInterval = setInterval(() => {
+                gemmaElapsed = Math.floor((Date.now() - gemmaLoadStart) / 1000);
+              }, 1000);
+            }
+            if (s === 'ready' || s === 'error') {
+              if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
+            }
+          },
+        });
+      }
+      return gemmaProvider;
+    }
     anthropicProvider.setModel(canvas.llm as any);
     return anthropicProvider;
   }
+
+  function unloadGemma() {
+    (gemmaProvider as unknown as { destroy?: () => void })?.destroy?.();
+    gemmaProvider = null;
+    gemmaStatus = 'idle';
+    gemmaProgress = 0;
+    if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
+  }
+
+  $effect(() => {
+    const llm = canvas.llm;
+    untrack(() => {
+      if ((llm === 'gemma-e2b' || llm === 'gemma-e4b') && gemmaStatus === 'idle') {
+        const p = getProvider();
+        if (p instanceof GemmaProvider) p.initialize();
+      }
+    });
+  });
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const selectedRecipe = $derived.by((): Recipe | null => {
@@ -183,7 +242,11 @@
         layers,
         callbacks: {
           onLLMResponse: (response, latencyMs) => {
-            if (response.usage) tokenTracker.record(response.usage, latencyMs);
+            if (response.usage) {
+              tokenTracker.record(response.usage, latencyMs);
+            } else if (response.stats) {
+              tokenTracker.recordEstimate(0, response.stats.totalTokens * 4, latencyMs);
+            }
           },
           onBlock: (type, data) => {
             previewBlocks = [...previewBlocks, { id: uid(), type, data }];
@@ -266,6 +329,13 @@
       name={canvas.mcpName ?? 'non connecte'}
     />
 
+    {#if gemmaStatus === 'ready'}
+      <span class="font-mono text-[10px] text-teal flex items-center gap-1 flex-shrink-0">
+        <span class="w-1.5 h-1.5 rounded-full bg-teal"></span>
+        {({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}
+      </span>
+    {/if}
+
     <span class="font-mono text-[10px] text-text2 flex-shrink-0">
       {WEBMCP_RECIPES.length} local + {mcpRecipes.length} mcp
     </span>
@@ -277,6 +347,19 @@
       &#9788;
     </button>
   </header>
+
+  <!-- GEMMA LOADER -->
+  {#if gemmaStatus === 'loading' || gemmaStatus === 'error'}
+    <GemmaLoader
+      status={gemmaStatus}
+      progress={gemmaProgress}
+      elapsed={gemmaElapsed}
+      loadedMB={gemmaLoadedMB}
+      totalMB={gemmaTotalMB}
+      modelName={({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}
+      onunload={unloadGemma}
+    />
+  {/if}
 
   <!-- MAIN AREA -->
   <div class="flex-1 flex overflow-hidden">

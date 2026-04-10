@@ -113,7 +113,7 @@
   });
 </script>
 
-<svelte:head><title>Todo2 — WebMCP Template</title></svelte:head>
+<svelte:head><title>Todo WebMCP</title></svelte:head>
 
 <div class="min-h-screen bg-bg font-sans">
   <!-- Header -->
@@ -121,7 +121,7 @@
     <div class="font-mono text-sm font-bold">
       <span class="text-text1">Todo2</span><span class="text-teal"> WebMCP</span>
     </div>
-    <span class="text-[10px] font-mono text-text2">template de reference</span>
+    <span class="text-[10px] font-mono text-text2">Todo WebMCP</span>
     <div class="flex-1"></div>
     <div class="text-[10px] font-mono text-teal flex items-center gap-1">
       <div class="w-1.5 h-1.5 rounded-full bg-teal animate-pulse"></div>

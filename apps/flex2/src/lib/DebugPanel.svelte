@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import type { ToolLayer } from '@webmcp-auto-ui/agent';
 
   interface Props {
@@ -18,8 +18,10 @@
     }
   }
 
-  onMount(() => window.addEventListener('keydown', onKeydown));
-  onDestroy(() => window.removeEventListener('keydown', onKeydown));
+  onMount(() => {
+    window.addEventListener('keydown', onKeydown);
+    return () => window.removeEventListener('keydown', onKeydown);
+  });
 
   // Rough token estimate: ~4 chars per token
   const estimatedTokens = $derived(Math.round(prompt.length / 4));

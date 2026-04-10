@@ -9,4 +9,10 @@ export default defineConfig({
       '@webmcp-auto-ui/sdk/canvas': path.resolve('../../packages/sdk/src/canvas.ts'),
     }
   },
+  server: {
+    headers: {
+      'Cross-Origin-Opener-Policy':   'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+    }
+  }
 });
