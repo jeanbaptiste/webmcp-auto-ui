@@ -306,8 +306,9 @@ export class WasmProvider implements LLMProvider {
     } catch {}
 
     // Parse tool calls — supports multiple formats:
-    // 1. Gemma 4 native: <|tool_call>call:tool_name{...args}<tool_call|>
-    // 2. JSON format: { "tool": "name", "args": {...} }
+    // 1. Gemma 4 native: <|tool_call>call:tool_name{key:<|"|>value<|"|>}<tool_call|>
+    // 2. JSON format (legacy): <|tool_call>call:tool_name{"key":"value"}<tool_call|>
+    // 3. Loose JSON: { "tool": "name", "args": {...} }
     const content: ContentBlock[] = [];
     const gemmaToolCallRe = /<\|tool_call>call:(\w+)(\{[^]*?\})<tool_call\|>/g;
     let match: RegExpExecArray | null;
@@ -317,7 +318,26 @@ export class WasmProvider implements LLMProvider {
       foundToolCall = true;
       const toolName = match[1];
       let toolArgs: Record<string, unknown> = {};
-      try { toolArgs = JSON.parse(match[2]); } catch {}
+      // Replace Gemma 4 native <|"|> string delimiters with standard quotes before parsing
+      const argsStr = match[2].replace(/<\|"\|>/g, '"');
+      try { toolArgs = JSON.parse(argsStr); } catch {
+        // If JSON parse fails, try to extract key:value pairs from Gemma native format
+        // e.g. {location:<|"|>London<|"|>,count:5}
+        try {
+          const obj: Record<string, unknown> = {};
+          // Already replaced <|"|> with " above, so try simple key:"value" and key:number
+          const kvRe = /(\w+)\s*:\s*(?:"([^"]*)"|([\d.]+(?:e[+-]?\d+)?)|(\[.*?\])|(true|false|null))/g;
+          let kv: RegExpExecArray | null;
+          while ((kv = kvRe.exec(argsStr)) !== null) {
+            const [, k, strVal, numVal, arrVal, litVal] = kv;
+            if (strVal !== undefined) obj[k] = strVal;
+            else if (numVal !== undefined) obj[k] = Number(numVal);
+            else if (arrVal !== undefined) { try { obj[k] = JSON.parse(arrVal); } catch { obj[k] = arrVal; } }
+            else if (litVal !== undefined) obj[k] = JSON.parse(litVal);
+          }
+          if (Object.keys(obj).length > 0) toolArgs = obj;
+        } catch {}
+      }
       content.push({
         type: 'tool_use',
         id: `tc-${Date.now()}-${content.length}`,
@@ -363,6 +383,83 @@ export class WasmProvider implements LLMProvider {
     };
   }
 
+  /**
+   * Format a value for Gemma 4 native tool syntax.
+   * Strings use <|"|> delimiters, numbers/booleans/null are bare.
+   */
+  private static gemmaValue(v: unknown): string {
+    const q = '<|"|>';
+    if (v === null || v === undefined) return 'null';
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    if (Array.isArray(v)) return `[${v.map(i => WasmProvider.gemmaValue(i)).join(',')}]`;
+    if (typeof v === 'object') {
+      const entries = Object.entries(v as Record<string, unknown>)
+        .map(([k, val]) => `${k}:${WasmProvider.gemmaValue(val)}`);
+      return `{${entries.join(',')}}`;
+    }
+    return `${q}${String(v)}${q}`;
+  }
+
+  /**
+   * Format a tool declaration in Gemma 4 native syntax.
+   */
+  private static formatToolDeclaration(tool: AnthropicTool): string {
+    const q = '<|"|>';
+    let decl = `<|tool>declaration:${tool.name}{\n`;
+    decl += `  description:${q}${tool.description}${q}`;
+
+    const schema = tool.input_schema;
+    if (schema?.properties) {
+      const props = schema.properties as Record<string, { description?: string; type?: string; enum?: string[] }>;
+      decl += `,\n  parameters:{\n    properties:{\n`;
+
+      const propEntries = Object.entries(props);
+      for (let i = 0; i < propEntries.length; i++) {
+        const [key, val] = propEntries[i];
+        decl += `      ${key}:{`;
+        const parts: string[] = [];
+        if (val.description) parts.push(`description:${q}${val.description}${q}`);
+        parts.push(`type:${q}${(val.type ?? 'string').toUpperCase()}${q}`);
+        if (val.enum) parts.push(`enum:[${val.enum.map(e => `${q}${e}${q}`).join(',')}]`);
+        decl += parts.join(',');
+        decl += `}${i < propEntries.length - 1 ? ',' : ''}\n`;
+      }
+
+      decl += `    }`;
+      if (schema.required && Array.isArray(schema.required)) {
+        decl += `,\n    required:[${(schema.required as string[]).map(r => `${q}${r}${q}`).join(',')}]`;
+      }
+      decl += `,\n    type:${q}OBJECT${q}\n  }`;
+    }
+
+    decl += `\n}<tool|>`;
+    return decl;
+  }
+
+  /**
+   * Format a tool response in Gemma 4 native syntax.
+   */
+  private static formatToolResponse(toolName: string, content: string): string {
+    const q = '<|"|>';
+    // Try to parse as JSON for structured output
+    try {
+      const parsed = JSON.parse(content);
+      return `<|tool_response>response:${toolName}${WasmProvider.gemmaValue(parsed)}<tool_response|>`;
+    } catch {
+      // Plain string result
+      return `<|tool_response>response:${toolName}{result:${q}${content}${q}}<tool_response|>`;
+    }
+  }
+
+  /**
+   * Format a tool call in Gemma 4 native syntax.
+   */
+  private static formatToolCall(name: string, input: Record<string, unknown>): string {
+    const entries = Object.entries(input)
+      .map(([k, v]) => `${k}:${WasmProvider.gemmaValue(v)}`);
+    return `<|tool_call>call:${name}{${entries.join(',')}}<tool_call|>`;
+  }
+
   private buildPrompt(messages: ChatMessage[], tools: AnthropicTool[], systemPrompt?: string, maxTools?: number): string {
     const systemParts: string[] = [];
 
@@ -383,23 +480,26 @@ export class WasmProvider implements LLMProvider {
           ]
         : tools;
 
-      systemParts.push(`TOOL CALLING FORMAT:
-- To call a tool: <|tool_call>call:tool_name{"param": "value"}<tool_call|>
-- Do NOT ask for confirmation. Execute directly.
-- When answering the user (no tool needed), respond in natural language.
+      // Minimal instruction — Gemma 4 is trained on native tool format
+      systemParts.push(`Tu es un assistant UI connecté à des serveurs MCP.
+Utilise les outils disponibles pour répondre. Après chaque appel DATA, rends visuellement avec component().
+Ne demande PAS confirmation. Exécute directement.`);
 
-IMPORTANT WORKFLOW — always follow these 2 steps:
-1. Call a data tool to fetch information (e.g. search, get, list)
-2. Then IMMEDIATELY call a render_* or component tool to display the results visually
-NEVER just describe the data in text. ALWAYS render it with a UI component.
+      // Native Gemma 4 tool declarations
+      systemParts.push(limitedTools.map(t => WasmProvider.formatToolDeclaration(t)).join('\n'));
+    }
 
-Available tools:`);
-      systemParts.push(limitedTools.map(t => {
-        const params = t.input_schema?.properties
-          ? Object.keys(t.input_schema.properties).join(', ')
-          : '';
-        return `<|tool>${t.name}: ${t.description}${params ? ` (params: ${params})` : ''}<tool|>`;
-      }).join('\n'));
+    // Build a map of tool_use_id → tool_name from all messages for tool_result resolution
+    const toolNameById = new Map<string, string>();
+    for (const msg of messages) {
+      if (typeof msg.content !== 'string') {
+        for (const block of msg.content as ContentBlock[]) {
+          if (block.type === 'tool_use') {
+            const b = block as { type: 'tool_use'; id: string; name: string };
+            toolNameById.set(b.id, b.name);
+          }
+        }
+      }
     }
 
     const parts: string[] = [];
@@ -412,17 +512,18 @@ Available tools:`);
       if (typeof msg.content === 'string') {
         parts.push(`<|turn>${role}\n${msg.content}<turn|>`);
       } else {
-        // Serialize all block types so Gemma sees tool calls and results
+        // Serialize all block types in Gemma 4 native format
         const segments: string[] = [];
         for (const block of msg.content as ContentBlock[]) {
           if (block.type === 'text') {
             segments.push((block as { type: 'text'; text: string }).text);
           } else if (block.type === 'tool_use') {
             const b = block as { type: 'tool_use'; name: string; input: Record<string, unknown> };
-            segments.push(`<|tool_call>call:${b.name}${JSON.stringify(b.input)}<tool_call|>`);
+            segments.push(WasmProvider.formatToolCall(b.name, b.input));
           } else if (block.type === 'tool_result') {
             const b = block as { type: 'tool_result'; tool_use_id: string; content: string };
-            segments.push(`[Tool result]: ${b.content}`);
+            const toolName = toolNameById.get(b.tool_use_id) ?? 'unknown';
+            segments.push(WasmProvider.formatToolResponse(toolName, b.content));
           }
         }
         if (segments.length > 0) {
