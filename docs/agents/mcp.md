@@ -222,12 +222,12 @@ Connect MCP, list tools, and let the agent auto-generate the UI:
 ## Example: Connect and Generate
 
 ```typescript
-// Connect to code4code MCP server
+// Connect to Tricoteuses MCP server
 const client = new McpClient('https://mcp.code4code.eu/mcp');
 await client.connect();
 
 console.log('Server:', client.getServerInfo());
-// { name: "code4code", version: "1.0.0" }
+// { name: "tricoteuses", version: "1.0.0" }
 
 const tools = await client.listTools();
 console.log('Available tools:', tools.map(t => t.name));

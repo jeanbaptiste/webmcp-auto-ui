@@ -69,7 +69,7 @@ A built-in registry of 7 demo MCP server endpoints for testing and showcasing:
 import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
 
 // MCP_DEMO_SERVERS: Array<{ url: string; name: string; description: string }>
-// Includes: code4code, weather, finance, etc.
+// Includes: tricoteuses, weather, finance, etc.
 ```
 
 Used by the `RemoteMCPserversDemo` component in `@webmcp-auto-ui/ui` to let users discover and connect to available servers.

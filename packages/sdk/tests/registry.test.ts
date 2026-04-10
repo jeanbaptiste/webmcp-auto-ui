@@ -75,7 +75,7 @@ describe('loadDemoSkills', () => {
     const skills = listSkills();
     expect(skills.length).toBe(3);
     expect(skills.every(s => s.mcp === 'https://mcp.code4code.eu/mcp')).toBe(true);
-    expect(skills.every(s => s.mcpName === 'code4code')).toBe(true);
+    expect(skills.every(s => s.mcpName === 'tricoteuses')).toBe(true);
   });
 
   it('does not overwrite existing skills', () => {

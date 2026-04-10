@@ -62,7 +62,7 @@
   ];
 
   const mcpServers = [
-    { name: 'Code4Code', desc: 'Parlement français' },
+    { name: 'Tricoteuses', desc: 'Parlement français' },
     { name: 'Hacker News', desc: 'Stories & commentaires' },
     { name: 'Met Museum', desc: 'Collections d\'art' },
     { name: 'Open-Meteo', desc: 'Données météo' },

@@ -253,7 +253,7 @@ canvas.clearMessages();
 ```ts
 canvas.setMcpUrl('https://mcp.example.com/mcp');
 canvas.setMcpConnecting(true);
-canvas.setMcpConnected(true, 'code4code', tools);
+canvas.setMcpConnected(true, 'tricoteuses', tools);
 canvas.setMcpError('Connection refused');
 ```
 

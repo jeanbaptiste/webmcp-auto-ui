@@ -94,7 +94,7 @@ const DEMO_SKILLS: Omit<Skill, 'id' | 'createdAt' | 'updatedAt'>[] = [
   {
     name: 'weather-dashboard',
     mcp: 'https://mcp.code4code.eu/mcp',
-    mcpName: 'code4code',
+    mcpName: 'tricoteuses',
     description: 'Météo locale avec température, conditions et prévisions',
     tags: ['météo', 'dashboard'],
     blocks: [
@@ -106,7 +106,7 @@ const DEMO_SKILLS: Omit<Skill, 'id' | 'createdAt' | 'updatedAt'>[] = [
   {
     name: 'kpi-overview',
     mcp: 'https://mcp.code4code.eu/mcp',
-    mcpName: 'code4code',
+    mcpName: 'tricoteuses',
     description: 'Vue KPIs : revenus, utilisateurs, churn',
     tags: ['kpi', 'dashboard'],
     blocks: [
@@ -119,7 +119,7 @@ const DEMO_SKILLS: Omit<Skill, 'id' | 'createdAt' | 'updatedAt'>[] = [
   {
     name: 'status-monitor',
     mcp: 'https://mcp.code4code.eu/mcp',
-    mcpName: 'code4code',
+    mcpName: 'tricoteuses',
     description: 'Monitoring état des services',
     tags: ['ops', 'monitoring'],
     blocks: [

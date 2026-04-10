@@ -11,13 +11,13 @@ export interface McpDemoServer {
 
 /**
  * MCP demo servers available for webmcp-auto-ui demos.
- * code4code has its own domain; others follow the pattern
+ * tricoteuses has its own domain; others follow the pattern
  * https://demos.hyperskills.net/<id>/mcp
  */
 export const MCP_DEMO_SERVERS: McpDemoServer[] = [
   {
-    id: 'code4code',
-    name: 'Code4Code',
+    id: 'tricoteuses',
+    name: 'Tricoteuses',
     description: 'Base de données parlementaire française — amendements, scrutins, députés, groupes politiques.',
     url: 'https://mcp.code4code.eu/mcp',
     tags: ['politique', 'france', 'parlement', 'open-data'],
