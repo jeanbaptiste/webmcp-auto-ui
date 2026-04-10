@@ -27,9 +27,11 @@
       description: 'List all available HyperSkills apps with their URLs and descriptions.',
       inputSchema: { type: 'object', properties: {} },
       execute: () => jsonResult([
-        { name: 'HyperSkills Composer', url: `${base}/composer`, description: '3-mode UI composer: auto (LLM), drag & drop, chat' },
-        { name: 'Todo Demo', url: `${base}/todo`, description: 'WebMCP todo list — 8 tools exposed to Chrome extension' },
-        { name: 'HyperSkills Viewer', url: `${base}/viewer`, description: 'Load and edit HyperSkills URLs with diff + traceability' },
+        { name: 'Flex', url: `${base}/flex2`, description: 'Layers, component() unique, recettes, debug panel, mode composeur/consommateur' },
+        { name: 'Viewer', url: `${base}/viewer2`, description: 'Lecteur HyperSkills read-only — décode et affiche les blocs' },
+        { name: 'Showcase', url: `${base}/showcase2`, description: 'Démo dynamique de tous les composants UI avec 3 thèmes' },
+        { name: 'Todo', url: `${base}/todo2`, description: 'Template minimal de référence pour démarrer une app webmcp-auto-ui' },
+        { name: 'Recipes', url: `${base}/recipes`, description: 'Explorateur de recettes MCP et WebMCP' },
       ]),
       annotations: { readOnlyHint: true },
     }, (tool, opts) => (navigator as unknown as { modelContext: { registerTool: (t: unknown, o: unknown) => void } }).modelContext?.registerTool(tool, opts));

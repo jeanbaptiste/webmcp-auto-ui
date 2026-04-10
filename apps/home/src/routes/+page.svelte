@@ -1,6 +1,9 @@
 <script lang="ts">
   declare const __BUILD_TIME__: string;
   import { PUBLIC_BASE_URL } from '$env/static/public';
+  import { getContext } from 'svelte';
+
+  const theme = getContext<{ mode: string; toggle: () => void }>('theme');
 
   const base = PUBLIC_BASE_URL ?? '';
 
@@ -67,6 +70,7 @@
       <div class="flex gap-4 mt-4">
         <a href="https://hyperskills.net" target="_blank" class="text-xs font-mono text-accent hover:underline">hyperskills.net</a>
         <a href="https://github.com/jeanbaptiste/webmcp-auto-ui" target="_blank" class="text-xs font-mono text-text2 hover:text-accent">GitHub</a>
+        <button onclick={theme.toggle} class="text-xs font-mono text-text2 hover:text-accent cursor-pointer" title="Toggle dark/light mode">{theme.mode === 'dark' ? '☀' : '☾'}</button>
       </div>
     </header>
 

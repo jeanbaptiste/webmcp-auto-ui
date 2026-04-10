@@ -1661,7 +1661,7 @@ Trois outils qui exposent 56 composants (31 renderable, 25 non-renderable) au LL
 import { COMPONENT_TOOL, executeComponent, componentRegistry } from '@webmcp-auto-ui/agent';
 ```
 
-### Trois outils
+### Trois modes d'appel
 
 | Outil | Retour |
 |-------|--------|
@@ -3264,7 +3264,7 @@ App                      Agent Package                     LLM
 2. **`buildSystemPrompt(layers, { toolMode })`** genere le prompt francais structure en `## mcp` / `## webmcp`
 3. **`buildToolsFromLayers(layers, toolMode)`** produit les `AnthropicTool[]` selon le mode
 4. **`runAgentLoop(msg, { layers, toolMode })`** lance la boucle iterative
-5. En mode smart : le LLM voit 3 outils UI (`list_components()`, `get_component()`, `component()`) + N tools MCP
+5. En mode smart : le LLM voit 1 tool `component()` + N tools MCP
 6. Le LLM appelle `list_components()` pour decouvrir, `get_component(nom)` pour le schema, puis `component(nom, {params})` pour rendre
 7. Les recettes WebMCP guident le LLM sur comment presenter les donnees
 
@@ -4008,7 +4008,7 @@ const layers: ToolLayer[] = [mcpLayer1, mcpLayer2, uiLayer];
 ## webmcp
 
 ### 3 outils UI (list_components, get_component, component)
-Appelle component("nom", {params}) pour rendre un composant.
+Appelle list_components() pour decouvrir, get_component(nom) pour le schema, component(nom, {params}) pour rendre.
 Composants disponibles : stat, kv, list, chart, alert, ...
 ```
 
