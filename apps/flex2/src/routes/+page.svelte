@@ -35,7 +35,15 @@
   let toolMode = $state<'smart' | 'explicit'>('smart');
   let temperature = $state(1.0);
   let topK = $state(64);
-  let systemPrompt = $state('');
+  const defaultSystemPrompt = `Tu es un assistant UI connecté à des serveurs MCP.
+
+WORKFLOW OBLIGATOIRE :
+1. Utilise un outil DATA pour récupérer les données
+2. Puis utilise un outil UI (render_* ou component) pour afficher visuellement
+3. Réponds en 1-2 phrases max — l'essentiel est dans l'UI
+
+Propose la visualisation la plus pertinente. Combine plusieurs composants quand c'est utile.`;
+  let systemPrompt = $state(defaultSystemPrompt);
   let composerMode = $state(true); // true = composer, false = consumer
   let layoutMode = $state<'float' | 'grid'>('float');
   let skills = $state<Skill[]>([]);
@@ -196,10 +204,11 @@
   });
 
   const effectivePrompt = $derived.by(() => {
+    const hasCustomPrompt = systemPrompt !== defaultSystemPrompt;
     const hasMcp = layers.some(l => l.source === 'mcp');
     if (hasMcp) {
       const structured = buildSystemPrompt(layers, { toolMode });
-      return systemPrompt ? `${systemPrompt}\n\n${structured}` : structured;
+      return hasCustomPrompt ? `${systemPrompt}\n\n${structured}` : structured;
     }
     return systemPrompt;
   });
