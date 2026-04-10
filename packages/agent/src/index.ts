@@ -23,11 +23,10 @@ export type { GemmaProviderOptions, GemmaStatus } from './providers/gemma.js';
 export { runAgentLoop, buildSystemPrompt, mcpToolsToAnthropic, fromMcpTools, trimConversationHistory, RECALL_TOOL } from './loop.js';
 export type { AgentLoopOptions } from './loop.js';
 
-export { UI_TOOLS, isUITool, executeUITool } from './ui-tools.js';
+export { UI_TOOLS, isUITool, executeUITool, registerCoercion } from './ui-tools.js';
 export {
   LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL,
   componentRegistry, executeListComponents, executeGetComponent, executeComponent,
-  registerCoercion,
 } from './component-tool.js';
 export type { ComponentEntry } from './component-tool.js';
 
