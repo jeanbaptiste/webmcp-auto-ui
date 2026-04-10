@@ -168,7 +168,7 @@ deploy_app() {
     todo)      deploy_static "todo" ;;
     todo2)     deploy_static "todo2" ;;
     showcase)  deploy_static "showcase" ;;
-    showcase2) deploy_static "showcase2" ;;
+    showcase2) deploy_node_root "showcase2" ;;
     *)
       echo "  [$app] ✗ unknown app (valid: home, viewer, viewer2, showcase, showcase2, todo, todo2, flex, flex2, recipes)"
       return 1
@@ -205,7 +205,7 @@ echo ""
 echo "Verifying..."
 for app in $APPS; do
   case "$app" in
-    viewer|flex|flex2|viewer2|recipes)
+    viewer|flex|flex2|viewer2|recipes|showcase2)
       status=$(ssh "$SSH_HOST" "systemctl is-active webmcp-$app 2>/dev/null" || echo "inactive")
       echo "  $app: $status"
       ;;
