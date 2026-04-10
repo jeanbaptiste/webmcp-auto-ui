@@ -340,8 +340,7 @@
             pushLog('iteration', `Iteration ${i}/${max}`);
             if (i === 1) {
               // Log the system prompt on first iteration
-              const promptPreview = systemPrompt?.slice(0, 300) ?? '(none)';
-              pushLog('prompt', promptPreview);
+              pushLog('prompt', systemPrompt ?? '(none)');
             }
           },
           onLLMRequest: (messages: unknown[], tools: unknown[]) => {

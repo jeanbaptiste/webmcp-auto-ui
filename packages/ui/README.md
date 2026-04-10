@@ -55,7 +55,7 @@ Requires Svelte 5 and Tailwind CSS.
 <StatCard spec={{ label: 'Users', value: '8 204', variant: 'success', delta: '+3.2%' }} />
 ```
 
-Each component accepts a `spec` prop (rich widgets) or `data` prop (simple blocks). See the showcase app at `:5177` for all components with live data.
+Each component accepts a `spec` prop (rich widgets) or `data` prop (simple blocks). See the showcase2 app at `:3010` for all components with live data.
 
 ## License
 

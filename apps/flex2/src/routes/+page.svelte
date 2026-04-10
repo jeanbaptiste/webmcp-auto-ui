@@ -323,8 +323,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'iteration', detail: `Iteration ${i}/${max}` }];
             if (i === 1) {
               // Log the system prompt on first iteration
-              const promptPreview = effectivePrompt?.slice(0, 300) ?? '(none)';
-              agentLogs = [...agentLogs, { ts: Date.now(), type: 'prompt', detail: promptPreview }];
+              agentLogs = [...agentLogs, { ts: Date.now(), type: 'prompt', detail: effectivePrompt ?? '(none)' }];
             }
           },
           onLLMRequest: (messages, tools) => {
