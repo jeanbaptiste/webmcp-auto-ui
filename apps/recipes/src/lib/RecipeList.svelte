@@ -57,9 +57,9 @@
                  {selectedId === recipe.id ? 'bg-accent/10 border-l-2 border-l-accent' : ''}"
           onclick={() => onselect(recipe.id, 'local')}
         >
-          <div class="font-mono text-xs font-medium text-text1 truncate">{recipe.name}</div>
+          <div class="font-mono text-xs font-medium text-text1 break-words">{recipe.name}</div>
           {#if recipe.description}
-            <div class="text-[10px] text-text2 truncate mt-0.5">{recipe.description}</div>
+            <div class="text-[10px] text-text2 break-words mt-0.5">{recipe.description}</div>
           {/if}
           {#if recipe.servers?.length}
             <div class="flex gap-1 mt-1 flex-wrap">
@@ -84,9 +84,9 @@
                  {selectedId === `mcp:${recipe.name}` ? 'bg-accent/10 border-l-2 border-l-accent' : ''}"
           onclick={() => onselect(`mcp:${recipe.name}`, 'mcp')}
         >
-          <div class="font-mono text-xs font-medium text-text1 truncate">{recipe.name}</div>
+          <div class="font-mono text-xs font-medium text-text1 break-words">{recipe.name}</div>
           {#if recipe.description}
-            <div class="text-[10px] text-text2 truncate mt-0.5">{recipe.description}</div>
+            <div class="text-[10px] text-text2 break-words mt-0.5">{recipe.description}</div>
           {/if}
         </button>
       {/each}

@@ -16,6 +16,7 @@
     textOutput: string;
     error: string;
     placeholder: string;
+    prefill: string;
     hasConversation: boolean;
     onsend: (msg: string) => void;
     onstop: () => void;
@@ -23,9 +24,15 @@
   }
 
   let { blocks, active, elapsed, toolCalls, lastTool, textOutput, error,
-        placeholder, hasConversation, onsend, onstop, onclear }: Props = $props();
+        placeholder, prefill, hasConversation, onsend, onstop, onclear }: Props = $props();
 
   let inputText = $state('');
+
+  // Pre-fill input when a recipe is selected (prefill prop changes)
+  $effect(() => {
+    const val = prefill;
+    inputText = val;
+  });
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {

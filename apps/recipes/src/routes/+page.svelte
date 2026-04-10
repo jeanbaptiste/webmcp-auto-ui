@@ -62,6 +62,30 @@
   }
   function onConsoleDragEnd() { dragging = false; }
 
+  // Column resize
+  let col1Width = $state(220);
+  let col2Width = $state(350);
+  const COL_MIN = 150;
+
+  let colDragging = $state<'col1' | 'col2' | null>(null);
+  let colDragStartX = $state(0);
+  let colDragStartW = $state(0);
+
+  function onColDragStart(col: 'col1' | 'col2', e: PointerEvent) {
+    colDragging = col;
+    colDragStartX = e.clientX;
+    colDragStartW = col === 'col1' ? col1Width : col2Width;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }
+  function onColDragMove(e: PointerEvent) {
+    if (!colDragging) return;
+    const delta = e.clientX - colDragStartX;
+    const newW = Math.max(COL_MIN, colDragStartW + delta);
+    if (colDragging === 'col1') col1Width = newW;
+    else col2Width = newW;
+  }
+  function onColDragEnd() { colDragging = null; }
+
   // Settings panel
   let settingsOpen = $state(false);
 
@@ -248,10 +272,11 @@
     'afficher-oeuvres-art-collection-musee': PLACEHOLDER_MAP['metmuseum'],
   };
 
-  const DEFAULT_PLACEHOLDER = 'Posez une question en rapport avec cette recette...';
+  const DEFAULT_PLACEHOLDER = 'Posez une question...';
 
-  const chatPlaceholder = $derived.by((): string => {
-    if (!selectedId) return DEFAULT_PLACEHOLDER;
+  // Contextual prefill: actual input value when a recipe is selected
+  const chatPrefill = $derived.by((): string => {
+    if (!selectedId) return '';
     // Try by recipe id first
     const byId = PLACEHOLDER_ID_MAP[selectedId.replace(/^mcp:/, '')];
     if (byId) return byId;
@@ -265,7 +290,7 @@
         }
       }
     }
-    return DEFAULT_PLACEHOLDER;
+    return '';
   });
 
   // ── Agent send ─────────────────────────────────────────────────────────────
@@ -497,7 +522,7 @@
   <div class="columns-area">
 
     <!-- LEFT: Recipe List -->
-    <div class="col-list" class:mobile-hidden={mobileTab !== 'list'}>
+    <div class="col-list" class:mobile-hidden={mobileTab !== 'list'} style="width:{col1Width}px">
       <RecipeList
         localRecipes={WEBMCP_RECIPES}
         {mcpRecipes}
@@ -506,14 +531,32 @@
       />
     </div>
 
+    <!-- Resize bar 1 -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="col-resize-bar"
+         onpointerdown={(e) => onColDragStart('col1', e)}
+         onpointermove={onColDragMove}
+         onpointerup={onColDragEnd}>
+      <div class="col-resize-grip"></div>
+    </div>
+
     <!-- CENTER: Recipe Detail -->
-    <div class="col-detail" class:mobile-hidden={mobileTab !== 'detail'}>
+    <div class="col-detail" class:mobile-hidden={mobileTab !== 'detail'} style="width:{col2Width}px">
       <RecipeDetail
         recipe={selectedRecipe}
         mcpRecipe={selectedMcpRecipe}
         ontest={() => { testRecipe(); mobileTab = 'preview'; }}
         {testing}
       />
+    </div>
+
+    <!-- Resize bar 2 -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="col-resize-bar"
+         onpointerdown={(e) => onColDragStart('col2', e)}
+         onpointermove={onColDragMove}
+         onpointerup={onColDragEnd}>
+      <div class="col-resize-grip"></div>
     </div>
 
     <!-- RIGHT: Preview + Chat -->
@@ -526,7 +569,8 @@
         lastTool={chatLastTool}
         textOutput={previewText}
         error={previewError}
-        placeholder={chatPlaceholder}
+        placeholder={DEFAULT_PLACEHOLDER}
+        prefill={chatPrefill}
         hasConversation={conversationHistory.length > 0 || previewBlocks.length > 0 || !!previewText}
         onsend={sendMessage}
         onstop={stopTest}
@@ -560,9 +604,7 @@
   }
 
   .col-list {
-    width: 14rem; /* w-56 */
     flex-shrink: 0;
-    border-right: 1px solid var(--color-border, #222);
     background: var(--color-surface, #1a1a2e);
     overflow: hidden;
     display: flex;
@@ -570,20 +612,46 @@
   }
 
   .col-detail {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    border-right: 1px solid var(--color-border, #222);
-    min-width: 0;
-  }
-
-  .col-preview {
-    width: 400px;
     flex-shrink: 0;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    min-width: 0;
+  }
+
+  .col-preview {
+    flex: 1;
+    min-width: 150px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Column resize bars */
+  .col-resize-bar {
+    width: 4px;
+    cursor: ew-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: var(--color-surface, #1a1a2e);
+    border-left: 1px solid var(--color-border, #222);
+    border-right: 1px solid var(--color-border, #222);
+    touch-action: none;
+  }
+  .col-resize-bar:hover {
+    background: var(--color-surface2, #1e1e2e);
+  }
+  .col-resize-grip {
+    width: 2px;
+    height: 32px;
+    border-radius: 1px;
+    background: var(--color-text2, #666);
+    opacity: 0.4;
+  }
+  .col-resize-bar:hover .col-resize-grip {
+    opacity: 0.7;
   }
 
   /* ── Console drawer ──────────────────────────────────────────── */
@@ -656,19 +724,17 @@
     .mobile-hidden { display: flex !important; }
 
     .col-list {
-      width: 12rem;
+      width: 12rem !important;
     }
     .col-detail {
-      flex: 1;
-      border-right: none;
+      flex: 1 !important;
     }
     .col-preview {
-      /* Stack under detail on tablet */
       display: none;
     }
-    /* On tablet, detail area takes full remaining width.
-       Preview content is accessible via the chat input in detail area.
-       For a better tablet experience, we show detail + preview stacked. */
+    .col-resize-bar:last-of-type {
+      display: none;
+    }
     .columns-area {
       flex-wrap: wrap;
     }
@@ -692,6 +758,10 @@
       width: 100% !important;
       flex: 1;
       border-right: none;
+    }
+
+    .col-resize-bar {
+      display: none;
     }
 
     .console-drawer {
