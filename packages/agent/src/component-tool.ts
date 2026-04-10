@@ -71,7 +71,7 @@ for (const tool of UI_TOOLS) {
 
 export const LIST_COMPONENTS_TOOL: AnthropicTool = {
   name: 'list_components',
-  description: 'Liste tous les composants UI disponibles et les recettes WebMCP.',
+  description: 'List all available UI components and WebMCP recipes.',
   input_schema: {
     type: 'object',
     properties: {},
@@ -80,13 +80,13 @@ export const LIST_COMPONENTS_TOOL: AnthropicTool = {
 
 export const GET_COMPONENT_TOOL: AnthropicTool = {
   name: 'get_component',
-  description: "Retourne le schéma JSON détaillé d'un composant ou d'une recette. Appelle list_components d'abord pour voir les noms disponibles.",
+  description: "Return the detailed JSON schema of a component or recipe. Call list_components first to see available names.",
   input_schema: {
     type: 'object',
     properties: {
       name: {
         type: 'string',
-        description: "Nom du composant (ex: 'stat-card', 'table', 'chart') ou d'une recette.",
+        description: "Component name (e.g. 'stat-card', 'table', 'chart') or recipe name.",
       },
     },
     required: ['name'],
@@ -95,17 +95,17 @@ export const GET_COMPONENT_TOOL: AnthropicTool = {
 
 export const COMPONENT_TOOL: AnthropicTool = {
   name: 'component',
-  description: "Rend un composant UI. Appelle get_component(nom) d'abord pour connaître les paramètres attendus.",
+  description: "Render a UI component. Call get_component(name) first to know the expected parameters.",
   input_schema: {
     type: 'object',
     properties: {
       name: {
         type: 'string',
-        description: "Nom du composant (ex: 'stat-card', 'table', 'chart').",
+        description: "Component name (e.g. 'stat-card', 'table', 'chart').",
       },
       params: {
         type: 'object',
-        description: "Paramètres du composant (selon le schéma retourné par get_component).",
+        description: "Component parameters (according to schema from get_component).",
       },
     },
     required: ['name'],

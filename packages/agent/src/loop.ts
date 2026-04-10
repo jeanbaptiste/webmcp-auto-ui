@@ -37,13 +37,13 @@ function isDiscoveryTool(name: string): boolean {
  */
 export const RECALL_TOOL: AnthropicTool = {
   name: 'recall',
-  description: "Relire le résultat complet d'un appel d'outil précédent. Utilise l'identifiant retourné dans le résumé (ex: recall('toolu_xxx')).",
+  description: "Re-read the full result of a previous tool call. Use the identifier returned in the summary (e.g. recall('toolu_xxx')).",
   input_schema: {
     type: 'object',
     properties: {
       id: {
         type: 'string',
-        description: "Identifiant du tool call (ex: 'toolu_xxx')",
+        description: "Tool call ID (e.g. 'toolu_xxx')",
       },
     },
     required: ['id'],
@@ -109,6 +109,9 @@ WORKFLOW OBLIGATOIRE :
 2. Appelle IMMÉDIATEMENT un outil UI (render_*) pour afficher le résultat
 3. Recommence ou arrête
 
+RECETTES : avant d'agir, consulte les recettes disponibles (search_recipes ou get_recipe). Si une recette correspond, suis ses instructions. Sinon, improvise.
+IMAGES : ne JAMAIS inventer d'URLs. Utilise UNIQUEMENT les URLs retournées par les outils DATA.
+
 RÈGLES :
 - Après CHAQUE outil DATA, appeler un render_* obligatoirement
 - Si erreur ou données vides, appeler render_kv ou render_stat pour montrer le statut
@@ -129,6 +132,9 @@ WORKFLOW OBLIGATOIRE :
 1. Appelle un outil DATA pour récupérer les données
 2. Appelle IMMÉDIATEMENT ${componentCall} pour afficher le résultat
 3. Recommence ou arrête
+
+RECETTES : avant d'agir, consulte les recettes disponibles (search_recipes ou get_recipe). Si une recette correspond à la demande, suis ses instructions. Sinon, improvise.
+IMAGES : ne JAMAIS inventer d'URLs. Utilise UNIQUEMENT les URLs retournées par les outils DATA.
 
 RÈGLE ABSOLUE : après CHAQUE outil DATA, appelle immédiatement ${componentCall} pour afficher le résultat. Si tu ne sais pas quel composant utiliser, appelle list_components() puis get_component(nom) puis ${componentCall}.
 Maximum 3 appels DATA avant de rendre visuellement. JAMAIS plus de 3.
@@ -298,7 +304,7 @@ export async function runAgentLoop(
   let lastText = '';
   let finishedNormally = false;
   let discoveryPhase = false;
-  let consecutiveDiscovery = 0;
+  let iterationsWithoutRender = 0;
   let nudgedOnce = false;
   let hasRendered = false;
 
@@ -307,10 +313,19 @@ export async function runAgentLoop(
     metrics.iterations++;
     callbacks.onIterationStart?.(i + 1, maxIterations);
 
-    // Fix 3: after 3+ consecutive discovery iterations, strip discovery tools to force action
+    // Fix 2: after 4+ iterations without render, strip discovery tools to force rendering
     let iterationTools = allTools;
-    if (consecutiveDiscovery >= 3) {
+    if (iterationsWithoutRender >= 4 && !hasRendered) {
       iterationTools = allTools.filter(t => !isDiscoveryTool(t.name));
+    }
+
+    // Fix 3: after 5+ iterations without render, inject a nudge message (once)
+    if (iterationsWithoutRender >= 5 && !hasRendered && !nudgedOnce) {
+      nudgedOnce = true;
+      messages.push({
+        role: 'user',
+        content: 'STOP exploration. Use the data you already collected. Call component("table", {rows: [...]}) NOW to display results.',
+      });
     }
 
     callbacks.onLLMRequest?.(messages, iterationTools);
@@ -387,9 +402,13 @@ export async function runAgentLoop(
         } else if (block.name === 'list_components') {
           result = executeListComponents();
         } else if (block.name === 'get_component') {
-          result = executeGetComponent((block.input as { name: string }).name);
+          const gcInput = block.input as Record<string, unknown>;
+          const gcName = (gcInput.name ?? gcInput.nom ?? gcInput.component) as string;
+          result = executeGetComponent(gcName ?? '');
         } else if (block.name === 'component') {
-          result = executeComponent(block.input as { name: string; params?: unknown }, callbacks);
+          const cInput = block.input as Record<string, unknown>;
+          const cName = (cInput.name ?? cInput.nom ?? cInput.component) as string;
+          result = executeComponent({ name: cName ?? '', params: cInput.params as unknown }, callbacks);
         } else if (isUITool(block.name)) {
           result = executeUITool(block.name, block.input, callbacks);
         } else if (client) {
@@ -418,13 +437,15 @@ export async function runAgentLoop(
 
     messages.push({ role: 'user', content: toolResults });
 
-    // Fix 3: track consecutive discovery iterations
-    const allDiscovery = toolBlocks.every(b => isDiscoveryTool(b.name));
-    consecutiveDiscovery = allDiscovery ? consecutiveDiscovery + 1 : 0;
-
-    // Track whether any render has happened (component or render_* tool)
-    if (toolBlocks.some(b => b.name === 'component' || b.name.startsWith('render_'))) {
+    // Track iterations without render — increment unless a render happened this iteration
+    const renderedThisIteration = toolBlocks.some(b =>
+      b.name === 'component' || b.name.startsWith('render_')
+    );
+    if (renderedThisIteration) {
       hasRendered = true;
+      iterationsWithoutRender = 0;
+    } else {
+      iterationsWithoutRender++;
     }
 
     // Compress old tool results to save context window (benefits both WASM and remote)
