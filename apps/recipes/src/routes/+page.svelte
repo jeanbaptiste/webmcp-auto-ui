@@ -2,7 +2,7 @@
   declare const __BUILD_TIME__: string;
   declare const __GIT_HASH__: string;
 
-  import { onMount, untrack } from 'svelte';
+  import { onMount, onDestroy, untrack } from 'svelte';
   import { base } from '$app/paths';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { McpMultiClient } from '@webmcp-auto-ui/core';
@@ -115,7 +115,7 @@
         unloadGemma();
       }
       if (!gemmaProvider) {
-        const wasmContext = Math.min(150_000, 32768);
+        const wasmContext = 32_768;
         gemmaProvider = new GemmaProvider({
           model: canvas.llm,
           contextSize: wasmContext,
@@ -214,7 +214,7 @@
     connectedUrls = connectedUrls.filter(u => u !== url);
     if (multiClient.serverCount === 0) {
       canvas.setMcpConnected(false, '', []);
-      mcpRecipes = [];
+      mcpRecipes = []; // TODO: track recipes per-server like flex2 (mcpRecipesByServer Map)
     } else {
       const allTools = multiClient.listAllTools();
       canvas.setMcpConnected(true, multiClient.listServers().map(s => s.name).join(', '), allTools as Parameters<typeof canvas.setMcpConnected>[2]);
@@ -435,6 +435,13 @@
     selectedId = id;
     selectedSource = source;
   }
+
+  onDestroy(() => {
+    if (gemmaTimerInterval) {
+      clearInterval(gemmaTimerInterval);
+      gemmaTimerInterval = null;
+    }
+  });
 
   function toggleTheme() {
     const root = document.documentElement;

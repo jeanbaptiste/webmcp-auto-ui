@@ -1,4 +1,4 @@
-import type { AnthropicTool, AgentCallbacks } from './types.js';
+import type { AnthropicTool } from './types.js';
 import type { SkillEntry } from './tool-layers.js';
 
 /** Build the use_skill meta-tool from available skills */
@@ -25,12 +25,10 @@ export function buildSkillTool(skills: SkillEntry[]): AnthropicTool {
   };
 }
 
-/** Execute a skill by name */
-export function executeSkill(
+/** Activate a skill by name (lookup + return metadata; does not execute) */
+export function activateSkill(
   skillName: string,
-  params: Record<string, unknown>,
   skills: SkillEntry[],
-  callbacks: AgentCallbacks,
 ): string {
   const skill = skills.find(s => s.name === skillName);
   if (!skill) return JSON.stringify({ error: `Unknown skill: ${skillName}. Available: ${skills.map(s => s.name).join(', ')}` });

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { buildToolsFromLayers } from '@webmcp-auto-ui/agent';
   import type { ToolLayer } from '@webmcp-auto-ui/agent';
 
   interface Props {
@@ -25,9 +26,13 @@
   // Rough token estimate: ~4 chars per token
   const estimatedTokens = $derived(Math.round(prompt.length / 4));
 
-  const toolCount = $derived(
+  /** MCP tools only (from layers with explicit tool arrays) */
+  const mcpToolCount = $derived(
     layers.reduce((sum, l) => sum + ('tools' in l && l.tools ? l.tools.length : 0), 0)
   );
+
+  /** Total tools actually sent to the LLM (MCP + UI + component/recall/use_skill) */
+  const toolCount = $derived(buildToolsFromLayers(layers).length);
 
   const recipeCount = $derived(
     layers.reduce((sum, l) => sum + ('recipes' in l && l.recipes ? l.recipes.length : 0), 0)
@@ -47,7 +52,7 @@
       <span class="text-text2">Active layers</span>
       <span class="text-text1">{layers.length}</span>
       <span class="text-text2">Tools sent</span>
-      <span class="text-text1">{toolCount}</span>
+      <span class="text-text1">{toolCount} <span class="text-text2">(MCP: {mcpToolCount}, UI: {toolCount - mcpToolCount})</span></span>
       <span class="text-text2">Recipes</span>
       <span class="text-text1">{recipeCount}</span>
     </div>

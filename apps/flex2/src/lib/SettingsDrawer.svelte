@@ -239,29 +239,4 @@
   .settings-drawer.open {
     transform: translateX(0);
   }
-
-  /* Tooltip */
-  .tooltip-trigger .tooltip-content {
-    display: none;
-    position: absolute;
-    left: 50%;
-    bottom: calc(100% + 6px);
-    transform: translateX(-50%);
-    width: 240px;
-    padding: 8px 10px;
-    background: var(--color-surface2, #1e1e2e);
-    border: 1px solid var(--color-border2, #333);
-    border-radius: 6px;
-    font-size: 9px;
-    line-height: 1.4;
-    color: var(--color-text2, #aaa);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-    z-index: 60;
-    pointer-events: none;
-  }
-  .tooltip-trigger:hover .tooltip-content,
-  .tooltip-trigger:focus .tooltip-content {
-    display: block;
-  }
-
 </style>

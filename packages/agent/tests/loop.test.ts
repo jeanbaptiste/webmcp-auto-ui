@@ -10,21 +10,11 @@ const TOOLS: McpToolDef[] = [
 ];
 
 describe('buildSystemPrompt', () => {
-  it('includes tool names when passed as layers', () => {
-    const layers = [{ source: 'mcp' as const, serverUrl: 'test', tools: TOOLS }];
-    const prompt = buildSystemPrompt(layers);
-    expect(prompt).toContain('search');
-    expect(prompt).toContain('get_item');
-  });
-
-  it('mentions DATA and UI tools', () => {
-    const layers = [
-      { source: 'mcp' as const, serverUrl: 'test', tools: TOOLS },
-      { source: 'ui' as const },
-    ];
-    const prompt = buildSystemPrompt(layers);
-    expect(prompt.toUpperCase()).toContain('DATA');
-    expect(prompt.toUpperCase()).toContain('UI');
+  it('returns concise behavioral prompt', () => {
+    const prompt = buildSystemPrompt([]);
+    expect(prompt).toContain('component(');
+    expect(prompt).toContain('images');
+    expect(prompt.length).toBeLessThan(600); // must stay concise
   });
 });
 
@@ -94,8 +84,8 @@ describe('runAgentLoop', () => {
         .mockResolvedValueOnce({
           content: [{
             type: 'tool_use', id: 'tc1',
-            name: 'render_stat',
-            input: { label: 'KPI', value: '42' },
+            name: 'component',
+            input: { name: 'stat', params: { label: 'KPI', value: '42' } },
           }],
           stopReason: 'tool_use',
         } satisfies LLMResponse)
@@ -128,7 +118,7 @@ describe('runAgentLoop', () => {
       name: 'mock', model: 'claude-haiku',
       // Always returns a tool call — never end_turn
       chat: vi.fn().mockResolvedValue({
-        content: [{ type: 'tool_use', id: 'tc1', name: 'render_text', input: { content: 'x' } }],
+        content: [{ type: 'tool_use', id: 'tc1', name: 'component', input: { name: 'text', params: { content: 'x' } } }],
         stopReason: 'tool_use',
       } satisfies LLMResponse),
     };
@@ -151,7 +141,7 @@ describe('runAgentLoop', () => {
       chat: vi.fn()
         .mockImplementationOnce(async () => {
           // First call: returns a tool use so loop continues
-          return { content: [{ type: 'tool_use', id: 'tc1', name: 'render_text', input: { content: 'x' } }], stopReason: 'tool_use' } satisfies LLMResponse;
+          return { content: [{ type: 'tool_use', id: 'tc1', name: 'component', input: { name: 'text', params: { content: 'x' } } }], stopReason: 'tool_use' } satisfies LLMResponse;
         })
         .mockImplementationOnce(async () => {
           // Second call: abort before returning

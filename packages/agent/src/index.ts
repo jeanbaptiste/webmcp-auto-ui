@@ -25,7 +25,7 @@ export type { AgentLoopOptions } from './loop.js';
 
 export { UI_TOOLS, isUITool, executeUITool, TOOL_TO_BLOCK } from './ui-tools.js';
 export {
-  LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL,
+  GET_COMPONENT_TOOL, COMPONENT_TOOL,
   componentRegistry, executeListComponents, executeGetComponent, executeComponent,
   validateParams,
 } from './component-tool.js';
@@ -46,7 +46,7 @@ export { buildToolsFromLayers } from './tool-layers.js';
 export type { ToolLayer, McpLayer, UILayer, SkillLayer, SkillEntry } from './tool-layers.js';
 
 // Skill executor
-export { buildSkillTool, executeSkill } from './skill-executor.js';
+export { buildSkillTool, activateSkill } from './skill-executor.js';
 
 // Component adapter
 export { ComponentAdapter, nativePreset, allNativePreset, minimalPreset } from './component-adapter.js';

@@ -51,7 +51,7 @@ export class ComponentAdapter {
     return this._defs.get(type);
   }
 
-  getRenderer(type: string): unknown | undefined {
+  getRenderer(type: string): unknown {
     return this._defs.get(type)?.renderer;
   }
 

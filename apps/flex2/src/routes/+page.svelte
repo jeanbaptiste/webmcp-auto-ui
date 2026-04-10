@@ -295,6 +295,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
 
     canvas.setGenerating(true);
     chatTimer = 0; chatToolCount = 0; chatLastTool = '';
+    let lastLoggedTextLen = 0;
     const timerInterval = setInterval(() => chatTimer++, 1000);
     abortController = new AbortController();
 
@@ -339,10 +340,9 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
           onToken: () => {},
           onText: (text) => {
             if (text) {
-              // Only log every ~50 chars to avoid spam
-              const textLogs = agentLogs.filter(l => l.type === 'text');
-              const prevLen = textLogs.length > 0 ? textLogs[textLogs.length - 1].detail.length : 0;
-              if (text.length < 50 || text.slice(-100).length - prevLen > 50) {
+              // Log text updates every ~50 chars to avoid spam
+              if (text.length < 50 || text.length - lastLoggedTextLen > 50) {
+                lastLoggedTextLen = text.length;
                 agentLogs = [...agentLogs, { ts: Date.now(), type: 'text', detail: text }];
               }
               // Strip Gemma tool call tags from ephemeral display
@@ -572,6 +572,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
 </div>
 
 <!-- SETTINGS DRAWER -->
+<!-- onconnect closure: safe because setMcpUrl is synchronous, so canvas.mcpUrl is always current -->
 <SettingsDrawer
   bind:open={settingsOpen}
   bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools

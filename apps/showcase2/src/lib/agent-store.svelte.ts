@@ -73,7 +73,7 @@ function getProvider() {
     if (!gemmaProvider) {
       gemmaProvider = new GemmaProvider({
         model: llm,
-        contextSize: 150_000,
+        contextSize: 32_768,
         onProgress: (p, _s, loaded, total) => {
           gemmaProgress = p * 100;
           if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;
@@ -178,6 +178,7 @@ export const agentStore = {
   async generate() {
     if (generating || !connectedUrl) return;
 
+    blockCounter = 0;
     generatedBlocks = [];
     conversationHistory = [];
     toolCallCount = 0;

@@ -12,12 +12,10 @@
   import { McpStatus, GemmaLoader, BlockRenderer } from '@webmcp-auto-ui/ui';
 
   // ── Types ──────────────────────────────────────────────────────────────────
-  type ToolMode = 'explicit' | 'smart' | 'smart+schema';
   type ModelId = 'gemma-e2b' | 'gemma-e4b' | 'claude-haiku-4-5' | 'claude-sonnet-4-6';
   type LogTab = 'prompt' | 'tools' | 'recipes' | 'raw' | 'diff';
 
   interface RunResult {
-    mode: ToolMode;
     blocks: { type: string; data: Record<string, unknown> }[];
     text: string;
     raw: string;
@@ -27,7 +25,6 @@
     recipes: { name: string; description?: string }[];
     elapsed: number;
     tokensPerSec: number;
-    coerced: boolean;
     messages: ChatMessage[];
   }
 
@@ -35,7 +32,6 @@
   let model = $state<ModelId>('gemma-e2b');
   let mcpUrl = $state('https://mcp.code4code.eu/mcp');
   let promptText = $state('Montre-moi les 5 derniers dossiers legislatifs');
-  let selectedMode = $state<ToolMode>('smart+schema');
   let running = $state(false);
 
   let mcpConnected = $state(false);
@@ -59,6 +55,9 @@
 
   // Multi-MCP
   let multiClient = $state<McpMultiClient>(new McpMultiClient());
+
+  // Theme state
+  let isDark = $state(true);
 
   // Anthropic provider singleton
   const anthropicProvider = new AnthropicProvider({ proxyUrl: `${base}/api/chat` });
@@ -109,7 +108,7 @@
       if (!gemmaProvider) {
         gemmaProvider = new GemmaProvider({
           model: modelId,
-          contextSize: 150_000,
+          contextSize: 32_768,
           onProgress: (p, _s, loaded, total) => {
             gemmaProgress = p * 100;
             if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;
@@ -214,17 +213,13 @@
     results = [];
 
     const layers = buildLayers();
-    // smart+schema maps to 'smart' for the loop
-    const effectiveMode = (m: ToolMode): 'smart' | 'explicit' => m === 'smart+schema' ? 'smart' : m;
-
     const provider = getProvider(model);
 
     try {
-      const result = await runSingleMode(selectedMode, layers, effectiveMode(selectedMode), provider);
+      const result = await runSingleMode(layers, provider);
       results = [result];
     } catch (e) {
       results = [{
-        mode: selectedMode,
         blocks: [],
         text: `Error: ${e instanceof Error ? e.message : String(e)}`,
         raw: '',
@@ -234,7 +229,6 @@
         recipes: [],
         elapsed: 0,
         tokensPerSec: 0,
-        coerced: false,
         messages: [],
       }];
     } finally {
@@ -243,9 +237,7 @@
   }
 
   async function runSingleMode(
-    mode: ToolMode,
     layers: ToolLayer[],
-    effectiveMode: 'smart' | 'explicit',
     provider: ReturnType<typeof getProvider>,
   ): Promise<RunResult> {
     const tools = buildToolsFromLayers(layers);
@@ -254,7 +246,6 @@
 
     const blocks: { type: string; data: Record<string, unknown> }[] = [];
     let rawText = '';
-    let coerced = false;
     const toolCalls: { name: string; args: Record<string, unknown> }[] = [];
     const start = performance.now();
 
@@ -279,13 +270,12 @@
     });
 
     const elapsed = Math.round(performance.now() - start);
-    const outputTokens = result.metrics?.outputTokens ?? 0;
+    const outputTokens = result.metrics?.completionTokens ?? 0;
     const tokensPerSec = elapsed > 0 && outputTokens > 0
       ? Math.round((outputTokens / (elapsed / 1000)) * 10) / 10
       : 0;
 
     return {
-      mode,
       blocks,
       text: result.text,
       raw: rawText || result.text,
@@ -295,7 +285,6 @@
       recipes,
       elapsed,
       tokensPerSec,
-      coerced,
       messages: result.messages,
     };
   }
@@ -317,6 +306,7 @@
     const root = document.documentElement;
     const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
     root.dataset.theme = next;
+    isDark = next === 'dark';
     try { localStorage.setItem('webmcp-theme', next); } catch {}
     import('@webmcp-auto-ui/ui').then(({ THEME_MAP }) => {
       const tokens = THEME_MAP[next as 'light' | 'dark'];
@@ -330,12 +320,6 @@
     { id: 'gemma-e4b', label: 'Gemma E4B' },
     { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
     { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-  ];
-
-  const MODES: { id: ToolMode; label: string }[] = [
-    { id: 'explicit', label: 'explicit' },
-    { id: 'smart', label: 'smart' },
-    { id: 'smart+schema', label: 'smart+schema' },
   ];
 
   function formatJson(obj: unknown): string {
@@ -383,7 +367,7 @@
       onclick={toggleTheme}
       aria-label="Toggle theme"
     >
-      {document.documentElement.dataset.theme === 'dark' ? '\u263D' : '\u2600'}
+      {isDark ? '\u263D' : '\u2600'}
     </button>
   </header>
 
@@ -427,26 +411,6 @@
       class="h-7 px-2 rounded border border-border2 bg-surface2 text-text1 font-mono text-xs outline-none flex-1 min-w-48"
     />
 
-    <div class="w-px h-5 bg-border2 mx-1"></div>
-
-    <div class="flex items-center gap-1">
-      {#each MODES as m}
-        <label
-          class="h-7 px-2 rounded border font-mono text-[10px] cursor-pointer flex items-center transition-colors
-                 {selectedMode === m.id ? 'border-accent bg-accent/10 text-accent' : 'border-border2 text-text2 hover:text-text1'}"
-        >
-          <input
-            type="radio"
-            name="toolmode"
-            value={m.id}
-            bind:group={selectedMode}
-            class="sr-only"
-          />
-          {m.label}
-        </label>
-      {/each}
-    </div>
-
     <button
       onclick={runBench}
       disabled={running || !promptText.trim()}
@@ -465,24 +429,18 @@
         <div class="flex-1 flex items-center justify-center">
           <div class="text-center text-text2 font-mono text-sm">
             <p class="text-lg mb-2">Bench WASM</p>
-            <p class="text-xs">Connectez un MCP, choisissez un mode, puis lancez.</p>
+            <p class="text-xs">Connectez un MCP, puis lancez.</p>
           </div>
         </div>
       {:else}
         {#each results as result, i}
           <div class="flex-1 min-w-0 flex flex-col gap-3">
-            <!-- Mode badge -->
+            <!-- Metrics -->
             <div class="flex items-center gap-2">
-              <span class="h-6 px-2 rounded border border-accent/30 bg-accent/10 text-accent font-mono text-[10px] flex items-center">
-                {result.mode}
-              </span>
               <span class="font-mono text-[10px] text-text2">
                 {result.elapsed}ms
                 {#if result.tokensPerSec > 0}
                   &middot; {result.tokensPerSec} tok/s
-                {/if}
-                {#if result.coerced}
-                  &middot; <span class="text-amber">coerced</span>
                 {/if}
               </span>
             </div>
@@ -548,7 +506,6 @@
         <div class="flex gap-4">
           {#each results as result, i}
             <div class="flex-1 min-w-0">
-              <div class="font-mono text-[10px] text-text2 mb-1">{result.mode}</div>
               <pre class="font-mono text-xs text-text1 whitespace-pre-wrap break-words">{result.prompt || '(aucun run)'}</pre>
             </div>
           {/each}
@@ -560,7 +517,7 @@
         <div class="flex gap-4">
           {#each results as result}
             <div class="flex-1 min-w-0">
-              <div class="font-mono text-[10px] text-text2 mb-1">{result.mode} &mdash; {result.tools.length} tools</div>
+              <div class="font-mono text-[10px] text-text2 mb-1">{result.tools.length} tools</div>
               {#each result.tools.slice(0, 15) as tool}
                 <details class="mb-1">
                   <summary class="font-mono text-xs text-accent cursor-pointer hover:underline">{tool.name}</summary>
@@ -580,7 +537,7 @@
         <div class="flex gap-4">
           {#each results as result}
             <div class="flex-1 min-w-0">
-              <div class="font-mono text-[10px] text-text2 mb-1">{result.mode} &mdash; {result.recipes.length} recettes</div>
+              <div class="font-mono text-[10px] text-text2 mb-1">{result.recipes.length} recettes</div>
               {#each result.recipes as recipe}
                 <div class="mb-1">
                   <span class="font-mono text-xs text-teal">{recipe.name}</span>
@@ -602,7 +559,6 @@
         <div class="flex gap-4">
           {#each results as result}
             <div class="flex-1 min-w-0">
-              <div class="font-mono text-[10px] text-text2 mb-1">{result.mode}</div>
               <pre class="font-mono text-xs text-text1 whitespace-pre-wrap break-words">{result.raw || result.text || '(vide)'}</pre>
             </div>
           {/each}
@@ -615,7 +571,7 @@
           {#if results.length >= 2}
             {#each results as result}
               <div class="flex-1 min-w-0">
-                <div class="font-mono text-[10px] text-text2 mb-1">{result.mode} &mdash; {result.toolCalls.length} tool calls</div>
+                <div class="font-mono text-[10px] text-text2 mb-1">{result.toolCalls.length} tool calls</div>
                 {#each result.toolCalls as call}
                   <details class="mb-1">
                     <summary class="font-mono text-xs text-accent cursor-pointer hover:underline">{call.name}</summary>
@@ -626,7 +582,7 @@
             {/each}
           {:else if results.length === 1}
             <div class="flex-1 min-w-0">
-              <div class="font-mono text-[10px] text-text2 mb-1">{results[0].mode} &mdash; {results[0].toolCalls.length} tool calls</div>
+              <div class="font-mono text-[10px] text-text2 mb-1">{results[0].toolCalls.length} tool calls</div>
               {#each results[0].toolCalls as call}
                 <details class="mb-1">
                   <summary class="font-mono text-xs text-accent cursor-pointer hover:underline">{call.name}</summary>

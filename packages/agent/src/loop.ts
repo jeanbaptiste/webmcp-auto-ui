@@ -10,15 +10,14 @@ import type {
   ChatMessage, ContentBlock, ToolCall, AgentMetrics, AgentResult,
   LLMProvider, AnthropicTool, McpToolDef, AgentCallbacks,
 } from './types.js';
-import type { ToolLayer, McpLayer, UILayer, SkillLayer } from './tool-layers.js';
+import type { ToolLayer, SkillLayer } from './tool-layers.js';
 import { buildToolsFromLayers } from './tool-layers.js';
 import { isUITool, executeUITool } from './ui-tools.js';
 import {
-  LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL,
   executeListComponents, executeGetComponent, executeComponent,
 } from './component-tool.js';
-import { formatRecipesForPrompt, formatMcpRecipesForPrompt } from './recipe-registry.js';
-import { executeSkill } from './skill-executor.js';
+// formatRecipesForPrompt / formatMcpRecipesForPrompt removed — recipes are discoverable via tools
+import { activateSkill } from './skill-executor.js';
 
 const MAX_RESULT_LEN = 10_000;
 
@@ -53,6 +52,9 @@ export const RECALL_TOOL: AnthropicTool = {
 
 /**
  * Compress old tool_result blocks in conversation history.
+ * IMPORTANT: mutates messages in-place intentionally to reduce memory usage.
+ * The caller's `result.messages` will contain compressed versions.
+ *
  * Once the LLM has read a tool_result and produced a response, the full result
  * is no longer needed — replace it with a truncated preview to save context.
  * Only compresses messages before the last 2 (current iteration).
@@ -80,90 +82,16 @@ function compressOldToolResults(messages: ChatMessage[], resultBuffer?: Map<stri
   }
 }
 
-/** Build system prompt from structured ToolLayers */
+/** Build system prompt — behavioral rules only, tool descriptions come from tool definitions. */
 export function buildSystemPrompt(layers: ToolLayer[]): string {
-  let prompt = `Tu es un assistant UI connecté à des serveurs MCP.
+  return `Tu es un assistant UI. Affiche les résultats avec component(nom, {params}).
+Ne fabrique jamais d'URLs d'images — utilise uniquement celles retournées par les outils.
 
-WORKFLOW OBLIGATOIRE :
-1. Appelle un outil DATA pour récupérer les données
-2. Appelle IMMÉDIATEMENT un outil UI (render_* ou component) pour afficher le résultat
-3. Recommence ou arrête
-
-RECETTES : avant d'agir, consulte les recettes disponibles (search_recipes ou get_recipe). Si une recette correspond à la demande, suis ses instructions. Sinon, improvise.
-IMAGES : ne JAMAIS inventer d'URLs. Utilise UNIQUEMENT les URLs retournées par les outils DATA.
-
-RÈGLE ABSOLUE : après CHAQUE outil DATA, appelle immédiatement un outil UI (render_* ou component) pour afficher le résultat. Si tu ne sais pas quel composant utiliser, appelle list_components() puis get_component(nom) puis component(nom, {params}).
-Maximum 3 appels DATA avant de rendre visuellement. JAMAIS plus de 3.
-TOUJOURS rendre visuellement — JAMAIS terminer avec du texte seul.
-
-CHOIX DU SCHÉMA : Ne liste PAS tous les schémas. Choisis directement le bon :
-- Assemblée nationale → schéma 'assemblee'
-- Sénat → schéma 'senat'
-- Textes de loi → schéma 'legifrance'
-
-`;
-
-  // ## mcp — depuis les McpLayers
-  const mcpLayers = layers.filter((l): l is McpLayer => l.source === 'mcp');
-  const allMcpTools = mcpLayers.flatMap(l => l.tools).filter(t => !isUITool(t.name));
-  const allMcpRecipes = mcpLayers.flatMap(l => l.recipes ?? []);
-
-  if (allMcpTools.length > 0) {
-    const serverNames = mcpLayers
-      .filter(l => l.serverName)
-      .map(l => l.serverName!);
-    prompt += `## mcp${serverNames.length ? ' (' + serverNames.join(', ') + ')' : ''}\n\n`;
-    prompt += `### outils DATA (${allMcpTools.length})\n`;
-    prompt += allMcpTools.map(t =>
-      `- ${t.name}: ${(t.description ?? t.name).split('\n')[0]}`
-    ).join('\n');
-    prompt += '\n\n';
-
-    if (allMcpRecipes.length > 0) {
-      prompt += `### recettes serveur (${allMcpRecipes.length})\n`;
-      prompt += formatMcpRecipesForPrompt(allMcpRecipes);
-      prompt += '\n→ Appelle get_recipe(id) avec le nom entre [crochets] pour obtenir les instructions détaillées.\n\n';
-    }
-  }
-
-  // ## webmcp — depuis UILayer
-  const uiLayer = layers.find((l): l is UILayer => l.source === 'ui');
-  if (uiLayer) {
-    prompt += `## webmcp\n\n`;
-
-    prompt += `### outils UI (affichage visuel)\n`;
-    prompt += `Appelle list_components() pour découvrir les composants disponibles.\n`;
-    prompt += `Appelle get_component(nom) pour le schéma détaillé.\n`;
-    prompt += `Appelle component(nom, {params}) pour rendre.\n`;
-    prompt += `Les outils render_* individuels sont aussi disponibles.\n\n`;
-
-    prompt += `RÈGLES :\n`;
-    prompt += `- RÈGLE ABSOLUE : après CHAQUE outil DATA, rendre visuellement avec un outil UI\n`;
-    prompt += `- Maximum 3 outils DATA avant de rendre. Au-delà, tes outils de découverte seront désactivés.\n`;
-    prompt += `- table pour les tableaux, chart pour les chiffres, stat pour les KPIs, kv pour les paires clé-valeur\n`;
-    prompt += `- Si erreur ou données vides, rendre kv ou stat pour montrer le statut\n`;
-    prompt += `- JAMAIS terminer avec du texte seul — TOUJOURS appeler un outil UI\n\n`;
-
-    if (uiLayer.recipes && uiLayer.recipes.length > 0) {
-      prompt += `### recettes UI (${uiLayer.recipes.length})\n`;
-      prompt += formatRecipesForPrompt(uiLayer.recipes);
-      prompt += '\n';
-    }
-  }
-
-  // ## skills — depuis SkillLayers
-  const skillLayers = layers.filter((l): l is SkillLayer => l.source === 'skill');
-  const allSkills = skillLayers.flatMap(l => l.skills);
-  if (allSkills.length > 0) {
-    prompt += `## skills (${allSkills.length})\n\n`;
-    prompt += `Appelle use_skill(name) pour activer un workflow prédéfini.\n`;
-    prompt += allSkills.map(s =>
-      `- ${s.name}: ${s.description}${s.expectedBlocks?.length ? ` → produit: ${s.expectedBlocks.join(', ')}` : ''}`
-    ).join('\n');
-    prompt += '\n\n';
-  }
-
-  return prompt.trimEnd();
+STRATÉGIE :
+1. Si search_recipes est disponible, consulte-le ABSOLUMENT EN PRIORITÉ — les recettes contiennent des instructions optimisées
+2. Appelle get_component(nom) pour obtenir le schéma et les recettes associées
+3. Appelle les outils de données pour récupérer les données
+4. Appelle component(nom, {params}) pour afficher`;
 }
 
 export function mcpToolsToAnthropic(tools: McpToolDef[]): AnthropicTool[] {
@@ -332,10 +260,12 @@ export async function runAgentLoop(
     for (const block of toolBlocks) {
       const call: ToolCall = { id: block.id, name: block.name, args: block.input };
       // Provenance tracking: mark whether this call is guided by a prior discovery
-      call.guided = discoveryPhase;
+      const wasDiscovering = discoveryPhase;
       if (isDiscoveryTool(block.name)) {
         discoveryPhase = true;
+        call.guided = false; // discovery tools are never "guided", they ARE discovery
       } else {
+        call.guided = wasDiscovering; // non-discovery tool guided by prior discovery
         discoveryPhase = false;
       }
       const t1 = performance.now();
@@ -364,11 +294,9 @@ export async function runAgentLoop(
           const skillInput = block.input as Record<string, unknown>;
           const skillLayers = (options.layers ?? []).filter((l): l is SkillLayer => l.source === 'skill');
           const allSkills = skillLayers.flatMap(l => l.skills);
-          result = executeSkill(
+          result = activateSkill(
             String(skillInput.skill ?? ''),
-            (skillInput.params as Record<string, unknown>) ?? {},
             allSkills,
-            callbacks,
           );
         } else if (isUITool(block.name)) {
           result = executeUITool(block.name, block.input, callbacks);

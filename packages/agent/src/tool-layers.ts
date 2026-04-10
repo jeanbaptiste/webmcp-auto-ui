@@ -4,8 +4,7 @@ import type { McpToolDef, AnthropicTool } from './types.js';
 import type { Recipe, McpRecipe } from './recipes/types.js';
 import type { ComponentAdapter } from './component-adapter.js';
 import { sanitizeSchema } from '@webmcp-auto-ui/core';
-import { UI_TOOLS } from './ui-tools.js';
-import { LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL } from './component-tool.js';
+import { GET_COMPONENT_TOOL, COMPONENT_TOOL } from './component-tool.js';
 import { buildSkillTool } from './skill-executor.js';
 
 /** MCP data layer — tools and recipes from a connected MCP server */
@@ -66,14 +65,7 @@ export function buildToolsFromLayers(
         tools.push(...mcpToolsToAnthropic(layer.tools));
         break;
       case 'ui':
-        // Always include adapter tools (if provided) or all UI_TOOLS
-        if (layer.adapter) {
-          tools.push(...layer.adapter.tools());
-        } else {
-          tools.push(...UI_TOOLS);
-        }
-        // Discovery + unified component tools always included
-        tools.push(LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL);
+        tools.push(GET_COMPONENT_TOOL, COMPONENT_TOOL);
         break;
       case 'skill': {
         if (layer.skills.length > 0) {
@@ -84,5 +76,10 @@ export function buildToolsFromLayers(
     }
   }
 
-  return tools;
+  // Deduplicate by tool name (last-wins if two layers define the same tool)
+  const seen = new Map<string, AnthropicTool>();
+  for (const tool of tools) {
+    seen.set(tool.name, tool);
+  }
+  return Array.from(seen.values());
 }

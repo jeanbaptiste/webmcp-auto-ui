@@ -78,7 +78,7 @@ export const LIST_COMPONENTS_TOOL: AnthropicTool = {
 
 export const GET_COMPONENT_TOOL: AnthropicTool = {
   name: 'get_component',
-  description: "Return the detailed JSON schema of a component or recipe. Call list_components first to see available names.",
+  description: "Return the detailed JSON schema of a component or recipe. Component names are listed in the component() tool description.",
   input_schema: {
     type: 'object',
     properties: {
@@ -91,19 +91,30 @@ export const GET_COMPONENT_TOOL: AnthropicTool = {
   },
 };
 
+function getComponentNames(): string {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of componentRegistry.values()) {
+    if (!entry.renderable || seen.has(entry.name)) continue;
+    seen.add(entry.name);
+    names.push(entry.name);
+  }
+  return names.join(', ');
+}
+
 export const COMPONENT_TOOL: AnthropicTool = {
   name: 'component',
-  description: "Render a UI component. Call get_component(name) first to know the expected parameters.",
+  description: `Render a UI component. Available: ${getComponentNames()}. Call get_component(name) for the expected parameters.`,
   input_schema: {
     type: 'object',
     properties: {
       name: {
         type: 'string',
-        description: "Component name (e.g. 'stat-card', 'table', 'chart').",
+        description: "Component name (e.g. 'stat', 'chart', 'data-table', 'kv').",
       },
       params: {
         type: 'object',
-        description: "Component parameters (according to schema from get_component).",
+        description: "Component parameters. Call get_component(name) for the schema if unsure.",
       },
     },
     required: ['name'],

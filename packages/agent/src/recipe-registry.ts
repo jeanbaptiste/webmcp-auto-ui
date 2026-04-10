@@ -78,7 +78,7 @@ export function formatRecipesForPrompt(recipes: Recipe[]): string {
 export function formatMcpRecipesForPrompt(recipes: McpRecipe[]): string {
   if (recipes.length === 0) return '';
   return recipes.map(r => {
-    const id = r.name ?? r.id ?? '';
+    const id = r.name ?? '';
     const desc = r.description ?? '';
     // If name is missing or looks like a prefix ("moulineuse: undefined"), use description as display
     if (!id || id.includes('undefined')) {
