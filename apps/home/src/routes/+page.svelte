@@ -29,6 +29,36 @@
       url: `${base}/viewer`,
       accent: '#f0a050',
     },
+    {
+      title: 'Flex 2',
+      desc: 'Nouvelle architecture : layers, component() unique, recettes, debug panel, mode composeur/consommateur.',
+      url: `${base}/flex2`,
+      accent: '#8b5cf6',
+    },
+    {
+      title: 'Viewer 2',
+      desc: 'Lecteur HyperSkills read-only. Décode et affiche les blocs, bouton Modifier vers Flex 2.',
+      url: `${base}/viewer2`,
+      accent: '#f59e0b',
+    },
+    {
+      title: 'Showcase 2',
+      desc: 'Démo dynamique de tous les composants UI avec 3 thèmes (corporate, pastel, cyberpunk).',
+      url: `${base}/showcase2`,
+      accent: '#10b981',
+    },
+    {
+      title: 'Todo 2',
+      desc: 'Template minimal de référence pour démarrer une app webmcp-auto-ui.',
+      url: `${base}/todo2`,
+      accent: '#14b8a6',
+    },
+    {
+      title: 'Recipes',
+      desc: 'Explorateur de recettes MCP et WebMCP. Connecte des serveurs, consulte les recettes, teste-les en live.',
+      url: `${base}/recipes`,
+      accent: '#ec4899',
+    },
   ];
 
   const mcpServers = [
@@ -39,6 +69,7 @@
     { name: 'Wikipedia', desc: 'Articles & recherche' },
     { name: 'iNaturalist', desc: 'Biodiversité' },
     { name: 'data.gouv.fr', desc: 'Open data FR' },
+    { name: 'NASA', desc: 'Données spatiales' },
   ];
 </script>
 

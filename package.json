@@ -1,7 +1,7 @@
 {
   "name": "webmcp-auto-ui",
   "private": true,
-  "version": "0.5.2",
+  "version": "0.6.0",
   "workspaces": [
     "packages/core",
     "packages/ui",
@@ -11,7 +11,12 @@
     "apps/todo",
     "apps/viewer",
     "apps/showcase",
-    "apps/flex"
+    "apps/flex",
+    "apps/flex2",
+    "apps/viewer2",
+    "apps/todo2",
+    "apps/showcase2",
+    "apps/recipes"
   ],
   "scripts": {
     "dev": "concurrently -n home,todo,viewer,showcase,flex -c blue,yellow,green,magenta,red \"npm -w apps/home run dev\" \"npm -w apps/todo run dev\" \"npm -w apps/viewer run dev\" \"npm -w apps/showcase run dev\" \"npm -w apps/flex run dev\"",

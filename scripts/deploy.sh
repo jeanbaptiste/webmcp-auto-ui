@@ -121,7 +121,7 @@ deploy_node_build() {
 deploy_static() {
   local app=$1
   local env_prefix=""
-  if [ "$app" = "home" ] || [ "$app" = "todo" ] || [ "$app" = "showcase" ]; then
+  if [ "$app" = "home" ] || [ "$app" = "todo" ] || [ "$app" = "showcase" ] || [ "$app" = "showcase2" ] || [ "$app" = "todo2" ]; then
     env_prefix="PUBLIC_BASE_URL=https://demos.hyperskills.net "
   fi
   if [ "$DRY_RUN" = "1" ]; then
@@ -141,13 +141,18 @@ deploy_static() {
 deploy_app() {
   local app=$1
   case "$app" in
-    flex)     deploy_node_root "flex" ;;
-    viewer)   deploy_node_build "viewer" ;;
-    home)     deploy_static "home" ;;
-    todo)     deploy_static "todo" ;;
-    showcase) deploy_static "showcase" ;;
+    flex)      deploy_node_root "flex" ;;
+    flex2)     deploy_node_root "flex2" ;;
+    viewer)    deploy_node_build "viewer" ;;
+    viewer2)   deploy_node_root "viewer2" ;;
+    recipes)   deploy_node_root "recipes" ;;
+    home)      deploy_static "home" ;;
+    todo)      deploy_static "todo" ;;
+    todo2)     deploy_static "todo2" ;;
+    showcase)  deploy_static "showcase" ;;
+    showcase2) deploy_static "showcase2" ;;
     *)
-      echo "  [$app] ✗ unknown app (valid: home, viewer, showcase, todo, flex)"
+      echo "  [$app] ✗ unknown app (valid: home, viewer, viewer2, showcase, showcase2, todo, todo2, flex, flex2, recipes)"
       return 1
       ;;
   esac
@@ -159,7 +164,7 @@ echo "webmcp-auto-ui deploy"
 echo ""
 
 if [ $# -eq 0 ]; then
-  APPS="home viewer showcase todo flex"
+  APPS="home viewer viewer2 showcase showcase2 todo todo2 flex flex2 recipes"
 else
   APPS="$*"
 fi
@@ -182,7 +187,7 @@ echo ""
 echo "Verifying..."
 for app in $APPS; do
   case "$app" in
-    viewer|flex)
+    viewer|flex|flex2|viewer2|recipes)
       status=$(ssh "$SSH_HOST" "systemctl is-active webmcp-$app 2>/dev/null" || echo "inactive")
       echo "  $app: $status"
       ;;
