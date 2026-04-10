@@ -374,12 +374,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
             const nextDetails = new Map(toolCallDetails);
             nextDetails.set(callId, detail);
             toolCallDetails = nextDetails;
-            if (showToolJSON) {
-              const argsJson = JSON.stringify(call.args, null, 2);
-              updateEphemeral(assistantId, `<span class="tool-call-tip"><strong>${call.name}</strong></span>\n<pre style="font-size:9px;margin-top:4px;opacity:0.7;white-space:pre-wrap;word-break:break-all">${argsJson}</pre>`);
-            } else {
-              updateEphemeral(assistantId, `<span class="tool-call-tip"><strong>${call.name}</strong>...</span>`);
-            }
+            updateEphemeral(assistantId, `<strong>${call.name}</strong>`);
           },
           onDone: (metrics) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'done', detail: `${metrics.iterations} iter, ${metrics.toolCalls} tools, ${metrics.totalTokens} tokens, ${Math.round(metrics.totalLatencyMs)}ms` }];
