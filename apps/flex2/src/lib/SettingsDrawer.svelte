@@ -1,8 +1,15 @@
 <script lang="ts">
+  declare const __BUILD_TIME__: string;
+  declare const __GIT_HASH__: string;
+
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
   import { McpConnector, LLMSelector, SettingsPanel, RemoteMCPserversDemo } from '@webmcp-auto-ui/ui';
   import RecipeModal from './RecipeModal.svelte';
+
+  const buildStamp = typeof __BUILD_TIME__ === 'string'
+    ? __BUILD_TIME__.replace('T', ' ').replace('Z', '').slice(0, 23) : '';
+  const gitHash = typeof __GIT_HASH__ === 'string' ? __GIT_HASH__ : '';
 
   interface McpRecipe { name: string; description?: string; }
   interface WebmcpRecipe { name: string; description?: string; when?: string; components_used?: string[]; servers?: string[]; layout?: { type: string; columns?: number; arrangement?: string }; body?: string; }
@@ -206,6 +213,14 @@
       </section>
     {/if}
 
+  </div>
+
+  <!-- Build footer -->
+  <div class="px-5 py-3 border-t border-border flex-shrink-0 flex items-center justify-between">
+    <span class="font-mono text-[8px] text-text2/40">v1.0.0 · {gitHash} · {buildStamp}</span>
+    <a href="https://github.com/jeanbaptiste/webmcp-auto-ui/tree/main/apps/flex2"
+       target="_blank" rel="noopener"
+       class="font-mono text-[8px] text-text2/40 hover:text-text2 transition-colors">GitHub</a>
   </div>
 </aside>
 

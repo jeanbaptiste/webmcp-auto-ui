@@ -1,4 +1,7 @@
 <script lang="ts">
+  declare const __BUILD_TIME__: string;
+  declare const __GIT_HASH__: string;
+
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import { BlockRenderer, Button, Input } from '@webmcp-auto-ui/ui';
@@ -6,7 +9,7 @@
     decodeHyperSkill, encodeHyperSkill, computeHash,
     getHsParam, type HyperSkill, type HyperSkillMeta,
   } from '@webmcp-auto-ui/sdk';
-  import { ExternalLink, Pencil, Plus, Trash2, GripVertical, FlaskConical, GitBranch } from 'lucide-svelte';
+  import { ExternalLink, Pencil, Plus, Trash2, GripVertical, FlaskConical, GitBranch, Github } from 'lucide-svelte';
 
   interface Block { id: string; type: string; data: Record<string, unknown>; }
   interface DagNode { hash: string; previousHash?: string; label: string; active: boolean; url?: string; }
@@ -209,6 +212,12 @@
         <Pencil size={11} /> Modifier
       </Button>
     {/if}
+    <a href="https://github.com/jeanbaptiste/webmcp-auto-ui/tree/main/apps/viewer2"
+       target="_blank" rel="noopener"
+       class="font-mono text-xs text-text2 hover:text-text1 hidden xl:inline flex items-center gap-1 transition-colors"
+       title="Source code">
+      <Github size={12} /> GitHub
+    </a>
     <a href="https://hyperskills.net" target="_blank"
        class="font-mono text-xs text-accent hover:underline hidden xl:inline flex items-center gap-1">
       <ExternalLink size={10} /> hyperskills.net
@@ -366,7 +375,7 @@
   </main>
 
   <footer class="border-t border-border bg-surface px-6 py-2 flex items-center justify-between text-xs font-mono text-text2">
-    <span>viewer2 -- CRUD</span>
+    <span class="text-[8px] text-text2/40">v1.0.0 · {__GIT_HASH__ ?? ''} · {__BUILD_TIME__?.replace('T', ' ').replace('Z', '').slice(0, 23)}</span>
     <div class="flex items-center gap-3">
       {#if skill}
         <span class="text-text2">{blocks.length} bloc{blocks.length !== 1 ? 's' : ''}</span>

@@ -1,5 +1,6 @@
 <script lang="ts">
   declare const __BUILD_TIME__: string;
+  declare const __GIT_HASH__: string;
   import { PUBLIC_BASE_URL } from '$env/static/public';
   import { getTheme } from '@webmcp-auto-ui/ui';
 
@@ -105,7 +106,7 @@
     <footer class="mt-16 pt-6 border-t border-border text-xs font-mono text-text2 flex flex-wrap gap-x-4 gap-y-1">
       <span>webmcp-auto-ui</span>
       <span>AGPL-3.0</span>
-      <span>{__BUILD_TIME__?.slice(0, 10)}</span>
+      <span>v1.0.0 · {__GIT_HASH__ ?? ''} · {__BUILD_TIME__?.replace('T', ' ').replace('Z', '').slice(0, 23)}</span>
     </footer>
   </div>
 </div>

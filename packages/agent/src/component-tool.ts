@@ -171,6 +171,52 @@ export function executeGetComponent(name: string): string {
   return JSON.stringify({ error: `Inconnu : ${name}. Appelle list_components() pour la liste.` });
 }
 
+// ── Parameter coercion ──────────────────────────────────────────────────────
+// LLMs (especially Haiku and Gemma) often send data in non-standard formats.
+// Coerce common mismatches BEFORE passing to executeUITool.
+
+function coerceParams(name: string, params: Record<string, unknown>): Record<string, unknown> {
+  // Table / data-table: {data: [{key: val}]} → {rows: [{key: val}]}
+  // DataTable expects `rows` (array of objects). LLMs often send `data` instead.
+  if ((name === 'table' || name === 'data-table' || name === 'render_table') && Array.isArray(params.data) && params.data.length > 0 && typeof params.data[0] === 'object' && !params.rows) {
+    const { data, ...rest } = params;
+    return { ...rest, rows: data };
+  }
+
+  // Stat-card: {stats: [{label, value}]} → {label, value} (first element)
+  if (name === 'stat-card' && Array.isArray(params.stats) && params.stats.length > 0 && !params.label) {
+    const first = params.stats[0] as Record<string, unknown>;
+    const { stats, ...rest } = params;
+    return { ...rest, ...first };
+  }
+
+  // KV: {data: {key: val}} → {rows: [[key, val]]}
+  if (name === 'kv' && params.data && typeof params.data === 'object' && !Array.isArray(params.data) && !params.rows) {
+    const rows = Object.entries(params.data as Record<string, unknown>).map(([k, v]) => [k, String(v ?? '')]);
+    const { data, ...rest } = params;
+    return { ...rest, rows };
+  }
+
+  // KV: {data: [[key, val]]} → {rows: [[key, val]]}
+  if (name === 'kv' && Array.isArray(params.data) && !params.rows) {
+    const { data, ...rest } = params;
+    return { ...rest, rows: data };
+  }
+
+  // Chart: {data: [{label, value}]} → {bars: [[label, value]]}
+  if (name === 'chart' && Array.isArray(params.data) && params.data.length > 0 && typeof params.data[0] === 'object' && !params.bars) {
+    const bars = (params.data as Record<string, unknown>[]).map(d => {
+      const label = String(d.label ?? d.name ?? '');
+      const value = Number(d.value ?? d.count ?? 0);
+      return [label, value];
+    });
+    const { data, ...rest } = params;
+    return { ...rest, bars };
+  }
+
+  return params;
+}
+
 // ── Execution — component (render only) ──────────────────────────────────────
 
 export function executeComponent(
@@ -179,9 +225,11 @@ export function executeComponent(
 ): string {
   const comp = componentRegistry.get(args.name);
   if (comp) {
+    const rawParams = (args.params as Record<string, unknown>) ?? {};
+    const coerced = coerceParams(comp.name, rawParams);
     return executeUITool(
       comp.toolName,
-      (args.params as Record<string, unknown>) ?? {},
+      coerced,
       callbacks,
     );
   }

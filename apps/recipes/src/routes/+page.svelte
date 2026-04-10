@@ -1,4 +1,7 @@
 <script lang="ts">
+  declare const __BUILD_TIME__: string;
+  declare const __GIT_HASH__: string;
+
   import { onMount, untrack } from 'svelte';
   import { base } from '$app/paths';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
@@ -477,6 +480,11 @@
       {WEBMCP_RECIPES.length} local + {mcpRecipes.length} mcp
     </span>
 
+    <a href="https://github.com/jeanbaptiste/webmcp-auto-ui/tree/main/apps/recipes"
+       target="_blank" rel="noopener"
+       class="font-mono text-[10px] h-7 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0 flex items-center"
+       title="Source code">GitHub</a>
+
     <button
       class="font-mono text-xs h-7 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
       onclick={toggleTheme} aria-label="Toggle theme"
@@ -592,6 +600,9 @@
     </div>
 
     <AgentConsole logs={agentLogs} onclear={() => agentLogs = []} />
+    <div class="px-3 py-1 text-right flex-shrink-0">
+      <span class="font-mono text-[8px] text-text2/40">v1.0.0 · {__GIT_HASH__ ?? ''} · {__BUILD_TIME__?.replace('T', ' ').replace('Z', '').slice(0, 23)}</span>
+    </div>
   </div>
 </div>
 

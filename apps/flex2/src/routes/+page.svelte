@@ -12,7 +12,7 @@
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer, UILayer } from '@webmcp-auto-ui/agent';
   import { McpStatus, GemmaLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
-  import { Menu, ExternalLink, Eye, Pencil, Terminal } from 'lucide-svelte';
+  import { Menu, ExternalLink, Eye, Pencil, Terminal, Github } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
   import SettingsDrawer from '$lib/SettingsDrawer.svelte';
@@ -494,6 +494,12 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
         {({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}
       </span>
     {/if}
+    <a href="https://github.com/jeanbaptiste/webmcp-auto-ui/tree/main/apps/flex2"
+       target="_blank" rel="noopener"
+       class="flex items-center h-7 px-1.5 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
+       title="Source code">
+      <Github size={14} />
+    </a>
     <button class="font-mono text-xs h-7 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
             onclick={toggleTheme} aria-label="Toggle theme">*</button>
   </header>

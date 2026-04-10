@@ -325,6 +325,8 @@ export class WasmProvider implements LLMProvider {
     // 3. Loose JSON: { "tool": "name", "args": {...} }
     const content: ContentBlock[] = [];
     const gemmaToolCallRe = /<\|tool_call>call:(\w+)(\{[^]*?\})<tool_call\|>/g;
+    // Fallback: parenthesized format — call:name("arg1", {arg2})
+    const parenToolCallRe = /<\|tool_call>call:(\w+)\(([^)]*(?:\{[^]*?\}[^)]*)?)\)(?:<tool_call\|>|$)/g;
     let match: RegExpExecArray | null;
     let foundToolCall = false;
 
@@ -367,6 +369,41 @@ export class WasmProvider implements LLMProvider {
         name: toolName,
         input: toolArgs,
       });
+    }
+
+    // Fallback: try parenthesized format — call:component("table", {data: [...]})
+    if (!foundToolCall) {
+      while ((match = parenToolCallRe.exec(fullText)) !== null) {
+        foundToolCall = true;
+        const toolName = match[1];
+        const argsRaw = match[2].replace(/<\|"\|>/g, '"').trim();
+        let toolArgs: Record<string, unknown> = {};
+
+        // Parse parenthesized args: could be ("name", {params}) or just ({params})
+        try {
+          // Try wrapping in array and parsing: ["name", {params}] or [{params}]
+          const asArray = JSON.parse(`[${argsRaw}]`);
+          if (asArray.length === 2 && typeof asArray[0] === 'string' && typeof asArray[1] === 'object') {
+            // component("table", {data: [...]}) → {name: "table", params: {data: [...]}}
+            toolArgs = { name: asArray[0], params: asArray[1] };
+          } else if (asArray.length === 1 && typeof asArray[0] === 'object') {
+            toolArgs = asArray[0];
+          } else if (asArray.length >= 1) {
+            // Generic: first string arg as name, rest as params
+            toolArgs = { name: String(asArray[0]), ...(typeof asArray[1] === 'object' ? { params: asArray[1] } : {}) };
+          }
+        } catch {
+          // Last resort: try parsing the whole thing as JSON object
+          try { toolArgs = JSON.parse(argsRaw); } catch {}
+        }
+
+        content.push({
+          type: 'tool_use',
+          id: `tc-${Date.now()}-${content.length}`,
+          name: toolName,
+          input: toolArgs,
+        });
+      }
     }
 
     if (!foundToolCall) {

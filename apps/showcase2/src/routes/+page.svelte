@@ -1,4 +1,7 @@
 <script lang="ts">
+  declare const __BUILD_TIME__: string;
+  declare const __GIT_HASH__: string;
+
   import { onMount, untrack } from 'svelte';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
@@ -94,6 +97,10 @@
           </button>
         {/each}
       </div>
+
+      <a href="https://github.com/jeanbaptiste/webmcp-auto-ui/tree/main/apps/showcase2"
+         target="_blank" rel="noopener"
+         class="text-xs font-mono text-text2 hover:text-text1 transition-colors">GitHub</a>
     </div>
   </header>
 
@@ -294,7 +301,7 @@
 
   <!-- Footer -->
   <footer class="border-t border-border py-6 mt-12">
-    <div class="max-w-7xl mx-auto px-4 text-center">
+    <div class="max-w-7xl mx-auto px-4 text-center flex flex-col items-center gap-1">
       <p class="text-xs font-mono text-text2">
         {#if displayBlocks}
           WebMCP Auto-UI — {displayBlocks.length} agent-generated blocks — {activePreset.label}
@@ -302,6 +309,7 @@
           WebMCP Auto-UI — {SIMPLE_BLOCKS.length + RICH_BLOCKS.length} components — 3 themes
         {/if}
       </p>
+      <span class="font-mono text-[8px] text-text2/40">v1.0.0 · {__GIT_HASH__ ?? ''} · {__BUILD_TIME__?.replace('T', ' ').replace('Z', '').slice(0, 23)}</span>
     </div>
   </footer>
 </div>
