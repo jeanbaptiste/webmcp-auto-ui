@@ -21,6 +21,15 @@ import { formatRecipesForPrompt, formatMcpRecipesForPrompt } from './recipe-regi
 
 const MAX_RESULT_LEN = 10_000;
 
+/** Tools that indicate the agent is discovering/consulting recipes or components */
+const DISCOVERY_TOOLS = new Set([
+  'get_recipe', 'search_recipes', 'get_component', 'list_components', 'recall',
+]);
+
+function isDiscoveryTool(name: string): boolean {
+  return DISCOVERY_TOOLS.has(name);
+}
+
 /**
  * recall — lets the LLM re-read the full result of a previous tool call on demand,
  * instead of keeping all results in the context window.
@@ -278,6 +287,7 @@ export async function runAgentLoop(
   const allToolCalls: ToolCall[] = [];
   let lastText = '';
   let finishedNormally = false;
+  let discoveryPhase = false;
 
   for (let i = 0; i < maxIterations; i++) {
     if (signal?.aborted) break;
@@ -333,6 +343,13 @@ export async function runAgentLoop(
     const toolResults: ContentBlock[] = [];
     for (const block of toolBlocks) {
       const call: ToolCall = { id: block.id, name: block.name, args: block.input };
+      // Provenance tracking: mark whether this call is guided by a prior discovery
+      call.guided = discoveryPhase;
+      if (isDiscoveryTool(block.name)) {
+        discoveryPhase = true;
+      } else {
+        discoveryPhase = false;
+      }
       const t1 = performance.now();
 
       try {

@@ -25,6 +25,7 @@ export default defineConfig({
             { label: 'Workflow', slug: 'fr/guide/workflow' },
             { label: 'Déploiement', slug: 'fr/guide/deploy' },
             { label: 'Composants custom', slug: 'fr/guide/custom-components' },
+            { label: 'Tutoriel : widget custom', slug: 'fr/guide/tutorial-custom-widget' },
           ],
         },
         {

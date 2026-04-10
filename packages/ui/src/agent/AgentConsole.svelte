@@ -31,6 +31,13 @@
     const d = new Date(ts);
     return d.toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
+
+  /** Extract provenance tag from tool log detail */
+  function parseProvenance(detail: string): { tag: 'recette' | 'impro' | null; rest: string } {
+    if (detail.startsWith('[recette] ')) return { tag: 'recette', rest: detail.slice(10) };
+    if (detail.startsWith('[impro] ')) return { tag: 'impro', rest: detail.slice(8) };
+    return { tag: null, rest: detail };
+  }
 </script>
 
 <div class="agent-console {cls}">
@@ -56,7 +63,15 @@
              tabindex={log.detail.length > 80 ? 0 : undefined}>
           <span class="ac-ts">{fmtTime(log.ts)}</span>
           <span class="ac-type" style="color:{typeColor[log.type] ?? 'var(--color-text2, #888)'}">{log.type}</span>
-          <span class="ac-detail">{log.detail.length > 120 ? log.detail.slice(0, 120) + '…' : log.detail}</span>
+          {#if log.type === 'tool'}
+            {@const prov = parseProvenance(log.detail)}
+            {#if prov.tag}
+              <span class="ac-tag" class:ac-tag-recette={prov.tag === 'recette'} class:ac-tag-impro={prov.tag === 'impro'}>{prov.tag}</span>
+            {/if}
+            <span class="ac-detail">{prov.rest.length > 120 ? prov.rest.slice(0, 120) + '…' : prov.rest}</span>
+          {:else}
+            <span class="ac-detail">{log.detail.length > 120 ? log.detail.slice(0, 120) + '…' : log.detail}</span>
+          {/if}
         </div>
       {/each}
       <div bind:this={logsEnd}></div>
@@ -171,6 +186,25 @@
 
   .ac-detail {
     color: var(--color-text2, #aaa);
+  }
+
+  .ac-tag {
+    flex-shrink: 0;
+    font-size: 7px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0 3px;
+    border-radius: 2px;
+    line-height: 1.6;
+  }
+  .ac-tag-recette {
+    color: #4ade80;
+    background: rgba(74, 222, 128, 0.1);
+  }
+  .ac-tag-impro {
+    color: #fb923c;
+    background: rgba(251, 146, 60, 0.1);
   }
 
   .ac-clickable {

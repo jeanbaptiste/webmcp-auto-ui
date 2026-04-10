@@ -374,9 +374,10 @@
           onToolCall: (call: any) => {
             chatToolCount++;
             chatLastTool = call.name;
+            const tag = call.guided ? '[recette]' : '[impro]';
             const argsPreview = JSON.stringify(call.args ?? {}).slice(0, 60);
             const resultPreview = typeof call.result === 'string' ? call.result.slice(0, 60) : JSON.stringify(call.result ?? '').slice(0, 60);
-            pushLog('tool', `${call.name}(${argsPreview}) -> ${resultPreview} [${call.elapsed ?? '?'}ms]`);
+            pushLog('tool', `${tag} ${call.name}(${argsPreview}) -> ${resultPreview} [${call.elapsed ?? '?'}ms]`);
           },
           onDone: (metrics: any) => {
             pushLog('done', `${metrics.iterations} iter, ${metrics.toolCalls} tools, ${metrics.totalTokens} tokens, ${Math.round(metrics.totalLatencyMs)}ms`);

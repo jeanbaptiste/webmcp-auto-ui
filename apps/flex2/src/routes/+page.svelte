@@ -359,9 +359,10 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
           onToolCall: (call) => {
             chatToolCount++; chatLastTool = call.name;
             allToolsUsed = [...allToolsUsed, call.name];
+            const tag = call.guided ? '[recette]' : '[impro]';
             const argsPreview = JSON.stringify(call.args).slice(0, 200);
             const resultPreview = (call.result ?? call.error ?? '').slice(0, 200);
-            agentLogs = [...agentLogs, { ts: Date.now(), type: 'tool', detail: `${call.name}(${argsPreview}) -> ${resultPreview} [${call.elapsed ?? '?'}ms]` }];
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'tool', detail: `${tag} ${call.name}(${argsPreview}) -> ${resultPreview} [${call.elapsed ?? '?'}ms]` }];
             // Store full details for tooltip
             const callId = `tc_${Date.now()}_${chatToolCount}`;
             const detail: ToolCallDetail = {
