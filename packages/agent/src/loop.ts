@@ -22,12 +22,33 @@ import { formatRecipesForPrompt, formatMcpRecipesForPrompt } from './recipe-regi
 const MAX_RESULT_LEN = 10_000;
 
 /**
+ * recall — lets the LLM re-read the full result of a previous tool call on demand,
+ * instead of keeping all results in the context window.
+ */
+export const RECALL_TOOL: AnthropicTool = {
+  name: 'recall',
+  description: "Relire le résultat complet d'un appel d'outil précédent. Utilise l'identifiant retourné dans le résumé (ex: recall('toolu_xxx')).",
+  input_schema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: "Identifiant du tool call (ex: 'toolu_xxx')",
+      },
+    },
+    required: ['id'],
+  },
+};
+
+/**
  * Compress old tool_result blocks in conversation history.
  * Once the LLM has read a tool_result and produced a response, the full result
  * is no longer needed — replace it with a truncated preview to save context.
  * Only compresses messages before the last 2 (current iteration).
+ * When a resultBuffer is provided, includes a recall('id') hint so the LLM
+ * can retrieve the full result on demand.
  */
-function compressOldToolResults(messages: ChatMessage[]): void {
+function compressOldToolResults(messages: ChatMessage[], resultBuffer?: Map<string, string>): void {
   for (let i = 0; i < messages.length - 2; i++) {
     const msg = messages[i];
     if (typeof msg.content !== 'string' && Array.isArray(msg.content)) {
@@ -36,7 +57,12 @@ function compressOldToolResults(messages: ChatMessage[]): void {
         if (block.type === 'tool_result' && typeof block.content === 'string' && block.content.length > 300) {
           const preview = block.content.slice(0, 200);
           const totalLen = block.content.length;
-          (block as any).content = `${preview}... [compressed, ${totalLen} chars original]`;
+          const id = block.tool_use_id;
+          if (resultBuffer && resultBuffer.has(id)) {
+            (block as any).content = `${preview}... [recall('${id}') pour le résultat complet, ${totalLen} chars]`;
+          } else {
+            (block as any).content = `${preview}... [compressed, ${totalLen} chars original]`;
+          }
         }
       }
     }
@@ -219,19 +245,22 @@ export async function runAgentLoop(
     signal,
   } = options;
 
+  // Buffer for recall — stores full tool results keyed by tool_use_id
+  const resultBuffer = new Map<string, string>();
+
   // Build tools and prompt from layers (new API) or mcpTools (legacy)
   let allTools: AnthropicTool[];
   let baseSystemPrompt: string;
 
   if (options.layers) {
-    allTools = buildToolsFromLayers(options.layers, toolMode);
+    allTools = [...buildToolsFromLayers(options.layers, toolMode), RECALL_TOOL];
     baseSystemPrompt = options.systemPrompt ?? buildSystemPrompt(options.layers, { toolMode });
   } else {
     // Legacy path — mcpTools flat array
     const mcpToolsDef = mcpToolsToAnthropic(mcpTools);
     allTools = toolMode === 'smart'
-      ? [...mcpToolsDef, LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL]
-      : [...mcpToolsDef, ...UI_TOOLS, LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL];
+      ? [...mcpToolsDef, LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL, RECALL_TOOL]
+      : [...mcpToolsDef, ...UI_TOOLS, LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL, RECALL_TOOL];
     baseSystemPrompt = options.systemPrompt ?? buildSystemPromptLegacy(mcpTools);
   }
 
@@ -309,7 +338,10 @@ export async function runAgentLoop(
       try {
         let result: string;
 
-        if (block.name === 'list_components') {
+        if (block.name === 'recall') {
+          const recallId = (block.input as { id: string }).id;
+          result = resultBuffer.get(recallId) ?? `Aucun résultat trouvé pour l'id '${recallId}'.`;
+        } else if (block.name === 'list_components') {
           result = executeListComponents();
         } else if (block.name === 'get_component') {
           result = executeGetComponent((block.input as { name: string }).name);
@@ -324,6 +356,9 @@ export async function runAgentLoop(
         } else {
           result = `Error: no MCP client available for tool ${block.name}`;
         }
+
+        // Store full result in buffer for later recall
+        resultBuffer.set(block.id, result);
 
         call.result = result;
         toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result });
@@ -341,7 +376,7 @@ export async function runAgentLoop(
     messages.push({ role: 'user', content: toolResults });
 
     // Compress old tool results to save context window (benefits both WASM and remote)
-    compressOldToolResults(messages);
+    compressOldToolResults(messages, resultBuffer);
   }
 
   callbacks.onDone?.(metrics);
