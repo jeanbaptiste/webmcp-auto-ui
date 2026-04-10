@@ -218,6 +218,12 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
     });
   });
 
+  // Auto-switch toolMode based on model: explicit for Claude, smart for Gemma
+  $effect(() => {
+    const isWasm = canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b';
+    toolMode = isWasm ? 'smart' : 'explicit';
+  });
+
   $effect(() => { toolMode; untrack(() => { conversationHistory = []; }); });
 
   // ── Layers & prompt ────────────────────────────────────────────────

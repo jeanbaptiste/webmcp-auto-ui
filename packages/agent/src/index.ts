@@ -27,6 +27,7 @@ export { UI_TOOLS, isUITool, executeUITool } from './ui-tools.js';
 export {
   LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, COMPONENT_TOOL,
   componentRegistry, executeListComponents, executeGetComponent, executeComponent,
+  registerCoercion,
 } from './component-tool.js';
 export type { ComponentEntry } from './component-tool.js';
 

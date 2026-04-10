@@ -24,6 +24,7 @@ export default defineConfig({
             { label: 'Architecture', slug: 'fr/guide/architecture' },
             { label: 'Workflow', slug: 'fr/guide/workflow' },
             { label: 'Déploiement', slug: 'fr/guide/deploy' },
+            { label: 'Composants custom', slug: 'fr/guide/custom-components' },
           ],
         },
         {

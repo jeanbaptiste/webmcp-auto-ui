@@ -175,12 +175,55 @@ export function executeGetComponent(name: string): string {
 // LLMs (especially Haiku and Gemma) often send data in non-standard formats.
 // Coerce common mismatches BEFORE passing to executeUITool.
 
+type CoercionFn = (params: Record<string, unknown>) => Record<string, unknown>;
+const customCoercions = new Map<string, CoercionFn>();
+
+/**
+ * Register a custom coercion function for a component.
+ * Called before built-in coercions — if the custom fn returns a value, built-ins are skipped.
+ */
+export function registerCoercion(componentName: string, fn: CoercionFn): void {
+  customCoercions.set(componentName, fn);
+}
+
 function coerceParams(name: string, params: Record<string, unknown>): Record<string, unknown> {
-  // Table / data-table: {data: [{key: val}]} → {rows: [{key: val}]}
-  // DataTable expects `rows` (array of objects). LLMs often send `data` instead.
-  if ((name === 'table' || name === 'data-table' || name === 'render_table') && Array.isArray(params.data) && params.data.length > 0 && typeof params.data[0] === 'object' && !params.rows) {
-    const { data, ...rest } = params;
-    return { ...rest, rows: data };
+  // Custom coercion takes priority
+  const custom = customCoercions.get(name);
+  if (custom) return custom(params);
+  // Table / data-table: normalize columns and rows for DataTable component
+  // DataTable expects: columns: {key,label}[], rows: Record<string,unknown>[]
+  if (name === 'table' || name === 'data-table' || name === 'render_table') {
+    let cols = params.columns as unknown[] | undefined;
+    let rowData = (params.rows ?? params.data) as unknown[] | undefined;
+
+    if (Array.isArray(rowData) && rowData.length > 0) {
+      // columns: string[] → {key, label}[]
+      if (Array.isArray(cols) && cols.length > 0 && typeof cols[0] === 'string') {
+        const colNames = cols as string[];
+        const normalizedCols = colNames.map(c => ({ key: c, label: c }));
+
+        // rows: string[][] → Record<string,unknown>[] (zip with column names)
+        if (Array.isArray(rowData[0])) {
+          const normalizedRows = (rowData as unknown[][]).map(row =>
+            Object.fromEntries(colNames.map((c, i) => [c, row[i] ?? '']))
+          );
+          const { data: _d, columns: _c, rows: _r, ...rest } = params;
+          return { ...rest, columns: normalizedCols, rows: normalizedRows };
+        }
+
+        // rows: Record<string,unknown>[] — already objects, just fix columns
+        if (typeof rowData[0] === 'object' && !Array.isArray(rowData[0])) {
+          const { data: _d, columns: _c, ...rest } = params;
+          return { ...rest, columns: normalizedCols, rows: rowData };
+        }
+      }
+
+      // No columns provided: {data: [{key: val}]} → {rows: [{key: val}]}
+      if (!params.rows && Array.isArray(params.data) && typeof rowData[0] === 'object' && !Array.isArray(rowData[0])) {
+        const { data, ...rest } = params;
+        return { ...rest, rows: data };
+      }
+    }
   }
 
   // Stat-card: {stats: [{label, value}]} → {label, value} (first element)
