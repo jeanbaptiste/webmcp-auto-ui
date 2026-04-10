@@ -1,0 +1,78 @@
+---
+title: WebMCP Auto-UI
+description: Svelte 5 framework for composing AI-driven interfaces via MCP
+template: splash
+hero:
+  tagline: Svelte 5 framework for composing AI-driven interfaces via the Model Context Protocol
+  actions:
+    - text: Installation guide
+      link: /webmcp-auto-ui/en/guide/installation/
+      icon: right-arrow
+      variant: primary
+    - text: Live demos
+      link: https://demos.hyperskills.net/
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## MVC + LLM + HyperSkills Architecture
+
+```
+User prompt --> Agent Loop --> LLM (Claude/Gemma/Ollama)
+                  |                    |
+                  |              tool_use blocks
+                  |                    |
+         +--------+--------+          |
+         |                  |          v
+    McpLayer (DATA)    UILayer (UI)
+    MCP Servers        component()
+         |                  |
+    Raw data           Rendered blocks
+         |                  |
+         +--------+---------+
+                  |
+            BlockRenderer
+                  |
+            Canvas / UI
+```
+
+<CardGrid stagger>
+  <Card title="LLM Agent" icon="rocket">
+    Iterative agent loop with 4 LLM providers: Claude (remote), Gemma LiteRT (WASM in-browser), Ollama and Llamafile (local). Smart mode (`component()` single tool) or explicit mode (31 `render_*` tools).
+  </Card>
+
+  <Card title="34+ UI Components" icon="puzzle">
+    Simple blocks (stat, chart, table, kv...), rich widgets (hemicycle, sankey, D3, Leaflet map...), window manager and complete theme system with 11 CSS tokens.
+  </Card>
+
+  <Card title="MCP Servers" icon="setting">
+    MCP Streamable HTTP client with simultaneous multi-server support. Tool discovery, server recipes, and automatic routing via `McpMultiClient`.
+  </Card>
+
+  <Card title="HyperSkills" icon="document">
+    Skill encode/decode into URLs (`?hs=`), CRUD registry, SHA-256 versioning, reactive canvas store (Svelte 5 runes + vanilla).
+  </Card>
+</CardGrid>
+
+## Packages
+
+| Package | Description |
+|---------|-------------|
+| [`@webmcp-auto-ui/core`](/webmcp-auto-ui/en/packages/core/) | W3C WebMCP polyfill + MCP Streamable HTTP client |
+| [`@webmcp-auto-ui/agent`](/webmcp-auto-ui/en/packages/agent/) | Agent loop, 4 LLM providers, ToolLayers, recipes, `component()` |
+| [`@webmcp-auto-ui/sdk`](/webmcp-auto-ui/en/packages/sdk/) | HyperSkill encode/decode, skills registry, canvas store |
+| [`@webmcp-auto-ui/ui`](/webmcp-auto-ui/en/packages/ui/) | 34+ Svelte 5 components, theme system, window manager |
+
+## Demo Apps
+
+| App | Description |
+|-----|-------------|
+| [flex2](/webmcp-auto-ui/en/apps/flex2/) | Layers, single `component()`, debug panel, composer/consumer mode |
+| [viewer2](/webmcp-auto-ui/en/apps/viewer2/) | Read-only HyperSkills viewer with CRUD, DAG, paste URI |
+| [showcase2](/webmcp-auto-ui/en/apps/showcase2/) | Dynamic demo with agent + MCP + 3 themes |
+| [recipes](/webmcp-auto-ui/en/apps/recipes/) | MCP + WebMCP recipe explorer with live testing |
+| [todo2](/webmcp-auto-ui/en/apps/todo2/) | WebMCP todo, minimal template |
+
+All demos are deployed at [demos.hyperskills.net](https://demos.hyperskills.net/).

@@ -10,7 +10,7 @@
     fromMcpTools, trimConversationHistory, TokenTracker,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, Recipe, McpRecipe, ToolLayer, McpLayer, UILayer } from '@webmcp-auto-ui/agent';
-  import { McpStatus, LLMSelector, GemmaLoader, RemoteMCPserversDemo, THEME_MAP } from '@webmcp-auto-ui/ui';
+  import { McpStatus, LLMSelector, GemmaLoader, RemoteMCPserversDemo, AgentConsole, THEME_MAP } from '@webmcp-auto-ui/ui';
   import RecipeList from '$lib/RecipeList.svelte';
   import RecipeDetail from '$lib/RecipeDetail.svelte';
   import RecipePreview from '$lib/RecipePreview.svelte';
@@ -37,8 +37,36 @@
   let conversationHistory = $state<ChatMessage[]>([]);
   let abortController = $state<AbortController | null>(null);
 
+  // Agent logs
+  let agentLogs = $state<{ ts: number; type: string; detail: string }[]>([]);
+
+  // Console drawer
+  let consoleHeight = $state(200);
+  let dragging = $state(false);
+  let dragStartY = $state(0);
+  let dragStartH = $state(0);
+  const CONSOLE_MIN_H = 80;
+  const CONSOLE_MAX_RATIO = 0.5;
+
+  function onConsoleDragStart(e: PointerEvent) {
+    dragging = true;
+    dragStartY = e.clientY;
+    dragStartH = consoleHeight;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }
+  function onConsoleDragMove(e: PointerEvent) {
+    if (!dragging) return;
+    const delta = dragStartY - e.clientY;
+    const maxH = Math.floor(window.innerHeight * CONSOLE_MAX_RATIO);
+    consoleHeight = Math.min(maxH, Math.max(CONSOLE_MIN_H, dragStartH + delta));
+  }
+  function onConsoleDragEnd() { dragging = false; }
+
   // Settings panel
   let settingsOpen = $state(false);
+
+  // Mobile tabs
+  let mobileTab = $state<'list' | 'detail' | 'preview'>('list');
 
   // Provider
   const anthropicProvider = new AnthropicProvider({ proxyUrl: `${base}/api/chat` });
@@ -196,30 +224,66 @@
     return result;
   });
 
-  // ── Test recipe ────────────────────────────────────────────────────────────
+  // ── Placeholder contextuel ──────────────────────────────────────────────────
+  const PLACEHOLDER_MAP: Record<string, string> = {
+    'inaturalist': 'Quels oiseaux observe-t-on a Paris ?',
+    'tricoteuses': 'Montre-moi les derniers scrutins publics',
+    'nasa': "Montre-moi les images APOD de cette semaine",
+    'openmeteo': "Quel temps fait-il a Lyon demain ?",
+    'metmuseum': 'Cherche des tableaux impressionnistes',
+    'hackernews': 'Quelles sont les top stories du moment ?',
+  };
+
+  const PLACEHOLDER_ID_MAP: Record<string, string> = {
+    'cartographier-observations-biodiversite': PLACEHOLDER_MAP['inaturalist'],
+    'afficher-profil-parlementaire-avec-hemicycle-et-votes': PLACEHOLDER_MAP['tricoteuses'],
+    'parlementaire-profile': PLACEHOLDER_MAP['tricoteuses'],
+    'explorer-dossiers-legislatifs-parcours-texte': "Ou en est le projet de loi finances 2026 ?",
+    'rechercher-textes-juridiques-legifrance': "Cherche l'article L.121-1 du Code de commerce",
+    'afficher-galerie-images-depuis-urls-mcp': PLACEHOLDER_MAP['nasa'],
+    'gallery-images': PLACEHOLDER_MAP['nasa'],
+    'analyser-actualites-hacker-news': PLACEHOLDER_MAP['hackernews'],
+    'visualiser-previsions-meteo-avec-graphiques-et-kpi': PLACEHOLDER_MAP['openmeteo'],
+    'weather-viz': PLACEHOLDER_MAP['openmeteo'],
+    'afficher-oeuvres-art-collection-musee': PLACEHOLDER_MAP['metmuseum'],
+  };
+
+  const DEFAULT_PLACEHOLDER = 'Posez une question en rapport avec cette recette...';
+
+  const chatPlaceholder = $derived.by((): string => {
+    if (!selectedId) return DEFAULT_PLACEHOLDER;
+    // Try by recipe id first
+    const byId = PLACEHOLDER_ID_MAP[selectedId.replace(/^mcp:/, '')];
+    if (byId) return byId;
+    // Try by server name
+    const recipe = selectedRecipe;
+    if (recipe?.servers?.length) {
+      for (const srv of recipe.servers) {
+        const lower = srv.toLowerCase();
+        for (const [key, val] of Object.entries(PLACEHOLDER_MAP)) {
+          if (lower.includes(key) || key.includes(lower)) return val;
+        }
+      }
+    }
+    return DEFAULT_PLACEHOLDER;
+  });
+
+  // ── Agent send ─────────────────────────────────────────────────────────────
   function uid() { return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 
-  async function testRecipe() {
-    if (testing) return;
-    conversationHistory = []; // Reset between recipe tests
+  function pushLog(type: string, detail: string) {
+    agentLogs = [...agentLogs, { ts: Date.now(), type, detail }];
+  }
 
-    // Build the prompt for the recipe
-    let prompt = '';
-    if (selectedRecipe) {
-      prompt = `Execute cette recette WebMCP UI :\n\nNom: ${selectedRecipe.name}\nDescription: ${selectedRecipe.description ?? ''}\nWhen: ${selectedRecipe.when}\n\n${selectedRecipe.body}`;
-    } else if (selectedMcpRecipe) {
-      prompt = `Execute la recette MCP "${selectedMcpRecipe.name}"${selectedMcpRecipe.description ? ` (${selectedMcpRecipe.description})` : ''}. Utilise get_recipe pour obtenir les details puis execute-la.`;
-    } else {
-      return;
-    }
+  async function sendMessage(prompt: string) {
+    if (testing || !prompt.trim()) return;
 
-    // Reset preview
-    previewBlocks = [];
-    previewText = '';
+    // Reset transient state but keep blocks + text for continuous conversation
     previewError = '';
     chatTimer = 0;
     chatToolCount = 0;
     chatLastTool = '';
+    agentLogs = [];
     testing = true;
     canvas.setGenerating(true);
     abortController = new AbortController();
@@ -241,21 +305,40 @@
         initialMessages: trimConversationHistory(conversationHistory, 150_000),
         layers,
         callbacks: {
-          onLLMResponse: (response, latencyMs) => {
+          onIterationStart: (i: number, max: number) => {
+            pushLog('iteration', `Iteration ${i}/${max}`);
+          },
+          onLLMRequest: (messages: unknown[], tools: unknown[]) => {
+            pushLog('request', `${(messages as unknown[]).length} messages, ${(tools as unknown[]).length} tools`);
+          },
+          onLLMResponse: (response: any, latencyMs: number) => {
+            const tokens = response.usage;
+            pushLog('response', `${tokens?.input ?? '?'}in ${tokens?.output ?? '?'}out, ${Math.round(latencyMs)}ms, ${response.stopReason}`);
             if (response.usage) {
               tokenTracker.record(response.usage, latencyMs);
             } else if (response.stats) {
               tokenTracker.recordEstimate(0, response.stats.totalTokens * 4, latencyMs);
             }
           },
-          onBlock: (type, data) => {
+          onBlock: (type: string, data: Record<string, unknown>) => {
             previewBlocks = [...previewBlocks, { id: uid(), type, data }];
           },
           onClear: () => { previewBlocks = []; },
-          onText: (text) => { if (text) previewText = text; },
-          onToolCall: (call) => {
+          onText: (text: string) => {
+            if (text) {
+              previewText = text;
+              pushLog('text', text.slice(0, 100));
+            }
+          },
+          onToolCall: (call: any) => {
             chatToolCount++;
             chatLastTool = call.name;
+            const argsPreview = JSON.stringify(call.args ?? {}).slice(0, 60);
+            const resultPreview = typeof call.result === 'string' ? call.result.slice(0, 60) : JSON.stringify(call.result ?? '').slice(0, 60);
+            pushLog('tool', `${call.name}(${argsPreview}) -> ${resultPreview} [${call.elapsed ?? '?'}ms]`);
+          },
+          onDone: (metrics: any) => {
+            pushLog('done', `${metrics.iterations} iter, ${metrics.toolCalls} tools, ${metrics.totalTokens} tokens, ${Math.round(metrics.totalLatencyMs)}ms`);
           },
         },
       });
@@ -264,6 +347,7 @@
       if (result.text) previewText = result.text;
     } catch (e) {
       previewError = e instanceof Error ? e.message : String(e);
+      pushLog('error', previewError);
     } finally {
       clearInterval(timerInterval);
       abortController = null;
@@ -272,8 +356,39 @@
     }
   }
 
+  function testRecipe() {
+    if (testing) return;
+    // Reset conversation for a fresh recipe test
+    conversationHistory = [];
+    previewBlocks = [];
+    previewText = '';
+    agentLogs = [];
+
+    let prompt = '';
+    if (selectedRecipe) {
+      prompt = `Execute cette recette WebMCP UI :\n\nNom: ${selectedRecipe.name}\nDescription: ${selectedRecipe.description ?? ''}\nWhen: ${selectedRecipe.when}\n\n${selectedRecipe.body}`;
+    } else if (selectedMcpRecipe) {
+      prompt = `Execute la recette MCP "${selectedMcpRecipe.name}"${selectedMcpRecipe.description ? ` (${selectedMcpRecipe.description})` : ''}. Utilise get_recipe pour obtenir les details puis execute-la.`;
+    } else {
+      return;
+    }
+
+    sendMessage(prompt);
+  }
+
   function stopTest() {
     abortController?.abort();
+  }
+
+  function clearPreview() {
+    conversationHistory = [];
+    previewBlocks = [];
+    previewText = '';
+    previewError = '';
+    chatTimer = 0;
+    chatToolCount = 0;
+    chatLastTool = '';
+    agentLogs = [];
   }
 
   function selectRecipe(id: string, source: 'local' | 'mcp') {
@@ -311,15 +426,6 @@
     >
       MCP
     </button>
-
-    {#if testing}
-      <button
-        class="font-mono text-[10px] h-6 px-2 rounded border border-accent2/40 bg-accent2/10 text-accent2 hover:bg-accent2/20 transition-colors flex-shrink-0"
-        onclick={stopTest}
-      >
-        Stop
-      </button>
-    {/if}
 
     <LLMSelector value={canvas.llm} onchange={(v) => canvas.setLlm(v)} />
 
@@ -361,58 +467,236 @@
     />
   {/if}
 
-  <!-- MAIN AREA -->
-  <div class="flex-1 flex overflow-hidden">
+  <!-- Settings Panel (collapsible, full-width) -->
+  {#if settingsOpen}
+    <div class="border-b border-border bg-surface p-3 flex-shrink-0 overflow-y-auto max-h-[300px]">
+      <RemoteMCPserversDemo
+        servers={MCP_DEMO_SERVERS}
+        {connectedUrls}
+        loading={loadingUrls}
+        onconnect={addMcpServer}
+        onconnectall={addAllServers}
+        ondisconnect={removeMcpServer}
+      />
+    </div>
+  {/if}
+
+  <!-- MOBILE TABS (< 768px) -->
+  <div class="mobile-tabs">
+    <button class="mobile-tab" class:active={mobileTab === 'list'} onclick={() => mobileTab = 'list'}>Recettes</button>
+    <button class="mobile-tab" class:active={mobileTab === 'detail'} onclick={() => mobileTab = 'detail'}>Detail</button>
+    <button class="mobile-tab" class:active={mobileTab === 'preview'} onclick={() => mobileTab = 'preview'}>Preview</button>
+  </div>
+
+  <!-- MAIN 3-COLUMN AREA -->
+  <div class="columns-area">
 
     <!-- LEFT: Recipe List -->
-    <div class="w-64 flex-shrink-0 border-r border-border bg-surface overflow-hidden flex flex-col">
+    <div class="col-list" class:mobile-hidden={mobileTab !== 'list'}>
       <RecipeList
         localRecipes={WEBMCP_RECIPES}
         {mcpRecipes}
         {selectedId}
-        onselect={selectRecipe}
+        onselect={(id, source) => { selectRecipe(id, source); mobileTab = 'detail'; }}
       />
     </div>
 
-    <!-- RIGHT: Detail + Preview -->
-    <div class="flex-1 flex flex-col overflow-hidden">
+    <!-- CENTER: Recipe Detail -->
+    <div class="col-detail" class:mobile-hidden={mobileTab !== 'detail'}>
+      <RecipeDetail
+        recipe={selectedRecipe}
+        mcpRecipe={selectedMcpRecipe}
+        ontest={() => { testRecipe(); mobileTab = 'preview'; }}
+        {testing}
+      />
+    </div>
 
-      <!-- Settings Panel (collapsible) -->
-      {#if settingsOpen}
-        <div class="border-b border-border bg-surface p-3 flex-shrink-0 overflow-y-auto max-h-[300px]">
-          <RemoteMCPserversDemo
-            servers={MCP_DEMO_SERVERS}
-            {connectedUrls}
-            loading={loadingUrls}
-            onconnect={addMcpServer}
-            onconnectall={addAllServers}
-            ondisconnect={removeMcpServer}
-          />
-        </div>
-      {/if}
-
-      <!-- Detail -->
-      <div class="flex-1 overflow-hidden border-b border-border">
-        <RecipeDetail
-          recipe={selectedRecipe}
-          mcpRecipe={selectedMcpRecipe}
-          ontest={testRecipe}
-          {testing}
-        />
-      </div>
-
-      <!-- Preview -->
-      <div class="h-[280px] flex-shrink-0 overflow-hidden">
-        <RecipePreview
-          blocks={previewBlocks}
-          active={testing}
-          elapsed={chatTimer}
-          toolCalls={chatToolCount}
-          lastTool={chatLastTool}
-          textOutput={previewText}
-          error={previewError}
-        />
-      </div>
+    <!-- RIGHT: Preview + Chat -->
+    <div class="col-preview" class:mobile-hidden={mobileTab !== 'preview'}>
+      <RecipePreview
+        blocks={previewBlocks}
+        active={testing}
+        elapsed={chatTimer}
+        toolCalls={chatToolCount}
+        lastTool={chatLastTool}
+        textOutput={previewText}
+        error={previewError}
+        placeholder={chatPlaceholder}
+        hasConversation={conversationHistory.length > 0 || previewBlocks.length > 0 || !!previewText}
+        onsend={sendMessage}
+        onstop={stopTest}
+        onclear={clearPreview}
+      />
     </div>
   </div>
+
+  <!-- BOTTOM: Resizable AgentConsole drawer -->
+  <div class="console-drawer" style="height:{consoleHeight}px">
+    <!-- Resize bar -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="resize-bar"
+         onpointerdown={onConsoleDragStart}
+         onpointermove={onConsoleDragMove}
+         onpointerup={onConsoleDragEnd}>
+      <div class="resize-grip"></div>
+    </div>
+
+    <AgentConsole logs={agentLogs} onclear={() => agentLogs = []} />
+  </div>
 </div>
+
+<style>
+  /* ── 3-column layout ─────────────────────────────────────────── */
+  .columns-area {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .col-list {
+    width: 14rem; /* w-56 */
+    flex-shrink: 0;
+    border-right: 1px solid var(--color-border, #222);
+    background: var(--color-surface, #1a1a2e);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .col-detail {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--color-border, #222);
+    min-width: 0;
+  }
+
+  .col-preview {
+    width: 400px;
+    flex-shrink: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Console drawer ──────────────────────────────────────────── */
+  .console-drawer {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-bg, #0e0e16);
+    border-top: 1px solid var(--color-border2, #333);
+    overflow: hidden;
+  }
+
+  .resize-bar {
+    height: 6px;
+    cursor: ns-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: var(--color-surface, #1a1a2e);
+    border-bottom: 1px solid var(--color-border, #222);
+    touch-action: none;
+  }
+  .resize-bar:hover {
+    background: var(--color-surface2, #1e1e2e);
+  }
+  .resize-grip {
+    width: 32px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--color-text2, #666);
+    opacity: 0.4;
+  }
+  .resize-bar:hover .resize-grip {
+    opacity: 0.7;
+  }
+
+  /* ── Mobile tabs ─────────────────────────────────────────────── */
+  .mobile-tabs {
+    display: none;
+  }
+
+  .mobile-tab {
+    flex: 1;
+    padding: 6px 0;
+    font-family: monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text2, #888);
+    background: var(--color-surface, #1a1a2e);
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .mobile-tab:hover { color: var(--color-text1, #eee); }
+  .mobile-tab.active {
+    color: var(--color-accent, #a78bfa);
+    border-bottom-color: var(--color-accent, #a78bfa);
+  }
+
+  .mobile-hidden {
+    display: none !important;
+  }
+
+  /* ── Tablet: 768–1024px → 2 columns ─────────────────────────── */
+  @media (min-width: 768px) and (max-width: 1024px) {
+    .mobile-tabs { display: none; }
+    .mobile-hidden { display: flex !important; }
+
+    .col-list {
+      width: 12rem;
+    }
+    .col-detail {
+      flex: 1;
+      border-right: none;
+    }
+    .col-preview {
+      /* Stack under detail on tablet */
+      display: none;
+    }
+    /* On tablet, detail area takes full remaining width.
+       Preview content is accessible via the chat input in detail area.
+       For a better tablet experience, we show detail + preview stacked. */
+    .columns-area {
+      flex-wrap: wrap;
+    }
+  }
+
+  /* ── Mobile: < 768px → tabs ──────────────────────────────────── */
+  @media (max-width: 767px) {
+    .mobile-tabs {
+      display: flex;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--color-border, #222);
+    }
+
+    .columns-area {
+      flex: 1;
+    }
+
+    .col-list,
+    .col-detail,
+    .col-preview {
+      width: 100% !important;
+      flex: 1;
+      border-right: none;
+    }
+
+    .console-drawer {
+      height: 120px !important;
+    }
+  }
+
+  /* ── Desktop: > 1024px → 3 columns (default, no media query needed) ── */
+  @media (min-width: 1025px) {
+    .mobile-tabs { display: none; }
+    .mobile-hidden { display: flex !important; }
+  }
+</style>

@@ -15,9 +15,31 @@
     lastTool: string;
     textOutput: string;
     error: string;
+    placeholder: string;
+    hasConversation: boolean;
+    onsend: (msg: string) => void;
+    onstop: () => void;
+    onclear: () => void;
   }
 
-  let { blocks, active, elapsed, toolCalls, lastTool, textOutput, error }: Props = $props();
+  let { blocks, active, elapsed, toolCalls, lastTool, textOutput, error,
+        placeholder, hasConversation, onsend, onstop, onclear }: Props = $props();
+
+  let inputText = $state('');
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  }
+
+  function send() {
+    const msg = inputText.trim();
+    if (!msg || active) return;
+    inputText = '';
+    onsend(msg);
+  }
 </script>
 
 <div class="flex flex-col h-full border-t border-border">
@@ -25,6 +47,19 @@
   <div class="flex items-center gap-2 px-3 py-1.5 bg-surface border-b border-border flex-shrink-0">
     <span class="text-[9px] font-mono uppercase tracking-wider text-text2">Preview</span>
     <div class="flex-1"></div>
+    {#if hasConversation}
+      <button
+        class="font-mono text-[9px] h-5 px-1.5 rounded border border-border2 text-text2 hover:text-text1 hover:border-accent/40 transition-colors"
+        onclick={onclear}
+        disabled={active}
+      >Effacer</button>
+    {/if}
+    {#if active}
+      <button
+        class="font-mono text-[9px] h-5 px-1.5 rounded border border-accent2/40 bg-accent2/10 text-accent2 hover:bg-accent2/20 transition-colors"
+        onclick={onstop}
+      >Stop</button>
+    {/if}
     <AgentProgress {active} {elapsed} {toolCalls} {lastTool} />
   </div>
 
@@ -52,9 +87,29 @@
       </div>
     {:else if !active && !textOutput && !error}
       <div class="flex items-center justify-center h-full text-text2 font-mono text-xs">
-        Cliquez "Tester" sur une recette pour voir le resultat ici
+        Cliquez "Tester" sur une recette ou posez une question ci-dessous
       </div>
     {/if}
+  </div>
+
+  <!-- Chat input -->
+  <div class="flex items-end gap-2 px-3 py-2 bg-surface border-t border-border flex-shrink-0">
+    <textarea
+      class="flex-1 font-mono text-xs text-text1 bg-bg border border-border2 rounded px-3 py-2
+             placeholder:text-text2/50 resize-none focus:outline-none focus:border-accent/50
+             disabled:opacity-40 disabled:cursor-not-allowed"
+      rows="1"
+      {placeholder}
+      disabled={active}
+      bind:value={inputText}
+      onkeydown={handleKeydown}
+    ></textarea>
+    <button
+      class="flex-shrink-0 font-mono text-xs h-8 px-3 rounded border border-accent bg-accent/10 text-accent
+             hover:bg-accent/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      disabled={active || !inputText.trim()}
+      onclick={send}
+    >Envoyer</button>
   </div>
 </div>
 
@@ -64,4 +119,9 @@
     to   { opacity: 1; transform: translateY(0); }
   }
   .block-anim { animation: slidein .25s ease-out; }
+  textarea {
+    min-height: 2rem;
+    max-height: 6rem;
+    field-sizing: content;
+  }
 </style>

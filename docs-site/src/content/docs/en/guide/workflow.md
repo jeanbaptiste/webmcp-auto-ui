@@ -1,0 +1,175 @@
+---
+title: Workflow
+description: The complete flow from layers to prompt to tools to LLM to component() to render
+sidebar:
+  order: 3
+---
+
+## Overview
+
+The v0.7.0 workflow follows a linear flow in 7 steps:
+
+```
+App                      Agent Package                     LLM
+ |                            |                             |
+ |  1. Build ToolLayer[]      |                             |
+ |    - McpLayer (per server) |                             |
+ |    - UILayer (+ adapter)   |                             |
+ |                            |                             |
+ |  2. buildSystemPrompt()    |                             |
+ |  ----layers, toolMode----> |                             |
+ |  <--- structured prompt -- |                             |
+ |       ## mcp / ## webmcp   |                             |
+ |                            |                             |
+ |  3. buildToolsFromLayers() |                             |
+ |  ----layers, toolMode----> |                             |
+ |  <--- AnthropicTool[] ---  |                             |
+ |                            |                             |
+ |  4. runAgentLoop(msg, {layers})                          |
+ |  ------------------------------------->  prompt + tools  |
+ |                            |             |               |
+ |                            |   5. component("help")      |
+ |                            |   <----------------------   |
+ |                            |   --- component list --->   |
+ |                            |             |               |
+ |                            |   6. query_sql({sql})       |
+ |                            |   <----------------------   |
+ |                   MCP call |   --- data --------------->  |
+ |                            |             |               |
+ |                            |   7. component("table",     |
+ |                            |      {rows, columns})       |
+ |  <-- onBlock(type, data) - |   <----------------------   |
+ |  Canvas renders the block  |                             |
+```
+
+## Step by step
+
+### 1. Build ToolLayers
+
+The app builds a `ToolLayer[]` array: one `McpLayer` per connected MCP server, plus a single `UILayer`.
+
+```ts
+import type { McpLayer, UILayer, ToolLayer } from '@webmcp-auto-ui/agent';
+import { WEBMCP_RECIPES, filterRecipesByServer } from '@webmcp-auto-ui/agent';
+
+const mcpLayer: McpLayer = {
+  source: 'mcp',
+  serverUrl: 'https://mcp.code4code.eu/mcp',
+  serverName: 'Tricoteuses',
+  tools: await client.listTools(),
+  recipes: [{ name: 'profil-depute', description: 'Full deputy profile' }],
+};
+
+const uiLayer: UILayer = {
+  source: 'ui',
+  recipes: filterRecipesByServer(WEBMCP_RECIPES, ['Tricoteuses']),
+};
+
+const layers: ToolLayer[] = [mcpLayer, uiLayer];
+```
+
+### 2. Generate the system prompt
+
+`buildSystemPrompt()` produces a structured markdown prompt:
+
+```ts
+import { buildSystemPrompt } from '@webmcp-auto-ui/agent';
+
+const prompt = buildSystemPrompt(layers, { toolMode: 'smart' });
+```
+
+The generated prompt contains:
+- `## mcp (Tricoteuses)` -- list of DATA tools + server recipes
+- `## webmcp` -- instructions for `component()` + UI recipes
+
+### 3. Build the tools
+
+`buildToolsFromLayers()` converts layers to `AnthropicTool[]`:
+
+```ts
+import { buildToolsFromLayers } from '@webmcp-auto-ui/agent';
+
+const tools = buildToolsFromLayers(layers, 'smart');
+// Smart mode: MCP tools + 1 single component() tool
+// Explicit mode: MCP tools + 31 render_* + component()
+```
+
+### 4. Run the agent loop
+
+```ts
+import { runAgentLoop } from '@webmcp-auto-ui/agent';
+
+const result = await runAgentLoop('Show me revenue by quarter', {
+  provider,
+  layers,
+  toolMode: 'smart',
+  maxIterations: 5,
+  callbacks: {
+    onBlock: (type, data) => canvas.addBlock(type, data),
+    onText: (text) => console.log('LLM:', text),
+    onToolCall: (call) => console.log('Tool:', call.name),
+  },
+  signal: abortController.signal,
+});
+```
+
+### 5. Discovery (smart mode)
+
+In smart mode, the LLM has a single UI tool. It calls `component("help")` to discover the 56 available components:
+
+```
+LLM -> component("help")
+    <- list of 56 components with name, description, renderable flag
+```
+
+### 6. DATA calls (MCP)
+
+The LLM calls MCP server tools to fetch data:
+
+```
+LLM -> query_sql({ sql: "SELECT * FROM deputies WHERE district = 'Paris 1'" })
+    <- { content: [{ text: "[{name: 'Dupont', ...}]" }] }
+```
+
+### 7. Render (component)
+
+The LLM calls `component()` with a type and parameters to render the result:
+
+```
+LLM -> component("profile", { name: "Jean Dupont", subtitle: "Deputy for Paris 1" })
+    -> onBlock("profile", { name: "Jean Dupont", ... })
+    -> Canvas displays the block
+```
+
+## Smart vs explicit mode
+
+| | Smart (default) | Explicit |
+|--|---------------|----------|
+| **UI tools** | 1 single: `component()` | 31 `render_*` + `component()` |
+| **Discovery** | `component("help")` | LLM sees all tools |
+| **Schema tokens** | ~200 tokens | ~3000 tokens |
+| **Recommended for** | Cloud (Claude) | WASM (Gemma) or debug |
+
+## Loop result
+
+```ts
+console.log(result.text);       // final LLM text
+console.log(result.toolCalls);  // list of tool calls made
+console.log(result.metrics);    // metrics (tokens, latency, iterations)
+console.log(result.stopReason); // 'end_turn' | 'max_iterations' | 'error'
+console.log(result.messages);   // complete conversation for resumption
+```
+
+## Auto UI generation pattern
+
+```
+1. User connects an MCP server
+2. App calls client.listTools() -> tool discovery
+3. App builds ToolLayers (McpLayer + UILayer)
+4. User asks a question in natural language
+5. runAgentLoop:
+   - LLM calls an MCP tool (data)
+   - LLM calls component() (display)
+   - Repeats until end_turn
+6. Result: dashboard generated without manual composition
+```
