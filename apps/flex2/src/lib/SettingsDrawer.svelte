@@ -11,6 +11,7 @@
     open: boolean;
     mcpToken?: string;
     systemPrompt?: string;
+    effectivePrompt?: string;
     maxTokens?: number;
     maxContextTokens?: number;
     cacheEnabled?: boolean;
@@ -33,6 +34,7 @@
     open = $bindable(false),
     mcpToken = $bindable(''),
     systemPrompt = $bindable(''),
+    effectivePrompt = '',
     maxTokens = $bindable(4096),
     maxContextTokens = $bindable(150_000),
     cacheEnabled = $bindable(true),
@@ -118,6 +120,7 @@
       <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Agent</div>
       <SettingsPanel
         bind:systemPrompt
+        {effectivePrompt}
         bind:maxTokens
         bind:maxContextTokens
         bind:cacheEnabled

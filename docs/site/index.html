@@ -336,17 +336,17 @@
 
   <!-- Inlined markdown content -->
   <script type="text/markdown" data-page="install">
-# Installation Guide
+# Guide d'installation
 
-Get WebMCP Auto-UI running locally in under 5 minutes.
+WebMCP Auto-UI en local en moins de 5 minutes.
 
-## Prerequisites
+## Prerequis
 
 - **Node.js 22+** (`node -v`)
 - **npm 10+** (`npm -v`)
-- An **Anthropic API key** (for LLM-powered chat features)
+- Une **cle API Anthropic** (pour les features LLM)
 
-## Clone and install
+## Cloner et installer
 
 ```bash
 git clone https://github.com/jeanbaptiste/webmcp-auto-ui.git
@@ -354,52 +354,57 @@ cd webmcp-auto-ui
 npm install
 ```
 
-`npm install` resolves all workspaces automatically (packages + apps).
+`npm install` resout tous les workspaces automatiquement (packages + apps).
 
-## Project structure
+## Structure du projet
 
 ```
 webmcp-auto-ui/
   packages/
-    core/       @webmcp-auto-ui/core   — W3C WebMCP polyfill + MCP client
-    sdk/        @webmcp-auto-ui/sdk    — HyperSkill format, skills registry, canvas store
-    agent/      @webmcp-auto-ui/agent  — LLM agent loop + Anthropic/Gemma LiteRT providers + UI tools
-    ui/         @webmcp-auto-ui/ui     — 34+ Svelte 5 components + agent UI widgets
+    core/       @webmcp-auto-ui/core   -- W3C WebMCP polyfill + MCP client
+    sdk/        @webmcp-auto-ui/sdk    -- HyperSkill format, skills registry, canvas store
+    agent/      @webmcp-auto-ui/agent  -- Agent loop + 4 providers + ToolLayers + recettes
+    ui/         @webmcp-auto-ui/ui     -- 34+ Svelte 5 components + agent UI widgets
   apps/
     home/       Landing page + app launcher
     flex/       Canvas drag & resize, multi-MCP, ephemeral chat
+    flex2/      Layers, component() unique, debug panel, mode composeur/consommateur
     todo/       Todo app demo (MCP-powered)
+    todo2/      Todo WebMCP, template minimal
     viewer/     HyperSkill URL viewer / renderer
+    viewer2/    Lecteur HyperSkills read-only avec CRUD, DAG, paste URI
     showcase/   Component showcase + WebMCP tool demos
+    showcase2/  Demo dynamique avec agent + MCP + 3 themes
+    recipes/    Explorateur de recettes MCP + WebMCP avec test live
 ```
 
-## Build packages
+## Builder les packages
 
-Packages must be built in dependency order:
+Les packages doivent etre buildes dans l'ordre de dependance :
 
 ```bash
-# 1. core (no deps)
+# 1. core (pas de deps)
 npm -w packages/core run build
 
-# 2. sdk (no package deps, but shares types)
+# 2. sdk (pas de deps package, partage des types)
 npm -w packages/sdk run build
 
-# 3. agent (depends on core)
+# 3. agent (depend de core)
 npm -w packages/agent run build
 
-# 4. ui (standalone, but build last for safety)
+# 4. ui (standalone, builder en dernier par securite)
 npm -w packages/ui run build
 ```
 
-## Run dev servers
+## Lancer les serveurs dev
 
-Run all apps at once:
+Toutes les apps v1 en parallele :
 
 ```bash
 npm run dev
 ```
 
-Or run a single app:
+Ou une app specifique :
 
 ```bash
 npm run dev:home
@@ -409,7 +414,17 @@ npm run dev:viewer
 npm run dev:showcase
 ```
 
-## Port mapping
+Pour les nouvelles apps (v2), lancer individuellement :
+
+```bash
+npm -w apps/flex2 run dev
+npm -w apps/viewer2 run dev
+npm -w apps/todo2 run dev
+npm -w apps/showcase2 run dev
+npm -w apps/recipes run dev
+```
+
+## Ports
 
 | App       | Port | URL                    |
 |-----------|------|------------------------|
@@ -419,55 +434,53 @@ npm run dev:showcase
 | showcase  | 5177 | http://localhost:5177   |
 | flex      | 5179 | http://localhost:5179   |
 
-## Environment variables
+Les apps v2 (flex2, viewer2, todo2, showcase2, recipes) sont assignees a des ports par Vite au lancement.
 
-| Variable           | Used by        | Purpose                                      |
-|--------------------|----------------|----------------------------------------------|
-| `ANTHROPIC_API_KEY`| flex, todo | Server-side proxy for Anthropic Claude API    |
-| `PUBLIC_BASE_URL`  | home           | Base URL for app links (default: localhost)    |
+## Variables d'environnement
 
-Set them in each app's `.env` file or export in your shell:
+| Variable           | Apps                    | Role                                          |
+|--------------------|-------------------------|-----------------------------------------------|
+| `ANTHROPIC_API_KEY`| flex, flex2, todo, todo2 | Proxy server-side pour l'API Anthropic Claude |
+| `PUBLIC_BASE_URL`  | home                    | Base URL pour les liens (default: localhost)   |
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-## Common issues
+## Problemes courants
 
 **`Cannot find module '@webmcp-auto-ui/core'`**
-Build core first: `npm -w packages/core run build`
+Builder core d'abord : `npm -w packages/core run build`
 
-**Port already in use**
-Kill the process on that port: `lsof -ti:5173 | xargs kill` or change the port in `vite.config.ts`.
+**Port deja utilise**
+`lsof -ti:5173 | xargs kill` ou changer le port dans `vite.config.ts`.
 
-**`ERR_MODULE_NOT_FOUND` on agent imports**
-The agent package uses `file:../core` as a dev dependency. Make sure core is built before running agent-dependent apps.
+**`ERR_MODULE_NOT_FOUND` sur les imports agent**
+Le package agent depend de core via `file:../core`. Builder core avant.
 
-**Svelte check errors in UI package**
-Run `npm -w packages/ui run check` to see detailed type diagnostics. Peer dependencies (`svelte`, `d3`, `leaflet`) must be installed at the root.
+**Svelte check errors dans le package UI**
+`npm -w packages/ui run check` pour les diagnostics. Les peer deps (`svelte`, `d3`, `leaflet`) doivent etre installees a la racine.
 
-## Deploying to production
+## Deployer en production
 
-Use the deploy script — it handles build order, correct deploy paths, and cleanup:
+Utiliser le script deploy -- il gere l'ordre de build, les chemins corrects, et le nettoyage :
 
 ```bash
-./scripts/deploy.sh              # deploy all apps
-./scripts/deploy.sh flex         # deploy one app
+./scripts/deploy.sh              # deployer toutes les apps
+./scripts/deploy.sh flex         # deployer une app
 ```
 
-See [Deploy Tutorial](tutorials/deploy.md) for full details.
+Voir le [tutoriel deploy](tutorials/deploy.md) pour les details.
 
-**Do NOT deploy manually with scp** — the deploy paths differ per app
-(flex deploys to root, viewer deploys to `build/`). The script
-knows the correct path for each app.
+**Ne JAMAIS deployer manuellement avec scp** -- les chemins de deploy different par app (flex = racine, viewer = `build/`).
 
   </script>
   <script type="text/markdown" data-page="architecture">
 # Architecture
 
-Monorepo structure, package dependencies, and key design decisions.
+Structure monorepo, dependances entre packages, et decisions de design (v0.7.0).
 
-## Monorepo layout
+## Structure monorepo
 
 ```
 webmcp-auto-ui/
@@ -475,7 +488,7 @@ webmcp-auto-ui/
  +-- packages/
  |    +-- core/          W3C WebMCP polyfill + MCP Streamable HTTP client
  |    +-- sdk/           HyperSkill format, skills CRUD, canvas store (Svelte 5)
- |    +-- agent/         LLM agent loop, Anthropic + Gemma providers, UI tools
+ |    +-- agent/         LLM agent loop, 4 providers, ToolLayers, recettes, component()
  |    +-- ui/            34+ Svelte 5 components (primitives, widgets, WM)
  |
  +-- apps/
@@ -484,12 +497,17 @@ webmcp-auto-ui/
  |    +-- viewer/        HyperSkill URL renderer (port 5176)
  |    +-- showcase/      Component showcase + WebMCP tool demos (port 5177)
  |    +-- flex/          Canvas drag & resize, multi-MCP, chat (port 5179)
+ |    +-- flex2/         Layers, component() unique, debug panel, mode composeur/consommateur
+ |    +-- viewer2/       Lecteur HyperSkills read-only avec CRUD, DAG, paste URI
+ |    +-- showcase2/     Demo dynamique avec agent + MCP + 3 themes
+ |    +-- todo2/         Todo WebMCP, template minimal
+ |    +-- recipes/       Explorateur de recettes MCP + WebMCP avec test live
  |
  +-- docs/               Documentation
  +-- package.json        Root workspace config
 ```
 
-## Package dependency graph
+## Graphe de dependances
 
 ```
                 +----------+
@@ -505,67 +523,128 @@ webmcp-auto-ui/
          (Svelte 5 runes)
 
          +---------+
-         |   ui    |  (standalone — no internal deps)
+         |   ui    |  (standalone -- pas de deps internes)
          +---------+
 ```
 
-- **core** has zero external dependencies. Pure TypeScript.
-- **sdk** depends on Svelte 5 (peer) for the canvas store. Also provides a vanilla (framework-agnostic) canvas store at `@webmcp-auto-ui/sdk/canvas-vanilla`. Ships `MCP_DEMO_SERVERS` registry. No dependency on core.
-- **agent** depends on core (`@webmcp-auto-ui/core`) for `McpClient`, `McpMultiClient`, `sanitizeSchema`, and types. Uses `@mediapipe/tasks-genai` for Gemma LiteRT (replaces `@huggingface/transformers` ONNX).
-- **ui** is standalone. Peer dependencies: `svelte ^5`, `d3 ^7`, `leaflet >=1.9`.
+- **core** : zero dependances externes. TypeScript pur.
+- **sdk** : depend de Svelte 5 (peer) pour le canvas store. Fournit aussi un store vanilla a `@webmcp-auto-ui/sdk/canvas-vanilla`. Shippe `MCP_DEMO_SERVERS`.
+- **agent** : depend de core (`McpClient`, `sanitizeSchema`, types). 4 providers LLM. ToolLayers. Recettes. ComponentAdapter.
+- **ui** : standalone. Peer deps : `svelte ^5`, `d3 ^7`, `leaflet >=1.9`.
 
-## App descriptions
+## Les 3 couches (v0.7.0)
 
-| App | Purpose |
-|-----|---------|
-| **home** | Landing page with links to all other apps. Configurable via `PUBLIC_BASE_URL`. |
-| **flex** | Canvas drag & resize, multi-MCP, ephemeral chat, HyperSkills export, Gemma WASM local. The most complete demo. |
-| **todo** | Minimal todo app demonstrating MCP tool integration for CRUD operations. |
-| **viewer** | Decodes a HyperSkill URL (`?hs=...`) and renders the embedded skill read-only. |
-| **showcase** | Interactive catalog of all UI components. Also demonstrates WebMCP tool registration and postMessage bridge. |
+L'architecture v0.7.0 structure les outils en 3 couches via les `ToolLayer[]` :
 
-## Technology stack
+```
++--------------------------------------------------+
+|                    ToolLayer[]                     |
+|                                                    |
+|  +-- McpLayer (par serveur) ---+  +-- UILayer --+ |
+|  |  tools: MCP tools           |  | component() | |
+|  |  recipes: MCP recipes       |  | adapter?    | |
+|  |  serverName, serverUrl      |  | recipes: UI | |
+|  +-----------------------------+  +-------------+ |
++--------------------------------------------------+
+         |                               |
+    buildSystemPrompt()          buildToolsFromLayers()
+         |                               |
+    Prompt structure:            AnthropicTool[]:
+    ## mcp (servers)             - MCP tools
+    ## webmcp                    - component() (smart)
+                                 - ou render_* (explicit)
+```
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | SvelteKit (apps), Svelte 5 (components) |
+### McpLayer
+
+Un par serveur MCP connecte. Porte les outils DATA (query, fetch) et les recettes serveur (ce que les outils retournent).
+
+### UILayer
+
+Un seul par app. Porte `component()`, le `ComponentAdapter` optionnel (pour filtrer les composants en mode explicit), et les recettes WebMCP (comment presenter les donnees).
+
+### Recettes
+
+Deux types de recettes cohabitent :
+
+| Type | Source | Role | Section prompt |
+|------|--------|------|---------------|
+| **Recette MCP** | Serveur (`list_recipes`) | Decrit les donnees retournees | `## mcp > recettes serveur` |
+| **Recette WebMCP** | Package agent (fichiers .md) | Guide la presentation UI | `## webmcp > recettes UI` |
+
+## Description des apps
+
+| App | Description |
+|-----|------------|
+| **home** | Landing page avec liens vers toutes les apps. Configurable via `PUBLIC_BASE_URL`. |
+| **flex** | Canvas drag & resize, multi-MCP, ephemeral chat, HyperSkills export, Gemma WASM. |
+| **flex2** | Version layers : component() unique, debug panel, badges provenance, mode composeur/consommateur, panneau recettes, agent logs. |
+| **todo** | Todo app demontrant l'integration MCP CRUD. |
+| **todo2** | Todo WebMCP, template minimal avec la nouvelle architecture layers. |
+| **viewer** | Decode une HyperSkill URL (`?hs=...`) et rend le skill en read-only. |
+| **viewer2** | Lecteur HyperSkills read-only avec CRUD, DAG de versions, paste URI. |
+| **showcase** | Catalogue interactif des composants UI + demo WebMCP tools. |
+| **showcase2** | Demo dynamique avec agent + MCP + 3 themes. |
+| **recipes** | Explorateur de recettes MCP + WebMCP avec test live. |
+
+## Stack technique
+
+| Couche | Technologie |
+|--------|-----------|
+| Framework | SvelteKit (apps), Svelte 5 (composants) |
 | Styling | Tailwind CSS 4 + CSS variables theming |
 | UI base | bits-ui (shadcn-svelte pattern), tailwind-variants |
 | Charting | D3.js v7 (Chart, Sankey, Hemicycle, D3Widget) |
 | Maps | Leaflet (MapView) |
-| LLM | Anthropic Claude API (via server proxy), Gemma 4 LiteRT (in-browser, main thread, OPFS cache) |
+| LLM | Anthropic Claude API (via server proxy), Gemma 4 LiteRT (in-browser, OPFS), Ollama/Llamafile (local) |
 | Protocol | MCP Streamable HTTP (JSON-RPC 2.0) |
 | Build | TypeScript, svelte-package, Vite |
 
-## Key design decisions
+## Decisions de design
+
+### ToolLayers (v0.7.0)
+
+Les outils ne sont plus passes en tableau plat (`mcpTools[]`). Ils sont structures en couches typees (`McpLayer`, `UILayer`) qui portent chacune leurs outils et recettes. `buildSystemPrompt()` et `buildToolsFromLayers()` consomment ces layers pour produire le prompt et les outils.
+
+### Mode smart vs explicit
+
+Le mode `smart` (defaut) n'expose qu'un seul tool `component()` au LLM. Le LLM decouvre les composants via `component("help")` et les rend via `component("nom", {params})`. Cela economise ~2800 tokens de schema par rapport au mode `explicit` (31 render_* individuels).
+
+### Recettes WebMCP
+
+Les recettes sont des fichiers `.md` avec frontmatter YAML. Elles guident le LLM sur le choix des composants en fonction des donnees retournees par le serveur MCP. Le parser est tolerant : il accepte aussi les fichiers sans frontmatter (freeform).
+
+### ComponentAdapter
+
+Decouple les definitions d'outils (ce que le LLM voit) des renderers (ce que l'utilisateur voit). Les apps enregistrent uniquement les composants dont elles ont besoin via des presets (`minimalPreset`, `nativePreset`, `allNativePreset`).
 
 ### CSS variables theming
 
-Theme tokens (colors, radii, fonts) are defined as CSS custom properties in `ThemeProvider`. Two built-in modes (`light`, `dark`) with full override support via `theme.json` or the canvas store's `themeOverrides`. Components read tokens from CSS variables, making theming work without recompilation.
+Tokens (couleurs, radii, fonts) en CSS custom properties dans `ThemeProvider`. Deux modes built-in (`light`, `dark`) avec override complet via `theme.json` ou le canvas store.
 
 ### FONC message bus
 
-Components never call each other directly. The `bus` singleton implements Alan Kay's "messaging not calling" principle: components register on named channels and exchange `BusMessage` objects. This decouples senders from receivers and enables composition without tight coupling.
+Les composants ne s'appellent jamais directement. Le bus `bus` singleton implemente le principe "messaging not calling" d'Alan Kay.
 
 ### BlockRenderer dispatch
 
-`BlockRenderer` is a single Svelte component that takes a `{ type, data }` block and dispatches rendering to the correct widget. The agent loop emits blocks via callbacks; the canvas store holds them; `BlockRenderer` renders them. This creates a clean pipeline: **LLM -> tool call -> block -> store -> renderer**.
+`BlockRenderer` recoit `{ type, data }` et dispatche vers le widget. Pipeline : **LLM -> tool call -> block -> store -> renderer**.
 
 ### HyperSkill URL format
 
-A skill (blocks + MCP URL + LLM choice + theme) is serialized to JSON, base64-encoded, and appended as `?hs=...` query parameter. Skills larger than 6KB are gzip-compressed (prefix `gz.`). Each version carries a SHA-256 hash for traceability and chaining.
+Skill serialisee en JSON -> base64 -> `?hs=`. Gzip au-dela de 6KB. SHA-256 pour tracabilite.
 
 ### LiteRT migration (v0.5.0)
 
-The Gemma WASM provider was migrated from ONNX (`@huggingface/transformers` running in a Web Worker) to LiteRT (`@mediapipe/tasks-genai` running on the main thread). LiteRT is 2-4x faster on WebGPU and provides native Gemma 4 support with the new `<|turn>...<turn|>` prompt format and `<|tool_call>call:name{args}<tool_call|>` tool call parsing. The provider runs on the main thread because MediaPipe is incompatible with ES module workers. Models are cached in OPFS (Origin Private File System) for instant reload after first download.
+Le provider Gemma WASM a migre de ONNX (`@huggingface/transformers` + Web Worker) a LiteRT (`@mediapipe/tasks-genai` main thread). 2-4x plus rapide sur WebGPU. Cache OPFS.
 
 ### Vanilla canvas store
 
-In addition to the Svelte 5 runes-based canvas store (`@webmcp-auto-ui/sdk/canvas`), a framework-agnostic vanilla store is available at `@webmcp-auto-ui/sdk/canvas-vanilla`. Same API but uses plain callbacks instead of Svelte runes, enabling integration with React, Vue, or vanilla JS.
+En plus du store Svelte 5 runes (`@webmcp-auto-ui/sdk/canvas`), un store vanilla framework-agnostic a `@webmcp-auto-ui/sdk/canvas-vanilla` pour React/Vue/vanilla.
 
 ### Agent loop architecture
 
-The agent loop (`runAgentLoop`) runs an iterative LLM -> tool call -> LLM cycle. UI tools (`render_*`) are executed locally via callbacks (no MCP roundtrip). Data tools are forwarded to the MCP server via `McpClient.callTool()`. The loop stops on `end_turn` or `max_iterations`.
+`runAgentLoop` accepte soit `layers` (nouvelle API) soit `mcpTools` (legacy). Les UI tools sont executes localement via callbacks. Les DATA tools sont forwards au serveur MCP via `McpClient.callTool()`. Arret sur `end_turn` ou `max_iterations`.
 
   </script>
   <script type="text/markdown" data-page="core">
@@ -1297,75 +1376,83 @@ Used by the `RemoteMCPserversDemo` component in `@webmcp-auto-ui/ui`.
   <script type="text/markdown" data-page="agent">
 # @webmcp-auto-ui/agent
 
-LLM agent loop with Anthropic and Gemma LiteRT providers, plus 22 UI tools for rendering blocks, a unified `component()` tool exposing 56 components, TokenTracker, and summarizeChat.
+Boucle agent LLM avec providers Anthropic, Gemma LiteRT et locaux (Ollama/Llamafile), ToolLayers structurés, recettes WebMCP, `component()` unifié (56 composants), TokenTracker et summarizeChat.
 
-## What it does
+## Ce que fait le package
 
-- Runs an iterative LLM agent loop: prompt -> tool calls -> LLM -> repeat until done
-- Provides two LLM providers: `AnthropicProvider` (cloud, with retry on 503) and `GemmaProvider` (in-browser via LiteRT/MediaPipe on the main thread)
-- Supports Gemma 4 prompt format (`<|turn>...<turn|>`) and native tool call parsing (`<|tool_call>call:name{args}<tool_call|>`)
-- Defines 22 `render_*` UI tools that the LLM calls to compose visual blocks on the canvas
-- Bridges MCP server tools and UI tools into a unified tool set for the LLM
-- Tracks real-time usage metrics via `TokenTracker` (tok/s, totalTokens, latencyMs)
-- Generates anonymized chat summaries via `summarizeChat()` for HyperSkill exports
-- Supports per-request `temperature`, `topK`, `maxTokens` configuration
-- Clips long prompts via `sizeInTokens()` estimation
+- Boucle agent itérative : prompt -> tool calls -> LLM -> repeat jusqu'à `end_turn`
+- **ToolLayers** : structuration des outils en couches `McpLayer` (données) et `UILayer` (affichage)
+- **Mode smart/explicit** : `toolMode: 'smart'` = 1 seul tool `component()`, `'explicit'` = 31 `render_*`
+- **Recettes WebMCP** : fichiers `.md` avec frontmatter, parsées et injectées dans le prompt
+- **ComponentAdapter** : filtrage/personnalisation des composants UI exposés au LLM
+- 4 providers LLM : `RemoteLLMProvider`, `WasmProvider`, `LocalLLMProvider`, + legacy `AnthropicProvider`/`GemmaProvider`
+- TokenTracker temps réel + summarizeChat pour la provenance HyperSkill
 
 ## Providers
 
-### AnthropicProvider
+### RemoteLLMProvider (nouveau)
 
-Calls the Anthropic Claude API through a server-side proxy (SvelteKit `+server.ts`). Retries on 503 with exponential backoff.
-
-```ts
-import { AnthropicProvider } from '@webmcp-auto-ui/agent';
-
-const provider = new AnthropicProvider({
-  proxyUrl: '/api/chat',          // your SvelteKit proxy endpoint
-  model: 'claude-haiku-4-5-20251001',  // optional, defaults to Haiku
-  apiKey: 'sk-ant-...',          // optional, injected as __apiKey in body
-});
-
-// Switch model at runtime
-provider.setModel('claude-sonnet');
-```
-
-Built-in model mapping:
-
-| ModelId | Anthropic model |
-|---------|----------------|
-| `claude-haiku` | `claude-haiku-4-5-20251001` |
-| `claude-sonnet` | `claude-sonnet-4-6` |
-
-### GemmaProvider (LiteRT)
-
-Runs Gemma 4 locally on the main thread via `@mediapipe/tasks-genai` (LiteRT). No API key needed. Uses WebGPU when available. Models are cached in OPFS after first download for instant subsequent loads.
-
-> **v0.5.0 migration**: Migrated from ONNX (`@huggingface/transformers` with Web Worker) to LiteRT (`@mediapipe/tasks-genai` on main thread). LiteRT is 2-4x faster on WebGPU. The provider runs on the main thread because MediaPipe is incompatible with ES module workers.
+Provider unifié pour les API cloud (Anthropic et compatibles). Remplace `AnthropicProvider` (qui reste disponible en alias).
 
 ```ts
-import { GemmaProvider } from '@webmcp-auto-ui/agent';
+import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
 
-const provider = new GemmaProvider({
-  model: 'gemma-e2b',
-  onProgress: (pct, status, loaded, total) => console.log(`${pct}% — ${status}`),
-  onStatusChange: (status) => console.log('Status:', status),
-  // status: 'idle' | 'loading' | 'ready' | 'error'
+const provider = new RemoteLLMProvider({
+  proxyUrl: '/api/chat',
+  model: 'haiku',          // 'haiku' | 'sonnet' | 'opus' | string
+  apiKey: 'sk-ant-...',    // optionnel
 });
 ```
 
-**Gemma 4 prompt format**: Uses `<|turn>...<turn|>` delimiters (instead of Gemma 2/3 `<start_of_turn>...<end_of_turn>`).
+### WasmProvider (nouveau)
 
-**Native tool calling**: Tool calls are parsed from `<|tool_call>call:name{args}<tool_call|>` format.
+Provider unifié pour les modèles WASM in-browser. Remplace `GemmaProvider` (qui reste disponible en alias).
+
+```ts
+import { WasmProvider } from '@webmcp-auto-ui/agent';
+
+const provider = new WasmProvider({
+  model: 'gemma-e2b',      // 'gemma-e2b' | 'gemma-e4b' | string
+  onProgress: (pct, status, loaded, total) => console.log(`${pct}%`),
+  onStatusChange: (status) => console.log(status),
+});
+```
+
+Tourne sur le main thread via `@mediapipe/tasks-genai` (LiteRT). WebGPU si disponible. Cache OPFS.
+
+### LocalLLMProvider (nouveau)
+
+Provider pour les LLM locaux via API OpenAI-compatible (Ollama, Llamafile, LM Studio).
+
+```ts
+import { LocalLLMProvider } from '@webmcp-auto-ui/agent';
+
+const provider = new LocalLLMProvider({
+  baseUrl: 'http://localhost:11434',  // Ollama
+  model: 'llama3.2',
+  backend: 'ollama',                  // 'ollama' | 'llamafile' | 'lm-studio' | string
+});
+```
+
+### createProvider (factory)
+
+Crée un provider à partir d'un objet de configuration :
+
+```ts
+import { createProvider, type LLMConfig } from '@webmcp-auto-ui/agent';
+
+const config: LLMConfig = { type: 'remote', model: 'sonnet', proxyUrl: '/api/chat' };
+const provider = createProvider(config);
+```
+
+Types de config : `{ type: 'remote' }`, `{ type: 'wasm' }`, `{ type: 'local' }`.
 
 ### LLMProvider interface
-
-Both providers implement:
 
 ```ts
 interface LLMProvider {
   readonly name: string;
-  readonly model: ModelId;
+  readonly model: string;
   chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
@@ -1376,93 +1463,145 @@ interface LLMProvider {
       temperature?: number;
       topK?: number;
       maxTokens?: number;
+      onToken?: (token: string) => void;
     }
   ): Promise<LLMResponse>;
 }
 ```
 
-`LLMResponse` includes stats: `tokPerSec`, `totalTokens`, `latencyMs` for real-time performance monitoring.
-
 ### TokenTracker
-
-Tracks real-time usage metrics across multiple requests:
 
 ```ts
 import { TokenTracker } from '@webmcp-auto-ui/agent';
 
 const tracker = new TokenTracker();
 tracker.record({ inputTokens: 500, outputTokens: 120, cached: 400, latencyMs: 850 });
-
 console.log(tracker.stats);
 // { reqPerMin, inputPerMin, outputPerMin, cachedPerMin, totalRequests, totalInput, totalOutput }
 ```
 
-Used by the `TokenBubble` UI component for live dashboard metrics.
-
 ### summarizeChat
-
-Generates an anonymized summary of a chat conversation for HyperSkill export provenance:
 
 ```ts
 import { summarizeChat } from '@webmcp-auto-ui/agent';
 
 const summary = summarizeChat(messages);
-// Short text summary without PII or raw message content
+// Résumé anonymisé sans PII pour la provenance HyperSkill
 ```
 
-### Prompt clipping
+## ToolLayers
+
+Les ToolLayers structurent les outils en couches typées. C'est la nouvelle API (v0.7.0) qui remplace le passage plat de `mcpTools[]`.
+
+### Types
 
 ```ts
-import { sizeInTokens } from '@webmcp-auto-ui/agent';
+/** Couche MCP — outils et recettes d'un serveur connecté */
+interface McpLayer {
+  source: 'mcp';
+  serverUrl: string;
+  serverName?: string;
+  tools: McpToolDef[];
+  recipes?: McpRecipe[];
+}
 
-const tokens = sizeInTokens(longPrompt);  // estimated token count
+/** Couche UI — component() + recettes WebMCP */
+interface UILayer {
+  source: 'ui';
+  adapter?: ComponentAdapter;  // filtrage des composants (mode explicit uniquement)
+  recipes?: Recipe[];
+}
+
+type ToolLayer = McpLayer | UILayer;
 ```
 
-Used internally to clip prompts that exceed the model's context window.
+### buildToolsFromLayers
+
+Convertit les layers en `AnthropicTool[]` envoyés au LLM :
+
+```ts
+import { buildToolsFromLayers } from '@webmcp-auto-ui/agent';
+
+const tools = buildToolsFromLayers(layers, 'smart');
+// Mode smart : tools MCP + 1 seul tool component()
+// Mode explicit : tools MCP + 31 render_* + component()
+```
+
+### buildSystemPrompt
+
+Génère le prompt système structuré en sections markdown `## mcp` et `## webmcp` :
+
+```ts
+import { buildSystemPrompt } from '@webmcp-auto-ui/agent';
+
+// Nouvelle API — depuis les layers
+const prompt = buildSystemPrompt(layers, { toolMode: 'smart' });
+
+// Legacy — depuis un tableau plat de McpToolDef[]
+const prompt2 = buildSystemPrompt(mcpTools);
+```
+
+Le prompt généré contient :
+- `## mcp (serverName)` — liste des outils DATA + recettes serveur
+- `## webmcp` — instructions pour `component()` (mode smart) ou liste des `render_*` (mode explicit) + recettes UI
+
+## Mode smart vs explicit
+
+| | Smart (defaut) | Explicit |
+|--|---------------|----------|
+| **Outils UI** | 1 seul : `component()` | 31 `render_*` + `component()` |
+| **Discovery** | `component("help")` pour lister | Le LLM voit tous les tools |
+| **Tokens** | Economique (~200 tokens schema) | Couteux (~3000 tokens) |
+| **Recommandation** | Cloud (Claude) | WASM (Gemma) ou debug |
+
+En mode smart, le LLM appelle `component("help")` pour decouvrir les composants disponibles, puis `component("nom", {params})` pour rendre.
 
 ## Agent loop
 
-```ts
-import { runAgentLoop, buildSystemPrompt, mcpToolsToAnthropic, fromMcpTools } from '@webmcp-auto-ui/agent';
-```
-
 ### runAgentLoop
 
-Runs the LLM -> tool call -> LLM cycle until `end_turn` or `maxIterations`.
-
 ```ts
-const result = await runAgentLoop('Show me revenue by quarter', {
+import { runAgentLoop } from '@webmcp-auto-ui/agent';
+
+const result = await runAgentLoop('Montre-moi le CA par trimestre', {
   provider,
-  client: mcpClient,         // optional McpClient instance
-  mcpTools: tools,           // tools from client.listTools()
-  maxIterations: 10,         // default: 10
-  cacheEnabled: true,        // enable prompt caching
-  systemPrompt: customPrompt, // override the default system prompt
-  signal: abortController.signal,
+  layers: [mcpLayer, uiLayer],   // nouvelle API
+  toolMode: 'smart',
+  maxIterations: 5,
+  cacheEnabled: true,
+  initialMessages: history,       // historique conversation
   callbacks: {
     onBlock: (type, data) => canvas.addBlock(type, data),
     onText: (text) => console.log('LLM:', text),
-    onToolCall: (call) => console.log('Tool:', call.name, call.result),
-    onClear: () => canvas.clearBlocks(),
+    onToolCall: (call) => console.log('Tool:', call.name),
+    onToken: (token) => process.stdout.write(token),
   },
+  signal: abortController.signal,
 });
 
-console.log(result.text);           // final LLM text
-console.log(result.toolCalls);      // all tool calls made
-console.log(result.metrics);        // token usage, latency, iterations
-console.log(result.stopReason);     // 'end_turn' | 'max_iterations' | 'error'
+console.log(result.text);
+console.log(result.toolCalls);
+console.log(result.metrics);
+console.log(result.stopReason);  // 'end_turn' | 'max_iterations' | 'error'
+console.log(result.messages);    // conversation complete pour reprise
 ```
 
 ### AgentLoopOptions
 
 ```ts
 interface AgentLoopOptions {
-  client?: McpClient;
   provider: LLMProvider;
-  mcpTools?: McpToolDef[];
-  maxIterations?: number;
+  client?: McpClient;
+  mcpTools?: McpToolDef[];       // legacy — prefer layers
+  layers?: ToolLayer[];          // nouvelle API
+  toolMode?: 'smart' | 'explicit';
+  maxIterations?: number;        // default: 5
+  maxTokens?: number;
+  temperature?: number;
+  topK?: number;
   cacheEnabled?: boolean;
-  systemPrompt?: string;
+  systemPrompt?: string;         // override le prompt auto-genere
+  initialMessages?: ChatMessage[];
   callbacks?: AgentCallbacks;
   signal?: AbortSignal;
 }
@@ -1472,240 +1611,361 @@ interface AgentLoopOptions {
 
 ```ts
 interface AgentCallbacks {
-  onBlock?: (type: string, data: Record<string, unknown>) => void;
-  onText?: (text: string) => void;
+  onIterationStart?: (iteration: number, maxIterations: number) => void;
+  onLLMRequest?: (messages: ChatMessage[], tools: AnthropicTool[]) => void;
+  onLLMResponse?: (response: LLMResponse, latencyMs: number, tokens?: { input: number; output: number }) => void;
   onToolCall?: (call: ToolCall) => void;
+  onBlock?: (type: string, data: Record<string, unknown>) => { id: string } | void;
   onClear?: () => void;
+  onText?: (text: string) => void;
+  onToken?: (token: string) => void;
+  onDone?: (metrics: AgentMetrics) => void;
+  onUpdate?: (id: string, data: Record<string, unknown>) => void;
+  onMove?: (id: string, x: number, y: number) => void;
+  onResize?: (id: string, w: number, h: number) => void;
+  onStyle?: (id: string, styles: Record<string, string>) => void;
 }
 ```
 
-### AgentResult
+### trimConversationHistory
+
+Tronque l'historique pour respecter un budget de tokens :
 
 ```ts
-interface AgentResult {
-  text: string;
-  toolCalls: ToolCall[];
-  metrics: AgentMetrics;
-  stopReason: 'end_turn' | 'max_iterations' | 'error';
-}
+import { trimConversationHistory } from '@webmcp-auto-ui/agent';
 
-interface AgentMetrics {
-  totalTokens: number;
-  promptTokens: number;
-  completionTokens: number;
-  totalLatencyMs: number;
-  toolCalls: number;
-  iterations: number;
-  cacheHits: number;
-}
+const trimmed = trimConversationHistory(messages, 4096);
+// Supprime les paires user/assistant les plus anciennes en preservant les system messages
 ```
 
-### Helper functions
+### Helpers
 
-**`buildSystemPrompt(mcpTools)`** — Generates the default system prompt listing all DATA and UI tools available to the LLM.
+- **`mcpToolsToAnthropic(tools)`** — Convertit `McpToolDef[]` en `AnthropicTool[]`
+- **`fromMcpTools(mcpTools)`** — Convertit `McpTool[]` (from core) en `McpToolDef[]`
 
-**`mcpToolsToAnthropic(tools)`** — Converts MCP tool definitions to Anthropic API format (sanitizes schemas).
+## Outils UI
 
-**`fromMcpTools(mcpTools)`** — Alias/helper for converting MCP tools for use in the agent loop.
-
-## UI tools
-
-22 render tools + 1 canvas action, exposed to the LLM. Each `render_*` tool maps to a block type in `@webmcp-auto-ui/ui`.
+22 tools render + actions canvas. Chaque `render_*` mappe vers un block type dans `@webmcp-auto-ui/ui`.
 
 ```ts
 import { UI_TOOLS, isUITool, executeUITool } from '@webmcp-auto-ui/agent';
 ```
 
-### Tool list
+| Tool | Block type |
+|------|-----------|
+| `render_stat` | `stat` |
+| `render_kv` | `kv` |
+| `render_list` | `list` |
+| `render_chart` | `chart` |
+| `render_alert` | `alert` |
+| `render_code` | `code` |
+| `render_text` | `text` |
+| `render_actions` | `actions` |
+| `render_tags` | `tags` |
+| `render_table` | `data-table` |
+| `render_timeline` | `timeline` |
+| `render_profile` | `profile` |
+| `render_trombinoscope` | `trombinoscope` |
+| `render_json` | `json-viewer` |
+| `render_hemicycle` | `hemicycle` |
+| `render_chart_rich` | `chart-rich` |
+| `render_cards` | `cards` |
+| `render_sankey` | `sankey` |
+| `render_log` | `log` |
+| `render_gallery` | `gallery` |
+| `render_carousel` | `carousel` |
+| `render_d3` | `d3` |
+| `clear_canvas` | (action) |
 
-#### Simple blocks
+## component() unifie
 
-| Tool | Block type | Required params |
-|------|-----------|-----------------|
-| `render_stat` | `stat` | `label`, `value` |
-| `render_kv` | `kv` | `rows` (array of `[key, value]`) |
-| `render_list` | `list` | `items` (string array) |
-| `render_chart` | `chart` | `bars` (array of `[label, number]`) |
-| `render_alert` | `alert` | `title` |
-| `render_code` | `code` | `content` |
-| `render_text` | `text` | `content` |
-| `render_actions` | `actions` | `buttons` (array of `{ label, primary? }`) |
-| `render_tags` | `tags` | `tags` (array of `{ text, active? }`) |
-
-#### Rich widgets
-
-| Tool | Block type | Required params |
-|------|-----------|-----------------|
-| `render_table` | `data-table` | `rows` |
-| `render_timeline` | `timeline` | `events` (array of `{ title, date?, status? }`) |
-| `render_profile` | `profile` | `name` |
-| `render_trombinoscope` | `trombinoscope` | `people` (array of `{ name, subtitle?, badge? }`) |
-| `render_json` | `json-viewer` | `data` (any JSON) |
-| `render_hemicycle` | `hemicycle` | `groups` (array of `{ id, label, seats, color }`) |
-| `render_chart_rich` | `chart-rich` | `data` (array of `{ values, label?, color? }`) |
-| `render_cards` | `cards` | `cards` (array of `{ title, description? }`) |
-| `render_sankey` | `sankey` | `nodes`, `links` |
-| `render_log` | `log` | `entries` (array of `{ message, level?, timestamp? }`) |
-| `render_gallery` | `gallery` | `images` (array of `{ src, alt?, caption? }`) |
-| `render_carousel` | `carousel` | `slides` |
-| `render_d3` | `d3` | `preset`, `data` |
-
-#### Canvas actions
-
-| Tool | Description |
-|------|-------------|
-| `clear_canvas` | Clears all blocks from the canvas |
-
-### Checking and executing UI tools
-
-```ts
-if (isUITool('render_stat')) {
-  const result = executeUITool('render_stat', { label: 'Users', value: '42' }, {
-    onBlock: (type, data) => canvas.addBlock(type, data),
-  });
-  // result: "Rendered stat block"
-}
-```
-
-## Unified `component()` tool
-
-In addition to the individual `render_*` tools, the agent package provides a single unified `component()` tool that exposes **56 components** (31 renderable, 25 non-renderable) through a consistent interface.
-
-This approach was inspired by [Emmanuel Raviart](https://www.tricoteuses.fr/mcp), creator of the Tricoteuses MCP server, who suggested consolidating the tool surface into a single discoverable entry point.
+Tool unique qui expose 56 composants (31 renderable, 25 non-renderable). En mode smart, c'est le seul outil UI visible par le LLM.
 
 ```ts
 import { COMPONENT_TOOL, executeComponent, componentRegistry } from '@webmcp-auto-ui/agent';
 ```
 
-### Three modes
+### Trois modes d'appel
 
-| Mode | Call | Returns |
-|------|------|---------|
-| **List all** | `component("help")` | Array of all 56 components with name, description, and `renderable` flag |
-| **Inspect one** | `component("help", "stat-card")` | Schema, description, and renderability of a single component |
-| **Render** | `component("stat-card", { label: "Revenue", value: "
+| Appel | Retour |
+|-------|--------|
+| `component("help")` | Liste des 56 composants avec nom, description, flag `renderable` |
+| `component("help", "stat-card")` | Schema + description + renderability d'un composant |
+| `component("stat-card", { label: "Revenue", value: "
   <script>
-42K" })` | Renders the component (renderable ones only) |
+42K" })` | Rend le composant |
 
-### Component categories
+Les noms utilisent des tirets (`stat-card`). Les noms `render_*` sont acceptes en backward compat.
 
-- **Renderable (31)** -- all `render_*` block types plus canvas actions (`clear`, `update`, `move`, `resize`, `style`). These can be rendered through the agent tool pipeline via `executeComponent`.
-- **Non-renderable (25)** -- primitives, base UI components, layouts, agent UI widgets, and theme provider. These are Svelte components available for direct import from `@webmcp-auto-ui/ui`. Calling render on them returns their schema and a usage hint.
-
-Component names use dashes (e.g., `stat-card`). The original `render_*` names are also accepted for backward compatibility.
-
-### Coexistence with `render_*` tools
-
-Both approaches work simultaneously. The individual `render_*` tools remain available and fully functional. The `component()` tool is an additional entry point that provides discoverability (via `help` mode) and a uniform interface.
-
-### Custom components
-
-The `componentRegistry` is a mutable `Map<string, ComponentEntry>`. Apps can register additional components at runtime:
+### Composants custom
 
 ```ts
-import { componentRegistry, type ComponentEntry } from '@webmcp-auto-ui/agent';
-
 componentRegistry.set('my-widget', {
   name: 'my-widget',
   toolName: 'my-widget',
-  description: 'Custom widget for my app.',
+  description: 'Widget custom.',
   inputSchema: { type: 'object', properties: { title: { type: 'string' } } },
   renderable: false,
 });
 ```
 
-For the full list of all 56 components and their schemas, see [composing.md](../agents/composing.md#unified-component-tool).
+## ComponentAdapter
 
-## Workflow
+Filtre et personnalise les composants UI exposes au LLM. Utile en mode explicit pour limiter les tools envoyes.
 
-The standard agent workflow:
+```ts
+import { ComponentAdapter, nativePreset, allNativePreset, minimalPreset } from '@webmcp-auto-ui/agent';
 
-1. User sends a message
-2. `buildSystemPrompt` lists available DATA tools (from MCP) and UI tools
-3. `runAgentLoop` sends the message + tools to the LLM
-4. LLM calls a DATA tool (e.g., `query_sql`) -> forwarded to MCP server via `McpClient`
-5. LLM receives data, calls a UI tool (e.g., `render_chart`) -> executed locally via callbacks
-6. Block appears on the canvas via `onBlock` callback
-7. Loop continues until LLM sends `end_turn`
+// Preset minimal : stat, kv, chart, table, text + clear, update
+const adapter = new ComponentAdapter();
+adapter.registerAll(minimalPreset());
+
+// Preset complet
+adapter.registerAll(allNativePreset());
+
+// Preset par groupes
+adapter.registerAll(nativePreset('simple', 'rich', 'canvas'));
+
+// Utilisation dans un UILayer
+const uiLayer: UILayer = { source: 'ui', adapter, recipes: myRecipes };
+```
+
+### Groupes disponibles
+
+| Groupe | Composants |
+|--------|-----------|
+| `simple` | stat, kv, list, chart, alert, code, text, actions, tags |
+| `rich` | table, timeline, profile, trombinoscope, json, hemicycle, chart-rich, cards, sankey, log, stat-card, grid |
+| `media` | gallery, carousel, map |
+| `advanced` | d3, js-sandbox |
+| `canvas` | clear, update, move, resize, style |
+
+### API
+
+```ts
+class ComponentAdapter {
+  register(def: ComponentDef): this;
+  registerAll(defs: ComponentDef[]): this;
+  unregister(type: string): this;
+  tools(): AnthropicTool[];         // definitions a envoyer au LLM
+  types(): string[];
+  get(type: string): ComponentDef | undefined;
+  getRenderer(type: string): unknown | undefined;
+  byGroup(group: string): ComponentDef[];
+  get size(): number;
+}
+```
+
+## Recettes WebMCP
+
+Les recettes guident le LLM sur comment presenter les donnees. Ce sont des fichiers `.md` avec un frontmatter YAML.
+
+### Format d'une recette
+
+```markdown
+---
+id: composer-tableau-de-bord-kpi
+name: Composer un tableau de bord KPI
+components_used: [stat-card, chart, table, kv]
+when: les donnees contiennent des metriques numeriques
+servers: []
+layout:
+  type: grid
+  columns: 3
+---
+
+## Quand utiliser
+Les resultats MCP contiennent des metriques numeriques...
+
+## Comment
+1. Identifier les 3-5 KPIs principaux
+2. Afficher chaque KPI en stat-card
+3. Ajouter un chart pour les series temporelles
+```
+
+### Types
+
+```ts
+interface Recipe {
+  id: string;
+  name: string;
+  description?: string;
+  components_used?: string[];
+  layout?: { type: string; columns?: number; arrangement?: string };
+  when: string;
+  servers?: string[];
+  body: string;
+}
+
+interface McpRecipe {
+  name: string;
+  description?: string;
+}
+```
+
+### API
+
+```ts
+import {
+  WEBMCP_RECIPES,        // recettes built-in parsees
+  parseRecipe,            // parser une recette .md brute
+  parseRecipes,           // parser un lot de recettes
+  recipeRegistry,         // registre singleton (read-only)
+  registerRecipes,        // populer le registre
+  filterRecipesByServer,  // filtrer par nom de serveur connecte
+  formatRecipesForPrompt, // formater pour injection dans le prompt
+} from '@webmcp-auto-ui/agent';
+
+// Les recettes built-in sont auto-enregistrees a l'import
+console.log(WEBMCP_RECIPES.length); // 8+ recettes
+
+// Filtrer par serveur connecte
+const relevant = filterRecipesByServer(WEBMCP_RECIPES, ['tricoteuses']);
+
+// Formater pour le prompt (compact, <500 tokens pour 5 recettes)
+const text = formatRecipesForPrompt(relevant);
+```
+
+### Recettes MCP (serveur)
+
+Les recettes MCP viennent du serveur via `list_recipes` / `get_recipe`. Elles decrivent ce que les outils retournent et comment les combiner. Elles sont portees par `McpLayer.recipes` et injectees dans la section `## mcp` du prompt.
+
+## Workflow complet (v0.7.0)
+
+```
+1. L'app construit des ToolLayer[]
+   - McpLayer pour chaque serveur MCP connecte
+   - UILayer avec adapter optionnel + recettes WebMCP
+
+2. buildSystemPrompt(layers, { toolMode })
+   -> prompt francais structure: ## mcp / ## webmcp
+
+3. buildToolsFromLayers(layers, toolMode)
+   -> AnthropicTool[] (smart: MCP + component(), explicit: MCP + 31 render_* + component())
+
+4. runAgentLoop(msg, { layers, toolMode, ... })
+   -> boucle LLM iterative
+
+5. En mode smart:
+   LLM appelle component("help") -> decouverte
+   LLM appelle component("stat-card", {params}) -> rendu
+   LLM appelle query_sql({sql}) -> donnees MCP
+   LLM appelle component("table", {rows}) -> affichage
+
+6. Les recettes WebMCP guident le LLM sur le choix des composants
+7. Les recettes MCP decrivent les donnees retournees par les outils
+```
+
+## Exports complets
+
+```ts
+// Providers
+export { RemoteLLMProvider, WasmProvider, LocalLLMProvider, createProvider };
+export { AnthropicProvider, GemmaProvider };  // backward compat
+
+// Agent loop
+export { runAgentLoop, buildSystemPrompt, mcpToolsToAnthropic, fromMcpTools, trimConversationHistory };
+
+// UI tools
+export { UI_TOOLS, isUITool, executeUITool };
+export { COMPONENT_TOOL, executeComponent, componentRegistry };
+
+// Recettes
+export { WEBMCP_RECIPES, parseRecipe, parseRecipes };
+export { recipeRegistry, registerRecipes, filterRecipesByServer, formatRecipesForPrompt, formatMcpRecipesForPrompt };
+
+// Tool layers
+export { buildToolsFromLayers };
+export type { ToolLayer, McpLayer, UILayer };
+
+// Component adapter
+export { ComponentAdapter, nativePreset, allNativePreset, minimalPreset };
+export type { ComponentDef };
+
+// Utilitaires
+export { TokenTracker, summarizeChat };
+
+// Types
+export type {
+  RemoteModelId, WasmModelId, LLMId, ModelId,
+  ChatMessage, ContentBlock, McpToolDef, AnthropicTool,
+  LLMProvider, LLMResponse, ToolCall, AgentMetrics, AgentResult, AgentCallbacks,
+  Recipe, McpRecipe, AgentLoopOptions, ComponentEntry,
+};
+```
 
   </script>
   <script type="text/markdown" data-page="deploy">
-# Deploy to Production
+# Deployer en production
 
-## Quick deploy (recommended)
+## Deploy rapide (recommande)
 
 ```bash
-./scripts/deploy.sh                # deploy all apps
-./scripts/deploy.sh flex           # deploy one app
-./scripts/deploy.sh home viewer    # deploy specific apps
+./scripts/deploy.sh                # deployer toutes les apps
+./scripts/deploy.sh flex           # deployer une app
+./scripts/deploy.sh home viewer    # deployer certaines apps
 ```
 
-The script handles everything: builds packages, **builds apps**, cleans old
-files on the server, copies to the correct location, **verifies sha256
-integrity**, restarts services, and confirms.
+Le script gere tout : build des packages, **build des apps**, nettoyage des anciens fichiers sur le serveur, copie au bon endroit, **verification sha256**, restart services, confirmation.
 
-**Always use this script. Never deploy manually with scp.**
+**Toujours utiliser ce script. Jamais de deploy manuel avec scp.**
 
 ---
 
-## Server architecture
+## Architecture serveur
 
 ```
 /opt/webmcp-demos/
-  home/              # static — nginx serves directly
-  todo/              # static — nginx serves directly
-  showcase/          # static — nginx serves directly
-  flex/              # Node — systemd runs: node index.js
-  viewer/build/      # Node — systemd runs: node build/index.js
+  home/              # static -- nginx sert directement
+  todo/              # static -- nginx sert directement
+  showcase/          # static -- nginx sert directement
+  flex/              # Node -- systemd : node index.js
+  viewer/build/      # Node -- systemd : node build/index.js
 ```
 
-### CRITICAL: Deploy paths are NOT the same for all Node apps
+### CRITIQUE : Les chemins de deploy ne sont PAS les memes pour toutes les apps Node
 
-| App | systemd ExecStart | Deploy destination | Why |
-|-----|-------------------|--------------------|-----|
-| **flex** | `node index.js` | `/opt/webmcp-demos/flex/` (root) | ExecStart has no `build/` prefix |
-| **viewer** | `node build/index.js` | `/opt/webmcp-demos/viewer/build/` | ExecStart includes `build/` |
-| home | static (nginx) | `/opt/webmcp-demos/home/` | — |
-| todo | static (nginx) | `/opt/webmcp-demos/todo/` | — |
-| showcase | static (nginx) | `/opt/webmcp-demos/showcase/` | — |
+| App | systemd ExecStart | Destination deploy | Pourquoi |
+|-----|-------------------|--------------------|----------|
+| **flex** | `node index.js` | `/opt/webmcp-demos/flex/` (racine) | ExecStart sans prefix `build/` |
+| **viewer** | `node build/index.js` | `/opt/webmcp-demos/viewer/build/` | ExecStart inclut `build/` |
+| home | static (nginx) | `/opt/webmcp-demos/home/` | -- |
+| todo | static (nginx) | `/opt/webmcp-demos/todo/` | -- |
+| showcase | static (nginx) | `/opt/webmcp-demos/showcase/` | -- |
 
-**If you deploy to the wrong path, the old code keeps running and your
-changes appear to not take effect.** This is the #1 deployment pitfall.
+**Si vous deployez au mauvais chemin, l'ancien code continue de tourner.**
 
-### Why the paths differ
+### Nouvelles apps (v2)
 
-The systemd services were created at different times. Flex
-uses `ExecStart=/usr/bin/node index.js` (working directory is the app root).
-Viewer uses `ExecStart=/usr/bin/node build/index.js`. The deploy script
-abstracts this difference — use the script.
+Les nouvelles apps (flex2, viewer2, todo2, showcase2, recipes) ne sont pas encore deployees en production. Quand elles le seront, elles seront ajoutees au script `deploy.sh` avec leurs chemins specifiques.
 
 ---
 
-## Manual deploy (if you must)
+## Deploy manuel (si absolument necessaire)
 
-### Static apps (home, todo, showcase)
+### Apps statiques (home, todo, showcase)
 
 ```bash
-# Build with production base URL (REQUIRED for home)
+# Builder avec l'URL de production (REQUIS pour home)
 PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/home run build
 
-# Clean old assets and copy
+# Nettoyer et copier
 ssh bot "rm -rf /opt/webmcp-demos/home/_app"
 scp -r apps/home/build/* bot:/opt/webmcp-demos/home/
 ```
 
-### Node apps — flex (root deploy)
+### Apps Node -- flex (deploy racine)
 
 ```bash
 npm -w apps/flex run build
 
-# MUST clean old files first — stale chunks cause the old version to be served
+# OBLIGATOIRE : nettoyer les anciens fichiers d'abord
 ssh bot "cd /opt/webmcp-demos/flex && rm -f index.js handler.js env.js shims.js && rm -rf client server"
 scp -r apps/flex/build/* bot:/opt/webmcp-demos/flex/
 ssh bot "systemctl restart webmcp-flex"
 ```
 
-### Node apps — viewer (build/ deploy)
+### Apps Node -- viewer (deploy build/)
 
 ```bash
 npm -w apps/viewer run build
@@ -1718,107 +1978,81 @@ ssh bot "systemctl restart webmcp-viewer"
 
 ---
 
-## Common mistakes
+## Erreurs courantes
 
-### 1. Deploying to the wrong path
+### 1. Deploy au mauvais chemin
 
-**Symptom**: You deploy, restart the service, but the old version still shows.
+**Symptome** : Deploy + restart, mais l'ancienne version persiste.
 
-**Cause**: You copied files to `flex/build/` but the service runs
-`node index.js` from `flex/` — it uses the old `index.js` at root.
+**Cause** : Fichiers copies dans `flex/build/` mais le service execute `node index.js` depuis `flex/`.
 
-**Fix**: Use `./scripts/deploy.sh` or check the ExecStart path in the
-systemd service file.
+**Fix** : `./scripts/deploy.sh` ou verifier le ExecStart du service systemd.
 
-### 2. Not cleaning old chunks
+### 2. Anciens chunks non nettoyes
 
-**Symptom**: New code is deployed but the browser shows a mix of old and
-new behavior.
+**Symptome** : Nouveau code deploye mais le navigateur montre un mix ancien/nouveau.
 
-**Cause**: SvelteKit produces hashed chunk filenames. `scp` copies new
-chunks but doesn't remove old ones. The browser may load cached old chunks.
+**Cause** : SvelteKit produit des fichiers hasches. `scp` ajoute sans supprimer. Le navigateur charge les anciens chunks caches.
 
-**Fix**: Always delete old files before copying:
+**Fix** : Toujours supprimer les anciens fichiers avant de copier :
 ```bash
 ssh bot "rm -rf /opt/webmcp-demos/flex/{client,server,index.js,handler.js}"
 ```
 
-### 3. Forgetting PUBLIC_BASE_URL for home
+### 3. PUBLIC_BASE_URL oublie pour home
 
-**Symptom**: Home page links point to `localhost:5173`.
+**Symptome** : Les liens de home pointent vers `localhost:5173`.
 
-**Cause**: SvelteKit adapter-static bakes `PUBLIC_BASE_URL` at build time.
+**Fix** : Builder avec `PUBLIC_BASE_URL=https://demos.hyperskills.net`.
 
-**Fix**: Build with `PUBLIC_BASE_URL=https://demos.hyperskills.net`.
+### 4. .env manquant apres deploy
 
-### 4. Missing .env after deploy
+**Symptome** : Service crash "ANTHROPIC_API_KEY is not defined".
 
-**Symptom**: Service crashes with "ANTHROPIC_API_KEY is not defined".
+**Cause** : Le .env a ete supprime pendant le nettoyage.
 
-**Cause**: The .env file was in the app root and got deleted during cleanup.
+**Fix** : Le script deploy preserve les .env. En manual, ne pas `rm -rf *`.
 
-**Fix**: The deploy script preserves .env files. If deploying manually,
-don't delete .env:
-```bash
-# DO NOT do: rm -rf /opt/webmcp-demos/flex/*
-# DO this instead: rm specific files, keep .env
-```
+### 5. rsync au lieu de scp
 
-### 5. Using rsync instead of scp
+**Jamais rsync.** `rsync --delete` a deja supprime les `.env` de production.
 
-**Never use rsync.** `rsync --delete` has previously wiped `.env` files
-containing API keys from production. Use `scp -r` only.
+### 6. Deploy sans rebuild de l'app
 
-### 6. Deploying without rebuilding the app (fixed in script)
+**Symptome** : Bug fixe dans le code, deploye, bug toujours la.
 
-**Symptom**: You fix a Svelte bug, deploy, the bug is still there. Services
-show `active`. No error anywhere.
+**Cause** : L'ancien deploy.sh rebuildait les packages mais pas les apps. Tout changement dans `apps/*/src/` etait ignore.
 
-**Cause**: The old `deploy.sh` rebuilt packages (`packages/*/dist/`) but
-copied the existing `apps/*/build/` without rebuilding it. Any change to
-`apps/*/src/` was silently ignored.
-
-**Fix applied**: `deploy.sh` now runs `npm run build` inside each app before
-copying. The sha256 check then verifies the deployed file matches the local
-build.
-
-**How to detect manually**:
-```bash
-sha256sum apps/flex/build/index.js
-ssh bot "sha256sum /opt/webmcp-demos/flex/index.js"
-# These must match. If they differ, the wrong file was deployed.
-```
-
-See [contributing.md](../contributing.md) for the full debug checklist.
+**Fix applique** : `deploy.sh` rebuild chaque app avant de copier. La verification sha256 confirme.
 
 ---
 
-## Verifying a deploy
+## Verifier un deploy
 
 ```bash
-# All pages return 200
+# Toutes les pages retournent 200
 for p in / /flex/ /viewer/ /showcase/ /todo/; do
   echo "$(curl -s -o /dev/null -w '%{http_code}' -L https://demos.hyperskills.net$p) $p"
 done
 
-# Chat API works (Node apps)
+# L'API chat fonctionne (apps Node)
 curl -s https://demos.hyperskills.net/flex/api/chat \
   -X POST -H 'Content-Type: application/json' \
   -d '{"messages":[{"role":"user","content":"hi"}],"model":"claude-haiku-4-5-20251001","max_tokens":5}' \
   | head -c 50
 
-# Services are active
+# Services actifs
 ssh bot "systemctl is-active webmcp-flex webmcp-viewer"
 ```
 
 ---
 
-## Environment
+## Environnement
 
-| Variable | Apps | Location on server |
+| Variable | Apps | Localisation serveur |
 |----------|------|--------------------|
 | `ANTHROPIC_API_KEY` | flex, viewer | `/opt/webmcp-demos/{app}/.env` |
-| `PUBLIC_BASE_URL` | home (build-time only) | Set in shell before `npm run build` |
+| `PUBLIC_BASE_URL` | home (build-time) | Variable shell avant `npm run build` |
 | `PORT` | flex(3004), viewer(3002) | systemd `Environment=PORT=...` |
 
   </script>
@@ -3006,55 +3240,163 @@ The `theme` field in a skill uses the flat token map (same as `tokens`), not the
 
   </script>
   <script type="text/markdown" data-page="agents-composing">
-# Composing UIs -- Agent Guide
+# Composer des UIs -- Guide Agent
 
-> This document is designed to be injected into an AI agent's context. It contains everything needed to compose a UI from blocks using webmcp-auto-ui.
+> Ce document est concu pour etre injecte dans le contexte d'un agent IA. Il contient tout le necessaire pour composer une UI a partir de blocs avec webmcp-auto-ui.
 
-## What is a Composed UI?
+## Qu'est-ce qu'une UI composee ?
 
-A composed UI is a collection of **blocks** arranged in sequence. Each block is a set of instructions for specific tools, expressed as a `type` and a `data` object. The `BlockRenderer` component renders each block visually by dispatching it to the appropriate widget based on its type.
+Une UI composee est une collection de **blocs** arranges en sequence. Chaque bloc a un `type` et un objet `data`. Le `BlockRenderer` rend chaque bloc visuellement en dispatchant vers le widget correspondant.
 
-## The 24 Block Types
+## Workflow complet (v0.7.0) : Layers -> Prompt -> Tools -> LLM -> component() -> Render
 
-### Simple Blocks (9)
+```
+App                      Agent Package                     LLM
+ |                            |                             |
+ |  1. Construit ToolLayer[]  |                             |
+ |    - McpLayer (par serveur)|                             |
+ |    - UILayer (+ adapter)   |                             |
+ |                            |                             |
+ |  2. buildSystemPrompt()    |                             |
+ |  ----layers, toolMode----> |                             |
+ |  <--- prompt structure --- |                             |
+ |       ## mcp / ## webmcp   |                             |
+ |                            |                             |
+ |  3. buildToolsFromLayers() |                             |
+ |  ----layers, toolMode----> |                             |
+ |  <--- AnthropicTool[] ---  |                             |
+ |                            |                             |
+ |  4. runAgentLoop(msg, {layers})                          |
+ |  ------------------------------------->  prompt + tools  |
+ |                            |             |               |
+ |                            |   5. component("help")      |
+ |                            |   <----------------------   |
+ |                            |   --- liste composants -->  |
+ |                            |             |               |
+ |                            |   6. query_sql({sql})       |
+ |                            |   <----------------------   |
+ |                   MCP call |   --- donnees ----------->  |
+ |                            |             |               |
+ |                            |   7. component("table",     |
+ |                            |      {rows, columns})       |
+ |  <-- onBlock(type, data) - |   <----------------------   |
+ |  Canvas affiche le bloc    |                             |
+```
 
-| Type | Description | Minimal data |
+### Etape par etape
+
+1. **L'app construit des `ToolLayer[]`** -- un `McpLayer` par serveur MCP connecte + un `UILayer`
+2. **`buildSystemPrompt(layers, { toolMode })`** genere le prompt francais structure en `## mcp` / `## webmcp`
+3. **`buildToolsFromLayers(layers, toolMode)`** produit les `AnthropicTool[]` selon le mode
+4. **`runAgentLoop(msg, { layers, toolMode })`** lance la boucle iterative
+5. En mode smart : le LLM voit 1 tool `component()` + N tools MCP
+6. Le LLM appelle `component("help")` pour decouvrir, puis `component("nom", {params})` pour rendre
+7. Les recettes WebMCP guident le LLM sur comment presenter les donnees
+
+### Exemple concret
+
+```ts
+import { runAgentLoop, buildToolsFromLayers, buildSystemPrompt } from '@webmcp-auto-ui/agent';
+import type { McpLayer, UILayer, ToolLayer } from '@webmcp-auto-ui/agent';
+
+// 1. Construire les layers
+const mcpLayer: McpLayer = {
+  source: 'mcp',
+  serverUrl: 'https://mcp.code4code.eu/mcp',
+  serverName: 'Tricoteuses',
+  tools: await client.listTools(),
+  recipes: [{ name: 'profil-depute', description: 'Fiche complete depute' }],
+};
+
+const uiLayer: UILayer = {
+  source: 'ui',
+  recipes: webmcpRecipes,  // recettes filtrees par serveur
+};
+
+const layers: ToolLayer[] = [mcpLayer, uiLayer];
+
+// 4. Lancer la boucle
+const result = await runAgentLoop('Qui est le depute de Paris 1er ?', {
+  provider,
+  layers,
+  toolMode: 'smart',
+  callbacks: {
+    onBlock: (type, data) => canvas.addBlock(type, data),
+    onText: (text) => console.log(text),
+  },
+});
+```
+
+## Les 24 types de blocs
+
+### Blocs simples (9)
+
+| Type | Description | Data minimal |
 |------|-------------|-------------|
-| `stat` | Single metric with optional trend | `{"label":"Revenue","value":"
+| `stat` | Metrique unique avec trend | `{"label":"Revenue","value":"
   <script>
 42K","trend":"+12%","trendDir":"up"}` |
-| `kv` | Key-value pair list | `{"title":"Info","rows":[["Status","Active"],["Uptime","99.9%"]]}` |
-| `list` | Bulleted text list | `{"title":"Tasks","items":["Deploy API","Run tests"]}` |
-| `chart` | Simple bar chart | `{"title":"Sales","bars":[["Q1",80],["Q2",120],["Q3",95]]}` |
-| `alert` | Alert banner with level | `{"title":"Warning","message":"Disk usage at 90%","level":"warn"}` |
-| `code` | Syntax-highlighted code block | `{"lang":"json","content":"{\"key\": \"value\"}"}` |
-| `text` | Plain text paragraph | `{"content":"This is a description paragraph."}` |
-| `actions` | Row of action buttons | `{"buttons":[{"label":"Approve","primary":true},{"label":"Reject"}]}` |
-| `tags` | Tag/chip collection | `{"label":"Tags","tags":[{"text":"prod","active":true},{"text":"v2.1"}]}` |
+| `kv` | Liste cle-valeur | `{"title":"Info","rows":[["Status","Active"],["Uptime","99.9%"]]}` |
+| `list` | Liste a puces | `{"title":"Tasks","items":["Deploy API","Run tests"]}` |
+| `chart` | Bar chart simple | `{"title":"Sales","bars":[["Q1",80],["Q2",120],["Q3",95]]}` |
+| `alert` | Banniere d'alerte | `{"title":"Warning","message":"Disk 90%","level":"warn"}` |
+| `code` | Bloc de code | `{"lang":"json","content":"{\"key\": \"value\"}"}` |
+| `text` | Paragraphe texte | `{"content":"Description paragraph."}` |
+| `actions` | Boutons d'action | `{"buttons":[{"label":"Approve","primary":true},{"label":"Reject"}]}` |
+| `tags` | Collection de tags | `{"label":"Tags","tags":[{"text":"prod","active":true},{"text":"v2.1"}]}` |
 
-### Rich Blocks (15)
+### Blocs riches (15)
 
-| Type | Description | Minimal data |
+| Type | Description | Data minimal |
 |------|-------------|-------------|
-| `stat-card` | Stat with variant color and trend | `{"label":"Users","value":8204,"variant":"success","trend":"up","delta":"+3.2%"}` |
-| `data-table` | Sortable data table | `{"title":"Users","columns":[{"key":"name","label":"Name"},{"key":"email","label":"Email"}],"rows":[{"name":"Alice","email":"a@b.com"}]}` |
-| `timeline` | Vertical timeline | `{"title":"History","events":[{"date":"2024-01","title":"Launch","status":"done"},{"date":"2024-03","title":"v2.0","status":"active"}]}` |
-| `profile` | User profile card | `{"name":"Jane Doe","subtitle":"Engineer","fields":[{"label":"Email","value":"j@co.com"}],"stats":[{"label":"Projects","value":"12"}]}` |
-| `trombinoscope` | People grid with avatars | `{"title":"Team","people":[{"name":"Alice","subtitle":"Lead"},{"name":"Bob","subtitle":"Dev"}],"columns":3}` |
-| `json-viewer` | Interactive JSON tree | `{"title":"Response","data":{"status":"ok","items":[1,2,3]}}` |
-| `hemicycle` | Parliamentary hemicycle chart | `{"title":"Assembly","groups":[{"id":"a","label":"Party A","seats":120,"color":"#3b82f6"},{"id":"b","label":"Party B","seats":80,"color":"#ef4444"}]}` |
-| `chart-rich` | Multi-type chart (bar/line/area/pie/donut) | `{"title":"Revenue","type":"line","labels":["Jan","Feb","Mar"],"data":[{"label":"2024","values":[10,20,30]}]}` |
-| `cards` | Card grid with images | `{"title":"Products","cards":[{"title":"Widget","description":"A useful widget","tags":["new"]}]}` |
-| `grid-data` | Spreadsheet-like grid | `{"title":"Matrix","columns":[{"key":"a","label":"A"},{"key":"b","label":"B"}],"rows":[[1,2],[3,4]]}` |
-| `sankey` | Flow diagram (sankey-style) | `{"title":"Traffic","nodes":[{"id":"a","label":"Google"},{"id":"b","label":"Site"}],"links":[{"source":"a","target":"b","value":500}]}` |
-| `map` | Interactive Leaflet map | `{"title":"Offices","center":{"lat":48.85,"lng":2.35},"zoom":5,"markers":[{"lat":48.85,"lng":2.35,"label":"Paris"}]}` |
-| `log` | Log viewer with levels | `{"title":"Logs","entries":[{"timestamp":"10:30:01","level":"info","message":"Server started"},{"level":"error","message":"Connection refused"}]}` |
-| `gallery` | Image gallery with lightbox | `{"title":"Photos","images":[{"src":"https://picsum.photos/400/300","caption":"Sample"}],"columns":3}` |
-| `carousel` | Slide carousel with autoplay | `{"title":"Slides","slides":[{"src":"https://picsum.photos/800/400","title":"Slide 1"}],"autoPlay":true,"interval":4000}` |
+| `stat-card` | Stat avec couleur variante | `{"label":"Users","value":8204,"variant":"success","trend":"up"}` |
+| `data-table` | Table triable | `{"title":"Users","columns":[...],"rows":[...]}` |
+| `timeline` | Timeline verticale | `{"title":"History","events":[{"date":"2024-01","title":"Launch","status":"done"}]}` |
+| `profile` | Fiche profil | `{"name":"Jane Doe","subtitle":"Engineer","fields":[...]}` |
+| `trombinoscope` | Grille de personnes | `{"title":"Team","people":[{"name":"Alice","subtitle":"Lead"}]}` |
+| `json-viewer` | Arbre JSON interactif | `{"title":"Response","data":{"status":"ok"}}` |
+| `hemicycle` | Hemicycle parlementaire | `{"title":"Assembly","groups":[{"id":"a","label":"Left","seats":150,"color":"#ef4444"}]}` |
+| `chart-rich` | Chart multi-type (bar/line/area/pie/donut) | `{"title":"Revenue","type":"line","labels":[...],"data":[...]}` |
+| `cards` | Grille de cards | `{"title":"Products","cards":[{"title":"Widget","description":"..."}]}` |
+| `grid-data` | Grille spreadsheet | `{"title":"Matrix","columns":[...],"rows":[[1,2],[3,4]]}` |
+| `sankey` | Diagramme de flux | `{"title":"Traffic","nodes":[...],"links":[...]}` |
+| `map` | Carte Leaflet | `{"title":"Offices","center":{"lat":48.85,"lng":2.35},"markers":[...]}` |
+| `log` | Viewer de logs | `{"title":"Logs","entries":[{"level":"error","message":"..."}]}` |
+| `gallery` | Galerie d'images | `{"title":"Photos","images":[{"src":"url","caption":"..."}]}` |
+| `carousel` | Carousel de slides | `{"title":"Slides","slides":[...],"autoPlay":true}` |
 
-## Composing a Skill (Recipe)
+## Composer avec component() (mode smart)
 
-A skill is a JSON object combining blocks with metadata:
+En mode smart, le LLM n'a qu'un seul outil UI : `component()`. Trois modes d'appel :
+
+```
+component("help")                        -> liste de tous les composants
+component("help", "stat-card")           -> schema detaille d'un composant
+component("stat-card", {label, value})   -> rend le composant
+```
+
+Actions canvas via noms courts :
+
+| Nom court | Equivalent |
+|-----------|-----------|
+| `clear` | `clear_canvas` |
+| `update` | `update_block` |
+| `move` | `move_block` |
+| `resize` | `resize_block` |
+| `style` | `style_block` |
+
+Les noms utilisent des tirets (`stat-card`). Les noms `render_*` sont acceptes en backward compat.
+
+### Tous les composants enregistres
+
+`component("help")` retourne **tous** les composants (56), pas seulement les widgets renderables :
+
+- **renderable: true** -- tous les block types `render_*` + actions canvas. Renderables via `executeComponent`.
+- **renderable: false** -- composants Svelte (primitives, base UI, layouts, agent UI, theme). Retournent leur schema et un hint d'usage.
+
+## Composer une recette (skill)
+
+Une skill est un objet JSON combinant blocs + metadata :
 
 ```json
 {
@@ -3064,52 +3406,24 @@ A skill is a JSON object combining blocks with metadata:
   "mcpName": "my-server",
   "llm": "claude-sonnet",
   "tags": ["kpi", "dashboard"],
-  "theme": {
-    "color-accent": "#2563eb"
-  },
+  "theme": { "color-accent": "#2563eb" },
   "blocks": [
     { "type": "stat", "data": { "label": "Revenue", "value": "
   <script>
-42K", "trend": "+12%", "trendDir": "up" } },
-    { "type": "stat", "data": { "label": "Users", "value": "8,204", "trend": "+3.2%", "trendDir": "up" } },
-    { "type": "chart", "data": { "title": "Monthly Revenue", "bars": [["Jan",80],["Feb",95],["Mar",120]] } }
+42K" } },
+    { "type": "chart", "data": { "title": "Monthly Revenue", "bars": [["Jan",80],["Feb",95]] } }
   ]
 }
 ```
 
-Fields:
-- `name` (required): skill identifier
-- `description` (optional): human-readable description
-- `mcp` (optional): MCP server URL
-- `mcpName` (optional): display name for the MCP server
-- `llm` (optional): preferred LLM model (`claude-haiku`, `claude-sonnet`, `gemma-e2b`, `auto`)
-- `tags` (optional): array of string tags
-- `theme` (optional): flat token overrides (`{"color-accent": "#2563eb"}`)
-- `blocks` (required): array of `{ type, data }` objects
-
 ## HyperSkill URL Encoding
 
-Skills can be encoded into a URL parameter `?hs=` for sharing:
+Les skills sont encodees en `?hs=` pour le partage :
+- JSON serialise -> base64
+- Si >= 6KB : gzip + prefix `gz.`
+- URL : `https://domain.com/viewer?hs=<base64>`
 
-- The skill is serialized as JSON
-- If < 6KB: base64 encoded directly
-- If >= 6KB: gzip compressed, then base64 encoded with `gz.` prefix
-
-URL format: `https://domain.com/viewer?hs=<base64>` or `https://domain.com/flex?hs=<base64>`
-
-To decode: read the `hs` query param, check for `gz.` prefix, decompress if needed, base64-decode, JSON.parse.
-
-## Workflow: Building a Dashboard
-
-When a designer says "I want a KPI dashboard":
-
-1. Identify the key metrics -- use `stat` blocks (3-4 max at the top)
-2. Add a chart for trends -- use `chart` (simple) or `chart-rich` (multi-series, pie, line)
-3. Add a data table for details -- use `data-table` for tabular data
-4. Add contextual info -- use `kv` for metadata pairs, `alert` for warnings
-5. Wrap with a theme if branding matters
-
-## Composition Examples
+## Exemples de composition
 
 ### Dashboard KPI (3 stats + chart)
 
@@ -3126,160 +3440,91 @@ When a designer says "I want a KPI dashboard":
 }
 ```
 
-### User Profile (profile + timeline + stats)
+### Profil utilisateur
 
 ```json
 {
   "blocks": [
-    { "type": "profile", "data": { "name": "Jane Doe", "subtitle": "Senior Engineer", "badge": { "text": "Active", "variant": "success" }, "fields": [{ "label": "Email", "value": "jane@example.com" }, { "label": "Team", "value": "Platform" }], "stats": [{ "label": "Projects", "value": "12" }, { "label": "Commits", "value": "847" }] } },
-    { "type": "timeline", "data": { "title": "Activity", "events": [{ "date": "2024-03-15", "title": "Promoted to Senior", "status": "done" }, { "date": "2024-01-10", "title": "Shipped v3.0", "status": "done" }, { "date": "2023-09-01", "title": "Joined team", "status": "done" }] } }
+    { "type": "profile", "data": { "name": "Jane Doe", "subtitle": "Senior Engineer", "badge": { "text": "Active", "variant": "success" }, "fields": [{ "label": "Email", "value": "jane@example.com" }], "stats": [{ "label": "Projects", "value": "12" }] } },
+    { "type": "timeline", "data": { "title": "Activity", "events": [{ "date": "2024-03-15", "title": "Promoted", "status": "done" }] } }
   ]
 }
 ```
 
-### Monitoring (alert + kv + log)
+### Monitoring
 
 ```json
 {
   "blocks": [
-    { "type": "alert", "data": { "title": "Database degraded", "message": "High latency on primary-eu. Investigating.", "level": "warn" } },
-    { "type": "kv", "data": { "title": "Service Status", "rows": [["API","OK"],["Database","Degraded"],["CDN","OK"],["Queue","Warning"]] } },
-    { "type": "log", "data": { "title": "Recent Logs", "entries": [{ "timestamp": "14:32:01", "level": "error", "source": "db", "message": "Connection timeout after 5000ms" }, { "timestamp": "14:31:45", "level": "warn", "source": "api", "message": "Slow query detected: 3200ms" }, { "timestamp": "14:30:00", "level": "info", "source": "cdn", "message": "Cache purge completed" }] } }
+    { "type": "alert", "data": { "title": "Database degraded", "message": "High latency.", "level": "warn" } },
+    { "type": "kv", "data": { "title": "Service Status", "rows": [["API","OK"],["Database","Degraded"]] } },
+    { "type": "log", "data": { "title": "Recent Logs", "entries": [{ "level": "error", "message": "Connection timeout" }] } }
   ]
 }
 ```
 
-## Unified `component` tool
+## Contraintes
 
-Instead of calling individual `render_*` tools, you can use the unified `component` tool:
+- Le `type` de bloc doit etre un des 24 types valides.
+- Les blocs sont rendus dans l'ordre, de haut en bas.
+- Taille max skill ~6KB avant gzip pour l'encodage HyperSkill URL.
+- `stat` : groupes de 2-4 pour le rythme visuel.
+- `data-table` : max 200 lignes affichees.
 
-- `component("help")` -- list all available components
-- `component("help", "stat-card")` -- get the schema for a specific component
-- `component("stat-card", { label: "Revenue", value: "
-  <script>
-42K" })` -- render a component
+## Erreurs courantes
 
-Both approaches (individual `render_*` tools and unified `component`) work simultaneously.
-
-The `component` tool also exposes canvas actions under short names:
-
-| Short name | Equivalent tool |
-|------------|-----------------|
-| `clear` | `clear_canvas` |
-| `update` | `update_block` |
-| `move` | `move_block` |
-| `resize` | `resize_block` |
-| `style` | `style_block` |
-
-Component names use dashes instead of underscores (e.g. `stat-card` instead of `render_stat_card`). The original `render_*` names are also accepted for backward compatibility.
-
-### All registered components
-
-The `component("help")` response includes **all** components in the system, not just the renderable widgets. Each entry includes a `renderable` flag:
-
-- **renderable: true** — can be rendered via the agent tool pipeline (all `render_*` tools + canvas actions)
-- **renderable: false** — Svelte component available for direct usage via `@webmcp-auto-ui/ui`, but cannot be rendered through `component("name", {...})`. Calling render on these returns their schema and a usage hint instead.
-
-#### Primitives (layout containers)
-
-| Name | Description |
-|------|-------------|
-| `card` | Container card with optional header and footer slots |
-| `grid-layout` | Responsive grid layout (stacks on mobile) |
-| `list-primitive` | Scrollable list container with item snippet |
-| `panel` | Panel with optional title header |
-| `window` | Window with draggable title bar |
-
-#### Base (shadcn-style UI primitives)
-
-| Name | Description |
-|------|-------------|
-| `button` | Button with variants: default, outline, destructive, ghost |
-| `input` | Text input field |
-| `badge` | Badge/tag with variants: default, success, warning, destructive, outline |
-| `select` | Native dropdown select |
-| `tooltip` | Tooltip on hover |
-| `dialog` | Modal dialog overlay |
-
-#### Layouts (window manager)
-
-| Name | Description |
-|------|-------------|
-| `tiling-layout` | Tiling window manager layout |
-| `floating-layout` | Floating drag-and-drop window manager with collapse/expand (double-click) and fit-to-content |
-| `flex-layout` | Auto-grid layout with size slider for adjusting block dimensions |
-| `stack-layout` | Stacked vertical scroll or single-window layout |
-| `pane` | Window pane with title bar, badge, fold/close actions |
-
-#### Agent UI
-
-| Name | Description |
-|------|-------------|
-| `llm-selector` | LLM model dropdown grouped by type |
-| `mcp-status` | MCP connection status indicator |
-| `mcp-connector` | MCP connection form with URL/token/status |
-| `agent-progress` | Agent progress bar (time, tools, tokens/sec) |
-| `gemma-loader` | Gemma WASM model loader with progress |
-| `chat-panel` | Full chat panel with feed, progress, and input |
-| `agent-console` | Collapsible agent debug console |
-| `settings-panel` | Agent settings (system prompt, tokens, cache) |
-| `remote-mcp-servers` | Remote MCP server list with connect/disconnect |
-
-#### Theme
-
-| Name | Description |
-|------|-------------|
-| `theme-provider` | Theme provider (dark/light) with CSS custom properties |
-
-## Constraints
-
-- Block `type` must be one of the 24 valid types listed above.
-- Block `data` must match the expected shape for that type (see the ui-widgets.md agent guide for full specs).
-- Blocks are rendered in order, top to bottom.
-- Keep skill size under ~6KB before gzip for HyperSkill URL encoding (browser URL length limits).
-- `stat` blocks work best in groups of 2-4 for visual rhythm.
-- `data-table` supports up to 200 displayed rows (overflow is indicated).
-
-## Common Mistakes
-
-| Mistake | Consequence | Fix |
-|---------|-------------|-----|
-| Using `chart` when you need multiple datasets | `chart` only supports single-series bars | Use `chart-rich` with `data` array for multi-series |
-| Putting too many blocks (10+) in one skill | Overwhelming UI, slow rendering | Split into focused skills or use tabs |
-| Missing `type` field on a block | BlockRenderer shows `[undefined]` placeholder | Always include `type` on every block |
-| Wrong data shape for block type | Widget renders empty or errors silently | Check the expected interface for each type |
-| Using `chart-rich` type as `chart` | Renders as simple bar chart, ignoring pie/line config | Use type `chart-rich` for Chart.svelte, `chart` for ChartBlock.svelte |
+| Erreur | Consequence | Correction |
+|--------|-------------|-----------|
+| `chart` pour plusieurs datasets | `chart` = single-series bars | Utiliser `chart-rich` |
+| Trop de blocs (10+) | UI surchargee | Scinder en skills focalisees |
+| `type` manquant sur un bloc | `[undefined]` | Toujours inclure `type` |
+| Mauvaise shape `data` | Widget vide | Verifier l'interface attendue |
+| `chart-rich` ecrit comme `chart` | Ignore pie/line config | Utiliser le type `chart-rich` |
 
   </script>
   <script type="text/markdown" data-page="agents-ui-widgets">
-# UI Widgets -- Agent Guide
+# Widgets UI -- Guide Agent
 
-> This document is designed to be injected into an AI agent's context. It is the exhaustive catalogue of all webmcp-auto-ui widgets with their props and data examples.
+> Ce document est concu pour etre injecte dans le contexte d'un agent IA. Catalogue exhaustif des widgets webmcp-auto-ui avec props et exemples.
 
-## How BlockRenderer Works
+## Comment ca marche
 
-The `BlockRenderer` component receives `{ type, data }` and dispatches to the correct widget:
-- Simple blocks receive data as the `data` prop
-- Rich blocks receive data as the `spec` prop
-- Unknown types render a `[type]` placeholder
+### Mode smart (defaut v0.7.0)
 
-Each block auto-registers WebMCP tools (`block_<id>_get`, `block_<id>_update`, `block_<id>_remove`) when `navigator.modelContext` is available.
+En mode smart, le LLM n'a qu'un seul outil UI : **`component()`**. Il decouvre les composants via `component("help")` et les rend via `component("nom", {params})`.
 
-> **Note**: All widgets listed below (plus primitives, base components, layouts, and agent UI) are also accessible via the unified `component()` tool from `@webmcp-auto-ui/agent`. Call `component("help")` to list all 56 components, or `component("help", "stat-card")` to get the schema for a specific one. See [composing.md](composing.md#unified-component-tool) and the [agent package docs](../packages/agent.md#unified-component-tool) for details.
+```
+LLM appelle component("help")
+  -> liste de 56 composants avec schemas
+
+LLM appelle component("stat-card", {label: "Users", value: 8204})
+  -> bloc rendu sur le canvas
+```
+
+### Mode explicit
+
+En mode explicit, le LLM voit les 31 `render_*` tools individuels + `component()`. Plus verbeux mais utile pour les modeles WASM qui ont besoin d'exemples concrets.
+
+### BlockRenderer
+
+Le `BlockRenderer` recoit `{ type, data }` et dispatche vers le widget :
+- Blocs simples : data via la prop `data`
+- Blocs riches : data via la prop `spec`
+- Types inconnus : placeholder `[type]`
+
+Chaque bloc auto-enregistre des tools WebMCP (`block_<id>_get`, `block_<id>_update`, `block_<id>_remove`) quand `navigator.modelContext` est disponible.
 
 ---
 
-## Category: Simple Blocks (9)
+## Categorie : Blocs simples (9)
 
-### stat -- Single Metric
+### stat -- Metrique unique
 
-Displays a single metric value with optional trend indicator.
-
-```typescript
+```ts
 interface StatBlockData {
-  label: string;       // metric name
-  value: string;       // displayed value
-  trend?: string;      // trend text (e.g. "+12%")
+  label: string;
+  value: string;
+  trend?: string;
   trendDir?: 'up' | 'down' | 'neutral';
 }
 ```
@@ -3290,30 +3535,26 @@ interface StatBlockData {
 42K", "trend": "+12.4%", "trendDir": "up" } }
 ```
 
-Use when: displaying a single KPI, metric, or counter.
+Mode smart : `component("stat", {label: "Revenue", value: "
+  <script>
+42K", trend: "+12.4%", trendDir: "up"})`
 
-### kv -- Key-Value Pairs
+### kv -- Paires cle-valeur
 
-Displays a list of key-value pairs with a divider between each row.
-
-```typescript
+```ts
 interface KVBlockData {
   title?: string;
-  rows: [string, string][];  // array of [key, value] tuples
+  rows: [string, string][];
 }
 ```
 
 ```json
-{ "type": "kv", "data": { "title": "Server Info", "rows": [["Host", "prod-eu-01"], ["CPU", "42%"], ["Memory", "6.2 GB"]] } }
+{ "type": "kv", "data": { "title": "Server Info", "rows": [["Host", "prod-eu-01"], ["CPU", "42%"]] } }
 ```
 
-Use when: showing metadata, config values, or property lists.
+### list -- Liste texte
 
-### list -- Text List
-
-Simple bulleted list of text items.
-
-```typescript
+```ts
 interface ListBlockData {
   title?: string;
   items: string[];
@@ -3321,33 +3562,27 @@ interface ListBlockData {
 ```
 
 ```json
-{ "type": "list", "data": { "title": "Action Items", "items": ["Review PR #42", "Update docs", "Deploy to staging"] } }
+{ "type": "list", "data": { "title": "Tasks", "items": ["Deploy API", "Run tests"] } }
 ```
 
-Use when: displaying ordered or unordered lists of items.
+### chart -- Bar chart simple
 
-### chart -- Simple Bar Chart
-
-Minimal bar chart with labeled bars.
-
-```typescript
+```ts
 interface ChartBlockData {
   title?: string;
-  bars: [string, number][];  // [label, value] tuples
+  bars: [string, number][];
 }
 ```
 
 ```json
-{ "type": "chart", "data": { "title": "Monthly Sales", "bars": [["Jan", 80], ["Feb", 95], ["Mar", 120], ["Apr", 110]] } }
+{ "type": "chart", "data": { "title": "Sales", "bars": [["Jan", 80], ["Feb", 95], ["Mar", 120]] } }
 ```
 
-Use when: showing a simple single-series bar chart. For multi-series, pie, line, or area charts, use `chart-rich`.
+Pour multi-series, pie, line, area : utiliser `chart-rich`.
 
-### alert -- Alert Banner
+### alert -- Banniere d'alerte
 
-Colored alert with a level indicator (border-left accent).
-
-```typescript
+```ts
 interface AlertBlockData {
   title?: string;
   message?: string;
@@ -3356,95 +3591,70 @@ interface AlertBlockData {
 ```
 
 ```json
-{ "type": "alert", "data": { "title": "Deployment failed", "message": "Build step 3 returned exit code 1.", "level": "error" } }
+{ "type": "alert", "data": { "title": "Deploy failed", "message": "Exit code 1.", "level": "error" } }
 ```
 
-Use when: showing warnings, errors, or informational notices.
+### code -- Bloc de code
 
-### code -- Code Block
-
-Monospaced code display with language label.
-
-```typescript
+```ts
 interface CodeBlockData {
-  lang?: string;     // language label (display only, no syntax highlighting)
-  content?: string;  // code content
-}
-```
-
-```json
-{ "type": "code", "data": { "lang": "sql", "content": "SELECT * FROM users WHERE active = true LIMIT 10;" } }
-```
-
-Use when: displaying code snippets, SQL queries, or technical output.
-
-### text -- Text Paragraph
-
-Plain text content block.
-
-```typescript
-interface TextBlockData {
+  lang?: string;
   content?: string;
 }
 ```
 
 ```json
-{ "type": "text", "data": { "content": "This report summarizes Q1 performance across all regions." } }
+{ "type": "code", "data": { "lang": "sql", "content": "SELECT * FROM users LIMIT 10;" } }
 ```
 
-Use when: adding descriptive text between other blocks.
+### text -- Paragraphe texte
 
-### actions -- Action Buttons
+```ts
+interface TextBlockData { content?: string; }
+```
 
-Row of buttons (primary and secondary variants).
+```json
+{ "type": "text", "data": { "content": "Ce rapport resume les performances Q1." } }
+```
 
-```typescript
-interface ActionButton { label: string; primary?: boolean; }
+### actions -- Boutons d'action
+
+```ts
 interface ActionsBlockData {
-  buttons: ActionButton[];
+  buttons: { label: string; primary?: boolean }[];
 }
 ```
 
 ```json
-{ "type": "actions", "data": { "buttons": [{ "label": "Approve", "primary": true }, { "label": "Reject" }, { "label": "Skip" }] } }
+{ "type": "actions", "data": { "buttons": [{ "label": "Approve", "primary": true }, { "label": "Reject" }] } }
 ```
 
-Use when: presenting action choices to the user.
+### tags -- Collection de tags
 
-### tags -- Tag Collection
-
-Horizontal list of tag chips with optional active state.
-
-```typescript
-interface TagItem { text: string; active?: boolean; }
+```ts
 interface TagsBlockData {
   label?: string;
-  tags: TagItem[];
+  tags: { text: string; active?: boolean }[];
 }
 ```
 
 ```json
-{ "type": "tags", "data": { "label": "Filters", "tags": [{ "text": "production", "active": true }, { "text": "staging" }, { "text": "v3.1", "active": true }] } }
+{ "type": "tags", "data": { "label": "Filters", "tags": [{ "text": "production", "active": true }, { "text": "staging" }] } }
 ```
-
-Use when: showing categories, filters, status badges, or labels.
 
 ---
 
-## Category: Rich Widgets (15)
+## Categorie : Widgets riches (15)
 
-### stat-card -- Enhanced Stat Card
+### stat-card -- Stat card enrichie
 
-Stat with colored variant, trend object, and previous value.
-
-```typescript
-interface StatCardTrend { direction: 'up' | 'down' | 'flat'; value?: string; positive?: boolean; }
+```ts
 interface StatCardSpec {
   label?: string;
-  value?: unknown;       // string or number
+  value?: unknown;
   unit?: string;
-  delta?: string;        // fallback trend text when trend is a string
-  trend?: 'up' | 'down' | 'flat' | StatCardTrend;
+  delta?: string;
+  trend?: 'up' | 'down' | 'flat' | { direction: 'up' | 'down' | 'flat'; value?: string; positive?: boolean };
   previousValue?: unknown;
   variant?: 'default' | 'success' | 'warning' | 'error' | 'info';
 }
@@ -3454,1096 +3664,807 @@ interface StatCardSpec {
 { "type": "stat-card", "data": { "label": "Active Users", "value": 8204, "unit": "users", "trend": { "direction": "up", "value": "+3.2%", "positive": true }, "variant": "success" } }
 ```
 
-Use when: you need a visually distinct stat card with color-coded variant.
+### data-table -- Table triable
 
-### data-table -- Sortable Table
-
-Full-featured data table with column definitions, sorting, and row click.
-
-```typescript
-interface DataTableColumn { key: string; label: string; align?: 'left' | 'center' | 'right'; type?: 'text' | 'number' | 'boolean' | 'link'; }
+```ts
 interface DataTableSpec {
   title?: string;
-  columns?: DataTableColumn[];   // auto-inferred from rows if omitted
+  columns?: { key: string; label: string; align?: string; type?: string }[];
   rows?: Record<string, unknown>[];
   compact?: boolean;
   striped?: boolean;
-  emptyMessage?: string;
 }
 ```
 
 ```json
-{ "type": "data-table", "data": { "title": "Users", "columns": [{ "key": "name", "label": "Name" }, { "key": "email", "label": "Email" }, { "key": "active", "label": "Active", "type": "boolean" }], "rows": [{ "name": "Alice", "email": "alice@co.com", "active": true }, { "name": "Bob", "email": "bob@co.com", "active": false }] } }
+{ "type": "data-table", "data": { "title": "Users", "columns": [{ "key": "name", "label": "Name" }, { "key": "email", "label": "Email" }], "rows": [{ "name": "Alice", "email": "a@co.com" }] } }
 ```
 
-Use when: displaying tabular data. Supports up to 200 displayed rows.
+Max 200 lignes affichees.
 
-### timeline -- Vertical Timeline
+### timeline -- Timeline verticale
 
-Chronological event list with status indicators.
-
-```typescript
-interface TimelineEvent {
-  date?: string;
-  title?: string;
-  description?: string;
-  status?: 'done' | 'active' | 'pending';
-  color?: string;
-  href?: string;
-  tags?: string[];
-}
+```ts
 interface TimelineSpec {
   title?: string;
-  events?: TimelineEvent[];
+  events?: { date?: string; title?: string; description?: string; status?: 'done' | 'active' | 'pending' }[];
 }
 ```
 
 ```json
-{ "type": "timeline", "data": { "title": "Project History", "events": [{ "date": "2024-01-15", "title": "Project started", "status": "done" }, { "date": "2024-03-01", "title": "Beta launch", "status": "active" }, { "date": "2024-06-01", "title": "GA release", "status": "pending" }] } }
+{ "type": "timeline", "data": { "title": "History", "events": [{ "date": "2024-01", "title": "Launch", "status": "done" }] } }
 ```
 
-Use when: showing chronological events, history, or process steps.
+### profile -- Fiche profil
 
-### profile -- Profile Card
-
-User/entity profile with avatar, fields, stats, and actions.
-
-```typescript
-interface ProfileField { label: string; value: string; href?: string; }
-interface ProfileStat { label: string; value: string; }
-interface ProfileAction { label: string; href?: string; variant?: 'primary' | 'secondary' | 'danger'; }
+```ts
 interface ProfileSpec {
   name?: string;
   subtitle?: string;
   avatar?: { src: string; alt?: string };
-  badge?: { text: string; variant?: 'default' | 'success' | 'warning' | 'error' };
-  fields?: ProfileField[];
-  stats?: ProfileStat[];
-  actions?: ProfileAction[];
+  badge?: { text: string; variant?: string };
+  fields?: { label: string; value: string }[];
+  stats?: { label: string; value: string }[];
+  actions?: { label: string; variant?: string }[];
 }
 ```
 
 ```json
-{ "type": "profile", "data": { "name": "Jane Doe", "subtitle": "Senior Engineer", "badge": { "text": "Active", "variant": "success" }, "fields": [{ "label": "Email", "value": "jane@example.com" }, { "label": "Location", "value": "Paris, FR" }], "stats": [{ "label": "Projects", "value": "12" }, { "label": "Commits", "value": "847" }], "actions": [{ "label": "Message", "variant": "primary" }, { "label": "View Profile", "variant": "secondary" }] } }
+{ "type": "profile", "data": { "name": "Jane Doe", "subtitle": "Engineer", "badge": { "text": "Active", "variant": "success" }, "fields": [{ "label": "Email", "value": "jane@co.com" }] } }
 ```
 
-Use when: displaying a person, user, or entity profile.
+### trombinoscope -- Grille de personnes
 
-### trombinoscope -- People Grid
-
-Grid of people with avatars and badges.
-
-```typescript
-interface TrombinoscopePerson {
-  name: string;
-  subtitle?: string;
-  avatar?: string;      // image URL
-  badge?: string;
-  color?: string;
-  badgeColor?: string;
-}
+```ts
 interface TrombinoscopeSpec {
   title?: string;
-  people?: TrombinoscopePerson[];
-  columns?: number;      // default: 4
-  showBadge?: boolean;   // default: true
+  people?: { name: string; subtitle?: string; avatar?: string; badge?: string }[];
+  columns?: number;
 }
 ```
 
 ```json
-{ "type": "trombinoscope", "data": { "title": "Engineering Team", "columns": 4, "people": [{ "name": "Alice Martin", "subtitle": "Lead", "badge": "TL" }, { "name": "Bob Chen", "subtitle": "Backend" }, { "name": "Carol Silva", "subtitle": "Frontend" }] } }
+{ "type": "trombinoscope", "data": { "title": "Team", "people": [{ "name": "Alice", "subtitle": "Lead" }], "columns": 4 } }
 ```
 
-Use when: displaying a team directory, org chart, or people listing.
+### json-viewer -- Arbre JSON interactif
 
-### json-viewer -- Interactive JSON Tree
-
-Collapsible tree view for JSON data.
-
-```typescript
+```ts
 interface JsonViewerSpec {
   title?: string;
-  data?: unknown;       // any JSON-serializable value
-  maxDepth?: number;    // default: 5
-  expanded?: boolean;   // default: true (first 2 levels open)
+  data?: unknown;
+  maxDepth?: number;
+  expanded?: boolean;
 }
 ```
 
 ```json
-{ "type": "json-viewer", "data": { "title": "API Response", "data": { "status": "ok", "users": [{ "id": 1, "name": "Alice" }, { "id": 2, "name": "Bob" }], "meta": { "total": 2, "page": 1 } } } }
+{ "type": "json-viewer", "data": { "title": "API Response", "data": { "status": "ok", "items": [1, 2, 3] } } }
 ```
 
-Use when: displaying raw JSON data for inspection or debugging.
+### hemicycle -- Hemicycle parlementaire
 
-### hemicycle -- Parliamentary Chart
-
-SVG hemicycle visualization for seat distribution.
-
-```typescript
-interface HemicycleGroup {
-  id: string;
-  label: string;
-  seats: number;
-  color: string;       // hex color
-}
+```ts
 interface HemicycleSpec {
   title?: string;
-  groups?: HemicycleGroup[];
-  totalSeats?: number;  // auto-calculated from groups if omitted
-  rows?: number;        // auto-calculated, 3-7 based on total seats
+  groups?: { id: string; label: string; seats: number; color: string }[];
+  totalSeats?: number;
+  rows?: number;
 }
 ```
 
 ```json
-{ "type": "hemicycle", "data": { "title": "National Assembly", "groups": [{ "id": "left", "label": "Left Coalition", "seats": 150, "color": "#ef4444" }, { "id": "center", "label": "Center", "seats": 120, "color": "#f59e0b" }, { "id": "right", "label": "Right Coalition", "seats": 130, "color": "#3b82f6" }] } }
+{ "type": "hemicycle", "data": { "title": "Assembly", "groups": [{ "id": "left", "label": "Left", "seats": 150, "color": "#ef4444" }, { "id": "right", "label": "Right", "seats": 130, "color": "#3b82f6" }] } }
 ```
 
-Use when: visualizing parliamentary seats, vote distribution, or proportional data.
+### chart-rich -- Chart multi-type
 
-### chart-rich -- Multi-Type Chart
-
-Full-featured chart supporting bar, line, area, pie, and donut types.
-
-```typescript
-interface ChartDataset { label?: string; values: number[]; color?: string; }
+```ts
 interface ChartSpec {
   title?: string;
-  type?: 'bar' | 'line' | 'area' | 'pie' | 'donut';  // default: 'bar'
-  labels?: string[];        // x-axis labels
-  data?: ChartDataset[];    // one or more datasets
-  legend?: boolean;         // default: true when multiple datasets
-  xAxis?: { label?: string };
-  yAxis?: { label?: string };
+  type?: 'bar' | 'line' | 'area' | 'pie' | 'donut';
+  labels?: string[];
+  data?: { label?: string; values: number[]; color?: string }[];
+  legend?: boolean;
 }
 ```
 
 ```json
-{ "type": "chart-rich", "data": { "title": "Revenue by Region", "type": "bar", "labels": ["EU", "US", "APAC"], "data": [{ "label": "2023", "values": [80, 120, 60], "color": "#6366f1" }, { "label": "2024", "values": [95, 140, 85], "color": "#22d3ee" }] } }
+{ "type": "chart-rich", "data": { "title": "Revenue", "type": "bar", "labels": ["EU", "US"], "data": [{ "label": "2024", "values": [95, 140] }] } }
 ```
 
-Pie/donut example:
-```json
-{ "type": "chart-rich", "data": { "title": "Market Share", "type": "donut", "labels": ["Chrome", "Safari", "Firefox", "Other"], "data": [{ "values": [65, 18, 10, 7] }] } }
-```
+### cards -- Grille de cards
 
-Use when: you need multi-series, line, area, pie, or donut charts. For single-series bars, `chart` is simpler.
-
-### cards -- Card Grid
-
-Responsive card grid with optional images and tags.
-
-```typescript
-interface CardItem {
-  title: string;
-  description?: string;
-  subtitle?: string;
-  image?: string;       // image URL
-  tags?: string[];
-  href?: string;
-}
+```ts
 interface CardsSpec {
   title?: string;
-  cards?: CardItem[];
-  minCardWidth?: string;   // default: '180px'
-  gap?: string;            // default: '1rem'
-  emptyMessage?: string;
+  cards?: { title: string; description?: string; tags?: string[]; image?: string }[];
+  minCardWidth?: string;
 }
 ```
 
 ```json
-{ "type": "cards", "data": { "title": "Products", "cards": [{ "title": "Pro Plan", "description": "For teams of 5-50", "tags": ["popular"] }, { "title": "Enterprise", "description": "Custom solutions", "subtitle": "Contact sales" }] } }
+{ "type": "cards", "data": { "title": "Products", "cards": [{ "title": "Pro Plan", "description": "For teams" }] } }
 ```
 
-Use when: displaying collections of items as visual cards (products, articles, features).
+### grid-data -- Grille spreadsheet
 
-### grid-data -- Spreadsheet Grid
-
-Low-level grid with row/column data and optional cell highlights.
-
-```typescript
-interface GridDataColumn { key: string; label: string; width?: string; }
-interface GridDataHighlight { row: number; col: number; color?: string; }
+```ts
 interface GridDataSpec {
   title?: string;
-  columns?: GridDataColumn[];
-  rows?: unknown[][];            // 2D array of cell values
-  highlights?: GridDataHighlight[];
-  cellHeight?: number;           // default: 32
+  columns?: { key: string; label: string }[];
+  rows?: unknown[][];
+  highlights?: { row: number; col: number; color?: string }[];
 }
 ```
 
 ```json
-{ "type": "grid-data", "data": { "title": "Correlation Matrix", "columns": [{ "key": "a", "label": "A" }, { "key": "b", "label": "B" }, { "key": "c", "label": "C" }], "rows": [[1.0, 0.8, 0.3], [0.8, 1.0, 0.5], [0.3, 0.5, 1.0]], "highlights": [{ "row": 0, "col": 1, "color": "rgba(59,130,246,0.2)" }] } }
+{ "type": "grid-data", "data": { "title": "Matrix", "columns": [{ "key": "a", "label": "A" }], "rows": [[1.0, 0.8], [0.8, 1.0]] } }
 ```
 
-Use when: showing matrix data, heatmaps, or spreadsheet-like grids.
+### sankey -- Diagramme de flux
 
-### sankey -- Flow Diagram
-
-Horizontal flow visualization with nodes and links.
-
-```typescript
-interface SankeyNode { id: string; label: string; color?: string; }
-interface SankeyLink { source: string; target: string; value: number; label?: string; }
+```ts
 interface SankeySpec {
   title?: string;
-  nodes?: SankeyNode[];
-  links?: SankeyLink[];
+  nodes?: { id: string; label: string; color?: string }[];
+  links?: { source: string; target: string; value: number }[];
 }
 ```
 
 ```json
-{ "type": "sankey", "data": { "title": "Traffic Flow", "nodes": [{ "id": "google", "label": "Google", "color": "#4285f4" }, { "id": "direct", "label": "Direct", "color": "#34a853" }, { "id": "landing", "label": "Landing Page", "color": "#fbbc05" }, { "id": "signup", "label": "Signup", "color": "#ea4335" }], "links": [{ "source": "google", "target": "landing", "value": 500 }, { "source": "direct", "target": "landing", "value": 300 }, { "source": "landing", "target": "signup", "value": 200 }] } }
+{ "type": "sankey", "data": { "title": "Traffic", "nodes": [{ "id": "google", "label": "Google" }, { "id": "site", "label": "Site" }], "links": [{ "source": "google", "target": "site", "value": 500 }] } }
 ```
 
-Use when: visualizing flows, conversions, or resource distribution.
+### map -- Carte interactive
 
-### map -- Interactive Map
-
-Leaflet-based map with circle markers.
-
-```typescript
-interface LatLng { lat: number; lng: number; }
-interface MapMarker { lat: number; lng: number; label?: string; color?: string; }
+```ts
 interface MapSpec {
   title?: string;
-  center?: LatLng;       // default: { lat: 46.6, lng: 2.3 } (France)
-  zoom?: number;         // default: 6
-  height?: string;       // default: '400px'
-  markers?: MapMarker[];
+  center?: { lat: number; lng: number };
+  zoom?: number;
+  markers?: { lat: number; lng: number; label?: string; color?: string }[];
 }
 ```
 
 ```json
-{ "type": "map", "data": { "title": "Office Locations", "center": { "lat": 48.85, "lng": 2.35 }, "zoom": 5, "markers": [{ "lat": 48.8566, "lng": 2.3522, "label": "Paris HQ" }, { "lat": 51.5074, "lng": -0.1278, "label": "London Office", "color": "#22d3ee" }] } }
+{ "type": "map", "data": { "title": "Offices", "center": { "lat": 48.85, "lng": 2.35 }, "zoom": 5, "markers": [{ "lat": 48.85, "lng": 2.35, "label": "Paris" }] } }
 ```
 
-Use when: showing geographic data, locations, or spatial information.
+### log -- Viewer de logs
 
-### log -- Log Viewer
-
-Monospaced log viewer with level coloring.
-
-```typescript
-interface LogEntry {
-  timestamp?: string;
-  level?: 'debug' | 'info' | 'warn' | 'error';
-  message: string;
-  source?: string;
-}
+```ts
 interface LogViewerSpec {
   title?: string;
-  entries?: LogEntry[];
-  maxHeight?: string;    // default: '320px'
+  entries?: { timestamp?: string; level?: 'debug' | 'info' | 'warn' | 'error'; message: string; source?: string }[];
+  maxHeight?: string;
 }
 ```
 
 ```json
-{ "type": "log", "data": { "title": "Application Logs", "entries": [{ "timestamp": "2024-03-15 14:30:01", "level": "info", "source": "api", "message": "Request processed in 42ms" }, { "timestamp": "2024-03-15 14:30:02", "level": "error", "source": "db", "message": "Connection pool exhausted" }] } }
+{ "type": "log", "data": { "title": "Logs", "entries": [{ "level": "error", "message": "Connection timeout" }] } }
 ```
 
-Use when: showing application logs, event streams, or audit trails.
+### gallery -- Galerie d'images
 
-### gallery -- Image Gallery
-
-Responsive image grid with built-in lightbox.
-
-```typescript
-interface GalleryImage {
-  src: string;           // image URL
-  alt?: string;
-  caption?: string;
-  href?: string;
-}
+```ts
 interface GallerySpec {
   title?: string;
-  images?: GalleryImage[];
-  columns?: number;       // default: 3
-  gap?: string;
-  emptyMessage?: string;
+  images?: { src: string; alt?: string; caption?: string }[];
+  columns?: number;
 }
 ```
 
 ```json
-{ "type": "gallery", "data": { "title": "Project Screenshots", "columns": 3, "images": [{ "src": "https://picsum.photos/400/300?1", "caption": "Dashboard" }, { "src": "https://picsum.photos/400/300?2", "caption": "Settings" }, { "src": "https://picsum.photos/400/300?3", "caption": "Profile" }] } }
+{ "type": "gallery", "data": { "title": "Photos", "columns": 3, "images": [{ "src": "https://picsum.photos/400/300", "caption": "Sample" }] } }
 ```
 
-Use when: displaying image collections. Supports keyboard navigation in lightbox (Escape, Arrow keys).
+Navigation clavier dans la lightbox (Escape, fleches).
 
-### carousel -- Slide Carousel
+### carousel -- Carousel de slides
 
-Horizontal slider with autoplay and touch/swipe support.
-
-```typescript
-interface CarouselSlide {
-  src?: string;           // image URL
-  content?: string;       // text content
-  title?: string;
-  subtitle?: string;
-}
+```ts
 interface CarouselSpec {
   title?: string;
-  slides?: CarouselSlide[];
-  autoPlay?: boolean;      // default: true
-  interval?: number;       // default: 5000 (ms)
+  slides?: { src?: string; content?: string; title?: string; subtitle?: string }[];
+  autoPlay?: boolean;
+  interval?: number;
 }
 ```
 
 ```json
-{ "type": "carousel", "data": { "title": "Feature Highlights", "autoPlay": true, "interval": 4000, "slides": [{ "src": "https://picsum.photos/800/400?1", "title": "New Dashboard", "subtitle": "Redesigned for clarity" }, { "src": "https://picsum.photos/800/400?2", "title": "Team View", "content": "See your whole team at a glance" }] } }
+{ "type": "carousel", "data": { "title": "Features", "autoPlay": true, "interval": 4000, "slides": [{ "src": "https://picsum.photos/800/400", "title": "Slide 1" }] } }
 ```
 
-Use when: showcasing features, images, or content in a rotating view.
+---
+
+## Categorie : Primitives (5)
+
+Composants layout internes (non-renderable via component()) :
+
+| Composant | Usage |
+|-----------|-------|
+| `Window` | Container draggable avec title bar |
+| `Card` | Wrapper card basique |
+| `Panel` | Container panel |
+| `List` | Liste primitive |
+| `GridLayout` | Layout grid |
 
 ---
 
-## Category: Primitives (5)
+## Categorie : Composants base (7)
 
-These are layout components used internally. They are not block types but can be used when building custom layouts:
+UI primitives de `@webmcp-auto-ui/ui/base` :
 
-| Component | Purpose |
-|-----------|---------|
-| `Window` | Draggable window container with title bar |
-| `Card` | Basic card wrapper |
-| `Panel` | Panel container |
-| `List` | Primitive list |
-| `GridLayout` | Grid layout wrapper |
-
----
-
-## Category: Base Components (7)
-
-UI primitives exported from `@webmcp-auto-ui/ui/base`:
-
-| Component | Purpose |
-|-----------|---------|
-| `Button` | Styled button with variants |
-| `Input` | Text input field |
-| `Badge` | Status badge with variants |
-| `NativeSelect` | Native select dropdown |
-| `Tooltip` | Tooltip wrapper |
-| `Dialog` | Modal dialog (Dialog, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription) |
+| Composant | Usage |
+|-----------|-------|
+| `Button` | Bouton avec variantes |
+| `Input` | Champ texte |
+| `Badge` | Badge status |
+| `NativeSelect` | Select dropdown |
+| `Tooltip` | Tooltip hover |
+| `Dialog` | Modal dialog |
 
 ---
 
-## Category: Agent UI Widgets (5)
+## Categorie : Agent UI Widgets (5)
 
-Specialized components for agent interactions, exported from `@webmcp-auto-ui/ui`:
+Composants specialises pour les interactions agent, depuis `@webmcp-auto-ui/ui` :
 
-| Component | Purpose |
-|-----------|---------|
-| `GemmaLoader` | Floating overlay with progress stream; auto-collapses to a pill once the model is loaded |
-| `TokenBubble` | Real-time metrics display: req/min, input tokens/min, output tokens/min, cached tokens |
-| `EphemeralBubble` | Transient notification bubble for ephemeral messages |
-| `RemoteMCPserversDemo` | MCP server discovery component listing demo servers from `MCP_DEMO_SERVERS` |
-| `SettingsPanel` | Sliders with dynamic ranges for temperature, topK, and maxTokens controls |
-
----
-
-## Category: Layout Extensions (1)
-
-| Component | Purpose |
-|-----------|---------|
-| `FlexLayout` | Auto-grid layout with size slider for adjusting block dimensions |
-
-`FlexLayout` complements the existing window manager layouts (Tiling, Floating, Stack) with a responsive auto-grid that lets users control block size via a slider.
+| Composant | Usage |
+|-----------|-------|
+| `GemmaLoader` | Overlay avec barre de progression, auto-collapse en pill |
+| `TokenBubble` | Metriques temps reel : req/min, tokens input/output |
+| `EphemeralBubble` | Notification ephemere |
+| `RemoteMCPserversDemo` | Decouverte serveurs MCP demo |
+| `SettingsPanel` | Sliders temperature, topK, maxTokens |
 
 ---
 
-## Constraints
+## Categorie : Layout extensions (1)
 
-- Block `type` must exactly match one of the 24 block types (case-sensitive).
-- Simple blocks use `data` prop; rich blocks use `spec` prop. The `BlockRenderer` handles this mapping automatically -- you always pass `data` in the block definition.
-- JSON data must be syntactically valid. All strings must be double-quoted.
-- Image URLs in `gallery`, `carousel`, `cards`, `profile` must be accessible (CORS-friendly).
-- `data-table` renders max 200 rows. Provide the most relevant subset.
-- `map` requires Leaflet (loaded dynamically). First render shows a loading state.
+| Composant | Usage |
+|-----------|-------|
+| `FlexLayout` | Auto-grid avec slider de taille pour ajuster les blocs |
 
-## Common Mistakes
+---
 
-| Mistake | Consequence | Fix |
-|---------|-------------|-----|
-| Using `chart` type for pie/donut | `chart` only renders bars | Use `chart-rich` with `type: "pie"` |
-| Passing `rows` as objects to `grid-data` | Grid expects 2D arrays `unknown[][]` | Use `data-table` for object rows, `grid-data` for arrays |
-| Missing `id` on hemicycle groups | Click events cannot identify the group | Always include `id` on each group |
-| `data-table` columns with wrong `key` | Cells render as empty/null | Column `key` must match the keys in row objects |
-| Gallery images without `src` | Broken image placeholders | Ensure every image has a valid `src` URL |
-| Using `trend` string on `stat-card` without `delta` | Trend arrow shows but no value text | Set `delta` when `trend` is a simple string, or use the object form |
+## Contraintes
+
+- `type` de bloc = exactement un des 24 types (case-sensitive).
+- JSON valide. Strings en double-quotes.
+- URLs images doivent etre accessibles (CORS).
+- `data-table` : max 200 lignes.
+- `map` : Leaflet charge dynamiquement.
+
+## Erreurs courantes
+
+| Erreur | Consequence | Correction |
+|--------|-------------|-----------|
+| `chart` pour pie/donut | `chart` = bars uniquement | `chart-rich` avec `type: "pie"` |
+| `rows` objets dans `grid-data` | Grid attend `unknown[][]` | `data-table` pour objets, `grid-data` pour arrays |
+| Pas d'`id` sur hemicycle groups | Click events cassent | Toujours `id` |
+| `columns.key` ne matche pas les rows | Cellules vides | `key` doit correspondre aux cles des objets row |
+| `trend` string sur `stat-card` sans `delta` | Fleche sans valeur | Mettre `delta` ou utiliser la forme objet |
 
   </script>
   <script type="text/markdown" data-page="agents-mcp">
-# MCP Integration -- Agent Guide
+# Integration MCP -- Guide Agent
 
-> This document is designed to be injected into an AI agent's context. It contains everything needed to connect and use MCP (Model Context Protocol) servers with webmcp-auto-ui.
+> Ce document est concu pour etre injecte dans le contexte d'un agent IA. Il couvre la connexion multi-MCP, les ToolLayers, et les recettes serveur.
 
-## What is MCP?
+## Qu'est-ce que MCP ?
 
-MCP (Model Context Protocol) is a JSON-RPC 2.0 protocol that allows AI agents and applications to discover and call tools exposed by remote servers. In webmcp-auto-ui, MCP is the bridge between data sources and the UI: you connect to an MCP server, list its tools, call them to fetch data, and display results using UI blocks.
+MCP (Model Context Protocol) est un protocole JSON-RPC 2.0 qui permet aux agents IA de decouvrir et appeler des outils exposes par des serveurs distants. Dans webmcp-auto-ui, MCP est le pont entre les sources de donnees et l'UI.
 
-## Architecture Overview
+## Architecture v0.7.0 : ToolLayers
 
 ```
-User prompt --> Agent Loop --> LLM (Claude/Gemma)
+User prompt --> Agent Loop --> LLM (Claude/Gemma/Ollama)
                   |                    |
                   |              tool_use blocks
                   |                    |
-                  v                    v
-              MCP Client -------> MCP Server (remote)
-                  |                    |
-              tool results        data/actions
-                  |
-                  v
-              UI Blocks (stat, chart, table, etc.)
+         +--------+--------+          |
+         |                  |          v
+    McpLayer 1         McpLayer 2     UILayer
+    (Tricoteuses)      (iNaturalist)  (component())
+         |                  |
+    MCP Client 1       MCP Client 2
+         |                  |
+    MCP Server 1       MCP Server 2
 ```
 
-## McpClient and McpMultiClient
+Chaque serveur MCP connecte produit un `McpLayer` avec ses outils et ses recettes serveur. Le tout est agrege dans un `ToolLayer[]` passe a `runAgentLoop`.
 
-The `McpClient` class (from `@webmcp-auto-ui/core`) handles the full MCP lifecycle for a single server. For multi-server scenarios, use `McpMultiClient`.
+### Construction des layers
 
-### McpMultiClient
+```ts
+import type { McpLayer, UILayer, ToolLayer } from '@webmcp-auto-ui/agent';
+import { WEBMCP_RECIPES, filterRecipesByServer } from '@webmcp-auto-ui/agent';
 
-Manages simultaneous connections to multiple MCP servers. Aggregates tool lists and routes tool calls to the correct server:
+// Layer MCP pour chaque serveur connecte
+const mcpLayer1: McpLayer = {
+  source: 'mcp',
+  serverUrl: 'https://mcp.code4code.eu/mcp',
+  serverName: 'Tricoteuses',
+  tools: await client1.listTools(),
+  recipes: [
+    { name: 'profil-depute', description: 'Fiche complete depute' },
+    { name: 'scrutin-detail', description: 'Analyse scrutin public' },
+  ],
+};
 
-```typescript
-import { McpMultiClient } from '@webmcp-auto-ui/core';
+const mcpLayer2: McpLayer = {
+  source: 'mcp',
+  serverUrl: 'https://other-mcp.example.com/mcp',
+  serverName: 'iNaturalist',
+  tools: await client2.listTools(),
+};
 
-const multi = new McpMultiClient();
-await multi.addServer('https://mcp1.example.com/mcp');
-await multi.addServer('https://mcp2.example.com/mcp');
+// Layer UI avec recettes filtrees par serveurs connectes
+const serverNames = ['Tricoteuses', 'iNaturalist'];
+const uiLayer: UILayer = {
+  source: 'ui',
+  recipes: filterRecipesByServer(WEBMCP_RECIPES, serverNames),
+};
 
-const allTools = multi.listAllTools();  // aggregated from all servers
-const result = await multi.callTool('query_sql', { sql: 'SELECT 1' });  // routes to correct server
-
-await multi.removeServer('https://mcp1.example.com/mcp');
-await multi.disconnectAll();
+const layers: ToolLayer[] = [mcpLayer1, mcpLayer2, uiLayer];
 ```
 
-The flex app uses `McpMultiClient` to connect to several MCP servers simultaneously and expose all their tools to the agent loop.
+### Ce que le LLM voit (prompt genere)
 
-## McpClient API
+```
+## mcp (Tricoteuses, iNaturalist)
 
-### Connecting
+### outils DATA (12)
+- query_sql: Execute une requete SQL
+- list_tables: Liste les tables disponibles
+- describe_table: Schema d'une table
+- search_recipes: Recherche des recettes
+...
 
-```typescript
+### recettes serveur (2)
+- profil-depute: Fiche complete depute
+- scrutin-detail: Analyse scrutin public
+
+## webmcp
+
+### component() -- seul outil UI
+Appelle component("nom", {params}) pour rendre un composant.
+Composants disponibles : stat, kv, list, chart, alert, ...
+```
+
+## McpClient et McpMultiClient
+
+### McpClient (connexion simple)
+
+```ts
 import { McpClient } from '@webmcp-auto-ui/core';
 
 const client = new McpClient('https://mcp.example.com/mcp', {
   clientName: 'my-app',
   clientVersion: '1.0.0',
   timeout: 30000,
-  headers: {
-    'Authorization': 'Bearer <token>'  // optional
-  },
+  headers: { 'Authorization': 'Bearer <token>' },
   autoReconnect: true,
-  maxReconnectAttempts: 3
+  maxReconnectAttempts: 3,
 });
 
-// Initialize the connection (required before any other call)
-const initResult = await client.connect();
-// initResult: { protocolVersion, capabilities, serverInfo }
-```
-
-### Listing Tools
-
-```typescript
+await client.connect();
 const tools = await client.listTools();
-// tools: McpTool[]
-// Each tool: { name, description, inputSchema, outputSchema, annotations }
-```
-
-### Calling a Tool
-
-```typescript
-const result = await client.callTool('query_sql', {
-  sql: 'SELECT name, revenue FROM products ORDER BY revenue DESC LIMIT 5'
-});
-// result: { content: [{ type: 'text', text: '...' }], isError?: boolean }
-```
-
-### Disconnecting
-
-```typescript
+const result = await client.callTool('query_sql', { sql: 'SELECT 1' });
 await client.disconnect();
 ```
 
-## Transport: Streamable HTTP
+### McpMultiClient (multi-serveur)
 
-The MCP client uses HTTP POST with JSON-RPC 2.0 payloads:
+Gere les connexions simultanees a plusieurs serveurs MCP. Agrege les listes d'outils et route les appels vers le bon serveur :
 
-- **Content-Type**: `application/json`
-- **Accept**: `application/json, text/event-stream`
-- **Session management**: The server returns an `Mcp-Session-Id` header on first request. The client sends it back on subsequent requests.
-- **Auto-reconnect**: If the server returns 404 (session expired), the client automatically re-initializes with exponential backoff (500ms * attempt).
-- **SSE responses**: The server may respond with `text/event-stream`. The client parses `data:` lines and extracts the last complete JSON-RPC response.
+```ts
+import { McpMultiClient } from '@webmcp-auto-ui/core';
 
-### Request Format
+const multi = new McpMultiClient();
+await multi.addServer('https://mcp1.example.com/mcp');
+await multi.addServer('https://mcp2.example.com/mcp');
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "tools/call",
-  "params": {
-    "name": "query_sql",
-    "arguments": { "sql": "SELECT 1" }
-  }
-}
+const allTools = multi.listAllTools();
+const result = await multi.callTool('query_sql', { sql: 'SELECT 1' });
+
+await multi.removeServer('https://mcp1.example.com/mcp');
+await multi.disconnectAll();
 ```
 
-### Response Format
+## Recettes serveur (MCP recipes)
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "content": [{ "type": "text", "text": "[{\"id\":1}]" }]
-  }
-}
+Les recettes MCP viennent du serveur et decrivent ce que les outils retournent et comment les combiner. Elles sont distinctes des recettes WebMCP (UI) qui guident le LLM sur la presentation.
+
+### Obtenir les recettes
+
+```ts
+// Certains serveurs exposent list_recipes / get_recipe
+const recipesResult = await client.callTool('list_recipes', {});
+const mcpRecipes: McpRecipe[] = JSON.parse(recipesResult.content[0].text);
+
+// Ajouter au McpLayer
+const mcpLayer: McpLayer = {
+  source: 'mcp',
+  serverUrl: client.url,
+  serverName: 'Tricoteuses',
+  tools: await client.listTools(),
+  recipes: mcpRecipes,
+};
 ```
 
-## MCP Tool Shape
+### Difference WebMCP vs MCP recipes
 
-```typescript
-interface McpTool {
-  name: string;
-  description?: string;
-  inputSchema?: JsonSchema;   // JSON Schema for parameters
-  outputSchema?: JsonSchema;
-  annotations?: {
-    readOnlyHint?: boolean;
-    destructiveHint?: boolean;
-    idempotentHint?: boolean;
-    openWorldHint?: boolean;
-  };
-}
+| | Recette WebMCP (UI) | Recette MCP (serveur) |
+|--|---------------------|----------------------|
+| Source | Package agent (fichiers .md) | Serveur MCP (`list_recipes`) |
+| Contenu | Comment presenter avec component() | Ce que les outils retournent |
+| Section prompt | `## webmcp > recettes UI` | `## mcp > recettes serveur` |
+| Type | `Recipe` | `McpRecipe` |
+| Porte par | `UILayer.recipes` | `McpLayer.recipes` |
+
+## Transport : Streamable HTTP
+
+Le client MCP utilise HTTP POST avec JSON-RPC 2.0 :
+
+- **Content-Type** : `application/json`
+- **Accept** : `application/json, text/event-stream`
+- **Session** : header `Mcp-Session-Id` gere automatiquement
+- **Auto-reconnect** : re-initialise sur 404 (session expiree), backoff exponentiel
+- **SSE** : le client parse les reponses `text/event-stream`
+
+## Pattern : generation auto d'UI
+
+```
+1. L'utilisateur connecte un serveur MCP
+2. L'app appelle client.listTools() -> decouverte des outils
+3. L'app construit les ToolLayers (McpLayer + UILayer)
+4. L'utilisateur pose une question en langage naturel
+5. runAgentLoop:
+   - LLM appelle un outil MCP (donnees)
+   - LLM appelle component() (affichage)
+   - Repete jusqu'a end_turn
+6. Resultat : dashboard genere sans composition manuelle
 ```
 
-## Integrating MCP in a Skill
+### Exemple complet
 
-A skill can reference an MCP server via the `mcp` and `mcpName` fields:
-
-```json
-{
-  "name": "sales-dashboard",
-  "mcp": "https://mcp.example.com/mcp",
-  "mcpName": "sales-api",
-  "blocks": [
-    { "type": "stat", "data": { "label": "Revenue", "value": "
-  <script>
-42K" } }
-  ]
-}
-```
-
-When a skill has an `mcp` field, the runtime:
-1. Creates an `McpClient` and connects to the URL
-2. Lists available tools
-3. Makes them available to the agent loop alongside UI tools
-
-## The Agent Loop Pattern
-
-The `runAgentLoop` function orchestrates LLM + MCP + UI:
-
-```typescript
+```ts
 import { McpClient } from '@webmcp-auto-ui/core';
-import { runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
+import { runAgentLoop, WEBMCP_RECIPES, filterRecipesByServer } from '@webmcp-auto-ui/agent';
+import type { McpLayer, UILayer } from '@webmcp-auto-ui/agent';
 
-// 1. Connect to MCP
-const client = new McpClient('https://mcp.example.com/mcp');
-await client.connect();
-const tools = await client.listTools();
-
-// 2. Run the agent loop
-const result = await runAgentLoop('Show me top 5 products by revenue', {
-  client,
-  provider: myLLMProvider,    // LLMProvider implementation
-  mcpTools: fromMcpTools(tools),
-  maxIterations: 5,
-  callbacks: {
-    onBlock: (type, data) => { /* add block to UI */ },
-    onText: (text) => { /* display assistant text */ },
-    onToolCall: (call) => { /* log tool call */ }
-  }
-});
-```
-
-The loop works as follows:
-1. Sends user message + system prompt to LLM
-2. LLM returns tool_use blocks (DATA tools or UI tools)
-3. DATA tools are executed via `client.callTool()`
-4. UI tools are executed locally via callbacks (`onBlock`, `onClear`)
-5. Tool results are sent back to LLM
-6. Repeat until LLM returns `end_turn` or max iterations reached
-
-### System Prompt
-
-The auto-generated system prompt tells the LLM:
-- Which DATA tools are available (from MCP server)
-- Which UI tools are available (stat, chart, table, etc.)
-- The mandatory workflow: fetch data first, then display with UI tools
-
-> **Tip**: In addition to individual `render_*` tools, the unified `component()` tool provides a single entry point for all 56 UI components (31 renderable, 25 non-renderable). The LLM can call `component("help")` to discover available components at runtime. See the [agent package docs](../packages/agent.md#unified-component-tool) for details.
-
-## Auto-Generated UI Pattern
-
-Connect MCP, list tools, and let the agent auto-generate the UI:
-
-1. User connects to an MCP server URL
-2. App calls `client.listTools()` to discover available tools
-3. User types a natural language query
-4. Agent loop calls MCP tools to fetch data, then UI tools to render blocks
-5. Result: a fully generated dashboard without manual block composition
-
-## Example: Connect and Generate
-
-```typescript
-// Connect to Tricoteuses MCP server
+// 1. Connecter
 const client = new McpClient('https://mcp.code4code.eu/mcp');
 await client.connect();
-
-console.log('Server:', client.getServerInfo());
-// { name: "tricoteuses", version: "1.0.0" }
-
 const tools = await client.listTools();
-console.log('Available tools:', tools.map(t => t.name));
-// ["query_sql", "list_tables", "describe_table", "search_recipes", ...]
 
-// Run agent loop with a user query
-const result = await runAgentLoop('List all recipes with their ratings', {
-  client,
+// 2. Construire les layers
+const mcpLayer: McpLayer = {
+  source: 'mcp',
+  serverUrl: 'https://mcp.code4code.eu/mcp',
+  serverName: 'Tricoteuses',
+  tools,
+};
+
+const uiLayer: UILayer = {
+  source: 'ui',
+  recipes: filterRecipesByServer(WEBMCP_RECIPES, ['Tricoteuses']),
+};
+
+// 3. Lancer
+const result = await runAgentLoop('Liste les deputes du groupe Ecologiste', {
   provider: claudeProvider,
-  mcpTools: fromMcpTools(tools),
+  layers: [mcpLayer, uiLayer],
+  toolMode: 'smart',
   callbacks: {
     onBlock: (type, data) => blocks.push({ type, data }),
-    onText: (text) => console.log('Assistant:', text)
-  }
+    onText: (text) => console.log('Assistant:', text),
+  },
 });
-
-// result.toolCalls shows what the agent did:
-// 1. Called query_sql to fetch recipes
-// 2. Called ui_data_table to display results
 ```
 
-## Authentication
+## Authentification
 
-MCP servers can require authentication. Pass a Bearer token in the headers:
-
-```typescript
+```ts
 const client = new McpClient('https://mcp.example.com/mcp', {
-  headers: {
-    'Authorization': 'Bearer eyJhbGci...'
-  }
+  headers: { 'Authorization': 'Bearer eyJhbGci...' },
 });
 ```
 
-The token is sent with every request (initialize, tools/list, tools/call).
+Le token est envoye avec chaque requete (initialize, tools/list, tools/call).
 
-## McpClient Options
+## Options McpClient
 
-```typescript
+```ts
 interface McpClientOptions {
-  clientName?: string;            // default: 'webmcp-auto-ui'
-  clientVersion?: string;         // default: '0.1.0'
-  timeout?: number;               // request timeout in ms, default: 30000
-  headers?: Record<string, string>; // extra headers (auth, etc.)
-  autoReconnect?: boolean;        // reconnect on 404, default: true
+  clientName?: string;
+  clientVersion?: string;
+  timeout?: number;               // default: 30000
+  headers?: Record<string, string>;
+  autoReconnect?: boolean;        // default: true
   maxReconnectAttempts?: number;  // default: 3
 }
 ```
 
-## Constraints
+## Contraintes
 
-- The MCP server must support Streamable HTTP transport (POST with JSON-RPC 2.0).
-- `connect()` must be called before `listTools()` or `callTool()`.
-- Tool results are text-based (`content[].type === 'text'`). Parse JSON from `content[0].text` if needed.
-- The agent loop truncates tool results to 10,000 characters to fit LLM context windows.
-- CORS: the MCP server must allow requests from your domain.
+- Le serveur MCP doit supporter Streamable HTTP (POST JSON-RPC 2.0).
+- `connect()` obligatoire avant `listTools()` ou `callTool()`.
+- Les resultats sont text-based : parser le JSON depuis `content[0].text`.
+- La boucle agent tronque les resultats a 10 000 caracteres.
+- CORS : le serveur doit autoriser les requetes depuis votre domaine.
 
-## Common Mistakes
+## Erreurs courantes
 
-| Mistake | Consequence | Fix |
-|---------|-------------|-----|
-| Calling `listTools()` before `connect()` | Error: session not initialized | Always call `connect()` first |
-| Missing `Authorization` header | 401 or 403 from server | Pass Bearer token in `headers` option |
-| Ignoring `isError` on tool results | Silent failures, incorrect data displayed | Check `result.isError` before using content |
-| Not handling SSE responses | Client hangs or parses incorrectly | The McpClient handles SSE automatically -- no action needed |
-| Setting `timeout` too low for slow tools | Request aborted mid-execution | Increase `timeout` for heavy queries (60000+) |
-| Not calling `disconnect()` | Session leaks on server side | Call `disconnect()` when done or on component unmount |
+| Erreur | Consequence | Correction |
+|--------|-------------|-----------|
+| `listTools()` avant `connect()` | Erreur session | Toujours `connect()` d'abord |
+| Header `Authorization` manquant | 401/403 | Passer le Bearer token |
+| Ignorer `isError` sur les resultats | Donnees incorrectes affichees | Verifier `result.isError` |
+| `timeout` trop bas | Requete abortee | Augmenter pour les queries lourdes (60000+) |
+| Pas de `disconnect()` | Fuite de session serveur | Appeler au unmount |
 
   </script>
   <script type="text/markdown" data-page="agents-skills">
-# Skills -- Agent Guide
+# Recettes et Skills -- Guide Agent
 
-> This document is designed to be injected into an AI agent's context. It contains everything needed to create, manage, encode, and share skills in webmcp-auto-ui.
+> Ce document est concu pour etre injecte dans le contexte d'un agent IA. Il couvre les recettes WebMCP (UI), les recettes MCP (serveur), et les skills (format HyperSkill).
 
-## What is a Skill?
+## Vue d'ensemble
 
-A skill is a set of instructions that help an agent use tools. It can define one or more blocks (each block being a set of instructions for specific tools), reference one or more MCP tools, and refer to other skills (composition via natural-language inclusion). Skills are the fundamental unit of saved agent behavior in webmcp-auto-ui. "Recette" (FR) and "recipe" (EN) are exact synonyms of "skill".
+Le systeme a deux types de recettes + un format de persistence :
 
-## Skill Format
+| Concept | Source | Role |
+|---------|--------|------|
+| **Recette WebMCP** | Package agent (fichiers `.md`) | Guide le LLM sur comment presenter les donnees avec les composants UI |
+| **Recette MCP** | Serveur MCP (`list_recipes`/`get_recipe`) | Decrit ce que les outils retournent et comment les combiner |
+| **Skill** | SDK (localStorage/HyperSkill URL) | Persistence : blocs + metadata + theme, encodable en URL |
 
-```typescript
-interface SkillBlock {
-  type: string;                      // one of the 24 block types
-  data: Record<string, unknown>;     // block-specific data
-}
+## Recettes WebMCP (UI)
 
-interface Skill {
-  id: string;                        // auto-generated (e.g. "sk_m1abc2def")
-  name: string;                      // required
+Les recettes WebMCP guident le LLM sur le choix des composants. Elles sont des fichiers `.md` avec un frontmatter YAML, parsees au build et injectees dans le prompt via `UILayer.recipes`.
+
+### Format
+
+```markdown
+---
+id: composer-tableau-de-bord-kpi
+name: Composer un tableau de bord KPI
+components_used: [stat-card, chart, table, kv]
+when: les donnees contiennent des metriques numeriques
+servers: []
+layout:
+  type: grid
+  columns: 3
+  arrangement: stat-cards en ligne, chart + table en dessous
+---
+
+## Quand utiliser
+Les resultats MCP contiennent des metriques numeriques...
+
+## Comment
+1. Identifier les 3-5 KPIs principaux
+2. Afficher chaque KPI en stat-card
+3. Ajouter un chart si series temporelles
+```
+
+### Type Recipe
+
+```ts
+interface Recipe {
+  id: string;
+  name: string;
   description?: string;
-  mcp?: string;                      // MCP server URL
-  mcpName?: string;                  // MCP server display name
-  llm?: string;                      // preferred model: "claude-haiku" | "claude-sonnet" | "gemma-e2b" | "auto"
-  tags?: string[];
-  theme?: Record<string, string>;    // flat token overrides (e.g. {"color-accent": "#2563eb"})
-  blocks: SkillBlock[];              // required
-  createdAt: number;                 // auto-set (epoch ms)
-  updatedAt: number;                 // auto-set (epoch ms)
+  components_used?: string[];
+  layout?: { type: string; columns?: number; arrangement?: string };
+  when: string;            // condition de declenchement (texte libre)
+  servers?: string[];      // serveurs MCP cibles (vide = universel)
+  body: string;            // contenu markdown
 }
 ```
 
-## CRUD Operations
+### API
 
-All CRUD functions are available from `@webmcp-auto-ui/sdk`:
-
-### Create
-
-```typescript
-import { createSkill } from '@webmcp-auto-ui/sdk';
-
-const skill = createSkill({
-  name: 'sales-dashboard',
-  description: 'Overview of sales KPIs',
-  mcp: 'https://mcp.example.com/mcp',
-  mcpName: 'sales-api',
-  llm: 'claude-sonnet',
-  tags: ['sales', 'kpi'],
-  theme: { 'color-accent': '#2563eb' },
-  blocks: [
-    { type: 'stat', data: { label: 'Revenue', value: '
-  <script>
-42K', trend: '+12%', trendDir: 'up' } },
-    { type: 'stat', data: { label: 'Orders', value: '1,204', trend: '+8%', trendDir: 'up' } },
-    { type: 'chart', data: { title: 'Monthly Revenue', bars: [['Jan',80],['Feb',95],['Mar',120]] } }
-  ]
-});
-// skill.id is auto-generated
-// skill.createdAt and skill.updatedAt are auto-set
+```ts
+import {
+  WEBMCP_RECIPES,           // 8+ recettes built-in, auto-enregistrees
+  parseRecipe,               // parser un .md brut -> Recipe
+  parseRecipes,              // parser un lot de .md -> Recipe[]
+  recipeRegistry,            // registre singleton read-only
+  registerRecipes,           // ajouter au registre
+  filterRecipesByServer,     // filtrer par nom de serveur connecte
+  formatRecipesForPrompt,    // formater pour injection prompt (<500 tokens/5 recettes)
+} from '@webmcp-auto-ui/agent';
 ```
 
-### Read
+### Recettes built-in
 
-```typescript
-import { getSkill, listSkills } from '@webmcp-auto-ui/sdk';
+| ID | Quand | Composants |
+|----|-------|-----------|
+| `composer-tableau-de-bord-kpi` | Metriques numeriques, compteurs, totaux | stat-card, chart, table, kv |
+| `afficher-oeuvres-art-collection-musee` | Collection d'images/oeuvres | gallery, cards, carousel |
+| `analyser-actualites-hacker-news` | Articles/actualites | cards, table, stat-card |
+| `cartographier-observations-biodiversite` | Donnees geographiques/observations | map, stat-card, table |
+| `explorer-dossiers-legislatifs` | Parcours legislatif | timeline, kv, table |
+| `gallery-images` | Images multiples | gallery, carousel |
+| `parlementaire-profile` | Profil depute/senateur | profile, hemicycle, timeline |
+| `rechercher-textes-juridiques` | Textes de loi | list, kv, code |
+| `weather-viz` | Donnees meteo | stat-card, chart |
+| `cross-server` | Donnees de plusieurs serveurs MCP | table, chart, kv |
 
-const skill = getSkill('sk_m1abc2def');   // returns Skill | undefined
-const allSkills = listSkills();            // returns Skill[], sorted by createdAt desc
+### Filtrage par serveur
+
+Les recettes ont un champ `servers[]` optionnel. La fonction `filterRecipesByServer` fait un matching substring (insensible a la casse) :
+
+```ts
+const recipes = filterRecipesByServer(WEBMCP_RECIPES, ['tricoteuses']);
+// Retourne les recettes dont servers contient "tricoteuses" + les universelles (servers: [])
 ```
 
-### Update
+### Injection dans le prompt
 
-```typescript
-import { updateSkill } from '@webmcp-auto-ui/sdk';
+Les recettes sont injectees dans la section `## webmcp` du prompt via `formatRecipesForPrompt()` :
 
-const updated = updateSkill('sk_m1abc2def', {
-  name: 'sales-dashboard-v2',
-  blocks: [/* new blocks */]
-});
-// returns updated Skill | null (null if not found)
-// updatedAt is auto-refreshed
+```
+### recettes UI (3)
+- Composer un tableau de bord KPI: les donnees contiennent des metriques numeriques [stat-card, chart, table, kv]
+- Afficher oeuvres art: collection d'images [gallery, cards, carousel]
+- Parlementaire profile: profil depute [profile, hemicycle, timeline]
 ```
 
-### Delete
+## Recettes MCP (serveur)
 
-```typescript
-import { deleteSkill } from '@webmcp-auto-ui/sdk';
+Les recettes MCP viennent du serveur connecte via les outils `list_recipes` et `get_recipe`. Elles decrivent ce que les outils retournent et comment les combiner.
 
-const deleted = deleteSkill('sk_m1abc2def');  // returns boolean
-```
+### Type McpRecipe
 
-### Bulk Operations
-
-```typescript
-import { clearSkills, loadSkills, loadDemoSkills } from '@webmcp-auto-ui/sdk';
-
-clearSkills();              // removes all skills
-loadSkills(skillArray);     // replaces all skills with provided array
-loadDemoSkills();           // loads built-in demo skills (only if registry is empty)
-```
-
-### Change Listener
-
-```typescript
-import { onSkillsChange } from '@webmcp-auto-ui/sdk';
-
-const unsubscribe = onSkillsChange(() => {
-  console.log('Skills changed!');
-});
-// later: unsubscribe();
-```
-
-## HyperSkill Format
-
-HyperSkill is a URL-based encoding for sharing skills. A skill is serialized into a URL parameter `?hs=` that can be pasted, bookmarked, or shared.
-
-The SDK re-exports `encode`, `decode`, `hash`, `diff`, and `getHsParam` directly from the [`hyperskills`](https://www.npmjs.com/package/hyperskills) NPM package. Apps should import from `@webmcp-auto-ui/sdk`:
-
-```typescript
-import { encode, decode, hash, diff, getHsParam } from '@webmcp-auto-ui/sdk';
-```
-
-### Structure
-
-```typescript
-interface HyperSkillMeta {
-  title?: string;
+```ts
+interface McpRecipe {
+  name: string;
   description?: string;
-  version?: string;
-  created?: string;
-  mcp?: string;
-  mcpName?: string;
-  llm?: string;
-  tags?: string[];
-  theme?: Record<string, string>;
-  hash?: string;
-  previousHash?: string;
-  chatSummary?: string;       // anonymized summary of the chat that produced the skill
-  provenance?: {              // records how the skill was created
-    model?: string;           // LLM model used (e.g. "claude-sonnet", "gemma-e2b")
-    mcp?: string;             // MCP server URL
-    timestamp?: number;       // epoch ms
-  };
-}
-
-interface HyperSkill {
-  meta: HyperSkillMeta;
-  content: unknown;       // typically the blocks array or full skill data
 }
 ```
 
-### Encoding
+### Utilisation dans les layers
 
-```typescript
-import { encode, type HyperSkill } from '@webmcp-auto-ui/sdk';
-
-const skill: HyperSkill = {
-  meta: {
-    title: 'Sales Dashboard',
-    description: 'KPI overview',
-    mcp: 'https://mcp.example.com/mcp',
-    tags: ['sales']
-  },
-  content: [
-    { type: 'stat', data: { label: 'Revenue', value: '
-  <script>
-42K' } },
-    { type: 'chart', data: { title: 'Trend', bars: [['Q1',80],['Q2',120]] } }
-  ]
+```ts
+const mcpLayer: McpLayer = {
+  source: 'mcp',
+  serverUrl: 'https://mcp.code4code.eu/mcp',
+  serverName: 'Tricoteuses',
+  tools: await client.listTools(),
+  recipes: [
+    { name: 'profil-depute', description: 'Fiche complete avec votes et mandats' },
+    { name: 'scrutin-detail', description: 'Analyse detaillee d\'un scrutin public' },
+  ],
 };
-
-const url = await encode('https://app.example.com/viewer', JSON.stringify(skill));
-// "https://app.example.com/viewer?hs=eyJtZXRhIjp7InRpdGxlIjoi..."
 ```
 
-Encoding rules:
-- JSON serialized, then base64-encoded
-- If payload > 6KB: gzip-compressed first, prefixed with `gz.`
-- The URL is built from the provided source URL + `?hs=` parameter
+Elles apparaissent dans le prompt sous :
 
-### Decoding
+```
+## mcp (Tricoteuses)
+### recettes serveur (2)
+- profil-depute: Fiche complete avec votes et mandats
+- scrutin-detail: Analyse detaillee d'un scrutin public
+```
 
-```typescript
-import { decode } from '@webmcp-auto-ui/sdk';
+### Comment les obtenir
 
-const { content: raw } = await decode('https://app.example.com/viewer?hs=eyJtZXRh...');
+Beaucoup de serveurs MCP exposent les outils `list_recipes` et `get_recipe`. L'app peut les appeler au moment de la connexion :
+
+```ts
+const recipesResult = await client.callTool('list_recipes', {});
+const mcpRecipes: McpRecipe[] = JSON.parse(recipesResult.content[0].text);
+```
+
+## Skills (format HyperSkill)
+
+Les skills sont le format de persistence. Un skill combine des blocs, des metadata, et un theme optionnel.
+
+### Format Skill
+
+```ts
+interface Skill {
+  id: string;                        // auto-genere
+  name: string;                      // requis
+  description?: string;
+  mcp?: string;                      // URL serveur MCP
+  mcpName?: string;
+  llm?: string;                      // modele prefere
+  tags?: string[];
+  theme?: Record<string, string>;    // overrides CSS tokens
+  blocks: SkillBlock[];              // requis
+  createdAt: number;
+  updatedAt: number;
+}
+```
+
+### CRUD
+
+```ts
+import { createSkill, getSkill, listSkills, updateSkill, deleteSkill } from '@webmcp-auto-ui/sdk';
+
+const skill = createSkill({ name: 'sales-dashboard', blocks: [...] });
+const all = listSkills();
+const updated = updateSkill(skill.id, { name: 'v2' });
+deleteSkill(skill.id);
+```
+
+### Encodage HyperSkill URL
+
+```ts
+import { encode, decode, getHsParam } from '@webmcp-auto-ui/sdk';
+
+// Encoder
+const url = await encode('https://app.com/viewer', JSON.stringify(hsSkill));
+// "https://app.com/viewer?hs=eyJtZXRhIjp7..."
+
+// Decoder
+const { content: raw } = await decode(hsParam);
 const skill = JSON.parse(raw);
-// or just the param value:
-const { content: raw2 } = await decode('eyJtZXRhIjp7...');
-const skill2 = JSON.parse(raw2);
-
-console.log(skill.meta.title);   // "Sales Dashboard"
-console.log(skill.content);      // blocks array
 ```
 
-### Chat summary and provenance
+Regles d'encodage :
+- JSON -> base64
+- Si > 6KB : gzip + prefix `gz.`
+- Points d'entree : `/viewer?hs=` (lecture seule) ou `/flex?hs=` (editable)
 
-When encoding a skill, you can include an anonymized summary of the conversation that produced it, plus provenance metadata:
+### Provenance et summary
 
-```typescript
+```ts
 import { summarizeChat } from '@webmcp-auto-ui/agent';
 
-const skill: HyperSkill = {
+const hsSkill: HyperSkill = {
   meta: {
-    title: 'Sales Dashboard',
-    chatSummary: summarizeChat(messages),  // anonymized, no PII
-    provenance: {
-      model: 'claude-sonnet',
-      mcp: 'https://mcp.example.com/mcp',
-      timestamp: Date.now(),
-    },
+    title: 'Dashboard',
+    chatSummary: summarizeChat(messages),
+    provenance: { model: 'claude-sonnet', mcp: 'https://mcp.example.com', timestamp: Date.now() },
   },
   content: blocks,
 };
 ```
 
-These fields enable traceability without exposing raw chat history in shared URLs.
+### Hashing et diff
 
-### Reading from Current URL
+```ts
+import { hash, diff } from '@webmcp-auto-ui/sdk';
 
-```typescript
-import { getHsParam, decode } from '@webmcp-auto-ui/sdk';
-
-const param = getHsParam();  // returns the ?hs= value or null
-if (param) {
-  const { content: raw } = await decode(param);
-  const skill = JSON.parse(raw);
-}
+const h = await hash('https://app.com/viewer', JSON.stringify(skill.content));
+const changed = diff(oldContent, newContent); // ["blocks", "meta"]
 ```
 
-### URL Format
+## Workflow : Creer une skill
 
-Skills can be shared via two entry points:
-- **Viewer**: `https://domain.com/viewer?hs=<encoded>` -- read-only display
-- **Flex**: `https://domain.com/flex?hs=<encoded>` -- editable view
+> Avec `component()`, l'agent decouvre les composants via `component("help")` puis rend via `component("nom", {params})`.
 
-### Hashing
+1. **Definir l'objectif** : quelles donnees, quel besoin
+2. **Choisir les blocs** : 2-5 types (voir composing.md)
+3. **Ecrire les data** : remplir chaque bloc
+4. **Ajouter les metadata** : name, description, tags, MCP, LLM
+5. **Theme** (optionnel) : overrides couleurs
+6. **Creer** : `createSkill()` 
+7. **Encoder** (optionnel) : `encode()` pour URL partageable
 
-HyperSkills support content-addressable versioning via SHA-256 hashes:
+## Contraintes
 
-```typescript
-import { hash } from '@webmcp-auto-ui/sdk';
+- `name` requis, non vide.
+- `blocks` requis, au moins un bloc.
+- `type` de bloc = un des 24 types valides.
+- Taille HyperSkill URL : ~2-8KB selon navigateur, gzip au-dela de 6KB.
+- `theme` : cles plates (`"color-accent"`, pas d'objet imbrique).
 
-const h = await hash('https://app.example.com/viewer', JSON.stringify(skill.content));
-// h: 64-char hex SHA-256
-```
+## Erreurs courantes
 
-### Diffing
-
-```typescript
-import { diff } from '@webmcp-auto-ui/sdk';
-
-const changed = diff(oldContent, newContent);
-// returns array of changed top-level keys, e.g. ["blocks", "meta"]
-```
-
-## Embedding a Theme
-
-Include theme token overrides in the skill's `theme` field:
-
-```json
-{
-  "name": "branded-dashboard",
-  "theme": {
-    "color-accent": "#2563eb",
-    "color-accent2": "#dc2626",
-    "color-bg": "#f8fafc"
-  },
-  "blocks": [...]
-}
-```
-
-The `theme` field uses flat key-value pairs (same format as `tokens` in theme.json). These are applied as CSS custom property overrides when the skill is loaded.
-
-## Demo Skills
-
-Three built-in demo skills are available via `loadDemoSkills()`:
-
-### weather-dashboard
-- Blocks: `stat` (temperature) + `kv` (conditions) + `chart` (7-day forecast)
-- Tags: `meteo`, `dashboard`
-
-### kpi-overview
-- Blocks: 3x `stat` (revenue, users, churn) + `chart` (quarterly revenue)
-- Tags: `kpi`, `dashboard`
-
-### status-monitor
-- Blocks: `alert` (DB degraded) + `kv` (service status) + `tags` (active filters)
-- Tags: `ops`, `monitoring`
-
-## Workflow: Create a Skill from Scratch
-
-> **Note**: Skills can reference components via the unified `component()` tool in addition to the individual `render_*` tools. The `component("help")` call lists all 56 available components with their schemas, making it easier for agents to discover what blocks they can use. See [composing.md](composing.md#unified-component-tool) for details.
-
-1. **Define the purpose**: What data does this skill display? What user need does it serve?
-2. **Choose blocks**: Pick 2-5 block types that best represent the data (see composing.md)
-3. **Write the data**: Fill in each block's data object with real or placeholder values
-4. **Add metadata**: Set name, description, tags, optional MCP/LLM references
-5. **Add theme** (optional): Override accent colors to match branding
-6. **Create**: Call `createSkill()` with the complete object
-7. **Encode** (optional): Call `encode()` to generate a shareable URL
-8. **Share**: Send the URL -- recipients load it via `?hs=` parameter
-
-### Example: Full Workflow
-
-```typescript
-import { createSkill, encode, type HyperSkill } from '@webmcp-auto-ui/sdk';
-
-// Step 1-5: Define the skill
-const skill = createSkill({
-  name: 'team-overview',
-  description: 'Team members and recent activity',
-  tags: ['team', 'hr'],
-  theme: { 'color-accent': '#6366f1' },
-  blocks: [
-    {
-      type: 'trombinoscope',
-      data: {
-        title: 'Engineering Team',
-        columns: 4,
-        people: [
-          { name: 'Alice Martin', subtitle: 'Tech Lead', badge: 'TL' },
-          { name: 'Bob Chen', subtitle: 'Backend' },
-          { name: 'Carol Silva', subtitle: 'Frontend' }
-        ]
-      }
-    },
-    {
-      type: 'timeline',
-      data: {
-        title: 'Recent Activity',
-        events: [
-          { date: '2024-03-15', title: 'Sprint 12 completed', status: 'done' },
-          { date: '2024-03-18', title: 'Sprint 13 started', status: 'active' }
-        ]
-      }
-    },
-    {
-      type: 'stat',
-      data: { label: 'Team Size', value: '8', trend: '+2', trendDir: 'up' }
-    }
-  ]
-});
-
-// Step 7: Encode for sharing
-const hsSkill: HyperSkill = {
-  meta: { title: skill.name, description: skill.description, tags: skill.tags },
-  content: skill.blocks,
-};
-const hsUrl = await encode('https://app.example.com/viewer', JSON.stringify(hsSkill));
-console.log('Share this URL:', hsUrl);
-```
-
-## Constraints
-
-- `name` is required. Cannot be empty.
-- `blocks` is required. Must contain at least one block.
-- Block `type` must be one of the 24 valid types (see composing.md or ui-widgets.md).
-- HyperSkill URL size limit: browser URL length is typically ~2KB-8KB depending on the browser. The gzip compression kicks in above 6KB of JSON. For very large skills (many blocks with large data), consider reducing data or splitting into multiple skills.
-- `theme` uses flat token keys (`"color-accent"`, not nested objects).
-- `id`, `createdAt`, `updatedAt` are auto-managed. Do not set them manually in `createSkill()`.
-
-## Common Mistakes
-
-| Mistake | Consequence | Fix |
-|---------|-------------|-----|
-| Setting `id` in `createSkill()` | TypeScript error (id is excluded from input type) | Let the registry auto-generate the id |
-| Huge blocks data (e.g. 1000-row table) | HyperSkill URL exceeds browser limits | Limit data to what fits visually; paginate server-side |
-| Missing `blocks` array | Skill renders empty | Always include at least one block |
-| `theme` with nested `dark` key | Dark overrides ignored (flat format only) | Use flat tokens; for dark mode, use the full theme.json in ThemeProvider |
-| Forgetting to `await` encode/decode | Returns a Promise, not the actual value | Both `encode` and `decode` are async |
-| Using wrong block type string | BlockRenderer shows `[unknown-type]` | Check exact type strings: `stat-card` not `statcard`, `chart-rich` not `chartRich` |
+| Erreur | Consequence | Correction |
+|--------|-------------|-----------|
+| Data trop volumineuses (1000 lignes) | URL depasse limites navigateur | Limiter les donnees, paginer cote serveur |
+| `blocks` manquant | Skill vide | Toujours inclure >= 1 bloc |
+| Oublier `await` sur encode/decode | Promise au lieu de valeur | Les deux sont async |
+| Confondre recette WebMCP et skill | Recette = guide pour le LLM, skill = donnees persistees | Les recettes guident, les skills stockent |
 
   </script>
 

@@ -529,6 +529,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
   bind:open={settingsOpen}
   bind:mcpToken
   bind:systemPrompt
+  {effectivePrompt}
   bind:maxTokens
   bind:maxContextTokens
   bind:cacheEnabled

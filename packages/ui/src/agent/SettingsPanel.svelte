@@ -3,6 +3,7 @@
 
   interface Props {
     systemPrompt?: string;
+    effectivePrompt?: string;
     maxTokens?: number;
     maxContextTokens?: number;
     cacheEnabled?: boolean;
@@ -15,6 +16,7 @@
 
   let {
     systemPrompt = $bindable(''),
+    effectivePrompt = '',
     maxTokens = $bindable(4096),
     maxContextTokens = $bindable(150_000),
     cacheEnabled = $bindable(true),
@@ -25,8 +27,30 @@
     class: cls = '',
   }: Props = $props();
 
+  /** When true, the user is editing a custom prompt; when false, show effectivePrompt readonly */
+  let customMode = $state(false);
+
   let promptSaved = $state(false);
   let savedTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Is the effective prompt available and different from the raw systemPrompt? */
+  const hasEffective = $derived(!!effectivePrompt && effectivePrompt !== systemPrompt);
+
+  /** The text shown in the textarea */
+  const displayedPrompt = $derived(
+    customMode || !hasEffective ? systemPrompt : effectivePrompt
+  );
+
+  /** Textarea is readonly when showing auto-generated prompt */
+  const isReadonly = $derived(hasEffective && !customMode);
+
+  function enterCustomMode() {
+    customMode = true;
+  }
+
+  function resetToAuto() {
+    customMode = false;
+  }
 
   $effect(() => {
     systemPrompt; // track changes
@@ -66,16 +90,38 @@
   <div class="flex flex-col gap-1.5">
     <div class="flex items-center justify-between">
       <label class="text-[9px] font-mono text-text2 uppercase tracking-wider">System Prompt</label>
-      {#if promptSaved}
-        <span class="text-[9px] font-mono text-teal transition-opacity">✓ appliqué</span>
-      {/if}
+      <div class="flex items-center gap-2">
+        {#if promptSaved && customMode}
+          <span class="text-[9px] font-mono text-teal transition-opacity">✓ applique</span>
+        {/if}
+        {#if hasEffective}
+          {#if customMode}
+            <button class="text-[9px] font-mono text-accent2 hover:text-accent transition-colors"
+                    onclick={resetToAuto}>reinitialiser</button>
+          {:else}
+            <button class="text-[9px] font-mono text-accent hover:text-text1 transition-colors"
+                    onclick={enterCustomMode}>personnaliser</button>
+          {/if}
+        {/if}
+      </div>
     </div>
-    <textarea
-      bind:value={systemPrompt}
-      rows={5}
-      class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none resize-none focus:border-accent/50 transition-colors placeholder:text-text2/40"
-      placeholder="Instructions système pour l'agent…"
-    ></textarea>
+    {#if isReadonly}
+      <textarea
+        readonly
+        value={displayedPrompt}
+        rows={8}
+        class="w-full bg-surface2/50 border border-border2/50 rounded-lg px-3 py-2 text-xs font-mono text-text2 outline-none resize-none cursor-default"
+        placeholder="Prompt auto-genere"
+      ></textarea>
+      <div class="text-[8px] font-mono text-text2/50">prompt auto-genere — cliquer personnaliser pour editer</div>
+    {:else}
+      <textarea
+        bind:value={systemPrompt}
+        rows={5}
+        class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none resize-none focus:border-accent/50 transition-colors placeholder:text-text2/40"
+        placeholder="Instructions systeme pour l'agent…"
+      ></textarea>
+    {/if}
   </div>
 
   <!-- Sliders section -->

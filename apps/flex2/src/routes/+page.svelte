@@ -557,7 +557,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
 <!-- SETTINGS DRAWER -->
 <SettingsDrawer
   bind:open={settingsOpen}
-  bind:mcpToken bind:systemPrompt bind:maxTokens bind:maxContextTokens
+  bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:toolMode
   onconnect={() => addMcpServer(canvas.mcpUrl)}
   {connectedUrls} {loadingUrls}
