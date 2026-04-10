@@ -362,18 +362,11 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
             const nextDetails = new Map(toolCallDetails);
             nextDetails.set(callId, detail);
             toolCallDetails = nextDetails;
-            // Build tooltip content
-            const tooltipArgs = JSON.stringify(call.args, null, 2).slice(0, 500);
-            const tooltipResult = (call.result ?? call.error ?? '').slice(0, 500);
-            const tooltipElapsed = call.elapsed != null ? `${call.elapsed}ms` : '?';
-            const tooltipSize = `${(call.result ?? '').length} chars`;
-            const tooltipText = `${call.name}\n\nArgs:\n${tooltipArgs}\n\nResult:\n${tooltipResult}\n\nDuration: ${tooltipElapsed}\nSize: ${tooltipSize}`;
-            const escapedTooltip = tooltipText.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
             if (showToolJSON) {
               const argsJson = JSON.stringify(call.args, null, 2);
-              updateEphemeral(assistantId, `<span class="tool-call-tip" title="${escapedTooltip}"><strong>${call.name}</strong></span>\n<pre style="font-size:9px;margin-top:4px;opacity:0.7;white-space:pre-wrap;word-break:break-all">${argsJson}</pre>`);
+              updateEphemeral(assistantId, `<span class="tool-call-tip"><strong>${call.name}</strong></span>\n<pre style="font-size:9px;margin-top:4px;opacity:0.7;white-space:pre-wrap;word-break:break-all">${argsJson}</pre>`);
             } else {
-              updateEphemeral(assistantId, `<span class="tool-call-tip" title="${escapedTooltip}"><strong>${call.name}</strong>...</span>`);
+              updateEphemeral(assistantId, `<span class="tool-call-tip"><strong>${call.name}</strong>...</span>`);
             }
           },
           onDone: (metrics) => {
