@@ -24,14 +24,34 @@ export function registerRecipes(recipes: Recipe[]): void {
  * Uses substring matching: recipe server "tricoteuses" matches connected server
  * "Tricoteuses - Moulineuse" or "tricoteuses-mcp".
  */
+// Known aliases: servers that are the same but have different names
+const SERVER_ALIASES: Record<string, string[]> = {
+  'tricoteuses': ['moulineuse', 'code4code', 'mcp.code4code.eu'],
+  'moulineuse': ['tricoteuses', 'code4code', 'mcp.code4code.eu'],
+  'code4code': ['tricoteuses', 'moulineuse', 'mcp.code4code.eu'],
+};
+
 export function filterRecipesByServer(recipes: Recipe[], serverNames: string[]): Recipe[] {
   if (serverNames.length === 0) return recipes;
-  const lowerNames = serverNames.map(s => s.toLowerCase());
+  // Expand server names with known aliases
+  const expanded = new Set<string>();
+  for (const name of serverNames) {
+    const lower = name.toLowerCase();
+    expanded.add(lower);
+    for (const alias of SERVER_ALIASES[lower] ?? []) expanded.add(alias);
+    // Also add parts of compound names ("Tricoteuses - Moulineuse" → tricoteuses, moulineuse)
+    for (const part of lower.split(/[\s,\-–]+/)) {
+      if (part.length > 2) {
+        expanded.add(part);
+        for (const alias of SERVER_ALIASES[part] ?? []) expanded.add(alias);
+      }
+    }
+  }
   return recipes.filter(r => {
-    if (!r.servers || r.servers.length === 0) return true; // no server constraint = always match
+    if (!r.servers || r.servers.length === 0) return true;
     return r.servers.some(recipeServer => {
       const lower = recipeServer.toLowerCase();
-      return lowerNames.some(name => name.includes(lower) || lower.includes(name));
+      return expanded.has(lower) || [...expanded].some(e => e.includes(lower) || lower.includes(e));
     });
   });
 }
@@ -57,7 +77,13 @@ export function formatRecipesForPrompt(recipes: Recipe[]): string {
  * Uses [name] prefix so LLMs know the exact ID to pass to get_recipe(). */
 export function formatMcpRecipesForPrompt(recipes: McpRecipe[]): string {
   if (recipes.length === 0) return '';
-  return recipes.map(r =>
-    `- [${r.name}]${r.description ? ' ' + r.description : ''}`
-  ).join('\n');
+  return recipes.map(r => {
+    const id = r.name ?? r.id ?? '';
+    const desc = r.description ?? '';
+    // If name is missing or looks like a prefix ("moulineuse: undefined"), use description as display
+    if (!id || id.includes('undefined')) {
+      return `- ${desc}`;
+    }
+    return `- [${id}] ${desc}`;
+  }).join('\n');
 }
