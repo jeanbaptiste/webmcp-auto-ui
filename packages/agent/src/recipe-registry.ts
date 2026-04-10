@@ -39,10 +39,18 @@ export function filterRecipesByServer(recipes: Recipe[], serverNames: string[]):
 /** Format recipes for injection into the system prompt (compact, <500 tokens for 5 recipes) */
 export function formatRecipesForPrompt(recipes: Recipe[]): string {
   if (recipes.length === 0) return '';
-  return recipes.map(r =>
-    `- ${r.name}: ${r.when}` +
-    (r.components_used?.length ? ` [${r.components_used.join(', ')}]` : '')
-  ).join('\n');
+  return recipes.map(r => {
+    let line = `- ${r.name}: ${r.when}`;
+    if (r.components_used?.length) line += ` [${r.components_used.join(', ')}]`;
+    // Extract the key instruction from the body (first line of "## Comment" or "## Erreurs")
+    if (r.body) {
+      const errMatch = r.body.match(/erreurs?\s+courantes?\s*\n+[-*]\s*\*?\*?(.+)/i);
+      const howMatch = r.body.match(/comment\s*\n+1\.\s*\*?\*?(.+)/i);
+      const hint = errMatch?.[1]?.replace(/\*\*/g, '').trim() ?? howMatch?.[1]?.replace(/\*\*/g, '').trim();
+      if (hint) line += `\n  → ${hint.slice(0, 120)}`;
+    }
+    return line;
+  }).join('\n');
 }
 
 /** Format MCP server recipes for the prompt.
