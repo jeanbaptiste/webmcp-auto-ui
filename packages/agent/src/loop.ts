@@ -11,6 +11,7 @@ import type {
   LLMProvider, AnthropicTool, McpToolDef, AgentCallbacks,
 } from './types.js';
 import type { ToolLayer, McpLayer, UILayer } from './tool-layers.js';
+import { buildToolsFromLayers } from './tool-layers.js';
 import { UI_TOOLS, isUITool, executeUITool } from './ui-tools.js';
 import { COMPONENT_TOOL, executeComponent } from './component-tool.js';
 import { formatRecipesForPrompt, formatMcpRecipesForPrompt } from './recipe-registry.js';
@@ -167,7 +168,9 @@ function truncateResult(result: string): string {
 export interface AgentLoopOptions {
   client?: McpClient;           // MCP client — optional if only UI tools used
   provider: LLMProvider;
-  mcpTools?: McpToolDef[];      // tools from MCP server
+  mcpTools?: McpToolDef[];      // tools from MCP server (legacy — prefer layers)
+  /** Structured tool layers (new API — replaces mcpTools) */
+  layers?: ToolLayer[];
   /** 'smart' = 1 tool component() (default), 'explicit' = 31 render_* + component() */
   toolMode?: 'smart' | 'explicit';
   maxIterations?: number;
@@ -200,12 +203,22 @@ export async function runAgentLoop(
     signal,
   } = options;
 
-  const mcpToolsDef = mcpToolsToAnthropic(mcpTools);
-  const allTools: AnthropicTool[] = toolMode === 'smart'
-    ? [...mcpToolsDef, COMPONENT_TOOL]
-    : [...mcpToolsDef, ...UI_TOOLS, COMPONENT_TOOL];
+  // Build tools and prompt from layers (new API) or mcpTools (legacy)
+  let allTools: AnthropicTool[];
+  let baseSystemPrompt: string;
 
-  const baseSystemPrompt = options.systemPrompt ?? buildSystemPromptLegacy(mcpTools);
+  if (options.layers) {
+    allTools = buildToolsFromLayers(options.layers, toolMode);
+    baseSystemPrompt = options.systemPrompt ?? buildSystemPrompt(options.layers, { toolMode });
+  } else {
+    // Legacy path — mcpTools flat array
+    const mcpToolsDef = mcpToolsToAnthropic(mcpTools);
+    allTools = toolMode === 'smart'
+      ? [...mcpToolsDef, COMPONENT_TOOL]
+      : [...mcpToolsDef, ...UI_TOOLS, COMPONENT_TOOL];
+    baseSystemPrompt = options.systemPrompt ?? buildSystemPromptLegacy(mcpTools);
+  }
+
   const systemPrompt = maxTokens
     ? `${baseSystemPrompt}\n\nIMPORTANT : Limite tes réponses à ${maxTokens} tokens.`
     : baseSystemPrompt;

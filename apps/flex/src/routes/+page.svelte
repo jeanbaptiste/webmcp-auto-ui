@@ -317,7 +317,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs render_* quand c'
         cacheEnabled,
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
-        mcpTools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
+        layers,
         callbacks: {
           onLLMResponse: (response, latencyMs) => {
             if (response.usage) {

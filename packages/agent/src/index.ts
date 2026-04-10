@@ -38,7 +38,12 @@ export { WEBMCP_RECIPES, parseRecipe, parseRecipes } from './recipes/index.js';
 export { recipeRegistry, registerRecipes, filterRecipesByServer, formatRecipesForPrompt, formatMcpRecipesForPrompt } from './recipe-registry.js';
 
 // Tool layers
+export { buildToolsFromLayers } from './tool-layers.js';
 export type { ToolLayer, McpLayer, UILayer } from './tool-layers.js';
+
+// Component adapter
+export { ComponentAdapter, nativePreset, allNativePreset, minimalPreset } from './component-adapter.js';
+export type { ComponentDef } from './component-adapter.js';
 
 export type {
   RemoteModelId, WasmModelId, LLMId, ModelId,
