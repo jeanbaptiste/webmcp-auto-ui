@@ -350,7 +350,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
               const textLogs = agentLogs.filter(l => l.type === 'text');
               const prevLen = textLogs.length > 0 ? textLogs[textLogs.length - 1].detail.length : 0;
               if (text.length < 50 || text.slice(-100).length - prevLen > 50) {
-                agentLogs = [...agentLogs, { ts: Date.now(), type: 'text', detail: text.slice(-100) }];
+                agentLogs = [...agentLogs, { ts: Date.now(), type: 'text', detail: text }];
               }
               updateEphemeral(assistantId, text);
             }
@@ -359,9 +359,9 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
             chatToolCount++; chatLastTool = call.name;
             allToolsUsed = [...allToolsUsed, call.name];
             const tag = call.guided ? '[recette]' : '[impro]';
-            const argsPreview = JSON.stringify(call.args).slice(0, 200);
-            const resultPreview = (call.result ?? call.error ?? '').slice(0, 200);
-            agentLogs = [...agentLogs, { ts: Date.now(), type: 'tool', detail: `${tag} ${call.name}(${argsPreview}) -> ${resultPreview} [${call.elapsed ?? '?'}ms]` }];
+            const argsJson = JSON.stringify(call.args, null, 2);
+            const resultFull = call.result ?? call.error ?? '';
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'tool', detail: `${tag} ${call.name}(${argsJson}) -> ${resultFull} [${call.elapsed ?? '?'}ms]` }];
             // Store full details for tooltip
             const callId = `tc_${Date.now()}_${chatToolCount}`;
             const detail: ToolCallDetail = {
