@@ -6,6 +6,7 @@
     effectivePrompt?: string;
     maxTokens?: number;
     maxContextTokens?: number;
+    maxTools?: number;
     cacheEnabled?: boolean;
     temperature?: number;
     topK?: number;
@@ -19,6 +20,7 @@
     effectivePrompt = '',
     maxTokens = $bindable(4096),
     maxContextTokens = $bindable(150_000),
+    maxTools = $bindable(8),
     cacheEnabled = $bindable(true),
     temperature = $bindable(0.7),
     topK = $bindable(10),
@@ -171,6 +173,19 @@
              min={ranges.topK.min} max={ranges.topK.max} step={ranges.topK.step}
              class="w-full accent-accent" />
     </div>
+
+    <!-- Max tools (WASM only) -->
+    {#if modelType === 'wasm'}
+    <div>
+      <div class="flex justify-between items-baseline mb-1">
+        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Max tools (WASM)</span>
+        <span class="font-mono text-xs text-text1">{maxTools}</span>
+      </div>
+      <input type="range" bind:value={maxTools}
+             min={4} max={20} step={1}
+             class="w-full accent-accent" />
+    </div>
+    {/if}
   </section>
 
   <!-- Cache -->

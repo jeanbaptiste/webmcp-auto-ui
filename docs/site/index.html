@@ -367,15 +367,11 @@ webmcp-auto-ui/
     ui/         @webmcp-auto-ui/ui     -- 34+ Svelte 5 components + agent UI widgets
   apps/
     home/       Landing page + app launcher
-    flex/       Canvas drag & resize, multi-MCP, ephemeral chat
-    flex2/      Layers, component() unique, debug panel, mode composeur/consommateur
-    todo/       Todo app demo (MCP-powered)
-    todo2/      Todo WebMCP, template minimal
-    viewer/     HyperSkill URL viewer / renderer
-    viewer2/    Lecteur HyperSkills read-only avec CRUD, DAG, paste URI
-    showcase/   Component showcase + WebMCP tool demos
-    showcase2/  Demo dynamique avec agent + MCP + 3 themes
-    recipes/    Explorateur de recettes MCP + WebMCP avec test live
+    flex2/      Flex -- canvas IA, ToolLayers, component(), LogDrawer, RecipeModal
+    viewer2/    Viewer -- lecteur HyperSkills read-only avec CRUD, DAG, paste URI
+    showcase2/  Showcase -- demo dynamique avec agent + MCP + 3 themes
+    todo2/      Todo -- todo WebMCP, template minimal
+    recipes/    Recipes -- explorateur de recettes, layout 3 colonnes, chat input, test live
 ```
 
 ## Builder les packages
@@ -398,7 +394,7 @@ npm -w packages/ui run build
 
 ## Lancer les serveurs dev
 
-Toutes les apps v1 en parallele :
+Toutes les apps en parallele :
 
 ```bash
 npm run dev
@@ -408,15 +404,6 @@ Ou une app specifique :
 
 ```bash
 npm run dev:home
-npm run dev:flex
-npm run dev:todo
-npm run dev:viewer
-npm run dev:showcase
-```
-
-Pour les nouvelles apps (v2), lancer individuellement :
-
-```bash
 npm -w apps/flex2 run dev
 npm -w apps/viewer2 run dev
 npm -w apps/todo2 run dev
@@ -429,18 +416,14 @@ npm -w apps/recipes run dev
 | App       | Port | URL                    |
 |-----------|------|------------------------|
 | home      | 5173 | http://localhost:5173   |
-| todo      | 5175 | http://localhost:5175   |
-| viewer    | 5176 | http://localhost:5176   |
-| showcase  | 5177 | http://localhost:5177   |
-| flex      | 5179 | http://localhost:5179   |
 
-Les apps v2 (flex2, viewer2, todo2, showcase2, recipes) sont assignees a des ports par Vite au lancement.
+Les autres apps (flex2, viewer2, todo2, showcase2, recipes) sont assignees a des ports par Vite au lancement.
 
 ## Variables d'environnement
 
 | Variable           | Apps                    | Role                                          |
 |--------------------|-------------------------|-----------------------------------------------|
-| `ANTHROPIC_API_KEY`| flex, flex2, todo, todo2 | Proxy server-side pour l'API Anthropic Claude |
+| `ANTHROPIC_API_KEY`| flex2, todo2              | Proxy server-side pour l'API Anthropic Claude |
 | `PUBLIC_BASE_URL`  | home                    | Base URL pour les liens (default: localhost)   |
 
 ```bash
@@ -478,7 +461,7 @@ Voir le [tutoriel deploy](tutorials/deploy.md) pour les details.
   <script type="text/markdown" data-page="architecture">
 # Architecture
 
-Structure monorepo, dependances entre packages, et decisions de design (v0.7.0).
+Structure monorepo, dependances entre packages, et decisions de design (v0.8).
 
 ## Structure monorepo
 
@@ -493,15 +476,11 @@ webmcp-auto-ui/
  |
  +-- apps/
  |    +-- home/          Landing page, app launcher (port 5173)
- |    +-- todo/          MCP-powered todo demo (port 5175)
- |    +-- viewer/        HyperSkill URL renderer (port 5176)
- |    +-- showcase/      Component showcase + WebMCP tool demos (port 5177)
- |    +-- flex/          Canvas drag & resize, multi-MCP, chat (port 5179)
- |    +-- flex2/         Layers, component() unique, debug panel, mode composeur/consommateur
- |    +-- viewer2/       Lecteur HyperSkills read-only avec CRUD, DAG, paste URI
- |    +-- showcase2/     Demo dynamique avec agent + MCP + 3 themes
- |    +-- todo2/         Todo WebMCP, template minimal
- |    +-- recipes/       Explorateur de recettes MCP + WebMCP avec test live
+ |    +-- flex2/         Flex -- canvas IA, ToolLayers, component(), LogDrawer, RecipeModal
+ |    +-- viewer2/       Viewer -- lecteur HyperSkills read-only avec CRUD, DAG, paste URI
+ |    +-- showcase2/     Showcase -- demo dynamique avec agent + MCP + 3 themes
+ |    +-- todo2/         Todo -- todo WebMCP, template minimal
+ |    +-- recipes/       Recipes -- explorateur de recettes, layout 3 colonnes, chat input, test live
  |
  +-- docs/               Documentation
  +-- package.json        Root workspace config
@@ -532,9 +511,9 @@ webmcp-auto-ui/
 - **agent** : depend de core (`McpClient`, `sanitizeSchema`, types). 4 providers LLM. ToolLayers. Recettes. ComponentAdapter.
 - **ui** : standalone. Peer deps : `svelte ^5`, `d3 ^7`, `leaflet >=1.9`.
 
-## Les 3 couches (v0.7.0)
+## Les 3 couches
 
-L'architecture v0.7.0 structure les outils en 3 couches via les `ToolLayer[]` :
+L'architecture structure les outils en 3 couches via les `ToolLayer[]` :
 
 ```
 +--------------------------------------------------+
@@ -574,18 +553,14 @@ Deux types de recettes cohabitent :
 
 ## Description des apps
 
-| App | Description |
-|-----|------------|
-| **home** | Landing page avec liens vers toutes les apps. Configurable via `PUBLIC_BASE_URL`. |
-| **flex** | Canvas drag & resize, multi-MCP, ephemeral chat, HyperSkills export, Gemma WASM. |
-| **flex2** | Version layers : component() unique, debug panel, badges provenance, mode composeur/consommateur, panneau recettes, agent logs. |
-| **todo** | Todo app demontrant l'integration MCP CRUD. |
-| **todo2** | Todo WebMCP, template minimal avec la nouvelle architecture layers. |
-| **viewer** | Decode une HyperSkill URL (`?hs=...`) et rend le skill en read-only. |
-| **viewer2** | Lecteur HyperSkills read-only avec CRUD, DAG de versions, paste URI. |
-| **showcase** | Catalogue interactif des composants UI + demo WebMCP tools. |
-| **showcase2** | Demo dynamique avec agent + MCP + 3 themes. |
-| **recipes** | Explorateur de recettes MCP + WebMCP avec test live. |
+| App | Chemin | Description |
+|-----|--------|------------|
+| **Home** | `apps/home/` | Landing page avec liens vers toutes les apps. Configurable via `PUBLIC_BASE_URL`. |
+| **Flex** | `apps/flex2/` | Canvas IA avec ToolLayers, component() unique, debug panel, badges provenance, mode composeur/consommateur, LogDrawer (AgentConsole), RecipeModal, export HyperSkill gzip. |
+| **Viewer** | `apps/viewer2/` | Lecteur HyperSkills read-only avec CRUD, DAG de versions, paste URI. |
+| **Showcase** | `apps/showcase2/` | Demo dynamique avec agent + MCP + 3 themes. |
+| **Todo** | `apps/todo2/` | Todo WebMCP, template minimal avec architecture layers. |
+| **Recipes** | `apps/recipes/` | Explorateur de recettes MCP + WebMCP, layout 3 colonnes, chat input, test live, sync recettes par serveur. |
 
 ## Stack technique
 
@@ -602,7 +577,7 @@ Deux types de recettes cohabitent :
 
 ## Decisions de design
 
-### ToolLayers (v0.7.0)
+### ToolLayers
 
 Les outils ne sont plus passes en tableau plat (`mcpTools[]`). Ils sont structures en couches typees (`McpLayer`, `UILayer`) qui portent chacune leurs outils et recettes. `buildSystemPrompt()` et `buildToolsFromLayers()` consomment ces layers pour produire le prompt et les outils.
 
@@ -956,7 +931,8 @@ Complex visualizations for data-heavy use cases.
 | `TokenBubble` | Real-time metrics display: req/min, input tokens/min, output tokens/min, cached tokens |
 | `EphemeralBubble` | Transient notification bubble (moved from app to package for reuse) |
 | `RemoteMCPserversDemo` | MCP server discovery component listing available demo servers from `MCP_DEMO_SERVERS` |
-| `SettingsPanel` | Sliders with dynamic ranges for temperature, topK, and maxTokens controls |
+| `SettingsPanel` | Sliders with dynamic ranges for temperature, topK, maxTokens; displays effectivePrompt in readonly |
+| `AgentConsole` | Scrollable agent log panel with iteration markers, tool calls, text output and token metrics |
 
 ### BlockRenderer
 
@@ -1491,7 +1467,7 @@ const summary = summarizeChat(messages);
 
 ## ToolLayers
 
-Les ToolLayers structurent les outils en couches typées. C'est la nouvelle API (v0.7.0) qui remplace le passage plat de `mcpTools[]`.
+Les ToolLayers structurent les outils en couches typées. C'est la nouvelle API (v0.8) qui remplace le passage plat de `mcpTools[]`.
 
 ### Types
 
@@ -1830,7 +1806,7 @@ const text = formatRecipesForPrompt(relevant);
 
 Les recettes MCP viennent du serveur via `list_recipes` / `get_recipe`. Elles decrivent ce que les outils retournent et comment les combiner. Elles sont portees par `McpLayer.recipes` et injectees dans la section `## mcp` du prompt.
 
-## Workflow complet (v0.7.0)
+## Workflow complet (v0.8)
 
 ```
 1. L'app construit des ToolLayer[]
@@ -1917,33 +1893,31 @@ Le script gere tout : build des packages, **build des apps**, nettoyage des anci
 ```
 /opt/webmcp-demos/
   home/              # static -- nginx sert directement
-  todo/              # static -- nginx sert directement
-  showcase/          # static -- nginx sert directement
-  flex/              # Node -- systemd : node index.js
-  viewer/build/      # Node -- systemd : node build/index.js
+  flex2/             # Node -- systemd : node index.js
+  viewer2/build/     # Node -- systemd : node build/index.js
+  showcase2/         # static -- nginx sert directement
+  todo2/             # static -- nginx sert directement
+  recipes/           # Node -- systemd : node index.js
 ```
 
 ### CRITIQUE : Les chemins de deploy ne sont PAS les memes pour toutes les apps Node
 
 | App | systemd ExecStart | Destination deploy | Pourquoi |
 |-----|-------------------|--------------------|----------|
-| **flex** | `node index.js` | `/opt/webmcp-demos/flex/` (racine) | ExecStart sans prefix `build/` |
-| **viewer** | `node build/index.js` | `/opt/webmcp-demos/viewer/build/` | ExecStart inclut `build/` |
-| home | static (nginx) | `/opt/webmcp-demos/home/` | -- |
-| todo | static (nginx) | `/opt/webmcp-demos/todo/` | -- |
-| showcase | static (nginx) | `/opt/webmcp-demos/showcase/` | -- |
+| **Flex** | `node index.js` | `/opt/webmcp-demos/flex2/` (racine) | ExecStart sans prefix `build/` |
+| **Viewer** | `node build/index.js` | `/opt/webmcp-demos/viewer2/build/` | ExecStart inclut `build/` |
+| **Recipes** | `node index.js` | `/opt/webmcp-demos/recipes/` (racine) | ExecStart sans prefix `build/` |
+| Home | static (nginx) | `/opt/webmcp-demos/home/` | -- |
+| Showcase | static (nginx) | `/opt/webmcp-demos/showcase2/` | -- |
+| Todo | static (nginx) | `/opt/webmcp-demos/todo2/` | -- |
 
 **Si vous deployez au mauvais chemin, l'ancien code continue de tourner.**
-
-### Nouvelles apps (v2)
-
-Les nouvelles apps (flex2, viewer2, todo2, showcase2, recipes) ne sont pas encore deployees en production. Quand elles le seront, elles seront ajoutees au script `deploy.sh` avec leurs chemins specifiques.
 
 ---
 
 ## Deploy manuel (si absolument necessaire)
 
-### Apps statiques (home, todo, showcase)
+### Apps statiques (home)
 
 ```bash
 # Builder avec l'URL de production (REQUIS pour home)
@@ -1954,26 +1928,26 @@ ssh bot "rm -rf /opt/webmcp-demos/home/_app"
 scp -r apps/home/build/* bot:/opt/webmcp-demos/home/
 ```
 
-### Apps Node -- flex (deploy racine)
+### Apps Node -- Flex (deploy racine)
 
 ```bash
-npm -w apps/flex run build
+npm -w apps/flex2 run build
 
 # OBLIGATOIRE : nettoyer les anciens fichiers d'abord
-ssh bot "cd /opt/webmcp-demos/flex && rm -f index.js handler.js env.js shims.js && rm -rf client server"
-scp -r apps/flex/build/* bot:/opt/webmcp-demos/flex/
-ssh bot "systemctl restart webmcp-flex"
+ssh bot "cd /opt/webmcp-demos/flex2 && rm -f index.js handler.js env.js shims.js && rm -rf client server"
+scp -r apps/flex2/build/* bot:/opt/webmcp-demos/flex2/
+ssh bot "systemctl restart webmcp-flex2"
 ```
 
-### Apps Node -- viewer (deploy build/)
+### Apps Node -- Viewer (deploy build/)
 
 ```bash
-npm -w apps/viewer run build
+npm -w apps/viewer2 run build
 
-ssh bot "rm -rf /opt/webmcp-demos/viewer/build"
-ssh bot "mkdir -p /opt/webmcp-demos/viewer/build"
-scp -r apps/viewer/build/* bot:/opt/webmcp-demos/viewer/build/
-ssh bot "systemctl restart webmcp-viewer"
+ssh bot "rm -rf /opt/webmcp-demos/viewer2/build"
+ssh bot "mkdir -p /opt/webmcp-demos/viewer2/build"
+scp -r apps/viewer2/build/* bot:/opt/webmcp-demos/viewer2/build/
+ssh bot "systemctl restart webmcp-viewer2"
 ```
 
 ---
@@ -1996,7 +1970,7 @@ ssh bot "systemctl restart webmcp-viewer"
 
 **Fix** : Toujours supprimer les anciens fichiers avant de copier :
 ```bash
-ssh bot "rm -rf /opt/webmcp-demos/flex/{client,server,index.js,handler.js}"
+ssh bot "rm -rf /opt/webmcp-demos/flex2/{client,server,index.js,handler.js}"
 ```
 
 ### 3. PUBLIC_BASE_URL oublie pour home
@@ -2031,18 +2005,18 @@ ssh bot "rm -rf /opt/webmcp-demos/flex/{client,server,index.js,handler.js}"
 
 ```bash
 # Toutes les pages retournent 200
-for p in / /flex/ /viewer/ /showcase/ /todo/; do
+for p in / /flex2/ /viewer2/ /showcase2/ /todo2/ /recipes/; do
   echo "$(curl -s -o /dev/null -w '%{http_code}' -L https://demos.hyperskills.net$p) $p"
 done
 
 # L'API chat fonctionne (apps Node)
-curl -s https://demos.hyperskills.net/flex/api/chat \
+curl -s https://demos.hyperskills.net/flex2/api/chat \
   -X POST -H 'Content-Type: application/json' \
   -d '{"messages":[{"role":"user","content":"hi"}],"model":"claude-haiku-4-5-20251001","max_tokens":5}' \
   | head -c 50
 
 # Services actifs
-ssh bot "systemctl is-active webmcp-flex webmcp-viewer"
+ssh bot "systemctl is-active webmcp-flex2 webmcp-viewer2 webmcp-recipes"
 ```
 
 ---
@@ -2051,9 +2025,9 @@ ssh bot "systemctl is-active webmcp-flex webmcp-viewer"
 
 | Variable | Apps | Localisation serveur |
 |----------|------|--------------------|
-| `ANTHROPIC_API_KEY` | flex, viewer | `/opt/webmcp-demos/{app}/.env` |
+| `ANTHROPIC_API_KEY` | flex2, viewer2, recipes | `/opt/webmcp-demos/{app}/.env` |
 | `PUBLIC_BASE_URL` | home (build-time) | Variable shell avant `npm run build` |
-| `PORT` | flex(3004), viewer(3002) | systemd `Environment=PORT=...` |
+| `PORT` | flex2(3004), viewer2(3002), recipes(3006) | systemd `Environment=PORT=...` |
 
   </script>
   <script type="text/markdown" data-page="themed-demo">
@@ -3248,7 +3222,7 @@ The `theme` field in a skill uses the flat token map (same as `tokens`), not the
 
 Une UI composee est une collection de **blocs** arranges en sequence. Chaque bloc a un `type` et un objet `data`. Le `BlockRenderer` rend chaque bloc visuellement en dispatchant vers le widget correspondant.
 
-## Workflow complet (v0.7.0) : Layers -> Prompt -> Tools -> LLM -> component() -> Render
+## Workflow complet (v0.8) : Layers -> Prompt -> Tools -> LLM -> component() -> Render
 
 ```
 App                      Agent Package                     LLM
@@ -3489,7 +3463,7 @@ Les skills sont encodees en `?hs=` pour le partage :
 
 ## Comment ca marche
 
-### Mode smart (defaut v0.7.0)
+### Mode smart (defaut v0.8)
 
 En mode smart, le LLM n'a qu'un seul outil UI : **`component()`**. Il decouvre les composants via `component("help")` et les rend via `component("nom", {params})`.
 
@@ -3957,7 +3931,7 @@ Composants specialises pour les interactions agent, depuis `@webmcp-auto-ui/ui` 
 
 MCP (Model Context Protocol) est un protocole JSON-RPC 2.0 qui permet aux agents IA de decouvrir et appeler des outils exposes par des serveurs distants. Dans webmcp-auto-ui, MCP est le pont entre les sources de donnees et l'UI.
 
-## Architecture v0.7.0 : ToolLayers
+## Architecture v0.8 : ToolLayers
 
 ```
 User prompt --> Agent Loop --> LLM (Claude/Gemma/Ollama)

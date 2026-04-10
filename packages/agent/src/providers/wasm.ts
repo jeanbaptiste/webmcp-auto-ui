@@ -168,7 +168,7 @@ export class WasmProvider implements LLMProvider {
   async chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
-    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string }
+    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string; maxTools?: number }
   ): Promise<LLMResponse> {
     if (this.status !== 'ready') await this.initialize();
     if (!this.inference) throw new Error('Model not initialized');
@@ -194,7 +194,7 @@ export class WasmProvider implements LLMProvider {
   private async _chat(
     messages: ChatMessage[],
     tools: AnthropicTool[],
-    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string }
+    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string; maxTools?: number }
   ): Promise<LLMResponse> {
     // Apply per-request options
     if (options?.maxTokens || options?.temperature || options?.topK) {
@@ -210,14 +210,21 @@ export class WasmProvider implements LLMProvider {
     }
 
     // Build Gemma chat prompt (Gemma 4 format with tool hints)
-    let prompt = this.buildPrompt(messages, tools, options?.system);
+    let prompt = this.buildPrompt(messages, tools, options?.system, options?.maxTools);
 
-    // Clipping: if prompt is too large, drop oldest messages (reserve 384 tokens for response)
+    // Aggressive clipping: Gemma struggles with long conversations — cap at 8 messages
+    const MAX_MESSAGES = 8;
+    while (messages.length > MAX_MESSAGES) {
+      messages = messages.slice(1);
+    }
+    prompt = this.buildPrompt(messages, tools, options?.system);
+
+    // Token-based clipping: if prompt is still too large, drop oldest messages
     const maxPromptTokens = (this.opts.contextSize ?? 4096) - 512;
     try {
       while (this.inference.sizeInTokens(prompt) > maxPromptTokens && messages.length > 1) {
         messages = messages.slice(1);
-        prompt = this.buildPrompt(messages, tools, options?.system);
+        prompt = this.buildPrompt(messages, tools, options?.system, options?.maxTools);
       }
     } catch {
       // sizeInTokens not available — skip clipping
@@ -232,10 +239,25 @@ export class WasmProvider implements LLMProvider {
     // even after our busy guard clears, because GPU resources release asynchronously.
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
+        let lastToken = '';
+        let repeatCount = 0;
+        const MAX_REPEATS = 20;
+
         const result = await this.inference.generateResponse(prompt, (partialResult: string, _done: boolean) => {
           if (options?.signal?.aborted) {
             this.inference?.cancelProcessing();
             return;
+          }
+          // Detect infinite repetition loop (e.g. Gemma repeating 't' 150 times)
+          if (partialResult === lastToken) {
+            repeatCount++;
+            if (repeatCount > MAX_REPEATS) {
+              this.inference?.cancelProcessing();
+              return;
+            }
+          } else {
+            lastToken = partialResult;
+            repeatCount = 0;
           }
           fullText += partialResult;
           tokenCount++;
@@ -259,6 +281,17 @@ export class WasmProvider implements LLMProvider {
           continue;
         }
         throw err;
+      }
+    }
+
+    // Clean up hallucinated content after the last valid tool call end tag.
+    // Gemma often hallucinates `<|tool_response>t...` after `<tool_call|>`, polluting context.
+    const lastEndTag = fullText.lastIndexOf('<tool_call|>');
+    if (lastEndTag !== -1) {
+      const afterEnd = fullText.slice(lastEndTag + '<tool_call|>'.length);
+      // If there's no new tool_call opening after the last closing tag, truncate
+      if (!afterEnd.includes('<|tool_call>')) {
+        fullText = fullText.slice(0, lastEndTag + '<tool_call|>'.length);
       }
     }
 
@@ -330,7 +363,7 @@ export class WasmProvider implements LLMProvider {
     };
   }
 
-  private buildPrompt(messages: ChatMessage[], tools: AnthropicTool[], systemPrompt?: string): string {
+  private buildPrompt(messages: ChatMessage[], tools: AnthropicTool[], systemPrompt?: string, maxTools?: number): string {
     const systemParts: string[] = [];
 
     // Inject system prompt from settings if provided
@@ -340,7 +373,7 @@ export class WasmProvider implements LLMProvider {
 
     if (tools.length > 0) {
       // Gemma small models struggle with too many tools — limit to most relevant
-      const MAX_TOOLS = 15;
+      const MAX_TOOLS = maxTools ?? 15;
       const limitedTools = tools.length > MAX_TOOLS
         ? [
             // Always include render_* tools (UI)

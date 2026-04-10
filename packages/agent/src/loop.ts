@@ -175,6 +175,7 @@ export interface AgentLoopOptions {
   toolMode?: 'smart' | 'explicit';
   maxIterations?: number;
   maxTokens?: number;
+  maxTools?: number;
   temperature?: number;
   topK?: number;
   cacheEnabled?: boolean;
@@ -195,6 +196,7 @@ export async function runAgentLoop(
     toolMode = 'smart',
     maxIterations = 5,
     maxTokens,
+    maxTools,
     temperature,
     topK,
     cacheEnabled = true,
@@ -243,7 +245,7 @@ export async function runAgentLoop(
     const t0 = performance.now();
     let streamingText = '';
     const response = await provider.chat(messages, allTools, {
-      signal, cacheEnabled, system: systemPrompt, maxTokens, temperature, topK,
+      signal, cacheEnabled, system: systemPrompt, maxTokens, maxTools, temperature, topK,
       onToken: callbacks.onToken ? (token) => {
         callbacks.onToken!(token);
         // Stream partial text to UI as tokens arrive

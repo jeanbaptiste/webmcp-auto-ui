@@ -12,7 +12,7 @@
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer, UILayer } from '@webmcp-auto-ui/agent';
   import { McpStatus, GemmaLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
-  import { Menu, ExternalLink, Eye, Pencil } from 'lucide-svelte';
+  import { Menu, ExternalLink, Eye, Pencil, Terminal } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
   import SettingsDrawer from '$lib/SettingsDrawer.svelte';
@@ -36,6 +36,7 @@
   let toolMode = $state<'smart' | 'explicit'>('smart');
   let temperature = $state(1.0);
   let topK = $state(64);
+  let maxTools = $state(8);
   const defaultSystemPrompt = `Tu es un assistant UI connecté à des serveurs MCP.
 
 WORKFLOW OBLIGATOIRE :
@@ -306,7 +307,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
-        toolMode, maxIterations: 15, maxTokens, temperature, topK, cacheEnabled,
+        toolMode, maxIterations: 15, maxTokens, maxTools, temperature, topK, cacheEnabled,
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         layers,
@@ -536,7 +537,17 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
   <!-- INPUT BAR (composer only) -->
   {#if composerMode}
     <div class="flex-shrink-0 px-[50px] py-4 bg-surface border-t border-border">
-      <div class="flex gap-2">
+      <div class="flex gap-2 items-center">
+        <button
+          class="relative flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-lg border transition-colors
+                 {showToolJSON ? 'border-accent bg-accent/10 text-accent' : 'border-border2 text-text2 hover:text-text1'}"
+          onclick={() => showToolJSON = !showToolJSON}
+          aria-label="Toggle logs">
+          <Terminal size={14} />
+          {#if canvas.generating && agentLogs.length > 0}
+            <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-teal"></span>
+          {/if}
+        </button>
         <input type="text" bind:value={input} onkeydown={onKeydown}
           placeholder={canvas.mcpConnected ? `Demandez une interface sur ${canvas.mcpName}...` : 'Ouvrez le menu pour connecter un MCP...'}
           disabled={canvas.generating}
@@ -557,7 +568,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
 <!-- SETTINGS DRAWER -->
 <SettingsDrawer
   bind:open={settingsOpen}
-  bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens
+  bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:toolMode
   onconnect={() => addMcpServer(canvas.mcpUrl)}
   {connectedUrls} {loadingUrls}

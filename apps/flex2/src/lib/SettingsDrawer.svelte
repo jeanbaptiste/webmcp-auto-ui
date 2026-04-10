@@ -14,6 +14,7 @@
     effectivePrompt?: string;
     maxTokens?: number;
     maxContextTokens?: number;
+    maxTools?: number;
     cacheEnabled?: boolean;
     temperature?: number;
     topK?: number;
@@ -37,6 +38,7 @@
     effectivePrompt = '',
     maxTokens = $bindable(4096),
     maxContextTokens = $bindable(150_000),
+    maxTools = $bindable(8),
     cacheEnabled = $bindable(true),
     temperature = $bindable(1.0),
     topK = $bindable(64),
@@ -123,6 +125,7 @@
         {effectivePrompt}
         bind:maxTokens
         bind:maxContextTokens
+        bind:maxTools
         bind:cacheEnabled
         bind:temperature
         bind:topK
