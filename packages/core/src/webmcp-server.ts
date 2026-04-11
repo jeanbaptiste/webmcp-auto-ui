@@ -309,6 +309,45 @@ export function mountWidget(
 // Factory
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Image URL sanitizer — strips hallucinated URLs from widget params
+// ---------------------------------------------------------------------------
+
+const VALID_URL_PREFIXES = ['http://', 'https://', 'data:', '/'];
+const IMAGE_KEY_PATTERN = /^(src|image|avatar|photo|thumbnail|poster|icon|logo|cover|banner|background)$/i;
+
+/** Recursively scan widget params and nullify image-like fields with invalid URLs. */
+function sanitizeImageUrls(obj: unknown): unknown {
+  if (Array.isArray(obj)) return obj.map(sanitizeImageUrls);
+  if (obj !== null && typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      if (IMAGE_KEY_PATTERN.test(key) && typeof value === 'string') {
+        if (VALID_URL_PREFIXES.some(p => value.startsWith(p))) {
+          result[key] = value;
+        } else {
+          // Invalid image URL — strip it (likely hallucinated)
+          // Keep the key but set to undefined so the widget can use its fallback
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        // Special case: avatar as object { src: '...' }
+        if (IMAGE_KEY_PATTERN.test(key) && 'src' in (value as Record<string, unknown>)) {
+          const srcVal = (value as Record<string, unknown>).src;
+          if (typeof srcVal === 'string' && !VALID_URL_PREFIXES.some(p => srcVal.startsWith(p))) {
+            // Strip the whole avatar object if src is invalid
+            continue;
+          }
+        }
+        result[key] = sanitizeImageUrls(value);
+      } else {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+  return obj;
+}
+
 export function createWebMcpServer(
   name: string,
   options: WebMcpServerOptions,
@@ -394,8 +433,8 @@ export function createWebMcpServer(
             };
           }
 
-          const widgetParams = (params.params ?? {}) as Record<string, unknown>;
-          const validation = validateJsonSchema(widgetParams, entry.inputSchema as JsonSchema);
+          const rawParams = (params.params ?? {}) as Record<string, unknown>;
+          const validation = validateJsonSchema(rawParams, entry.inputSchema as JsonSchema);
           if (!validation.valid) {
             return {
               error: 'Validation failed',
@@ -403,6 +442,9 @@ export function createWebMcpServer(
               expected_schema: entry.inputSchema,
             };
           }
+
+          // Sanitize image URLs — strip hallucinated/invalid URLs before sending to UI
+          const widgetParams = sanitizeImageUrls(rawParams) as Record<string, unknown>;
 
           return { widget: widgetName, data: widgetParams, id: generateId() };
         },

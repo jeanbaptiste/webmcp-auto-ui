@@ -59,6 +59,24 @@
     return block;
   }
 
+  /** Sync windows from canvas blocks already loaded (e.g. from HyperSkill URL) */
+  export function syncFromCanvas() {
+    const existing = new Set(windows.map(w => w.id));
+    for (const block of canvas.blocks) {
+      if (existing.has(block.id)) continue;
+      windows = [...windows, {
+        id: block.id,
+        title: block.type,
+        visible: true,
+        focused: true,
+        folded: false,
+        weight: 1,
+        createdAt: Date.now(),
+        lastFocusedAt: Date.now(),
+      }];
+    }
+  }
+
   export function clearBlocks() {
     windows = [];
     provenance = {};

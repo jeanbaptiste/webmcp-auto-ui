@@ -43,7 +43,7 @@
   let skills = $state<Skill[]>([]);
 
   // FlexGrid ref
-  let flexGrid: { addBlock: (type: string, data: Record<string, unknown>, server?: string, component?: string) => { id: string }; clearBlocks: () => void } | undefined;
+  let flexGrid: { addBlock: (type: string, data: Record<string, unknown>, server?: string, component?: string) => { id: string }; clearBlocks: () => void; syncFromCanvas: () => void } | undefined;
 
   // ── Widget interaction → LLM pipeline ─────────────────────────────
   const INTERACTIVE_ACTIONS = new Set(['click', 'select', 'submit', 'itemclick', 'rowclick', 'cardclick', 'eventclick', 'personclick', 'groupclick', 'cellclick', 'imageclick', 'slidechange']);
@@ -81,6 +81,10 @@
   let agentLogs = $state<{ ts: number; type: string; detail: string }[]>([]);
   let abortController = $state<AbortController | null>(null);
   let exportCopied = $state(false);
+  let exportState = $state<'idle' | 'loading' | 'done'>('idle');
+  let exportedUrl = $state('');
+  let exportModalOpen = $state(false);
+  let exportedBlockSummary = $state<{count: number; types: string[]}>({count: 0, types: []});
   let includeSummary = $state(true);
   let allToolsUsed = $state<string[]>([]);
 
@@ -269,23 +273,37 @@
 
   // ── HyperSkill export ─────────────────────────────────────────────
   async function exportHsUrl() {
-    const skill = canvas.buildSkillJSON() as Record<string, unknown>;
-    if (includeSummary && conversationHistory.length > 0) {
-      try {
-        const result = await summarizeChat({
-          messages: conversationHistory, provider: getProvider(),
-          toolsUsed: allToolsUsed, toolCallCount: chatToolCount,
-          mcpServers: multiClient.listServers().map(s => s.name),
-          skillsReferenced: skills.map(s => s.name),
-        });
-        skill.chatSummary = result.chatSummary;
-        skill.provenance = result.provenance;
-      } catch { /* don't block export */ }
+    if (exportState === 'loading') return;
+    exportState = 'loading';
+    try {
+      const skill = canvas.buildSkillJSON() as Record<string, unknown>;
+      if (includeSummary && conversationHistory.length > 0) {
+        try {
+          const result = await summarizeChat({
+            messages: conversationHistory, provider: getProvider(),
+            toolsUsed: allToolsUsed, toolCallCount: chatToolCount,
+            mcpServers: multiClient.listServers().map(s => s.name),
+            skillsReferenced: skills.map(s => s.name),
+          });
+          skill.chatSummary = result.chatSummary;
+          skill.provenance = result.provenance;
+        } catch { /* don't block export */ }
+      }
+      const url = await encodeHyperSkill(skill as HyperSkill, window.location.origin + base);
+      await navigator.clipboard.writeText(url);
+      exportedUrl = url;
+      // Build block summary
+      const blocks = canvas.blocks;
+      const typeSet = new Set(blocks.map(b => b.type));
+      exportedBlockSummary = { count: blocks.length, types: [...typeSet] };
+      exportState = 'done';
+      exportCopied = true;
+      // Open modal
+      exportModalOpen = true;
+      setTimeout(() => { exportState = 'idle'; exportCopied = false; }, 3000);
+    } catch {
+      exportState = 'idle';
     }
-    const url = await encodeHyperSkill(skill as HyperSkill, window.location.origin + base);
-    await navigator.clipboard.writeText(url);
-    exportCopied = true;
-    setTimeout(() => { exportCopied = false; }, 2000);
   }
 
   // ── Agent ──────────────────────────────────────────────────────────
@@ -421,7 +439,14 @@
 
   onMount(() => {
     const param = new URLSearchParams(window.location.search).get('hs');
-    if (param) canvas.loadFromParam(param).then(() => { if (canvas.mcpUrl) addMcpServer(canvas.mcpUrl); });
+    if (param) {
+      canvas.loadFromParam(param).then((ok) => {
+        if (!ok) return;
+        // Sync FlexGrid windows from canvas blocks already loaded into the store
+        flexGrid?.syncFromCanvas();
+        if (canvas.mcpUrl) addMcpServer(canvas.mcpUrl);
+      });
+    }
     skills = listSkills();
   });
 
@@ -537,7 +562,7 @@
 <SettingsDrawer
   bind:open={settingsOpen}
   bind:composerMode bind:layoutMode bind:includeSummary
-  onexport={exportHsUrl} onhistory={() => historyOpen = true}
+  onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true}
   bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON
   bind:schemaValidation
@@ -547,6 +572,44 @@
   {mcpRecipes}
   webmcpRecipes={layers.find(l => l.protocol === 'webmcp')?.recipes ?? []}
 />
+
+<!-- EXPORT MODAL -->
+{#if exportModalOpen}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-10"
+       onclick={(e) => { if (e.target === e.currentTarget) exportModalOpen = false; }}>
+    <div class="w-full max-w-xl bg-surface border border-border2 rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+      <div class="flex items-center gap-3 px-6 py-4 border-b border-border flex-shrink-0">
+        <span class="font-mono text-sm font-bold text-text1">Hyper-recette exportee</span>
+        <div class="flex-1"></div>
+        <button class="text-text2 hover:text-text1 font-mono text-base leading-none transition-colors"
+                onclick={() => exportModalOpen = false}>x</button>
+      </div>
+      <div class="flex flex-col gap-4 p-6">
+        <p class="font-mono text-xs text-text2 leading-relaxed">
+          Cette Hyper-recette contient vos widgets, parametres et resume de conversation.
+          Partagez ce lien pour que d'autres puissent reproduire votre session.
+        </p>
+        <div class="bg-surface2 border border-border2 rounded-lg p-3 break-all">
+          <a href={exportedUrl} target="_blank" rel="noopener"
+             class="font-mono text-[11px] text-accent hover:underline">{exportedUrl}</a>
+        </div>
+        {#if exportedBlockSummary.count > 0}
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-mono text-[10px] text-text2">{exportedBlockSummary.count} widget{exportedBlockSummary.count > 1 ? 's' : ''} inclus :</span>
+            {#each exportedBlockSummary.types as t}
+              <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono border border-accent/30 text-accent bg-accent/5">{t}</span>
+            {/each}
+          </div>
+        {/if}
+        <button class="font-mono text-xs h-8 px-4 rounded-lg border border-accent text-accent hover:bg-accent/10 transition-colors self-end"
+                onclick={async () => { await navigator.clipboard.writeText(exportedUrl); }}>
+          Copier le lien
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <!-- HISTORY MODAL -->
 <HistoryModal bind:open={historyOpen} messages={historyLog} />

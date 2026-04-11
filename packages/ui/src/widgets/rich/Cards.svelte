@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SafeImage from '../SafeImage.svelte';
   export interface CardItem { title: string; description?: string; subtitle?: string; image?: string; tags?: string[]; href?: string; }
   export interface CardsSpec { title?: string; cards?: CardItem[]; minCardWidth?: string; gap?: string; emptyMessage?: string; }
   interface Props { spec: Partial<CardsSpec>; data?: unknown; oncardclick?: (c: CardItem) => void; }
@@ -20,7 +21,7 @@
         <!-- svelte-ignore a11y_interactive_supports_focus -->
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <div class="bg-surface2 border border-border rounded-lg overflow-hidden hover:border-border2 transition-all {oncardclick?'cursor-pointer':''}" role={oncardclick?"button":undefined} tabindex={oncardclick?0:undefined} onclick={()=>oncardclick?.(card)}>
-          {#if card.image}<img src={card.image} alt={card.title} class="w-full h-32 object-cover"/>{/if}
+          {#if card.image}<SafeImage src={card.image} alt={card.title} class="w-full h-32 object-cover" hideOnError />{/if}
           <div class="p-3">
             <div class="font-semibold text-sm text-text1 leading-tight">{card.title}</div>
             {#if card.subtitle}<div class="text-xs text-text2 mt-0.5">{card.subtitle}</div>{/if}

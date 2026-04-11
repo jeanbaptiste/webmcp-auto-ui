@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SafeImage from '../SafeImage.svelte';
   export interface GalleryImage { src: string; alt?: string; caption?: string; href?: string; }
   export interface GallerySpec { title?: string; images?: GalleryImage[]; columns?: number; gap?: string; emptyMessage?: string; }
   interface Props { spec: Partial<GallerySpec>; data?: unknown; onimageclick?: (img: GalleryImage, index: number) => void; }
@@ -39,7 +40,7 @@
       {#each images as img, i}
         <button class="relative overflow-hidden rounded-lg border border-border hover:border-border2 transition-all cursor-pointer bg-transparent p-0 group"
           onclick={() => open(i)}>
-          <img src={img.src} alt={img.alt ?? ''} class="w-full h-32 sm:h-40 object-cover transition-transform group-hover:scale-105" loading="lazy" />
+          <SafeImage src={img.src} alt={img.alt ?? ''} class="w-full h-32 sm:h-40 object-cover transition-transform group-hover:scale-105" loading="lazy" />
           {#if img.caption}
             <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5">
               <span class="text-white text-xs">{img.caption}</span>
@@ -58,7 +59,7 @@
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="relative max-w-[90vw] max-h-[90vh]" onclick={(e) => e.stopPropagation()}>
-        <img src={lightboxImg.src} alt={lightboxImg.alt ?? ''} class="max-w-full max-h-[85vh] object-contain rounded" />
+        <SafeImage src={lightboxImg.src} alt={lightboxImg.alt ?? ''} class="max-w-full max-h-[85vh] object-contain rounded" />
         {#if lightboxImg.caption}
           <div class="text-center text-white text-sm mt-2">{lightboxImg.caption}</div>
         {/if}

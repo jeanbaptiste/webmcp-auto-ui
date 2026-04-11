@@ -1,18 +1,26 @@
 <script lang="ts">
+  import SafeImage from '../SafeImage.svelte';
   export interface ProfileField { label: string; value: string; href?: string; }
   export interface ProfileStat { label: string; value: string; }
   export interface ProfileAction { label: string; href?: string; variant?: 'primary'|'secondary'|'danger'; onclick?: () => void; }
   export interface ProfileSpec { name?: string; subtitle?: string; avatar?: { src: string; alt?: string }; badge?: { text: string; variant?: 'default'|'success'|'warning'|'error' }; fields?: ProfileField[]; stats?: ProfileStat[]; actions?: ProfileAction[]; }
   interface Props { spec: Partial<ProfileSpec>; }
   let { spec }: Props = $props();
+  /** Track if avatar failed to load — fall back to initials */
+  let avatarFailed = $state(false);
+  $effect(() => { if (spec.avatar?.src) avatarFailed = false; });
+  const VALID_PREFIXES = ['http://', 'https://', 'data:', '/'];
+  const avatarValid = $derived(
+    !!spec.avatar?.src && VALID_PREFIXES.some(p => spec.avatar!.src.startsWith(p))
+  );
   const BADGE: Record<string,string> = { default:'bg-surface2 text-text2', success:'bg-teal/20 text-teal', warning:'bg-amber/20 text-amber', error:'bg-accent2/20 text-accent2' };
   const ACTION: Record<string,string> = { primary:'bg-accent text-white', secondary:'bg-surface2 text-text2', danger:'bg-accent2 text-white' };
   const initials = $derived((spec.name??'?').split(/\s+/).slice(0,2).map((w:string)=>w[0]??'').join('').toUpperCase()||'?');
 </script>
 <div class="bg-surface border border-border rounded-lg p-3 md:p-4 font-sans max-w-full md:max-w-[480px]">
   <div class="flex flex-col sm:flex-row items-center sm:items-start mb-4 gap-3 sm:gap-4">
-    {#if spec.avatar?.src}
-      <img src={spec.avatar.src} alt={spec.avatar.alt??''} class="w-16 h-16 rounded-full object-cover border-2 border-border2 flex-shrink-0" />
+    {#if avatarValid && !avatarFailed}
+      <img src={spec.avatar?.src} alt={spec.avatar?.alt??''} class="w-16 h-16 rounded-full object-cover border-2 border-border2 flex-shrink-0" onerror={() => { avatarFailed = true; }} />
     {:else}
       <div class="w-16 h-16 rounded-full bg-accent text-white flex items-center justify-center text-xl font-bold flex-shrink-0">{initials}</div>
     {/if}

@@ -44,3 +44,6 @@ Pour afficher la fiche d'une personne ou d'une entité — employé, client, org
 1. Récupérer les informations de la personne/entité via MCP
 2. Séparer les données en `fields` (détails textuels) et `stats` (chiffres clés)
 3. Appeler `autoui_webmcp_widget_display('profile', { name: 'Alice Martin', subtitle: 'Développeuse Senior', fields: [{ label: 'Email', value: 'alice@ex.com' }], stats: [{ label: 'Projets', value: '12' }] })`
+
+## Erreurs courantes
+- Ne JAMAIS inventer d'URLs d'images pour l'avatar. Utiliser UNIQUEMENT les URLs retournées par les outils MCP. Si aucune URL n'est disponible, ne pas inclure de champ avatar — le widget affichera les initiales automatiquement.

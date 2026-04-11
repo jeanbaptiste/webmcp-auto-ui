@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SafeImage from '../SafeImage.svelte';
   export interface CarouselSlide { src?: string; content?: string; title?: string; subtitle?: string; }
   export interface CarouselSpec { title?: string; slides?: CarouselSlide[]; autoPlay?: boolean; interval?: number; }
   interface Props { spec: Partial<CarouselSpec>; data?: unknown; onslidechange?: (slide: CarouselSlide, index: number) => void; }
@@ -56,7 +57,7 @@
         {#each slides as slide}
           <div class="w-full flex-shrink-0">
             {#if slide.src}
-              <img src={slide.src} alt={slide.title ?? ''} class="w-full h-48 sm:h-64 object-cover" loading="lazy" />
+              <SafeImage src={slide.src} alt={slide.title ?? ''} class="w-full h-48 sm:h-64 object-cover" loading="lazy" />
             {/if}
             {#if slide.title || slide.subtitle || slide.content}
               <div class="p-3">

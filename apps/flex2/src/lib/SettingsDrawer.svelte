@@ -19,7 +19,8 @@
     composerMode?: boolean;
     layoutMode?: 'float' | 'grid';
     includeSummary?: boolean;
-    onexport?: () => void;
+    onexport?: () => Promise<void>;
+    exportState?: 'idle' | 'loading' | 'done';
     onhistory?: () => void;
     mcpToken?: string;
     systemPrompt?: string;
@@ -49,6 +50,7 @@
     layoutMode = $bindable<'float' | 'grid'>('float'),
     includeSummary = $bindable(true),
     onexport,
+    exportState = 'idle',
     onhistory,
     mcpToken = $bindable(''),
     systemPrompt = $bindable(''),
@@ -173,9 +175,18 @@
         <input type="checkbox" bind:checked={includeSummary} class="accent-accent w-3.5 h-3.5" />
         Inclure synthese
       </label>
-      <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-text2 hover:text-text1 transition-colors w-full text-left"
-              onclick={onexport}>
-        Exporter HyperSkill URL
+      <button class="font-mono text-xs h-7 px-3 rounded border transition-colors w-full text-left flex items-center gap-2
+                     {exportState === 'done' ? 'border-teal/40 text-teal' : 'border-border2 text-text2 hover:text-text1'}"
+              onclick={onexport}
+              disabled={exportState === 'loading'}>
+        {#if exportState === 'loading'}
+          <span class="inline-block w-3 h-3 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></span>
+          Preparation...
+        {:else if exportState === 'done'}
+          Copie &#x2713;
+        {:else}
+          Exporter Hyper-recette
+        {/if}
       </button>
       <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-text2 hover:text-text1 transition-colors w-full text-left"
               onclick={onhistory}>

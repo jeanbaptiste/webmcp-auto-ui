@@ -34,3 +34,6 @@ Pour afficher une grille de personnes — équipe, membres d'un groupe, particip
 ## Comment
 1. Récupérer la liste des personnes via MCP
 2. Appeler `autoui_webmcp_widget_display('trombinoscope', { title: 'Équipe Dev', people: [{ name: 'Alice', subtitle: 'Lead', badge: 'PM', color: '#4CAF50' }], columns: 3 })`
+
+## Erreurs courantes
+- Ne JAMAIS inventer d'URLs d'images pour le champ `avatar`. Utiliser UNIQUEMENT les URLs retournées par les outils MCP. Si aucune URL n'est disponible, ne pas inclure de champ avatar — le widget affichera les initiales automatiquement.

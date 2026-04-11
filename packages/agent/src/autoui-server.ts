@@ -359,6 +359,9 @@ Pour afficher une fiche personne ou entite avec champs structures.
 
 ## Comment
 Appeler widget_display('profile', {name: "Alice", fields: [{label:"Role", value:"Dev"}]}).
+
+## Erreurs courantes
+- Ne JAMAIS inventer d'URLs pour l'avatar — utiliser uniquement celles retournées par les outils MCP. Sans URL, le widget affiche les initiales automatiquement.
 `,
 
   // ── trombinoscope ────────────────────────────────────────────────────────
@@ -396,6 +399,9 @@ Pour afficher une grille de personnes (equipe, assemblee, etc.).
 
 ## Comment
 Appeler widget_display('trombinoscope', {people: [{name: "Alice", badge: "Lead"}]}).
+
+## Erreurs courantes
+- Ne JAMAIS inventer d'URLs pour le champ avatar — utiliser uniquement celles retournées par les outils MCP. Sans URL, le widget affiche les initiales automatiquement.
 `,
 
   // ── json-viewer ──────────────────────────────────────────────────────────
@@ -540,6 +546,9 @@ Pour afficher des resultats, dossiers ou entites en grille de cartes.
 
 ## Comment
 Appeler widget_display('cards', {cards: [{title: "Projet A", description: "En cours"}]}).
+
+## Erreurs courantes
+- Ne JAMAIS inventer d'URLs d'images pour le champ image — utiliser uniquement celles retournées par les outils MCP. Si aucune URL n'est disponible, ne pas inclure de champ image.
 `,
 
   // ── sankey ───────────────────────────────────────────────────────────────
@@ -661,6 +670,10 @@ Pour afficher une collection d'images avec navigation lightbox.
 
 ## Comment
 Appeler widget_display('gallery', {images: [{src: "https://...", alt: "Photo 1"}]}).
+
+## Erreurs courantes
+- Ne JAMAIS fabriquer d'URLs d'images — utiliser uniquement celles retournées par les outils MCP
+- Toujours fournir un alt pour l'accessibilité
 `,
 
   // ── carousel ─────────────────────────────────────────────────────────────
@@ -698,6 +711,9 @@ Pour presenter du contenu en diaporama avec navigation.
 
 ## Comment
 Appeler widget_display('carousel', {slides: [{src: "https://...", title: "Slide 1"}]}).
+
+## Erreurs courantes
+- Ne JAMAIS fabriquer d'URLs d'images pour src — utiliser uniquement celles retournées par les outils MCP
 `,
 
   // ── map ──────────────────────────────────────────────────────────────────
