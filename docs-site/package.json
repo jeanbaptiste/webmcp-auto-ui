@@ -13,5 +13,8 @@
     "@astrojs/starlight": "^0.34.0",
     "astro": "^5.7.0",
     "sharp": "^0.33.0"
+  },
+  "devDependencies": {
+    "remark-mermaidjs": "^7.0.0"
   }
 }
