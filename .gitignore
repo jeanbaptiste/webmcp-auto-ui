@@ -23,6 +23,12 @@ npm-debug.log*
 # TypeScript incremental build cache
 *.tsbuildinfo
 
+# TypeScript declaration files (build artifacts in src/)
+packages/core/src/*.d.ts
+
+# Astro cache
+docs-site/.astro/
+
 # Auto-generated recipe file
 packages/agent/src/recipes/_generated.ts
 

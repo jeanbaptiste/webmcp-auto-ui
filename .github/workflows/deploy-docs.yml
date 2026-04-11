@@ -3,7 +3,10 @@ name: Deploy docs to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['docs-site/**']
+    paths:
+      - 'docs-site/**'
+      - 'packages/*/src/**'
+      - 'scripts/generate-docs.*'
   workflow_dispatch:
 
 permissions:
@@ -25,7 +28,11 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: rm -rf node_modules package-lock.json && npm install --no-audit --no-fund
-      - name: Build docs
+      - name: Generate docs from source
+        run: npm run docs:generate
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - name: Build Starlight
         working-directory: docs-site
         run: npm run build
       - uses: actions/upload-pages-artifact@v3
