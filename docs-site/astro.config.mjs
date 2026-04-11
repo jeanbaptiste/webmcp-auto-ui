@@ -12,50 +12,25 @@ export default defineConfig({
         fr: { label: 'Français', lang: 'fr' },
         en: { label: 'English', lang: 'en' },
       },
-      social: {
-        github: 'https://github.com/jeanbaptiste/webmcp-auto-ui',
-      },
+      social: [
+        { icon: 'github', label: 'GitHub', href: 'https://github.com/jeanbaptiste/webmcp-auto-ui' },
+      ],
       sidebar: [
-        { label: 'Accueil', slug: 'fr' },
         {
           label: 'Guide',
-          items: [
-            { label: 'Installation', slug: 'fr/guide/installation' },
-            { label: 'Architecture', slug: 'fr/guide/architecture' },
-            { label: 'Workflow', slug: 'fr/guide/workflow' },
-            { label: 'Déploiement', slug: 'fr/guide/deploy' },
-            { label: 'Composants custom', slug: 'fr/guide/custom-components' },
-            { label: 'Tutoriel : widget custom', slug: 'fr/guide/tutorial-custom-widget' },
-          ],
+          autogenerate: { directory: 'guide' },
         },
         {
           label: 'Packages',
-          items: [
-            { label: 'agent', slug: 'fr/packages/agent' },
-            { label: 'core', slug: 'fr/packages/core' },
-            { label: 'sdk', slug: 'fr/packages/sdk' },
-            { label: 'ui', slug: 'fr/packages/ui' },
-          ],
+          autogenerate: { directory: 'packages' },
         },
         {
           label: 'Concepts',
-          items: [
-            { label: 'ToolLayers', slug: 'fr/concepts/tool-layers' },
-            { label: 'component()', slug: 'fr/concepts/component-tool' },
-            { label: 'Recettes', slug: 'fr/concepts/recipes' },
-            { label: 'Widgets UI', slug: 'fr/concepts/ui-widgets' },
-            { label: 'MCP', slug: 'fr/concepts/mcp' },
-          ],
+          autogenerate: { directory: 'concepts' },
         },
         {
           label: 'Apps',
-          items: [
-            { label: 'flex2', slug: 'fr/apps/flex2' },
-            { label: 'viewer2', slug: 'fr/apps/viewer2' },
-            { label: 'showcase2', slug: 'fr/apps/showcase2' },
-            { label: 'recipes', slug: 'fr/apps/recipes' },
-            { label: 'todo2', slug: 'fr/apps/todo2' },
-          ],
+          autogenerate: { directory: 'apps' },
         },
       ],
     }),
