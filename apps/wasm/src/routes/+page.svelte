@@ -188,9 +188,8 @@
     const result: ToolLayer[] = [];
     if (mcpConnected) {
       const mcpLayer: McpLayer = {
-        source: 'mcp',
-        serverUrl: mcpUrl,
-        serverName: mcpName || undefined,
+        protocol: 'mcp',
+        serverName: mcpName || 'mcp',
         tools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
         recipes: mcpRecipes.length > 0 ? mcpRecipes : undefined,
       };

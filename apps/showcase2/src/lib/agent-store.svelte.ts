@@ -195,9 +195,8 @@ export const agentStore = {
 
     if (canvas.mcpConnected) {
       const mcpLayer: McpLayer = {
-        source: 'mcp',
-        serverUrl: connectedUrl,
-        serverName: canvas.mcpName ?? undefined,
+        protocol: 'mcp',
+        serverName: canvas.mcpName ?? 'mcp',
         tools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
       };
       layers.push(mcpLayer);
