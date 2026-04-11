@@ -10,7 +10,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "@sveltejs/adapter-static": "^3.0.0",
+    "@sveltejs/adapter-node": "^5.0.0",
     "@sveltejs/kit": "^2.15.0",
     "@webmcp-auto-ui/agent": "file:../../packages/agent",
     "@webmcp-auto-ui/core": "file:../../packages/core",

@@ -91,6 +91,11 @@ deploy_node_root() {
     echo "  [$app] ✗ INTEGRITY ERROR — deployed file ≠ local build (sha256 mismatch)"
     exit 1
   fi
+  # Install runtime deps if server code has external imports (e.g. @sveltejs/kit)
+  if ssh "$SSH_HOST" "test -f $REMOTE_BASE/$app/package.json" 2>/dev/null; then
+    echo "  [$app] installing runtime deps on server..."
+    ssh "$SSH_HOST" "cd $REMOTE_BASE/$app && npm install --production --silent 2>/dev/null"
+  fi
   echo "  [$app] restarting service..."
   ssh "$SSH_HOST" "systemctl restart webmcp-$app"
   echo "  [$app] ✓ deployed v$app_version (node index.js at root)"
@@ -220,7 +225,7 @@ deploy_app() {
     home)                deploy_static "home" ;;
     todo2)               deploy_static "todo2" ;;
     showcase2)           deploy_node_root "showcase2" ;;
-    multi-svelte)        deploy_static "multi-svelte" ;;
+    multi-svelte)        deploy_node_root "multi-svelte" ;;
     multi-react)         deploy_vite_static "multi-react" ;;
     multi-vue)           deploy_vite_static "multi-vue" ;;
     multi-webcomponents) deploy_vite_static "multi-webcomponents" ;;
@@ -261,7 +266,7 @@ echo ""
 echo "Verifying..."
 for app in $APPS; do
   case "$app" in
-    flex2|viewer2|recipes|showcase2|multi-astro)
+    flex2|viewer2|recipes|showcase2|multi-svelte|multi-astro)
       status=$(ssh "$SSH_HOST" "systemctl is-active webmcp-$app 2>/dev/null" || echo "inactive")
       echo "  $app: $status"
       ;;
