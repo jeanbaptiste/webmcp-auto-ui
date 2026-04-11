@@ -27,7 +27,7 @@
     "build": "svelte-package -i src"
   },
   "dependencies": {
-    "hyperskills": "^0.1.0"
+    "hyperskills": "^0.1.4"
   },
   "peerDependencies": {
     "svelte": "^5.0.0"
