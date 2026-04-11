@@ -27,8 +27,8 @@
       description: 'List all available HyperSkills apps with their URLs and descriptions.',
       inputSchema: { type: 'object', properties: {} },
       execute: () => jsonResult([
-        { name: 'Flex', url: `${base}/flex2`, description: 'Layers, component() unique, recettes, debug panel, mode composeur/consommateur' },
-        { name: 'Viewer', url: `${base}/viewer2`, description: 'Lecteur HyperSkills read-only — décode et affiche les blocs' },
+        { name: 'Flex', url: `${base}/flex2`, description: 'WebMCP multi-serveurs, widgets, recettes, lazy loading, debug panel' },
+        { name: 'Viewer', url: `${base}/viewer2`, description: 'Lecteur HyperSkills read-only — décode et affiche les widgets' },
         { name: 'Showcase', url: `${base}/showcase2`, description: 'Démo dynamique de tous les composants UI avec 3 thèmes' },
         { name: 'Todo', url: `${base}/todo2`, description: 'Template minimal de référence pour démarrer une app webmcp-auto-ui' },
         { name: 'Recipes', url: `${base}/recipes`, description: 'Explorateur de recettes MCP et WebMCP' },

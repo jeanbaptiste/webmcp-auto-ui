@@ -76,7 +76,7 @@
         <h1 class="text-lg font-bold text-text1 font-mono tracking-tight">WebMCP Auto-UI</h1>
         <p class="text-xs text-text2 font-mono">
           {#if mode === 'agent' && displayBlocks}
-            Agent — {displayBlocks.length} blocks — {activePreset.label}
+            Agent — {displayBlocks.length} widgets — {activePreset.label}
           {:else}
             Component Showcase — {activePreset.label}
           {/if}
@@ -210,7 +210,7 @@
             Generated from {canvas.mcpName ?? 'MCP'}
           </h2>
           <span class="text-[10px] font-mono text-text2">
-            {displayBlocks.length} blocks — {agentStore.toolCallCount} tool calls — {agentStore.elapsed}s
+            {displayBlocks.length} widgets — {agentStore.toolCallCount} tool calls — {agentStore.elapsed}s
           </span>
         </div>
 
@@ -263,7 +263,7 @@
       <!-- ═══ Static demo blocks ═══ -->
       <section class="mb-12">
         <h2 class="text-sm font-mono text-text2 uppercase tracking-widest mb-6 border-b border-border pb-2">
-          Simple Blocks
+          Simple Widgets
         </h2>
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {#each SIMPLE_BLOCKS as block}
@@ -280,7 +280,7 @@
 
       <section>
         <h2 class="text-sm font-mono text-text2 uppercase tracking-widest mb-6 border-b border-border pb-2">
-          Rich Blocks
+          Rich Widgets
         </h2>
         <div class="flex flex-col gap-6">
           {#each RICH_BLOCKS as block}
@@ -304,7 +304,7 @@
     <div class="max-w-7xl mx-auto px-4 text-center flex flex-col items-center gap-1">
       <p class="text-xs font-mono text-text2">
         {#if displayBlocks}
-          WebMCP Auto-UI — {displayBlocks.length} agent-generated blocks — {activePreset.label}
+          WebMCP Auto-UI — {displayBlocks.length} agent-generated widgets — {activePreset.label}
         {:else}
           WebMCP Auto-UI — {SIMPLE_BLOCKS.length + RICH_BLOCKS.length} components — 3 themes
         {/if}

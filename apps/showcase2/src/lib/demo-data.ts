@@ -1,6 +1,6 @@
 /**
- * Demo data for every BlockRenderer type.
- * Each entry is { type, data } matching BlockRenderer's Props.
+ * Demo data for every WidgetRenderer type.
+ * Each entry is { type, data } matching WidgetRenderer's Props.
  */
 
 export interface DemoBlock {
@@ -70,12 +70,12 @@ export const SIMPLE_BLOCKS: DemoBlock[] = [
     label: 'Code',
     data: {
       lang: 'typescript',
-      content: `import { BlockRenderer } from '@webmcp-auto-ui/ui';
+      content: `import { WidgetRenderer } from '@webmcp-auto-ui/ui';
 
-// Render any block type dynamically
-const blocks = canvas.blocks;
-for (const block of blocks) {
-  render(BlockRenderer, { type: block.type, data: block.data });
+// Render any widget type dynamically
+const widgets = canvas.blocks;
+for (const widget of widgets) {
+  render(WidgetRenderer, { type: widget.type, data: widget.data });
 }`,
     },
   },
@@ -235,7 +235,7 @@ export const RICH_BLOCKS: DemoBlock[] = [
     data: {
       title: 'Temps de reponse API (ms)',
       type: 'bar',
-      labels: ['GET /users', 'POST /auth', 'GET /blocks', 'PUT /canvas', 'DELETE /session'],
+      labels: ['GET /users', 'POST /auth', 'GET /widgets', 'PUT /canvas', 'DELETE /session'],
       data: [
         { label: 'p50', values: [12, 45, 8, 22, 5], color: '#3ecfb2' },
         { label: 'p99', values: [89, 230, 42, 110, 18], color: '#fa6d7c' },
@@ -261,7 +261,7 @@ export const RICH_BLOCKS: DemoBlock[] = [
       cards: [
         { title: '@webmcp-auto-ui/core', description: 'Client MCP, groupes d\'outils, polyfill WebMCP', tags: ['core', 'mcp'] },
         { title: '@webmcp-auto-ui/ui', description: 'Composants Svelte 5, theme system, widgets', tags: ['ui', 'svelte'] },
-        { title: '@webmcp-auto-ui/agent', description: 'Boucle agent, providers LLM, tool component()', tags: ['agent', 'llm'] },
+        { title: '@webmcp-auto-ui/agent', description: 'Boucle agent, providers LLM, widgets WebMCP', tags: ['agent', 'llm'] },
         { title: '@webmcp-auto-ui/sdk', description: 'Canvas store, HyperSkill encode/decode', tags: ['sdk', 'canvas'] },
       ],
     },
@@ -309,7 +309,7 @@ export const RICH_BLOCKS: DemoBlock[] = [
         { source: 'agent', target: 'claude', value: 60, label: 'remote' },
         { source: 'gemma', target: 'mcp', value: 30 },
         { source: 'claude', target: 'mcp', value: 50 },
-        { source: 'mcp', target: 'canvas', value: 80, label: 'blocks' },
+        { source: 'mcp', target: 'canvas', value: 80, label: 'widgets' },
       ],
     },
   },
@@ -321,8 +321,8 @@ export const RICH_BLOCKS: DemoBlock[] = [
       entries: [
         { timestamp: '14:23:01.123', level: 'info', message: 'Agent loop started', source: 'agent' },
         { timestamp: '14:23:01.456', level: 'debug', message: 'Sending prompt to Gemma WASM provider', source: 'gemma' },
-        { timestamp: '14:23:03.789', level: 'info', message: 'Tool call: component({ type: "stat", data: {...} })', source: 'agent' },
-        { timestamp: '14:23:03.801', level: 'info', message: 'Block stat_revenue rendered', source: 'canvas' },
+        { timestamp: '14:23:03.789', level: 'info', message: 'Tool call: autoui_webmcp_widget_display({ name: "stat", params: {...} })', source: 'agent' },
+        { timestamp: '14:23:03.801', level: 'info', message: 'Widget stat_revenue rendered', source: 'canvas' },
         { timestamp: '14:23:04.100', level: 'warn', message: 'Token budget at 82% (3280/4000)', source: 'agent' },
         { timestamp: '14:23:05.500', level: 'error', message: 'MCP tool fetch_data timed out after 5000ms', source: 'mcp' },
         { timestamp: '14:23:05.510', level: 'info', message: 'Retrying with fallback data', source: 'agent' },
@@ -337,7 +337,7 @@ export const RICH_BLOCKS: DemoBlock[] = [
       autoPlay: true,
       interval: 4000,
       slides: [
-        { title: 'Dashboard principal', subtitle: 'Vue agent avec canvas et chat', content: 'L\'agent genere des blocs en temps reel via le protocole MCP.' },
+        { title: 'Dashboard principal', subtitle: 'Vue agent avec canvas et chat', content: 'L\'agent genere des widgets en temps reel via le protocole MCP.' },
         { title: 'Theme Cyberpunk', subtitle: 'Neon et contrastes forts', content: 'Le systeme de themes permet de changer l\'apparence de toute l\'app en un clic.' },
         { title: 'Multi-agent', subtitle: 'Collaboration entre agents', content: 'Plusieurs agents peuvent travailler sur le meme canvas simultanement.' },
       ],

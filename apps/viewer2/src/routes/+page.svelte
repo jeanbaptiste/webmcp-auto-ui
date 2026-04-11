@@ -112,7 +112,7 @@
   }
 
   function addBlock() {
-    blocks = [...blocks, { id: uid(), type: 'text', data: { text: 'Nouveau bloc' } }];
+    blocks = [...blocks, { id: uid(), type: 'text', data: { text: 'Nouveau widget' } }];
     updateSkillContent();
   }
 
@@ -316,14 +316,14 @@
               <button
                 class="p-1 rounded hover:bg-surface2 text-text2 hover:text-accent transition-colors"
                 onclick={() => startEdit(block)}
-                title="Modifier le bloc"
+                title="Modifier le widget"
               >
                 <Pencil size={12} />
               </button>
               <button
                 class="p-1 rounded hover:bg-surface2 text-text2 hover:text-red-400 transition-colors"
                 onclick={() => deleteBlock(block.id)}
-                title="Supprimer le bloc"
+                title="Supprimer le widget"
               >
                 <Trash2 size={12} />
               </button>
@@ -361,13 +361,13 @@
                  text-text2 hover:text-accent hover:border-accent/50 transition-colors font-mono text-xs cursor-pointer"
           onclick={addBlock}
         >
-          <Plus size={14} /> Ajouter un bloc
+          <Plus size={14} /> Ajouter un widget
         </button>
 
         {#if blocks.length === 0 && skill}
           <div class="flex flex-col items-center justify-center py-16 gap-4 text-center">
             <div class="text-5xl opacity-20">&#x2B21;</div>
-            <div class="font-mono text-sm text-text2">Skill chargee mais vide -- aucun bloc a afficher</div>
+            <div class="font-mono text-sm text-text2">Skill chargee mais vide -- aucun widget a afficher</div>
           </div>
         {/if}
       </div>

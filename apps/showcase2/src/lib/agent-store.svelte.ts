@@ -205,18 +205,9 @@ export const agentStore = {
 
     layers.push(autoui.layer());
 
-    const systemPrompt = `Tu es un agent de showcase UI. Tu es connecté à un serveur MCP.
-
-TON OBJECTIF : créer une page de démonstration visuellement riche en utilisant les données réelles du serveur MCP.
-
-WORKFLOW :
-1. Utilise les outils MCP pour explorer et récupérer des données intéressantes
-2. Pour chaque donnée, crée un composant UI approprié avec render_* (stat, chart, data-table, list, etc.)
-3. Varie les types de composants : stat, chart, data-table, list, kv, timeline, profile, cards, etc.
-4. Crée au moins 6 composants variés
-5. Utilise des données RÉELLES du serveur, pas des données inventées
-
-Réponds en 1-2 phrases max entre les composants. L'essentiel est dans l'UI.
+    const systemPrompt = `Crée une page de démonstration visuellement riche avec au moins 6 widgets variés.
+Utilise des données RÉELLES du serveur, pas des données inventées.
+Réponds en 1-2 phrases max entre les widgets. L'essentiel est dans l'UI.
 
 ${buildSystemPrompt(layers)}`;
 

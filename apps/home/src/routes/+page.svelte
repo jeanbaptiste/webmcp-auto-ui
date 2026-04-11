@@ -11,13 +11,13 @@
   const demos = [
     {
       title: 'Flex',
-      desc: 'Nouvelle architecture : layers, component() unique, recettes, debug panel, mode composeur/consommateur.',
+      desc: 'WebMCP multi-serveurs, widgets, recettes, lazy loading, debug panel.',
       url: `${base}/flex2`,
       accent: '#8b5cf6',
     },
     {
       title: 'Viewer',
-      desc: 'Lecteur HyperSkills read-only. Décode et affiche les blocs, bouton Modifier vers Flex.',
+      desc: 'Lecteur HyperSkills read-only. Décode et affiche les widgets, bouton Modifier vers Flex.',
       url: `${base}/viewer2`,
       accent: '#f59e0b',
     },
