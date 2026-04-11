@@ -105,6 +105,9 @@ export class WasmProvider implements LLMProvider {
     const root = await navigator.storage.getDirectory();
     const modelsDir = await root.getDirectoryHandle('webmcp-models', { create: true });
 
+    // ── Clean orphan .crswap files (Chrome WritableStream leftovers) ──
+    try { await modelsDir.removeEntry(`${filename}.crswap`); } catch { /* no swap — OK */ }
+
     // ── OPFS cache hit ───────────────────────────────────────────────
     try {
       const cached = await modelsDir.getFileHandle(filename);
@@ -114,8 +117,9 @@ export class WasmProvider implements LLMProvider {
         this.opts.onProgress?.(1, 'cached', file.size, file.size);
         return file.stream() as ReadableStream<Uint8Array>;
       }
-      // Corrupt cache — remove and re-download
+      // Corrupt cache (0 bytes or wrong size) — remove and re-download
       await modelsDir.removeEntry(filename).catch(() => {});
+      try { await modelsDir.removeEntry(`${filename}.crswap`); } catch { /* OK */ }
     } catch {
       // Cache miss
     }
