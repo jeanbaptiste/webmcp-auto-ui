@@ -1,17 +1,34 @@
 # Utiliser les widgets existants
 
-Ce tutorial explique comment utiliser les widgets natifs du serveur `autoui` via les outils MCP. Il couvre la recherche de widgets, la lecture de leurs schemas, l'affichage, la manipulation du canvas, et la composition de dashboards.
+Ce tutorial explique comment utiliser les widgets natifs du serveur `autoui`
+via les outils WebMCP. Il couvre la decouverte, l'affichage, la manipulation
+du canvas, et la composition de dashboards.
 
 ## Prerequis
 
-- Un serveur `autoui` connecte via MCP
-- Un agent capable d'appeler les outils MCP (`autoui_webmcp_*`)
+- Un serveur `autoui` connecte via les layers
+- Un agent capable d'appeler les outils WebMCP (`autoui_webmcp_*`)
+
+---
+
+## Vue d'ensemble du flow
+
+```mermaid
+flowchart LR
+    A["search_recipes\n(decouvrir)"] --> B["get_recipe\n(comprendre)"]
+    B --> C["widget_display\n(afficher)"]
+    C --> D["canvas\n(positionner)"]
+```
+
+Chaque etape est un appel d'outil. Le LLM execute cette sequence
+automatiquement quand il recoit une demande de visualisation.
 
 ---
 
 ## Etape 1 -- Lister les widgets disponibles
 
-L'outil `autoui_webmcp_search_recipes` retourne la liste des widgets avec leurs descriptions et groupes.
+L'outil `autoui_webmcp_search_recipes` retourne la liste des widgets
+avec leurs descriptions et groupes.
 
 ```json
 {
@@ -20,7 +37,8 @@ L'outil `autoui_webmcp_search_recipes` retourne la liste des widgets avec leurs 
 }
 ```
 
-La reponse contient un tableau de recettes. Chaque entree indique le nom du widget, son groupe et une description courte. C'est le point de depart pour savoir ce qui est disponible.
+La reponse contient un tableau de recettes. Chaque entree indique le nom
+du widget, son groupe et une description courte.
 
 Vous pouvez filtrer par mot-cle :
 
@@ -37,49 +55,49 @@ Vous pouvez filtrer par mot-cle :
 
 #### Groupe simple (9 widgets)
 
-| Widget | Description |
-|--------|-------------|
-| `stat` | Valeur numerique avec label et tendance |
-| `kv` | Liste de paires cle-valeur |
-| `list` | Liste simple d'elements |
-| `chart` | Graphique basique (bar, line, pie) |
-| `alert` | Message d'alerte avec niveau de severite |
-| `code` | Bloc de code avec coloration syntaxique |
-| `text` | Texte riche (markdown) |
-| `actions` | Groupe de boutons d'action |
-| `tags` | Ensemble de badges/etiquettes |
+| Widget | Description | Exemple minimal |
+|--------|-------------|-----------------|
+| `stat` | Valeur numerique avec label et tendance | `{label: "PIB", value: "2.1T EUR"}` |
+| `kv` | Liste de paires cle-valeur | `{rows: [["Nom", "Dupont"], ["Age", "42"]]}` |
+| `list` | Liste simple d'elements | `{items: ["Item 1", "Item 2"]}` |
+| `chart` | Graphique a barres simples | `{bars: [["Jan", 120], ["Fev", 190]]}` |
+| `alert` | Message d'alerte avec severite | `{title: "Attention", level: "warn"}` |
+| `code` | Bloc de code avec coloration | `{lang: "ts", content: "const x = 1;"}` |
+| `text` | Texte riche (paragraphe) | `{content: "Bonjour le monde"}` |
+| `actions` | Groupe de boutons d'action | `{buttons: [{label: "OK", primary: true}]}` |
+| `tags` | Ensemble de badges/etiquettes | `{tags: [{text: "v2"}, {text: "stable"}]}` |
 
 #### Groupe rich (12 widgets)
 
-| Widget | Description |
-|--------|-------------|
-| `data-table` | Tableau de donnees avec tri et filtres |
-| `timeline` | Chronologie d'evenements |
-| `profile` | Fiche de profil utilisateur |
-| `trombinoscope` | Grille de profils |
-| `json-viewer` | Explorateur JSON interactif |
-| `hemicycle` | Visualisation en hemicycle (votes parlementaires) |
-| `chart-rich` | Graphique avance multi-series |
-| `cards` | Grille de cartes avec contenu structure |
-| `sankey` | Diagramme de flux Sankey |
-| `log` | Journal d'evenements horodate |
-| `stat-card` | Carte statistique enrichie |
-| `grid-data` | Grille de donnees editable |
+| Widget | Description | Exemple minimal |
+|--------|-------------|-----------------|
+| `data-table` | Tableau de donnees avec tri | `{columns: [{key: "nom", label: "Nom"}], rows: [{nom: "Dupont"}]}` |
+| `timeline` | Chronologie d'evenements | `{events: [{title: "v1", date: "2024-01"}]}` |
+| `profile` | Fiche de profil | `{name: "Jean Dupont"}` |
+| `trombinoscope` | Grille de profils | `{people: [{name: "Alice"}, {name: "Bob"}]}` |
+| `json-viewer` | Explorateur JSON interactif | `{data: {key: "value"}}` |
+| `hemicycle` | Hemicycle parlementaire | `{groups: [{id: "g1", label: "Gauche", seats: 150, color: "#e74c3c"}]}` |
+| `chart-rich` | Graphique multi-series | `{type: "bar", labels: ["Q1"], data: [{values: [42]}]}` |
+| `cards` | Grille de cartes | `{cards: [{title: "Projet A"}]}` |
+| `sankey` | Diagramme de flux Sankey | `{nodes: [{id: "a", label: "A"}], links: [{source: "a", target: "b", value: 10}]}` |
+| `log` | Journal d'evenements horodate | `{entries: [{message: "Start", level: "info"}]}` |
+| `stat-card` | KPI enrichi avec delta | `{label: "Users", value: "1.2M", delta: "+5%"}` |
+| `grid-data` | Grille de donnees avec highlights | `{rows: [["A", 1], ["B", 2]]}` |
 
 #### Groupe media (2 widgets)
 
-| Widget | Description |
-|--------|-------------|
-| `gallery` | Galerie d'images avec lightbox |
-| `carousel` | Carrousel d'images/contenus |
+| Widget | Description | Exemple minimal |
+|--------|-------------|-----------------|
+| `gallery` | Galerie d'images avec lightbox | `{images: [{src: "https://...", alt: "Photo"}]}` |
+| `carousel` | Carrousel de slides | `{slides: [{title: "Slide 1", content: "..."}]}` |
 
 #### Groupe advanced (3 widgets)
 
-| Widget | Description |
-|--------|-------------|
-| `map` | Carte interactive (Leaflet) |
-| `d3` | Visualisation D3.js custom |
-| `js-sandbox` | Sandbox JavaScript isolee |
+| Widget | Description | Exemple minimal |
+|--------|-------------|-----------------|
+| `map` | Carte avec marqueurs (vanilla) | `{markers: [{lat: 48.85, lng: 2.35, label: "Paris"}]}` |
+| `d3` | Visualisation D3 simplifiee | `{preset: "hex-heatmap", data: {values: [1,2,3]}}` |
+| `js-sandbox` | Sandbox JavaScript isolee | `{code: "document.body.textContent = 'Hello'"}` |
 
 ---
 
@@ -91,26 +109,23 @@ Avant d'afficher un widget, lisez sa recette pour connaitre les parametres atten
 {
   "name": "autoui_webmcp_get_recipe",
   "arguments": {
-    "recipe": "hemicycle"
+    "name": "hemicycle"
   }
 }
 ```
 
 La reponse contient :
 
-- **schema** : les proprietes attendues (types, valeurs par defaut, contraintes)
-- **description** : ce que le widget fait et comment l'utiliser
-- **exemples** : des appels types avec leurs parametres
+- **name** : identifiant du widget
+- **description** : ce que le widget fait
+- **schema** : JSON Schema des proprietes attendues
+- **recipe** : instructions pour le LLM (quand utiliser, comment, erreurs courantes)
 
-Autre exemple avec `data-table` :
-
-```json
-{
-  "name": "autoui_webmcp_get_recipe",
-  "arguments": {
-    "recipe": "data-table"
-  }
-}
+```mermaid
+flowchart TB
+    A["get_recipe('hemicycle')"] --> B["Retour"]
+    B --> C["schema:\n  type: object\n  required: [groups]\n  properties:\n    groups: array\n    totalSeats: number"]
+    B --> D["recipe:\n  ## Quand utiliser\n  Pour visualiser une\n  assemblee parlementaire"]
 ```
 
 ---
@@ -129,8 +144,8 @@ Un indicateur statistique :
 {
   "name": "autoui_webmcp_widget_display",
   "arguments": {
-    "recipe": "stat",
-    "data": {
+    "name": "stat",
+    "params": {
       "label": "PIB",
       "value": "2.1T EUR",
       "trend": "+1.2%"
@@ -145,13 +160,9 @@ Un graphique en barres :
 {
   "name": "autoui_webmcp_widget_display",
   "arguments": {
-    "recipe": "chart",
-    "data": {
-      "type": "bar",
-      "labels": ["Jan", "Fev", "Mar", "Avr"],
-      "datasets": [
-        { "label": "Ventes", "data": [120, 190, 300, 250] }
-      ]
+    "name": "chart",
+    "params": {
+      "bars": [["Jan", 120], ["Fev", 190], ["Mar", 300], ["Avr", 250]]
     }
   }
 }
@@ -163,9 +174,9 @@ Une alerte :
 {
   "name": "autoui_webmcp_widget_display",
   "arguments": {
-    "recipe": "alert",
-    "data": {
-      "level": "warning",
+    "name": "alert",
+    "params": {
+      "level": "warn",
       "title": "Quota proche",
       "message": "Vous avez utilise 92% de votre quota mensuel."
     }
@@ -181,13 +192,16 @@ Un tableau de donnees :
 {
   "name": "autoui_webmcp_widget_display",
   "arguments": {
-    "recipe": "data-table",
-    "data": {
-      "columns": ["Pays", "Population", "PIB"],
+    "name": "data-table",
+    "params": {
+      "columns": [
+        {"key": "pays", "label": "Pays"},
+        {"key": "pop", "label": "Population"},
+        {"key": "pib", "label": "PIB"}
+      ],
       "rows": [
-        ["France", "67M", "2.78T"],
-        ["Allemagne", "83M", "3.86T"],
-        ["Espagne", "47M", "1.40T"]
+        {"pays": "France", "pop": "67M", "pib": "2.78T"},
+        {"pays": "Allemagne", "pop": "83M", "pib": "3.86T"}
       ]
     }
   }
@@ -200,12 +214,12 @@ Une timeline :
 {
   "name": "autoui_webmcp_widget_display",
   "arguments": {
-    "recipe": "timeline",
-    "data": {
+    "name": "timeline",
+    "params": {
       "events": [
-        { "date": "2024-01-15", "title": "Lancement v1", "description": "Premiere version publique" },
-        { "date": "2024-06-01", "title": "v2 beta", "description": "Refonte complete de l'UI" },
-        { "date": "2024-09-30", "title": "v2 stable", "description": "Release officielle" }
+        {"date": "2024-01-15", "title": "Lancement v1", "status": "done"},
+        {"date": "2024-06-01", "title": "v2 beta", "status": "active"},
+        {"date": "2024-09-30", "title": "v2 stable", "status": "pending"}
       ]
     }
   }
@@ -218,14 +232,14 @@ Un hemicycle :
 {
   "name": "autoui_webmcp_widget_display",
   "arguments": {
-    "recipe": "hemicycle",
-    "data": {
+    "name": "hemicycle",
+    "params": {
       "groups": [
-        { "name": "Gauche", "seats": 150, "color": "#e74c3c" },
-        { "name": "Centre", "seats": 120, "color": "#f39c12" },
-        { "name": "Droite", "seats": 200, "color": "#3498db" }
+        {"id": "gauche", "label": "Gauche", "seats": 150, "color": "#e74c3c"},
+        {"id": "centre", "label": "Centre", "seats": 120, "color": "#f39c12"},
+        {"id": "droite", "label": "Droite", "seats": 200, "color": "#3498db"}
       ],
-      "total": 470
+      "totalSeats": 470
     }
   }
 }
@@ -239,12 +253,13 @@ Une galerie :
 {
   "name": "autoui_webmcp_widget_display",
   "arguments": {
-    "recipe": "gallery",
-    "data": {
+    "name": "gallery",
+    "params": {
       "images": [
-        { "src": "https://example.com/photo1.jpg", "alt": "Vue aerienne" },
-        { "src": "https://example.com/photo2.jpg", "alt": "Detail facade" }
-      ]
+        {"src": "https://example.com/photo1.jpg", "alt": "Vue aerienne"},
+        {"src": "https://example.com/photo2.jpg", "alt": "Detail facade"}
+      ],
+      "columns": 2
     }
   }
 }
@@ -258,13 +273,13 @@ Une carte interactive :
 {
   "name": "autoui_webmcp_widget_display",
   "arguments": {
-    "recipe": "map",
-    "data": {
-      "center": [48.8566, 2.3522],
+    "name": "map",
+    "params": {
+      "center": {"lat": 48.8566, "lng": 2.3522},
       "zoom": 12,
       "markers": [
-        { "lat": 48.8584, "lng": 2.2945, "label": "Tour Eiffel" },
-        { "lat": 48.8606, "lng": 2.3376, "label": "Louvre" }
+        {"lat": 48.8584, "lng": 2.2945, "label": "Tour Eiffel"},
+        {"lat": 48.8606, "lng": 2.3376, "label": "Louvre"}
       ]
     }
   }
@@ -275,7 +290,8 @@ Une carte interactive :
 
 ## Etape 4 -- Manipuler le canvas
 
-Une fois les widgets affiches, utilisez `autoui_webmcp_canvas` pour les repositionner, redimensionner ou supprimer.
+Une fois les widgets affiches, utilisez `autoui_webmcp_canvas` pour les
+repositionner, redimensionner ou supprimer.
 
 ### Deplacer un widget
 
@@ -285,7 +301,7 @@ Une fois les widgets affiches, utilisez `autoui_webmcp_canvas` pour les repositi
   "arguments": {
     "action": "move",
     "id": "w_abc",
-    "params": { "x": 100, "y": 200 }
+    "params": {"x": 100, "y": 200}
   }
 }
 ```
@@ -298,7 +314,20 @@ Une fois les widgets affiches, utilisez `autoui_webmcp_canvas` pour les repositi
   "arguments": {
     "action": "resize",
     "id": "w_abc",
-    "params": { "width": 400, "height": 300 }
+    "params": {"width": 400, "height": 300}
+  }
+}
+```
+
+### Mettre a jour les donnees
+
+```json
+{
+  "name": "autoui_webmcp_canvas",
+  "arguments": {
+    "action": "update",
+    "id": "w_abc",
+    "params": {"label": "PIB mis a jour", "value": "2.85T EUR"}
   }
 }
 ```
@@ -332,15 +361,17 @@ Une fois les widgets affiches, utilisez `autoui_webmcp_canvas` pour les repositi
 
 Le pattern standard pour creer un dashboard complet :
 
-1. **Chercher** les widgets adaptes avec `search_recipes`
-2. **Lire** les schemas des widgets choisis avec `get_recipe`
-3. **Preparer** les donnees selon chaque schema
-4. **Afficher** chaque widget avec `widget_display`
-5. **Positionner** les widgets sur le canvas avec `canvas`
+```mermaid
+flowchart TB
+    A["search_recipes()\nTrouver les widgets adaptes"] --> B["get_recipe() x N\nLire les schemas"]
+    B --> C["Preparer les donnees\n(MCP ou hardcoded)"]
+    C --> D["widget_display() x N\nAfficher chaque widget"]
+    D --> E["canvas() x N\nPositionner en grille"]
+```
 
 ### Exemple : dashboard economique
 
-Quatre widgets combines pour un apercu economique d'un pays.
+Quatre widgets combines pour un apercu economique.
 
 **Widget 1 -- Indicateur principal :**
 
@@ -348,11 +379,12 @@ Quatre widgets combines pour un apercu economique d'un pays.
 {
   "name": "autoui_webmcp_widget_display",
   "arguments": {
-    "recipe": "stat",
-    "data": {
+    "name": "stat",
+    "params": {
       "label": "PIB France 2024",
       "value": "2.78T EUR",
-      "trend": "+0.9%"
+      "trend": "+0.9%",
+      "trendDir": "up"
     }
   }
 }
@@ -364,12 +396,12 @@ Quatre widgets combines pour un apercu economique d'un pays.
 {
   "name": "autoui_webmcp_widget_display",
   "arguments": {
-    "recipe": "chart",
-    "data": {
+    "name": "chart-rich",
+    "params": {
       "type": "line",
       "labels": ["T1", "T2", "T3", "T4"],
-      "datasets": [
-        { "label": "Croissance (%)", "data": [0.7, 0.9, 1.1, 0.9] }
+      "data": [
+        {"label": "Croissance (%)", "values": [0.7, 0.9, 1.1, 0.9]}
       ]
     }
   }
@@ -382,14 +414,19 @@ Quatre widgets combines pour un apercu economique d'un pays.
 {
   "name": "autoui_webmcp_widget_display",
   "arguments": {
-    "recipe": "data-table",
-    "data": {
-      "columns": ["Pays", "PIB (T EUR)", "Croissance", "Chomage"],
+    "name": "data-table",
+    "params": {
+      "columns": [
+        {"key": "pays", "label": "Pays"},
+        {"key": "pib", "label": "PIB (T EUR)"},
+        {"key": "croiss", "label": "Croissance"},
+        {"key": "chomage", "label": "Chomage"}
+      ],
       "rows": [
-        ["France", "2.78", "+0.9%", "7.4%"],
-        ["Allemagne", "3.86", "+0.3%", "5.7%"],
-        ["Italie", "1.95", "+0.7%", "7.8%"],
-        ["Espagne", "1.40", "+2.1%", "11.7%"]
+        {"pays": "France", "pib": "2.78", "croiss": "+0.9%", "chomage": "7.4%"},
+        {"pays": "Allemagne", "pib": "3.86", "croiss": "+0.3%", "chomage": "5.7%"},
+        {"pays": "Italie", "pib": "1.95", "croiss": "+0.7%", "chomage": "7.8%"},
+        {"pays": "Espagne", "pib": "1.40", "croiss": "+2.1%", "chomage": "11.7%"}
       ]
     }
   }
@@ -402,12 +439,12 @@ Quatre widgets combines pour un apercu economique d'un pays.
 {
   "name": "autoui_webmcp_widget_display",
   "arguments": {
-    "recipe": "chart",
-    "data": {
+    "name": "chart-rich",
+    "params": {
       "type": "pie",
       "labels": ["Services", "Industrie", "Agriculture", "Construction"],
-      "datasets": [
-        { "label": "Part du PIB", "data": [70.2, 16.8, 3.4, 9.6] }
+      "data": [
+        {"label": "Part du PIB", "values": [70.2, 16.8, 3.4, 9.6]}
       ]
     }
   }
@@ -425,16 +462,14 @@ Apres affichage, positionnez les widgets en grille :
 
 ---
 
-## Recapitulatif du flow
+## Recapitulatif
 
-```
-search_recipes  -->  get_recipe  -->  widget_display  -->  canvas
-(decouvrir)          (comprendre)     (afficher)           (positionner)
-```
+| Etape | Outil | Ce qui se passe |
+|-------|-------|-----------------|
+| Decouvrir | `search_recipes` | Trouver les widgets par nom ou mot-cle |
+| Comprendre | `get_recipe` | Lire le schema et les exemples |
+| Afficher | `widget_display` | Creer le widget avec les donnees |
+| Positionner | `canvas` | Deplacer, redimensionner, supprimer |
 
-1. **search_recipes** : trouver les widgets par nom ou mot-cle
-2. **get_recipe** : lire le schema et les exemples d'un widget
-3. **widget_display** : creer le widget avec les donnees preparees
-4. **canvas** : deplacer, redimensionner ou supprimer les widgets sur le canvas
-
-Chaque `widget_display` retourne un identifiant (`id`) que vous utilisez ensuite dans les appels `canvas`.
+Chaque `widget_display` retourne un identifiant (`id`) que vous utilisez
+ensuite dans les appels `canvas`.

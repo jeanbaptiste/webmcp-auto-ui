@@ -40,10 +40,34 @@
       accent: '#ec4899',
     },
     {
-      title: 'WASM Bench',
-      desc: 'Benchmark smart vs explicit avec Gemma WASM',
-      url: `${base}/wasm`,
-      accent: '#06b6d4',
+      title: 'Multi — Svelte',
+      desc: 'Multi-framework demo: Svelte 5 + SvelteKit, all widget families, WASM agent.',
+      url: `${base}/multi-svelte`,
+      accent: '#ff3e00',
+    },
+    {
+      title: 'Multi — React',
+      desc: 'Multi-framework demo: React 19 + MUI, D3/Plotly/Mermaid widgets, Claude API.',
+      url: `${base}/multi-react`,
+      accent: '#61dafb',
+    },
+    {
+      title: 'Multi — Vue',
+      desc: 'Multi-framework demo: Vue 3 Composition API, vanilla/D3/Plotly/Mermaid widgets.',
+      url: `${base}/multi-vue`,
+      accent: '#42b883',
+    },
+    {
+      title: 'Multi — Web Components',
+      desc: 'Multi-framework demo: pure Web Components, zero-framework vanilla widgets.',
+      url: `${base}/multi-webcomponents`,
+      accent: '#f7df1e',
+    },
+    {
+      title: 'Multi — Astro',
+      desc: 'Multi-framework demo: Astro SSR + islands, Canvas2D/D3/Plotly/Mermaid widgets.',
+      url: `${base}/multi-astro`,
+      accent: '#bc52ee',
     },
   ];
 

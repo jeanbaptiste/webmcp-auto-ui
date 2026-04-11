@@ -16,7 +16,7 @@
 <meta charset="utf-8">
 <style>
 *,*::before,*::after{box-sizing:border-box}
-body{margin:0;padding:8px;font-family:system-ui,sans-serif;font-size:13px;background:#fff;color:#111}
+body{margin:0;padding:8px;font-family:system-ui,sans-serif;font-size:13px;background:var(--bg,#1a1a2e);color:var(--fg,#e2e2e8)}
 ${spec.css ?? ''}
 </style>
 </head>

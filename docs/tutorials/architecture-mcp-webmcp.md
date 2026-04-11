@@ -18,6 +18,26 @@ Le systeme repose sur deux protocoles symetriques :
 Chacun expose des **tools** (actions atomiques) et des **recettes**
 (guides de composition).
 
+```mermaid
+flowchart TB
+    subgraph MCP ["MCP (donnees distantes)"]
+        direction TB
+        M1["Transport: HTTP Streamable\n(JSON-RPC 2.0)"]
+        M2["Execution: serveur distant"]
+        M3["Tools: query_sql, fetch_document"]
+    end
+
+    subgraph WebMCP ["WebMCP (affichage local)"]
+        direction TB
+        W1["Transport: appels JS in-process"]
+        W2["Execution: navigateur local"]
+        W3["Tools: widget_display, canvas"]
+    end
+
+    LLM["LLM"] --> MCP
+    LLM --> WebMCP
+```
+
 ### Tableau comparatif
 
 | Dimension       | MCP                            | WebMCP                          |
@@ -35,7 +55,7 @@ Chacun expose des **tools** (actions atomiques) et des **recettes**
 ## 2. La symetrie
 
 Le design fondamental est la **symetrie** : le LLM ne distingue pas un
-tool MCP d'un tool WebMCP. Les deux protocols exposent la meme interface :
+tool MCP d'un tool WebMCP. Les deux protocoles exposent la meme interface :
 
 - `search_recipes()` -- decouvrir les recettes disponibles
 - `get_recipe()` -- obtenir le schema et les instructions
@@ -45,18 +65,13 @@ Du point de vue du LLM, un appel MCP et un appel WebMCP suivent le meme
 cycle : decouverte, lecture du schema, execution. Seul le routage interne
 differe -- la boucle agent dispatche vers le bon serveur selon le prefixe.
 
-```
-             LLM
-              |
-     +--------+--------+
-     |                  |
-  *_mcp_*           *_webmcp_*
-     |                  |
-  McpClient         WebMcpServer
-  (HTTP)            (JS local)
-     |                  |
-  Serveur            Navigateur
-  distant            (widgets)
+```mermaid
+flowchart TB
+    LLM["LLM"]
+    LLM -->|"*_mcp_*"| MC["McpClient\n(HTTP)"]
+    LLM -->|"*_webmcp_*"| WS["WebMcpServer\n(JS local)"]
+    MC --> SD["Serveur distant"]
+    WS --> NAV["Navigateur\n(widgets)"]
 ```
 
 ---
@@ -82,7 +97,7 @@ Exemples concrets avec plusieurs serveurs connectes :
 
 Le routage dans la boucle agent parse ce prefixe avec une regex :
 
-```
+```typescript
 /^(.+?)_(mcp|webmcp)_(.+)$/
 ```
 
@@ -95,7 +110,37 @@ Ce prefixage garantit qu'il n'y a **aucune collision de noms** meme avec
 
 ---
 
-## 4. Le lazy loading
+## 4. Le system prompt dynamique
+
+`buildSystemPrompt(layers)` genere un prompt **recipe-driven** adapte
+aux serveurs connectes. Le prompt impose un workflow strict en 4 etapes :
+
+1. **Decouverte** -- appeler `search_recipes()` pour trouver la recette pertinente
+2. **Lecture** -- appeler `get_recipe()` pour lire les instructions
+3. **Execution** -- suivre les instructions de la recette (fetch data, etc.)
+4. **Affichage** -- utiliser `widget_display`, `canvas`, `recall` pour le rendu UI
+
+### Placeholders dynamiques
+
+Les listes d'outils aux etapes 1, 2 et 4 sont des **placeholders** :
+`buildSystemPrompt` injecte automatiquement les noms prefixes selon
+les layers connectes. Avec 2 serveurs MCP et 1 WebMCP, l'etape 1
+contiendra par exemple :
+
+```
+tricoteuses_mcp_search_recipes(), datagouv_mcp_search_recipes(), autoui_webmcp_search_recipes()
+```
+
+### Personnalisation par app
+
+Les apps peuvent passer un `systemPrompt` custom dans les options de
+`runAgentLoop()`. Quand il est fourni, il remplace le prompt genere.
+Cependant, le prompt unifie s'adapte aux serveurs presents et couvre
+la majorite des cas.
+
+---
+
+## 5. Le lazy loading
 
 Au demarrage, la boucle agent n'expose **pas** tous les tools de tous
 les serveurs. Elle ne fournit que les tools de decouverte :
@@ -109,32 +154,23 @@ les serveurs. Elle ne fournit que les tools de decouverte :
 Les tools WebMCP d'action (`widget_display`, `canvas`, `recall`) sont
 toujours presents car ils sont necessaires pour afficher des resultats.
 
-### Timeline du lazy loading
+```mermaid
+sequenceDiagram
+    participant LLM
+    participant Loop as Agent Loop
+    participant MCP as MCP Server
 
-```
-Iteration 1     Iteration 2       Iteration 3        Iteration 4
-    |               |                 |                  |
-    v               v                 v                  v
+    Note over LLM,Loop: Iteration 1 - Discovery
+    LLM->>Loop: tricoteuses_mcp_search_recipes("profil")
+    Loop->>MCP: callTool("search_recipes", ...)
+    MCP-->>Loop: [{name: "parl-profile"}]
+    Note over Loop: activateServerTools(tricoteuses)
+    Note over Loop: Tous les tools MCP actifs
 
-[discovery]    [activation]      [data tools]       [display]
-                                                         
-Tools:          Tools:             Tools:             Tools:
-  tricoX_mcp_     tricoX_mcp_       tricoX_mcp_       tricoX_mcp_
-  search_recipes  search_recipes    search_recipes    search_recipes
-  get_recipe      get_recipe        get_recipe        get_recipe
-                  query_sql    <--  query_sql         query_sql
-                  fetch_doc         fetch_doc         fetch_doc
-                  list_tables       list_tables       list_tables
-                                                         
-  autoui_webmcp_  autoui_webmcp_    autoui_webmcp_    autoui_webmcp_
-  search_recipes  search_recipes    search_recipes    search_recipes
-  get_recipe      get_recipe        get_recipe        get_recipe
-  widget_display  widget_display    widget_display    widget_display
-                                                         
-LLM appelle:   LLM appelle:      LLM appelle:      LLM appelle:
-search_recipes query_sql         get_recipe        widget_display
-               (active le        (charge le        (rendu final)
-                serveur)         schema widget)
+    Note over LLM,Loop: Iteration 2 - Data
+    LLM->>Loop: tricoteuses_mcp_query_sql(...)
+    Loop->>MCP: callTool("query_sql", ...)
+    MCP-->>Loop: {nom: "Dupont", ...}
 ```
 
 Quand le LLM appelle un tool d'un serveur pour la premiere fois,
@@ -150,93 +186,38 @@ par tour.
 
 ---
 
-## 5. Le system prompt dynamique
-
-`buildSystemPrompt(layers)` genere un prompt **recipe-driven** adapte
-aux serveurs connectes. Le prompt impose un workflow strict en 4 etapes :
-
-1. **Decouverte** — appeler `search_recipes()` pour trouver la recette pertinente
-2. **Lecture** — appeler `get_recipe()` pour lire les instructions
-3. **Execution** — suivre les instructions de la recette (fetch data, etc.)
-4. **Affichage** — utiliser `widget_display`, `canvas`, `recall` pour le rendu UI
-
-### Placeholders dynamiques
-
-Les listes d'outils aux etapes 1, 2 et 4 sont des **placeholders** :
-`buildSystemPrompt` injecte automatiquement les noms prefixes selon
-les layers connectes. Avec 2 serveurs MCP et 1 WebMCP, l'etape 1
-contiendra par exemple :
-
-```
-tricoteuses_mcp_search_recipes(), datagouv_mcp_search_recipes(), autoui_webmcp_search_recipes()
-```
-
-Cela fonctionne en tandem avec le **lazy loading** : les outils de
-decouverte (`search_recipes`, `get_recipe`) sont les seuls exposes
-au LLM au premier tour via `buildDiscoveryTools()`. Le prompt guide
-le LLM vers ces outils, et `activateServerTools()` charge les outils
-data a la demande.
-
-> Voir [docs/system-prompt.md](../system-prompt.md) pour le texte
-> complet du prompt et les decisions de design.
-
-### Personnalisation par app
-
-Les apps peuvent passer un `systemPrompt` custom dans les options de
-`runAgentLoop()`. Quand il est fourni, il remplace le prompt genere.
-Cependant, les apps ne doivent plus hardcoder de prompt -- le prompt
-unifie s'adapte aux serveurs presents et couvre la majorite des cas.
-
----
-
 ## 6. Le pipeline de schemas
 
 Les schemas des widgets suivent un pipeline en 4 etapes, du composant
 Svelte au runtime :
 
-```
-+-------------------+     +------------------+     +-------------------+
-| Composant Svelte  |     |  Script          |     |  Recette .md      |
-| (interface Props) | --> | sync-schemas.ts  | --> | (frontmatter YAML)|
-|                   |     |                  |     |                   |
-| interface Props { |     | - Parse TS       |     | ---               |
-|   label: string;  |     | - Extract Props  |     | widget: stat      |
-|   value: string;  |     | - Convert to     |     | schema:           |
-|   trend?: string; |     |   JSON Schema    |     |   type: object    |
-| }                 |     | - Inject into    |     |   required:       |
-|                   |     |   frontmatter    |     |     - label       |
-+-------------------+     +------------------+     |     - value       |
-                                                   |   properties:     |
-                                                   |     label:        |
-                                                   |       type: string|
-                                                   | ---               |
-                                                   | ## Quand utiliser |
-                                                   | ...               |
-                                                   +--------+----------+
-                                                            |
-                                                            v
-                                                   +-------------------+
-                                                   | WebMCP Server     |
-                                                   | (runtime)         |
-                                                   |                   |
-                                                   | registerWidget()  |
-                                                   | - parse front.    |
-                                                   | - extract schema  |
-                                                   | - build tools     |
-                                                   | - validate params |
-                                                   +-------------------+
+```mermaid
+flowchart LR
+    A["Composant Svelte\ninterface Props {\n  label: string;\n  value: string;\n}"] --> B["sync-schemas.ts\nParse TS\nConvert to JSON Schema\nInject into frontmatter"]
+    B --> C["Recette .md\nwidget: stat\nschema:\n  type: object\n  required: [label, value]"]
+    C --> D["WebMCP Server\nregisterWidget()\nparse frontmatter\nbuild tools\nvalidate params"]
 ```
 
 Le script `sync-schemas.ts` maintient un mapping explicite entre chaque
 nom de widget et son fichier `.svelte` (ex: `"stat"` <--> `StatBlock.svelte`,
-`"profile"` <--> `ProfileCard.svelte`). Les schemas restent a jour via
-`npm run docs:sync` (mode `--check` en CI).
+`"profile"` <--> `ProfileCard.svelte`).
 
 ### Validation au runtime
 
 Quand le LLM appelle `widget_display(name, params)`, le serveur WebMCP
 valide les params contre le JSON Schema **avant** de les passer au
-renderer. Si la validation echoue, le LLM recoit un message d'erreur
+renderer :
+
+```mermaid
+flowchart TB
+    A["LLM appelle\nwidget_display('stat', params)"] --> B{"validateJsonSchema\n(params, schema)"}
+    B -->|valid| C["Retourne\n{widget: 'stat', data: params, id: 'w_x'}"]
+    B -->|invalid| D["Retourne\n{error: 'Validation failed',\ndetails: [...],\nexpected_schema: {...}}"]
+    D --> E["LLM corrige ses params\net reessaie"]
+    C --> F["WidgetRenderer\nStatBlock.svelte"]
+```
+
+Si la validation echoue, le LLM recoit un message d'erreur
 avec le schema attendu, ce qui lui permet de corriger son appel.
 
 ---
@@ -246,77 +227,44 @@ avec le schema attendu, ce qui lui permet de corriger son appel.
 Sequence diagram d'une conversation typique. L'utilisateur demande :
 "Montre-moi le profil du depute Jean Dupont".
 
-```
-User            LLM              Agent Loop         MCP Server       WebMCP Server
- |               |                  |                  |                 |
- |  "Profil de   |                  |                  |                 |
- |   Jean Dupont"|                  |                  |                 |
- |-------------->|                  |                  |                 |
- |               |                  |                  |                 |
- |               |  [Iteration 1 - Discovery]          |                 |
- |               |  tricoteuses_mcp_                   |                 |
- |               |  search_recipes("profil")           |                 |
- |               |----------------->|                  |                 |
- |               |                  |  callTool()      |                 |
- |               |                  |----------------->|                 |
- |               |                  |  [{name: "parl.  |                 |
- |               |                  |    -profile",    |                 |
- |               |                  |    desc: "..."}] |                 |
- |               |                  |<-----------------|                 |
- |               |                  |                  |                 |
- |               |  activateServerTools(tricoteuses)   |                 |
- |               |  --> tous les tools MCP actifs      |                 |
- |               |                  |                  |                 |
- |               |<-----------------|                  |                 |
- |               |                  |                  |                 |
- |               |  [Iteration 2 - Data]               |                 |
- |               |  tricoteuses_mcp_                   |                 |
- |               |  query_sql("SELECT ... depute")     |                 |
- |               |----------------->|                  |                 |
- |               |                  |  callTool()      |                 |
- |               |                  |----------------->|                 |
- |               |                  |  {nom: "Dupont", |                 |
- |               |                  |   groupe: "RE",  |                 |
- |               |                  |   photo: "..."}  |                 |
- |               |                  |<-----------------|                 |
- |               |<-----------------|                  |                 |
- |               |                  |                  |                 |
- |               |  [Iteration 3 - Schema]             |                 |
- |               |  autoui_webmcp_                     |                 |
- |               |  get_recipe("profile")              |                 |
- |               |----------------->|                  |                 |
- |               |                  |  executeTool()   |                 |
- |               |                  |---------------------------------->|
- |               |                  |  {schema: {...}, |                 |
- |               |                  |   recipe: "..."}|                 |
- |               |                  |<----------------------------------|
- |               |<-----------------|                  |                 |
- |               |                  |                  |                 |
- |               |  [Iteration 4 - Display]            |                 |
- |               |  autoui_webmcp_                     |                 |
- |               |  widget_display("profile",          |                 |
- |               |    {name:"J. Dupont",               |                 |
- |               |     subtitle:"Depute RE",           |                 |
- |               |     avatar:"https://..."})          |                 |
- |               |----------------->|                  |                 |
- |               |                  |  executeTool()   |                 |
- |               |                  |---------------------------------->|
- |               |                  |  1. Validate vs  |                 |
- |               |                  |     JSON Schema  |                 |
- |               |                  |  2. Return       |                 |
- |               |                  |     {widget,data}|                 |
- |               |                  |<----------------------------------|
- |               |                  |                  |                 |
- |               |                  |  onWidget()      |                 |
- |               |                  |  --> BlockRenderer                 |
- |               |                  |  --> ProfileCard  |                 |
- |               |                  |                  |                 |
- |               |<-----------------|                  |                 |
- |               |  "Voici le       |                  |                 |
- |               |   profil de..."  |                  |                 |
- |<--------------|                  |                  |                 |
- |               |                  |                  |                 |
- | [ProfileCard rendu dans le canvas]                  |                 |
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant LLM
+    participant Loop as Agent Loop
+    participant MCP as MCP Server
+    participant WS as WebMCP Server
+
+    U->>LLM: "Profil de Jean Dupont"
+
+    Note over LLM,Loop: Iteration 1 - Discovery
+    LLM->>Loop: tricoteuses_mcp_search_recipes("profil")
+    Loop->>MCP: callTool("search_recipes", ...)
+    MCP-->>Loop: [{name: "parl-profile", desc: "..."}]
+    Note over Loop: activateServerTools(tricoteuses)
+    Loop-->>LLM: resultat
+
+    Note over LLM,Loop: Iteration 2 - Data
+    LLM->>Loop: tricoteuses_mcp_query_sql("SELECT ... depute")
+    Loop->>MCP: callTool("query_sql", ...)
+    MCP-->>Loop: {nom: "Dupont", groupe: "RE", photo: "..."}
+    Loop-->>LLM: resultat
+
+    Note over LLM,Loop: Iteration 3 - Schema
+    LLM->>Loop: autoui_webmcp_get_recipe("profile")
+    Loop->>WS: executeTool("get_recipe", ...)
+    WS-->>Loop: {schema: {...}, recipe: "..."}
+    Loop-->>LLM: resultat
+
+    Note over LLM,Loop: Iteration 4 - Display
+    LLM->>Loop: autoui_webmcp_widget_display("profile", {...})
+    Loop->>WS: executeTool("widget_display", ...)
+    WS-->>Loop: {widget: "profile", data: {...}, id: "w_x"}
+    Note over Loop: onWidget() -> WidgetRenderer -> ProfileCard
+    Loop-->>LLM: resultat
+
+    LLM-->>U: "Voici le profil de Jean Dupont"
+    Note over U: ProfileCard rendu dans le canvas
 ```
 
 ### Mecanismes de securite
@@ -327,7 +275,7 @@ Deux garde-fous evitent les boucles infinies :
    `widget_display`, les tools de discovery sont retires du jeu actif.
    Apres 5 iterations, un message de nudge est injecte.
 
-2. **`max_iterations`** (defaut 5) -- la boucle s'arrete meme si le
+2. **`maxIterations`** (defaut 5) -- la boucle s'arrete meme si le
    LLM n'a pas termine.
 
 ### Compression des resultats
@@ -342,57 +290,35 @@ les textes de plus de 300 caracteres sont tronques a 200 avec un hint
 ## 8. Multi-serveurs
 
 Plusieurs serveurs MCP et WebMCP coexistent grace au prefixage uniforme.
-Voici un exemple avec 4 serveurs :
 
-```
-+-------------------------------------------------------------------+
-|                        Agent Loop                                 |
-|                                                                   |
-|  layers: ToolLayer[]                                              |
-|                                                                   |
-|  +---------------------------+  +---------------------------+     |
-|  | McpLayer                  |  | McpLayer                  |     |
-|  | serverName: "tricoteuses" |  | serverName: "datagouv"    |     |
-|  | protocol: "mcp"           |  | protocol: "mcp"           |     |
-|  | tools:                    |  | tools:                    |     |
-|  |   query_sql               |  |   fetch_dataset           |     |
-|  |   search_recipes          |  |   search_recipes          |     |
-|  |   get_recipe              |  |   get_recipe              |     |
-|  |   fetch_document          |  |   list_datasets           |     |
-|  +---------------------------+  +---------------------------+     |
-|                                                                   |
-|  +---------------------------+  +---------------------------+     |
-|  | WebMcpLayer               |  | WebMcpLayer               |     |
-|  | serverName: "autoui"      |  | serverName: "designkit"   |     |
-|  | protocol: "webmcp"        |  | protocol: "webmcp"        |     |
-|  | tools:                    |  | tools:                    |     |
-|  |   search_recipes          |  |   search_recipes          |     |
-|  |   get_recipe              |  |   get_recipe              |     |
-|  |   widget_display          |  |   widget_display          |     |
-|  |   canvas                  |  |                           |     |
-|  |   recall                  |  |                           |     |
-|  +---------------------------+  +---------------------------+     |
-|                                                                   |
-|  buildSystemPrompt(layers) --> prompt avec 4 serveurs             |
-|  buildDiscoveryTools(layers) --> 8 search/get tools + 3 actions   |
-|  activateServerTools() --> ajoute les tools d'un serveur          |
-|                                                                   |
-+-----+----------------------------+-------------------------------+
-      |                            |
-      v                            v
-  McpClient                    WebMcpServer(s)
-  (HTTP vers                   (JS local,
-   tricoteuses,                 autoui + designkit)
-   datagouv)
+```mermaid
+flowchart TB
+    subgraph Loop ["Agent Loop"]
+        direction TB
+        SP["buildSystemPrompt(layers)"]
+        DT["buildDiscoveryTools(layers)"]
+        AS["activateServerTools()"]
+    end
+
+    subgraph MCP ["MCP Layers"]
+        M1["tricoteuses\nprotocol: mcp\ntools: query_sql, search_recipes, ..."]
+        M2["datagouv\nprotocol: mcp\ntools: fetch_dataset, ..."]
+    end
+
+    subgraph WebMCP ["WebMCP Layers"]
+        W1["autoui\nprotocol: webmcp\n26 widgets natifs"]
+        W2["designkit\nprotocol: webmcp\nwidgets design"]
+    end
+
+    Loop --> MCP
+    Loop --> WebMCP
 ```
 
 ### Recettes multi-serveurs
 
 Les recettes sont filtrees par serveur connecte. Quand le systeme
 decouvre les serveurs actifs, `filterRecipesByServer()` selectionne les
-recettes pertinentes. Le systeme gere aussi des **alias** : le serveur
-"tricoteuses" matche les recettes qui referencent "moulineuse" ou
-"code4code" (memes donnees, noms differents).
+recettes pertinentes.
 
 ### Isolation des namespaces
 
@@ -402,32 +328,54 @@ exposent tous les deux un tool `widget_display`, le LLM voit :
 - `autoui_webmcp_widget_display` -- widgets standards (stat, chart, map...)
 - `designkit_webmcp_widget_display` -- widgets design (mockup, wireframe...)
 
-Pas de confusion possible. Le LLM choisit le bon serveur en fonction
-des donnees et du contexte.
+Pas de confusion possible.
 
 ---
 
-## 9. Extensibilite future
+## 9. Le resolver canonique (4 couches)
 
-L'architecture par layers est concu pour accueillir de nouveaux types
+Les serveurs MCP n'utilisent pas toujours les noms exacts `search_recipes`
+et `get_recipe`. Le resolver canonique identifie les tools equivalents
+via 4 couches de matching :
+
+| Couche | Strategie | Exemple |
+|--------|-----------|---------|
+| Layer 1 | Correspondance exacte sur le nom | `search_recipes` |
+| Layer 2 | Decomposition (action, resource) | `list_skills` -> action=list, resource=skills -> search_recipes |
+| Layer 3 | Scan de la description pour keywords | description contient "recipe" + action "search" |
+| Layer 4 | Fallback : pas de tool recette, liste les tools bruts | serveur sans recettes |
+
+Le resolver enregistre des **alias** dans une map locale :
+
+```typescript
+// Si le serveur expose "list_skills" au lieu de "search_recipes"
+aliasMap.set('serveur_mcp_search_recipes', 'serveur_mcp_list_skills');
+```
+
+Le system prompt utilise le nom canonique (`search_recipes`), et la boucle
+agent resout l'alias au moment de l'execution.
+
+---
+
+## 10. Extensibilite future
+
+L'architecture par layers est concue pour accueillir de nouveaux types
 de serveurs sans modifier la boucle agent.
 
 ### Browser WebMCP
 
 Un serveur WebMCP `browser` pourrait exposer `notify`, `clipboard`,
-`share`, `download`. Le LLM appellerait `browser_webmcp_notify(...)` de
-la meme facon qu'il appelle `autoui_webmcp_widget_display(...)`.
+`share`, `download`. Le LLM appellerait `browser_webmcp_notify(...)`.
 
 ### Native WebMCP (SwiftUI bridge)
 
 Un bridge natif pourrait exposer `widget_display` (rendu SwiftUI),
-`haptic`, `speech`. Meme convention de nommage : `native_webmcp_*`.
+`haptic`, `speech`. Meme convention : `native_webmcp_*`.
 
-### Nouveaux protocols
+### Nouveaux protocoles
 
 `ToolLayer` est un union discrimine par `protocol`. Ajouter un troisieme
-type (gRPC, WASM) = nouveau membre d'union + un cas dans
-`buildToolsFromLayers()`.
+type = nouveau membre d'union + un cas dans `buildToolsFromLayers()`.
 
 ```typescript
 // Aujourd'hui
@@ -438,49 +386,30 @@ export type ToolLayer = McpLayer | WebMcpLayer | WasmLayer;
 
 ---
 
-## Architecture globale -- Vue d'ensemble
+## Architecture globale
 
-```
-+=========================================================================+
-|                              NAVIGATEUR                                 |
-|                                                                         |
-|  +------------------+    +------------------+    +-------------------+  |
-|  | App (SvelteKit)  |    | Agent Loop       |    | BlockRenderer     |  |
-|  |                  |    |                  |    |                   |  |
-|  | - Chat input     |--->| - LLM provider   |--->| Dispatch:         |  |
-|  | - Config LLM     |    | - Tool dispatch  |    |   type -> widget  |  |
-|  | - Canvas         |<---| - Lazy loading   |<---|   data -> props   |  |
-|  |                  |    | - Compression    |    |                   |  |
-|  +------------------+    +--------+---------+    +---+----------+----+  |
-|                                   |                  |          |       |
-|              +--------------------+---+              |          |       |
-|              |                        |         StatBlock  ProfileCard  |
-|              v                        v         ChartBlock MapView ...  |
-|  +-----------+-------+  +------------+------+                           |
-|  | WebMCP Server(s)  |  | LLM Provider      |                          |
-|  | (autoui,designkit)|  | (Remote/Wasm/Local)|                          |
-|  |                   |  |                    |                          |
-|  | - search_recipes  |  | - chat()           |                          |
-|  | - get_recipe      |  | - streaming        |                          |
-|  | - widget_display  |  | - token tracking   |                          |
-|  | - canvas/recall   |  +--------+-----------+                          |
-|  +-------------------+           |                                      |
-|                                  |  HTTP (Remote)                       |
-+==========+=======================|======================================+
-           |                       |
-           |  MCP Streamable HTTP  |
-           |  (JSON-RPC 2.0)      v
-           |                                                               
-+----------+-----------+  +-------------------+                            
-| MCP Server           |  | LLM API           |                            
-| (tricoteuses,        |  | (Claude, Ollama)  |                            
-|  datagouv, ...)      |  |                   |                            
-|                      |  +-------------------+                            
-| - query_sql          |                                                   
-| - search_recipes     |                                                   
-| - get_recipe         |                                                   
-| - fetch_document     |                                                   
-+----------------------+                                                   
+```mermaid
+flowchart TB
+    subgraph Browser ["NAVIGATEUR"]
+        APP["App (SvelteKit)\nChat, Config, Canvas"]
+        LOOP["Agent Loop\nLLM provider, Tool dispatch\nLazy loading, Compression"]
+        BR["WidgetRenderer\nDispatch: type -> widget\ndata -> props"]
+        WS["WebMCP Server(s)\nautoui, designkit, ..."]
+        PROV["LLM Provider\nRemote / Wasm / Local"]
+
+        APP --> LOOP
+        LOOP --> BR
+        LOOP --> WS
+        LOOP --> PROV
+    end
+
+    subgraph Remote ["SERVEURS DISTANTS"]
+        MCPS["MCP Server(s)\ntricoteuses, datagouv"]
+        LLMAPI["LLM API\nClaude, Ollama"]
+    end
+
+    LOOP -->|"MCP Streamable HTTP"| MCPS
+    PROV -->|"HTTP"| LLMAPI
 ```
 
 ---
@@ -497,5 +426,6 @@ export type ToolLayer = McpLayer | WebMcpLayer | WasmLayer;
 | Pipeline schemas       | Props TS -> sync-schemas -> .md -> WebMCP     |
 | Validation             | JSON Schema au runtime avant rendu            |
 | Multi-serveurs         | Namespaces isoles, alias, filtrage recettes    |
+| Resolver canonique     | 4 couches : exact, decomposition, description, fallback |
 | Compression contexte   | Troncature + recall() pour long results       |
 | Extensibilite          | Union discriminee `ToolLayer`, nouveau type    |

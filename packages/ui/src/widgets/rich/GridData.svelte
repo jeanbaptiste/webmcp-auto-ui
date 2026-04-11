@@ -16,7 +16,7 @@
   {#if !columns.length&&!rows.length}<p class="text-text2 text-sm">Aucune donnée</p>
   {:else}
     <div class="overflow-auto rounded border border-border">
-      <table class="border-collapse text-xs font-mono">
+      <table class="w-full border-collapse text-xs font-mono">
         {#if columns.length}
           <thead>
             <tr>

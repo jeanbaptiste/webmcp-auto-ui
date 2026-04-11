@@ -7,13 +7,15 @@
 </script>
 <div class="p-3 md:p-4">
   {#if data.title}<div class="text-[10px] font-mono text-text2 mb-4 uppercase tracking-widest">{data.title}</div>{/if}
-  <div class="flex items-end gap-1.5 h-20">
-    {#each bars as [label, val]}
-      <div class="flex flex-col items-center gap-1 flex-1">
-        <div class="w-full rounded-t bg-accent/80 hover:bg-accent transition-all"
-          style="height: {Math.round(val / max * 100)}%"></div>
-        <span class="text-[9px] font-mono text-text2">{label}</span>
-      </div>
+  <div class="flex items-end gap-1.5 h-16">
+    {#each bars as [, val]}
+      <div class="flex-1 rounded-t bg-accent/80 hover:bg-accent transition-all min-h-[2px]"
+        style="height: {Math.round(val / max * 100)}%"></div>
+    {/each}
+  </div>
+  <div class="flex gap-1.5 mt-1">
+    {#each bars as [label]}
+      <span class="flex-1 text-center text-[9px] font-mono text-text2 truncate">{label}</span>
     {/each}
   </div>
 </div>

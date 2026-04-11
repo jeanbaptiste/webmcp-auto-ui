@@ -15,7 +15,8 @@ export type WidgetType =
   | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
   | 'stat-card' | 'data-table' | 'timeline' | 'profile' | 'trombinoscope' | 'json-viewer'
   | 'hemicycle' | 'chart-rich' | 'cards' | 'grid-data' | 'sankey' | 'map' | 'log'
-  | 'gallery' | 'carousel' | 'd3' | 'js-sandbox';
+  | 'gallery' | 'carousel' | 'd3' | 'js-sandbox'
+  | (string & {}); // accept arbitrary widget types from widget packs while keeping autocompletion
 
 /** @deprecated Use WidgetType */
 export type BlockType = WidgetType;

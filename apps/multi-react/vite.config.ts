@@ -1,20 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import path from 'node:path';
 
 export default defineConfig({
+  base: '/multi-react/',
   plugins: [react()],
   resolve: {
     dedupe: ['react', 'react-dom', '@mui/material', '@emotion/react', '@emotion/styled', 'd3', 'plotly.js-dist-min', 'mermaid'],
-    alias: {
-      // Force Vite to resolve widget transitive deps from multi-react's node_modules
-      'd3': path.resolve(__dirname, 'node_modules/d3'),
-      'plotly.js-dist-min': path.resolve(__dirname, 'node_modules/plotly.js-dist-min'),
-      'mermaid': path.resolve(__dirname, 'node_modules/mermaid'),
-      '@mui/material': path.resolve(__dirname, 'node_modules/@mui/material'),
-      '@emotion/react': path.resolve(__dirname, 'node_modules/@emotion/react'),
-      '@emotion/styled': path.resolve(__dirname, 'node_modules/@emotion/styled'),
-    },
   },
   server: {
     port: 5182,

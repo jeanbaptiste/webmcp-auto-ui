@@ -95,15 +95,17 @@ export function resolveCanonicalTools(tools: McpToolDef[]): CanonicalMatch[] {
     if (found.size === 2) return Array.from(found.values()); // early exit
   }
 
-  // Layer 2 — Decompose name into (action, resource)
+  // Layer 2 — Decompose name into (action, resource), testing all pairs (not just adjacent)
   for (const t of tools) {
     const tokens = tokenize(t.name);
     if (tokens.length < 2) continue;
-    // Try all adjacent (action, resource) pairs
-    for (let i = 0; i < tokens.length - 1; i++) {
-      const role = matchRole(tokens[i], tokens[i + 1]);
-      if (role && !found.has(role)) {
-        found.set(role, { role, realToolName: t.name });
+    for (const a of tokens) {
+      for (const r of tokens) {
+        if (a === r) continue;
+        const role = matchRole(a, r);
+        if (role && !found.has(role)) {
+          found.set(role, { role, realToolName: t.name });
+        }
       }
     }
     if (found.size === 2) return Array.from(found.values());
@@ -130,9 +132,9 @@ export function resolveCanonicalTools(tools: McpToolDef[]): CanonicalMatch[] {
 }
 
 /**
- * Global alias map: maps prefixed canonical name → prefixed real tool name.
- * Used by the dispatch in loop.ts to resolve aliases transparently.
- * Rebuilt each time buildSystemPrompt() or buildDiscoveryTools() is called.
+ * @deprecated Use buildSystemPromptWithAliases() or buildDiscoveryToolsWithAliases() instead.
+ * Kept for backward compat — populated as a side-effect of buildSystemPrompt/buildDiscoveryTools.
+ * NOT safe when multiple agent loops run in parallel.
  */
 export const toolAliasMap = new Map<string, string>();
 
@@ -186,17 +188,21 @@ export function buildToolsFromLayers(layers: ToolLayer[]): ProviderTool[] {
   return Array.from(seen.values());
 }
 
-/** Build system prompt — dynamic, recipe-driven workflow.
- *  Uses 4-layer matching to detect recipe tools on MCP servers,
- *  then injects them under canonical names (search_recipes / get_recipe).
- *  Populates toolAliasMap so the dispatch in loop.ts can resolve aliases.
+/** Result of buildSystemPromptWithAliases — prompt text + per-call alias map */
+export interface SystemPromptResult {
+  prompt: string;
+  aliasMap: Map<string, string>;
+}
+
+/**
+ * Build system prompt with a local alias map (parallel-safe).
+ * Prefer this over buildSystemPrompt() when running multiple agent loops.
  */
-export function buildSystemPrompt(layers: ToolLayer[]): string {
+export function buildSystemPromptWithAliases(layers: ToolLayer[]): SystemPromptResult {
   const mcpLayers = layers.filter((l): l is McpLayer => l.protocol === 'mcp');
   const webmcpLayers = layers.filter((l): l is WebMcpLayer => l.protocol === 'webmcp');
 
-  // Reset alias map
-  toolAliasMap.clear();
+  const aliasMap = new Map<string, string>();
 
   // ── Collect search_recipes / get_recipe from all layers ──
   const searchRecipes: string[] = [];
@@ -228,7 +234,7 @@ export function buildSystemPrompt(layers: ToolLayer[]): string {
 
       // Register alias only if names differ
       if (m.role !== m.realToolName) {
-        toolAliasMap.set(canonicalPrefixed, realPrefixed);
+        aliasMap.set(canonicalPrefixed, realPrefixed);
       }
 
       if (m.role === 'search_recipes') searchRecipes.push(`${canonicalPrefixed}()`);
@@ -280,19 +286,36 @@ ${actionTools.join('\n')}`;
 
   prompt += `\n\nNe fabrique jamais d'URLs d'images — utilise uniquement celles retournées par les outils.`;
 
+  return { prompt, aliasMap };
+}
+
+/** Build system prompt — backward-compatible wrapper that returns a plain string.
+ *  Also populates the deprecated global toolAliasMap for legacy consumers.
+ *  For parallel-safe usage, use buildSystemPromptWithAliases() instead.
+ */
+export function buildSystemPrompt(layers: ToolLayer[]): string {
+  const { prompt, aliasMap } = buildSystemPromptWithAliases(layers);
+
+  // Populate deprecated global singleton for backward compat
+  toolAliasMap.clear();
+  for (const [k, v] of aliasMap) toolAliasMap.set(k, v);
+
   return prompt;
 }
 
+/** Result of buildDiscoveryToolsWithAliases */
+export interface DiscoveryToolsResult {
+  tools: ProviderTool[];
+  aliasMap: Map<string, string>;
+}
+
 /**
- * Build discovery-only tools: search_recipes + get_recipe for each server,
- * plus "always present" WebMCP action tools (widget_display, canvas, recall).
- * Used as the initial tool set before any server is activated.
- *
- * For MCP servers, uses 4-layer matching to find recipe tools and exposes
- * them under canonical names (with aliases registered in toolAliasMap).
+ * Build discovery-only tools with a local alias map (parallel-safe).
+ * Prefer this over buildDiscoveryTools() when running multiple agent loops.
  */
-export function buildDiscoveryTools(layers: ToolLayer[]): ProviderTool[] {
+export function buildDiscoveryToolsWithAliases(layers: ToolLayer[]): DiscoveryToolsResult {
   const tools: ProviderTool[] = [];
+  const aliasMap = new Map<string, string>();
 
   for (const layer of layers) {
     const prefix = `${layer.serverName}_${layer.protocol}_`;
@@ -312,7 +335,7 @@ export function buildDiscoveryTools(layers: ToolLayer[]): ProviderTool[] {
 
         // Register alias if names differ
         if (m.role !== m.realToolName) {
-          toolAliasMap.set(canonicalPrefixed, realPrefixed);
+          aliasMap.set(canonicalPrefixed, realPrefixed);
         }
       }
     } else {
@@ -331,7 +354,21 @@ export function buildDiscoveryTools(layers: ToolLayer[]): ProviderTool[] {
   for (const tool of tools) {
     seen.set(tool.name, tool);
   }
-  return Array.from(seen.values());
+  return { tools: Array.from(seen.values()), aliasMap };
+}
+
+/**
+ * Build discovery-only tools — backward-compatible wrapper.
+ * Also populates the deprecated global toolAliasMap for legacy consumers.
+ * For parallel-safe usage, use buildDiscoveryToolsWithAliases() instead.
+ */
+export function buildDiscoveryTools(layers: ToolLayer[]): ProviderTool[] {
+  const { tools, aliasMap } = buildDiscoveryToolsWithAliases(layers);
+
+  // Populate deprecated global singleton for backward compat
+  for (const [k, v] of aliasMap) toolAliasMap.set(k, v);
+
+  return tools;
 }
 
 /**

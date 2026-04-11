@@ -17,5 +17,10 @@ export default defineConfig({
         '@webmcp-auto-ui/widgets-plotly',
       ],
     },
+    ssr: {
+      // Force-bundle all non-node deps so the dist/ is self-contained
+      // (no node_modules needed on the server)
+      noExternal: true,
+    },
   },
 });

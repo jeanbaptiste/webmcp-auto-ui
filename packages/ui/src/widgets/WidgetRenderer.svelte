@@ -118,24 +118,20 @@
 
   // ── Renderer resolution: servers > native > fallback ────────────
 
-  // Look up a custom renderer from connected WebMCP servers
-  const customRenderer = $derived.by(() => {
+  // Look up a custom widget entry from connected WebMCP servers
+  const customWidgetEntry = $derived.by(() => {
     if (!servers) return null;
     for (const server of servers) {
       const w = server.getWidget(type);
-      if (w?.renderer) return w.renderer;
+      if (w?.renderer) return w;
     }
     return null;
   });
 
+  const customRenderer = $derived(customWidgetEntry?.renderer ?? null);
+
   /** True when the custom renderer is a vanilla function (not a Svelte component) */
-  const isVanillaRenderer = $derived(
-    customRenderer !== null && typeof customRenderer === 'function'
-      // Svelte components compiled to classes have a $$render or a prototype with $set;
-      // plain functions (vanilla renderers) do not. A safe heuristic: if the function
-      // has no prototype beyond Function.prototype, treat it as vanilla.
-      && Object.getPrototypeOf(customRenderer) === Function.prototype
-  );
+  const isVanillaRenderer = $derived(customWidgetEntry?.vanilla === true);
 
   const nativeEntry: NativeEntry | undefined = $derived(
     customRenderer ? undefined : NATIVE_MAP[type],

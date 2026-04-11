@@ -14,6 +14,9 @@ export default defineConfig({
       '@webmcp-auto-ui/sdk/canvas': path.resolve('../../packages/sdk/src/canvas.ts'),
     }
   },
+  ssr: {
+    noExternal: ['hyperskills'],
+  },
   server: {
     headers: {
       'Cross-Origin-Opener-Policy':   'same-origin',

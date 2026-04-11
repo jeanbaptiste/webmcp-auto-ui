@@ -68,9 +68,9 @@
             {#if prov.tag}
               <span class="ac-tag" class:ac-tag-recette={prov.tag === 'recette'} class:ac-tag-impro={prov.tag === 'impro'}>{prov.tag}</span>
             {/if}
-            <span class="ac-detail">{prov.rest.length > 120 ? prov.rest.slice(0, 120) + '…' : prov.rest}</span>
+            <span class="ac-detail">{prov.rest}</span>
           {:else}
-            <span class="ac-detail">{log.detail.length > 120 ? log.detail.slice(0, 120) + '…' : log.detail}</span>
+            <span class="ac-detail">{log.detail}</span>
           {/if}
         </div>
       {/each}

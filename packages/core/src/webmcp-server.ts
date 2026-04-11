@@ -34,6 +34,8 @@ export interface WidgetEntry {
   recipe: string;
   renderer: WidgetRenderer;
   group?: string;
+  /** True when the renderer is a plain function (not a framework component). */
+  vanilla: boolean;
 }
 
 export interface WebMcpServer {
@@ -80,7 +82,7 @@ export function parseFrontmatter(markdown: string): ParsedFrontmatter {
   }
 
   const yamlBlock = trimmed.slice(4, endIdx); // skip opening "---\n"
-  const body = trimmed.slice(endIdx + 4).replace(/^\n/, ''); // skip closing "---\n"
+  const body = trimmed.slice(endIdx + 4).replace(/^\r?\n/, ''); // skip closing "---\n" or "---\r\n"
 
   const frontmatter = parseYaml(yamlBlock);
   return { frontmatter, body };
@@ -296,7 +298,7 @@ export function mountWidget(
 ): (() => void) | void {
   for (const server of servers) {
     const widget = server.getWidget(type);
-    if (widget?.renderer && typeof widget.renderer === 'function') {
+    if (widget?.renderer && widget.vanilla) {
       return (widget.renderer as (container: HTMLElement, data: Record<string, unknown>) => void | (() => void))(container, data);
     }
   }
@@ -432,6 +434,7 @@ export function createWebMcpServer(
         recipe: body,
         renderer,
         group: frontmatter.group as string | undefined,
+        vanilla: typeof renderer === 'function',
       };
 
       widgets.set(widgetName, entry);

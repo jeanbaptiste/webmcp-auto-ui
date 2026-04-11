@@ -20,6 +20,8 @@ export {
   categoryColor,
   drawAxis,
   drawGrid,
+  createTooltip,
   showTooltip,
   hideTooltip,
 } from './utils.js';
+export type { Tooltip } from './utils.js';

@@ -9,7 +9,7 @@ import type {
   LLMProvider, ProviderTool, McpToolDef, AgentCallbacks,
 } from './types.js';
 import type { ToolLayer } from './tool-layers.js';
-import { buildToolsFromLayers, buildSystemPrompt, buildDiscoveryTools, activateServerTools, toProviderTools, toolAliasMap } from './tool-layers.js';
+import { buildToolsFromLayers, buildSystemPromptWithAliases, buildDiscoveryToolsWithAliases, buildSystemPrompt, buildDiscoveryTools, activateServerTools, toProviderTools } from './tool-layers.js';
 
 // Re-export buildSystemPrompt for backward compat
 export { buildSystemPrompt } from './tool-layers.js';
@@ -65,19 +65,19 @@ export { toProviderTools };
 /** @deprecated Use toProviderTools */
 export const mcpToolsToAnthropic = toProviderTools;
 
-function truncateResult(result: string): string {
-  if (result.length <= MAX_RESULT_LEN) return result;
+function truncateResult(result: string, maxLen: number = MAX_RESULT_LEN): string {
+  if (result.length <= maxLen) return result;
   try {
     const parsed: unknown = JSON.parse(result);
     if (Array.isArray(parsed)) {
       let sliced = parsed;
-      while (JSON.stringify(sliced).length > MAX_RESULT_LEN && sliced.length > 1) {
+      while (JSON.stringify(sliced).length > maxLen && sliced.length > 1) {
         sliced = sliced.slice(0, Math.ceil(sliced.length / 2));
       }
       return JSON.stringify(sliced) + `\n... (tronqué, ${parsed.length} items total)`;
     }
   } catch { /* not JSON */ }
-  return result.slice(0, MAX_RESULT_LEN) + '\n... (tronqué)';
+  return result.slice(0, maxLen) + '\n... (tronqué)';
 }
 
 export interface AgentLoopOptions {
@@ -95,6 +95,12 @@ export interface AgentLoopOptions {
   initialMessages?: ChatMessage[]; // conversation history from previous turns
   callbacks?: AgentCallbacks;
   signal?: AbortSignal;
+  /** Truncate tool results to maxResultLength chars (default: true) */
+  truncateResults?: boolean;
+  /** Compress old tool_result blocks to save context (default: true) */
+  compressHistory?: boolean;
+  /** Max length for tool result truncation (default: 10000) */
+  maxResultLength?: number;
 }
 
 export async function runAgentLoop(
@@ -113,6 +119,9 @@ export async function runAgentLoop(
     initialMessages = [],
     callbacks = {},
     signal,
+    truncateResults = true,
+    compressHistory = true,
+    maxResultLength = MAX_RESULT_LEN,
   } = options;
 
   // Buffer for recall — stores full tool results keyed by tool_use_id
@@ -134,9 +143,22 @@ export async function runAgentLoop(
   }
 
   // Start with discovery tools only (lazy loading by server)
+  // Use local alias maps (parallel-safe — no global singleton)
   const activatedServers = new Set<string>();
-  let activeTools: ProviderTool[] = buildDiscoveryTools(options.layers ?? []);
-  const baseSystemPrompt: string = options.systemPrompt ?? buildSystemPrompt(options.layers ?? []);
+  const localAliasMap = new Map<string, string>();
+
+  const disc = buildDiscoveryToolsWithAliases(options.layers ?? []);
+  let activeTools: ProviderTool[] = disc.tools;
+  for (const [k, v] of disc.aliasMap) localAliasMap.set(k, v);
+
+  let baseSystemPrompt: string;
+  if (options.systemPrompt) {
+    baseSystemPrompt = options.systemPrompt;
+  } else {
+    const sp = buildSystemPromptWithAliases(options.layers ?? []);
+    baseSystemPrompt = sp.prompt;
+    for (const [k, v] of sp.aliasMap) localAliasMap.set(k, v);
+  }
 
   const systemPrompt = maxTokens
     ? `${baseSystemPrompt}\n\nIMPORTANT : Limite tes réponses à ${maxTokens} tokens.`
@@ -269,7 +291,7 @@ export async function runAgentLoop(
         const name = block.name;
 
         // Resolve alias (canonical name → real tool name) if needed
-        const resolvedName = toolAliasMap.get(name) ?? name;
+        const resolvedName = localAliasMap.get(name) ?? name;
 
         // Parse tool name: {serverName}_{protocol}_{toolName}
         const toolMatch = resolvedName.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
@@ -285,46 +307,47 @@ export async function runAgentLoop(
             } else {
               const mcpResult = await client.callTool(realToolName, block.input);
               const textContent = mcpResult.content?.find((c: { type: string }) => c.type === 'text') as { text?: string } | undefined;
-              result = truncateResult(textContent?.text ?? JSON.stringify(mcpResult));
+              const rawResult = textContent?.text ?? JSON.stringify(mcpResult);
+              result = truncateResults ? truncateResult(rawResult, maxResultLength) : rawResult;
             }
           } else if (protocol === 'webmcp') {
-            // Route to WebMCP server
-            const webmcpServer = webmcpServers.get(serverName);
-            if (!webmcpServer) {
-              result = `Error: no WebMCP server "${serverName}" found.`;
+            // Intercept recall BEFORE hitting executeTool — use the local resultBuffer directly
+            if (realToolName === 'recall' && resultBuffer.size > 0) {
+              const recallId = (block.input as { id: string }).id;
+              result = resultBuffer.get(recallId) ?? `Aucun résultat trouvé pour l'id '${recallId}'.`;
             } else {
-              const toolResult = await webmcpServer.executeTool(realToolName, block.input);
-              result = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+              // Route to WebMCP server
+              const webmcpServer = webmcpServers.get(serverName);
+              if (!webmcpServer) {
+                result = `Error: no WebMCP server "${serverName}" found.`;
+              } else {
+                const toolResult = await webmcpServer.executeTool(realToolName, block.input);
+                result = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
 
-              // Special handling for widget_display — notify via onWidget callback
-              if (realToolName === 'widget_display' && typeof toolResult === 'object' && toolResult !== null) {
-                const wr = toolResult as Record<string, unknown>;
-                if (wr.widget && wr.data && !wr.error) {
-                  const widgetResult = callbacks.onWidget?.(wr.widget as string, wr.data as Record<string, unknown>);
-                  if (widgetResult?.id) {
-                    result = JSON.stringify({ ...wr, id: widgetResult.id });
+                // Special handling for widget_display — notify via onWidget callback
+                if (realToolName === 'widget_display' && typeof toolResult === 'object' && toolResult !== null) {
+                  const wr = toolResult as Record<string, unknown>;
+                  if (wr.widget && wr.data && !wr.error) {
+                    const widgetResult = callbacks.onWidget?.(wr.widget as string, wr.data as Record<string, unknown>);
+                    if (widgetResult?.id) {
+                      result = JSON.stringify({ ...wr, id: widgetResult.id });
+                    }
                   }
                 }
-              }
 
-              // Special handling for canvas tool — route to callbacks
-              if (realToolName === 'canvas') {
-                const action = (block.input as Record<string, unknown>).action as string;
-                const id = (block.input as Record<string, unknown>).id as string;
-                const actionParams = (block.input as Record<string, unknown>).params as Record<string, unknown> | undefined;
-                switch (action) {
-                  case 'clear': callbacks.onClear?.(); break;
-                  case 'update': callbacks.onUpdate?.(id, actionParams ?? {}); break;
-                  case 'move': callbacks.onMove?.(id, (actionParams?.x ?? (block.input as any).x) as number, (actionParams?.y ?? (block.input as any).y) as number); break;
-                  case 'resize': callbacks.onResize?.(id, (actionParams?.width ?? (block.input as any).width) as number, (actionParams?.height ?? (block.input as any).height) as number); break;
-                  case 'style': callbacks.onStyle?.(id, (actionParams?.styles ?? (block.input as any).styles) as Record<string, string>); break;
+                // Special handling for canvas tool — route to callbacks
+                if (realToolName === 'canvas') {
+                  const action = (block.input as Record<string, unknown>).action as string;
+                  const id = (block.input as Record<string, unknown>).id as string;
+                  const actionParams = (block.input as Record<string, unknown>).params as Record<string, unknown> | undefined;
+                  switch (action) {
+                    case 'clear': callbacks.onClear?.(); break;
+                    case 'update': callbacks.onUpdate?.(id, actionParams ?? {}); break;
+                    case 'move': callbacks.onMove?.(id, (actionParams?.x ?? (block.input as any).x) as number, (actionParams?.y ?? (block.input as any).y) as number); break;
+                    case 'resize': callbacks.onResize?.(id, (actionParams?.width ?? (block.input as any).width) as number, (actionParams?.height ?? (block.input as any).height) as number); break;
+                    case 'style': callbacks.onStyle?.(id, (actionParams?.styles ?? (block.input as any).styles) as Record<string, string>); break;
+                  }
                 }
-              }
-
-              // Special handling for recall — use the resultBuffer
-              if (realToolName === 'recall') {
-                const recallId = (block.input as { id: string }).id;
-                result = resultBuffer.get(recallId) ?? `Aucun résultat trouvé pour l'id '${recallId}'.`;
               }
             }
           } else {
@@ -363,7 +386,7 @@ export async function runAgentLoop(
     }
 
     // Compress old tool results to save context window
-    compressOldToolResults(messages, resultBuffer);
+    if (compressHistory) compressOldToolResults(messages, resultBuffer);
   }
 
   callbacks.onDone?.(metrics);

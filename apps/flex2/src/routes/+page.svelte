@@ -292,6 +292,7 @@
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
         schemaValidation, maxIterations: 15, maxTokens, maxTools, temperature, topK, cacheEnabled,
+        truncateResults: false, compressHistory: false,
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         layers,

@@ -171,35 +171,60 @@ export function drawGrid(
 }
 
 // ---------------------------------------------------------------------------
-// Tooltip
+// Tooltip — factory pattern (each widget instance gets its own tooltip)
 // ---------------------------------------------------------------------------
 
-let tooltipEl: HTMLDivElement | null = null;
-
-function ensureTooltip(): HTMLDivElement {
-  if (!tooltipEl) {
-    tooltipEl = document.createElement('div');
-    Object.assign(tooltipEl.style, {
-      position: 'fixed', pointerEvents: 'none', zIndex: '99999',
-      background: 'rgba(30,30,30,0.92)', color: '#eee',
-      fontSize: '12px', fontFamily: 'system-ui, sans-serif',
-      padding: '4px 8px', borderRadius: '4px',
-      whiteSpace: 'nowrap', display: 'none',
-      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-    });
-    document.body.appendChild(tooltipEl);
-  }
-  return tooltipEl;
+export interface Tooltip {
+  show(x: number, y: number, html: string): void;
+  hide(): void;
+  destroy(): void;
 }
 
+/** Create a tooltip instance scoped to a single widget. */
+export function createTooltip(): Tooltip {
+  const el = document.createElement('div');
+  Object.assign(el.style, {
+    position: 'fixed', pointerEvents: 'none', zIndex: '99999',
+    background: 'rgba(30,30,30,0.92)', color: '#eee',
+    fontSize: '12px', fontFamily: 'system-ui, sans-serif',
+    padding: '4px 8px', borderRadius: '4px',
+    whiteSpace: 'nowrap', display: 'none',
+    boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+  });
+  document.body.appendChild(el);
+
+  return {
+    show(x: number, y: number, html: string): void {
+      el.innerHTML = html;
+      el.style.display = 'block';
+      el.style.left = `${x + 12}px`;
+      el.style.top = `${y - 10}px`;
+    },
+    hide(): void {
+      el.style.display = 'none';
+    },
+    destroy(): void {
+      el.remove();
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Backward-compat singleton (deprecated — use createTooltip() for new code)
+// ---------------------------------------------------------------------------
+
+let _singletonTooltip: Tooltip | null = null;
+function ensureSingleton(): Tooltip {
+  if (!_singletonTooltip) _singletonTooltip = createTooltip();
+  return _singletonTooltip;
+}
+
+/** @deprecated Use createTooltip() instead — singleton is not safe with multiple widget instances. */
 export function showTooltip(x: number, y: number, html: string): void {
-  const el = ensureTooltip();
-  el.innerHTML = html;
-  el.style.display = 'block';
-  el.style.left = `${x + 12}px`;
-  el.style.top = `${y - 10}px`;
+  ensureSingleton().show(x, y, html);
 }
 
+/** @deprecated Use createTooltip() instead — singleton is not safe with multiple widget instances. */
 export function hideTooltip(): void {
-  if (tooltipEl) tooltipEl.style.display = 'none';
+  ensureSingleton().hide();
 }
