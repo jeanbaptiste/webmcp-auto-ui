@@ -12,7 +12,7 @@
   import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
   import { autoui } from '@webmcp-auto-ui/agent';
   import { McpStatus, GemmaLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
-  import { Menu, Terminal } from 'lucide-svelte';
+  import { Menu, Terminal, LayoutGrid } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
   import SettingsDrawer from '$lib/SettingsDrawer.svelte';
@@ -416,8 +416,17 @@
         <span class="text-text1">Auto-UI</span> <span class="text-accent">flex2</span>
       </span>
     </button>
+    <TokenBubble metrics={tokenMetrics} visible={showTokens && composerMode} />
     <div class="flex-1"></div>
 
+    {#if composerMode}
+      <button class="flex items-center h-7 px-1.5 rounded border transition-all flex-shrink-0
+                     {layoutMode === 'grid' ? 'border-accent bg-accent/10 text-accent' : 'border-border2 text-text2 hover:text-text1'}"
+              onclick={() => layoutMode = layoutMode === 'float' ? 'grid' : 'float'}
+              aria-label="Toggle layout" title={layoutMode === 'grid' ? 'Vue grille' : 'Vue flottante'}>
+        <LayoutGrid size={14} />
+      </button>
+    {/if}
     <McpStatus
       connecting={canvas.mcpConnecting}
       connected={canvas.mcpConnected}
@@ -447,10 +456,6 @@
   <!-- CANVAS + EPHEMERAL -->
   <div class="flex-1 relative overflow-hidden">
     <FlexGrid bind:this={flexGrid} class="w-full h-full" {layoutMode} />
-
-    <div class="absolute top-1 left-2 z-20 pointer-events-none">
-      <TokenBubble metrics={tokenMetrics} visible={showTokens && composerMode} />
-    </div>
 
     {#if composerMode}
       <div class="absolute bottom-3 left-[50px] right-[50px] flex flex-col gap-2 pointer-events-none z-20">

@@ -7,6 +7,7 @@
     messages: HistoryEntry[];
   }
   let { open = $bindable(false), messages }: Props = $props();
+  let selected = $state<HistoryEntry | null>(null);
 
   const ROW_BG: Record<string, string> = {
     user:      'bg-accent/10',
@@ -59,7 +60,8 @@
             </thead>
             <tbody>
               {#each messages as msg (msg.id)}
-                <tr class="{ROW_BG[msg.role] ?? ''} border-b border-border/40 hover:brightness-[0.97] transition-all">
+                <tr class="{ROW_BG[msg.role] ?? ''} border-b border-border/40 hover:brightness-[0.97] transition-all cursor-pointer"
+                    onclick={() => selected = msg}>
                   <td class="px-5 py-3 text-text2 whitespace-nowrap">{fmt(msg.ts)}</td>
                   <td class="px-5 py-3">
                     <span class="inline-block px-2 py-0.5 rounded-full text-[10px] border {BADGE_COLOR[msg.role] ?? 'text-text2 border-border2'}">
@@ -76,5 +78,28 @@
         {/if}
       </div>
     </div>
+
+    {#if selected}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-10"
+           onclick={(e) => { if (e.target === e.currentTarget) selected = null; }}
+           transition:fade={{ duration: 150 }}>
+        <div class="w-full max-w-3xl max-h-[80vh] bg-surface border border-border2 rounded-xl flex flex-col shadow-2xl overflow-hidden"
+             transition:fly={{ y: 16, duration: 200 }}>
+          <div class="flex items-center gap-3 px-5 py-3 border-b border-border flex-shrink-0">
+            <span class="inline-block px-2 py-0.5 rounded-full text-[10px] border {BADGE_COLOR[selected.role] ?? 'text-text2 border-border2'}">
+              {selected.role}
+            </span>
+            <span class="font-mono text-xs text-text2">{fmt(selected.ts)}</span>
+            <div class="flex-1"></div>
+            <button class="text-text2 hover:text-text1 font-mono text-base leading-none transition-colors"
+                    onclick={() => selected = null}>x</button>
+          </div>
+          <div class="flex-1 overflow-auto p-5">
+            <pre class="font-mono text-xs text-text1 whitespace-pre-wrap break-words">{selected.content}</pre>
+          </div>
+        </div>
+      </div>
+    {/if}
   </div>
 {/if}
