@@ -18,7 +18,7 @@ Agent: component("progress-bar", {label: "Chargement", value: 75}) → barre aff
 ## Prerequis
 
 - Une app SvelteKit avec `@webmcp-auto-ui/agent` et `@webmcp-auto-ui/ui` installes
-- Familiarite avec les concepts de [composants custom](/fr/guide/custom-components)
+- Familiarite avec les concepts de [composants custom](/webmcp-auto-ui/guide/custom-components)
 
 ---
 

@@ -216,7 +216,7 @@ LLM -> component("stat-card", {label: "Temperature", value: "22°C"})
 
 Les recettes WebMCP guident le **View** (comment afficher), les recettes MCP guident le **Model/Data** (quoi demander). L'agent utilise les deux ensemble.
 
-Voir [Recettes](/fr/concepts/recipes/) pour le detail complet des types et du lazy loading.
+Voir [Recettes](/webmcp-auto-ui/concepts/recipes/) pour le detail complet des types et du lazy loading.
 
 ## Pattern generation auto d'UI
 
