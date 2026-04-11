@@ -27,19 +27,20 @@ const MODEL = 'claude-sonnet-4-20250514';
 const SOURCE_FILES = [
   'packages/agent/src/loop.ts',
   'packages/agent/src/tool-layers.ts',
-  'packages/agent/src/component-tool.ts',
-  'packages/agent/src/component-adapter.ts',
-  'packages/agent/src/ui-tools.ts',
-  'packages/agent/src/skill-executor.ts',
+  'packages/agent/src/autoui-server.ts',
   'packages/agent/src/types.ts',
   'packages/agent/src/index.ts',
-  'packages/ui/src/widgets/BlockRenderer.svelte',
-  'packages/ui/src/index.ts',
-  'packages/sdk/src/stores/canvas.svelte.ts',
-  'packages/sdk/src/canvas.ts',
-  'packages/sdk/src/index.ts',
+  'packages/core/src/webmcp-server.ts',
   'packages/core/src/types.ts',
   'packages/core/src/index.ts',
+  'packages/ui/src/widgets/WidgetRenderer.svelte',
+  'packages/ui/src/widgets/SafeImage.svelte',
+  'packages/ui/src/widgets/LinkOverlay.svelte',
+  'packages/ui/src/messaging/bus.svelte.ts',
+  'packages/ui/src/index.ts',
+  'packages/sdk/src/stores/canvas.svelte.ts',
+  'packages/sdk/src/stores/canvas.ts',
+  'packages/sdk/src/index.ts',
   'CLAUDE.md',
 ];
 
@@ -258,14 +259,15 @@ async function main() {
     return;
   }
 
-  // Check API key
+  // Check API key — skip gracefully in CI if not set
   if (!process.env.ANTHROPIC_API_KEY) {
-    console.error(
-      'ERROR: ANTHROPIC_API_KEY environment variable is not set.\n' +
+    console.warn(
+      'WARNING: ANTHROPIC_API_KEY not set — skipping doc generation.\n' +
         'Set it before running: export ANTHROPIC_API_KEY=sk-ant-...\n' +
-        'Or use --dry-run to preview without calling the API.',
+        'Or use --dry-run to preview without calling the API.\n' +
+        'The Starlight site will build with existing docs.',
     );
-    process.exit(1);
+    return;
   }
 
   const client = new Anthropic();
