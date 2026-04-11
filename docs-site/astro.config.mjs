@@ -7,9 +7,9 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'WebMCP Auto-UI',
-      defaultLocale: 'fr',
+      defaultLocale: 'root',
       locales: {
-        fr: { label: 'Français', lang: 'fr' },
+        root: { label: 'Français', lang: 'fr' },
         en: { label: 'English', lang: 'en' },
       },
       social: [
