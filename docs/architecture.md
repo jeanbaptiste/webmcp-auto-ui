@@ -47,7 +47,7 @@ webmcp-auto-ui/
 
 - **core** : zero dependances externes. TypeScript pur. Fournit `McpClient`, `createWebMcpServer`, `parseFrontmatter`.
 - **sdk** : depend de Svelte 5 (peer) pour le canvas store. Fournit aussi un store vanilla a `@webmcp-auto-ui/sdk/canvas-vanilla`. Shippe `MCP_DEMO_SERVERS`.
-- **agent** : depend de core (`McpClient`, `WebMcpServer`, types). 4 providers LLM. ToolLayers. `autoui` server pre-configure.
+- **agent** : depend de core (`McpClient`, `WebMcpServer`, types). 4 providers LLM. ToolLayers. `autoui` server pre-configure. System prompt unifie recipe-driven (voir [docs/system-prompt.md](system-prompt.md)).
 - **ui** : standalone. Peer deps : `svelte ^5`, `d3 ^7`, `leaflet >=1.9`.
 
 ## Les 2 protocoles symetriques
@@ -206,9 +206,13 @@ Agent Loop (runAgentLoop)
 
 MCP et WebMCP partagent le meme pattern : serveur avec outils, recettes, et decouverte. La seule difference est le transport (HTTP vs in-process). Les `ToolLayer[]` les unifient pour la boucle agent.
 
+### System prompt unifie (recipe-driven)
+
+`buildSystemPrompt(layers)` genere un prompt en **4 etapes** qui impose un workflow strict : decouverte des recettes, lecture des instructions, execution, affichage. Les listes d'outils sont des placeholders dynamiques injectes selon les layers connectes. Les apps ne hardcodent plus de prompt — voir [system-prompt.md](system-prompt.md) pour le texte complet et les decisions de design.
+
 ### Lazy loading par serveur
 
-Les outils ne sont pas tous envoyes au LLM au premier tour. `buildDiscoveryTools()` fournit uniquement les outils de decouverte (search_recipes, get_recipe) + les outils d'action. Quand le LLM touche un serveur, `activateServerTools()` charge ses outils data. Cela economise le context window.
+Les outils ne sont pas tous envoyes au LLM au premier tour. `buildDiscoveryTools()` fournit uniquement les outils de decouverte (search_recipes, get_recipe) + les outils d'action. Quand le LLM touche un serveur, `activateServerTools()` charge ses outils data. Cela economise le context window. Le system prompt reference ces outils de decouverte dans ses etapes 1 et 2, ce qui forme un pipeline coherent entre le prompt et le lazy loading.
 
 ### Recettes dans les serveurs
 

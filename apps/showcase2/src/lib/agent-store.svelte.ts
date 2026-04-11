@@ -205,11 +205,7 @@ export const agentStore = {
 
     layers.push(autoui.layer());
 
-    const systemPrompt = `Crée une page de démonstration visuellement riche avec au moins 6 widgets variés.
-Utilise des données RÉELLES du serveur, pas des données inventées.
-Réponds en 1-2 phrases max entre les widgets. L'essentiel est dans l'UI.
-
-${buildSystemPrompt(layers)}`;
+    const systemPrompt = buildSystemPrompt(layers);
 
     try {
       const result = await runAgentLoop(

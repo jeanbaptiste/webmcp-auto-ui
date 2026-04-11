@@ -209,10 +209,16 @@ import { buildSystemPrompt } from '@webmcp-auto-ui/agent';
 const prompt = buildSystemPrompt(layers);
 ```
 
-Le prompt genere contient :
-- Liste des serveurs connectes (nom, protocole, description)
-- Strategie en 3 etapes : recettes d'abord, donnees, affichage
-- Instructions sur les prefixes d'outils
+Le prompt genere impose un **workflow en 4 etapes** (recipe-driven) :
+
+1. **Decouverte** — appeler `search_recipes()` pour trouver la recette pertinente
+2. **Lecture** — appeler `get_recipe()` pour lire les instructions de la recette
+3. **Execution** — suivre les instructions de la recette (fetch data, etc.)
+4. **Affichage** — utiliser `widget_display`, `canvas`, `recall` pour le rendu UI
+
+Les listes d'outils aux etapes 1, 2 et 4 sont des **placeholders dynamiques** : `buildSystemPrompt` injecte automatiquement les bons noms prefixes (`{server}_{protocol}_search_recipes`, etc.) selon les layers connectes. Les apps ne doivent plus hardcoder de prompt — le prompt genere s'adapte aux serveurs presents.
+
+> Voir [docs/system-prompt.md](../system-prompt.md) pour le texte complet du prompt et les decisions de design.
 
 ## Agent loop
 
@@ -354,18 +360,18 @@ import {
    -> outils de decouverte uniquement (search_recipes, get_recipe, widget_display, canvas, recall)
 
 3. buildSystemPrompt(layers)
-   -> prompt dynamique: serveurs connectes + strategie
+   -> prompt recipe-driven en 4 etapes avec placeholders dynamiques
+      (voir docs/system-prompt.md pour le texte complet)
 
 4. runAgentLoop(msg, { layers, ... })
    -> boucle LLM iterative avec lazy loading
 
-5. Deroulement type:
-   LLM appelle autoui_webmcp_search_recipes() -> decouverte widgets
-   LLM appelle tricoteuses_mcp_search_recipes() -> decouverte donnees
-     -> activateServerTools() charge les outils tricoteuses
-   LLM appelle tricoteuses_mcp_query_sql({sql}) -> donnees
-   LLM appelle autoui_webmcp_get_recipe('data-table') -> schema
-   LLM appelle autoui_webmcp_widget_display({name:'data-table', params:{rows}}) -> affichage
+5. Deroulement type (suit les 4 etapes du prompt) :
+   Etape 1 : LLM appelle search_recipes() -> decouverte recettes
+   Etape 2 : LLM appelle get_recipe('data-table') -> instructions + schema
+   Etape 3 : LLM appelle tricoteuses_mcp_query_sql({sql}) -> donnees
+     -> activateServerTools() charge les outils tricoteuses au premier appel
+   Etape 4 : LLM appelle autoui_webmcp_widget_display({name:'data-table', params:{rows}}) -> affichage
      -> callbacks.onWidget('data-table', {rows}) -> canvas.addWidget(...)
 
 6. Les recettes guident le LLM sur le choix des widgets

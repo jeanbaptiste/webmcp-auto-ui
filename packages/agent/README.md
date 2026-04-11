@@ -26,14 +26,16 @@ const layer = autoui.layer();
 // → { protocol: 'webmcp', serverName: 'autoui', tools: [...] }
 ```
 
-## Lazy tool loading
+## System prompt & lazy tool loading
+
+`buildSystemPrompt(layers)` generates a unified **recipe-driven prompt** with a strict 4-step workflow: discover recipes, read instructions, execute, display. Tool lists in the prompt are dynamic placeholders injected from the connected layers. Apps should not hardcode prompts — see [docs/system-prompt.md](../../docs/system-prompt.md) for the full prompt text and design decisions.
 
 Tools are loaded lazily via discovery. The agent initially receives only lightweight discovery tools, then activates full tool schemas on demand:
 
-- `buildDiscoveryTools(servers)` — creates `list_components` and `get_component` tools across all WebMCP servers
-- `activateServerTools(serverName)` — loads the full tool set for a specific server
+- `buildDiscoveryTools(layers)` — creates `search_recipes` and `get_recipe` tools across all servers, plus WebMCP action tools (`widget_display`, `canvas`, `recall`)
+- `activateServerTools(currentTools, layer)` — loads the full tool set for a specific server
 
-This keeps the initial prompt small when many servers/widgets are available.
+This keeps the initial prompt small when many servers/widgets are available. The system prompt references these discovery tools in its steps 1 and 2, forming a coherent pipeline.
 
 ## Install
 

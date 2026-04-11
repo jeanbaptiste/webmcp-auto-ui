@@ -152,41 +152,40 @@ par tour.
 
 ## 5. Le system prompt dynamique
 
-`buildSystemPrompt(layers)` genere un prompt adapte aux serveurs
-connectes. Le prompt contient trois sections :
+`buildSystemPrompt(layers)` genere un prompt **recipe-driven** adapte
+aux serveurs connectes. Le prompt impose un workflow strict en 4 etapes :
 
-1. **SERVEURS CONNECTES** -- liste chaque serveur avec son protocol
-2. **STRATEGIE** -- ordre des operations (recettes, donnees, affichage)
-3. **Contraintes** -- regles (pas d'URLs inventees, etc.)
+1. **Decouverte** — appeler `search_recipes()` pour trouver la recette pertinente
+2. **Lecture** — appeler `get_recipe()` pour lire les instructions
+3. **Execution** — suivre les instructions de la recette (fetch data, etc.)
+4. **Affichage** — utiliser `widget_display`, `canvas`, `recall` pour le rendu UI
 
-### Exemple de prompt genere
+### Placeholders dynamiques
 
-Avec 2 serveurs MCP (tricoteuses, datagouv) et 1 serveur WebMCP (autoui) :
+Les listes d'outils aux etapes 1, 2 et 4 sont des **placeholders** :
+`buildSystemPrompt` injecte automatiquement les noms prefixes selon
+les layers connectes. Avec 2 serveurs MCP et 1 WebMCP, l'etape 1
+contiendra par exemple :
 
 ```
-Tu es un assistant UI.
-
-SERVEURS CONNECTES :
-- tricoteuses (mcp) : API parlementaire francaise
-- datagouv (mcp) : Open data gouv.fr
-- autoui (webmcp) : serveur d'affichage
-
-STRATEGIE :
-1. Recettes d'abord : tricoteuses_mcp_search_recipes(),
-   datagouv_mcp_search_recipes(), autoui_webmcp_search_recipes()
-2. Donnees : les outils *_mcp_* du bon serveur
-3. Affichage : les outils *_webmcp_widget_display() du bon serveur
-
-Ne fabrique jamais d'URLs d'images -- utilise uniquement celles
-retournees par les outils.
+tricoteuses_mcp_search_recipes(), datagouv_mcp_search_recipes(), autoui_webmcp_search_recipes()
 ```
+
+Cela fonctionne en tandem avec le **lazy loading** : les outils de
+decouverte (`search_recipes`, `get_recipe`) sont les seuls exposes
+au LLM au premier tour via `buildDiscoveryTools()`. Le prompt guide
+le LLM vers ces outils, et `activateServerTools()` charge les outils
+data a la demande.
+
+> Voir [docs/system-prompt.md](../system-prompt.md) pour le texte
+> complet du prompt et les decisions de design.
 
 ### Personnalisation par app
 
 Les apps peuvent passer un `systemPrompt` custom dans les options de
 `runAgentLoop()`. Quand il est fourni, il remplace le prompt genere.
-Les apps ajoutent typiquement des instructions specifiques a leur
-domaine (mode compositeur, contraintes de layout, etc.).
+Cependant, les apps ne doivent plus hardcoder de prompt -- le prompt
+unifie s'adapte aux serveurs presents et couvre la majorite des cas.
 
 ---
 

@@ -37,9 +37,7 @@
   let temperature = $state(1.0);
   let topK = $state(64);
   let maxTools = $state(8);
-  const defaultSystemPrompt = `Réponds en 1-2 phrases max entre les widgets. L'essentiel est dans l'UI.
-Propose la visualisation la plus pertinente. Combine plusieurs widgets quand c'est utile.`;
-  let systemPrompt = $state(defaultSystemPrompt);
+  let systemPrompt = $state('');
   let composerMode = $state(true); // true = composer, false = consumer
   let layoutMode = $state<'float' | 'grid'>('float');
   let skills = $state<Skill[]>([]);
@@ -229,13 +227,10 @@ Propose la visualisation la plus pertinente. Combine plusieurs widgets quand c'e
   });
 
   const effectivePrompt = $derived.by(() => {
-    const hasCustomPrompt = systemPrompt !== defaultSystemPrompt;
-    const hasMcp = layers.some(l => l.protocol === 'mcp');
-    if (hasMcp) {
-      const structured = buildSystemPrompt(layers);
-      return hasCustomPrompt ? `${systemPrompt}\n\n${structured}` : structured;
-    }
-    return systemPrompt;
+    const base = buildSystemPrompt(layers);
+    // Si l'utilisateur a customisé le prompt dans les settings, le préfixer
+    const hasCustom = systemPrompt && systemPrompt.trim().length > 0;
+    return hasCustom ? `${systemPrompt}\n\n${base}` : base;
   });
 
   // ── Helpers ────────────────────────────────────────────────────────

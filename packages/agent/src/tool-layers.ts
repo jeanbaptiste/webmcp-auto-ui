@@ -75,41 +75,49 @@ export function buildToolsFromLayers(layers: ToolLayer[]): ProviderTool[] {
   return Array.from(seen.values());
 }
 
-/** Build system prompt — lists connected servers and strategy */
+/** Build system prompt — dynamic, recipe-driven workflow */
 export function buildSystemPrompt(layers: ToolLayer[]): string {
   const mcpLayers = layers.filter((l): l is McpLayer => l.protocol === 'mcp');
   const webmcpLayers = layers.filter((l): l is WebMcpLayer => l.protocol === 'webmcp');
 
-  let prompt = `Tu es un assistant UI.\n\n`;
-
-  prompt += `SERVEURS CONNECTÉS :\n`;
-  for (const l of mcpLayers) {
-    prompt += `- ${l.serverName} (mcp) : ${l.description ?? 'serveur de données'}\n`;
-  }
-  for (const l of webmcpLayers) {
-    prompt += `- ${l.serverName} (webmcp) : ${l.description ?? "serveur d'affichage"}\n`;
-  }
-  prompt += `\n`;
-
-  // Build search_recipes calls only for servers that actually have the tool
-  const allSearchRecipes = [
-    ...mcpLayers
-      .filter(l => l.tools.some(t => t.name === 'search_recipes'))
+  // Build dynamic tool lists (only include servers that actually have these tools)
+  const searchRecipes = [
+    ...mcpLayers.filter(l => l.tools.some(t => t.name === 'search_recipes'))
       .map(l => `${l.serverName}_mcp_search_recipes()`),
-    ...webmcpLayers
-      .filter(l => l.tools.some(t => t.name === 'search_recipes'))
+    ...webmcpLayers.filter(l => l.tools.some(t => t.name === 'search_recipes'))
       .map(l => `${l.serverName}_webmcp_search_recipes()`),
-  ];
+  ].join(', ');
 
-  prompt += `STRATÉGIE :\n`;
-  if (allSearchRecipes.length > 0) {
-    prompt += `1. Recettes d'abord : ${allSearchRecipes.join(', ')}\n`;
-  }
-  prompt += `2. Données : les outils *_mcp_* du bon serveur\n`;
-  prompt += `3. Affichage : les outils *_webmcp_widget_display() du bon serveur\n\n`;
-  prompt += `Ne fabrique jamais d'URLs d'images — utilise uniquement celles retournées par les outils.`;
+  const getRecipes = [
+    ...mcpLayers.filter(l => l.tools.some(t => t.name === 'get_recipe'))
+      .map(l => `${l.serverName}_mcp_get_recipe()`),
+    ...webmcpLayers.filter(l => l.tools.some(t => t.name === 'get_recipe'))
+      .map(l => `${l.serverName}_webmcp_get_recipe()`),
+  ].join(', ');
 
-  return prompt;
+  return `Tu es un assistant IA qui aide les utilisateurs en répondant à leurs questions et en accomplissant des tâches à l'aide de recettes. Pour CHAQUE nouvelle tâche, demande ou question, tu DOIS exécuter les étapes suivantes dans l'ordre exact. Tu NE DOIS PAS sauter d'étapes.
+
+RÈGLE CRITIQUE : Tu DOIS exécuter toutes les étapes en silence. Ne génère et ne produis AUCUNE réflexion interne, raisonnement, explication ou texte intermédiaire, à AUCUNE étape.
+
+1. Tout d'abord, trouve la recette la plus pertinente en utilisant les outils suivants pour découvrir les recettes disponibles.
+
+${searchRecipes}
+
+Après cette étape, tu DOIS passer à l'étape suivante.
+
+2. Si une recette pertinente existe, utilise les outils suivants pour lire ses instructions.
+
+${getRecipes}
+
+3. Suis les instructions de la recette exactement pour accomplir la tâche. Tu NE DOIS PAS produire de réflexions intermédiaires ni de mises à jour de statut. Aucune exception ! Produis UNIQUEMENT le résultat final en cas de succès. Il doit contenir un résumé en une phrase de l'action effectuée, ainsi que le résultat final de la recette.
+
+4. Sauf indication contraire d'une recette, utilise ces outils pour l'affichage de l'UI :
+
+autoui_webmcp_widget_display
+autoui_webmcp_canvas
+autoui_webmcp_recall
+
+Ne fabrique jamais d'URLs d'images — utilise uniquement celles retournées par les outils.`;
 }
 
 /**
