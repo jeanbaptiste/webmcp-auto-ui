@@ -1,7 +1,7 @@
 {
   "name": "webmcp-auto-ui",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "workspaces": [
     "packages/core",
     "packages/ui",
@@ -31,9 +31,11 @@
     "docs:sync": "node scripts/sync-docs.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "docs:generate": "bash scripts/generate-docs.sh"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@mediapipe/tasks-genai": "^0.10.27",
     "@playwright/test": "^1.59.1",
     "concurrently": "^8.2.0",
