@@ -1,6 +1,6 @@
 {
   "name": "@webmcp-auto-ui/agent",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "LLM agent loop + Anthropic/Gemma LiteRT providers + MCP wrapper",
   "license": "AGPL-3.0-or-later",
   "type": "module",
