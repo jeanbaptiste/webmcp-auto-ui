@@ -170,7 +170,7 @@ export class McpMultiClient {
 
   /** Convert a server name to a snake_case prefix for tool name disambiguation. */
   private normalizeServerName(name: string): string {
-    return name.toLowerCase().replace(/[\s\-]+/g, '_');
+    return name.toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '');
   }
 
   // -------------------------------------------------------------------------

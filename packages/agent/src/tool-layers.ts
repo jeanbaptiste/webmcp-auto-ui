@@ -5,6 +5,12 @@ import type { McpRecipe } from './recipes/types.js';
 import type { WebMcpToolDef } from '@webmcp-auto-ui/core';
 import { sanitizeSchema } from '@webmcp-auto-ui/core';
 
+/** Sanitize a server name for use in tool name prefixes.
+ *  Tool names must match ^[a-zA-Z0-9_-]{1,128}$ per the Anthropic API. */
+function sanitizeServerName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '') || 'mcp';
+}
+
 /** MCP data layer — tools and recipes from a connected MCP server */
 export interface McpLayer {
   protocol: 'mcp';
@@ -167,7 +173,7 @@ export function buildToolsFromLayers(layers: ToolLayer[]): ProviderTool[] {
   const tools: ProviderTool[] = [];
 
   for (const layer of layers) {
-    const prefix = `${layer.serverName}_${layer.protocol}_`;
+    const prefix = `${sanitizeServerName(layer.serverName)}_${layer.protocol}_`;
 
     if (layer.protocol === 'mcp') {
       for (const tool of toProviderTools(layer.tools)) {
@@ -211,7 +217,7 @@ export function buildSystemPromptWithAliases(layers: ToolLayer[]): SystemPromptR
 
   // WebMCP layers: always exact match (we control the naming)
   for (const l of webmcpLayers) {
-    const prefix = `${l.serverName}_webmcp_`;
+    const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
     for (const t of l.tools) {
       if (t.name === 'search_recipes') searchRecipes.push(`${prefix}search_recipes()`);
       if (t.name === 'get_recipe') getRecipes.push(`${prefix}get_recipe()`);
@@ -220,7 +226,7 @@ export function buildSystemPromptWithAliases(layers: ToolLayer[]): SystemPromptR
 
   // MCP layers: 4-layer matching + alias registration
   for (const l of mcpLayers) {
-    const prefix = `${l.serverName}_mcp_`;
+    const prefix = `${sanitizeServerName(l.serverName)}_mcp_`;
     const matches = resolveCanonicalTools(l.tools);
 
     if (matches.length === 0) {
@@ -246,7 +252,7 @@ export function buildSystemPromptWithAliases(layers: ToolLayer[]): SystemPromptR
   const actionTools: string[] = [];
   const ACTION_NAMES = ['widget_display', 'canvas', 'recall'];
   for (const l of webmcpLayers) {
-    const prefix = `${l.serverName}_webmcp_`;
+    const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
     for (const t of l.tools) {
       if (ACTION_NAMES.includes(t.name)) actionTools.push(`${prefix}${t.name}`);
     }
@@ -277,7 +283,7 @@ ${actionTools.join('\n')}`;
   if (mcpFallbackServers.length > 0) {
     const fallbackLines: string[] = [];
     for (const l of mcpFallbackServers) {
-      const prefix = `${l.serverName}_mcp_`;
+      const prefix = `${sanitizeServerName(l.serverName)}_mcp_`;
       const toolNames = l.tools.map(t => `${prefix}${t.name}()`).join(', ');
       fallbackLines.push(`- ${l.serverName} : ${toolNames}`);
     }
@@ -318,7 +324,7 @@ export function buildDiscoveryToolsWithAliases(layers: ToolLayer[]): DiscoveryTo
   const aliasMap = new Map<string, string>();
 
   for (const layer of layers) {
-    const prefix = `${layer.serverName}_${layer.protocol}_`;
+    const prefix = `${sanitizeServerName(layer.serverName)}_${layer.protocol}_`;
 
     if (layer.protocol === 'mcp') {
       const allProviderTools = toProviderTools(layer.tools);
@@ -379,7 +385,7 @@ export function activateServerTools(
   currentTools: ProviderTool[],
   layer: ToolLayer,
 ): ProviderTool[] {
-  const prefix = `${layer.serverName}_${layer.protocol}_`;
+  const prefix = `${sanitizeServerName(layer.serverName)}_${layer.protocol}_`;
   const existing = new Set(currentTools.map(t => t.name));
   const newTools = [...currentTools];
 
