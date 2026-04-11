@@ -29,13 +29,24 @@ Layout containers for multi-pane interfaces. `TilingLayout` uses a Fibonacci spi
 
 `GemmaLoader` — floating overlay with progress stream, auto-collapses to a pill once model is loaded. `TokenBubble` — real-time metrics display (req/min, input tokens/min, output tokens/min, cached tokens). `EphemeralBubble` — transient notification bubble (moved from app to package). `RemoteMCPserversDemo` — MCP server discovery component listing available demo servers. `SettingsPanel` — sliders with dynamic ranges for temperature, topK, and maxTokens controls.
 
-### BlockRenderer
+### WidgetRenderer
 
-Dispatches a `type` string and `data` object to the right component. Used by the agent loop to render whatever the LLM asks for.
+Dispatches a `type` string and `data` object to the right component. Accepts a `servers` prop listing WebMCP servers whose widgets should be available for rendering.
 
 ```svelte
-<BlockRenderer type="stat" data={{ label: 'Revenue', value: '€142K', trendDir: 'up' }} />
+<script>
+  import { WidgetRenderer } from '@webmcp-auto-ui/ui';
+  import { autoui } from '@webmcp-auto-ui/agent';
+</script>
+
+<WidgetRenderer
+  type="stat"
+  data={{ label: 'Revenue', value: '€142K', trendDir: 'up' }}
+  servers={[autoui]}
+/>
 ```
+
+> **Migration**: `BlockRenderer` is still exported as a deprecated alias for `WidgetRenderer`. The `adapter` prop is replaced by `servers: WebMcpServer[]`.
 
 ## Install
 

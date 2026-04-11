@@ -6,10 +6,10 @@
   import {
     AnthropicProvider, GemmaProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, buildToolsFromLayers, trimConversationHistory,
-    WEBMCP_RECIPES, filterRecipesByServer,
   } from '@webmcp-auto-ui/agent';
-  import type { ChatMessage, ToolLayer, McpLayer, UILayer, AnthropicTool } from '@webmcp-auto-ui/agent';
-  import { McpStatus, GemmaLoader, BlockRenderer } from '@webmcp-auto-ui/ui';
+  import type { ChatMessage, ToolLayer, McpLayer, AnthropicTool } from '@webmcp-auto-ui/agent';
+  import { autoui } from '@webmcp-auto-ui/agent';
+  import { McpStatus, GemmaLoader, WidgetRenderer } from '@webmcp-auto-ui/ui';
 
   // ── Types ──────────────────────────────────────────────────────────────────
   type ModelId = 'gemma-e2b' | 'gemma-e4b' | 'claude-haiku-4-5' | 'claude-sonnet-4-6';
@@ -196,13 +196,7 @@
       };
       result.push(mcpLayer);
     }
-    const serverNames = mcpName ? [mcpName] : [];
-    const uiRecipes = filterRecipesByServer(WEBMCP_RECIPES, serverNames);
-    const uiLayer: UILayer = {
-      source: 'ui',
-      recipes: uiRecipes.length > 0 ? uiRecipes : undefined,
-    };
-    result.push(uiLayer);
+    result.push(autoui.layer());
     return result;
   }
 
@@ -257,7 +251,7 @@
       maxTokens: 4096,
       layers,
       callbacks: {
-        onBlock: (type, data) => {
+        onWidget: (type, data) => {
           blocks.push({ type, data: data as Record<string, unknown> });
         },
         onText: (text) => {
@@ -450,7 +444,7 @@
               <div class="flex flex-col gap-2">
                 {#each result.blocks as block}
                   <div class="block-anim">
-                    <BlockRenderer type={block.type} data={block.data} />
+                    <WidgetRenderer type={block.type} data={block.data} />
                   </div>
                 {/each}
               </div>

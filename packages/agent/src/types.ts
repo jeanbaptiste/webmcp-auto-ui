@@ -31,11 +31,14 @@ export interface McpToolDef {
   inputSchema?: Record<string, unknown>;
 }
 
-export interface AnthropicTool {
+export interface ProviderTool {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
 }
+
+/** @deprecated Use ProviderTool */
+export type AnthropicTool = ProviderTool;
 
 export interface LLMResponse {
   content: ContentBlock[];
@@ -49,7 +52,7 @@ export interface LLMProvider {
   readonly model: string;
   chat(
     messages: ChatMessage[],
-    tools: AnthropicTool[],
+    tools: ProviderTool[],
     options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; maxTools?: number }
   ): Promise<LLMResponse>;
 }
@@ -61,7 +64,7 @@ export interface ToolCall {
   result?: string;
   error?: string;
   elapsed?: number;
-  /** true if this call was preceded by a discovery tool (get_recipe, search_recipes, get_component, list_components) */
+  /** true if this call was preceded by a discovery tool (search_recipes, get_recipe, etc.) */
   guided?: boolean;
 }
 
@@ -79,18 +82,18 @@ export interface AgentResult {
   text: string;
   toolCalls: ToolCall[];
   metrics: AgentMetrics;
-  stopReason: 'end_turn' | 'max_iterations' | 'error';
+  stopReason: 'end_turn' | 'max_iterations';
   messages: ChatMessage[]; // full conversation including this turn, for history
 }
 
 // Callbacks for streaming UI updates
 export interface AgentCallbacks {
   onIterationStart?: (iteration: number, maxIterations: number) => void;
-  onLLMRequest?: (messages: ChatMessage[], tools: AnthropicTool[]) => void;
+  onLLMRequest?: (messages: ChatMessage[], tools: ProviderTool[]) => void;
   onLLMResponse?: (response: LLMResponse, latencyMs: number, tokens?: { input: number; output: number }) => void;
   onToolCall?: (call: ToolCall) => void;
-  /** Called when a render_* block is created. Return { id } so the LLM knows the block id. */
-  onBlock?: (type: string, data: Record<string, unknown>) => { id: string } | void;
+  /** Called when a widget_display renders a widget. Return { id } so the LLM knows the block id. */
+  onWidget?: (type: string, data: Record<string, unknown>) => { id: string } | void;
   onClear?: () => void;
   onText?: (text: string) => void;
   onToken?: (token: string) => void;

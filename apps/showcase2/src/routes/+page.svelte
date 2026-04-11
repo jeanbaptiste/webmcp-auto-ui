@@ -5,7 +5,7 @@
   import { onMount, untrack } from 'svelte';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
-  import { BlockRenderer, getTheme, LLMSelector, GemmaLoader, AgentProgress, McpStatus } from '@webmcp-auto-ui/ui';
+  import { WidgetRenderer, getTheme, LLMSelector, GemmaLoader, AgentProgress, McpStatus } from '@webmcp-auto-ui/ui';
   import { PRESETS, type ThemePreset } from '$lib/themes';
   import { SIMPLE_BLOCKS, RICH_BLOCKS } from '$lib/demo-data';
   import { agentStore } from '$lib/agent-store.svelte';
@@ -31,7 +31,7 @@
   let selectedServerUrl = $state(MCP_DEMO_SERVERS[0]?.url ?? '');
 
   function onLlmChange(llm: string) {
-    canvas.setLLM(llm as Parameters<typeof canvas.setLLM>[0]);
+    canvas.setLlm(llm as Parameters<typeof canvas.setLlm>[0]);
     untrack(() => agentStore.initGemma());
   }
 
@@ -60,7 +60,7 @@
   onMount(() => {
     selectPreset(activePreset);
     // Default LLM
-    canvas.setLLM('haiku');
+    canvas.setLlm('haiku');
   });
 </script>
 
@@ -228,7 +228,7 @@
                   <span class="text-[10px] font-mono text-text2 uppercase tracking-widest">{block.label}</span>
                   <code class="text-[10px] font-mono text-accent ml-2">type="{block.type}"</code>
                 </div>
-                <BlockRenderer type={block.type} data={block.data} />
+                <WidgetRenderer type={block.type} data={block.data} />
               </div>
             {/each}
           </div>
@@ -243,7 +243,7 @@
                   <code class="text-[10px] font-mono text-accent">type="{block.type}"</code>
                 </div>
                 <div class="p-4">
-                  <BlockRenderer type={block.type} data={block.data} />
+                  <WidgetRenderer type={block.type} data={block.data} />
                 </div>
               </div>
             {/each}
@@ -272,7 +272,7 @@
                 <span class="text-[10px] font-mono text-text2 uppercase tracking-widest">{block.label}</span>
                 <code class="text-[10px] font-mono text-accent ml-2">type="{block.type}"</code>
               </div>
-              <BlockRenderer type={block.type} data={block.data} />
+              <WidgetRenderer type={block.type} data={block.data} />
             </div>
           {/each}
         </div>
@@ -290,7 +290,7 @@
                 <code class="text-[10px] font-mono text-accent">type="{block.type}"</code>
               </div>
               <div class="p-4">
-                <BlockRenderer type={block.type} data={block.data} />
+                <WidgetRenderer type={block.type} data={block.data} />
               </div>
             </div>
           {/each}

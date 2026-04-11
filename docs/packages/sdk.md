@@ -6,7 +6,7 @@ HyperSkill encode/decode, skills registry, and Svelte 5 canvas store.
 
 - Encodes/decodes HyperSkill URLs (base64 + optional gzip for skills > 6KB)
 - Provides an in-memory skills CRUD registry with change notifications
-- Exposes a reactive canvas store (Svelte 5 runes) for blocks, chat, MCP state, and theme
+- Exposes a reactive canvas store (Svelte 5 runes) for widgets, chat, MCP state, and theme
 - Provides a vanilla (framework-agnostic) canvas store at `@webmcp-auto-ui/sdk/canvas-vanilla`
 - Ships `MCP_DEMO_SERVERS` — a registry of 7 demo MCP server endpoints
 - Supports `chatSummary` and `provenance` fields in `HyperSkillMeta` for traceability
@@ -42,8 +42,8 @@ interface HyperSkillMeta {
   theme?: Record<string, string>;
   hash?: string;
   previousHash?: string;
-  chatSummary?: string;       // anonymized summary of the chat that produced the skill
-  provenance?: {              // records how the skill was created
+  chatSummary?: string;
+  provenance?: {
     model?: string;
     mcp?: string;
     timestamp?: number;
@@ -81,7 +81,6 @@ const skill: HyperSkill = {
 };
 
 const url = await encode('https://app.example.com/viewer', JSON.stringify(skill));
-// https://app.example.com/viewer?hs=eyJtZXRhIjp7...
 ```
 
 Skills larger than 6KB are automatically gzip-compressed (prefix `gz.`).
@@ -91,11 +90,7 @@ Skills larger than 6KB are automatically gzip-compressed (prefix `gz.`).
 ```ts
 const { content: raw } = await decode('https://app.example.com/viewer?hs=eyJtZXRh...');
 const skill = JSON.parse(raw);
-console.log(skill.meta.title);  // "Weather Dashboard"
-console.log(skill.content);     // [{ type: 'stat', ... }, ...]
 ```
-
-Also accepts a raw `hs` parameter value (without the full URL).
 
 ### Hashing and versioning
 
@@ -154,33 +149,20 @@ interface Skill {
 ### CRUD operations
 
 ```ts
-// Create
 const skill = createSkill({
   name: 'kpi-dashboard',
   description: 'Revenue and user metrics',
   mcp: 'https://mcp.example.com/mcp',
   blocks: [
     { type: 'stat', data: { label: 'Revenue', value: '$142K' } },
-    { type: 'stat', data: { label: 'Users', value: '8,204' } },
   ],
 });
 
-// Update
 updateSkill(skill.id, { description: 'Updated KPI dashboard' });
-
-// Get
 const s = getSkill(skill.id);
-
-// List (sorted by createdAt descending)
 const all = listSkills();
-
-// Delete
 deleteSkill(skill.id);
-
-// Clear all
 clearSkills();
-
-// Bulk load (replaces all)
 loadSkills(skillArray);
 ```
 
@@ -189,7 +171,6 @@ loadSkills(skillArray);
 ```ts
 loadDemoSkills();
 // Loads 3 built-in skills: weather-dashboard, kpi-overview, status-monitor
-// No-op if skills already exist
 ```
 
 ### Change listener
@@ -198,7 +179,6 @@ loadDemoSkills();
 const unsubscribe = onSkillsChange(() => {
   console.log('Skills changed:', listSkills().length);
 });
-// later: unsubscribe()
 ```
 
 ## Canvas store
@@ -213,9 +193,9 @@ import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `canvas.blocks` | `Block[]` | All blocks on the canvas |
+| `canvas.blocks` | `Widget[]` | All widgets on the canvas |
 | `canvas.mode` | `'auto' \| 'drag' \| 'chat'` | Current interaction mode |
-| `canvas.llm` | `'haiku' \| 'sonnet' \| 'gemma-e2b' \| 'gemma-e4b'` | Selected LLM |
+| `canvas.llm` | `LLMId` | Selected LLM |
 | `canvas.mcpUrl` | `string` | MCP server URL |
 | `canvas.mcpConnected` | `boolean` | MCP connection status |
 | `canvas.mcpConnecting` | `boolean` | Connection in progress |
@@ -225,19 +205,46 @@ import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 | `canvas.generating` | `boolean` | LLM is generating |
 | `canvas.statusText` | `string` | Status bar text |
 | `canvas.statusColor` | `string` | Status bar color class |
-| `canvas.blockCount` | `number` | Number of blocks (derived) |
-| `canvas.isEmpty` | `boolean` | No blocks on canvas (derived) |
+| `canvas.blockCount` | `number` | Number of widgets (derived) |
+| `canvas.isEmpty` | `boolean` | No widgets on canvas (derived) |
 | `canvas.themeOverrides` | `Record<string, string>` | Theme CSS variable overrides |
 
-### Block operations
+### Widget operations
 
 ```ts
+// New API
+canvas.addWidget('stat', { label: 'Users', value: '1,204' });
+
+// Backward compat alias
 canvas.addBlock('stat', { label: 'Users', value: '1,204' });
+
 canvas.removeBlock('b_abc123');
 canvas.updateBlock('b_abc123', { value: '1,300' });
 canvas.moveBlock('b_abc123', 'b_def456');  // reorder
 canvas.clearBlocks();
 canvas.setBlocks(newBlockArray);
+```
+
+### Types
+
+```ts
+type WidgetType =
+  | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
+  | 'stat-card' | 'data-table' | 'timeline' | 'profile' | 'trombinoscope' | 'json-viewer'
+  | 'hemicycle' | 'chart-rich' | 'cards' | 'grid-data' | 'sankey' | 'map' | 'log'
+  | 'gallery' | 'carousel' | 'd3';
+
+/** @deprecated Use WidgetType */
+type BlockType = WidgetType;
+
+interface Widget {
+  id: string;
+  type: WidgetType;
+  data: Record<string, unknown>;
+}
+
+/** @deprecated Use Widget */
+type Block = Widget;
 ```
 
 ### Chat operations
@@ -260,14 +267,9 @@ canvas.setMcpError('Connection refused');
 ### HyperSkill integration
 
 ```ts
-// Export current canvas as a skill JSON
 const json = canvas.buildSkillJSON();
-
-// Export as base64 param for URL embedding
 const param = canvas.buildHyperskillParam();
-
-// Load a skill from a base64 param
-canvas.loadFromParam(hsParam);  // returns true on success
+canvas.loadFromParam(hsParam);
 ```
 
 ## Vanilla canvas store
@@ -277,7 +279,7 @@ A framework-agnostic canvas store for non-Svelte environments. Same API as the S
 ```ts
 import { canvas } from '@webmcp-auto-ui/sdk/canvas-vanilla';
 
-canvas.addBlock('stat', { label: 'Revenue', value: '$142K' });
+canvas.addWidget('stat', { label: 'Revenue', value: '$142K' });
 canvas.subscribe(() => console.log('state changed'));
 ```
 
@@ -289,8 +291,6 @@ A registry of 7 demo MCP server endpoints for testing and showcasing:
 
 ```ts
 import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
-
-// MCP_DEMO_SERVERS: Array<{ url: string; name: string; description: string }>
 ```
 
 Used by the `RemoteMCPserversDemo` component in `@webmcp-auto-ui/ui`.

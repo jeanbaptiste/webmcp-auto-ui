@@ -1,60 +1,52 @@
 // @webmcp-auto-ui/agent — public API
 
-// New providers (prefer these)
+// Providers
 export { RemoteLLMProvider } from './providers/remote.js';
 export type { RemoteLLMProviderOptions } from './providers/remote.js';
-
 export { WasmProvider } from './providers/wasm.js';
 export type { WasmProviderOptions, WasmStatus } from './providers/wasm.js';
-
 export { LocalLLMProvider } from './providers/local.js';
 export type { LocalLLMProviderOptions, LocalBackend } from './providers/local.js';
-
 export { createProvider } from './providers/factory.js';
 export type { LLMConfig } from './providers/factory.js';
 
 // Backward-compat aliases
 export { AnthropicProvider } from './providers/anthropic.js';
 export type { AnthropicProviderOptions } from './providers/anthropic.js';
-
 export { GemmaProvider } from './providers/gemma.js';
 export type { GemmaProviderOptions, GemmaStatus } from './providers/gemma.js';
 
-export { runAgentLoop, buildSystemPrompt, mcpToolsToAnthropic, fromMcpTools, trimConversationHistory, RECALL_TOOL } from './loop.js';
+// Agent loop
+export { runAgentLoop, toProviderTools, mcpToolsToAnthropic, fromMcpTools, trimConversationHistory } from './loop.js';
+export { buildSystemPrompt } from './tool-layers.js';
 export type { AgentLoopOptions } from './loop.js';
 
-export { UI_TOOLS, isUITool, executeUITool, TOOL_TO_BLOCK } from './ui-tools.js';
-export {
-  GET_COMPONENT_TOOL, COMPONENT_TOOL,
-  componentRegistry, executeListComponents, executeGetComponent, executeComponent,
-  validateParams,
-} from './component-tool.js';
-export type { ComponentEntry, ValidationResult } from './component-tool.js';
+// autoui — built-in WebMCP server
+export { autoui, NATIVE_WIDGET_NAMES } from './autoui-server.js';
 
-export { summarizeChat } from './summarize.js';
-export type { SummarizeOptions, ChatSummaryResult } from './summarize.js';
+// Tool layers
+export { buildToolsFromLayers, buildDiscoveryTools, activateServerTools } from './tool-layers.js';
+export type { ToolLayer, McpLayer, WebMcpLayer } from './tool-layers.js';
 
-export { TokenTracker } from './token-tracker.js';
-export type { TokenMetrics } from './token-tracker.js';
+// Re-export core WebMCP types
+export type { WebMcpServer, WebMcpToolDef, WidgetEntry } from '@webmcp-auto-ui/core';
 
 // Recipes
 export { WEBMCP_RECIPES, parseRecipe, parseRecipes } from './recipes/index.js';
 export { recipeRegistry, registerRecipes, filterRecipesByServer, formatRecipesForPrompt, formatMcpRecipesForPrompt } from './recipe-registry.js';
 
-// Tool layers
-export { buildToolsFromLayers } from './tool-layers.js';
-export type { ToolLayer, McpLayer, UILayer, SkillLayer, SkillEntry } from './tool-layers.js';
+// Summarize
+export { summarizeChat } from './summarize.js';
+export type { SummarizeOptions, ChatSummaryResult } from './summarize.js';
 
-// Skill executor
-export { buildSkillTool, activateSkill } from './skill-executor.js';
+// Token tracker
+export { TokenTracker } from './token-tracker.js';
+export type { TokenMetrics } from './token-tracker.js';
 
-// Component adapter
-export { ComponentAdapter, nativePreset, allNativePreset, minimalPreset } from './component-adapter.js';
-export type { ComponentDef } from './component-adapter.js';
-
+// Types
 export type {
   RemoteModelId, WasmModelId, LLMId, ModelId,
-  ChatMessage, ContentBlock, McpToolDef, AnthropicTool,
+  ChatMessage, ContentBlock, McpToolDef, ProviderTool, AnthropicTool,
   LLMProvider, LLMResponse, ToolCall, AgentMetrics, AgentResult, AgentCallbacks,
   Recipe, McpRecipe,
 } from './types.js';

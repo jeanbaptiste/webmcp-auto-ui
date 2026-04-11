@@ -5,20 +5,26 @@
 
 import { encode, decode } from 'hyperskills';
 
-export type BlockType =
+export type WidgetType =
   | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
   | 'stat-card' | 'data-table' | 'timeline' | 'profile' | 'trombinoscope' | 'json-viewer'
   | 'hemicycle' | 'chart-rich' | 'cards' | 'grid-data' | 'sankey' | 'map' | 'log'
-  | 'gallery' | 'carousel' | 'd3';
+  | 'gallery' | 'carousel' | 'd3' | 'js-sandbox';
+
+/** @deprecated Use WidgetType */
+export type BlockType = WidgetType;
 
 export type Mode = 'auto' | 'drag' | 'chat';
 export type LLMId = 'haiku' | 'sonnet' | 'gemma-e2b' | 'gemma-e4b';
 
-export interface Block {
+export interface Widget {
   id: string;
-  type: BlockType;
+  type: WidgetType;
   data: Record<string, unknown>;
 }
+
+/** @deprecated Use Widget */
+export type Block = Widget;
 
 export interface ChatMsg {
   id: string;
@@ -34,7 +40,7 @@ export interface McpToolInfo {
 }
 
 function uuid() {
-  return 'b_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  return 'w_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 }
 
 function msgId() {
@@ -61,10 +67,10 @@ function createCanvas() {
   const isEmpty = $derived(blocks.length === 0);
 
   // ── Block actions ────────────────────────────────────────────────────────
-  function addBlock(type: BlockType, data: Record<string, unknown> = {}): Block {
-    const block: Block = { id: uuid(), type, data };
-    blocks = [...blocks, block];
-    return block;
+  function addWidget(type: WidgetType, data: Record<string, unknown> = {}): Widget {
+    const widget: Widget = { id: uuid(), type, data };
+    blocks = [...blocks, widget];
+    return widget;
   }
 
   function removeBlock(id: string) {
@@ -245,8 +251,14 @@ function createCanvas() {
     setMcpUrl(u: string) { mcpUrl = u; },
     setGenerating(g: boolean) { generating = g; },
 
-    // Block actions
-    addBlock, removeBlock, updateBlock, moveBlock, clearBlocks, setBlocks,
+    // Widget actions (new names)
+    addWidget,
+
+    // Backward compat aliases
+    addBlock: addWidget,
+
+    // Block actions (kept as-is)
+    removeBlock, updateBlock, moveBlock, clearBlocks, setBlocks,
 
     // Chat
     addMsg, updateMsg, clearMessages,

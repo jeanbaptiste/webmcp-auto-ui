@@ -4,12 +4,12 @@
 
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
-  import { BlockRenderer, Button, Input } from '@webmcp-auto-ui/ui';
+  import { WidgetRenderer, Button, Input } from '@webmcp-auto-ui/ui';
   import {
-    decodeHyperSkill, encodeHyperSkill, computeHash,
+    decodeHyperSkill, encodeHyperSkill,
     getHsParam, type HyperSkill, type HyperSkillMeta,
   } from '@webmcp-auto-ui/sdk';
-  import { ExternalLink, Pencil, Plus, Trash2, GripVertical, FlaskConical, GitBranch, Github } from 'lucide-svelte';
+  import { ExternalLink, Pencil, Plus, Trash2, FlaskConical, GitBranch, Github } from 'lucide-svelte';
 
   interface Block { id: string; type: string; data: Record<string, unknown>; }
   interface DagNode { hash: string; previousHash?: string; label: string; active: boolean; url?: string; }
@@ -350,7 +350,7 @@
                 </div>
               </div>
             {:else}
-              <BlockRenderer type={block.type} data={block.data} />
+              <WidgetRenderer type={block.type} data={block.data} />
             {/if}
           </div>
         {/each}

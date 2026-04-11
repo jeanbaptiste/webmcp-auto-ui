@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { FloatingLayout, FlexLayout, BlockRenderer, layoutAdapter } from '@webmcp-auto-ui/ui';
+  import { FloatingLayout, FlexLayout, WidgetRenderer, layoutAdapter } from '@webmcp-auto-ui/ui';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import type { ManagedWindow } from '@webmcp-auto-ui/ui';
   import ProvenanceBadge from './ProvenanceBadge.svelte';
@@ -77,7 +77,7 @@
           </div>
           <div class="flex-1 overflow-auto min-h-0">
             {#if block}
-              <BlockRenderer type={block.type} data={block.data} id={block.id} />
+              <WidgetRenderer type={block.type} data={block.data} id={block.id} />
             {/if}
           </div>
           <ProvenanceBadge serverName={prov?.server} componentName={prov?.component} />
@@ -106,7 +106,7 @@
           {#if !ctx.collapsed}
             <div class="flex-1 overflow-auto min-h-0">
               {#if block}
-                <BlockRenderer type={block.type} data={block.data} id={block.id} />
+                <WidgetRenderer type={block.type} data={block.data} id={block.id} />
               {/if}
             </div>
           {/if}

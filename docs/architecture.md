@@ -1,6 +1,6 @@
 # Architecture
 
-Structure monorepo, dependances entre packages, et decisions de design (v0.8).
+Structure monorepo, dependances entre packages, et decisions de design (Phase 8).
 
 ## Structure monorepo
 
@@ -8,14 +8,14 @@ Structure monorepo, dependances entre packages, et decisions de design (v0.8).
 webmcp-auto-ui/
  |
  +-- packages/
- |    +-- core/          W3C WebMCP polyfill + MCP Streamable HTTP client
+ |    +-- core/          W3C WebMCP polyfill + MCP client + WebMCP server factory
  |    +-- sdk/           HyperSkill format, skills CRUD, canvas store (Svelte 5)
- |    +-- agent/         LLM agent loop, 4 providers, ToolLayers, recettes, component()
+ |    +-- agent/         LLM agent loop, 4 providers, ToolLayers, autoui server, recettes
  |    +-- ui/            34+ Svelte 5 components (primitives, widgets, WM)
  |
  +-- apps/
  |    +-- home/          Landing page, app launcher (port 5173)
- |    +-- flex2/         Flex -- canvas IA, ToolLayers, component(), LogDrawer, RecipeModal
+ |    +-- flex2/         Flex -- canvas IA, ToolLayers, LogDrawer, RecipeModal
  |    +-- viewer2/       Viewer -- lecteur HyperSkills read-only avec CRUD, DAG, paste URI
  |    +-- showcase2/     Showcase -- demo dynamique avec agent + MCP + 3 themes
  |    +-- todo2/         Todo -- todo WebMCP, template minimal
@@ -45,57 +45,143 @@ webmcp-auto-ui/
          +---------+
 ```
 
-- **core** : zero dependances externes. TypeScript pur.
+- **core** : zero dependances externes. TypeScript pur. Fournit `McpClient`, `createWebMcpServer`, `parseFrontmatter`.
 - **sdk** : depend de Svelte 5 (peer) pour le canvas store. Fournit aussi un store vanilla a `@webmcp-auto-ui/sdk/canvas-vanilla`. Shippe `MCP_DEMO_SERVERS`.
-- **agent** : depend de core (`McpClient`, `sanitizeSchema`, types). 4 providers LLM. ToolLayers. Recettes. ComponentAdapter.
+- **agent** : depend de core (`McpClient`, `WebMcpServer`, types). 4 providers LLM. ToolLayers. `autoui` server pre-configure.
 - **ui** : standalone. Peer deps : `svelte ^5`, `d3 ^7`, `leaflet >=1.9`.
 
-## Les 3 couches
+## Les 2 protocoles symetriques
 
-L'architecture structure les outils en 3 couches via les `ToolLayer[]` :
+L'architecture repose sur deux protocoles symetriques :
+
+| Protocole | Role | Transport | Exemple |
+|-----------|------|-----------|---------|
+| **MCP** | Donnees distantes (query, fetch) | Streamable HTTP (JSON-RPC 2.0) | `tricoteuses_mcp_search_recipes` |
+| **WebMCP** | Affichage local (widgets, canvas) | In-process (JS) | `autoui_webmcp_widget_display` |
+
+Les deux protocoles sont traites uniformement par les `ToolLayer[]`. Chaque layer porte un `protocol: 'mcp' | 'webmcp'` et un `serverName`.
 
 ```
 +--------------------------------------------------+
 |                    ToolLayer[]                     |
 |                                                    |
-|  +-- McpLayer (par serveur) ---+  +-- UILayer --+ |
-|  |  tools: MCP tools           |  | component() | |
-|  |  recipes: MCP recipes       |  | adapter?    | |
-|  |  serverName, serverUrl      |  | recipes: UI | |
-|  +-----------------------------+  +-------------+ |
+|  +-- McpLayer (par serveur) ---+  +-- WebMcpLayer --+ |
+|  |  protocol: 'mcp'           |  | protocol: 'webmcp' |
+|  |  tools: McpToolDef[]       |  | tools: WebMcpToolDef[] |
+|  |  recipes: McpRecipe[]      |  | (search_recipes, get_recipe, |
+|  |  serverName, serverUrl     |  |  widget_display, canvas, recall) |
+|  +-----------------------------+  +---------------------+ |
 +--------------------------------------------------+
          |                               |
-    buildSystemPrompt()          buildToolsFromLayers()
-         |                               |
+    buildSystemPrompt()          buildDiscoveryTools()
+         |                      activateServerTools()
     Prompt structure:            AnthropicTool[]:
-    ## mcp (servers)             - MCP tools
-    ## webmcp                    - component() (smart)
-                                 - ou render_* (explicit)
+    SERVEURS CONNECTES           - {server}_{protocol}_{tool}
+    STRATEGIE                    - Lazy loaded per server
 ```
 
 ### McpLayer
 
-Un par serveur MCP connecte. Porte les outils DATA (query, fetch) et les recettes serveur (ce que les outils retournent).
+Un par serveur MCP connecte. Porte les outils DATA (query, fetch) et les recettes serveur.
 
-### UILayer
+```ts
+interface McpLayer {
+  protocol: 'mcp';
+  serverName: string;
+  description?: string;
+  serverUrl?: string;
+  tools: McpToolDef[];
+  recipes?: McpRecipe[];
+}
+```
 
-Un seul par app. Porte `component()`, le `ComponentAdapter` optionnel (pour filtrer les composants en mode explicit), et les recettes WebMCP (comment presenter les donnees).
+### WebMcpLayer
 
-### Recettes
+Un par serveur WebMCP (autoui built-in + serveurs custom). Porte les outils d'affichage.
 
-Deux types de recettes cohabitent :
+```ts
+interface WebMcpLayer {
+  protocol: 'webmcp';
+  serverName: string;
+  description: string;
+  tools: WebMcpToolDef[];
+}
+```
 
-| Type | Source | Role | Section prompt |
-|------|--------|------|---------------|
-| **Recette MCP** | Serveur (`list_recipes`) | Decrit les donnees retournees | `## mcp > recettes serveur` |
-| **Recette WebMCP** | Package agent (fichiers .md) | Guide la presentation UI | `## webmcp > recettes UI` |
+### Multi-serveurs WebMCP
+
+Plusieurs serveurs WebMCP peuvent coexister. Le serveur `autoui` (built-in) fournit les 26 widgets natifs. Des serveurs custom peuvent ajouter des widgets supplementaires :
+
+```ts
+import { autoui } from '@webmcp-auto-ui/agent';
+import { createWebMcpServer } from '@webmcp-auto-ui/core';
+
+// Built-in: 26 widgets natifs
+const autouiLayer = autoui.layer();
+
+// Custom: widgets metier
+const designkit = createWebMcpServer('designkit', { description: 'Design system widgets' });
+designkit.registerWidget(recipeMarkdown, CustomComponent);
+const designkitLayer = designkit.layer();
+
+// Les deux coexistent dans les layers
+const layers = [mcpLayer, autouiLayer, designkitLayer];
+```
+
+## Tool naming convention
+
+Tous les outils sont prefixes : `{serverName}_{protocol}_{toolName}`.
+
+| Outil prefixe | Serveur | Protocole | Outil |
+|--------------|---------|-----------|-------|
+| `tricoteuses_mcp_query_sql` | tricoteuses | mcp | query_sql |
+| `autoui_webmcp_widget_display` | autoui | webmcp | widget_display |
+| `autoui_webmcp_search_recipes` | autoui | webmcp | search_recipes |
+| `designkit_webmcp_widget_display` | designkit | webmcp | widget_display |
+
+Le prefixe elimine les collisions entre serveurs et permet le routage automatique dans la boucle agent.
+
+## Lazy loading des tools
+
+Au demarrage, seuls les outils de decouverte sont envoyes au LLM :
+
+1. `buildDiscoveryTools(layers)` — extrait `search_recipes`, `get_recipe` pour chaque serveur, plus les outils d'action WebMCP (`widget_display`, `canvas`, `recall`)
+2. Quand le LLM appelle un outil d'un serveur, `activateServerTools()` charge tous les outils de ce serveur
+3. Le budget tokens initial est minimal (~10 outils) meme avec de nombreux serveurs
+
+## Pipeline des schemas
+
+```
+Composant Svelte (Props)
+        |
+        v
+Recette (.md avec frontmatter YAML)
+  - widget: nom
+  - description: texte
+  - schema: JSON Schema des props
+  - body: instructions d'utilisation
+        |
+        v
+WebMCP Server (createWebMcpServer)
+  - registerWidget(recipe, renderer)
+  - genere automatiquement: search_recipes, get_recipe, widget_display
+        |
+        v
+ToolLayer (server.layer())
+  - protocol: 'webmcp'
+  - tools: WebMcpToolDef[]
+        |
+        v
+Agent Loop (runAgentLoop)
+  - buildDiscoveryTools → buildSystemPrompt → LLM
+```
 
 ## Description des apps
 
 | App | Chemin | Description |
 |-----|--------|------------|
 | **Home** | `apps/home/` | Landing page avec liens vers toutes les apps. Configurable via `PUBLIC_BASE_URL`. |
-| **Flex** | `apps/flex2/` | Canvas IA avec ToolLayers, component() unique, debug panel, badges provenance, mode composeur/consommateur, LogDrawer (AgentConsole), RecipeModal, export HyperSkill gzip. |
+| **Flex** | `apps/flex2/` | Canvas IA avec ToolLayers, debug panel, badges provenance, mode composeur/consommateur, LogDrawer (AgentConsole), RecipeModal, export HyperSkill gzip. |
 | **Viewer** | `apps/viewer2/` | Lecteur HyperSkills read-only avec CRUD, DAG de versions, paste URI. |
 | **Showcase** | `apps/showcase2/` | Demo dynamique avec agent + MCP + 3 themes. |
 | **Todo** | `apps/todo2/` | Todo WebMCP, template minimal avec architecture layers. |
@@ -111,26 +197,22 @@ Deux types de recettes cohabitent :
 | Charting | D3.js v7 (Chart, Sankey, Hemicycle, D3Widget) |
 | Maps | Leaflet (MapView) |
 | LLM | Anthropic Claude API (via server proxy), Gemma 4 LiteRT (in-browser, OPFS), Ollama/Llamafile (local) |
-| Protocol | MCP Streamable HTTP (JSON-RPC 2.0) |
+| Protocol | MCP Streamable HTTP (JSON-RPC 2.0), WebMCP (in-process) |
 | Build | TypeScript, svelte-package, Vite |
 
 ## Decisions de design
 
-### ToolLayers
+### Deux protocoles, une interface
 
-Les outils ne sont plus passes en tableau plat (`mcpTools[]`). Ils sont structures en couches typees (`McpLayer`, `UILayer`) qui portent chacune leurs outils et recettes. `buildSystemPrompt()` et `buildToolsFromLayers()` consomment ces layers pour produire le prompt et les outils.
+MCP et WebMCP partagent le meme pattern : serveur avec outils, recettes, et decouverte. La seule difference est le transport (HTTP vs in-process). Les `ToolLayer[]` les unifient pour la boucle agent.
 
-### Mode smart vs explicit
+### Lazy loading par serveur
 
-Le mode `smart` (defaut) expose 3 outils UI au LLM : `list_components()`, `get_component()` et `component()`. Le LLM decouvre les composants via `list_components()`, obtient le schema via `get_component(nom)`, et rend via `component(nom, {params})`. Cela economise ~2800 tokens de schema par rapport au mode `explicit` (31 render_* individuels).
+Les outils ne sont pas tous envoyes au LLM au premier tour. `buildDiscoveryTools()` fournit uniquement les outils de decouverte (search_recipes, get_recipe) + les outils d'action. Quand le LLM touche un serveur, `activateServerTools()` charge ses outils data. Cela economise le context window.
 
-### Recettes WebMCP
+### Recettes dans les serveurs
 
-Les recettes sont des fichiers `.md` avec frontmatter YAML. Elles guident le LLM sur le choix des composants en fonction des donnees retournees par le serveur MCP. Le parser est tolerant : il accepte aussi les fichiers sans frontmatter (freeform).
-
-### ComponentAdapter
-
-Decouple les definitions d'outils (ce que le LLM voit) des renderers (ce que l'utilisateur voit). Les apps enregistrent uniquement les composants dont elles ont besoin via des presets (`minimalPreset`, `nativePreset`, `allNativePreset`).
+Les recettes (fichiers .md avec frontmatter) sont enregistrees dans les serveurs WebMCP via `registerWidget()`. Le serveur genere automatiquement les outils `search_recipes` et `get_recipe`. Le LLM decouvre les widgets via ces outils, pas via un listing statique dans le prompt.
 
 ### CSS variables theming
 
@@ -140,9 +222,9 @@ Tokens (couleurs, radii, fonts) en CSS custom properties dans `ThemeProvider`. D
 
 Les composants ne s'appellent jamais directement. Le bus `bus` singleton implemente le principe "messaging not calling" d'Alan Kay.
 
-### BlockRenderer dispatch
+### WidgetRenderer dispatch
 
-`BlockRenderer` recoit `{ type, data }` et dispatche vers le widget. Pipeline : **LLM -> tool call -> block -> store -> renderer**.
+`WidgetRenderer` recoit `{ type, data, servers? }` et dispatche vers le widget. Pipeline : **LLM -> widget_display -> store -> WidgetRenderer**. Resout d'abord dans les serveurs WebMCP custom, puis dans NATIVE_MAP.
 
 ### HyperSkill URL format
 
@@ -150,7 +232,7 @@ Skill serialisee en JSON -> base64 -> `?hs=`. Gzip au-dela de 6KB. SHA-256 pour 
 
 ### LiteRT migration (v0.5.0)
 
-Le provider Gemma WASM a migre de ONNX (`@huggingface/transformers` + Web Worker) a LiteRT (`@mediapipe/tasks-genai` main thread). 2-4x plus rapide sur WebGPU. Cache OPFS.
+Le provider Gemma WASM a migre de ONNX a LiteRT (`@mediapipe/tasks-genai` main thread). 2-4x plus rapide sur WebGPU. Cache OPFS.
 
 ### Vanilla canvas store
 
@@ -158,4 +240,4 @@ En plus du store Svelte 5 runes (`@webmcp-auto-ui/sdk/canvas`), un store vanilla
 
 ### Agent loop architecture
 
-`runAgentLoop` accepte soit `layers` (nouvelle API) soit `mcpTools` (legacy). Les UI tools sont executes localement via callbacks. Les DATA tools sont forwards au serveur MCP via `McpClient.callTool()`. Arret sur `end_turn` ou `max_iterations`.
+`runAgentLoop` accepte des `layers` structures. Les outils sont routes via le prefixe `{server}_{protocol}_{tool}`. Les MCP tools vont au `McpClient`, les WebMCP tools vont au serveur correspondant. Arret sur `end_turn` ou `max_iterations`.

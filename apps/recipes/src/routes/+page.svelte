@@ -9,10 +9,11 @@
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
   import {
     AnthropicProvider, GemmaProvider, runAgentLoop, buildSystemPrompt,
-    WEBMCP_RECIPES, recipeRegistry, filterRecipesByServer,
+    WEBMCP_RECIPES, recipeRegistry,
     fromMcpTools, trimConversationHistory, TokenTracker,
   } from '@webmcp-auto-ui/agent';
-  import type { ChatMessage, Recipe, McpRecipe, ToolLayer, McpLayer, UILayer } from '@webmcp-auto-ui/agent';
+  import type { ChatMessage, Recipe, McpRecipe, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
+  import { autoui } from '@webmcp-auto-ui/agent';
   import { McpStatus, LLMSelector, GemmaLoader, RemoteMCPserversDemo, AgentConsole, THEME_MAP } from '@webmcp-auto-ui/ui';
   import RecipeList from '$lib/RecipeList.svelte';
   import RecipeDetail from '$lib/RecipeDetail.svelte';
@@ -242,13 +243,7 @@
       };
       result.push(mcpLayer);
     }
-    const serverNames = canvas.mcpName?.split(', ').filter(Boolean) ?? [];
-    const uiRecipes = filterRecipesByServer(WEBMCP_RECIPES, serverNames);
-    const uiLayer: UILayer = {
-      source: 'ui',
-      recipes: uiRecipes.length > 0 ? uiRecipes : undefined,
-    };
-    result.push(uiLayer);
+    result.push(autoui.layer());
     return result;
   });
 
@@ -319,8 +314,6 @@
     const timerInterval = setInterval(() => chatTimer++, 1000);
 
     try {
-      const isWasm = canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b';
-      const mode = isWasm ? 'smart' : 'explicit';
       const systemPrompt = buildSystemPrompt(layers);
 
       const result = await runAgentLoop(prompt, {
@@ -354,7 +347,7 @@
               tokenTracker.recordEstimate(0, response.stats.totalTokens * 4, latencyMs);
             }
           },
-          onBlock: (type: string, data: Record<string, unknown>) => {
+          onWidget: (type: string, data: Record<string, unknown>) => {
             previewBlocks = [...previewBlocks, { id: uid(), type, data }];
           },
           onClear: () => { previewBlocks = []; },

@@ -8,11 +8,11 @@
   import {
     AnthropicProvider, GemmaProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, trimConversationHistory, summarizeChat, TokenTracker,
-    WEBMCP_RECIPES, filterRecipesByServer,
   } from '@webmcp-auto-ui/agent';
-  import type { ChatMessage, ToolLayer, McpLayer, UILayer } from '@webmcp-auto-ui/agent';
+  import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
+  import { autoui } from '@webmcp-auto-ui/agent';
   import { McpStatus, GemmaLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
-  import { Menu, ExternalLink, Eye, Pencil, Terminal, Github } from 'lucide-svelte';
+  import { Menu, Terminal } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
   import SettingsDrawer from '$lib/SettingsDrawer.svelte';
@@ -37,16 +37,8 @@
   let temperature = $state(1.0);
   let topK = $state(64);
   let maxTools = $state(8);
-  const defaultSystemPrompt = `Tu es un assistant UI connecté à des serveurs MCP.
-
-WORKFLOW OBLIGATOIRE :
-1. Utilise un outil DATA pour récupérer les données
-2. Appelle list_components() si tu ne connais pas les composants
-3. Appelle get_component(nom) pour le schéma
-4. Appelle component(nom, {params}) pour afficher visuellement
-5. Réponds en 1-2 phrases max — l'essentiel est dans l'UI
-
-Propose la visualisation la plus pertinente. Combine plusieurs composants quand c'est utile.`;
+  const defaultSystemPrompt = `Réponds en 1-2 phrases max entre les widgets. L'essentiel est dans l'UI.
+Propose la visualisation la plus pertinente. Combine plusieurs widgets quand c'est utile.`;
   let systemPrompt = $state(defaultSystemPrompt);
   let composerMode = $state(true); // true = composer, false = consumer
   let layoutMode = $state<'float' | 'grid'>('float');
@@ -232,16 +224,13 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
       };
       result.push(mcpLayer);
     }
-    const serverNames = canvas.mcpName?.split(', ').filter(Boolean) ?? [];
-    const uiRecipes = filterRecipesByServer(WEBMCP_RECIPES, serverNames);
-    const uiLayer: UILayer = { source: 'ui', recipes: uiRecipes.length > 0 ? uiRecipes : undefined };
-    result.push(uiLayer);
+    result.push(autoui.layer());
     return result;
   });
 
   const effectivePrompt = $derived.by(() => {
     const hasCustomPrompt = systemPrompt !== defaultSystemPrompt;
-    const hasMcp = layers.some(l => l.source === 'mcp');
+    const hasMcp = layers.some(l => l.protocol === 'mcp');
     if (hasMcp) {
       const structured = buildSystemPrompt(layers);
       return hasCustomPrompt ? `${systemPrompt}\n\n${structured}` : structured;
@@ -273,7 +262,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
         skill.provenance = result.provenance;
       } catch { /* don't block export */ }
     }
-    const url = await encodeHyperSkill(skill as HyperSkill, window.location.origin + base + '/flex2');
+    const url = await encodeHyperSkill(skill as HyperSkill, window.location.origin + base);
     await navigator.clipboard.writeText(url);
     exportCopied = true;
     setTimeout(() => { exportCopied = false; }, 2000);
@@ -328,9 +317,9 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
             if (response.usage) tokenTracker.record(response.usage, latencyMs);
             else if (response.stats) tokenTracker.recordEstimate(0, response.stats.totalTokens * 4, latencyMs);
           },
-          onBlock: (type, data) => {
-                const block = flexGrid?.addBlock(type, data, currentServerName, type);
-                return block ? { id: block.id } : undefined;
+          onWidget: (type, data) => {
+                const widget = flexGrid?.addBlock(type, data, currentServerName, type);
+                return widget ? { id: widget.id } : undefined;
               },
           onClear: () => flexGrid?.clearBlocks(),
           onUpdate: (id, data) => bus.send('agent', id, 'data-update', data),
@@ -435,54 +424,6 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
     </button>
     <div class="flex-1"></div>
 
-    <!-- Composer / Consumer toggle -->
-    <button
-      class="flex items-center gap-1.5 font-mono text-[10px] h-6 px-2 rounded border transition-colors flex-shrink-0
-             {composerMode ? 'border-accent bg-accent/10 text-accent' : 'border-teal bg-teal/10 text-teal'}"
-      onclick={() => composerMode = !composerMode}>
-      {#if composerMode}
-        <Pencil size={12} /> compositeur
-      {:else}
-        <Eye size={12} /> consommateur
-      {/if}
-    </button>
-
-    {#if composerMode}
-      <button
-        class="font-mono text-[10px] h-6 px-2 rounded border transition-colors flex-shrink-0
-               {layoutMode === 'grid' ? 'border-accent bg-accent/10 text-accent' : 'border-border2 text-text2 hover:text-text1'}"
-        onclick={() => layoutMode = layoutMode === 'float' ? 'grid' : 'float'}>
-        {layoutMode === 'grid' ? 'grid' : 'float'}
-      </button>
-    {/if}
-
-    {#if canvas.blockCount > 0}
-      <span class="hidden md:inline font-mono text-[10px] text-text2">{canvas.blockCount} bloc{canvas.blockCount !== 1 ? 's' : ''}</span>
-      {#if composerMode}
-        <button class="hidden md:inline font-mono text-[10px] text-text2 hover:text-accent2 transition-colors"
-                onclick={() => flexGrid?.clearBlocks()}>effacer</button>
-      {/if}
-    {/if}
-
-    {#if composerMode}
-      <label class="hidden md:flex items-center gap-1.5 font-mono text-[10px] text-text2 cursor-pointer flex-shrink-0">
-        <input type="checkbox" bind:checked={includeSummary} class="accent-accent w-3 h-3" />
-        synthese
-      </label>
-      <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-text2 hover:text-text1 transition-colors flex-shrink-0"
-              onclick={exportHsUrl}>
-        {#if exportCopied}
-          <span class="text-teal">copie !</span>
-        {:else}
-          <ExternalLink size={14} class="inline -mt-px" /> <span class="hidden md:inline">exporter</span>
-        {/if}
-      </button>
-      <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-text2 hover:text-text1 transition-colors flex-shrink-0"
-              onclick={() => historyOpen = true}>
-        historique
-      </button>
-    {/if}
-
     <McpStatus
       connecting={canvas.mcpConnecting}
       connected={canvas.mcpConnected}
@@ -495,12 +436,6 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
         {({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}
       </span>
     {/if}
-    <a href="https://github.com/jeanbaptiste/webmcp-auto-ui/tree/main/apps/flex2"
-       target="_blank" rel="noopener"
-       class="flex items-center h-7 px-1.5 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
-       title="Source code">
-      <Github size={14} />
-    </a>
     <button class="font-mono text-xs h-7 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
             onclick={toggleTheme} aria-label="Toggle theme">*</button>
   </header>
@@ -575,6 +510,8 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
 <!-- onconnect closure: safe because setMcpUrl is synchronous, so canvas.mcpUrl is always current -->
 <SettingsDrawer
   bind:open={settingsOpen}
+  bind:composerMode bind:layoutMode bind:includeSummary
+  onexport={exportHsUrl} onhistory={() => historyOpen = true}
   bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON
   bind:schemaValidation
@@ -582,7 +519,7 @@ Propose la visualisation la plus pertinente. Combine plusieurs composants quand 
   {connectedUrls} {loadingUrls}
   onaddserver={addMcpServer} onaddall={addAllServers} onremoveserver={removeMcpServer}
   {mcpRecipes}
-  webmcpRecipes={layers.find(l => l.source === 'ui')?.recipes ?? []}
+  webmcpRecipes={layers.find(l => l.protocol === 'webmcp')?.recipes ?? []}
 />
 
 <!-- HISTORY MODAL -->

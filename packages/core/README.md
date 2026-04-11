@@ -70,6 +70,45 @@ group.abort();
 await multi.disconnectAll();
 ```
 
+## WebMCP Server
+
+WebMCP is a protocol symmetric to MCP. MCP provides remote data tools, WebMCP provides local display/interaction tools.
+
+### Creating a WebMCP server
+
+```ts
+import { createWebMcpServer } from '@webmcp-auto-ui/core';
+
+const myServer = createWebMcpServer('mywidgets', {
+  description: 'Custom visualization widgets'
+});
+
+// Register widgets (recipe .md + renderer component)
+myServer.registerWidget(recipeMarkdown, RendererComponent);
+
+// Add custom tools
+myServer.addTool({
+  name: 'theme',
+  description: 'Switch theme',
+  inputSchema: { type: 'object', properties: { mode: { type: 'string' } } },
+  execute: async (params) => ({ ok: true })
+});
+
+// Get a layer for the agent loop
+const layer = myServer.layer();
+// → { protocol: 'webmcp', serverName: 'mywidgets', description: '...', tools: [...] }
+```
+
+### Frontmatter parser
+
+```ts
+import { parseFrontmatter } from '@webmcp-auto-ui/core';
+
+const { frontmatter, body } = parseFrontmatter(markdownString);
+// frontmatter.widget, frontmatter.schema, frontmatter.description
+// body = markdown content after the --- block
+```
+
 ## Types
 
 All types follow the W3C WebMCP Draft 2026-03-27 spec. See `src/types.ts`.

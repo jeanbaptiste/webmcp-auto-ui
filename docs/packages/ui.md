@@ -41,42 +41,43 @@ Layout and container components.
 
 ### Simple blocks
 
-Lightweight data blocks used by `BlockRenderer`. Each maps to a `render_*` agent tool.
+Lightweight data blocks. Each maps to a widget type.
 
-| Component | Block type | Agent tool | Description |
-|-----------|-----------|------------|-------------|
-| `StatBlock` | `stat` | `render_stat` | Single KPI with trend indicator |
-| `KVBlock` | `kv` | `render_kv` | Key-value pairs table |
-| `ListBlock` | `list` | `render_list` | Ordered list of items |
-| `ChartBlock` | `chart` | `render_chart` | Simple bar chart |
-| `AlertBlock` | `alert` | `render_alert` | Alert banner (info/warn/error) |
-| `CodeBlock` | `code` | `render_code` | Syntax-highlighted code block |
-| `TextBlock` | `text` | `render_text` | Free-form text paragraph |
-| `ActionsBlock` | `actions` | `render_actions` | Row of action buttons |
-| `TagsBlock` | `tags` | `render_tags` | Group of tags/badges |
+| Component | Widget type | Description |
+|-----------|-----------|-------------|
+| `StatBlock` | `stat` | Single KPI with trend indicator |
+| `KVBlock` | `kv` | Key-value pairs table |
+| `ListBlock` | `list` | Ordered list of items |
+| `ChartBlock` | `chart` | Simple bar chart |
+| `AlertBlock` | `alert` | Alert banner (info/warn/error) |
+| `CodeBlock` | `code` | Syntax-highlighted code block |
+| `TextBlock` | `text` | Free-form text paragraph |
+| `ActionsBlock` | `actions` | Row of action buttons |
+| `TagsBlock` | `tags` | Group of tags/badges |
 
 ### Rich widgets
 
 Complex visualizations for data-heavy use cases.
 
-| Component | Block type | Agent tool | Description |
-|-----------|-----------|------------|-------------|
-| `StatCard` | `stat-card` | -- | Enhanced stat with sparkline |
-| `DataTable` | `data-table` | `render_table` | Sortable data table |
-| `Timeline` | `timeline` | `render_timeline` | Event chronology with statuses |
-| `ProfileCard` | `profile` | `render_profile` | Profile card with avatar, fields, stats |
-| `Trombinoscope` | `trombinoscope` | `render_trombinoscope` | Grid of portrait cards |
-| `JsonViewer` | `json-viewer` | `render_json` | Interactive JSON tree |
-| `Hemicycle` | `hemicycle` | `render_hemicycle` | SVG parliament hemicycle |
-| `Chart` | `chart-rich` | `render_chart_rich` | Multi-series chart (bar/line/area/pie/donut) |
-| `Cards` | `cards` | `render_cards` | Grid of content cards |
-| `GridData` | `grid-data` | -- | Data grid layout |
-| `Sankey` | `sankey` | `render_sankey` | D3 Sankey flow diagram |
-| `MapView` | `map` | -- | Leaflet map with markers |
-| `D3Widget` | `d3` | `render_d3` | D3 presets (hex-heatmap, radial, treemap, force) |
-| `LogViewer` | `log` | `render_log` | Log stream with levels and timestamps |
-| `Gallery` | `gallery` | `render_gallery` | Image gallery with lightbox |
-| `Carousel` | `carousel` | `render_carousel` | Slide carousel with auto-play |
+| Component | Widget type | Description |
+|-----------|-----------|-------------|
+| `StatCard` | `stat-card` | Enhanced stat with sparkline |
+| `DataTable` | `data-table` | Sortable data table |
+| `Timeline` | `timeline` | Event chronology with statuses |
+| `ProfileCard` | `profile` | Profile card with avatar, fields, stats |
+| `Trombinoscope` | `trombinoscope` | Grid of portrait cards |
+| `JsonViewer` | `json-viewer` | Interactive JSON tree |
+| `Hemicycle` | `hemicycle` | SVG parliament hemicycle |
+| `Chart` | `chart-rich` | Multi-series chart (bar/line/area/pie/donut) |
+| `Cards` | `cards` | Grid of content cards |
+| `GridData` | `grid-data` | Data grid layout |
+| `Sankey` | `sankey` | D3 Sankey flow diagram |
+| `MapView` | `map` | Leaflet map with markers |
+| `D3Widget` | `d3` | D3 presets (hex-heatmap, radial, treemap, force) |
+| `JsSandbox` | `js-sandbox` | Sandboxed JavaScript execution |
+| `LogViewer` | `log` | Log stream with levels and timestamps |
+| `Gallery` | `gallery` | Image gallery with lightbox |
+| `Carousel` | `carousel` | Slide carousel with auto-play |
 
 ### Window Manager
 
@@ -99,18 +100,77 @@ Complex visualizations for data-heavy use cases.
 | `SettingsPanel` | Sliders with dynamic ranges for temperature, topK, maxTokens; displays effectivePrompt in readonly |
 | `AgentConsole` | Scrollable agent log panel with iteration markers, tool calls, text output and token metrics |
 
-### BlockRenderer
+## WidgetRenderer
+
+`WidgetRenderer` is the primary rendering entry point. It dispatches `{ type, data }` to the matching widget component, with support for custom renderers from WebMCP servers.
 
 ```svelte
 <script>
-  import { BlockRenderer } from '@webmcp-auto-ui/ui';
+  import { WidgetRenderer } from '@webmcp-auto-ui/ui';
 </script>
 
-<BlockRenderer type="stat" data={{ label: 'Users', value: '1,204', trend: '+5%', trendDir: 'up' }} />
-<BlockRenderer type="chart" data={{ title: 'Revenue', bars: [['Q1', 100], ['Q2', 140]] }} />
+<WidgetRenderer type="stat" data={{ label: 'Users', value: '1,204', trend: '+5%', trendDir: 'up' }} />
+<WidgetRenderer type="chart" data={{ title: 'Revenue', bars: [['Q1', 100], ['Q2', 140]] }} />
 ```
 
-`BlockRenderer` dispatches `{ type, data }` to the matching widget component. It is the single rendering entry point used by the canvas.
+### Props
+
+```ts
+interface Props {
+  id?: string;
+  type: string;
+  data: Record<string, unknown>;
+  servers?: WebMcpServer[];           // custom WebMCP servers for resolution
+  oninteract?: (type: string, action: string, payload: unknown) => void;
+}
+```
+
+### Resolution order
+
+1. **Custom servers** — If `servers` is provided, looks for a matching widget in each server (first match wins)
+2. **NATIVE_MAP** — Falls back to the built-in 26 native widget components
+3. **Fallback** — Renders `[type]` text if no match found
+
+### `servers` prop
+
+Pass connected WebMCP servers to allow custom widget resolution:
+
+```svelte
+<script>
+  import { WidgetRenderer } from '@webmcp-auto-ui/ui';
+  import type { WebMcpServer } from '@webmcp-auto-ui/core';
+
+  let { servers }: { servers: WebMcpServer[] } = $props();
+</script>
+
+{#each widgets as widget}
+  <WidgetRenderer type={widget.type} data={widget.data} {servers} />
+{/each}
+```
+
+### WebMCP tool auto-registration
+
+Each `WidgetRenderer` instance automatically registers 3 tools on `navigator.modelContext` (if available):
+- `widget_{id}_get` — Read current widget data
+- `widget_{id}_update` — Update widget data
+- `widget_{id}_remove` — Remove widget from view
+
+### FONC message bus
+
+Each instance auto-registers on the FONC message bus, listening on `data-update`, `interact`, and `*` channels.
+
+## BlockRenderer (deprecated)
+
+`BlockRenderer` is deprecated in favor of `WidgetRenderer`. It remains exported for backward compatibility but does not support the `servers` prop.
+
+```svelte
+<!-- Deprecated — use WidgetRenderer instead -->
+<BlockRenderer type="stat" data={{ label: 'Users', value: '1,204' }} />
+```
+
+### NATIVE_MAP
+
+The static map of 26 native widget types to Svelte components is unchanged. All entries from `stat` to `js-sandbox` are supported.
 
 ## Theming
 
@@ -129,8 +189,6 @@ Wrap your app with `ThemeProvider`:
 ```
 
 ### Token override
-
-Pass a `theme.json` object to override specific tokens:
 
 ```svelte
 <ThemeProvider mode="dark" overrides={{ '--color-primary': '#ff6600', '--radius': '0.5rem' }}>
@@ -169,43 +227,23 @@ const unregister = bus.register(
     console.log(`Received ${msg.channel} from ${msg.from}:`, msg.payload);
   }
 );
-// later: unregister()
 ```
 
 ### Send a message
 
 ```ts
-// To a specific component
 bus.send('my-panel', 'my-chart', 'data', { values: [1, 2, 3] });
-
-// Broadcast to all listeners on a channel
 bus.broadcast('my-panel', 'theme', { mode: 'dark' });
-```
-
-### Subscribe without registering a component
-
-```ts
-const unsub = bus.subscribe(['data'], (msg) => {
-  console.log('Data update:', msg.payload);
-});
-```
-
-### Inspect the bus
-
-```ts
-bus.listPeers();  // [{ id: 'my-chart', type: 'Chart' }, ...]
-bus.peerCount;    // 3
-bus.lastMessage;  // most recent BusMessage or null
 ```
 
 ### BusMessage shape
 
 ```ts
 interface BusMessage {
-  from: string;       // sender ID
-  to: string | '*';   // target ID or broadcast
-  channel: string;    // channel name
-  payload: unknown;   // message data
-  timestamp: number;  // Date.now()
+  from: string;
+  to: string | '*';
+  channel: string;
+  payload: unknown;
+  timestamp: number;
 }
 ```

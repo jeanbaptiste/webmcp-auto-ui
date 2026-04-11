@@ -1,6 +1,6 @@
 # @webmcp-auto-ui/agent
 
-LLM agent loop that connects an MCP server to a UI. Given a user message and a set of MCP tools, it runs a tool-use loop until the LLM signals it's done, calling `render_*` tools to build the interface.
+LLM agent loop that connects MCP and WebMCP servers to a UI. Given a user message and a set of tool layers, it runs a tool-use loop until the LLM signals it's done, calling widget tools to build the interface.
 
 ## Providers
 
@@ -14,26 +14,26 @@ LLM agent loop that connects an MCP server to a UI. Given a user message and a s
 
 **Native tool calling** — Gemma 4 tool calls are parsed from `<|tool_call>call:name{args}<tool_call|>` format. No regex heuristics needed.
 
-## UI tools
+## WebMCP `autoui` server
 
-19 `render_*` tools exposed to the LLM, one per block type:
-
-`render_stat` · `render_kv` · `render_list` · `render_chart` · `render_alert` · `render_code` · `render_text` · `render_actions` · `render_tags` · `render_table` · `render_timeline` · `render_profile` · `render_trombinoscope` · `render_json` · `render_hemicycle` · `render_chart_rich` · `render_cards` · `render_sankey` · `render_log` · `clear_canvas`
-
-## Unified `component()` tool
-
-A single tool that exposes **56 components** (31 renderable, 25 non-renderable) through a consistent interface. Inspired by [Emmanuel Raviart](https://www.tricoteuses.fr/mcp), creator of the Tricoteuses MCP server.
+The package ships a pre-configured WebMCP server named `autoui` with all built-in widget recipes (stat, table, chart, timeline, etc.). This replaces the previous `componentRegistry` / `ComponentAdapter` / `COMPONENT_TOOL` API.
 
 ```ts
-import { COMPONENT_TOOL, executeComponent, componentRegistry } from '@webmcp-auto-ui/agent';
+import { autoui } from '@webmcp-auto-ui/agent';
+
+// autoui is a WebMcpServer with all built-in widgets registered
+const layer = autoui.layer();
+// → { protocol: 'webmcp', serverName: 'autoui', tools: [...] }
 ```
 
-Three tools:
-- `list_components()` -- list all 56 components + recipes
-- `get_component("stat-card")` -- get the detailed JSON schema
-- `component("stat-card", { label: "Revenue", value: "$142K" })` -- render it
+## Lazy tool loading
 
-Coexists with the individual `render_*` tools -- both work simultaneously. For the full component catalogue, see `docs/agents/composing.md`.
+Tools are loaded lazily via discovery. The agent initially receives only lightweight discovery tools, then activates full tool schemas on demand:
+
+- `buildDiscoveryTools(servers)` — creates `list_components` and `get_component` tools across all WebMCP servers
+- `activateServerTools(serverName)` — loads the full tool set for a specific server
+
+This keeps the initial prompt small when many servers/widgets are available.
 
 ## Install
 
@@ -44,21 +44,25 @@ npm install @webmcp-auto-ui/agent
 ## Usage
 
 ```ts
-import { runAgentLoop, AnthropicProvider, fromMcpTools } from '@webmcp-auto-ui/agent';
+import { autoui, runAgentLoop, AnthropicProvider } from '@webmcp-auto-ui/agent';
 
 const result = await runAgentLoop('Show me sales data', {
-  client,                          // McpClient from @webmcp-auto-ui/core
   provider: new AnthropicProvider({ proxyUrl: '/api/chat' }),
-  mcpTools: fromMcpTools(tools),   // convert McpTool[] from client.listTools()
+  layers: [mcpClient.layer(), autoui.layer()],
   maxIterations: 5,
   callbacks: {
-    onBlock: (type, data) => { /* mount component */ },
+    onWidget: (type, data) => {
+      // Display the widget in your UI
+      return { id: widgetId };
+    },
     onClear: () => { /* clear canvas */ },
     onText: (text) => { /* update chat */ },
     onToolCall: (call) => { /* log tool use */ },
   },
 });
 ```
+
+> **Migration from Phase 7**: `onBlock` still works as a deprecated alias for `onWidget`. The `UILayer`, `SkillLayer`, `COMPONENT_TOOL`, `executeComponent`, and `componentRegistry` exports are removed — use `autoui.layer()` instead.
 
 ## TokenTracker
 

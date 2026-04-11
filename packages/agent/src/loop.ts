@@ -1,54 +1,32 @@
 /**
- * Agent loop — inspired from Archive/agent/src/loop.ts
- * Runs LLM → tool call → LLM until end_turn or max iterations
- * UI tools are executed via callbacks (no MCP roundtrip)
+ * Agent loop — runs LLM → tool call → LLM until end_turn or max iterations
+ * Tools are dispatched via the {source}_{protocol}_{tool} naming convention.
  */
 
 import type { McpClient, McpTool } from '@webmcp-auto-ui/core';
-import { sanitizeSchema } from '@webmcp-auto-ui/core';
 import type {
   ChatMessage, ContentBlock, ToolCall, AgentMetrics, AgentResult,
-  LLMProvider, AnthropicTool, McpToolDef, AgentCallbacks,
+  LLMProvider, ProviderTool, McpToolDef, AgentCallbacks,
 } from './types.js';
-import type { ToolLayer, SkillLayer } from './tool-layers.js';
-import { buildToolsFromLayers } from './tool-layers.js';
-import { isUITool, executeUITool } from './ui-tools.js';
-import {
-  executeListComponents, executeGetComponent, executeComponent,
-} from './component-tool.js';
-// formatRecipesForPrompt / formatMcpRecipesForPrompt removed — recipes are discoverable via tools
-import { activateSkill } from './skill-executor.js';
+import type { ToolLayer } from './tool-layers.js';
+import { buildToolsFromLayers, buildSystemPrompt, buildDiscoveryTools, activateServerTools, toProviderTools } from './tool-layers.js';
+
+// Re-export buildSystemPrompt for backward compat
+export { buildSystemPrompt } from './tool-layers.js';
 
 const MAX_RESULT_LEN = 10_000;
 
-/** Tools that indicate the agent is discovering/exploring rather than acting */
-const DISCOVERY_TOOLS = new Set([
-  'get_recipe', 'search_recipes', 'list_recipes', 'get_component', 'list_components', 'recall',
-  'list_tables', 'describe_table', 'get_json_schemas', 'get_typescript_types',
+/** Tool names (after prefix strip) that indicate discovery/exploration */
+const DISCOVERY_TOOL_NAMES = new Set([
+  'search_recipes', 'get_recipe', 'list_recipes', 'list_tables', 'describe_table',
+  'get_json_schemas', 'get_typescript_types', 'recall',
 ]);
 
-function isDiscoveryTool(name: string): boolean {
-  return DISCOVERY_TOOLS.has(name);
+function isDiscoveryTool(prefixedName: string): boolean {
+  const match = prefixedName.match(/^.+?_(mcp|webmcp)_(.+)$/);
+  if (!match) return false;
+  return DISCOVERY_TOOL_NAMES.has(match[2]);
 }
-
-/**
- * recall — lets the LLM re-read the full result of a previous tool call on demand,
- * instead of keeping all results in the context window.
- */
-export const RECALL_TOOL: AnthropicTool = {
-  name: 'recall',
-  description: "Re-read the full result of a previous tool call. Use the identifier returned in the summary (e.g. recall('toolu_xxx')).",
-  input_schema: {
-    type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: "Tool call ID (e.g. 'toolu_xxx')",
-      },
-    },
-    required: ['id'],
-  },
-};
 
 /**
  * Compress old tool_result blocks in conversation history.
@@ -82,27 +60,10 @@ function compressOldToolResults(messages: ChatMessage[], resultBuffer?: Map<stri
   }
 }
 
-/** Build system prompt — behavioral rules only, tool descriptions come from tool definitions. */
-export function buildSystemPrompt(layers: ToolLayer[]): string {
-  return `Tu es un assistant UI. Affiche les résultats avec component(nom, {params}).
-Ne fabrique jamais d'URLs d'images — utilise uniquement celles retournées par les outils.
-
-STRATÉGIE :
-1. Si search_recipes est disponible, consulte-le ABSOLUMENT EN PRIORITÉ — les recettes contiennent des instructions optimisées
-2. Appelle get_component(nom) pour obtenir le schéma et les recettes associées
-3. Appelle les outils de données pour récupérer les données
-4. Appelle component(nom, {params}) pour afficher`;
-}
-
-export function mcpToolsToAnthropic(tools: McpToolDef[]): AnthropicTool[] {
-  return tools.map(t => ({
-    name: t.name,
-    description: t.description ?? t.name,
-    input_schema: sanitizeSchema(
-      (t.inputSchema ?? { type: 'object', properties: {} }) as import('@webmcp-auto-ui/core').JsonSchema
-    ) as Record<string, unknown>,
-  }));
-}
+// Re-export toProviderTools
+export { toProviderTools };
+/** @deprecated Use toProviderTools */
+export const mcpToolsToAnthropic = toProviderTools;
 
 function truncateResult(result: string): string {
   if (result.length <= MAX_RESULT_LEN) return result;
@@ -120,7 +81,7 @@ function truncateResult(result: string): string {
 }
 
 export interface AgentLoopOptions {
-  client?: McpClient;           // MCP client — optional if only UI tools used
+  client?: McpClient;           // MCP client — optional if only WebMCP tools used
   provider: LLMProvider;
   /** Structured tool layers (replaces legacy mcpTools) */
   layers?: ToolLayer[];
@@ -134,8 +95,6 @@ export interface AgentLoopOptions {
   initialMessages?: ChatMessage[]; // conversation history from previous turns
   callbacks?: AgentCallbacks;
   signal?: AbortSignal;
-  /** Enable schema validation for component() calls (default: true) */
-  schemaValidation?: boolean;
 }
 
 export async function runAgentLoop(
@@ -154,21 +113,42 @@ export async function runAgentLoop(
     initialMessages = [],
     callbacks = {},
     signal,
-    schemaValidation = true,
   } = options;
 
   // Buffer for recall — stores full tool results keyed by tool_use_id
   const resultBuffer = new Map<string, string>();
 
-  // Build tools and prompt from layers
-  const allTools: AnthropicTool[] = [...buildToolsFromLayers(options.layers ?? []), RECALL_TOOL];
+  // Build WebMCP server dispatch map from layers
+  const webmcpServers = new Map<string, { executeTool: (name: string, params: Record<string, unknown>) => Promise<unknown> }>();
+  for (const layer of (options.layers ?? [])) {
+    if (layer.protocol === 'webmcp') {
+      const toolMap = new Map(layer.tools.map(t => [t.name, t]));
+      webmcpServers.set(layer.serverName, {
+        executeTool: async (toolName: string, params: Record<string, unknown>) => {
+          const tool = toolMap.get(toolName);
+          if (!tool) throw new Error(`Tool "${toolName}" not found in WebMCP server "${layer.serverName}"`);
+          return tool.execute(params);
+        },
+      });
+    }
+  }
+
+  // Start with discovery tools only (lazy loading by server)
+  const activatedServers = new Set<string>();
+  let activeTools: ProviderTool[] = buildDiscoveryTools(options.layers ?? []);
   const baseSystemPrompt: string = options.systemPrompt ?? buildSystemPrompt(options.layers ?? []);
 
   const systemPrompt = maxTokens
     ? `${baseSystemPrompt}\n\nIMPORTANT : Limite tes réponses à ${maxTokens} tokens.`
     : baseSystemPrompt;
 
-  const messages: ChatMessage[] = [...initialMessages, { role: 'user', content: userMessage }];
+  const messages: ChatMessage[] = [
+    ...initialMessages.map(m => ({
+      ...m,
+      content: Array.isArray(m.content) ? m.content.map(b => ({ ...b })) : m.content,
+    })),
+    { role: 'user', content: userMessage },
+  ];
 
   const metrics: AgentMetrics = {
     totalTokens: 0, promptTokens: 0, completionTokens: 0,
@@ -188,18 +168,18 @@ export async function runAgentLoop(
     metrics.iterations++;
     callbacks.onIterationStart?.(i + 1, maxIterations);
 
-    // Fix 2: after 4+ iterations without render, strip discovery tools to force rendering
-    let iterationTools = allTools;
+    // After 4+ iterations without render, strip discovery tools to force rendering
+    let iterationTools = activeTools;
     if (iterationsWithoutRender >= 4 && !hasRendered) {
-      iterationTools = allTools.filter(t => !isDiscoveryTool(t.name));
+      iterationTools = activeTools.filter(t => !isDiscoveryTool(t.name));
     }
 
-    // Fix 3: after 5+ iterations without render, inject a nudge message (once)
+    // After 5+ iterations without render, inject a nudge message (once)
     if (iterationsWithoutRender >= 5 && !hasRendered && !nudgedOnce) {
       nudgedOnce = true;
       messages.push({
         role: 'user',
-        content: 'STOP exploration. Use the data you already collected. Call component("table", {rows: [...]}) NOW to display results.',
+        content: 'STOP exploration. Use the data you already collected. Call widget_display() NOW to display results.',
       });
     }
 
@@ -210,7 +190,6 @@ export async function runAgentLoop(
       signal, cacheEnabled, system: systemPrompt, maxTokens, maxTools, temperature, topK,
       onToken: callbacks.onToken ? (token) => {
         callbacks.onToken!(token);
-        // Stream partial text to UI as tokens arrive
         streamingText += token;
         callbacks.onText?.(streamingText);
       } : undefined,
@@ -238,12 +217,12 @@ export async function runAgentLoop(
     lastText = textBlocks.map(b => b.text).join('\n');
 
     if (toolBlocks.length === 0) {
-      // Fix 5: if no tool calls and nothing rendered yet, nudge the LLM to render (once)
+      // If no tool calls and nothing rendered yet, nudge the LLM to render (once)
       if (!hasRendered && !nudgedOnce && metrics.toolCalls > 0) {
         nudgedOnce = true;
         messages.push({ role: 'assistant', content: response.content });
-        messages.push({ role: 'user', content: 'Tu n\'as pas encore affiché de résultat visuel. Appelle component() avec les données que tu as récoltées.' });
-        continue; // Force another iteration instead of ending
+        messages.push({ role: 'user', content: 'Tu n\'as pas encore affiché de résultat visuel. Appelle widget_display() avec les données que tu as récoltées.' });
+        continue;
       }
       messages.push({ role: 'assistant', content: response.content });
       callbacks.onText?.(lastText);
@@ -251,7 +230,7 @@ export async function runAgentLoop(
       break;
     }
 
-    // Texte intermédiaire (reasoning/commentary avant les tool_use) — mise à jour live
+    // Intermediate text (reasoning/commentary before tool_use) — live update
     if (lastText) callbacks.onText?.(lastText);
 
     messages.push({ role: 'assistant', content: response.content });
@@ -259,53 +238,95 @@ export async function runAgentLoop(
     const toolResults: ContentBlock[] = [];
     for (const block of toolBlocks) {
       const call: ToolCall = { id: block.id, name: block.name, args: block.input };
-      // Provenance tracking: mark whether this call is guided by a prior discovery
       const wasDiscovering = discoveryPhase;
       if (isDiscoveryTool(block.name)) {
         discoveryPhase = true;
-        call.guided = false; // discovery tools are never "guided", they ARE discovery
+        call.guided = false;
       } else {
-        call.guided = wasDiscovering; // non-discovery tool guided by prior discovery
+        call.guided = wasDiscovering;
         discoveryPhase = false;
       }
       const t1 = performance.now();
 
+      // Parse tool name to extract server — activate on first contact
+      {
+        const activateMatch = block.name.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
+        if (activateMatch) {
+          const [, serverName, protocol] = activateMatch;
+          const serverKey = `${serverName}_${protocol}`;
+          if (!activatedServers.has(serverKey)) {
+            activatedServers.add(serverKey);
+            const layer = (options.layers ?? []).find(l => l.serverName === serverName && l.protocol === protocol);
+            if (layer) {
+              activeTools = activateServerTools(activeTools, layer);
+            }
+          }
+        }
+      }
+
       try {
         let result: string;
+        const name = block.name;
 
-        if (block.name === 'recall') {
-          const recallId = (block.input as { id: string }).id;
-          result = resultBuffer.get(recallId) ?? `Aucun résultat trouvé pour l'id '${recallId}'.`;
-        } else if (block.name === 'list_components') {
-          result = executeListComponents();
-        } else if (block.name === 'get_component') {
-          const gcInput = block.input as Record<string, unknown>;
-          const gcName = String(gcInput.name ?? gcInput.nom ?? gcInput.component ?? '');
-          result = executeGetComponent(gcName);
-        } else if (block.name === 'component') {
-          const cInput = block.input as Record<string, unknown>;
-          const cName = String(cInput.name ?? cInput.nom ?? cInput.component ?? '');
-          result = executeComponent(
-            { name: cName, params: cInput.params as unknown },
-            callbacks,
-            { schemaValidation },
-          );
-        } else if (block.name === 'use_skill') {
-          const skillInput = block.input as Record<string, unknown>;
-          const skillLayers = (options.layers ?? []).filter((l): l is SkillLayer => l.source === 'skill');
-          const allSkills = skillLayers.flatMap(l => l.skills);
-          result = activateSkill(
-            String(skillInput.skill ?? ''),
-            allSkills,
-          );
-        } else if (isUITool(block.name)) {
-          result = executeUITool(block.name, block.input, callbacks);
-        } else if (client) {
-          const mcpResult = await client.callTool(block.name, block.input);
-          const textContent = mcpResult.content?.find((c: { type: string }) => c.type === 'text') as { text?: string } | undefined;
-          result = truncateResult(textContent?.text ?? JSON.stringify(mcpResult));
+        // Parse tool name: {serverName}_{protocol}_{toolName}
+        const toolMatch = name.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
+        if (!toolMatch) {
+          result = `Error: unknown tool format "${name}". Expected {source}_{protocol}_{tool}.`;
         } else {
-          result = `Error: no MCP client available for tool ${block.name}`;
+          const [, serverName, protocol, realToolName] = toolMatch;
+
+          if (protocol === 'mcp') {
+            // Route to MCP client
+            if (!client) {
+              result = `Error: no MCP client available for tool ${name}`;
+            } else {
+              const mcpResult = await client.callTool(realToolName, block.input);
+              const textContent = mcpResult.content?.find((c: { type: string }) => c.type === 'text') as { text?: string } | undefined;
+              result = truncateResult(textContent?.text ?? JSON.stringify(mcpResult));
+            }
+          } else if (protocol === 'webmcp') {
+            // Route to WebMCP server
+            const webmcpServer = webmcpServers.get(serverName);
+            if (!webmcpServer) {
+              result = `Error: no WebMCP server "${serverName}" found.`;
+            } else {
+              const toolResult = await webmcpServer.executeTool(realToolName, block.input);
+              result = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+
+              // Special handling for widget_display — notify via onWidget callback
+              if (realToolName === 'widget_display' && typeof toolResult === 'object' && toolResult !== null) {
+                const wr = toolResult as Record<string, unknown>;
+                if (wr.widget && wr.data && !wr.error) {
+                  const widgetResult = callbacks.onWidget?.(wr.widget as string, wr.data as Record<string, unknown>);
+                  if (widgetResult?.id) {
+                    result = JSON.stringify({ ...wr, id: widgetResult.id });
+                  }
+                }
+              }
+
+              // Special handling for canvas tool — route to callbacks
+              if (realToolName === 'canvas') {
+                const action = (block.input as Record<string, unknown>).action as string;
+                const id = (block.input as Record<string, unknown>).id as string;
+                const actionParams = (block.input as Record<string, unknown>).params as Record<string, unknown> | undefined;
+                switch (action) {
+                  case 'clear': callbacks.onClear?.(); break;
+                  case 'update': callbacks.onUpdate?.(id, actionParams ?? {}); break;
+                  case 'move': callbacks.onMove?.(id, (actionParams?.x ?? (block.input as any).x) as number, (actionParams?.y ?? (block.input as any).y) as number); break;
+                  case 'resize': callbacks.onResize?.(id, (actionParams?.width ?? (block.input as any).width) as number, (actionParams?.height ?? (block.input as any).height) as number); break;
+                  case 'style': callbacks.onStyle?.(id, (actionParams?.styles ?? (block.input as any).styles) as Record<string, string>); break;
+                }
+              }
+
+              // Special handling for recall — use the resultBuffer
+              if (realToolName === 'recall') {
+                const recallId = (block.input as { id: string }).id;
+                result = resultBuffer.get(recallId) ?? `Aucun résultat trouvé pour l'id '${recallId}'.`;
+              }
+            }
+          } else {
+            result = `Error: unknown protocol "${protocol}" in tool "${name}".`;
+          }
         }
 
         // Store full result in buffer for later recall
@@ -326,10 +347,11 @@ export async function runAgentLoop(
 
     messages.push({ role: 'user', content: toolResults });
 
-    // Track iterations without render — increment unless a render happened this iteration
-    const renderedThisIteration = toolBlocks.some(b =>
-      b.name === 'component' || b.name.startsWith('render_')
-    );
+    // Track iterations without render — widget_display means a render happened
+    const renderedThisIteration = toolBlocks.some(b => {
+      const match = b.name.match(/^.+?_(mcp|webmcp)_(.+)$/);
+      return match && match[2] === 'widget_display';
+    });
     if (renderedThisIteration) {
       hasRendered = true;
       iterationsWithoutRender = 0;
@@ -337,7 +359,7 @@ export async function runAgentLoop(
       iterationsWithoutRender++;
     }
 
-    // Compress old tool results to save context window (benefits both WASM and remote)
+    // Compress old tool results to save context window
     compressOldToolResults(messages, resultBuffer);
   }
 
@@ -372,7 +394,6 @@ export function trimConversationHistory(history: ChatMessage[], maxTokens: numbe
   let total = history.reduce((s, m) => s + JSON.stringify(m).length, 0);
   const trimmed = [...history];
   while (total > maxChars && trimmed.length >= 2) {
-    // Skip system messages — only remove user/assistant pairs from the front
     const firstNonSystem = trimmed.findIndex(m => m.role !== 'system');
     if (firstNonSystem < 0 || firstNonSystem + 1 >= trimmed.length) break;
     const removed = trimmed.splice(firstNonSystem, 2);

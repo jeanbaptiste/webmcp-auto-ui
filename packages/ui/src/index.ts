@@ -45,6 +45,7 @@ export { default as Carousel } from './widgets/rich/Carousel.svelte';
 
 // Dispatcher
 export { default as BlockRenderer } from './widgets/BlockRenderer.svelte';
+export { default as WidgetRenderer } from './widgets/WidgetRenderer.svelte';
 
 // Window Manager
 export { default as Pane } from './wm/Pane.svelte';

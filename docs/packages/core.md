@@ -1,17 +1,191 @@
 # @webmcp-auto-ui/core
 
-W3C WebMCP polyfill and MCP Streamable HTTP client. Zero dependencies, framework-agnostic, SSR-safe.
+W3C WebMCP polyfill, MCP Streamable HTTP client, WebMCP server factory. Zero dependencies, framework-agnostic, SSR-safe.
 
 ## What it does
 
 - Implements the W3C WebMCP Draft CG Report (2026-03-27) as a polyfill on `navigator.modelContext`
 - Provides `McpClient` for connecting to MCP servers over Streamable HTTP (JSON-RPC 2.0)
+- Provides `createWebMcpServer` for creating local WebMCP servers with widget registration
+- Includes `parseFrontmatter` for parsing markdown recipes with YAML frontmatter
 - Includes a postMessage bridge for cross-frame tool invocation
 - Ships result builders and a lightweight skill registry for WebMCP tool registration
 
-## Exports
+## WebMCP Server
 
-### Polyfill
+### createWebMcpServer
+
+Factory for creating a WebMCP server. A server registers widgets (via recipes) and exposes tools for the agent loop.
+
+```ts
+import { createWebMcpServer } from '@webmcp-auto-ui/core';
+
+const server = createWebMcpServer('designkit', {
+  description: 'Custom design system widgets',
+});
+```
+
+### registerWidget
+
+Registers a widget from a markdown recipe with YAML frontmatter. The frontmatter must include `widget` (name), `description`, and `schema` (JSON Schema of the widget props).
+
+```ts
+const recipe = `---
+widget: metric-card
+description: Business metric card with sparkline.
+group: business
+schema:
+  type: object
+  required:
+    - label
+    - value
+  properties:
+    label:
+      type: string
+    value:
+      type: string
+    sparkline:
+      type: array
+      items:
+        type: number
+---
+
+## Quand utiliser
+Pour afficher un KPI business avec mini graphique.
+
+## Comment
+Appeler widget_display('metric-card', {label: "MRR", value: "$42K", sparkline: [10, 20, 15, 30]}).
+`;
+
+server.registerWidget(recipe, MetricCardComponent);
+```
+
+On first `registerWidget` call, the server auto-generates 3 built-in tools:
+- **`search_recipes`** — List available widget recipes (filterable by query)
+- **`get_recipe`** — Get the full recipe for a widget (schema + instructions)
+- **`widget_display`** — Display a widget on the canvas (validates params against schema)
+
+### addTool
+
+Adds a custom tool to the server (beyond the 3 built-in ones):
+
+```ts
+server.addTool({
+  name: 'export_pdf',
+  description: 'Export the current canvas as PDF',
+  inputSchema: { type: 'object', properties: { quality: { type: 'string' } } },
+  execute: async (params) => {
+    // ...
+    return { url: '/exports/canvas.pdf' };
+  },
+});
+```
+
+### layer
+
+Returns a `WebMcpLayer` for use in the agent loop:
+
+```ts
+const layer = server.layer();
+// {
+//   protocol: 'webmcp',
+//   serverName: 'designkit',
+//   description: 'Custom design system widgets',
+//   tools: WebMcpToolDef[]  // built-in + custom tools
+// }
+```
+
+### getWidget / listWidgets
+
+```ts
+const entry = server.getWidget('metric-card');
+// { name, description, inputSchema, recipe, renderer, group? }
+
+const all = server.listWidgets();
+// WidgetEntry[]
+```
+
+### WebMcpServer interface
+
+```ts
+interface WebMcpServer {
+  readonly name: string;
+  readonly description: string;
+
+  registerWidget(recipeMarkdown: string, renderer: unknown): void;
+  addTool(tool: WebMcpToolDef): void;
+
+  layer(): {
+    protocol: 'webmcp';
+    serverName: string;
+    description: string;
+    tools: WebMcpToolDef[];
+  };
+
+  getWidget(name: string): WidgetEntry | undefined;
+  listWidgets(): WidgetEntry[];
+}
+```
+
+### WebMcpToolDef
+
+```ts
+interface WebMcpToolDef {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  execute: (params: Record<string, unknown>) => Promise<unknown>;
+}
+```
+
+### WidgetEntry
+
+```ts
+interface WidgetEntry {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  recipe: string;          // markdown body (after frontmatter)
+  renderer: unknown;       // Svelte component or null (for native widgets)
+  group?: string;
+}
+```
+
+## parseFrontmatter
+
+Parses a markdown file with YAML frontmatter (--- delimited). No external YAML dependency.
+
+```ts
+import { parseFrontmatter } from '@webmcp-auto-ui/core';
+
+const { frontmatter, body } = parseFrontmatter(`---
+widget: stat
+description: KPI counter
+schema:
+  type: object
+  required:
+    - label
+---
+## Usage
+Display a stat.
+`);
+
+console.log(frontmatter.widget); // 'stat'
+console.log(body);               // '## Usage\nDisplay a stat.'
+```
+
+Supports scalars, nested objects (indentation), arrays (`- item`), inline values, quoted strings, inline objects/arrays.
+
+### ParsedFrontmatter
+
+```ts
+interface ParsedFrontmatter {
+  frontmatter: Record<string, unknown>;
+  body: string;
+}
+```
+
+## Polyfill
 
 ```ts
 import {
@@ -36,7 +210,7 @@ initializeWebMCPPolyfill({
 
 **`executeToolInternal(name, args)`** — Executes a registered tool by name. Used internally by the polyfill.
 
-### McpMultiClient
+## McpMultiClient
 
 ```ts
 import { McpMultiClient } from '@webmcp-auto-ui/core';
@@ -49,18 +223,14 @@ const multi = new McpMultiClient();
 await multi.addServer('https://mcp1.example.com/mcp');
 await multi.addServer('https://mcp2.example.com/mcp');
 
-const allTools = multi.listAllTools();  // tools from both servers
-const result = await multi.callTool('query_sql', { sql: 'SELECT 1' });  // routes automatically
+const allTools = multi.listAllTools();
+const result = await multi.callTool('query_sql', { sql: 'SELECT 1' });
 
 await multi.removeServer('https://mcp1.example.com/mcp');
 await multi.disconnectAll();
 ```
 
-### Prompt caching fix
-
-The `cache_control` property is applied on the tools array (not individual tools) to work correctly with Anthropic's prompt caching API. This ensures cache hits when the tool set is stable across consecutive requests, reducing latency and cost.
-
-### MCP Client
+## MCP Client
 
 ```ts
 import { McpClient } from '@webmcp-auto-ui/core';
@@ -76,22 +246,11 @@ const client = new McpClient('https://mcp.example.com/mcp', {
   headers: { Authorization: 'Bearer ...' },
 });
 
-// Connect (sends initialize + notifications/initialized)
 const info = await client.connect();
-console.log(info.serverInfo.name);
-
-// List available tools
 const tools = await client.listTools();
-
-// Call a tool
 const result = await client.callTool('get_weather', { city: 'Paris' });
-console.log(result.content);
-
-// Disconnect
 await client.disconnect();
 ```
-
-#### McpClient API
 
 | Method | Returns | Description |
 |--------|---------|-------------|
@@ -100,7 +259,11 @@ await client.disconnect();
 | `callTool(name, args?)` | `McpToolResult` | Calls a tool with optional arguments |
 | `disconnect()` | `void` | Ends the session |
 
-### postMessage bridge
+### Prompt caching fix
+
+The `cache_control` property is applied on the tools array (not individual tools) to work correctly with Anthropic's prompt caching API.
+
+## postMessage bridge
 
 ```ts
 import {
@@ -113,23 +276,11 @@ import {
 
 **`listenForAgentCalls(handler)`** — Listens for `webmcp:call-tool` events from iframes or other windows.
 
-```ts
-const cleanup = listenForAgentCalls(async (event) => {
-  const result = await executeToolInternal(event.name, event.args);
-  return result;
-});
-// later: cleanup()
-```
-
 **`callToolViaPostMessage(target, name, args)`** — Sends a tool call to a parent/child window via postMessage.
-
-```ts
-const result = await callToolViaPostMessage(window.parent, 'get_data', { id: 42 });
-```
 
 **`isWebMCPEvent(event)`** — Type guard for WebMCP postMessage events.
 
-### Utilities
+## Utilities
 
 ```ts
 import {
@@ -140,60 +291,27 @@ import {
 } from '@webmcp-auto-ui/core';
 ```
 
-**`dispatchAndWait(eventName, detail?, options?)`** — Dispatches a CustomEvent and waits for a matching completion event. Solves the "execute must return after UI updates" pattern.
+- **`dispatchAndWait(eventName, detail?, options?)`** — Dispatches a CustomEvent and waits for a matching completion event.
+- **`signalCompletion(requestId, result?)`** — Fires the completion event for `dispatchAndWait`.
+- **`sanitizeSchema(schema)`** — Cleans a JSON Schema for Anthropic API compatibility.
+- **`createToolGroup(prefix, tools)`** — Groups related tools under a common prefix.
 
-**`signalCompletion(requestId, result?)`** — Fires the completion event for `dispatchAndWait`.
-
-**`sanitizeSchema(schema)`** — Cleans a JSON Schema for Anthropic API compatibility (removes unsupported fields).
-
-**`createToolGroup(prefix, tools)`** — Groups related tools under a common prefix for registration.
-
-### Result builders and skill registry
+## Result builders
 
 ```ts
-import {
-  textResult,
-  jsonResult,
-  registerSkill,
-  unregisterSkill,
-  getSkill,
-  listSkills,
-  clearSkills,
-} from '@webmcp-auto-ui/core';
-```
+import { textResult, jsonResult } from '@webmcp-auto-ui/core';
 
-**`textResult(text)`** — Creates a `ToolExecuteResult` with a text content block.
-
-```ts
 return textResult('Operation completed successfully');
-```
-
-**`jsonResult(data)`** — Creates a `ToolExecuteResult` with JSON-stringified content.
-
-```ts
 return jsonResult({ count: 42, items: ['a', 'b'] });
 ```
 
-**`registerSkill(skill)`** — Exposes a skill as a WebMCP tool on `navigator.modelContext`, making it discoverable and invocable by an agent.
-
-```ts
-registerSkill({
-  id: 'weather',
-  name: 'Weather Dashboard',
-  description: 'Shows local weather conditions',
-  component: 'WeatherDash',
-});
-```
-
-### Validation
+## Validation
 
 ```ts
 import { validateJsonSchema } from '@webmcp-auto-ui/core';
 
 const result = validateJsonSchema(someSchema);
-if (!result.valid) {
-  console.error(result.errors);
-}
+if (!result.valid) console.error(result.errors);
 ```
 
 ## Types
@@ -202,6 +320,7 @@ All types are exported and documented via JSDoc. Key types:
 
 - `ModelContext`, `ModelContextTool` — W3C WebMCP spec types
 - `McpClient`, `McpTool`, `McpToolResult` — MCP protocol types
+- `WebMcpServer`, `WebMcpToolDef`, `WidgetEntry` — WebMCP server types
+- `ParsedFrontmatter` — frontmatter parser types
 - `WebMCPCallToolEvent`, `PostMessageBridgeOptions` — bridge types
 - `JsonSchema`, `JsonSchemaObject` — schema validation types
-- ~~`SkillDef`~~ — removed, skill types now live in `@webmcp-auto-ui/sdk` (`Skill`)

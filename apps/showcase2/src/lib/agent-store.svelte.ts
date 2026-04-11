@@ -12,10 +12,9 @@ import {
   buildSystemPrompt,
   fromMcpTools,
   TokenTracker,
-  WEBMCP_RECIPES,
-  filterRecipesByServer,
 } from '@webmcp-auto-ui/agent';
-import type { ChatMessage, ToolLayer, McpLayer, UILayer } from '@webmcp-auto-ui/agent';
+import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
+import { autoui } from '@webmcp-auto-ui/agent';
 import { base } from '$app/paths';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -204,13 +203,7 @@ export const agentStore = {
       layers.push(mcpLayer);
     }
 
-    const serverNames = canvas.mcpName?.split(', ').filter(Boolean) ?? [];
-    const uiRecipes = filterRecipesByServer(WEBMCP_RECIPES, serverNames);
-    const uiLayer: UILayer = {
-      source: 'ui',
-      recipes: uiRecipes.length > 0 ? uiRecipes : undefined,
-    };
-    layers.push(uiLayer);
+    layers.push(autoui.layer());
 
     const systemPrompt = `Tu es un agent de showcase UI. Tu es connecté à un serveur MCP.
 
@@ -247,7 +240,7 @@ ${buildSystemPrompt(layers)}`;
                 tokenTracker.recordEstimate(0, response.stats.totalTokens * 4, latencyMs);
               }
             },
-            onBlock: (type, data) => {
+            onWidget: (type, data) => {
               const block: GeneratedBlock = {
                 id: uid(),
                 type,

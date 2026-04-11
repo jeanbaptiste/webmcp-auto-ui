@@ -16,6 +16,11 @@
 
   interface Props {
     open: boolean;
+    composerMode?: boolean;
+    layoutMode?: 'float' | 'grid';
+    includeSummary?: boolean;
+    onexport?: () => void;
+    onhistory?: () => void;
     mcpToken?: string;
     systemPrompt?: string;
     effectivePrompt?: string;
@@ -40,6 +45,11 @@
 
   let {
     open = $bindable(false),
+    composerMode = $bindable(true),
+    layoutMode = $bindable<'float' | 'grid'>('float'),
+    includeSummary = $bindable(true),
+    onexport,
+    onhistory,
     mcpToken = $bindable(''),
     systemPrompt = $bindable(''),
     effectivePrompt = '',
@@ -141,18 +151,47 @@
       />
     </section>
 
-    <!-- Tools -->
+    <!-- Mode & Layout -->
+    <section class="flex flex-col gap-3">
+      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Mode</div>
+      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+        <input type="checkbox" bind:checked={composerMode} class="accent-accent w-3.5 h-3.5" />
+        Mode compositeur
+      </label>
+      {#if composerMode}
+        <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+          <input type="checkbox" checked={layoutMode === 'grid'} onchange={() => layoutMode = layoutMode === 'float' ? 'grid' : 'float'} class="accent-accent w-3.5 h-3.5" />
+          Layout grille
+        </label>
+      {/if}
+    </section>
+
+    <!-- Export & History -->
+    <section class="flex flex-col gap-3">
+      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Export</div>
+      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+        <input type="checkbox" bind:checked={includeSummary} class="accent-accent w-3.5 h-3.5" />
+        Inclure synthese
+      </label>
+      <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-text2 hover:text-text1 transition-colors w-full text-left"
+              onclick={onexport}>
+        Exporter HyperSkill URL
+      </button>
+      <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-text2 hover:text-text1 transition-colors w-full text-left"
+              onclick={onhistory}>
+        Historique
+      </button>
+    </section>
+
+    <!-- Validation -->
     <section class="flex flex-col gap-2">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Outils UI</div>
-      <div class="text-[9px] font-mono text-text2/60">
-        render_* + component() + list_components() + get_component()
-      </div>
+      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Validation</div>
       <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
         <input type="checkbox" bind:checked={schemaValidation} class="accent-teal w-3.5 h-3.5" />
         Schema validation
       </label>
       <div class="text-[9px] font-mono text-text2/60 pl-5">
-        {schemaValidation ? 'Valide les params contre le schema — pas de coercion' : 'Coercion classique — devine les params'}
+        {schemaValidation ? 'Valide les params des widgets contre le schema JSON' : 'Pas de validation — les params sont passes tels quels'}
       </div>
     </section>
 

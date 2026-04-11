@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { BlockRenderer, AgentProgress } from '@webmcp-auto-ui/ui';
+  import { WidgetRenderer, AgentProgress } from '@webmcp-auto-ui/ui';
 
   interface Block {
     id: string;
@@ -88,7 +88,7 @@
       <div class="flex flex-col gap-2">
         {#each blocks as block (block.id)}
           <div class="block-anim">
-            <BlockRenderer type={block.type} data={block.data} />
+            <WidgetRenderer type={block.type} data={block.data} />
           </div>
         {/each}
       </div>

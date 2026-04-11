@@ -8,10 +8,10 @@ An agent (Claude or Gemma WASM) reads available tools and recipes from MCP + Web
 
 | Package | Description |
 |---------|-------------|
-| [`@webmcp-auto-ui/agent`](./packages/agent/README.md) | Agent loop, providers (Claude / Gemma 4 WASM), 5 internal tools (`list_components`, `get_component`, `component`, `recall`), ToolLayers, recipes, coercion, ComponentAdapter |
-| [`@webmcp-auto-ui/core`](./packages/core/README.md) | MCP client, McpMultiClient, utilities |
-| [`@webmcp-auto-ui/sdk`](./packages/sdk/README.md) | Canvas store (Svelte 5 + vanilla), HyperSkills encode/decode/hash/diff, Skills registry, MCP demo servers |
-| [`@webmcp-auto-ui/ui`](./packages/ui/README.md) | 31 Svelte 5 components (blocks, widgets, layouts), extensible BlockRenderer, AgentConsole, ThemeProvider |
+| [`@webmcp-auto-ui/agent`](./packages/agent/README.md) | Agent loop, providers (Claude / Gemma 4 WASM), `autoui` WebMCP server, lazy tool loading, recipes |
+| [`@webmcp-auto-ui/core`](./packages/core/README.md) | MCP client, McpMultiClient, `createWebMcpServer()`, frontmatter parser, utilities |
+| [`@webmcp-auto-ui/sdk`](./packages/sdk/README.md) | Canvas store (Svelte 5 + vanilla), Widget/WidgetType, HyperSkills encode/decode/hash/diff, Skills registry |
+| [`@webmcp-auto-ui/ui`](./packages/ui/README.md) | 31 Svelte 5 components (blocks, widgets, layouts), WidgetRenderer, AgentConsole, ThemeProvider |
 
 ## Apps
 
@@ -26,13 +26,21 @@ An agent (Claude or Gemma WASM) reads available tools and recipes from MCP + Web
 
 ## Architecture
 
-- **ToolLayers** -- McpLayer (MCP tools) + UILayer (render tools), composed per agent call
-- **Smart mode** -- 3 abstract tools (`list_components`, `get_component`, `component`) with lazy loading via `recall()`
-- **Explicit mode** -- 31 concrete `render_*` tools, one per component
-- **Recipes** -- WebMCP recipes (`.md` files) + MCP recipes (served via `list_recipes`/`get_recipe`)
-- **Coercion** -- automatic parameter coercion in `executeUITool`
+### MCP + WebMCP: two symmetric protocols
+
+- **MCP** (Model Context Protocol) provides **remote data tools** — databases, APIs, external services
+- **WebMCP** provides **local display/interaction tools** — widgets, renderers, UI actions
+
+Both expose tools to the agent via the same `layer()` interface. Tool names follow the convention `{source}_{protocol}_{tool}` for disambiguation when multiple servers are connected.
+
+### Key concepts
+
+- **`createWebMcpServer(name, opts)`** -- create a WebMCP server with custom widgets and tools (in `@webmcp-auto-ui/core`)
+- **`autoui`** -- pre-configured WebMCP server with all built-in widgets (in `@webmcp-auto-ui/agent`)
+- **Lazy tool loading** -- `buildDiscoveryTools()` + `activateServerTools()` keep the initial prompt small
+- **Recipes** -- WebMCP recipes (`.md` files with frontmatter) + MCP recipes (served via `list_recipes`/`get_recipe`)
 - **Compression** -- old tool results compressed to save context window
-- **WasmProvider** -- Gemma 4 LiteRT running in-browser via Web Worker, native `<|tool_call|>` format
+- **WasmProvider** -- Gemma 4 LiteRT running in-browser, native `<|tool_call|>` format
 
 ## Getting started
 

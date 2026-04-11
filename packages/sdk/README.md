@@ -54,12 +54,20 @@ Svelte 5 runes state for the composer canvas. Import from the `/canvas` subpath 
 ```ts
 import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 
-canvas.addBlock('stat', { label: 'Revenue', value: '€142K' });
+canvas.addWidget('stat', { label: 'Revenue', value: '€142K' });
+// → returns widget with id prefixed 'w_'
 canvas.setMcpConnected(true, 'my-server', tools);
 const param = canvas.buildHyperskillParam(); // base64 for ?hs=
 ```
 
-The canvas store manages blocks, mode (`auto` | `drag` | `chat`), MCP connection state, chat messages, and generating flag.
+The canvas store manages widgets, mode (`auto` | `drag` | `chat`), MCP connection state, chat messages, and generating flag.
+
+### Types
+
+- **`Widget`** — a rendered UI element with `id` (prefixed `w_`), `type`, and `data`
+- **`WidgetType`** — union of all supported widget type strings
+
+> **Migration**: `Block`, `BlockType`, and `addBlock()` are still exported as deprecated aliases. New code should use `Widget`, `WidgetType`, and `addWidget()`. Widget IDs use the `w_` prefix (previously `b_`).
 
 ## MCP Demo Servers
 
