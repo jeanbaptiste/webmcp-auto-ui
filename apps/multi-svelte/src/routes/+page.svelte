@@ -13,6 +13,7 @@
     McpStatus, GemmaLoader, AgentProgress, EphemeralBubble,
     TokenBubble, LLMSelector, bus, layoutAdapter,
     FloatingLayout, FlexLayout, WidgetRenderer,
+    LinkIndicators, linkGroupColor,
   } from '@webmcp-auto-ui/ui';
   import type { ManagedWindow } from '@webmcp-auto-ui/ui';
   import { Settings, Terminal, LayoutGrid, X, ChevronLeft, ChevronRight } from 'lucide-svelte';
@@ -109,6 +110,18 @@
   function closeBlock(id: string) {
     windows = windows.filter(w => w.id !== id);
     canvas.removeBlock(id);
+  }
+
+  /** Compute the left-border accent color for a linked widget. */
+  function linkBorderStyle(widgetId: string): string {
+    if (typeof (bus as any).hasLinks !== 'function') return '';
+    if (!(bus as any).hasLinks(widgetId)) return '';
+    const links = typeof (bus as any).getLinks === 'function' ? (bus as any).getLinks(widgetId) : [];
+    if (!Array.isArray(links) || links.length === 0) return '';
+    const first = links[0];
+    const gid = typeof first === 'object' && first?.groupId ? String(first.groupId) : null;
+    if (!gid) return '';
+    return `border-left:3px solid ${linkGroupColor(gid)};`;
   }
 
   // ── Multi-MCP ─────────────────────────────────────────────────────
@@ -505,8 +518,10 @@
             {@const block = canvas.blocks.find(b => b.id === win.id)}
             <div class="relative flex flex-col h-full bg-surface rounded-lg border border-border overflow-hidden"
                  data-block-id={win.id}>
-              <div class="flex items-center gap-2 px-3 py-1.5 bg-surface2/50 border-b border-border shrink-0 select-none">
+              <div class="flex items-center gap-2 px-3 py-1.5 bg-surface2/50 border-b border-border shrink-0 select-none"
+                   style={linkBorderStyle(win.id)}>
                 <span class="text-[10px] font-mono text-text2 flex-1 truncate">{win.title}</span>
+                <LinkIndicators busId={win.id} />
                 <!-- svelte-ignore a11y_consider_explicit_label -->
                 <button class="w-4 h-4 text-text2 hover:text-accent2 text-sm leading-none transition-colors flex-shrink-0"
                         onclick={(e) => { e.stopPropagation(); closeBlock(win.id); }}>x</button>
@@ -526,9 +541,11 @@
             <div class="relative flex flex-col h-full bg-surface rounded-lg border border-border overflow-hidden"
                  data-block-id={win.id}>
               <div class="flex items-center gap-2 px-3 py-1.5 bg-surface2/50 border-b border-border shrink-0 cursor-move select-none"
+                   style={linkBorderStyle(win.id)}
                    onmousedown={(e) => ctx.ondragstart(e)}
                    ondblclick={() => ctx.ontogglecollapse()}>
                 <span class="text-[10px] font-mono text-text2 flex-1 truncate">{win.title}</span>
+                <LinkIndicators busId={win.id} />
                 <!-- svelte-ignore a11y_consider_explicit_label -->
                 <button class="w-4 h-4 text-text2 hover:text-accent text-sm leading-none transition-colors flex-shrink-0"
                         onclick={(e) => { e.stopPropagation(); ctx.onfittocontent(); }}

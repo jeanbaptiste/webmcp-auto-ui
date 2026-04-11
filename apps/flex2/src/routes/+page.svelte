@@ -45,6 +45,32 @@
   // FlexGrid ref
   let flexGrid: { addBlock: (type: string, data: Record<string, unknown>, server?: string, component?: string) => { id: string }; clearBlocks: () => void } | undefined;
 
+  // ── Widget interaction → LLM pipeline ─────────────────────────────
+  const INTERACTIVE_ACTIONS = new Set(['click', 'select', 'submit', 'itemclick', 'rowclick', 'cardclick', 'eventclick', 'personclick', 'groupclick', 'cellclick', 'imageclick', 'slidechange']);
+  let lastInteractionTs = $state(0);
+  let interactionPending = $state(false);
+  const INTERACTION_DEBOUNCE_MS = 500;
+
+  function handleWidgetInteraction(widgetId: string, widgetType: string, action: string, payload: unknown) {
+    // Only allow interactive actions (no update/remove to avoid loops)
+    if (!INTERACTIVE_ACTIONS.has(action)) return;
+    // Debounce
+    const now = Date.now();
+    if (now - lastInteractionTs < INTERACTION_DEBOUNCE_MS) return;
+    // Ignore if LLM is already processing
+    if (canvas.generating || interactionPending) return;
+    lastInteractionTs = now;
+
+    // Build a descriptive message for the LLM
+    const p = payload as Record<string, unknown> | null;
+    const label = p?.name ?? p?.title ?? p?.label ?? p?.item ?? 'un element';
+    const msg = `[Interaction widget] L'utilisateur a clique sur "${label}" dans le widget ${widgetType} (id: ${widgetId}). Action: ${action}. Donnees: ${JSON.stringify(payload)}`;
+
+    // Inject into conversation and rerun agent loop
+    interactionPending = true;
+    sendMessage(msg).finally(() => { interactionPending = false; });
+  }
+
   // ── Token tracking ─────────────────────────────────────────────────
   const tokenTracker = new TokenTracker();
   let tokenMetrics = $state(tokenTracker.metrics);
@@ -456,7 +482,7 @@
 
   <!-- CANVAS + EPHEMERAL -->
   <div class="flex-1 relative overflow-hidden">
-    <FlexGrid bind:this={flexGrid} class="w-full h-full" {layoutMode} />
+    <FlexGrid bind:this={flexGrid} class="w-full h-full" {layoutMode} oninteract={handleWidgetInteraction} />
 
     {#if composerMode}
       <div class="absolute bottom-3 left-[50px] right-[50px] flex flex-col gap-2 pointer-events-none z-20">

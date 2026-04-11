@@ -30,6 +30,12 @@ function createBus() {
   let entries = $state<Map<string, BusEntry>>(new Map());
   let lastMessage = $state<BusMessage | null>(null);
 
+  // ── Link groups (reactive) ──────────────────────────────────────
+  /** groupId → Set of widgetIds */
+  let groups = $state<Map<string, Set<string>>>(new Map());
+  /** widgetId → Set of groupIds (reverse index) */
+  let widgetGroups = $state<Map<string, Set<string>>>(new Map());
+
   /**
    * Register a component on the bus.
    * Returns an unregister function.
@@ -94,12 +100,84 @@ function createBus() {
     return Array.from(entries.values()).map(e => ({ id: e.id, type: e.type }));
   }
 
+  // ── Link management ──────────────────────────────────────────────
+
+  /**
+   * Link two or more widgets into a group.
+   * Returns the groupId (auto-generated if not provided).
+   */
+  function link(widgetIds: string[], groupId?: string): string {
+    const gid = groupId ?? '_grp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    let group = groups.get(gid);
+    if (!group) {
+      group = new Set();
+      groups.set(gid, group);
+    }
+    for (const wid of widgetIds) {
+      group.add(wid);
+      let wg = widgetGroups.get(wid);
+      if (!wg) {
+        wg = new Set();
+        widgetGroups.set(wid, wg);
+      }
+      wg.add(gid);
+    }
+    broadcast('_system', 'link', { action: 'linked', groupId: gid, widgetIds });
+    return gid;
+  }
+
+  /**
+   * Unlink a widget from a group.
+   */
+  function unlink(widgetId: string, groupId: string): void {
+    const group = groups.get(groupId);
+    if (group) {
+      group.delete(widgetId);
+      if (group.size === 0) groups.delete(groupId);
+    }
+    const wg = widgetGroups.get(widgetId);
+    if (wg) {
+      wg.delete(groupId);
+      if (wg.size === 0) widgetGroups.delete(widgetId);
+    }
+    broadcast('_system', 'link', { action: 'unlinked', groupId, widgetId });
+  }
+
+  /**
+   * Get the groupIds a widget belongs to.
+   */
+  function getLinks(widgetId: string): string[] {
+    const wg = widgetGroups.get(widgetId);
+    return wg ? Array.from(wg) : [];
+  }
+
+  /**
+   * Get all widgetIds in a group.
+   */
+  function getGroup(groupId: string): string[] {
+    const group = groups.get(groupId);
+    return group ? Array.from(group) : [];
+  }
+
+  /**
+   * Check if a widget has any links.
+   */
+  function hasLinks(widgetId: string): boolean {
+    const wg = widgetGroups.get(widgetId);
+    return !!wg && wg.size > 0;
+  }
+
   return {
     register,
     send,
     broadcast,
     subscribe,
     listPeers,
+    link,
+    unlink,
+    getLinks,
+    getGroup,
+    hasLinks,
     get lastMessage() { return lastMessage; },
     get peerCount() { return entries.size; },
   };

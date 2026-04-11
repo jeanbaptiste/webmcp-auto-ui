@@ -65,7 +65,7 @@
     // Simple widgets (data prop)
     'stat':           d(StatBlock),
     'kv':             d(KVBlock),
-    'list':           d(ListBlock),
+    'list':           { component: ListBlock, props: (data, emit) => ({ data, onitemclick: (item: unknown, index: unknown) => emit('itemclick', { item, index }) }) },
     'chart':          d(ChartBlock),
     'alert':          d(AlertBlock),
     'code':           d(CodeBlock),

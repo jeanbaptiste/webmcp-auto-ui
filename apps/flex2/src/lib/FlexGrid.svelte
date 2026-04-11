@@ -1,12 +1,24 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { FloatingLayout, FlexLayout, WidgetRenderer, layoutAdapter } from '@webmcp-auto-ui/ui';
+  import { FloatingLayout, FlexLayout, WidgetRenderer, layoutAdapter, LinkIndicators, linkGroupColor, bus } from '@webmcp-auto-ui/ui';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import type { ManagedWindow } from '@webmcp-auto-ui/ui';
   import ProvenanceBadge from './ProvenanceBadge.svelte';
 
-  interface Props { class?: string; layoutMode?: 'float' | 'grid'; }
-  let { class: cls = '', layoutMode = 'float' }: Props = $props();
+  /** Compute the left-border accent color for a linked widget (or 'transparent'). */
+  function linkBorderStyle(widgetId: string): string {
+    if (typeof (bus as any).hasLinks !== 'function') return '';
+    if (!(bus as any).hasLinks(widgetId)) return '';
+    const links = typeof (bus as any).getLinks === 'function' ? (bus as any).getLinks(widgetId) : [];
+    if (!Array.isArray(links) || links.length === 0) return '';
+    const first = links[0];
+    const gid = typeof first === 'object' && first?.groupId ? String(first.groupId) : null;
+    if (!gid) return '';
+    return `border-left:3px solid ${linkGroupColor(gid)};`;
+  }
+
+  interface Props { class?: string; layoutMode?: 'float' | 'grid'; oninteract?: (widgetId: string, widgetType: string, action: string, payload: unknown) => void; }
+  let { class: cls = '', layoutMode = 'float', oninteract }: Props = $props();
 
   let windows = $state<ManagedWindow[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -69,15 +81,18 @@
         {@const prov = provenance[win.id]}
         <div class="relative flex flex-col h-full bg-surface rounded-lg border border-border overflow-hidden"
              data-block-id={win.id}>
-          <div class="flex items-center gap-2 px-3 py-1.5 bg-surface2/50 border-b border-border shrink-0 select-none">
+          <div class="flex items-center gap-2 px-3 py-1.5 bg-surface2/50 border-b border-border shrink-0 select-none"
+               style={linkBorderStyle(win.id)}>
             <span class="text-[10px] font-mono text-text2 flex-1 truncate">{win.title}</span>
+            <LinkIndicators busId={win.id} />
             <!-- svelte-ignore a11y_consider_explicit_label -->
             <button class="w-4 h-4 text-text2 hover:text-accent2 text-sm leading-none transition-colors flex-shrink-0"
                     onclick={(e) => { e.stopPropagation(); closeBlock(win.id); }}>x</button>
           </div>
           <div class="flex-1 overflow-auto min-h-0">
             {#if block}
-              <WidgetRenderer type={block.type} data={block.data} id={block.id} />
+              <WidgetRenderer type={block.type} data={block.data} id={block.id}
+                oninteract={(type, action, payload) => oninteract?.(block.id, type, action, payload)} />
             {/if}
           </div>
           <ProvenanceBadge serverName={prov?.server} componentName={prov?.component} />
@@ -92,9 +107,11 @@
         <div class="relative flex flex-col h-full bg-surface rounded-lg border border-border overflow-hidden"
              data-block-id={win.id}>
           <div class="flex items-center gap-2 px-3 py-1.5 bg-surface2/50 border-b border-border shrink-0 cursor-move select-none"
+               style={linkBorderStyle(win.id)}
                onmousedown={(e) => ctx.ondragstart(e)}
                ondblclick={() => ctx.ontogglecollapse()}>
             <span class="text-[10px] font-mono text-text2 flex-1 truncate">{win.title}</span>
+            <LinkIndicators busId={win.id} />
             <!-- svelte-ignore a11y_consider_explicit_label -->
             <button class="w-4 h-4 text-text2 hover:text-accent text-sm leading-none transition-colors flex-shrink-0"
                     onclick={(e) => { e.stopPropagation(); ctx.onfittocontent(); }}
@@ -106,7 +123,8 @@
           {#if !ctx.collapsed}
             <div class="flex-1 overflow-auto min-h-0">
               {#if block}
-                <WidgetRenderer type={block.type} data={block.data} id={block.id} />
+                <WidgetRenderer type={block.type} data={block.data} id={block.id}
+                oninteract={(type, action, payload) => oninteract?.(block.id, type, action, payload)} />
               {/if}
             </div>
           {/if}

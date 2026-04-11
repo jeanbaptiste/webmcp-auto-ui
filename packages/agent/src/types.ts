@@ -103,4 +103,6 @@ export interface AgentCallbacks {
   onMove?: (id: string, x: number, y: number) => void;
   onResize?: (id: string, w: number, h: number) => void;
   onStyle?: (id: string, styles: Record<string, string>) => void;
+  /** Called when a widget interaction should be injected into the conversation */
+  onUserInteraction?: (widgetId: string, widgetType: string, action: string, payload: unknown) => void;
 }

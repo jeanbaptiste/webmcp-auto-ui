@@ -47,12 +47,17 @@ export { default as Carousel } from './widgets/rich/Carousel.svelte';
 export { default as BlockRenderer } from './widgets/BlockRenderer.svelte';
 export { default as WidgetRenderer } from './widgets/WidgetRenderer.svelte';
 
+// Link overlay (SVG arrows between linked widgets)
+export { default as LinkOverlay } from './widgets/LinkOverlay.svelte';
+
 // Window Manager
 export { default as Pane } from './wm/Pane.svelte';
 export { default as TilingLayout } from './wm/TilingLayout.svelte';
 export { default as FloatingLayout } from './wm/FloatingLayout.svelte';
 export { default as StackLayout } from './wm/StackLayout.svelte';
 export { default as FlexLayout } from './wm/FlexLayout.svelte';
+export { default as LinkIndicators } from './wm/LinkIndicators.svelte';
+export { groupColor as linkGroupColor } from './wm/link-utils.js';
 
 // Base components (shadcn-svelte pattern)
 export { Button, buttonVariants, Input, Badge, badgeVariants, NativeSelect, Tooltip } from './base/index.js';
