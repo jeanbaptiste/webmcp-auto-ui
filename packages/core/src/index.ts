@@ -90,5 +90,5 @@ export { McpMultiClient } from './multi-client.js';
 export type { ConnectedServer } from './multi-client.js';
 
 // WebMCP Server
-export { createWebMcpServer, parseFrontmatter } from './webmcp-server.js';
-export type { WebMcpServer, WebMcpServerOptions, WebMcpToolDef, WidgetEntry } from './webmcp-server.js';
+export { createWebMcpServer, parseFrontmatter, mountWidget } from './webmcp-server.js';
+export type { WebMcpServer, WebMcpServerOptions, WebMcpToolDef, WidgetEntry, WidgetRenderer } from './webmcp-server.js';

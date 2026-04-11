@@ -1,0 +1,162 @@
+---
+// WidgetGrid — responsive grid of widgets rendered via mountWidget()
+---
+
+<div class="widget-grid" id="widget-grid">
+  <div class="empty-state" id="empty-state">
+    <div class="empty-icon">&#9632;</div>
+    <div class="empty-text">Widgets will appear here</div>
+    <div class="empty-sub">Ask the agent to create charts, diagrams, or visualizations</div>
+  </div>
+</div>
+
+<script>
+  import { widgets, type WidgetItem } from '../lib/stores';
+  import { mountWidgetInContainer } from '../lib/agent';
+
+  const grid = document.getElementById('widget-grid')!;
+  const emptyState = document.getElementById('empty-state')!;
+
+  // Track cleanup functions for each widget
+  const cleanups = new Map<string, (() => void) | void>();
+
+  function render(items: WidgetItem[]) {
+    emptyState.style.display = items.length === 0 ? 'flex' : 'none';
+
+    // Find IDs that are no longer in the list
+    const currentIds = new Set(items.map(w => w.id));
+    for (const [id, cleanup] of cleanups) {
+      if (!currentIds.has(id)) {
+        if (typeof cleanup === 'function') cleanup();
+        cleanups.delete(id);
+        const el = document.getElementById(`widget-${id}`);
+        if (el) el.remove();
+      }
+    }
+
+    // Add new widgets
+    for (const item of items) {
+      if (document.getElementById(`widget-${item.id}`)) continue;
+
+      const card = document.createElement('div');
+      card.id = `widget-${item.id}`;
+      card.className = 'widget-card';
+
+      const header = document.createElement('div');
+      header.className = 'widget-header';
+
+      const title = document.createElement('span');
+      title.className = 'widget-type';
+      title.textContent = item.type;
+
+      const server = document.createElement('span');
+      server.className = 'widget-server';
+      server.textContent = item.serverName ?? '';
+
+      header.appendChild(title);
+      header.appendChild(server);
+
+      const body = document.createElement('div');
+      body.className = 'widget-body';
+
+      card.appendChild(header);
+      card.appendChild(body);
+      grid.appendChild(card);
+
+      // Mount the widget
+      try {
+        const cleanup = mountWidgetInContainer(body, item.type, item.data);
+        cleanups.set(item.id, cleanup);
+      } catch (e) {
+        body.textContent = `Error: ${e instanceof Error ? e.message : String(e)}`;
+        body.style.color = 'var(--error)';
+      }
+    }
+  }
+
+  widgets.subscribe(render);
+</script>
+
+<style>
+  .widget-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 16px;
+    padding: 16px;
+    overflow-y: auto;
+    height: 100%;
+    align-content: start;
+  }
+
+  .empty-state {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    gap: 8px;
+  }
+
+  .empty-icon {
+    font-size: 32px;
+    color: var(--border2);
+    opacity: 0.4;
+  }
+
+  .empty-text {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--text2);
+  }
+
+  .empty-sub {
+    font-size: 12px;
+    color: var(--text2);
+    opacity: 0.6;
+  }
+
+  :global(.widget-card) {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+    min-height: 250px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :global(.widget-card:hover) {
+    border-color: var(--border2);
+  }
+
+  :global(.widget-header) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  :global(.widget-type) {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  :global(.widget-server) {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text2);
+  }
+
+  :global(.widget-body) {
+    flex: 1;
+    padding: 12px;
+    min-height: 200px;
+    position: relative;
+  }
+</style>

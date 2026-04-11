@@ -155,18 +155,79 @@ deploy_static() {
   echo "  [$app] ✓ deployed (static)"
 }
 
+deploy_vite_static() {
+  local app=$1
+  local env_prefix=""
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "  [$app] DRY RUN: would build + deploy → $REMOTE_BASE/$app/ (vite static)"
+    return
+  fi
+  backup_app "$app"
+  echo "  [$app] building with vite..."
+  (cd "$LOCAL_ROOT/apps/$app" && ${env_prefix}npm run build > /dev/null 2>&1)
+  echo "  [$app] cleaning old assets on server..."
+  ssh "$SSH_HOST" "rm -rf $REMOTE_BASE/$app/assets"
+  echo "  [$app] copying dist..."
+  scp -r "$LOCAL_ROOT/apps/$app/dist/"* "$SSH_HOST:$REMOTE_BASE/$app/"
+  echo "  [$app] verifying deploy integrity..."
+  local expected actual
+  expected=$(sha256sum "$LOCAL_ROOT/apps/$app/dist/index.html" | cut -d' ' -f1)
+  actual=$(ssh "$SSH_HOST" "sha256sum $REMOTE_BASE/$app/index.html | cut -d' ' -f1")
+  if [ "$expected" != "$actual" ]; then
+    echo "  [$app] ✗ INTEGRITY ERROR — sha256 mismatch, rolling back"
+    rollback_app "$app"
+    return 1
+  fi
+  echo "  [$app] ✓ deployed (vite static)"
+}
+
+deploy_astro_node() {
+  local app=$1
+  local app_version
+  app_version=$(node -e "console.log(require('$LOCAL_ROOT/apps/$app/package.json').version)" 2>/dev/null || echo "?")
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "  [$app] DRY RUN: would build + deploy v$app_version → $REMOTE_BASE/$app/ (astro node)"
+    return
+  fi
+  backup_app "$app"
+  echo "  [$app] building astro..."
+  (cd "$LOCAL_ROOT/apps/$app" && npm run build > /dev/null 2>&1)
+  echo "  [$app] cleaning old build on server..."
+  ssh "$SSH_HOST" "rm -rf $REMOTE_BASE/$app/server $REMOTE_BASE/$app/client"
+  ssh "$SSH_HOST" "mkdir -p $REMOTE_BASE/$app"
+  echo "  [$app] copying dist..."
+  scp -r "$LOCAL_ROOT/apps/$app/dist/"* "$SSH_HOST:$REMOTE_BASE/$app/"
+  echo "  [$app] verifying deploy integrity..."
+  local expected actual
+  expected=$(sha256sum "$LOCAL_ROOT/apps/$app/dist/server/entry.mjs" | cut -d' ' -f1)
+  actual=$(ssh "$SSH_HOST" "sha256sum $REMOTE_BASE/$app/server/entry.mjs | cut -d' ' -f1")
+  if [ "$expected" != "$actual" ]; then
+    echo "  [$app] ✗ INTEGRITY ERROR — sha256 mismatch, rolling back"
+    rollback_app "$app"
+    return 1
+  fi
+  echo "  [$app] restarting service..."
+  ssh "$SSH_HOST" "systemctl restart webmcp-$app"
+  echo "  [$app] ✓ deployed v$app_version (astro node)"
+}
+
 deploy_app() {
   local app=$1
   case "$app" in
-    flex2)     deploy_node_root "flex2" ;;
-    viewer2)   deploy_node_root "viewer2" ;;
-    recipes)   deploy_node_root "recipes" ;;
-    home)      deploy_static "home" ;;
-    todo2)     deploy_static "todo2" ;;
-    showcase2) deploy_node_root "showcase2" ;;
-    wasm)      deploy_node_root "wasm" ;;
+    flex2)               deploy_node_root "flex2" ;;
+    viewer2)             deploy_node_root "viewer2" ;;
+    recipes)             deploy_node_root "recipes" ;;
+    home)                deploy_static "home" ;;
+    todo2)               deploy_static "todo2" ;;
+    showcase2)           deploy_node_root "showcase2" ;;
+    wasm)                deploy_node_root "wasm" ;;
+    multi-svelte)        deploy_static "multi-svelte" ;;
+    multi-react)         deploy_vite_static "multi-react" ;;
+    multi-vue)           deploy_vite_static "multi-vue" ;;
+    multi-webcomponents) deploy_vite_static "multi-webcomponents" ;;
+    multi-astro)         deploy_astro_node "multi-astro" ;;
     *)
-      echo "  [$app] ✗ unknown app (valid: home, flex2, viewer2, showcase2, todo2, recipes, wasm)"
+      echo "  [$app] ✗ unknown app (valid: home, flex2, viewer2, showcase2, todo2, recipes, wasm, multi-svelte, multi-react, multi-vue, multi-webcomponents, multi-astro)"
       return 1
       ;;
   esac
@@ -178,7 +239,7 @@ echo "webmcp-auto-ui deploy"
 echo ""
 
 if [ $# -eq 0 ]; then
-  APPS="home flex2 viewer2 showcase2 todo2 recipes wasm"
+  APPS="home flex2 viewer2 showcase2 todo2 recipes wasm multi-svelte multi-react multi-vue multi-webcomponents multi-astro"
 else
   APPS="$*"
 fi
@@ -201,7 +262,7 @@ echo ""
 echo "Verifying..."
 for app in $APPS; do
   case "$app" in
-    flex2|viewer2|recipes|showcase2|wasm)
+    flex2|viewer2|recipes|showcase2|wasm|multi-astro)
       status=$(ssh "$SSH_HOST" "systemctl is-active webmcp-$app 2>/dev/null" || echo "inactive")
       echo "  $app: $status"
       ;;

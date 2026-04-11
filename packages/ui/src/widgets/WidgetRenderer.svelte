@@ -128,9 +128,35 @@
     return null;
   });
 
+  /** True when the custom renderer is a vanilla function (not a Svelte component) */
+  const isVanillaRenderer = $derived(
+    customRenderer !== null && typeof customRenderer === 'function'
+      // Svelte components compiled to classes have a $$render or a prototype with $set;
+      // plain functions (vanilla renderers) do not. A safe heuristic: if the function
+      // has no prototype beyond Function.prototype, treat it as vanilla.
+      && Object.getPrototypeOf(customRenderer) === Function.prototype
+  );
+
   const nativeEntry: NativeEntry | undefined = $derived(
     customRenderer ? undefined : NATIVE_MAP[type],
   );
+
+  // ── Vanilla renderer container + lifecycle ────────────
+  let vanillaContainer: HTMLElement | undefined = $state(undefined);
+
+  $effect(() => {
+    if (!isVanillaRenderer || !vanillaContainer) return;
+    // Clear previous content
+    vanillaContainer.innerHTML = '';
+    // Call the vanilla renderer, capture optional cleanup
+    const cleanup = (customRenderer as (container: HTMLElement, data: Record<string, unknown>) => void | (() => void))(
+      vanillaContainer, data,
+    );
+    // Return teardown for $effect
+    return () => {
+      cleanup?.();
+    };
+  });
 
   // ── Auto-register WebMCP tools when modelContext is available ────────────
   type ModelContext = {
@@ -188,8 +214,10 @@
   });
 </script>
 
-{#if customRenderer}
-  <svelte:component this={customRenderer} {data} {id} />
+{#if isVanillaRenderer}
+  <div bind:this={vanillaContainer}></div>
+{:else if customRenderer}
+  <svelte:component this={customRenderer as Component<any>} {data} {id} />
 {:else if nativeEntry}
   <svelte:component this={nativeEntry.component} {...nativeEntry.props(data, emit)} />
 {:else}

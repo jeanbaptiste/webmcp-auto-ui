@@ -1,0 +1,13 @@
+{
+  "name": "@webmcp-auto-ui/widgets-threejs",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@webmcp-auto-ui/core": "file:../core",
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.170.0"
+  }
+}

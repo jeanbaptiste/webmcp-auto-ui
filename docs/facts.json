@@ -1,0 +1,4040 @@
+[
+  {
+    "name": "@webmcp-auto-ui/core",
+    "exports": [
+      {
+        "name": "JsonSchemaType",
+        "kind": "type",
+        "signature": "type JsonSchemaType = | 'string'\n  | 'number'\n  | 'integer'\n  | 'boolean'\n  | 'object'\n  | 'array'\n  | 'null'"
+      },
+      {
+        "name": "JsonSchemaObject",
+        "kind": "interface",
+        "signature": "interface JsonSchemaObject"
+      },
+      {
+        "name": "JsonSchema",
+        "kind": "type",
+        "signature": "type JsonSchema = boolean | JsonSchemaObject"
+      },
+      {
+        "name": "ToolAnnotations",
+        "kind": "interface",
+        "signature": "interface ToolAnnotations"
+      },
+      {
+        "name": "ModelContextTool",
+        "kind": "interface",
+        "signature": "interface ModelContextTool"
+      },
+      {
+        "name": "ToolExecuteCallback",
+        "kind": "type",
+        "signature": "type ToolExecuteCallback = (\n  input: Record<string, unknown>,\n  client: ModelContextClient\n) => Promise<ToolExecuteResult> | ToolExecuteResult"
+      },
+      {
+        "name": "ModelContextClient",
+        "kind": "interface",
+        "signature": "interface ModelContextClient"
+      },
+      {
+        "name": "UserInteractionOptions",
+        "kind": "interface",
+        "signature": "interface UserInteractionOptions"
+      },
+      {
+        "name": "UserInteractionResult",
+        "kind": "interface",
+        "signature": "interface UserInteractionResult"
+      },
+      {
+        "name": "ToolRegistrationOptions",
+        "kind": "interface",
+        "signature": "interface ToolRegistrationOptions"
+      },
+      {
+        "name": "RegisteredTool",
+        "kind": "interface",
+        "signature": "interface RegisteredTool"
+      },
+      {
+        "name": "ContextRegistration",
+        "kind": "interface",
+        "signature": "interface ContextRegistration"
+      },
+      {
+        "name": "ToolsChangedCallback",
+        "kind": "type",
+        "signature": "type ToolsChangedCallback = () => void",
+        "jsdoc": "/** Called with no arguments when the tool set changes (MCP-B spec). */"
+      },
+      {
+        "name": "ModelContext",
+        "kind": "interface",
+        "signature": "interface ModelContext"
+      },
+      {
+        "name": "ModelContextTesting",
+        "kind": "interface",
+        "signature": "interface ModelContextTesting"
+      },
+      {
+        "name": "ModelContextTestingToolInfo",
+        "kind": "interface",
+        "signature": "interface ModelContextTestingToolInfo",
+        "jsdoc": "/** Info shape returned by modelContextTesting.listTools() */"
+      },
+      {
+        "name": "ToolContentType",
+        "kind": "type",
+        "signature": "type ToolContentType = 'text' | 'image' | 'resource' | 'error'",
+        "jsdoc": "/** Content types returned by a tool */"
+      },
+      {
+        "name": "ToolContentText",
+        "kind": "interface",
+        "signature": "interface ToolContentText"
+      },
+      {
+        "name": "ToolContentImage",
+        "kind": "interface",
+        "signature": "interface ToolContentImage"
+      },
+      {
+        "name": "ToolContentResource",
+        "kind": "interface",
+        "signature": "interface ToolContentResource"
+      },
+      {
+        "name": "ToolContentError",
+        "kind": "interface",
+        "signature": "interface ToolContentError"
+      },
+      {
+        "name": "ToolContent",
+        "kind": "type",
+        "signature": "type ToolContent = | ToolContentText\n  | ToolContentImage\n  | ToolContentResource\n  | ToolContentError"
+      },
+      {
+        "name": "ToolExecuteResult",
+        "kind": "interface",
+        "signature": "interface ToolExecuteResult"
+      },
+      {
+        "name": "ToolResultMetadata",
+        "kind": "interface",
+        "signature": "interface ToolResultMetadata",
+        "jsdoc": "/** Extensible metadata for tool results */"
+      },
+      {
+        "name": "AuthContext",
+        "kind": "interface",
+        "signature": "interface AuthContext"
+      },
+      {
+        "name": "ConfirmationTier",
+        "kind": "type",
+        "signature": "type ConfirmationTier = 'none' | 'warn' | 'block'"
+      },
+      {
+        "name": "ConfirmationPolicy",
+        "kind": "interface",
+        "signature": "interface ConfirmationPolicy"
+      },
+      {
+        "name": "WebMCPPolyfillOptions",
+        "kind": "interface",
+        "signature": "interface WebMCPPolyfillOptions"
+      },
+      {
+        "name": "JsonRpcRequest",
+        "kind": "interface",
+        "signature": "interface JsonRpcRequest"
+      },
+      {
+        "name": "JsonRpcError",
+        "kind": "interface",
+        "signature": "interface JsonRpcError"
+      },
+      {
+        "name": "JsonRpcResponse",
+        "kind": "interface",
+        "signature": "interface JsonRpcResponse"
+      },
+      {
+        "name": "McpServerInfo",
+        "kind": "interface",
+        "signature": "interface McpServerInfo"
+      },
+      {
+        "name": "McpCapabilities",
+        "kind": "interface",
+        "signature": "interface McpCapabilities"
+      },
+      {
+        "name": "McpInitializeResult",
+        "kind": "interface",
+        "signature": "interface McpInitializeResult"
+      },
+      {
+        "name": "McpTool",
+        "kind": "interface",
+        "signature": "interface McpTool"
+      },
+      {
+        "name": "McpToolResultContent",
+        "kind": "interface",
+        "signature": "interface McpToolResultContent"
+      },
+      {
+        "name": "McpToolResult",
+        "kind": "interface",
+        "signature": "interface McpToolResult"
+      },
+      {
+        "name": "McpListToolsResult",
+        "kind": "interface",
+        "signature": "interface McpListToolsResult"
+      },
+      {
+        "name": "McpClientOptions",
+        "kind": "interface",
+        "signature": "interface McpClientOptions"
+      },
+      {
+        "name": "WebMCPCallToolEvent",
+        "kind": "interface",
+        "signature": "interface WebMCPCallToolEvent"
+      },
+      {
+        "name": "WebMCPToolResultEvent",
+        "kind": "interface",
+        "signature": "interface WebMCPToolResultEvent"
+      },
+      {
+        "name": "WebMCPToolErrorEvent",
+        "kind": "interface",
+        "signature": "interface WebMCPToolErrorEvent"
+      },
+      {
+        "name": "PostMessageBridgeOptions",
+        "kind": "interface",
+        "signature": "interface PostMessageBridgeOptions"
+      },
+      {
+        "name": "validateJsonSchema",
+        "kind": "function",
+        "signature": "function validateJsonSchema(value: unknown, schema: JsonSchema, path = ''): ValidationResult"
+      },
+      {
+        "name": "ValidationResult",
+        "kind": "interface",
+        "signature": "interface ValidationResult"
+      },
+      {
+        "name": "ValidationError",
+        "kind": "interface",
+        "signature": "interface ValidationError"
+      },
+      {
+        "name": "initializeWebMCPPolyfill",
+        "kind": "function",
+        "signature": "function initializeWebMCPPolyfill(options?: WebMCPPolyfillOptions): void",
+        "jsdoc": "/**\n * Install the WebMCP polyfill on `navigator.modelContext`.\n *\n * Behavior:\n *  - If native WebMCP is present and `forcePolyfill` is not set, skip install\n *  - If already installed by us, call cleanupWebMCPPolyfill first then re-install\n *  - Saves previous property descriptors for restore on cleanup (Fix 7)\n *  - Installs testing shim per installTestingShim option (Fix 14)\n *\n * Throws a SecurityError if called from a non-secure context (HTTP)\n * unless `options.allowInsecureContext` is true.\n */"
+      },
+      {
+        "name": "cleanupWebMCPPolyfill",
+        "kind": "function",
+        "signature": "function cleanupWebMCPPolyfill(): void",
+        "jsdoc": "/**\n * Remove the WebMCP polyfill from navigator and reset all module state.\n *\n * Restores previous property descriptors if they existed (Fix 7).\n * Call this in your framework's cleanup / onDestroy hook to support\n * Vite/Svelte HMR without tool duplication on reload.\n */"
+      },
+      {
+        "name": "hasNativeWebMCP",
+        "kind": "function",
+        "signature": "function hasNativeWebMCP(): boolean",
+        "jsdoc": "/**\n * Returns true when the browser exposes a native WebMCP implementation\n * (Chrome 146+ or a compatible browser) — no polyfill needed in that case.\n */"
+      },
+      {
+        "name": "executeToolInternal",
+        "kind": "function",
+        "signature": "function executeToolInternal(name: string, input: Record<string, unknown>): Promise<ToolExecuteResult>",
+        "jsdoc": "/**\n * Execute a registered tool by name.\n * Steps:\n *   1. Look up tool in map\n *   2. Validate input against inputSchema (Feature 8)\n *   3. Inject authContext if configured (Extra)\n *   4. Apply confirmation policy if applicable (Extra)\n *   5. Create a ModelContextClient (Feature 6)\n *   6. Call execute(input, client)\n *   7. Normalize and return the result (Fix 8)\n */"
+      },
+      {
+        "name": "McpClient",
+        "kind": "class",
+        "signature": "class McpClient"
+      },
+      {
+        "name": "listenForAgentCalls",
+        "kind": "function",
+        "signature": "function listenForAgentCalls(executor: ToolExecutor, options?: PostMessageBridgeOptions): () => void"
+      },
+      {
+        "name": "stopListening",
+        "kind": "function",
+        "signature": "function stopListening(): void",
+        "jsdoc": "/** @deprecated Use the stop function returned by listenForAgentCalls() instead. */",
+        "deprecated": true
+      },
+      {
+        "name": "callToolViaPostMessage",
+        "kind": "function",
+        "signature": "function callToolViaPostMessage(name: string, args: Record<string, unknown>, options?: { timeout?: number; targetWindow?: Window } & PostMessageBridgeOptions): Promise<ToolExecuteResult>",
+        "jsdoc": "/**\n * Helper for agents / Chrome extensions that want to call a tool via\n * postMessage and get the result as a Promise.\n */"
+      },
+      {
+        "name": "isWebMCPEvent",
+        "kind": "function",
+        "signature": "function isWebMCPEvent(data: unknown): boolean",
+        "jsdoc": "/** Type guard — returns true if data looks like any webmcp:* event. */"
+      },
+      {
+        "name": "dispatchAndWait",
+        "kind": "function",
+        "signature": "function dispatchAndWait(eventName: string, detail?: Record<string, unknown>, options?: { timeout?: number; successValue?: T; target?: EventTarget }): Promise<T>",
+        "jsdoc": "/**\n * Dispatch a CustomEvent and wait for a completion event.\n * Solves the \"execute must return after UI updates\" requirement.\n *\n * Pattern: dispatch \"tool-action\" → UI handles it → UI dispatches \"tool-completion-{requestId}\"\n *\n * @param eventName - Name of the event to dispatch\n * @param detail - Event detail payload\n * @param options - Timeout and target\n * @returns Promise that resolves when the completion event fires\n */"
+      },
+      {
+        "name": "signalCompletion",
+        "kind": "function",
+        "signature": "function signalCompletion(completionEventName: string, detail?: unknown): void",
+        "jsdoc": "/**\n * Helper to signal completion of a dispatchAndWait request.\n * Call this from your UI handler after the update is done.\n */"
+      },
+      {
+        "name": "sanitizeSchema",
+        "kind": "function",
+        "signature": "function sanitizeSchema(schema: JsonSchema): JsonSchema",
+        "jsdoc": "/**\n * Strip JSON Schema keywords that cause errors in AI SDKs\n * (e.g., Vercel AI SDK rejects oneOf/anyOf on non-STRING types).\n *\n * Use this before passing tool schemas to LLM providers.\n */"
+      },
+      {
+        "name": "createToolGroup",
+        "kind": "function",
+        "signature": "function createToolGroup(name: string): {\n  name: string;\n  register: (\n    tool: {\n      name: string;\n      description: string;\n      inputSchema?: JsonSchema;\n      execute: (...args: any[]) => any;\n      annotations?: Record<string, unknown>;\n    },\n    registerFn: (tool: any, options: { signal: AbortSignal }) => void\n  ) => void;\n  abort: () => void;\n  isAborted: () => boolean;\n}",
+        "jsdoc": "/**\n * Create a named tool group backed by a shared AbortController.\n * Ergonomic helper for SPA route-based tool registration.\n *\n * Usage:\n *   const group = createToolGroup('search-page');\n *   group.register(tool1, registerFn);\n *   group.register(tool2, registerFn);\n *   // On route change:\n *   group.abort(); // unregisters all tools in the group\n */"
+      },
+      {
+        "name": "textResult",
+        "kind": "function",
+        "signature": "function textResult(text: string): ToolExecuteResult"
+      },
+      {
+        "name": "jsonResult",
+        "kind": "function",
+        "signature": "function jsonResult(data: unknown): ToolExecuteResult"
+      },
+      {
+        "name": "McpMultiClient",
+        "kind": "class",
+        "signature": "class McpMultiClient"
+      },
+      {
+        "name": "ConnectedServer",
+        "kind": "interface",
+        "signature": "interface ConnectedServer"
+      },
+      {
+        "name": "createWebMcpServer",
+        "kind": "function",
+        "signature": "function createWebMcpServer(name: string, options: WebMcpServerOptions): WebMcpServer"
+      },
+      {
+        "name": "parseFrontmatter",
+        "kind": "function",
+        "signature": "function parseFrontmatter(markdown: string): ParsedFrontmatter",
+        "jsdoc": "/**\n * Parse a markdown file with YAML frontmatter (--- delimited).\n * Supports: scalars, nested objects (indentation), arrays (- item), inline values.\n * No external YAML dependency.\n */"
+      },
+      {
+        "name": "mountWidget",
+        "kind": "function",
+        "signature": "function mountWidget(container: HTMLElement, type: string, data: Record<string, unknown>, servers: WebMcpServer[]): (() => void) | void",
+        "jsdoc": "/**\n * Mount a widget into a DOM container by searching registered servers.\n * If the renderer is a function (vanilla renderer), it is called directly.\n * Returns an optional cleanup function.\n * Falls back to a text placeholder if no server provides the widget.\n */"
+      },
+      {
+        "name": "WebMcpServer",
+        "kind": "interface",
+        "signature": "interface WebMcpServer"
+      },
+      {
+        "name": "WebMcpServerOptions",
+        "kind": "interface",
+        "signature": "interface WebMcpServerOptions"
+      },
+      {
+        "name": "WebMcpToolDef",
+        "kind": "interface",
+        "signature": "interface WebMcpToolDef"
+      },
+      {
+        "name": "WidgetEntry",
+        "kind": "interface",
+        "signature": "interface WidgetEntry"
+      },
+      {
+        "name": "WidgetRenderer",
+        "kind": "type",
+        "signature": "type WidgetRenderer = | ((container: HTMLElement, data: Record<string, unknown>) => void | (() => void))\n  | unknown",
+        "jsdoc": "/** A vanilla renderer: receives a container + data, optionally returns a cleanup function. */"
+      }
+    ],
+    "imports": [],
+    "interfaces": [
+      {
+        "name": "JsonSchemaObject",
+        "properties": [
+          {
+            "name": "type",
+            "type": "JsonSchemaType | JsonSchemaType[]",
+            "optional": true
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "default",
+            "type": "unknown",
+            "optional": true
+          },
+          {
+            "name": "examples",
+            "type": "unknown[]",
+            "optional": true
+          },
+          {
+            "name": "minLength",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "maxLength",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "pattern",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "format",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "enum",
+            "type": "unknown[]",
+            "optional": true
+          },
+          {
+            "name": "const",
+            "type": "unknown",
+            "optional": true
+          },
+          {
+            "name": "minimum",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "maximum",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "exclusiveMinimum",
+            "type": "number | boolean",
+            "optional": true
+          },
+          {
+            "name": "exclusiveMaximum",
+            "type": "number | boolean",
+            "optional": true
+          },
+          {
+            "name": "multipleOf",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "properties",
+            "type": "Record<string, JsonSchema>",
+            "optional": true
+          },
+          {
+            "name": "required",
+            "type": "string[]",
+            "optional": true
+          },
+          {
+            "name": "additionalProperties",
+            "type": "boolean | JsonSchema",
+            "optional": true
+          },
+          {
+            "name": "patternProperties",
+            "type": "Record<string, JsonSchema>",
+            "optional": true
+          },
+          {
+            "name": "items",
+            "type": "JsonSchema | JsonSchema[]",
+            "optional": true
+          },
+          {
+            "name": "minItems",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "maxItems",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "uniqueItems",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "allOf",
+            "type": "JsonSchema[]",
+            "optional": true
+          },
+          {
+            "name": "anyOf",
+            "type": "JsonSchema[]",
+            "optional": true
+          },
+          {
+            "name": "oneOf",
+            "type": "JsonSchema[]",
+            "optional": true
+          },
+          {
+            "name": "not",
+            "type": "JsonSchema",
+            "optional": true
+          },
+          {
+            "name": "$ref",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "$schema",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "$id",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "$defs",
+            "type": "Record<string, JsonSchema>",
+            "optional": true
+          },
+          {
+            "name": "definitions",
+            "type": "Record<string, JsonSchema>",
+            "optional": true
+          },
+          {
+            "name": "if",
+            "type": "JsonSchema",
+            "optional": true
+          },
+          {
+            "name": "then",
+            "type": "JsonSchema",
+            "optional": true
+          },
+          {
+            "name": "else",
+            "type": "JsonSchema",
+            "optional": true
+          },
+          {
+            "name": "nullable",
+            "type": "boolean",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "ToolAnnotations",
+        "properties": [
+          {
+            "name": "readOnlyHint",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "destructiveHint",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "idempotentHint",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "openWorldHint",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "cautionHint",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "ModelContextTool",
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "inputSchema",
+            "type": "JsonSchema",
+            "optional": true
+          },
+          {
+            "name": "outputSchema",
+            "type": "JsonSchema",
+            "optional": true
+          },
+          {
+            "name": "annotations",
+            "type": "ToolAnnotations",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "ModelContextClient",
+        "properties": []
+      },
+      {
+        "name": "UserInteractionOptions",
+        "properties": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "kind",
+            "type": "'confirmation' | 'input' | 'choice'",
+            "optional": true
+          },
+          {
+            "name": "choices",
+            "type": "string[]",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "UserInteractionResult",
+        "properties": [
+          {
+            "name": "accepted",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "value",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "ToolRegistrationOptions",
+        "properties": [
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "RegisteredTool",
+        "properties": [
+          {
+            "name": "tool",
+            "type": "ModelContextTool",
+            "optional": false
+          },
+          {
+            "name": "execute",
+            "type": "ToolExecuteCallback",
+            "optional": false
+          },
+          {
+            "name": "serializedInputSchema",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "registeredAt",
+            "type": "number",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "ContextRegistration",
+        "properties": [
+          {
+            "name": "tool",
+            "type": "ModelContextTool & { execute: ToolExecuteCallback }",
+            "optional": false
+          },
+          {
+            "name": "options",
+            "type": "ToolRegistrationOptions",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "ModelContext",
+        "properties": []
+      },
+      {
+        "name": "ModelContextTesting",
+        "properties": []
+      },
+      {
+        "name": "ModelContextTestingToolInfo",
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "inputSchema",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "ToolContentText",
+        "properties": [
+          {
+            "name": "type",
+            "type": "'text'",
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "ToolContentImage",
+        "properties": [
+          {
+            "name": "type",
+            "type": "'image'",
+            "optional": false
+          },
+          {
+            "name": "data",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "mimeType",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "ToolContentResource",
+        "properties": [
+          {
+            "name": "type",
+            "type": "'resource'",
+            "optional": false
+          },
+          {
+            "name": "resource",
+            "type": "{\n    uri: string;\n    mimeType?: string;\n    text?: string;\n    blob?: string;\n  }",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "ToolContentError",
+        "properties": [
+          {
+            "name": "type",
+            "type": "'error'",
+            "optional": false
+          },
+          {
+            "name": "error",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "ToolExecuteResult",
+        "properties": [
+          {
+            "name": "content",
+            "type": "ToolContent[]",
+            "optional": false
+          },
+          {
+            "name": "isError",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "structuredContent",
+            "type": "Record<string, unknown>",
+            "optional": true
+          },
+          {
+            "name": "_meta",
+            "type": "ToolResultMetadata",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "ToolResultMetadata",
+        "properties": [
+          {
+            "name": "willNavigate",
+            "type": "boolean",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "AuthContext",
+        "properties": [
+          {
+            "name": "userId",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "tenantId",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "workspaceId",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "roles",
+            "type": "string[]",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "ConfirmationPolicy",
+        "properties": [
+          {
+            "name": "destructive",
+            "type": "ConfirmationTier",
+            "optional": true
+          },
+          {
+            "name": "mutating",
+            "type": "ConfirmationTier",
+            "optional": true
+          },
+          {
+            "name": "all",
+            "type": "ConfirmationTier",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "WebMCPPolyfillOptions",
+        "properties": [
+          {
+            "name": "forcePolyfill",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "allowInsecureContext",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "degradeGracefully",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "authContext",
+            "type": "AuthContext",
+            "optional": true
+          },
+          {
+            "name": "confirmationPolicy",
+            "type": "ConfirmationPolicy",
+            "optional": true
+          },
+          {
+            "name": "installTestingShim",
+            "type": "'if-missing' | 'always' | false",
+            "optional": true
+          },
+          {
+            "name": "autoInitialize",
+            "type": "boolean",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "JsonRpcRequest",
+        "properties": [
+          {
+            "name": "jsonrpc",
+            "type": "'2.0'",
+            "optional": false
+          },
+          {
+            "name": "id",
+            "type": "number | string",
+            "optional": false
+          },
+          {
+            "name": "method",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "params",
+            "type": "Record<string, unknown>",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "JsonRpcError",
+        "properties": [
+          {
+            "name": "code",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "message",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "data",
+            "type": "unknown",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "JsonRpcResponse",
+        "properties": [
+          {
+            "name": "jsonrpc",
+            "type": "'2.0'",
+            "optional": false
+          },
+          {
+            "name": "id",
+            "type": "number | string | null",
+            "optional": false
+          },
+          {
+            "name": "result",
+            "type": "T",
+            "optional": true
+          },
+          {
+            "name": "error",
+            "type": "JsonRpcError",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "McpServerInfo",
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "version",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "McpCapabilities",
+        "properties": [
+          {
+            "name": "tools",
+            "type": "{ listChanged?: boolean }",
+            "optional": true
+          },
+          {
+            "name": "resources",
+            "type": "{ listChanged?: boolean; subscribe?: boolean }",
+            "optional": true
+          },
+          {
+            "name": "prompts",
+            "type": "{ listChanged?: boolean }",
+            "optional": true
+          },
+          {
+            "name": "logging",
+            "type": "Record<string, unknown>",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "McpInitializeResult",
+        "properties": [
+          {
+            "name": "protocolVersion",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "capabilities",
+            "type": "McpCapabilities",
+            "optional": false
+          },
+          {
+            "name": "serverInfo",
+            "type": "McpServerInfo",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "McpTool",
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "inputSchema",
+            "type": "JsonSchema",
+            "optional": true
+          },
+          {
+            "name": "outputSchema",
+            "type": "JsonSchema",
+            "optional": true
+          },
+          {
+            "name": "annotations",
+            "type": "ToolAnnotations",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "McpToolResultContent",
+        "properties": [
+          {
+            "name": "type",
+            "type": "'text' | 'image' | 'resource'",
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "data",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "mimeType",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "resource",
+            "type": "{ uri: string; mimeType?: string; text?: string; blob?: string }",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "McpToolResult",
+        "properties": [
+          {
+            "name": "content",
+            "type": "McpToolResultContent[]",
+            "optional": false
+          },
+          {
+            "name": "isError",
+            "type": "boolean",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "McpListToolsResult",
+        "properties": [
+          {
+            "name": "tools",
+            "type": "McpTool[]",
+            "optional": false
+          },
+          {
+            "name": "nextCursor",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "McpClientOptions",
+        "properties": [
+          {
+            "name": "clientName",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "clientVersion",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "timeout",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "headers",
+            "type": "Record<string, string>",
+            "optional": true
+          },
+          {
+            "name": "autoReconnect",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "maxReconnectAttempts",
+            "type": "number",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "WebMCPCallToolEvent",
+        "properties": [
+          {
+            "name": "type",
+            "type": "'webmcp:call-tool'",
+            "optional": false
+          },
+          {
+            "name": "callId",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "args",
+            "type": "Record<string, unknown>",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "WebMCPToolResultEvent",
+        "properties": [
+          {
+            "name": "type",
+            "type": "'webmcp:tool-result'",
+            "optional": false
+          },
+          {
+            "name": "callId",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "result",
+            "type": "ToolExecuteResult",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "WebMCPToolErrorEvent",
+        "properties": [
+          {
+            "name": "type",
+            "type": "'webmcp:tool-error'",
+            "optional": false
+          },
+          {
+            "name": "callId",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "error",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "PostMessageBridgeOptions",
+        "properties": [
+          {
+            "name": "targetOrigin",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "allowedOrigins",
+            "type": "string[]",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "ValidationResult",
+        "properties": [
+          {
+            "name": "valid",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "errors",
+            "type": "ValidationError[]",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "ValidationError",
+        "properties": [
+          {
+            "name": "path",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "message",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "keyword",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "expected",
+            "type": "unknown",
+            "optional": true
+          },
+          {
+            "name": "actual",
+            "type": "unknown",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "ConnectedServer",
+        "properties": [
+          {
+            "name": "url",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "tools",
+            "type": "McpTool[]",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "WebMcpServer",
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "WebMcpServerOptions",
+        "properties": [
+          {
+            "name": "description",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "WebMcpToolDef",
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "inputSchema",
+            "type": "Record<string, unknown>",
+            "optional": false
+          },
+          {
+            "name": "execute",
+            "type": "(params: Record<string, unknown>) => Promise<unknown>",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "WidgetEntry",
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "inputSchema",
+            "type": "Record<string, unknown>",
+            "optional": false
+          },
+          {
+            "name": "recipe",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "renderer",
+            "type": "WidgetRenderer",
+            "optional": false
+          },
+          {
+            "name": "group",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      }
+    ],
+    "functions": [
+      {
+        "name": "validateJsonSchema",
+        "signature": "function validateJsonSchema(value: unknown, schema: JsonSchema, path = ''): ValidationResult",
+        "params": [
+          {
+            "name": "value",
+            "type": "unknown"
+          },
+          {
+            "name": "schema",
+            "type": "JsonSchema"
+          },
+          {
+            "name": "path",
+            "type": "string"
+          }
+        ],
+        "returnType": "ValidationResult"
+      },
+      {
+        "name": "initializeWebMCPPolyfill",
+        "signature": "function initializeWebMCPPolyfill(options?: WebMCPPolyfillOptions): void",
+        "params": [
+          {
+            "name": "options",
+            "type": "WebMCPPolyfillOptions"
+          }
+        ],
+        "returnType": "void"
+      },
+      {
+        "name": "cleanupWebMCPPolyfill",
+        "signature": "function cleanupWebMCPPolyfill(): void",
+        "params": [],
+        "returnType": "void"
+      },
+      {
+        "name": "hasNativeWebMCP",
+        "signature": "function hasNativeWebMCP(): boolean",
+        "params": [],
+        "returnType": "boolean"
+      },
+      {
+        "name": "executeToolInternal",
+        "signature": "function executeToolInternal(name: string, input: Record<string, unknown>): Promise<ToolExecuteResult>",
+        "params": [
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "input",
+            "type": "Record<string, unknown>"
+          }
+        ],
+        "returnType": "Promise<ToolExecuteResult>"
+      },
+      {
+        "name": "listenForAgentCalls",
+        "signature": "function listenForAgentCalls(executor: ToolExecutor, options?: PostMessageBridgeOptions): () => void",
+        "params": [
+          {
+            "name": "executor",
+            "type": "ToolExecutor"
+          },
+          {
+            "name": "options",
+            "type": "PostMessageBridgeOptions"
+          }
+        ],
+        "returnType": "() => void"
+      },
+      {
+        "name": "stopListening",
+        "signature": "function stopListening(): void",
+        "params": [],
+        "returnType": "void"
+      },
+      {
+        "name": "callToolViaPostMessage",
+        "signature": "function callToolViaPostMessage(name: string, args: Record<string, unknown>, options?: { timeout?: number; targetWindow?: Window } & PostMessageBridgeOptions): Promise<ToolExecuteResult>",
+        "params": [
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "args",
+            "type": "Record<string, unknown>"
+          },
+          {
+            "name": "options",
+            "type": "{ timeout?: number; targetWindow?: Window } & PostMessageBridgeOptions"
+          }
+        ],
+        "returnType": "Promise<ToolExecuteResult>"
+      },
+      {
+        "name": "isWebMCPEvent",
+        "signature": "function isWebMCPEvent(data: unknown): boolean",
+        "params": [
+          {
+            "name": "data",
+            "type": "unknown"
+          }
+        ],
+        "returnType": "boolean"
+      },
+      {
+        "name": "dispatchAndWait",
+        "signature": "function dispatchAndWait(eventName: string, detail?: Record<string, unknown>, options?: { timeout?: number; successValue?: T; target?: EventTarget }): Promise<T>",
+        "params": [
+          {
+            "name": "eventName",
+            "type": "string"
+          },
+          {
+            "name": "detail",
+            "type": "Record<string, unknown>"
+          },
+          {
+            "name": "options",
+            "type": "{ timeout?: number; successValue?: T; target?: EventTarget }"
+          }
+        ],
+        "returnType": "Promise<T>"
+      },
+      {
+        "name": "signalCompletion",
+        "signature": "function signalCompletion(completionEventName: string, detail?: unknown): void",
+        "params": [
+          {
+            "name": "completionEventName",
+            "type": "string"
+          },
+          {
+            "name": "detail",
+            "type": "unknown"
+          }
+        ],
+        "returnType": "void"
+      },
+      {
+        "name": "sanitizeSchema",
+        "signature": "function sanitizeSchema(schema: JsonSchema): JsonSchema",
+        "params": [
+          {
+            "name": "schema",
+            "type": "JsonSchema"
+          }
+        ],
+        "returnType": "JsonSchema"
+      },
+      {
+        "name": "createToolGroup",
+        "signature": "function createToolGroup(name: string): {\n  name: string;\n  register: (\n    tool: {\n      name: string;\n      description: string;\n      inputSchema?: JsonSchema;\n      execute: (...args: any[]) => any;\n      annotations?: Record<string, unknown>;\n    },\n    registerFn: (tool: any, options: { signal: AbortSignal }) => void\n  ) => void;\n  abort: () => void;\n  isAborted: () => boolean;\n}",
+        "params": [
+          {
+            "name": "name",
+            "type": "string"
+          }
+        ],
+        "returnType": "{\n  name: string;\n  register: (\n    tool: {\n      name: string;\n      description: string;\n      inputSchema?: JsonSchema;\n      execute: (...args: any[]) => any;\n      annotations?: Record<string, unknown>;\n    },\n    registerFn: (tool: any, options: { signal: AbortSignal }) => void\n  ) => void;\n  abort: () => void;\n  isAborted: () => boolean;\n}"
+      },
+      {
+        "name": "textResult",
+        "signature": "function textResult(text: string): ToolExecuteResult",
+        "params": [
+          {
+            "name": "text",
+            "type": "string"
+          }
+        ],
+        "returnType": "ToolExecuteResult"
+      },
+      {
+        "name": "jsonResult",
+        "signature": "function jsonResult(data: unknown): ToolExecuteResult",
+        "params": [
+          {
+            "name": "data",
+            "type": "unknown"
+          }
+        ],
+        "returnType": "ToolExecuteResult"
+      },
+      {
+        "name": "createWebMcpServer",
+        "signature": "function createWebMcpServer(name: string, options: WebMcpServerOptions): WebMcpServer",
+        "params": [
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "options",
+            "type": "WebMcpServerOptions"
+          }
+        ],
+        "returnType": "WebMcpServer"
+      },
+      {
+        "name": "parseFrontmatter",
+        "signature": "function parseFrontmatter(markdown: string): ParsedFrontmatter",
+        "params": [
+          {
+            "name": "markdown",
+            "type": "string"
+          }
+        ],
+        "returnType": "ParsedFrontmatter"
+      },
+      {
+        "name": "mountWidget",
+        "signature": "function mountWidget(container: HTMLElement, type: string, data: Record<string, unknown>, servers: WebMcpServer[]): (() => void) | void",
+        "params": [
+          {
+            "name": "container",
+            "type": "HTMLElement"
+          },
+          {
+            "name": "type",
+            "type": "string"
+          },
+          {
+            "name": "data",
+            "type": "Record<string, unknown>"
+          },
+          {
+            "name": "servers",
+            "type": "WebMcpServer[]"
+          }
+        ],
+        "returnType": "(() => void) | void"
+      }
+    ]
+  },
+  {
+    "name": "@webmcp-auto-ui/agent",
+    "exports": [
+      {
+        "name": "RemoteLLMProvider",
+        "kind": "class",
+        "signature": "class RemoteLLMProvider"
+      },
+      {
+        "name": "RemoteLLMProviderOptions",
+        "kind": "interface",
+        "signature": "interface RemoteLLMProviderOptions"
+      },
+      {
+        "name": "WasmProvider",
+        "kind": "class",
+        "signature": "class WasmProvider"
+      },
+      {
+        "name": "WasmProviderOptions",
+        "kind": "interface",
+        "signature": "interface WasmProviderOptions"
+      },
+      {
+        "name": "WasmStatus",
+        "kind": "type",
+        "signature": "type WasmStatus = 'idle' | 'loading' | 'ready' | 'error'"
+      },
+      {
+        "name": "LocalLLMProvider",
+        "kind": "class",
+        "signature": "class LocalLLMProvider"
+      },
+      {
+        "name": "LocalLLMProviderOptions",
+        "kind": "interface",
+        "signature": "interface LocalLLMProviderOptions"
+      },
+      {
+        "name": "LocalBackend",
+        "kind": "type",
+        "signature": "type LocalBackend = 'ollama' | 'llamafile' | 'lm-studio' | string"
+      },
+      {
+        "name": "createProvider",
+        "kind": "function",
+        "signature": "function createProvider(config: LLMConfig): LLMProvider"
+      },
+      {
+        "name": "LLMConfig",
+        "kind": "type",
+        "signature": "type LLMConfig = | { type: 'remote'; model?: RemoteModelId; proxyUrl?: string; apiKey?: string }\n  | { type: 'wasm';   model?: WasmModelId;   onProgress?: (loaded: number, total: number) => void }\n  | { type: 'local';  model: string;         baseUrl: string; backend?: LocalBackend }"
+      },
+      {
+        "name": "AnthropicProvider",
+        "kind": "unknown",
+        "signature": "AnthropicProvider"
+      },
+      {
+        "name": "AnthropicProviderOptions",
+        "kind": "type",
+        "signature": "AnthropicProviderOptions"
+      },
+      {
+        "name": "GemmaProvider",
+        "kind": "unknown",
+        "signature": "GemmaProvider"
+      },
+      {
+        "name": "GemmaProviderOptions",
+        "kind": "type",
+        "signature": "GemmaProviderOptions"
+      },
+      {
+        "name": "GemmaStatus",
+        "kind": "type",
+        "signature": "GemmaStatus"
+      },
+      {
+        "name": "runAgentLoop",
+        "kind": "function",
+        "signature": "function runAgentLoop(userMessage: string, options: AgentLoopOptions): Promise<AgentResult>"
+      },
+      {
+        "name": "toProviderTools",
+        "kind": "unknown",
+        "signature": "toProviderTools"
+      },
+      {
+        "name": "mcpToolsToAnthropic",
+        "kind": "const",
+        "signature": "const mcpToolsToAnthropic: typeof toProviderTools"
+      },
+      {
+        "name": "fromMcpTools",
+        "kind": "function",
+        "signature": "function fromMcpTools(tools: McpTool[]): McpToolDef[]"
+      },
+      {
+        "name": "trimConversationHistory",
+        "kind": "function",
+        "signature": "function trimConversationHistory(history: ChatMessage[], maxTokens: number): ChatMessage[]",
+        "jsdoc": "/**\n * Trim conversation history to fit within a token budget.\n * Removes oldest message pairs (user+assistant) from the front until under limit.\n * @param history - Full conversation history\n * @param maxTokens - Token budget (1 token ≈ 4 chars)\n */"
+      },
+      {
+        "name": "buildSystemPrompt",
+        "kind": "function",
+        "signature": "function buildSystemPrompt(layers: ToolLayer[]): string",
+        "jsdoc": "/** Build system prompt — dynamic, recipe-driven workflow.\n *  Uses 4-layer matching to detect recipe tools on MCP servers,\n *  then injects them under canonical names (search_recipes / get_recipe).\n *  Populates toolAliasMap so the dispatch in loop.ts can resolve aliases.\n */"
+      },
+      {
+        "name": "AgentLoopOptions",
+        "kind": "interface",
+        "signature": "interface AgentLoopOptions"
+      },
+      {
+        "name": "autoui",
+        "kind": "const",
+        "signature": "const autoui: import(\"/Users/m3/Desktop/TMP/webmcp-auto-ui/packages/core/dist/webmcp-server\").WebMcpServer"
+      },
+      {
+        "name": "NATIVE_WIDGET_NAMES",
+        "kind": "const",
+        "signature": "const NATIVE_WIDGET_NAMES: string[]"
+      },
+      {
+        "name": "buildToolsFromLayers",
+        "kind": "function",
+        "signature": "function buildToolsFromLayers(layers: ToolLayer[]): ProviderTool[]",
+        "jsdoc": "/** Build ProviderTool[] from structured layers.\n *  ALL tools are prefixed: {serverName}_{protocol}_{toolName}\n */"
+      },
+      {
+        "name": "buildDiscoveryTools",
+        "kind": "function",
+        "signature": "function buildDiscoveryTools(layers: ToolLayer[]): ProviderTool[]",
+        "jsdoc": "/**\n * Build discovery-only tools: search_recipes + get_recipe for each server,\n * plus \"always present\" WebMCP action tools (widget_display, canvas, recall).\n * Used as the initial tool set before any server is activated.\n *\n * For MCP servers, uses 4-layer matching to find recipe tools and exposes\n * them under canonical names (with aliases registered in toolAliasMap).\n */"
+      },
+      {
+        "name": "activateServerTools",
+        "kind": "function",
+        "signature": "function activateServerTools(currentTools: ProviderTool[], layer: ToolLayer): ProviderTool[]",
+        "jsdoc": "/**\n * Add all tools from a specific server layer to the active tool set.\n * Called when a server is \"touched\" for the first time.\n */"
+      },
+      {
+        "name": "resolveCanonicalTools",
+        "kind": "function",
+        "signature": "function resolveCanonicalTools(tools: McpToolDef[]): CanonicalMatch[]",
+        "jsdoc": "/**\n * Resolve canonical tools for a set of MCP tools using 4-layer matching.\n * Returns at most one match per canonical role.\n */"
+      },
+      {
+        "name": "toolAliasMap",
+        "kind": "const",
+        "signature": "const toolAliasMap: Map<string, string>"
+      },
+      {
+        "name": "ToolLayer",
+        "kind": "type",
+        "signature": "type ToolLayer = McpLayer | WebMcpLayer"
+      },
+      {
+        "name": "McpLayer",
+        "kind": "interface",
+        "signature": "interface McpLayer",
+        "jsdoc": "/** MCP data layer — tools and recipes from a connected MCP server */"
+      },
+      {
+        "name": "WebMcpLayer",
+        "kind": "interface",
+        "signature": "interface WebMcpLayer",
+        "jsdoc": "/** WebMCP display layer — tools from a WebMCP server (e.g. autoui, designkit) */"
+      },
+      {
+        "name": "WebMcpServer",
+        "kind": "type",
+        "signature": "WebMcpServer"
+      },
+      {
+        "name": "WebMcpToolDef",
+        "kind": "type",
+        "signature": "WebMcpToolDef"
+      },
+      {
+        "name": "WidgetEntry",
+        "kind": "type",
+        "signature": "WidgetEntry"
+      },
+      {
+        "name": "WEBMCP_RECIPES",
+        "kind": "const",
+        "signature": "const WEBMCP_RECIPES: import(\"/Users/m3/Desktop/TMP/webmcp-auto-ui/packages/agent/src/recipes/types\").Recipe[]"
+      },
+      {
+        "name": "parseRecipe",
+        "kind": "function",
+        "signature": "function parseRecipe(raw: string, fileKey?: string): Recipe",
+        "jsdoc": "/**\n * Parse a single recipe from its raw markdown string.\n *\n * Supports two formats:\n * - **Structured**: YAML-like frontmatter between `---` delimiters + markdown body\n * - **Freeform**: plain markdown without frontmatter (id derived from fileKey)\n *\n * @param raw - The raw markdown string\n * @param fileKey - Optional file key (e.g. \"gallery-images\") used as fallback id for freeform recipes\n */"
+      },
+      {
+        "name": "parseRecipes",
+        "kind": "function",
+        "signature": "function parseRecipes(raws: Record<string, string>): Recipe[]",
+        "jsdoc": "/** Parse all raw recipe strings into Recipe objects. Skips invalid ones with a warning. */"
+      },
+      {
+        "name": "recipeRegistry",
+        "kind": "const",
+        "signature": "const recipeRegistry: { get(id: string): Recipe | undefined; getAll(): Recipe[]; has(id: string): boolean; readonly size: number; }"
+      },
+      {
+        "name": "registerRecipes",
+        "kind": "function",
+        "signature": "function registerRecipes(recipes: Recipe[]): void",
+        "jsdoc": "/** Populate the registry (additive — does not clear existing entries) */"
+      },
+      {
+        "name": "filterRecipesByServer",
+        "kind": "function",
+        "signature": "function filterRecipesByServer(recipes: Recipe[], serverNames: string[]): Recipe[]"
+      },
+      {
+        "name": "formatRecipesForPrompt",
+        "kind": "function",
+        "signature": "function formatRecipesForPrompt(recipes: Recipe[]): string",
+        "jsdoc": "/** Format recipes for injection into the system prompt (compact, <500 tokens for 5 recipes) */"
+      },
+      {
+        "name": "formatMcpRecipesForPrompt",
+        "kind": "function",
+        "signature": "function formatMcpRecipesForPrompt(recipes: McpRecipe[]): string",
+        "jsdoc": "/** Format MCP server recipes for the prompt.\n * Uses [name] prefix so LLMs know the exact ID to pass to get_recipe(). */"
+      },
+      {
+        "name": "summarizeChat",
+        "kind": "function",
+        "signature": "function summarizeChat(options: SummarizeOptions): Promise<ChatSummaryResult>"
+      },
+      {
+        "name": "SummarizeOptions",
+        "kind": "interface",
+        "signature": "interface SummarizeOptions"
+      },
+      {
+        "name": "ChatSummaryResult",
+        "kind": "interface",
+        "signature": "interface ChatSummaryResult"
+      },
+      {
+        "name": "TokenTracker",
+        "kind": "class",
+        "signature": "class TokenTracker"
+      },
+      {
+        "name": "TokenMetrics",
+        "kind": "interface",
+        "signature": "interface TokenMetrics",
+        "jsdoc": "/**\n * TokenTracker — accumulates LLM usage metrics with rolling-window rates.\n * Subscribe to get real-time updates after each LLM response.\n */"
+      },
+      {
+        "name": "RemoteModelId",
+        "kind": "type",
+        "signature": "type RemoteModelId = 'haiku' | 'sonnet' | 'opus' | string"
+      },
+      {
+        "name": "WasmModelId",
+        "kind": "type",
+        "signature": "type WasmModelId = 'gemma-e2b' | 'gemma-e4b' | string"
+      },
+      {
+        "name": "LLMId",
+        "kind": "type",
+        "signature": "type LLMId = RemoteModelId | WasmModelId"
+      },
+      {
+        "name": "ModelId",
+        "kind": "type",
+        "signature": "type ModelId = LLMId"
+      },
+      {
+        "name": "ChatMessage",
+        "kind": "interface",
+        "signature": "interface ChatMessage"
+      },
+      {
+        "name": "ContentBlock",
+        "kind": "type",
+        "signature": "type ContentBlock = | { type: 'text'; text: string }\n  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }\n  | { type: 'tool_result'; tool_use_id: string; content: string }"
+      },
+      {
+        "name": "McpToolDef",
+        "kind": "interface",
+        "signature": "interface McpToolDef"
+      },
+      {
+        "name": "ProviderTool",
+        "kind": "interface",
+        "signature": "interface ProviderTool"
+      },
+      {
+        "name": "AnthropicTool",
+        "kind": "type",
+        "signature": "type AnthropicTool = ProviderTool",
+        "jsdoc": "/** @deprecated Use ProviderTool */",
+        "deprecated": true
+      },
+      {
+        "name": "LLMProvider",
+        "kind": "interface",
+        "signature": "interface LLMProvider"
+      },
+      {
+        "name": "LLMResponse",
+        "kind": "interface",
+        "signature": "interface LLMResponse"
+      },
+      {
+        "name": "ToolCall",
+        "kind": "interface",
+        "signature": "interface ToolCall"
+      },
+      {
+        "name": "AgentMetrics",
+        "kind": "interface",
+        "signature": "interface AgentMetrics"
+      },
+      {
+        "name": "AgentResult",
+        "kind": "interface",
+        "signature": "interface AgentResult"
+      },
+      {
+        "name": "AgentCallbacks",
+        "kind": "interface",
+        "signature": "interface AgentCallbacks"
+      },
+      {
+        "name": "Recipe",
+        "kind": "interface",
+        "signature": "interface Recipe"
+      },
+      {
+        "name": "McpRecipe",
+        "kind": "interface",
+        "signature": "interface McpRecipe"
+      }
+    ],
+    "imports": [
+      {
+        "from": "@webmcp-auto-ui/core",
+        "symbols": [
+          "McpClient",
+          "McpTool",
+          "WebMcpToolDef",
+          "createWebMcpServer",
+          "sanitizeSchema"
+        ]
+      }
+    ],
+    "interfaces": [
+      {
+        "name": "RemoteLLMProviderOptions",
+        "properties": [
+          {
+            "name": "proxyUrl",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "model",
+            "type": "RemoteModelId",
+            "optional": true
+          },
+          {
+            "name": "apiKey",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "WasmProviderOptions",
+        "properties": [
+          {
+            "name": "model",
+            "type": "WasmModelId",
+            "optional": true
+          },
+          {
+            "name": "contextSize",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "onProgress",
+            "type": "(progress: number, status: string, loaded?: number, total?: number) => void",
+            "optional": true
+          },
+          {
+            "name": "onStatusChange",
+            "type": "(status: WasmStatus) => void",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "LocalLLMProviderOptions",
+        "properties": [
+          {
+            "name": "baseUrl",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "model",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "backend",
+            "type": "LocalBackend",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "AgentLoopOptions",
+        "properties": [
+          {
+            "name": "client",
+            "type": "McpClient",
+            "optional": true
+          },
+          {
+            "name": "provider",
+            "type": "LLMProvider",
+            "optional": false
+          },
+          {
+            "name": "layers",
+            "type": "ToolLayer[]",
+            "optional": true
+          },
+          {
+            "name": "maxIterations",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "maxTokens",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "maxTools",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "temperature",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "topK",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "cacheEnabled",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "systemPrompt",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "initialMessages",
+            "type": "ChatMessage[]",
+            "optional": true
+          },
+          {
+            "name": "callbacks",
+            "type": "AgentCallbacks",
+            "optional": true
+          },
+          {
+            "name": "signal",
+            "type": "AbortSignal",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "McpLayer",
+        "properties": [
+          {
+            "name": "protocol",
+            "type": "'mcp'",
+            "optional": false
+          },
+          {
+            "name": "serverName",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "serverUrl",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "tools",
+            "type": "McpToolDef[]",
+            "optional": false
+          },
+          {
+            "name": "recipes",
+            "type": "McpRecipe[]",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "WebMcpLayer",
+        "properties": [
+          {
+            "name": "protocol",
+            "type": "'webmcp'",
+            "optional": false
+          },
+          {
+            "name": "serverName",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "tools",
+            "type": "WebMcpToolDef[]",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "SummarizeOptions",
+        "properties": [
+          {
+            "name": "messages",
+            "type": "ChatMessage[]",
+            "optional": false
+          },
+          {
+            "name": "provider",
+            "type": "LLMProvider",
+            "optional": false
+          },
+          {
+            "name": "toolsUsed",
+            "type": "string[]",
+            "optional": true
+          },
+          {
+            "name": "toolCallCount",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "mcpServers",
+            "type": "string[]",
+            "optional": true
+          },
+          {
+            "name": "skillsReferenced",
+            "type": "string[]",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "ChatSummaryResult",
+        "properties": [
+          {
+            "name": "chatSummary",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "provenance",
+            "type": "{\n    mcpServers?: string[];\n    toolsUsed?: string[];\n    toolCallCount?: number;\n    skillsReferenced?: string[];\n    llm?: string;\n    exportedAt: string;\n  }",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "TokenMetrics",
+        "properties": [
+          {
+            "name": "totalRequests",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "totalInputTokens",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "totalOutputTokens",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "totalCacheReadTokens",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "requestsPerMin",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "inputTokensPerMin",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "outputTokensPerMin",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "lastInputTokens",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "lastOutputTokens",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "lastCacheReadTokens",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "lastLatencyMs",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "totalCachedGB",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "isWasm",
+            "type": "boolean",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "ChatMessage",
+        "properties": [
+          {
+            "name": "role",
+            "type": "'user' | 'assistant' | 'system'",
+            "optional": false
+          },
+          {
+            "name": "content",
+            "type": "string | ContentBlock[]",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "McpToolDef",
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "inputSchema",
+            "type": "Record<string, unknown>",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "ProviderTool",
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "input_schema",
+            "type": "Record<string, unknown>",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "LLMProvider",
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "model",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "LLMResponse",
+        "properties": [
+          {
+            "name": "content",
+            "type": "ContentBlock[]",
+            "optional": false
+          },
+          {
+            "name": "stopReason",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "usage",
+            "type": "{ input_tokens: number; output_tokens: number; cache_read_input_tokens?: number }",
+            "optional": true
+          },
+          {
+            "name": "stats",
+            "type": "{ tokensPerSec: number; totalTokens: number; latencyMs: number }",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "ToolCall",
+        "properties": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "args",
+            "type": "Record<string, unknown>",
+            "optional": false
+          },
+          {
+            "name": "result",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "error",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "elapsed",
+            "type": "number",
+            "optional": true
+          },
+          {
+            "name": "guided",
+            "type": "boolean",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "AgentMetrics",
+        "properties": [
+          {
+            "name": "totalTokens",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "promptTokens",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "completionTokens",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "totalLatencyMs",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "toolCalls",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "iterations",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "cacheHits",
+            "type": "number",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "AgentResult",
+        "properties": [
+          {
+            "name": "text",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "toolCalls",
+            "type": "ToolCall[]",
+            "optional": false
+          },
+          {
+            "name": "metrics",
+            "type": "AgentMetrics",
+            "optional": false
+          },
+          {
+            "name": "stopReason",
+            "type": "'end_turn' | 'max_iterations'",
+            "optional": false
+          },
+          {
+            "name": "messages",
+            "type": "ChatMessage[]",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "AgentCallbacks",
+        "properties": [
+          {
+            "name": "onIterationStart",
+            "type": "(iteration: number, maxIterations: number) => void",
+            "optional": true
+          },
+          {
+            "name": "onLLMRequest",
+            "type": "(messages: ChatMessage[], tools: ProviderTool[]) => void",
+            "optional": true
+          },
+          {
+            "name": "onLLMResponse",
+            "type": "(response: LLMResponse, latencyMs: number, tokens?: { input: number; output: number }) => void",
+            "optional": true
+          },
+          {
+            "name": "onToolCall",
+            "type": "(call: ToolCall) => void",
+            "optional": true
+          },
+          {
+            "name": "onWidget",
+            "type": "(type: string, data: Record<string, unknown>) => { id: string } | void",
+            "optional": true
+          },
+          {
+            "name": "onClear",
+            "type": "() => void",
+            "optional": true
+          },
+          {
+            "name": "onText",
+            "type": "(text: string) => void",
+            "optional": true
+          },
+          {
+            "name": "onToken",
+            "type": "(token: string) => void",
+            "optional": true
+          },
+          {
+            "name": "onDone",
+            "type": "(metrics: AgentMetrics) => void",
+            "optional": true
+          },
+          {
+            "name": "onUpdate",
+            "type": "(id: string, data: Record<string, unknown>) => void",
+            "optional": true
+          },
+          {
+            "name": "onMove",
+            "type": "(id: string, x: number, y: number) => void",
+            "optional": true
+          },
+          {
+            "name": "onResize",
+            "type": "(id: string, w: number, h: number) => void",
+            "optional": true
+          },
+          {
+            "name": "onStyle",
+            "type": "(id: string, styles: Record<string, string>) => void",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "Recipe",
+        "properties": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "components_used",
+            "type": "string[]",
+            "optional": true
+          },
+          {
+            "name": "layout",
+            "type": "{ type: string; columns?: number; arrangement?: string }",
+            "optional": true
+          },
+          {
+            "name": "example_data",
+            "type": "Record<string, unknown>",
+            "optional": true
+          },
+          {
+            "name": "interactions",
+            "type": "{ source: string; target: string; event: string; action: string }[]",
+            "optional": true
+          },
+          {
+            "name": "when",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "servers",
+            "type": "string[]",
+            "optional": true
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "McpRecipe",
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      }
+    ],
+    "functions": [
+      {
+        "name": "createProvider",
+        "signature": "function createProvider(config: LLMConfig): LLMProvider",
+        "params": [
+          {
+            "name": "config",
+            "type": "LLMConfig"
+          }
+        ],
+        "returnType": "LLMProvider"
+      },
+      {
+        "name": "runAgentLoop",
+        "signature": "function runAgentLoop(userMessage: string, options: AgentLoopOptions): Promise<AgentResult>",
+        "params": [
+          {
+            "name": "userMessage",
+            "type": "string"
+          },
+          {
+            "name": "options",
+            "type": "AgentLoopOptions"
+          }
+        ],
+        "returnType": "Promise<AgentResult>"
+      },
+      {
+        "name": "fromMcpTools",
+        "signature": "function fromMcpTools(tools: McpTool[]): McpToolDef[]",
+        "params": [
+          {
+            "name": "tools",
+            "type": "McpTool[]"
+          }
+        ],
+        "returnType": "McpToolDef[]"
+      },
+      {
+        "name": "trimConversationHistory",
+        "signature": "function trimConversationHistory(history: ChatMessage[], maxTokens: number): ChatMessage[]",
+        "params": [
+          {
+            "name": "history",
+            "type": "ChatMessage[]"
+          },
+          {
+            "name": "maxTokens",
+            "type": "number"
+          }
+        ],
+        "returnType": "ChatMessage[]"
+      },
+      {
+        "name": "buildSystemPrompt",
+        "signature": "function buildSystemPrompt(layers: ToolLayer[]): string",
+        "params": [
+          {
+            "name": "layers",
+            "type": "ToolLayer[]"
+          }
+        ],
+        "returnType": "string"
+      },
+      {
+        "name": "buildToolsFromLayers",
+        "signature": "function buildToolsFromLayers(layers: ToolLayer[]): ProviderTool[]",
+        "params": [
+          {
+            "name": "layers",
+            "type": "ToolLayer[]"
+          }
+        ],
+        "returnType": "ProviderTool[]"
+      },
+      {
+        "name": "buildDiscoveryTools",
+        "signature": "function buildDiscoveryTools(layers: ToolLayer[]): ProviderTool[]",
+        "params": [
+          {
+            "name": "layers",
+            "type": "ToolLayer[]"
+          }
+        ],
+        "returnType": "ProviderTool[]"
+      },
+      {
+        "name": "activateServerTools",
+        "signature": "function activateServerTools(currentTools: ProviderTool[], layer: ToolLayer): ProviderTool[]",
+        "params": [
+          {
+            "name": "currentTools",
+            "type": "ProviderTool[]"
+          },
+          {
+            "name": "layer",
+            "type": "ToolLayer"
+          }
+        ],
+        "returnType": "ProviderTool[]"
+      },
+      {
+        "name": "resolveCanonicalTools",
+        "signature": "function resolveCanonicalTools(tools: McpToolDef[]): CanonicalMatch[]",
+        "params": [
+          {
+            "name": "tools",
+            "type": "McpToolDef[]"
+          }
+        ],
+        "returnType": "CanonicalMatch[]"
+      },
+      {
+        "name": "parseRecipe",
+        "signature": "function parseRecipe(raw: string, fileKey?: string): Recipe",
+        "params": [
+          {
+            "name": "raw",
+            "type": "string"
+          },
+          {
+            "name": "fileKey",
+            "type": "string"
+          }
+        ],
+        "returnType": "Recipe"
+      },
+      {
+        "name": "parseRecipes",
+        "signature": "function parseRecipes(raws: Record<string, string>): Recipe[]",
+        "params": [
+          {
+            "name": "raws",
+            "type": "Record<string, string>"
+          }
+        ],
+        "returnType": "Recipe[]"
+      },
+      {
+        "name": "registerRecipes",
+        "signature": "function registerRecipes(recipes: Recipe[]): void",
+        "params": [
+          {
+            "name": "recipes",
+            "type": "Recipe[]"
+          }
+        ],
+        "returnType": "void"
+      },
+      {
+        "name": "filterRecipesByServer",
+        "signature": "function filterRecipesByServer(recipes: Recipe[], serverNames: string[]): Recipe[]",
+        "params": [
+          {
+            "name": "recipes",
+            "type": "Recipe[]"
+          },
+          {
+            "name": "serverNames",
+            "type": "string[]"
+          }
+        ],
+        "returnType": "Recipe[]"
+      },
+      {
+        "name": "formatRecipesForPrompt",
+        "signature": "function formatRecipesForPrompt(recipes: Recipe[]): string",
+        "params": [
+          {
+            "name": "recipes",
+            "type": "Recipe[]"
+          }
+        ],
+        "returnType": "string"
+      },
+      {
+        "name": "formatMcpRecipesForPrompt",
+        "signature": "function formatMcpRecipesForPrompt(recipes: McpRecipe[]): string",
+        "params": [
+          {
+            "name": "recipes",
+            "type": "McpRecipe[]"
+          }
+        ],
+        "returnType": "string"
+      },
+      {
+        "name": "summarizeChat",
+        "signature": "function summarizeChat(options: SummarizeOptions): Promise<ChatSummaryResult>",
+        "params": [
+          {
+            "name": "options",
+            "type": "SummarizeOptions"
+          }
+        ],
+        "returnType": "Promise<ChatSummaryResult>"
+      }
+    ]
+  },
+  {
+    "name": "@webmcp-auto-ui/sdk",
+    "exports": [
+      {
+        "name": "encode",
+        "kind": "unknown",
+        "signature": "encode"
+      },
+      {
+        "name": "decode",
+        "kind": "unknown",
+        "signature": "decode"
+      },
+      {
+        "name": "hash",
+        "kind": "unknown",
+        "signature": "hash"
+      },
+      {
+        "name": "diff",
+        "kind": "unknown",
+        "signature": "diff"
+      },
+      {
+        "name": "getHsParam",
+        "kind": "unknown",
+        "signature": "getHsParam"
+      },
+      {
+        "name": "createSkill",
+        "kind": "function",
+        "signature": "function createSkill(data: Omit<Skill, 'id' | 'createdAt' | 'updatedAt'>): Skill"
+      },
+      {
+        "name": "updateSkill",
+        "kind": "function",
+        "signature": "function updateSkill(id: string, patch: Partial<Omit<Skill, 'id' | 'createdAt'>>): Skill | null"
+      },
+      {
+        "name": "deleteSkill",
+        "kind": "function",
+        "signature": "function deleteSkill(id: string): boolean"
+      },
+      {
+        "name": "getSkill",
+        "kind": "function",
+        "signature": "function getSkill(id: string): Skill | undefined"
+      },
+      {
+        "name": "listSkills",
+        "kind": "function",
+        "signature": "function listSkills(): Skill[]"
+      },
+      {
+        "name": "clearSkills",
+        "kind": "function",
+        "signature": "function clearSkills(): void"
+      },
+      {
+        "name": "loadSkills",
+        "kind": "function",
+        "signature": "function loadSkills(skills: Skill[]): void",
+        "jsdoc": "/** Load a list of skills (e.g. from a HyperSkill URL) — replaces all */"
+      },
+      {
+        "name": "loadDemoSkills",
+        "kind": "function",
+        "signature": "function loadDemoSkills(): void"
+      },
+      {
+        "name": "onSkillsChange",
+        "kind": "function",
+        "signature": "function onSkillsChange(fn: () => void): () => void"
+      },
+      {
+        "name": "Skill",
+        "kind": "interface",
+        "signature": "interface Skill"
+      },
+      {
+        "name": "SkillBlock",
+        "kind": "interface",
+        "signature": "interface SkillBlock",
+        "jsdoc": "/**\n * Skills registry — in-memory CRUD for skills.\n * Each skill is a set of instructions that help an agent use tools.\n */"
+      },
+      {
+        "name": "MCP_DEMO_SERVERS",
+        "kind": "const",
+        "signature": "const MCP_DEMO_SERVERS: McpDemoServer[]"
+      },
+      {
+        "name": "McpDemoServer",
+        "kind": "interface",
+        "signature": "interface McpDemoServer"
+      },
+      {
+        "name": "HyperSkillMeta",
+        "kind": "interface",
+        "signature": "interface HyperSkillMeta"
+      },
+      {
+        "name": "HyperSkill",
+        "kind": "interface",
+        "signature": "interface HyperSkill"
+      },
+      {
+        "name": "HyperSkillVersion",
+        "kind": "interface",
+        "signature": "interface HyperSkillVersion"
+      },
+      {
+        "name": "encodeHyperSkill",
+        "kind": "function",
+        "signature": "function encodeHyperSkill(skill: HyperSkill, sourceUrl?: string): Promise<string>"
+      },
+      {
+        "name": "decodeHyperSkill",
+        "kind": "function",
+        "signature": "function decodeHyperSkill(urlOrParam: string): Promise<HyperSkill>"
+      },
+      {
+        "name": "computeHash",
+        "kind": "function",
+        "signature": "function computeHash(sourceUrl: string, content: unknown): Promise<string>"
+      },
+      {
+        "name": "createVersion",
+        "kind": "function",
+        "signature": "function createVersion(skill: HyperSkill, sourceUrl: string, previousHash?: string): Promise<HyperSkillVersion>"
+      },
+      {
+        "name": "diffSkills",
+        "kind": "const",
+        "signature": "const diffSkills: any"
+      }
+    ],
+    "imports": [],
+    "interfaces": [
+      {
+        "name": "Skill",
+        "properties": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "mcp",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "mcpName",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "llm",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "tags",
+            "type": "string[]",
+            "optional": true
+          },
+          {
+            "name": "theme",
+            "type": "ThemeOverrides",
+            "optional": true
+          },
+          {
+            "name": "blocks",
+            "type": "SkillBlock[]",
+            "optional": false
+          },
+          {
+            "name": "component",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "presentation",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "expectedBlockTypes",
+            "type": "string[]",
+            "optional": true
+          },
+          {
+            "name": "createdAt",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "updatedAt",
+            "type": "number",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "SkillBlock",
+        "properties": [
+          {
+            "name": "type",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "data",
+            "type": "Record<string, unknown>",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "McpDemoServer",
+        "properties": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "url",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "tags",
+            "type": "string[]",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "HyperSkillMeta",
+        "properties": [
+          {
+            "name": "title",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "version",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "mcp",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "mcpName",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "llm",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "tags",
+            "type": "string[]",
+            "optional": true
+          },
+          {
+            "name": "theme",
+            "type": "Record<string, string>",
+            "optional": true
+          },
+          {
+            "name": "hash",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "previousHash",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "chatSummary",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "provenance",
+            "type": "{\n    mcpServers?: string[];\n    toolsUsed?: string[];\n    toolCallCount?: number;\n    skillsReferenced?: string[];\n    llm?: string;\n    exportedAt?: string;\n  }",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "HyperSkill",
+        "properties": [
+          {
+            "name": "meta",
+            "type": "HyperSkillMeta",
+            "optional": false
+          },
+          {
+            "name": "content",
+            "type": "unknown",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "HyperSkillVersion",
+        "properties": [
+          {
+            "name": "hash",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "previousHash",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "timestamp",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "skill",
+            "type": "HyperSkill",
+            "optional": false
+          }
+        ]
+      }
+    ],
+    "functions": [
+      {
+        "name": "createSkill",
+        "signature": "function createSkill(data: Omit<Skill, 'id' | 'createdAt' | 'updatedAt'>): Skill",
+        "params": [
+          {
+            "name": "data",
+            "type": "Omit<Skill, 'id' | 'createdAt' | 'updatedAt'>"
+          }
+        ],
+        "returnType": "Skill"
+      },
+      {
+        "name": "updateSkill",
+        "signature": "function updateSkill(id: string, patch: Partial<Omit<Skill, 'id' | 'createdAt'>>): Skill | null",
+        "params": [
+          {
+            "name": "id",
+            "type": "string"
+          },
+          {
+            "name": "patch",
+            "type": "Partial<Omit<Skill, 'id' | 'createdAt'>>"
+          }
+        ],
+        "returnType": "Skill | null"
+      },
+      {
+        "name": "deleteSkill",
+        "signature": "function deleteSkill(id: string): boolean",
+        "params": [
+          {
+            "name": "id",
+            "type": "string"
+          }
+        ],
+        "returnType": "boolean"
+      },
+      {
+        "name": "getSkill",
+        "signature": "function getSkill(id: string): Skill | undefined",
+        "params": [
+          {
+            "name": "id",
+            "type": "string"
+          }
+        ],
+        "returnType": "Skill | undefined"
+      },
+      {
+        "name": "listSkills",
+        "signature": "function listSkills(): Skill[]",
+        "params": [],
+        "returnType": "Skill[]"
+      },
+      {
+        "name": "clearSkills",
+        "signature": "function clearSkills(): void",
+        "params": [],
+        "returnType": "void"
+      },
+      {
+        "name": "loadSkills",
+        "signature": "function loadSkills(skills: Skill[]): void",
+        "params": [
+          {
+            "name": "skills",
+            "type": "Skill[]"
+          }
+        ],
+        "returnType": "void"
+      },
+      {
+        "name": "loadDemoSkills",
+        "signature": "function loadDemoSkills(): void",
+        "params": [],
+        "returnType": "void"
+      },
+      {
+        "name": "onSkillsChange",
+        "signature": "function onSkillsChange(fn: () => void): () => void",
+        "params": [
+          {
+            "name": "fn",
+            "type": "() => void"
+          }
+        ],
+        "returnType": "() => void"
+      },
+      {
+        "name": "encodeHyperSkill",
+        "signature": "function encodeHyperSkill(skill: HyperSkill, sourceUrl?: string): Promise<string>",
+        "params": [
+          {
+            "name": "skill",
+            "type": "HyperSkill"
+          },
+          {
+            "name": "sourceUrl",
+            "type": "string"
+          }
+        ],
+        "returnType": "Promise<string>"
+      },
+      {
+        "name": "decodeHyperSkill",
+        "signature": "function decodeHyperSkill(urlOrParam: string): Promise<HyperSkill>",
+        "params": [
+          {
+            "name": "urlOrParam",
+            "type": "string"
+          }
+        ],
+        "returnType": "Promise<HyperSkill>"
+      },
+      {
+        "name": "computeHash",
+        "signature": "function computeHash(sourceUrl: string, content: unknown): Promise<string>",
+        "params": [
+          {
+            "name": "sourceUrl",
+            "type": "string"
+          },
+          {
+            "name": "content",
+            "type": "unknown"
+          }
+        ],
+        "returnType": "Promise<string>"
+      },
+      {
+        "name": "createVersion",
+        "signature": "function createVersion(skill: HyperSkill, sourceUrl: string, previousHash?: string): Promise<HyperSkillVersion>",
+        "params": [
+          {
+            "name": "skill",
+            "type": "HyperSkill"
+          },
+          {
+            "name": "sourceUrl",
+            "type": "string"
+          },
+          {
+            "name": "previousHash",
+            "type": "string"
+          }
+        ],
+        "returnType": "Promise<HyperSkillVersion>"
+      }
+    ]
+  },
+  {
+    "name": "@webmcp-auto-ui/ui",
+    "exports": [
+      {
+        "name": "ThemeProvider",
+        "kind": "unknown",
+        "signature": "ThemeProvider"
+      },
+      {
+        "name": "getTheme",
+        "kind": "unknown",
+        "signature": "getTheme"
+      },
+      {
+        "name": "ThemeJSON",
+        "kind": "type",
+        "signature": "ThemeJSON"
+      },
+      {
+        "name": "DARK_TOKENS",
+        "kind": "const",
+        "signature": "const DARK_TOKENS: ThemeTokens"
+      },
+      {
+        "name": "LIGHT_TOKENS",
+        "kind": "const",
+        "signature": "const LIGHT_TOKENS: ThemeTokens"
+      },
+      {
+        "name": "THEME_MAP",
+        "kind": "const",
+        "signature": "const THEME_MAP: Record<ThemeMode, ThemeTokens>"
+      },
+      {
+        "name": "ThemeMode",
+        "kind": "type",
+        "signature": "type ThemeMode = 'light' | 'dark'"
+      },
+      {
+        "name": "ThemeOverrides",
+        "kind": "type",
+        "signature": "type ThemeOverrides = Partial<ThemeTokens>"
+      },
+      {
+        "name": "ThemeTokens",
+        "kind": "interface",
+        "signature": "interface ThemeTokens",
+        "jsdoc": "/**\n * Design tokens for light and dark themes.\n * These map directly to CSS custom properties injected by ThemeProvider.\n */"
+      },
+      {
+        "name": "Card",
+        "kind": "unknown",
+        "signature": "Card"
+      },
+      {
+        "name": "GridLayout",
+        "kind": "unknown",
+        "signature": "GridLayout"
+      },
+      {
+        "name": "List",
+        "kind": "unknown",
+        "signature": "List"
+      },
+      {
+        "name": "Panel",
+        "kind": "unknown",
+        "signature": "Panel"
+      },
+      {
+        "name": "Window",
+        "kind": "unknown",
+        "signature": "Window"
+      },
+      {
+        "name": "StatBlock",
+        "kind": "unknown",
+        "signature": "StatBlock"
+      },
+      {
+        "name": "KVBlock",
+        "kind": "unknown",
+        "signature": "KVBlock"
+      },
+      {
+        "name": "ListBlock",
+        "kind": "unknown",
+        "signature": "ListBlock"
+      },
+      {
+        "name": "ChartBlock",
+        "kind": "unknown",
+        "signature": "ChartBlock"
+      },
+      {
+        "name": "AlertBlock",
+        "kind": "unknown",
+        "signature": "AlertBlock"
+      },
+      {
+        "name": "CodeBlock",
+        "kind": "unknown",
+        "signature": "CodeBlock"
+      },
+      {
+        "name": "TextBlock",
+        "kind": "unknown",
+        "signature": "TextBlock"
+      },
+      {
+        "name": "ActionsBlock",
+        "kind": "unknown",
+        "signature": "ActionsBlock"
+      },
+      {
+        "name": "TagsBlock",
+        "kind": "unknown",
+        "signature": "TagsBlock"
+      },
+      {
+        "name": "StatCard",
+        "kind": "unknown",
+        "signature": "StatCard"
+      },
+      {
+        "name": "DataTable",
+        "kind": "unknown",
+        "signature": "DataTable"
+      },
+      {
+        "name": "Timeline",
+        "kind": "unknown",
+        "signature": "Timeline"
+      },
+      {
+        "name": "ProfileCard",
+        "kind": "unknown",
+        "signature": "ProfileCard"
+      },
+      {
+        "name": "Trombinoscope",
+        "kind": "unknown",
+        "signature": "Trombinoscope"
+      },
+      {
+        "name": "JsonViewer",
+        "kind": "unknown",
+        "signature": "JsonViewer"
+      },
+      {
+        "name": "Hemicycle",
+        "kind": "unknown",
+        "signature": "Hemicycle"
+      },
+      {
+        "name": "Chart",
+        "kind": "unknown",
+        "signature": "Chart"
+      },
+      {
+        "name": "Cards",
+        "kind": "unknown",
+        "signature": "Cards"
+      },
+      {
+        "name": "GridData",
+        "kind": "unknown",
+        "signature": "GridData"
+      },
+      {
+        "name": "Sankey",
+        "kind": "unknown",
+        "signature": "Sankey"
+      },
+      {
+        "name": "MapView",
+        "kind": "unknown",
+        "signature": "MapView"
+      },
+      {
+        "name": "D3Widget",
+        "kind": "unknown",
+        "signature": "D3Widget"
+      },
+      {
+        "name": "JsSandbox",
+        "kind": "unknown",
+        "signature": "JsSandbox"
+      },
+      {
+        "name": "LogViewer",
+        "kind": "unknown",
+        "signature": "LogViewer"
+      },
+      {
+        "name": "Gallery",
+        "kind": "unknown",
+        "signature": "Gallery"
+      },
+      {
+        "name": "Carousel",
+        "kind": "unknown",
+        "signature": "Carousel"
+      },
+      {
+        "name": "BlockRenderer",
+        "kind": "unknown",
+        "signature": "BlockRenderer"
+      },
+      {
+        "name": "WidgetRenderer",
+        "kind": "unknown",
+        "signature": "WidgetRenderer"
+      },
+      {
+        "name": "Pane",
+        "kind": "unknown",
+        "signature": "Pane"
+      },
+      {
+        "name": "TilingLayout",
+        "kind": "unknown",
+        "signature": "TilingLayout"
+      },
+      {
+        "name": "FloatingLayout",
+        "kind": "unknown",
+        "signature": "FloatingLayout"
+      },
+      {
+        "name": "StackLayout",
+        "kind": "unknown",
+        "signature": "StackLayout"
+      },
+      {
+        "name": "FlexLayout",
+        "kind": "unknown",
+        "signature": "FlexLayout"
+      },
+      {
+        "name": "Button",
+        "kind": "unknown",
+        "signature": "Button"
+      },
+      {
+        "name": "buttonVariants",
+        "kind": "unknown",
+        "signature": "buttonVariants"
+      },
+      {
+        "name": "Input",
+        "kind": "unknown",
+        "signature": "Input"
+      },
+      {
+        "name": "Badge",
+        "kind": "unknown",
+        "signature": "Badge"
+      },
+      {
+        "name": "badgeVariants",
+        "kind": "unknown",
+        "signature": "badgeVariants"
+      },
+      {
+        "name": "NativeSelect",
+        "kind": "unknown",
+        "signature": "NativeSelect"
+      },
+      {
+        "name": "Tooltip",
+        "kind": "unknown",
+        "signature": "Tooltip"
+      },
+      {
+        "name": "Dialog",
+        "kind": "unknown",
+        "signature": "Dialog"
+      },
+      {
+        "name": "DialogTrigger",
+        "kind": "unknown",
+        "signature": "DialogTrigger"
+      },
+      {
+        "name": "DialogContent",
+        "kind": "unknown",
+        "signature": "DialogContent"
+      },
+      {
+        "name": "DialogHeader",
+        "kind": "unknown",
+        "signature": "DialogHeader"
+      },
+      {
+        "name": "DialogFooter",
+        "kind": "unknown",
+        "signature": "DialogFooter"
+      },
+      {
+        "name": "DialogTitle",
+        "kind": "unknown",
+        "signature": "DialogTitle"
+      },
+      {
+        "name": "DialogDescription",
+        "kind": "unknown",
+        "signature": "DialogDescription"
+      },
+      {
+        "name": "ManagedWindow",
+        "kind": "interface",
+        "signature": "interface ManagedWindow"
+      },
+      {
+        "name": "LayoutWindow",
+        "kind": "interface",
+        "signature": "interface LayoutWindow"
+      },
+      {
+        "name": "FloatingWindowState",
+        "kind": "interface",
+        "signature": "interface FloatingWindowState"
+      },
+      {
+        "name": "layoutAdapter",
+        "kind": "const",
+        "signature": "const layoutAdapter: { register(cbs: { move?: MoveCallback; resize?: ResizeCallback; style?: StyleCallback; }): void; unregister(): void; move(id: string, x: number, y: number): void; resize(id: string, w: number, h: number): void; style(id: string, styles: Record<string, string>): void; }"
+      },
+      {
+        "name": "bus",
+        "kind": "const",
+        "signature": "const bus: { register: (id: string, type: string, channels: string[], handler: MessageHandler) => () => void; send: (from: string, to: string, channel: string, payload: unknown) => void; broadcast: (from: string, channel: string, payload: unknown) => void; subscribe: (channels: string[], handler: MessageHandler) => () => void; listPeers: () => Array<{ id: string; type: string; }>; readonly lastMessage: any; readonly peerCount: any; }"
+      },
+      {
+        "name": "BusMessage",
+        "kind": "interface",
+        "signature": "interface BusMessage",
+        "jsdoc": "/**\n * FONC-inspired message bus for inter-component communication.\n *\n * Inspired by Alan Kay's \"messaging not calling\" principle (FONC / STEPS):\n * components never call each other directly — they send messages on named\n * channels, and the bus delivers them. This decouples senders from receivers,\n * enabling composition without tight coupling.\n *\n * Uses Svelte 5 runes ($state) internally for reactivity.\n */"
+      },
+      {
+        "name": "LLMSelector",
+        "kind": "unknown",
+        "signature": "LLMSelector"
+      },
+      {
+        "name": "GemmaLoader",
+        "kind": "unknown",
+        "signature": "GemmaLoader"
+      },
+      {
+        "name": "McpStatus",
+        "kind": "unknown",
+        "signature": "McpStatus"
+      },
+      {
+        "name": "AgentProgress",
+        "kind": "unknown",
+        "signature": "AgentProgress"
+      },
+      {
+        "name": "McpConnector",
+        "kind": "unknown",
+        "signature": "McpConnector"
+      },
+      {
+        "name": "ChatPanel",
+        "kind": "unknown",
+        "signature": "ChatPanel"
+      },
+      {
+        "name": "ChatFeedItem",
+        "kind": "type",
+        "signature": "ChatFeedItem"
+      },
+      {
+        "name": "ChatBubble",
+        "kind": "type",
+        "signature": "ChatBubble"
+      },
+      {
+        "name": "ChatBlock",
+        "kind": "type",
+        "signature": "ChatBlock"
+      },
+      {
+        "name": "AgentConsole",
+        "kind": "unknown",
+        "signature": "AgentConsole"
+      },
+      {
+        "name": "SettingsPanel",
+        "kind": "unknown",
+        "signature": "SettingsPanel"
+      },
+      {
+        "name": "RemoteMCPserversDemo",
+        "kind": "unknown",
+        "signature": "RemoteMCPserversDemo"
+      },
+      {
+        "name": "EphemeralBubble",
+        "kind": "unknown",
+        "signature": "EphemeralBubble"
+      },
+      {
+        "name": "TokenBubble",
+        "kind": "unknown",
+        "signature": "TokenBubble"
+      }
+    ],
+    "imports": [
+      {
+        "from": "@webmcp-auto-ui/sdk",
+        "symbols": [
+          "Block",
+          "BlockType",
+          "ChatMsg",
+          "LLMId",
+          "McpToolInfo",
+          "Mode",
+          "canvasVanilla"
+        ]
+      }
+    ],
+    "interfaces": [
+      {
+        "name": "ThemeTokens",
+        "properties": [
+          {
+            "name": "'color-bg'",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "'color-surface'",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "'color-surface2'",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "'color-border'",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "'color-border2'",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "'color-accent'",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "'color-accent2'",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "'color-amber'",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "'color-teal'",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "'color-text1'",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "'color-text2'",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "ManagedWindow",
+        "properties": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "visible",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "focused",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "folded",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "weight",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "createdAt",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "lastFocusedAt",
+            "type": "number",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "LayoutWindow",
+        "properties": [
+          {
+            "name": "id",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "x",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "y",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "width",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "height",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "zIndex",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "visible",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "folded",
+            "type": "boolean",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "FloatingWindowState",
+        "properties": [
+          {
+            "name": "x",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "y",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "width",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "height",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "zIndex",
+            "type": "number",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "BusMessage",
+        "properties": [
+          {
+            "name": "from",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "to",
+            "type": "string | '*'",
+            "optional": false
+          },
+          {
+            "name": "channel",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "payload",
+            "type": "unknown",
+            "optional": false
+          },
+          {
+            "name": "timestamp",
+            "type": "number",
+            "optional": false
+          }
+        ]
+      }
+    ],
+    "functions": []
+  }
+]

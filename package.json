@@ -1,12 +1,21 @@
 {
   "name": "webmcp-auto-ui",
   "private": true,
-  "version": "2.1.1",
+  "version": "2.2.0",
   "workspaces": [
     "packages/core",
     "packages/ui",
     "packages/agent",
     "packages/sdk",
+    "packages/widgets-vanilla",
+    "packages/widgets-d3",
+    "packages/widgets-threejs",
+    "packages/widgets-canvas2d",
+    "packages/widgets-leaflet",
+    "packages/widgets-plotly",
+    "packages/widgets-mermaid",
+    "packages/widgets-mapbox",
+    "packages/widgets-mui",
     "apps/home",
     "apps/flex2",
     "apps/viewer2",
@@ -14,6 +23,11 @@
     "apps/showcase2",
     "apps/recipes",
     "apps/wasm",
+    "apps/multi-astro",
+    "apps/multi-svelte",
+    "apps/multi-react",
+    "apps/multi-vue",
+    "apps/multi-webcomponents",
     "docs-site"
   ],
   "scripts": {
@@ -32,6 +46,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "docs:facts": "npx tsx scripts/extract-facts.ts",
+    "docs:diagrams": "npx tsx scripts/generate-diagrams.ts",
+    "docs:svg": "npx tsx scripts/render-diagrams.ts",
+    "docs:prose": "npx tsx scripts/generate-prose.ts",
+    "docs:pipeline": "npx tsx scripts/generate-docs.pipeline.ts",
     "docs:generate": "bash scripts/generate-docs.sh"
   },
   "devDependencies": {
@@ -39,6 +58,7 @@
     "@mediapipe/tasks-genai": "^0.10.27",
     "@playwright/test": "^1.59.1",
     "concurrently": "^8.2.0",
+    "ts-morph": "^27.0.2",
     "vitest": "^4.1.2"
   },
   "overrides": {

@@ -1,277 +1,116 @@
 /**
- * Canvas state store — Svelte 5 runes
- * Manages blocks on the canvas, mode, MCP connection, chat history
+ * Canvas state store — Svelte 5 runes wrapper
+ * Thin reactive wrapper around the framework-agnostic canvas store (canvas.ts).
+ *
+ * All state mutations go through the vanilla store; this file only adds
+ * Svelte 5 $state/$derived reactivity via subscribe().
  */
 
-import { encode, decode } from 'hyperskills';
+import { canvasVanilla } from './canvas.js';
+import type { Widget, WidgetType, Mode, LLMId, ChatMsg, McpToolInfo } from './canvas.js';
 
-export type WidgetType =
-  | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
-  | 'stat-card' | 'data-table' | 'timeline' | 'profile' | 'trombinoscope' | 'json-viewer'
-  | 'hemicycle' | 'chart-rich' | 'cards' | 'grid-data' | 'sankey' | 'map' | 'log'
-  | 'gallery' | 'carousel' | 'd3' | 'js-sandbox';
-
-/** @deprecated Use WidgetType */
-export type BlockType = WidgetType;
-
-export type Mode = 'auto' | 'drag' | 'chat';
-export type LLMId = 'haiku' | 'sonnet' | 'gemma-e2b' | 'gemma-e4b';
-
-export interface Widget {
-  id: string;
-  type: WidgetType;
-  data: Record<string, unknown>;
-}
-
-/** @deprecated Use Widget */
-export type Block = Widget;
-
-export interface ChatMsg {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  thinking?: boolean;
-}
-
-export interface McpToolInfo {
-  name: string;
-  description: string;
-  inputSchema?: Record<string, unknown>;
-}
-
-function uuid() {
-  return 'w_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-}
-
-function msgId() {
-  return 'm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-}
+// Re-export types (including deprecated aliases)
+export type { Widget, WidgetType, Mode, LLMId, ChatMsg, McpToolInfo };
+export type { Block, BlockType, CanvasSnapshot } from './canvas.js';
 
 function createCanvas() {
-  // ── State ────────────────────────────────────────────────────────────────
-  let blocks = $state<Block[]>([]);
-  let mode = $state<Mode>('drag');
-  let llm = $state<LLMId>('haiku');
-  let mcpUrl = $state('');
-  let mcpConnected = $state(false);
-  let mcpConnecting = $state(false);
-  let mcpName = $state('');
-  let mcpTools = $state<McpToolInfo[]>([]);
-  let messages = $state<ChatMsg[]>([]);
-  let generating = $state(false);
-  let statusText = $state('● aucun MCP connecté');
-  let statusColor = $state('text-zinc-600');
+  // ── Reactive mirror of vanilla state ────────────────────────────────────
+  let blocks = $state<Widget[]>(canvasVanilla.blocks);
+  let mode = $state<Mode>(canvasVanilla.mode);
+  let llm = $state<LLMId>(canvasVanilla.llm);
+  let mcpUrl = $state(canvasVanilla.mcpUrl);
+  let mcpConnected = $state(canvasVanilla.mcpConnected);
+  let mcpConnecting = $state(canvasVanilla.mcpConnecting);
+  let mcpName = $state(canvasVanilla.mcpName);
+  let mcpTools = $state<McpToolInfo[]>(canvasVanilla.mcpTools);
+  let messages = $state<ChatMsg[]>(canvasVanilla.messages);
+  let generating = $state(canvasVanilla.generating);
+  let statusText = $state(canvasVanilla.statusText);
+  let statusColor = $state(canvasVanilla.statusColor);
+  let themeOverrides = $state<Record<string, string>>(canvasVanilla.themeOverrides);
 
-  // ── Derived ──────────────────────────────────────────────────────────────
+  // ── Derived ─────────────────────────────────────────────────────────────
   const blockCount = $derived(blocks.length);
   const isEmpty = $derived(blocks.length === 0);
 
-  // ── Block actions ────────────────────────────────────────────────────────
-  function addWidget(type: WidgetType, data: Record<string, unknown> = {}): Widget {
-    const widget: Widget = { id: uuid(), type, data };
-    blocks = [...blocks, widget];
-    return widget;
-  }
+  // ── Sync from vanilla store on every change ─────────────────────────────
+  canvasVanilla.subscribe(() => {
+    const s = canvasVanilla.getSnapshot();
+    blocks = s.blocks;
+    mode = s.mode;
+    llm = s.llm;
+    mcpUrl = s.mcpUrl;
+    mcpConnected = s.mcpConnected;
+    mcpConnecting = s.mcpConnecting;
+    mcpName = s.mcpName;
+    mcpTools = s.mcpTools;
+    messages = s.messages;
+    generating = s.generating;
+    statusText = s.statusText;
+    statusColor = s.statusColor;
+    themeOverrides = s.themeOverrides;
+  });
 
-  function removeBlock(id: string) {
-    blocks = blocks.filter((b) => b.id !== id);
-  }
-
-  function updateBlock(id: string, data: Partial<Record<string, unknown>>) {
-    blocks = blocks.map((b) => b.id === id ? { ...b, data: { ...b.data, ...data } } : b);
-  }
-
-  function moveBlock(fromId: string, toId: string) {
-    const fi = blocks.findIndex((b) => b.id === fromId);
-    const ti = blocks.findIndex((b) => b.id === toId);
-    if (fi < 0 || ti < 0 || fi === ti) return;
-    const next = [...blocks];
-    const [moved] = next.splice(fi, 1);
-    next.splice(ti, 0, moved);
-    blocks = next;
-  }
-
-  function clearBlocks() {
-    blocks = [];
-  }
-
-  function setBlocks(newBlocks: Block[]) {
-    blocks = newBlocks;
-  }
-
-  // ── Chat ─────────────────────────────────────────────────────────────────
-  function addMsg(role: ChatMsg['role'], content: string, thinking = false): ChatMsg {
-    const msg: ChatMsg = { id: msgId(), role, content, thinking };
-    messages = [...messages, msg];
-    return msg;
-  }
-
-  function updateMsg(id: string, content: string, thinking = false) {
-    messages = messages.map((m) => m.id === id ? { ...m, content, thinking } : m);
-  }
-
-  function clearMessages() {
-    messages = [];
-  }
-
-  // ── MCP ──────────────────────────────────────────────────────────────────
-  function setMcpConnecting(connecting: boolean) {
-    mcpConnecting = connecting;
-    if (connecting) {
-      statusText = '● connexion…';
-      statusColor = 'text-amber-400';
-    }
-  }
-
-  function setMcpConnected(
-    connected: boolean,
-    name?: string,
-    tools?: McpToolInfo[]
-  ) {
-    mcpConnected = connected;
-    if (name) mcpName = name;
-    if (tools) mcpTools = tools;
-    if (connected) {
-      statusText = `● ${name} · ${tools?.length ?? 0} tools`;
-      statusColor = 'text-teal-400';
-    } else {
-      statusText = '● aucun MCP connecté';
-      statusColor = 'text-zinc-600';
-    }
-  }
-
-  function setMcpError(err: string) {
-    mcpConnected = false;
-    mcpConnecting = false;
-    statusText = `● erreur: ${err}`;
-    statusColor = 'text-red-400';
-  }
-
-  // ── Theme ────────────────────────────────────────────────────────────────
-  let themeOverrides = $state<Record<string, string>>({});
-
-  function setThemeOverrides(overrides: Record<string, string>) {
-    themeOverrides = overrides;
-  }
-
-  // ── HyperSkill ───────────────────────────────────────────────────────────
-  function buildSkillJSON() {
-    const skill: Record<string, unknown> = {
-      version: '1.0',
-      name: 'skill-' + Date.now(),
-      created: new Date().toISOString(),
-      mcp: mcpUrl,
-      llm,
-      blocks: blocks.map((b) => ({ type: b.type, data: b.data })),
-    };
-    if (Object.keys(themeOverrides).length > 0) skill.theme = themeOverrides;
-    return skill;
-  }
-
-  async function buildHyperskillParam(): Promise<string> {
-    const json = JSON.stringify(buildSkillJSON());
-    const compress = json.length > 6144 ? 'gz' as const : undefined;
-    const url = await encode('https://x.local', json, compress ? { compress } : {});
-    return new URL(url).searchParams.get('hs')!;
-  }
-
-  async function loadFromParam(param: string): Promise<boolean> {
-    function applySkill(skill: {
-      mcp?: string; llm?: LLMId;
-      theme?: Record<string, string>;
-      blocks?: { type: BlockType; data: Record<string, unknown> }[];
-    }) {
-      if (skill.mcp) mcpUrl = skill.mcp;
-      if (skill.llm) llm = skill.llm;
-      if (skill.theme) themeOverrides = skill.theme;
-      if (skill.blocks) {
-        blocks = skill.blocks.map((b) => ({ id: uuid(), type: b.type, data: b.data }));
-      }
-    }
-
-    // Try hyperskills NPM decode (handles gz., br., and plain base64)
-    try {
-      const { content: json } = await decode(param);
-      applySkill(JSON.parse(json));
-      return true;
-    } catch { /* fall through to legacy */ }
-
-    // Fallback: legacy format (plain base64 with escape/unescape)
-    try {
-      let b64 = param.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/');
-      while (b64.length % 4) b64 += '=';
-      const json = decodeURIComponent(escape(atob(b64)));
-      applySkill(JSON.parse(json));
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  // ── loadFromUrl ──────────────────────────────────────────────────────────
-  async function loadFromUrl(url: string): Promise<boolean> {
-    try {
-      const { content: raw } = await decode(url);
-      const decoded = JSON.parse(raw) as { meta?: Record<string, unknown>; content?: { blocks?: { type: BlockType; data: Record<string, unknown> }[] } };
-      if (decoded.meta?.mcp) mcpUrl = decoded.meta.mcp as string;
-      if (decoded.meta?.llm) llm = decoded.meta.llm as LLMId;
-      if (decoded.meta?.theme) themeOverrides = decoded.meta.theme as Record<string, string>;
-      if (decoded.content?.blocks) blocks = decoded.content.blocks.map((b) => ({ id: uuid(), type: b.type, data: b.data }));
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  // ── Return public API ────────────────────────────────────────────────────
+  // ── Return public API ───────────────────────────────────────────────────
   return {
     // State getters + setters (reactive — supports bind:)
     get blocks() { return blocks; },
     get mode() { return mode; },
-    set mode(v: Mode) { mode = v; },
+    set mode(v: Mode) { canvasVanilla.mode = v; },
     get llm() { return llm; },
-    set llm(v: LLMId) { llm = v; },
+    set llm(v: LLMId) { canvasVanilla.llm = v; },
     get mcpUrl() { return mcpUrl; },
-    set mcpUrl(v: string) { mcpUrl = v; },
+    set mcpUrl(v: string) { canvasVanilla.mcpUrl = v; },
     get mcpConnected() { return mcpConnected; },
     get mcpConnecting() { return mcpConnecting; },
     get mcpName() { return mcpName; },
     get mcpTools() { return mcpTools; },
     get messages() { return messages; },
     get generating() { return generating; },
-    set generating(v: boolean) { generating = v; },
+    set generating(v: boolean) { canvasVanilla.generating = v; },
     get statusText() { return statusText; },
     get statusColor() { return statusColor; },
     get blockCount() { return blockCount; },
     get isEmpty() { return isEmpty; },
 
     // Setters (kept for backward compat)
-    setMode(m: Mode) { mode = m; },
-    setLlm(l: LLMId) { llm = l; },
-    setMcpUrl(u: string) { mcpUrl = u; },
-    setGenerating(g: boolean) { generating = g; },
+    setMode(m: Mode) { canvasVanilla.setMode(m); },
+    setLlm(l: LLMId) { canvasVanilla.setLlm(l); },
+    setMcpUrl(u: string) { canvasVanilla.setMcpUrl(u); },
+    setGenerating(g: boolean) { canvasVanilla.setGenerating(g); },
 
-    // Widget actions (new names)
-    addWidget,
+    // Widget actions (primary name)
+    addWidget: canvasVanilla.addWidget.bind(canvasVanilla),
 
-    // Backward compat aliases
-    addBlock: addWidget,
+    // Backward compat alias
+    addBlock: canvasVanilla.addBlock.bind(canvasVanilla),
 
     // Block actions (kept as-is)
-    removeBlock, updateBlock, moveBlock, clearBlocks, setBlocks,
+    removeBlock: canvasVanilla.removeBlock.bind(canvasVanilla),
+    updateBlock: canvasVanilla.updateBlock.bind(canvasVanilla),
+    moveBlock: canvasVanilla.moveBlock.bind(canvasVanilla),
+    clearBlocks: canvasVanilla.clearBlocks.bind(canvasVanilla),
+    setBlocks: canvasVanilla.setBlocks.bind(canvasVanilla),
 
     // Chat
-    addMsg, updateMsg, clearMessages,
+    addMsg: canvasVanilla.addMsg.bind(canvasVanilla),
+    updateMsg: canvasVanilla.updateMsg.bind(canvasVanilla),
+    clearMessages: canvasVanilla.clearMessages.bind(canvasVanilla),
 
     // MCP
-    setMcpConnecting, setMcpConnected, setMcpError,
+    setMcpConnecting: canvasVanilla.setMcpConnecting.bind(canvasVanilla),
+    setMcpConnected: canvasVanilla.setMcpConnected.bind(canvasVanilla),
+    setMcpError: canvasVanilla.setMcpError.bind(canvasVanilla),
 
     // Theme
     get themeOverrides() { return themeOverrides; },
-    setThemeOverrides,
+    setThemeOverrides: canvasVanilla.setThemeOverrides.bind(canvasVanilla),
 
     // HyperSkill
-    buildSkillJSON, buildHyperskillParam, loadFromParam, loadFromUrl,
+    buildSkillJSON: canvasVanilla.buildSkillJSON.bind(canvasVanilla),
+    buildHyperskillParam: canvasVanilla.buildHyperskillParam.bind(canvasVanilla),
+    loadFromParam: canvasVanilla.loadFromParam.bind(canvasVanilla),
+    loadFromUrl: canvasVanilla.loadFromUrl.bind(canvasVanilla),
   };
 }
 

@@ -1,0 +1,32 @@
+{
+  "name": "@webmcp-auto-ui/widgets-mui",
+  "version": "1.0.0",
+  "description": "Material UI widgets for WebMCP — React components rendered in vanilla containers",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts"
+    },
+    "./server": {
+      "import": "./src/server.ts"
+    }
+  },
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@webmcp-auto-ui/core": "file:../core",
+    "@mui/material": "^6.3.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.0.0"
+  }
+}

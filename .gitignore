@@ -32,6 +32,10 @@ docs-site/.astro/
 # Auto-generated recipe file
 packages/agent/src/recipes/_generated.ts
 
+# Generated documentation artifacts
+docs/diagrams/svg/
+docs/generated/
+
 # Local
 *.local
 

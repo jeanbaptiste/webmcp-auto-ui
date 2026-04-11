@@ -1,0 +1,703 @@
+classDiagram
+  class JsonSchemaObject {
+    <<interface>>
+    +type?: JsonSchemaType | JsonSchemaType[]
+    +title?: string
+    +description?: string
+    +default?: unknown
+    +examples?: unknown[]
+    +minLength?: number
+    +maxLength?: number
+    +pattern?: string
+    +format?: string
+    +enum?: unknown[]
+    +const?: unknown
+    +minimum?: number
+    +maximum?: number
+    +exclusiveMinimum?: number | boolean
+    +exclusiveMaximum?: number | boolean
+    +multipleOf?: number
+    +properties?: Record#lt;string, JsonSchema#gt;
+    +required?: string[]
+    +additionalProperties?: boolean | JsonSchema
+    +patternProperties?: Record#lt;string, JsonSchema#gt;
+    +items?: JsonSchema | JsonSchema[]
+    +minItems?: number
+    +maxItems?: number
+    +uniqueItems?: boolean
+    +allOf?: JsonSchema[]
+    +anyOf?: JsonSchema[]
+    +oneOf?: JsonSchema[]
+    +not?: JsonSchema
+    +$ref?: string
+    +$schema?: string
+    +$id?: string
+    +$defs?: Record#lt;string, JsonSchema#gt;
+    +definitions?: Record#lt;string, JsonSchema#gt;
+    +if?: JsonSchema
+    +then?: JsonSchema
+    +else?: JsonSchema
+    +nullable?: boolean
+  }
+
+  class ToolAnnotations {
+    <<interface>>
+    +readOnlyHint?: boolean
+    +destructiveHint?: boolean
+    +idempotentHint?: boolean
+    +openWorldHint?: boolean
+    +cautionHint?: boolean
+    +title?: string
+  }
+
+  class ModelContextTool {
+    <<interface>>
+    +name: string
+    +description: string
+    +inputSchema?: JsonSchema
+    +outputSchema?: JsonSchema
+    +annotations?: ToolAnnotations
+  }
+
+  class ModelContextClient {
+    <<interface>>
+  }
+
+  class UserInteractionOptions {
+    <<interface>>
+    +prompt?: string
+    +kind?: 'confirmation' | 'input' | 'choice'
+    +choices?: string[]
+  }
+
+  class UserInteractionResult {
+    <<interface>>
+    +accepted: boolean
+    +value?: string
+  }
+
+  class ToolRegistrationOptions {
+    <<interface>>
+    +signal?: AbortSignal
+  }
+
+  class RegisteredTool {
+    <<interface>>
+    +tool: ModelContextTool
+    +execute: ToolExecuteCallback
+    +serializedInputSchema?: string
+    +registeredAt: number
+  }
+
+  class ContextRegistration {
+    <<interface>>
+    +tool: ModelContextTool & { execute: ToolExecuteCallba...
+    +options?: ToolRegistrationOptions
+  }
+
+  class ModelContext {
+    <<interface>>
+  }
+
+  class ModelContextTesting {
+    <<interface>>
+  }
+
+  class ModelContextTestingToolInfo {
+    <<interface>>
+    +name: string
+    +description: string
+    +inputSchema?: string
+  }
+
+  class ToolContentText {
+    <<interface>>
+    +type: 'text'
+    +text: string
+  }
+
+  class ToolContentImage {
+    <<interface>>
+    +type: 'image'
+    +data: string
+    +mimeType: string
+  }
+
+  class ToolContentResource {
+    <<interface>>
+    +type: 'resource'
+    +resource: {
+    uri: string;
+    mimeType?: string;
+    t...
+  }
+
+  class ToolContentError {
+    <<interface>>
+    +type: 'error'
+    +error: string
+  }
+
+  class ToolExecuteResult {
+    <<interface>>
+    +content: ToolContent[]
+    +isError?: boolean
+    +structuredContent?: Record#lt;string, unknown#gt;
+    +_meta?: ToolResultMetadata
+  }
+
+  class ToolResultMetadata {
+    <<interface>>
+    +willNavigate?: boolean
+  }
+
+  class AuthContext {
+    <<interface>>
+    +userId?: string
+    +tenantId?: string
+    +workspaceId?: string
+    +roles?: string[]
+  }
+
+  class ConfirmationPolicy {
+    <<interface>>
+    +destructive?: ConfirmationTier
+    +mutating?: ConfirmationTier
+    +all?: ConfirmationTier
+  }
+
+  class WebMCPPolyfillOptions {
+    <<interface>>
+    +forcePolyfill?: boolean
+    +allowInsecureContext?: boolean
+    +degradeGracefully?: boolean
+    +authContext?: AuthContext
+    +confirmationPolicy?: ConfirmationPolicy
+    +installTestingShim?: 'if-missing' | 'always' | false
+    +autoInitialize?: boolean
+  }
+
+  class JsonRpcRequest {
+    <<interface>>
+    +jsonrpc: '2.0'
+    +id: number | string
+    +method: string
+    +params?: Record#lt;string, unknown#gt;
+  }
+
+  class JsonRpcError {
+    <<interface>>
+    +code: number
+    +message: string
+    +data?: unknown
+  }
+
+  class JsonRpcResponse {
+    <<interface>>
+    +jsonrpc: '2.0'
+    +id: number | string | null
+    +result?: T
+    +error?: JsonRpcError
+  }
+
+  class McpServerInfo {
+    <<interface>>
+    +name: string
+    +version: string
+  }
+
+  class McpCapabilities {
+    <<interface>>
+    +tools?: { listChanged?: boolean }
+    +resources?: { listChanged?: boolean; subscribe?: boolean }
+    +prompts?: { listChanged?: boolean }
+    +logging?: Record#lt;string, unknown#gt;
+  }
+
+  class McpInitializeResult {
+    <<interface>>
+    +protocolVersion: string
+    +capabilities: McpCapabilities
+    +serverInfo: McpServerInfo
+  }
+
+  class McpTool {
+    <<interface>>
+    +name: string
+    +description?: string
+    +inputSchema?: JsonSchema
+    +outputSchema?: JsonSchema
+    +annotations?: ToolAnnotations
+  }
+
+  class McpToolResultContent {
+    <<interface>>
+    +type: 'text' | 'image' | 'resource'
+    +text?: string
+    +data?: string
+    +mimeType?: string
+    +resource?: { uri: string; mimeType?: string; text?: string...
+  }
+
+  class McpToolResult {
+    <<interface>>
+    +content: McpToolResultContent[]
+    +isError?: boolean
+  }
+
+  class McpListToolsResult {
+    <<interface>>
+    +tools: McpTool[]
+    +nextCursor?: string
+  }
+
+  class McpClientOptions {
+    <<interface>>
+    +clientName?: string
+    +clientVersion?: string
+    +timeout?: number
+    +headers?: Record#lt;string, string#gt;
+    +autoReconnect?: boolean
+    +maxReconnectAttempts?: number
+  }
+
+  class WebMCPCallToolEvent {
+    <<interface>>
+    +type: 'webmcp:call-tool'
+    +callId: string
+    +name: string
+    +args?: Record#lt;string, unknown#gt;
+  }
+
+  class WebMCPToolResultEvent {
+    <<interface>>
+    +type: 'webmcp:tool-result'
+    +callId: string
+    +result: ToolExecuteResult
+  }
+
+  class WebMCPToolErrorEvent {
+    <<interface>>
+    +type: 'webmcp:tool-error'
+    +callId: string
+    +error: string
+  }
+
+  class PostMessageBridgeOptions {
+    <<interface>>
+    +targetOrigin?: string
+    +allowedOrigins?: string[]
+  }
+
+  class ValidationResult {
+    <<interface>>
+    +valid: boolean
+    +errors: ValidationError[]
+  }
+
+  class ValidationError {
+    <<interface>>
+    +path: string
+    +message: string
+    +keyword: string
+    +expected?: unknown
+    +actual?: unknown
+  }
+
+  class ConnectedServer {
+    <<interface>>
+    +url: string
+    +name: string
+    +tools: McpTool[]
+  }
+
+  class WebMcpServer {
+    <<interface>>
+    +name: string
+    +description: string
+  }
+
+  class WebMcpServerOptions {
+    <<interface>>
+    +description: string
+  }
+
+  class WebMcpToolDef {
+    <<interface>>
+    +name: string
+    +description: string
+    +inputSchema: Record#lt;string, unknown#gt;
+    +execute: (params: Record#lt;string, unknown#gt;) =#gt; P...
+  }
+
+  class WidgetEntry {
+    <<interface>>
+    +name: string
+    +description: string
+    +inputSchema: Record#lt;string, unknown#gt;
+    +recipe: string
+    +renderer: WidgetRenderer
+    +group?: string
+  }
+
+  class RemoteLLMProviderOptions {
+    <<interface>>
+    +proxyUrl: string
+    +model?: RemoteModelId
+    +apiKey?: string
+  }
+
+  class WasmProviderOptions {
+    <<interface>>
+    +model?: WasmModelId
+    +contextSize?: number
+    +onProgress?: (progress: number, status: string, loaded?: num...
+    +onStatusChange?: (status: WasmStatus) =#gt; void
+  }
+
+  class LocalLLMProviderOptions {
+    <<interface>>
+    +baseUrl: string
+    +model: string
+    +backend?: LocalBackend
+  }
+
+  class AgentLoopOptions {
+    <<interface>>
+    +client?: McpClient
+    +provider: LLMProvider
+    +layers?: ToolLayer[]
+    +maxIterations?: number
+    +maxTokens?: number
+    +maxTools?: number
+    +temperature?: number
+    +topK?: number
+    +cacheEnabled?: boolean
+    +systemPrompt?: string
+    +initialMessages?: ChatMessage[]
+    +callbacks?: AgentCallbacks
+    +signal?: AbortSignal
+  }
+
+  class McpLayer {
+    <<interface>>
+    +protocol: 'mcp'
+    +serverName: string
+    +description?: string
+    +serverUrl?: string
+    +tools: McpToolDef[]
+    +recipes?: McpRecipe[]
+  }
+
+  class WebMcpLayer {
+    <<interface>>
+    +protocol: 'webmcp'
+    +serverName: string
+    +description: string
+    +tools: WebMcpToolDef[]
+  }
+
+  class SummarizeOptions {
+    <<interface>>
+    +messages: ChatMessage[]
+    +provider: LLMProvider
+    +toolsUsed?: string[]
+    +toolCallCount?: number
+    +mcpServers?: string[]
+    +skillsReferenced?: string[]
+  }
+
+  class ChatSummaryResult {
+    <<interface>>
+    +chatSummary: string
+    +provenance: {
+    mcpServers?: string[];
+    toolsUsed?: st...
+  }
+
+  class TokenMetrics {
+    <<interface>>
+    +totalRequests: number
+    +totalInputTokens: number
+    +totalOutputTokens: number
+    +totalCacheReadTokens: number
+    +requestsPerMin: number
+    +inputTokensPerMin: number
+    +outputTokensPerMin: number
+    +lastInputTokens: number
+    +lastOutputTokens: number
+    +lastCacheReadTokens: number
+    +lastLatencyMs: number
+    +totalCachedGB: number
+    +isWasm: boolean
+  }
+
+  class ChatMessage {
+    <<interface>>
+    +role: 'user' | 'assistant' | 'system'
+    +content: string | ContentBlock[]
+  }
+
+  class McpToolDef {
+    <<interface>>
+    +name: string
+    +description?: string
+    +inputSchema?: Record#lt;string, unknown#gt;
+  }
+
+  class ProviderTool {
+    <<interface>>
+    +name: string
+    +description: string
+    +input_schema: Record#lt;string, unknown#gt;
+  }
+
+  class LLMProvider {
+    <<interface>>
+    +name: string
+    +model: string
+  }
+
+  class LLMResponse {
+    <<interface>>
+    +content: ContentBlock[]
+    +stopReason: string
+    +usage?: { input_tokens: number; output_tokens: number; ...
+    +stats?: { tokensPerSec: number; totalTokens: number; la...
+  }
+
+  class ToolCall {
+    <<interface>>
+    +id: string
+    +name: string
+    +args: Record#lt;string, unknown#gt;
+    +result?: string
+    +error?: string
+    +elapsed?: number
+    +guided?: boolean
+  }
+
+  class AgentMetrics {
+    <<interface>>
+    +totalTokens: number
+    +promptTokens: number
+    +completionTokens: number
+    +totalLatencyMs: number
+    +toolCalls: number
+    +iterations: number
+    +cacheHits: number
+  }
+
+  class AgentResult {
+    <<interface>>
+    +text: string
+    +toolCalls: ToolCall[]
+    +metrics: AgentMetrics
+    +stopReason: 'end_turn' | 'max_iterations'
+    +messages: ChatMessage[]
+  }
+
+  class AgentCallbacks {
+    <<interface>>
+    +onIterationStart?: (iteration: number, maxIterations: number) =#gt...
+    +onLLMRequest?: (messages: ChatMessage[], tools: ProviderTool[]...
+    +onLLMResponse?: (response: LLMResponse, latencyMs: number, toke...
+    +onToolCall?: (call: ToolCall) =#gt; void
+    +onWidget?: (type: string, data: Record#lt;string, unknown#...
+    +onClear?: () =#gt; void
+    +onText?: (text: string) =#gt; void
+    +onToken?: (token: string) =#gt; void
+    +onDone?: (metrics: AgentMetrics) =#gt; void
+    +onUpdate?: (id: string, data: Record#lt;string, unknown#gt...
+    +onMove?: (id: string, x: number, y: number) =#gt; void
+    +onResize?: (id: string, w: number, h: number) =#gt; void
+    +onStyle?: (id: string, styles: Record#lt;string, string#g...
+  }
+
+  class Recipe {
+    <<interface>>
+    +id: string
+    +name: string
+    +description?: string
+    +components_used?: string[]
+    +layout?: { type: string; columns?: number; arrangement?:...
+    +example_data?: Record#lt;string, unknown#gt;
+    +interactions?: { source: string; target: string; event: string...
+    +when: string
+    +servers?: string[]
+    +body: string
+  }
+
+  class McpRecipe {
+    <<interface>>
+    +name: string
+    +description?: string
+  }
+
+  class Skill {
+    <<interface>>
+    +id: string
+    +name: string
+    +description?: string
+    +mcp?: string
+    +mcpName?: string
+    +llm?: string
+    +tags?: string[]
+    +theme?: ThemeOverrides
+    +blocks: SkillBlock[]
+    +component?: string
+    +presentation?: string
+    +expectedBlockTypes?: string[]
+    +createdAt: number
+    +updatedAt: number
+  }
+
+  class SkillBlock {
+    <<interface>>
+    +type: string
+    +data: Record#lt;string, unknown#gt;
+  }
+
+  class McpDemoServer {
+    <<interface>>
+    +id: string
+    +name: string
+    +description: string
+    +url: string
+    +tags?: string[]
+  }
+
+  class HyperSkillMeta {
+    <<interface>>
+    +title?: string
+    +description?: string
+    +version?: string
+    +created?: string
+    +mcp?: string
+    +mcpName?: string
+    +llm?: string
+    +tags?: string[]
+    +theme?: Record#lt;string, string#gt;
+    +hash?: string
+    +previousHash?: string
+    +chatSummary?: string
+    +provenance?: {
+    mcpServers?: string[];
+    toolsUsed?: st...
+  }
+
+  class HyperSkill {
+    <<interface>>
+    +meta: HyperSkillMeta
+    +content: unknown
+  }
+
+  class HyperSkillVersion {
+    <<interface>>
+    +hash: string
+    +previousHash?: string
+    +timestamp: number
+    +skill: HyperSkill
+  }
+
+  class ThemeTokens {
+    <<interface>>
+    +'color-bg': string
+    +'color-surface': string
+    +'color-surface2': string
+    +'color-border': string
+    +'color-border2': string
+    +'color-accent': string
+    +'color-accent2': string
+    +'color-amber': string
+    +'color-teal': string
+    +'color-text1': string
+    +'color-text2': string
+  }
+
+  class ManagedWindow {
+    <<interface>>
+    +id: string
+    +title: string
+    +visible: boolean
+    +focused: boolean
+    +folded: boolean
+    +weight: number
+    +createdAt: number
+    +lastFocusedAt: number
+  }
+
+  class LayoutWindow {
+    <<interface>>
+    +id: string
+    +x: number
+    +y: number
+    +width: number
+    +height: number
+    +zIndex: number
+    +visible: boolean
+    +folded: boolean
+  }
+
+  class FloatingWindowState {
+    <<interface>>
+    +x: number
+    +y: number
+    +width: number
+    +height: number
+    +zIndex: number
+  }
+
+  class BusMessage {
+    <<interface>>
+    +from: string
+    +to: string | '*'
+    +channel: string
+    +payload: unknown
+    +timestamp: number
+  }
+
+  ModelContextTool --> ToolAnnotations : annotations
+  RegisteredTool --> ModelContextTool : tool
+  RegisteredTool --> ModelContext : tool
+  ContextRegistration --> ModelContextTool : tool
+  ContextRegistration --> ModelContext : tool
+  ContextRegistration --> ToolRegistrationOptions : options
+  ToolExecuteResult --> ToolResultMetadata : _meta
+  WebMCPPolyfillOptions --> AuthContext : authContext
+  WebMCPPolyfillOptions --> ConfirmationPolicy : confirmationPolicy
+  JsonRpcResponse --> JsonRpcError : error
+  McpInitializeResult --> McpCapabilities : capabilities
+  McpInitializeResult --> McpServerInfo : serverInfo
+  McpTool --> ToolAnnotations : annotations
+  McpToolResult --> McpTool : content
+  McpToolResult --> McpToolResultContent : content
+  McpListToolsResult --> McpTool : tools
+  WebMCPToolResultEvent --> ToolExecuteResult : result
+  ValidationResult --> ValidationError : errors
+  ConnectedServer --> McpTool : tools
+  AgentLoopOptions --> LLMProvider : provider
+  AgentLoopOptions --> ChatMessage : initialMessages
+  AgentLoopOptions --> AgentCallbacks : callbacks
+  McpLayer --> McpTool : tools
+  McpLayer --> McpToolDef : tools
+  McpLayer --> Recipe : recipes
+  McpLayer --> McpRecipe : recipes
+  WebMcpLayer --> McpTool : tools
+  WebMcpLayer --> WebMcpToolDef : tools
+  WebMcpLayer --> McpToolDef : tools
+  SummarizeOptions --> ChatMessage : messages
+  SummarizeOptions --> LLMProvider : provider
+  AgentResult --> ToolCall : toolCalls
+  AgentResult --> AgentMetrics : metrics
+  AgentResult --> ChatMessage : messages
+  AgentCallbacks --> ChatMessage : onLLMRequest
+  AgentCallbacks --> ProviderTool : onLLMRequest
+  AgentCallbacks --> LLMResponse : onLLMResponse
+  AgentCallbacks --> ToolCall : onToolCall
+  AgentCallbacks --> AgentMetrics : onDone
+  Skill --> SkillBlock : blocks
+  HyperSkill --> Skill : meta
+  HyperSkill --> HyperSkillMeta : meta
+  HyperSkillVersion --> Skill : skill
+  HyperSkillVersion --> HyperSkill : skill

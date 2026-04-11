@@ -1,28 +1,36 @@
 /**
  * Canvas state store — Vanilla (framework-agnostic)
- * Manages blocks on the canvas, mode, MCP connection, chat history
+ * Manages widgets on the canvas, mode, MCP connection, chat history
  *
- * This is the framework-agnostic version of the canvas store.
- * For Svelte 5 reactivity, use @webmcp-auto-ui/sdk/canvas (Svelte runes)
- * or @webmcp-auto-ui/ui/canvas (adapter).
+ * This is the canonical, framework-agnostic version of the canvas store.
+ * For Svelte 5 reactivity, use the Svelte wrapper (canvas.svelte.ts)
+ * which re-exports this store with $state/$derived reactivity.
+ *
+ * Reactivity: subscribe(fn) / getSnapshot() pattern (useSyncExternalStore compatible).
  */
 
 import { encode, decode } from 'hyperskills';
 
-export type BlockType =
+export type WidgetType =
   | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
   | 'stat-card' | 'data-table' | 'timeline' | 'profile' | 'trombinoscope' | 'json-viewer'
   | 'hemicycle' | 'chart-rich' | 'cards' | 'grid-data' | 'sankey' | 'map' | 'log'
-  | 'gallery' | 'carousel' | 'd3';
+  | 'gallery' | 'carousel' | 'd3' | 'js-sandbox';
+
+/** @deprecated Use WidgetType */
+export type BlockType = WidgetType;
 
 export type Mode = 'auto' | 'drag' | 'chat';
 export type LLMId = 'haiku' | 'sonnet' | 'gemma-e2b' | 'gemma-e4b';
 
-export interface Block {
+export interface Widget {
   id: string;
-  type: BlockType;
+  type: WidgetType;
   data: Record<string, unknown>;
 }
+
+/** @deprecated Use Widget */
+export type Block = Widget;
 
 export interface ChatMsg {
   id: string;
@@ -38,7 +46,7 @@ export interface McpToolInfo {
 }
 
 export interface CanvasSnapshot {
-  blocks: Block[];
+  blocks: Widget[];
   mode: Mode;
   llm: LLMId;
   mcpUrl: string;
@@ -58,7 +66,7 @@ export interface CanvasSnapshot {
 type Listener = () => void;
 
 function uuid() {
-  return 'b_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  return 'w_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 }
 
 function msgId() {
@@ -71,7 +79,7 @@ function createCanvasVanilla() {
   function notify() { listeners.forEach(fn => fn()); }
 
   // ── State ──────────────────────────────────────────────────────────────
-  let _blocks: Block[] = [];
+  let _blocks: Widget[] = [];
   let _mode: Mode = 'drag';
   let _llm: LLMId = 'haiku';
   let _mcpUrl = '';
@@ -85,13 +93,16 @@ function createCanvasVanilla() {
   let _statusColor = 'text-zinc-600';
   let _themeOverrides: Record<string, string> = {};
 
-  // ── Block actions ──────────────────────────────────────────────────────
-  function addBlock(type: BlockType, data: Record<string, unknown> = {}): Block {
-    const block: Block = { id: uuid(), type, data };
-    _blocks = [..._blocks, block];
+  // ── Widget actions ─────────────────────────────────────────────────────
+  function addWidget(type: WidgetType, data: Record<string, unknown> = {}): Widget {
+    const widget: Widget = { id: uuid(), type, data };
+    _blocks = [..._blocks, widget];
     notify();
-    return block;
+    return widget;
   }
+
+  /** @deprecated Use addWidget */
+  const addBlock = addWidget;
 
   function removeBlock(id: string) {
     _blocks = _blocks.filter((b) => b.id !== id);
@@ -119,7 +130,7 @@ function createCanvasVanilla() {
     notify();
   }
 
-  function setBlocks(newBlocks: Block[]) {
+  function setBlocks(newBlocks: Widget[]) {
     _blocks = newBlocks;
     notify();
   }
@@ -209,7 +220,7 @@ function createCanvasVanilla() {
     function applySkill(skill: {
       mcp?: string; llm?: LLMId;
       theme?: Record<string, string>;
-      blocks?: { type: BlockType; data: Record<string, unknown> }[];
+      blocks?: { type: WidgetType; data: Record<string, unknown> }[];
     }) {
       if (skill.mcp) _mcpUrl = skill.mcp;
       if (skill.llm) _llm = skill.llm;
@@ -243,7 +254,7 @@ function createCanvasVanilla() {
   async function loadFromUrl(url: string): Promise<boolean> {
     try {
       const { content: raw } = await decode(url);
-      const decoded = JSON.parse(raw) as { meta?: Record<string, unknown>; content?: { blocks?: { type: BlockType; data: Record<string, unknown> }[] } };
+      const decoded = JSON.parse(raw) as { meta?: Record<string, unknown>; content?: { blocks?: { type: WidgetType; data: Record<string, unknown> }[] } };
       if (decoded.meta?.mcp) _mcpUrl = decoded.meta.mcp as string;
       if (decoded.meta?.llm) _llm = decoded.meta.llm as LLMId;
       if (decoded.meta?.theme) _themeOverrides = decoded.meta.theme as Record<string, string>;
@@ -310,8 +321,14 @@ function createCanvasVanilla() {
     setMcpUrl(u: string) { _mcpUrl = u; notify(); },
     setGenerating(g: boolean) { _generating = g; notify(); },
 
-    // Block actions
-    addBlock, removeBlock, updateBlock, moveBlock, clearBlocks, setBlocks,
+    // Widget actions (primary name)
+    addWidget,
+
+    // Backward compat alias
+    addBlock,
+
+    // Block actions (kept as-is)
+    removeBlock, updateBlock, moveBlock, clearBlocks, setBlocks,
 
     // Chat
     addMsg, updateMsg, clearMessages,

@@ -1,0 +1,145 @@
+// @ts-nocheck
+// ---------------------------------------------------------------------------
+// Sunburst widget — hierarchical data as nested rings
+// ---------------------------------------------------------------------------
+
+interface TreeNode {
+  name: string;
+  value?: number;
+  children?: TreeNode[];
+}
+
+interface SunburstData {
+  root: TreeNode;
+  title?: string;
+  colorScheme?: string;
+}
+
+export async function render(
+  container: HTMLElement,
+  data: Record<string, unknown>,
+): Promise<void | (() => void)> {
+  const d3 = await import('d3');
+  const { root: rawRoot, title, colorScheme } = data as unknown as SunburstData;
+
+  const width = 500;
+  const radius = width / 2;
+
+  const colors = d3.scaleOrdinal(
+    (d3 as any)[`scheme${colorScheme ?? 'Tableau10'}`] ?? d3.schemeTableau10,
+  );
+
+  const hierarchy = d3
+    .hierarchy(rawRoot)
+    .sum((d: any) => d.value ?? 0)
+    .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+
+  const partition = d3.partition<TreeNode>().size([2 * Math.PI, radius]);
+  const root = partition(hierarchy);
+
+  const arc = d3
+    .arc<d3.HierarchyRectangularNode<TreeNode>>()
+    .startAngle((d) => d.x0)
+    .endAngle((d) => d.x1)
+    .padAngle((d) => Math.min((d.x1 - d.x0) / 2, 0.005))
+    .padRadius(radius / 2)
+    .innerRadius((d) => d.y0)
+    .outerRadius((d) => d.y1 - 1);
+
+  const svg = d3
+    .select(container)
+    .append('svg')
+    .attr('viewBox', `${-radius} ${-radius} ${width} ${width}`)
+    .style('width', '100%')
+    .style('height', 'auto')
+    .style('font', '10px sans-serif');
+
+  // Title
+  if (title) {
+    svg
+      .append('text')
+      .attr('text-anchor', 'middle')
+      .attr('y', -radius + 16)
+      .style('font-size', '14px')
+      .style('font-weight', 'bold')
+      .text(title);
+  }
+
+  // Tooltip
+  const tooltip = d3
+    .select(container)
+    .append('div')
+    .style('position', 'absolute')
+    .style('pointer-events', 'none')
+    .style('background', 'rgba(0,0,0,0.8)')
+    .style('color', '#fff')
+    .style('padding', '4px 8px')
+    .style('border-radius', '4px')
+    .style('font-size', '12px')
+    .style('opacity', '0');
+
+  container.style.position = 'relative';
+
+  const cells = svg
+    .selectAll('path')
+    .data(root.descendants().filter((d) => d.depth > 0))
+    .join('path')
+    .attr('fill', (d) => {
+      let node = d;
+      while (node.depth > 1) node = node.parent!;
+      return colors(node.data.name);
+    })
+    .attr('fill-opacity', (d) => 1 - d.depth * 0.15)
+    .attr('d', arc as any)
+    .style('cursor', 'pointer')
+    .style('opacity', 0);
+
+  // Entry transition
+  cells
+    .transition()
+    .duration(600)
+    .delay((_, i) => i * 20)
+    .style('opacity', 1);
+
+  // Hover
+  cells
+    .on('mouseenter', function (event: MouseEvent, d) {
+      d3.select(this).attr('fill-opacity', 1);
+      tooltip
+        .style('opacity', '1')
+        .html(`<strong>${d.data.name}</strong><br/>Value: ${d.value}`);
+    })
+    .on('mousemove', function (event: MouseEvent) {
+      const rect = container.getBoundingClientRect();
+      tooltip
+        .style('left', `${event.clientX - rect.left + 10}px`)
+        .style('top', `${event.clientY - rect.top - 10}px`);
+    })
+    .on('mouseleave', function (_, d) {
+      d3.select(this).attr('fill-opacity', 1 - d.depth * 0.15);
+      tooltip.style('opacity', '0');
+    });
+
+  // Labels for large-enough arcs
+  svg
+    .selectAll('text.label')
+    .data(
+      root.descendants().filter((d) => d.depth > 0 && d.x1 - d.x0 > 0.1),
+    )
+    .join('text')
+    .attr('class', 'label')
+    .attr('transform', (d) => {
+      const x = (((d.x0 + d.x1) / 2) * 180) / Math.PI;
+      const y = (d.y0 + d.y1) / 2;
+      return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
+    })
+    .attr('dy', '0.35em')
+    .attr('text-anchor', 'middle')
+    .style('font-size', '9px')
+    .text((d) => d.data.name);
+
+  return () => {
+    tooltip.remove();
+    svg.remove();
+  };
+}

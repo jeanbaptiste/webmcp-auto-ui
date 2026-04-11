@@ -1,0 +1,26 @@
+{
+  "name": "@webmcp-auto-ui/widgets-canvas2d",
+  "version": "1.0.0",
+  "description": "High-performance Canvas 2D widgets for large datasets — heatmap, sparklines, scatter, density, flame graph",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts"
+    }
+  },
+  "keywords": [
+    "webmcp",
+    "canvas2d",
+    "widgets",
+    "heatmap",
+    "sparklines",
+    "scatter",
+    "density",
+    "flame-graph"
+  ],
+  "dependencies": {
+    "@webmcp-auto-ui/core": "file:../core"
+  }
+}

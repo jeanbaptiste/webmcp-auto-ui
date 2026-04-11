@@ -22,12 +22,17 @@ export interface WebMcpToolDef {
   execute: (params: Record<string, unknown>) => Promise<unknown>;
 }
 
+/** A vanilla renderer: receives a container + data, optionally returns a cleanup function. */
+export type WidgetRenderer =
+  | ((container: HTMLElement, data: Record<string, unknown>) => void | (() => void))
+  | unknown; // framework component (Svelte, React, etc.)
+
 export interface WidgetEntry {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
   recipe: string;
-  renderer: unknown;
+  renderer: WidgetRenderer;
   group?: string;
 }
 
@@ -35,7 +40,7 @@ export interface WebMcpServer {
   readonly name: string;
   readonly description: string;
 
-  registerWidget(recipeMarkdown: string, renderer: unknown): void;
+  registerWidget(recipeMarkdown: string, renderer: WidgetRenderer): void;
   addTool(tool: WebMcpToolDef): void;
 
   layer(): {
@@ -274,6 +279,31 @@ function parseInlineObject(value: string): Record<string, unknown> {
 }
 
 // ---------------------------------------------------------------------------
+// Mount helper — framework-agnostic widget mounting
+// ---------------------------------------------------------------------------
+
+/**
+ * Mount a widget into a DOM container by searching registered servers.
+ * If the renderer is a function (vanilla renderer), it is called directly.
+ * Returns an optional cleanup function.
+ * Falls back to a text placeholder if no server provides the widget.
+ */
+export function mountWidget(
+  container: HTMLElement,
+  type: string,
+  data: Record<string, unknown>,
+  servers: WebMcpServer[],
+): (() => void) | void {
+  for (const server of servers) {
+    const widget = server.getWidget(type);
+    if (widget?.renderer && typeof widget.renderer === 'function') {
+      return (widget.renderer as (container: HTMLElement, data: Record<string, unknown>) => void | (() => void))(container, data);
+    }
+  }
+  container.textContent = `[${type}]`;
+}
+
+// ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
@@ -382,7 +412,7 @@ export function createWebMcpServer(
     get name() { return name; },
     get description() { return options.description; },
 
-    registerWidget(recipeMarkdown: string, renderer: unknown): void {
+    registerWidget(recipeMarkdown: string, renderer: WidgetRenderer): void {
       const { frontmatter, body } = parseFrontmatter(recipeMarkdown);
 
       const widgetName = frontmatter.widget as string | undefined;

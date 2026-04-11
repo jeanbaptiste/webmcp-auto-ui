@@ -1,0 +1,85 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ServerSelector from '../components/ServerSelector.astro';
+import McpConnector from '../components/McpConnector.astro';
+import ChatPanel from '../components/ChatPanel.astro';
+import WidgetGrid from '../components/WidgetGrid.astro';
+---
+
+<Layout title="Multi-Server WebMCP — Astro">
+  <div class="app">
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="logo-text">
+          <span class="logo-auto">Auto-UI</span>
+          <span class="logo-multi">multi</span>
+        </span>
+      </div>
+
+      <ServerSelector />
+      <McpConnector />
+
+      <div class="sidebar-chat">
+        <ChatPanel />
+      </div>
+    </aside>
+
+    <!-- MAIN CANVAS -->
+    <main class="canvas">
+      <WidgetGrid />
+    </main>
+  </div>
+</Layout>
+
+<style>
+  .app {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .sidebar {
+    width: 360px;
+    min-width: 360px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .logo-text {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .logo-auto {
+    color: var(--text1);
+  }
+
+  .logo-multi {
+    color: var(--accent);
+    margin-left: 6px;
+  }
+
+  .sidebar-chat {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .canvas {
+    flex: 1;
+    background: var(--bg);
+    overflow: hidden;
+  }
+</style>

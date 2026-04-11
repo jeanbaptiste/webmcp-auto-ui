@@ -1,0 +1,16 @@
+sequenceDiagram
+  participant User
+  participant AgentLoop
+  participant LLMProvider
+  participant WebMcpServer
+
+  User->>AgentLoop: message
+  AgentLoop->>LLMProvider: chat(messages, tools)
+  LLMProvider-->>AgentLoop: tool_use blocks
+  AgentLoop->>WebMcpServer: executeTool()
+  WebMcpServer-->>AgentLoop: result
+  AgentLoop-->>User: assistant response
+
+  Note over AgentLoop,WebMcpServer: Lazy tool discovery via<br/>buildDiscoveryTools + activateServerTools
+
+  Note over LLMProvider: RemoteLLMProvider (Claude API)<br/>or WasmProvider (in-browser Gemma)

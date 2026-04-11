@@ -1,0 +1,13 @@
+{
+  "name": "@webmcp-auto-ui/widgets-leaflet",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@webmcp-auto-ui/core": "file:../core",
+    "leaflet": "^1.9.4"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.8"
+  }
+}

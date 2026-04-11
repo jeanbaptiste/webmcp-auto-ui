@@ -1,0 +1,256 @@
+classDiagram
+  class Core {
+    +validateJsonSchema() ValidationResult
+    +initializeWebMCPPolyfill() void
+    +cleanupWebMCPPolyfill() void
+    +hasNativeWebMCP() boolean
+    +executeToolInternal() Promise#lt;ToolExecuteResult#gt;
+    +listenForAgentCalls() () =#gt; void
+    ~~+stopListening() void~~
+    +callToolViaPostMessage() Promise#lt;ToolExecuteResult#gt;
+    +isWebMCPEvent() boolean
+    +dispatchAndWait() Promise#lt;T#gt;
+    +signalCompletion() void
+    +sanitizeSchema() JsonSchema
+    +createToolGroup()
+    +textResult() ToolExecuteResult
+    +jsonResult() ToolExecuteResult
+    +createWebMcpServer() WebMcpServer
+    +parseFrontmatter() ParsedFrontmatter
+    +mountWidget() (() =#gt; void) | void
+    +McpClient
+    +McpMultiClient
+    <<interface>> JsonSchemaObject
+    <<interface>> ToolAnnotations
+    <<interface>> ModelContextTool
+    <<interface>> ModelContextClient
+    <<interface>> UserInteractionOptions
+    <<interface>> UserInteractionResult
+    <<interface>> ToolRegistrationOptions
+    <<interface>> RegisteredTool
+    <<interface>> ContextRegistration
+    <<interface>> ModelContext
+    <<interface>> ModelContextTesting
+    <<interface>> ModelContextTestingToolInfo
+    <<interface>> ToolContentText
+    <<interface>> ToolContentImage
+    <<interface>> ToolContentResource
+    <<interface>> ToolContentError
+    <<interface>> ToolExecuteResult
+    <<interface>> ToolResultMetadata
+    <<interface>> AuthContext
+    <<interface>> ConfirmationPolicy
+    <<interface>> WebMCPPolyfillOptions
+    <<interface>> JsonRpcRequest
+    <<interface>> JsonRpcError
+    <<interface>> JsonRpcResponse
+    <<interface>> McpServerInfo
+    <<interface>> McpCapabilities
+    <<interface>> McpInitializeResult
+    <<interface>> McpTool
+    <<interface>> McpToolResultContent
+    <<interface>> McpToolResult
+    <<interface>> McpListToolsResult
+    <<interface>> McpClientOptions
+    <<interface>> WebMCPCallToolEvent
+    <<interface>> WebMCPToolResultEvent
+    <<interface>> WebMCPToolErrorEvent
+    <<interface>> PostMessageBridgeOptions
+    <<interface>> ValidationResult
+    <<interface>> ValidationError
+    <<interface>> ConnectedServer
+    <<interface>> WebMcpServer
+    <<interface>> WebMcpServerOptions
+    <<interface>> WebMcpToolDef
+    <<interface>> WidgetEntry
+    <<type>> JsonSchemaType
+    <<type>> JsonSchema
+    <<type>> ToolExecuteCallback
+    <<type>> ToolsChangedCallback
+    <<type>> ToolContentType
+    <<type>> ToolContent
+    <<type>> ConfirmationTier
+    <<type>> WidgetRenderer
+  }
+
+  class Agent {
+    +createProvider() LLMProvider
+    +runAgentLoop() Promise#lt;AgentResult#gt;
+    +fromMcpTools() McpToolDef[]
+    +trimConversationHistory() ChatMessage[]
+    +buildSystemPrompt() string
+    +buildToolsFromLayers() ProviderTool[]
+    +buildDiscoveryTools() ProviderTool[]
+    +activateServerTools() ProviderTool[]
+    +resolveCanonicalTools() CanonicalMatch[]
+    +parseRecipe() Recipe
+    +parseRecipes() Recipe[]
+    +registerRecipes() void
+    +filterRecipesByServer() Recipe[]
+    +formatRecipesForPrompt() string
+    +formatMcpRecipesForPrompt() string
+    +summarizeChat() Promise#lt;ChatSummaryResult#gt;
+    +RemoteLLMProvider
+    +WasmProvider
+    +LocalLLMProvider
+    +TokenTracker
+    <<interface>> RemoteLLMProviderOptions
+    <<interface>> WasmProviderOptions
+    <<interface>> LocalLLMProviderOptions
+    <<interface>> AgentLoopOptions
+    <<interface>> McpLayer
+    <<interface>> WebMcpLayer
+    <<interface>> SummarizeOptions
+    <<interface>> ChatSummaryResult
+    <<interface>> TokenMetrics
+    <<interface>> ChatMessage
+    <<interface>> McpToolDef
+    <<interface>> ProviderTool
+    <<interface>> LLMProvider
+    <<interface>> LLMResponse
+    <<interface>> ToolCall
+    <<interface>> AgentMetrics
+    <<interface>> AgentResult
+    <<interface>> AgentCallbacks
+    <<interface>> Recipe
+    <<interface>> McpRecipe
+    <<type>> WasmStatus
+    <<type>> LocalBackend
+    <<type>> LLMConfig
+    <<type>> AnthropicProviderOptions
+    <<type>> GemmaProviderOptions
+    <<type>> GemmaStatus
+    <<type>> ToolLayer
+    <<type>> WebMcpServer
+    <<type>> WebMcpToolDef
+    <<type>> WidgetEntry
+    <<type>> RemoteModelId
+    <<type>> WasmModelId
+    <<type>> LLMId
+    <<type>> ModelId
+    <<type>> ContentBlock
+    ~~<<type>> AnthropicTool~~
+    +mcpToolsToAnthropic
+    +autoui
+    +NATIVE_WIDGET_NAMES
+    +toolAliasMap
+    +WEBMCP_RECIPES
+    +recipeRegistry
+    +AnthropicProvider
+    +GemmaProvider
+    +toProviderTools
+  }
+
+  class Sdk {
+    +createSkill() Skill
+    +updateSkill() Skill | null
+    +deleteSkill() boolean
+    +getSkill() Skill | undefined
+    +listSkills() Skill[]
+    +clearSkills() void
+    +loadSkills() void
+    +loadDemoSkills() void
+    +onSkillsChange() void): () =#gt; void
+    +encodeHyperSkill() Promise#lt;string#gt;
+    +decodeHyperSkill() Promise#lt;HyperSkill#gt;
+    +computeHash() Promise#lt;string#gt;
+    +createVersion() Promise#lt;HyperSkillVersion#gt;
+    <<interface>> Skill
+    <<interface>> SkillBlock
+    <<interface>> McpDemoServer
+    <<interface>> HyperSkillMeta
+    <<interface>> HyperSkill
+    <<interface>> HyperSkillVersion
+    +MCP_DEMO_SERVERS
+    +diffSkills
+    +encode
+    +decode
+    +hash
+    +diff
+    +getHsParam
+  }
+
+  class Ui {
+    <<interface>> ThemeTokens
+    <<interface>> ManagedWindow
+    <<interface>> LayoutWindow
+    <<interface>> FloatingWindowState
+    <<interface>> BusMessage
+    <<type>> ThemeJSON
+    <<type>> ThemeMode
+    <<type>> ThemeOverrides
+    <<type>> ChatFeedItem
+    <<type>> ChatBubble
+    <<type>> ChatBlock
+    +DARK_TOKENS
+    +LIGHT_TOKENS
+    +THEME_MAP
+    +layoutAdapter
+    +bus
+    +ThemeProvider
+    +getTheme
+    +Card
+    +GridLayout
+    +List
+    +Panel
+    +Window
+    +StatBlock
+    +KVBlock
+    +ListBlock
+    +ChartBlock
+    +AlertBlock
+    +CodeBlock
+    +TextBlock
+    +ActionsBlock
+    +TagsBlock
+    +StatCard
+    +DataTable
+    +Timeline
+    +ProfileCard
+    +Trombinoscope
+    +JsonViewer
+    +Hemicycle
+    +Chart
+    +Cards
+    +GridData
+    +Sankey
+    +MapView
+    +D3Widget
+    +JsSandbox
+    +LogViewer
+    +Gallery
+    +Carousel
+    +BlockRenderer
+    +WidgetRenderer
+    +Pane
+    +TilingLayout
+    +FloatingLayout
+    +StackLayout
+    +FlexLayout
+    +Button
+    +buttonVariants
+    +Input
+    +Badge
+    +badgeVariants
+    +NativeSelect
+    +Tooltip
+    +Dialog
+    +DialogTrigger
+    +DialogContent
+    +DialogHeader
+    +DialogFooter
+    +DialogTitle
+    +DialogDescription
+    +LLMSelector
+    +GemmaLoader
+    +McpStatus
+    +AgentProgress
+    +McpConnector
+    +ChatPanel
+    +AgentConsole
+    +SettingsPanel
+    +RemoteMCPserversDemo
+    +EphemeralBubble
+    +TokenBubble
+  }
+

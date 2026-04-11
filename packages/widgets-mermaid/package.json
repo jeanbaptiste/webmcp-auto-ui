@@ -1,0 +1,20 @@
+{
+  "name": "@webmcp-auto-ui/widgets-mermaid",
+  "version": "1.0.0",
+  "description": "Mermaid.js diagram renderers for WebMCP Auto-UI — flowcharts, sequences, Gantt, ER, class, mindmaps, pie charts",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@webmcp-auto-ui/core": "file:../core",
+    "mermaid": "^11.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

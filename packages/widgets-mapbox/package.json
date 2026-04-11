@@ -1,0 +1,26 @@
+{
+  "name": "@webmcp-auto-ui/widgets-mapbox",
+  "version": "1.0.0",
+  "description": "Mapbox GL JS vector map widgets for WebMCP (map, choropleth, 3D buildings, route)",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts"
+    },
+    "./server": {
+      "import": "./src/server.ts"
+    }
+  },
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@webmcp-auto-ui/core": "file:../core",
+    "mapbox-gl": "^3.9.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

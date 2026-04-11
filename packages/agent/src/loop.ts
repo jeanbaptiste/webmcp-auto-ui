@@ -9,7 +9,7 @@ import type {
   LLMProvider, ProviderTool, McpToolDef, AgentCallbacks,
 } from './types.js';
 import type { ToolLayer } from './tool-layers.js';
-import { buildToolsFromLayers, buildSystemPrompt, buildDiscoveryTools, activateServerTools, toProviderTools } from './tool-layers.js';
+import { buildToolsFromLayers, buildSystemPrompt, buildDiscoveryTools, activateServerTools, toProviderTools, toolAliasMap } from './tool-layers.js';
 
 // Re-export buildSystemPrompt for backward compat
 export { buildSystemPrompt } from './tool-layers.js';
@@ -268,8 +268,11 @@ export async function runAgentLoop(
         let result: string;
         const name = block.name;
 
+        // Resolve alias (canonical name → real tool name) if needed
+        const resolvedName = toolAliasMap.get(name) ?? name;
+
         // Parse tool name: {serverName}_{protocol}_{toolName}
-        const toolMatch = name.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
+        const toolMatch = resolvedName.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
         if (!toolMatch) {
           result = `Error: unknown tool format "${name}". Expected {source}_{protocol}_{tool}.`;
         } else {
