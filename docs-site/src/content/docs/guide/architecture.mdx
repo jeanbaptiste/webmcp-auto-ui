@@ -66,7 +66,7 @@ sequenceDiagram
         alt Pas de tool_use
             Agent->>Chat: texte final
             Agent->>Canvas: onDone(metrics)
-            break Agent terminé
+            Note over Agent: Terminé
         else tool_use présent
             Agent->>Dispatcher: Traiter chaque block
             
