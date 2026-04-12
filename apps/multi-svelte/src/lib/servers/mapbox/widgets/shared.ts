@@ -19,7 +19,8 @@ export async function createMapboxMap(container: HTMLElement, options?: any) {
   const mapboxgl = await import('mapbox-gl');
   mapboxgl.default.accessToken =
     options?.accessToken ||
-    'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+    (typeof import.meta !== 'undefined' && (import.meta as any).env?.PUBLIC_MAPBOX_TOKEN) ||
+    '';
   container.style.height = container.style.height || '400px';
   const map = new mapboxgl.default.Map({
     container,
