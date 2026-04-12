@@ -245,6 +245,15 @@ else
   APPS="$*"
 fi
 
+# Sync all workspace versions to root
+echo "Syncing versions..."
+ROOT_VERSION=$(node -e "console.log(require('$LOCAL_ROOT/package.json').version)")
+for pkg in "$LOCAL_ROOT"/apps/*/package.json "$LOCAL_ROOT"/packages/*/package.json; do
+  node -e "const f=require('fs'); const p=JSON.parse(f.readFileSync('$pkg','utf8')); if(p.version!=='$ROOT_VERSION'){p.version='$ROOT_VERSION'; f.writeFileSync('$pkg', JSON.stringify(p,null,2)+'\n')}"
+done
+echo "  ✓ all workspaces → v$ROOT_VERSION"
+echo ""
+
 # Build packages first (order matters)
 echo "Building packages..."
 (cd "$LOCAL_ROOT" && npm run build --workspace=packages/core 2>/dev/null && echo "  ✓ core")

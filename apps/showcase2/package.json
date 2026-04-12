@@ -1,6 +1,6 @@
 {
   "name": "@webmcp-auto-ui/showcase2",
-  "version": "0.4.0",
+  "version": "2.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,9 +12,9 @@
   "dependencies": {
     "@sveltejs/adapter-node": "^5.5.4",
     "@webmcp-auto-ui/agent": "file:../../packages/agent",
-    "@webmcp-auto-ui/core":  "file:../../packages/core",
-    "@webmcp-auto-ui/sdk":   "file:../../packages/sdk",
-    "@webmcp-auto-ui/ui":    "file:../../packages/ui"
+    "@webmcp-auto-ui/core": "file:../../packages/core",
+    "@webmcp-auto-ui/sdk": "file:../../packages/sdk",
+    "@webmcp-auto-ui/ui": "file:../../packages/ui"
   },
   "devDependencies": {
     "@huggingface/transformers": "^4.0.1",
