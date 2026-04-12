@@ -1,117 +1,150 @@
 ---
 title: Architecture
-description: Detailed overview of the WebMCP Auto-UI system architecture
+description: Components and flows of the WebMCP Auto-UI system
 sidebar:
   order: 2
 ---
 
-## Global Architecture
+## Overview
+
+WebMCP Auto-UI consists of **4 layers** :
+
+1. **LLM Provider** : Interface with Claude, Gemma, or Haiku
+2. **Agent Loop** : Orchestration of tool calls and context management
+3. **Tool Layers** : Unified abstraction of MCP + WebMCP tools
+4. **UI Rendering** : Native widgets + dispatcher
+
+### Complete architecture diagram
 
 ```mermaid
 graph TB
-    subgraph Client["Client Web (Browser)"]
-        A["👤 User"]
-        UI["🎨 Canvas + Widgets<br/>(Svelte/Vanilla/Multi-framework)"]
-        Store["📦 Canvas Store<br/>(Svelte runes)"]
-        Agent["🤖 Agent Loop<br/>(runAgentLoop)"]
-        LLM["🧠 LLM Provider<br/>(Remote/WASM)"]
+    subgraph "1. LLM Provider Layer"
+        RA["RemoteLLMProvider<br/>(Claude via API)"]
+        WA["WasmProvider<br/>(Gemma in-browser)"]
+        LA["LocalLLMProvider<br/>(Ollama local)"]
     end
-
-    subgraph Local["Local Layer (WebMCP)"]
-        AutoUI["⚙️ AutoUI Server<br/>(Built-in WebMCP)"]
-        Widgets["🎭 Native Widgets<br/>(stat, chart, data-table, etc.)"]
+    
+    subgraph "2. Agent Loop"
+        AL["runAgentLoop()"]
+        SP["buildSystemPrompt()"]
+        TL["buildToolsFromLayers()"]
+        CM["compressOldToolResults()"]
     end
-
-    subgraph Remote["Remote Layer (MCP)"]
-        MCPClient["🔗 MCP Client<br/>(JSON-RPC/HTTP)"]
-        MCPServer["🖥️ MCP Server<br/>(Tools: search, get, etc.)"]
-        Data["💾 Data Source<br/>(DB, API, files)"]
+    
+    subgraph "3. Tool Layers"
+        DT["Discovery Tools<br/>(search_recipes,<br/>list_recipes,<br/>list_tools)"]
+        AT["Activation<br/>(lazy loading)"]
+        AR["Tool Alias Registry<br/>(4-layer matching)"]
     end
-
-    A -->|"Writes message"| UI
-    UI -->|"Sends"| Agent
-    Agent -->|"chat(messages, tools)"| LLM
-    LLM -->|"Tool calls"| Agent
-    Agent -->|"Dispatch"| AutoUI
-    Agent -->|"Dispatch (MCP)"| MCPClient
-    AutoUI -->|"Render"| Widgets
-    Widgets -->|"Display"| UI
-    MCPClient -->|"JSON-RPC"| MCPServer
-    MCPServer -->|"Execute"| Data
-    MCPClient -->|"Results"| Agent
-    Agent -->|"UI state"| Store
-    Store -->|"Reactivity"| UI
+    
+    subgraph "4a. MCP Data Sources"
+        MC["MCP Client"]
+        MS["Remote Servers<br/>(db, api, ...)"]
+    end
+    
+    subgraph "4b. WebMCP Display"
+        WS["WebMCP Servers<br/>(autoui + custom)"]
+        WD["widget_display()"]
+    end
+    
+    subgraph "5. UI Rendering"
+        WR["WidgetRenderer"]
+        NM["Native Map<br/>(stat, chart,<br/>map, gallery, ...)"]
+        CV["Canvas + Bus"]
+    end
+    
+    RA --> AL
+    WA --> AL
+    LA --> AL
+    
+    AL --> SP
+    AL --> TL
+    
+    SP --> AR
+    TL --> DT
+    DT --> AT
+    AT --> AR
+    
+    AR -->|"resolve alias"| MC
+    MC --> MS
+    
+    AL -->|"dispatch tool_use"| MC
+    AL -->|"dispatch tool_use"| WS
+    
+    WS --> WD
+    WD --> WR
+    WR --> NM
+    NM --> CV
+    
+    CM -->|"compress ctx"| AL
 ```
 
-## Agent Iteration Flow
+## Agent Loop Flow
 
 ```mermaid
 sequenceDiagram
-    participant UI as UI<br/>(User)
-    participant AgentLoop as Agent Loop<br/>(runAgentLoop)
-    participant LLM as LLM<br/>(Provider)
-    participant Tools as Tool Dispatcher
-    participant MCP as MCP Server
-    participant WebMCP as WebMCP Server<br/>(AutoUI)
-    participant Canvas as Canvas<br/>(Render)
-
-    UI->>AgentLoop: userMessage: "Show stats"
-    AgentLoop->>LLM: chat([messages], [tools])
-    note right of LLM: Iteration 1
-    LLM-->>AgentLoop: {content: [toolCalls]}
-    AgentLoop->>Tools: Dispatch tools
-    Tools->>MCP: callTool('search_recipes')
-    MCP-->>Tools: [{name: 'stat', ...}]
-    Tools->>AgentLoop: result
-    AgentLoop->>LLM: chat([...messages, tool_result])
-    note right of LLM: Iteration 2
-    LLM-->>AgentLoop: {content: [toolCalls]}
-    AgentLoop->>Tools: Dispatch tools
-    Tools->>WebMCP: executeTool('widget_display')
-    WebMCP-->>Tools: {widget: 'stat', data: {...}, id}
-    Tools->>AgentLoop: result
-    AgentLoop->>Canvas: onWidget('stat', data)
-    Canvas->>Canvas: Render widget
-    Canvas-->>UI: 📊 Display
-
-    AgentLoop->>LLM: chat([...messages, tool_result])
-    note right of LLM: Iteration 3
-    LLM-->>AgentLoop: {content: [{type: 'text', ...}]}
-    note right of LLM: No tool_call
-    AgentLoop->>AgentLoop: end_turn
-    AgentLoop-->>UI: Final result
+    participant User
+    participant Agent as runAgentLoop()
+    participant LLM as LLM Provider
+    participant Tools as Tool Dispatch
+    participant MCP as MCP Client
+    participant WebMCP as WebMCP Server
+    participant UI as Widget Renderer
+    
+    User->>Agent: chat message
+    Agent->>Agent: Build discovery tools
+    
+    loop Until end_turn or max_iterations
+        Agent->>LLM: chat(messages, activeTools)
+        LLM-->>Agent: response + tool_calls
+        
+        alt No tool calls
+            Agent->>Agent: finishedNormally = true
+            break
+        end
+        
+        Agent->>Agent: Add assistant response to messages
+        
+        for each tool_call
+            Agent->>Tools: Resolve alias + dispatch
+            
+            alt MCP tool
+                Tools->>MCP: callTool(name, args)
+                MCP-->>Tools: result
+            else WebMCP tool (widget_display)
+                Tools->>WebMCP: executeTool(name, args)
+                WebMCP-->>Tools: {widget, data, id}
+                Tools->>UI: onWidget callback
+                UI-->>Tools: widgetId
+            else WebMCP tool (recall)
+                Tools->>Agent: resultBuffer[id]
+                Agent-->>Tools: full result
+            end
+            
+            Tools-->>Agent: tool_result (truncated if > 10KB)
+            Agent->>Agent: Store in resultBuffer[tool_use_id]
+        end
+        
+        Agent->>Agent: Add tool_results to messages
+        Agent->>Agent: compressOldToolResults(messages)
+        
+        alt No render yet && iterationsWithoutRender >= 4
+            Agent->>Agent: Strip discovery tools to force render
+        end
+        
+        alt No render yet && iterationsWithoutRender >= 5
+            Agent->>Agent: Nudge: "Call widget_display() NOW"
+        end
+    end
+    
+    Agent-->>User: AgentResult {text, toolCalls, metrics}
 ```
 
-## Key Components
+## Tool Layers — Resolution and Dispatch
 
-### 1. Agent Loop (`packages/agent/src/loop.ts`)
+### What is a Tool Layer?
 
-Iterative LLM loop with complete state management:
-
-```typescript
-async function runAgentLoop(
-  userMessage: string,
-  options: AgentLoopOptions
-): Promise<AgentResult>
-```
-
-**Responsibilities**:
-- Maintain message history
-- Call LLM provider
-- Parse tool calls
-- Dispatch tools (MCP or WebMCP)
-- Compress old results to save context
-- Manage callbacks (onToken, onWidget, etc.)
-
-**Special features**:
-- **Discovery phase** : Discovery tools (`search_recipes`, `get_recipe`) at startup
-- **Lazy activation** : Additional tools activated on first use
-- **Recall** : Retrieve full results via `resultBuffer`
-- **Nudging** : Message injection to force rendering if agent explores too much
-
-### 2. Tool Layers (`packages/agent/src/tool-layers.ts`)
-
-Unified abstraction for multiple tool sources:
+A **ToolLayer** encapsulates a tool server (MCP or WebMCP) :
 
 ```typescript
 interface ToolLayer {
@@ -122,271 +155,188 @@ interface ToolLayer {
 }
 ```
 
-**Operations**:
-- `buildToolsFromLayers()` : Generate list of all tools (prefixed)
-- `buildDiscoveryToolsWithAliases()` : Initially available tools (recipes + actions)
-- `activateServerTools()` : Add all tools from a server on first call
-- `resolveCanonicalTools()` : 4-layer matching to identify `search_recipes` and `get_recipe`
+### Unified naming: `{serverName}_{protocol}_{toolName}`
 
-**Canonical resolution (4 layers)**:
-1. **Layer 1** : Exact match (`tool.name === 'search_recipes'`)
-2. **Layer 2** : Decomposition (tokenize + action×resource pairs)
-3. **Layer 3** : Description scan for keywords
-4. **Layer 4** : Fallback (raw tools if no recipe found)
+All tools receive a unique prefix :
+- `recipes_mcp_search_recipes` → MCP server "recipes"
+- `autoui_webmcp_stat` → WebMCP server "autoui"
+- `autoui_webmcp_widget_display` → Built-in display tool
 
-### 3. Canvas Store (`packages/sdk/src/stores/canvas.ts`)
+### 4-layer Canonical Tool Matching
 
-Reactive state management for widgets and context:
+The agent must know which tools correspond to :
+- `search_recipes` — Search for a recipe
+- `list_recipes` — List all recipes
+- `get_recipe` — Read a complete recipe
+
+The system finds them via 4 layers of heuristic :
 
 ```typescript
-interface Widget {
-  id: string;
-  type: WidgetType;
-  data: Record<string, unknown>;
+// Layer 1 — Exact name match
+if (toolName === 'search_recipes') → found!
+
+// Layer 2 — Decompose name into tokens (action, resource)
+'find_templates' → action='find' + resource='templates'
+if (action in SEARCH_ACTIONS && resource in RESOURCES) → found!
+
+// Layer 3 — Scan description
+if (description.includes('recipe')) → likely a recipe tool
+
+// Layer 4 — Fallback : no recipes found
+// → list raw available tools
+```
+
+### Lazy Loading and Activation
+
+At startup, only **discovery tools** are active :
+```typescript
+const disc = buildDiscoveryToolsWithAliases(layers);
+// → [search_recipes, list_recipes, search_tools, list_tools, ...]
+```
+
+When the agent calls a tool from a server for the first time :
+```typescript
+// Detect: "autoui_webmcp_stat" → serverName="autoui", protocol="webmcp"
+if (!activatedServers.has("autoui_webmcp")) {
+  activateServerTools(currentTools, layer); // Add all server tools
+}
+```
+
+This saves initial context by hiding detailed implementations.
+
+## Context compression
+
+After 2+ iterations, old tool results are truncated :
+
+```typescript
+// Before (300+ chars)
+{
+  "content": "SELECT * FROM users;... [5000 rows] ...",
+  "type": "tool_result"
 }
 
-interface CanvasSnapshot {
-  blocks: Widget[];
-  mode: Mode;
-  llm: LLMId;
-  mcpUrl: string;
-  mcpConnected: boolean;
-  messages: ChatMsg[];
-  generating: boolean;
-  // ...
+// After (saves ~2KB)
+{
+  "content": "SELECT * FROM users;... [recall('toolu_xxx') for full result, 125000 chars]",
+  "type": "tool_result"
 }
 ```
 
-**Operations**:
-- `addWidget(type, data)` : Add widget to canvas
-- `updateBlock(id, data)` : Update widget data
-- `removeBlock(id)` : Remove widget
-- `setBlocks(widgets)` : Load complete state
+The agent can call `recall('toolu_xxx')` to retrieve the full result.
 
-**Serialization**:
-- `buildSkillJSON()` : Export state to JSON
-- `buildHyperskillParam()` : Encode to compact URL
-- `loadFromParam()` : Decode and load
+## Widget Registry and Rendering
 
-### 4. AutoUI Server (`packages/agent/src/autoui-server.ts`)
+### Native Map
 
-Built-in WebMCP server providing:
+The UI exposes a **static map** of 30+ native widgets :
 
-**Native widgets** (30+):
-- Simple: `stat`, `kv`, `list`, `chart`, `alert`, `code`, `text`, `actions`, `tags`
-- Rich: `data-table`, `timeline`, `profile`, `trombinoscope`, `json-viewer`, `hemicycle`, `chart-rich`, `cards`, `sankey`, `map`, `log`, `gallery`, `carousel`, `d3`, `js-sandbox`
-
-**Action tools**:
-- `widget_display(name, params)` : Display a widget
-- `canvas(action, id, params)` : Manipulate widgets (move, resize, style, update, clear)
-- `recall(id)` : Retrieve full result from prior iteration
-
-**Recipe tools** (auto-generated):
-- `search_recipes(query)` : List available widgets
-- `get_recipe(name)` : Get schema and instructions
-
-### 5. Widget Renderer (`packages/ui/src/widgets/WidgetRenderer.svelte`)
-
-Svelte component that encounters a widget type and selects the right renderer:
-
-```svelte
-<WidgetRenderer
-  type="data-table"
-  data={{rows: [...], columns: [...]}}
-  servers={[autoui, customServer]}
-  oninteract={(type, action, payload) => ...}
-/>
-```
-
-**Resolution logic**:
-1. Look for custom renderer in connected `servers`
-2. Look for native renderer in `NATIVE_MAP` (Svelte)
-3. Fallback vanilla renderer if defined
-4. Fallback text `[type]` if no renderer found
-
-## Model Context Protocol (MCP)
-
-### Client and Server
-
-```mermaid
-graph LR
-    A["MCP Client<br/>(JSON-RPC)"]
-    B["HTTP Streamable<br/>(Server-Sent Events)"]
-    C["MCP Server<br/>(JSON-RPC handler)"]
-    D["Tools<br/>(Tools)"]
-
-    A -->|"Initialize"| B
-    B -->|"ListTools"| C
-    C -->|"Tools list"| B
-    B -->|"CallTool"| C
-    C -->|"Execute"| D
-    D -->|"Result"| C
-    C -->|"Result JSON"| B
-    B -->|"Tool result"| A
-```
-
-### Integration in agent
-
-Agent dispatches tool calls to MCP in 3 steps:
-
-1. **Parse prefix** : `{serverName}_{protocol}_{toolName}`
-2. **Resolve alias** : canonical (e.g. `search_recipes`) → real (e.g. `list_all_recipes`)
-3. **Route** :
-   - `protocol === 'mcp'` → `client.callTool(realToolName, input)`
-   - `protocol === 'webmcp'` → `webmcpServer.executeTool(realToolName, input)`
-
-## WebMCP (Local Display Layer)
-
-Complement to MCP for the **presentation layer**:
-
-### Widgets
-
-Each widget is a **Markdown recipe**:
-
-```markdown
----
-widget: stat
-description: Key statistic
-schema:
-  type: object
-  required: [label, value]
-  properties:
-    label: { type: string }
-    value: { type: string }
----
-
-## Usage
-Call widget_display('stat', {label: "Total", value: "42"}).
-```
-
-Frontmatter = schema + metadata
-Body = instructions for agent
-
-### Renderers
-
-Two approaches:
-
-**Native (Svelte)**:
 ```typescript
 const NATIVE_MAP = {
   'stat': { component: StatBlock, props: (data) => ({ data }) },
-  'chart': { component: ChartBlock, props: (data) => ({ data }) },
+  'chart': { component: ChartBlock, ... },
+  'map': { component: MapView, ... },
+  'gallery': { component: Gallery, ... },
+  // ...
 };
 ```
 
-**Vanilla**:
-```typescript
-mountWidget(container, 'stat', {label: "Total", value: "42"}, [autoui]);
-```
+### Rendering resolution
 
-## LLM Providers
+When a widget must be rendered :
 
-### Three Strategies
-
-1. **Remote (Anthropic)** : Distant Claude API
-   ```typescript
-   new RemoteLLMProvider({
-     apiKey: 'sk-ant-...',
-     model: 'claude-3-5-sonnet-20241022',
-   })
-   ```
-
-2. **WASM (Gemma)** : In-browser LLM
-   ```typescript
-   new WasmProvider({
-     model: 'gemma-2b',
-     wasmUrl: '...',
-   })
-   ```
-
-3. **Local** : Local server (Ollama, etc.)
-   ```typescript
-   new LocalLLMProvider({
-     baseUrl: 'http://localhost:11434',
-     model: 'llama2',
-   })
-   ```
-
-## Multi-Framework Integration
-
-```mermaid
-graph TB
-    A["Widget Registry"]
-    B["Svelte<br/>(Native)"]
-    C["Vanilla JS<br/>(mountWidget)"]
-    D["Astro"]
-    E["React"]
-    F["Vue"]
-    G["Web Components"]
-
-    A --> B
-    A --> C
-    C --> D
-    C --> E
-    C --> F
-    C --> G
-
-    style B fill:#ff3e00,color:#fff
-    style C fill:#333,color:#fff
-    style D fill:#ff5d00,color:#fff
-    style E fill:#61dafb,color:#000
-    style F fill:#42b883,color:#fff
-    style G fill:#fff,stroke:#333
-```
-
-Each framework can register **widget packs**:
-- `packages/widgets-d3` : D3.js visualizations
-- `packages/widgets-threejs` : 3D (Three.js)
-- `packages/widgets-leaflet` : Mapping
-- `packages/widgets-plotly` : Interactive charts
-- etc.
-
-## Persistence and Import/Export
-
-### HyperSkill Encoding
-
-Each canvas can be serialized and compressed to a compact URL:
+1. **Search in connected WebMCP servers** → custom renderers
+2. **Otherwise search in NATIVE_MAP** → native widgets
+3. **Otherwise** → placeholder `[widget_type]`
 
 ```typescript
-const skill = {
-  meta: { title: "My analysis", version: "1.0" },
-  content: { blocks: [...], mode: "chat", llm: "sonnet" }
-};
+// WidgetRenderer.svelte
+const customRenderer = servers?.find(s => s.getWidget(type))?.renderer;
+const nativeEntry = NATIVE_MAP[type];
 
-const url = await encodeHyperSkill(skill);
-// https://demos.hyperskills.net?hs=Ez_xv...
+if (customRenderer) {
+  // Custom renderer (framework component or vanilla)
+} else if (nativeEntry) {
+  // Native widget
+} else {
+  // Fallback
+}
 ```
 
-Decoding (viewer app):
-```typescript
-const skill = await decodeHyperSkill(urlOrParam);
-canvas.setBlocks(skill.content.blocks);
-```
+### SafeImage — URL Validation
 
-## Security
-
-### Image URL Sanitization
-
-Prevention of URL hallucinations:
+Since agents can hallucinate image URLs, **SafeImage** validates URLs :
 
 ```typescript
 const VALID_PREFIXES = ['http://', 'https://', 'data:', '/'];
-const IMAGE_KEY_PATTERN = /^(src|image|avatar|...)$/i;
 
-function sanitizeImageUrls(obj) {
-  // Nullify invalid image URLs before rendering
+if (!src?.startsWith(...VALID_PREFIXES)) {
+  // Show placeholder instead of <img src="hallucination">
 }
 ```
 
-Applied in `widget_display()` before rendering.
+## System Prompt — Discovery Cascade
 
-### Schema Validation
+The generated prompt follows a 4-step cascade :
 
-All widget inputs are validated against schema:
+```text
+STEP 1 — Search recipe (search_recipes)
+   ↓ If no result
+STEP 1b — List recipes (list_recipes)
+   ↓ If no recipes
+STEP 1c — Search tools (search_tools)
+   ↓ If no tools
+STEP 1d — List tools (list_tools)
+   ↓
+STEP 2 — Read recipe (get_recipe)
+   ↓
+STEP 3 — Execution (use recipe or tool)
+   ↓
+STEP 4 — UI display (widget_display)
+```
+
+This ensures that :
+- Agent searches for **recipes** first (pre-defined workflows)
+- As fallback, searches for **raw tools**
+- Reads full documentation before executing
+- Always displays a UI result (not just text)
+
+## Canvas Store — UI State
+
+The canvas centralizes UI state :
 
 ```typescript
-const validation = validateJsonSchema(params, widget.inputSchema);
-if (!validation.valid) {
-  return { error: 'Validation failed', details: validation.errors };
-}
+// @webmcp-auto-ui/sdk
+const canvas = {
+  blocks: [], // Current widgets
+  mode: 'chat' | 'drag',
+  llm: 'claude-3-5-sonnet-20241022',
+  mcpUrl: 'http://localhost:3001',
+  mcpConnected: boolean,
+  messages: [], // Chat history
+  
+  // Methods
+  addWidget(type, data),
+  removeBlock(id),
+  updateBlock(id, data),
+  addMsg(role, content),
+};
 ```
+
+## FONC Message Bus
+
+Components communicate via a message bus inspired by Smalltalk (FONC) :
+
+```typescript
+// Send a message
+bus.broadcast('myComponent', 'data-changed', { newValue: 42 });
+
+// Listen
+const unsub = bus.subscribe(['data-changed'], (msg) => {
+  console.log(msg.payload);
+});
+
+// Link widgets (visualize relationships)
+bus.link(['widget1_id', 'widget2_id'], 'groupId');
+```
+
+This approach decouples components and enables interactions without prop drilling.

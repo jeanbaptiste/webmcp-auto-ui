@@ -1,93 +1,132 @@
 ---
-title: '@webmcp-auto-ui/core'
-description: 'MCP client, WebMCP server, JSON schema validation, utils, W3C WebMCP polyfill'
+title: "@webmcp-auto-ui/core"
+description: "MCP client, JSON Schema validation, WebMCP server, type definitions"
 sidebar:
   order: 4
 ---
 
-## Overview
+The `@webmcp-auto-ui/core` package contains W3C WebMCP types, Streamable HTTP MCP client, JSON Schema validation, and helpers.
 
-The `@webmcp-auto-ui/core` package provides the **MCP infrastructure** (Model Context Protocol — client/server protocol for LLM), **JSON Schema validation**, and **low-level utilities**.
+## W3C WebMCP Types
 
-### Components
+### `ModelContextTool`
 
-- **McpClient** : HTTP JSON-RPC client for remote MCP servers
-- **createWebMcpServer** : factory for WebMCP servers (local display/interaction)
-- **validateJsonSchema** : strict parameter validation for tools
-- **W3C Polyfill** : implementation of `navigator.modelContext` for LLM tool execution
-- **Utilities** : schema sanitization, tool groups, formatted results
-
----
-
-## McpClient
-
-HTTP client for MCP protocol (initialization, listing tools, execution).
+Tool signature following the W3C standard.
 
 ```ts
-export class McpClient {
-  constructor(options: McpClientOptions);
-  
-  // Core
-  initialize(): Promise<McpInitializeResult>;
-  listTools(cursor?: string): Promise<McpListToolsResult>;
-  callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult>;
-  
-  // Lifecycle
-  connect(): Promise<void>;
-  disconnect(): Promise<void>;
-}
-
-interface McpClientOptions {
-  serverUrl: string;                     // MCP server URL
-  clientName?: string;                   // Client name (default: 'webmcp-auto-ui')
-  clientVersion?: string;                // Client version
-  timeout?: number;                      // Timeout (default: 30000)
-  headers?: Record<string, string>;      // Custom HTTP headers
-  autoReconnect?: boolean;               // Auto reconnect (default: true)
-  maxReconnectAttempts?: number;         // Max attempts (default: 3)
+export interface ModelContextTool {
+  name: string;                                // Unique, non-empty
+  description: string;                        // Human-readable, non-empty
+  inputSchema?: JsonSchema;                   // JSON Schema for parameters
+  outputSchema?: JsonSchema;                  // JSON Schema for return (optional)
+  annotations?: ToolAnnotations;              // Hints (readOnly, destructive, etc.)
 }
 ```
 
-### Example
+### `ToolAnnotations`
+
+Hints for tool behavior.
+
+```ts
+export interface ToolAnnotations {
+  readOnlyHint?: boolean;        // Tool does not modify state
+  destructiveHint?: boolean;     // Tool is irreversible
+  idempotentHint?: boolean;      // Multiple calls = same effect
+  openWorldHint?: boolean;       // Interacts with external systems
+  cautionHint?: boolean;         // Use with caution
+  title?: string;                // Human-readable title (MCP SDK)
+}
+```
+
+### `JsonSchema`
+
+Union of JSON schemas (compatible with JSON Schema Draft 7+).
+
+```ts
+export type JsonSchema = boolean | JsonSchemaObject;
+
+export interface JsonSchemaObject {
+  type?: JsonSchemaType | JsonSchemaType[];
+  title?: string;
+  description?: string;
+  properties?: Record<string, JsonSchema>;
+  required?: string[];
+  items?: JsonSchema | JsonSchema[];
+  enum?: unknown[];
+  pattern?: string;
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
+  // ... + composition (allOf, anyOf, oneOf)
+}
+```
+
+## MCP Client
+
+### `McpClient`
+
+JSON-RPC client for MCP protocol (Streamable HTTP).
 
 ```ts
 import { McpClient } from '@webmcp-auto-ui/core';
 
-const client = new McpClient({
-  serverUrl: 'http://localhost:3000/mcp',
-  clientName: 'my-app',
-});
+const client = new McpClient(
+  'http://localhost:3000/mcp',
+  {
+    clientName: 'MyApp',
+    clientVersion: '1.0',
+    timeout: 30000,
+  }
+);
 
 // Initialize
 await client.initialize();
-console.log('Ready!');
 
 // List tools
-const { tools } = await client.listTools();
-tools.forEach(t => console.log(t.name, t.description));
+const tools = await client.listTools();
 
-// Call tool
-const result = await client.callTool('search_recipes', {
-  query: 'pizza',
-});
-
-console.log(result.content); // [{type: 'text', text: '...'}, ...]
+// Call a tool
+const result = await client.callTool('search_recipes', { query: 'pizza' });
 ```
 
-### Tool response structure
+### Types
 
 ```ts
-interface McpToolResult {
+export interface McpClientOptions {
+  clientName?: string;
+  clientVersion?: string;
+  timeout?: number;                // ms (default: 30000)
+  headers?: Record<string, string>;
+  autoReconnect?: boolean;
+  maxReconnectAttempts?: number;   // Default: 3
+}
+
+export interface McpInitializeResult {
+  protocolVersion: string;
+  capabilities: McpCapabilities;
+  serverInfo: McpServerInfo;
+}
+
+export interface McpTool {
+  name: string;
+  description?: string;
+  inputSchema?: JsonSchema;
+  outputSchema?: JsonSchema;
+  annotations?: ToolAnnotations;
+}
+
+export interface McpToolResult {
   content: McpToolResultContent[];
   isError?: boolean;
 }
 
-interface McpToolResultContent {
+export interface McpToolResultContent {
   type: 'text' | 'image' | 'resource';
-  text?: string;                  // For type: 'text'
-  data?: string;                  // Base64 for type: 'image'
+  text?: string;
+  data?: string;        // base64 for images
   mimeType?: string;
-  resource?: {                    // For type: 'resource'
+  resource?: {
     uri: string;
     mimeType?: string;
     text?: string;
@@ -96,173 +135,65 @@ interface McpToolResultContent {
 }
 ```
 
----
-
-## createWebMcpServer
-
-Factory for creating a WebMCP server (exposes tools + widgets for local UI).
+### Example
 
 ```ts
-export function createWebMcpServer(
-  name: string,
-  options: WebMcpServerOptions
-): WebMcpServer
+const client = new McpClient('http://localhost:3000/mcp');
+await client.initialize();
 
-interface WebMcpServerOptions {
-  description: string;                   // Server description
-}
-
-interface WebMcpServer {
-  readonly name: string;
-  readonly description: string;
+try {
+  const result = await client.callTool('describe_image', {
+    image_path: '/path/to/image.png',
+  });
   
-  registerWidget(recipeMarkdown: string, renderer: WidgetRenderer): void;
-  addTool(tool: WebMcpToolDef): void;
-  
-  layer(): WebMcpLayer;
-  getWidget(name: string): WidgetEntry | undefined;
-  listWidgets(): WidgetEntry[];
+  const textContent = result.content.find((c) => c.type === 'text');
+  console.log(textContent?.text);
+} catch (err) {
+  console.error('Tool failed:', err);
 }
 ```
 
-### Parameters
+## Multi-MCP Client
 
-#### WidgetRenderer
+### `McpMultiClient`
 
-```ts
-type WidgetRenderer =
-  | ((container: HTMLElement, data: Record<string, unknown>) => void | (() => void))
-  | unknown;  // Framework component (Svelte, React, etc.)
-```
-
-#### WebMcpToolDef
+Wrapper to manage multiple MCP servers.
 
 ```ts
-interface WebMcpToolDef {
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-  execute: (params: Record<string, unknown>) => Promise<unknown>;
-}
+import { McpMultiClient } from '@webmcp-auto-ui/core';
+
+const multi = new McpMultiClient();
+
+// Add servers
+await multi.connect('recipe_server', 'http://localhost:3000/mcp');
+await multi.connect('image_server', 'http://localhost:3001/mcp');
+
+// List all tools from all servers
+const allTools = multi.listAllTools();
+
+// Call a tool (auto-routes)
+const result = await multi.callTool('search_recipes', { query: 'pizza' });
 ```
 
-### Example
+### Route resolver
+
+Determines which server to call based on tool name.
 
 ```ts
-import { createWebMcpServer } from '@webmcp-auto-ui/core';
-
-const server = createWebMcpServer('my-widgets', {
-  description: 'My custom widgets',
-});
-
-// Register a recipe (markdown with frontmatter)
-const recipeMarkdown = `---
-widget: my-chart
-description: Custom chart
-schema:
-  type: object
-  properties:
-    title: { type: string }
-    data: { type: array }
----
-
-## How to use
-Call widget_display('my-chart', {title: 'Q1', data: [10, 20, 30]})
-`;
-
-server.registerWidget(recipeMarkdown, (container, data) => {
-  // Vanilla renderer (function)
-  container.innerHTML = `<h1>${data.title}</h1>`;
-});
-
-// Add a custom tool
-server.addTool({
-  name: 'custom_action',
-  description: 'Do an action',
-  inputSchema: { type: 'object', properties: { text: { type: 'string' } } },
-  execute: async (params) => {
-    return { ok: true, text: params.text };
-  },
-});
-
-// Export as layer for agent
-const layer = server.layer();
-console.log(layer.protocol);    // 'webmcp'
-console.log(layer.tools.length); // 4 (search_recipes, get_recipe, widget_display, custom_action)
+// Try search_recipes on each connected server
+// Return the first non-error result
 ```
 
----
+## JSON Schema Validation
 
-## parseFrontmatter
+### `validateJsonSchema()`
 
-Parses a recipe markdown with YAML frontmatter.
-
-```ts
-export function parseFrontmatter(
-  markdown: string
-): ParsedFrontmatter
-
-interface ParsedFrontmatter {
-  frontmatter: Record<string, unknown>;
-  body: string;
-}
-```
-
-### Example
-
-```ts
-import { parseFrontmatter } from '@webmcp-auto-ui/core';
-
-const recipe = `---
-widget: stat-card
-description: Enriched KPI
-schema:
-  type: object
-  properties:
-    label: { type: string }
-    value: { type: string }
----
-
-# How to use
-
-Call \`widget_display('stat-card', {label: 'ROI', value: '42%'})\`
-`;
-
-const { frontmatter, body } = parseFrontmatter(recipe);
-console.log(frontmatter.widget);    // 'stat-card'
-console.log(body.startsWith('# How'));  // true
-```
-
----
-
-## validateJsonSchema
-
-Strict validation of an object against a JSON Schema.
-
-```ts
-export function validateJsonSchema(
-  value: unknown,
-  schema: JsonSchema
-): ValidationResult
-
-interface ValidationResult {
-  valid: boolean;
-  errors: ValidationError[];
-}
-
-interface ValidationError {
-  path: string;                  // Ex: 'data.items[0].price'
-  message: string;
-  context?: unknown;
-}
-```
-
-### Example
+Validate a value against a JSON schema.
 
 ```ts
 import { validateJsonSchema } from '@webmcp-auto-ui/core';
 
-const schema = {
+const schema: JsonSchema = {
   type: 'object',
   properties: {
     name: { type: 'string' },
@@ -271,81 +202,354 @@ const schema = {
   required: ['name'],
 };
 
-const result = validateJsonSchema({ name: 'Alice', age: 30 }, schema);
-console.log(result.valid);   // true
+const result = validateJsonSchema(
+  { name: 'Alice', age: 30 },
+  schema
+);
 
-const badResult = validateJsonSchema({ age: 'wrong' }, schema);
-console.log(badResult.valid); // false
-badResult.errors.forEach(e => console.log(e.message));
-// name: required
-// age: should be integer
+console.log(result.valid);   // true
+console.log(result.errors);  // []
 ```
 
----
-
-## createToolGroup
-
-Creates a tool group with namespace and metadata.
+### Result
 
 ```ts
-export function createToolGroup(
-  groupName: string,
-  tools: Array<{
-    name: string;
-    description: string;
-    inputSchema?: JsonSchema;
-    execute: (params: Record<string, unknown>) => Promise<unknown>;
-  }>
-): ModelContextTool[] & { groupName: string }
+export interface ValidationResult {
+  valid: boolean;
+  errors: ValidationError[];
+}
+
+export interface ValidationError {
+  path: string;           // "$.age"
+  message: string;        // "Expected integer, got string"
+  value?: unknown;
+  expected?: unknown;
+}
 ```
 
-### Example
+## Helpers
+
+### `sanitizeSchema()`
+
+Clean a JSON schema for Anthropic API (removes unsupported fields).
+
+```ts
+import { sanitizeSchema } from '@webmcp-auto-ui/core';
+
+const raw = {
+  type: 'object',
+  $comment: 'Will be removed',
+  properties: { name: { type: 'string' } },
+};
+
+const clean = sanitizeSchema(raw);
+```
+
+### `createToolGroup()`
+
+Create a tool group with namespace.
 
 ```ts
 import { createToolGroup } from '@webmcp-auto-ui/core';
 
-const calculatorTools = createToolGroup('calculator', [
+const group = createToolGroup('database', [
   {
-    name: 'add',
-    description: 'Add two numbers',
-    inputSchema: {
-      type: 'object',
-      properties: { a: { type: 'number' }, b: { type: 'number' } },
-    },
-    execute: async (params) => ({
-      result: (params.a as number) + (params.b as number),
-    }),
-  },
-  {
-    name: 'multiply',
-    description: 'Multiply two numbers',
-    inputSchema: {
-      type: 'object',
-      properties: { a: { type: 'number' }, b: { type: 'number' } },
-    },
-    execute: async (params) => ({
-      result: (params.a as number) * (params.b as number),
-    }),
+    name: 'query',
+    description: 'Execute a SQL query',
+    inputSchema: { /* ... */ },
+    execute: async (params) => { /* ... */ },
   },
 ]);
 
-console.log(calculatorTools.groupName);  // 'calculator'
-console.log(calculatorTools.length);     // 2
+// All tools prefixed: database_query, database_insert, etc.
 ```
 
----
+## WebMCP Server
 
-## mountWidget
+Local server for widgets + UI tools.
 
-Mounts a vanilla widget into a DOM container by searching registered servers.
+### `createWebMcpServer()`
 
 ```ts
-export function mountWidget(
-  container: HTMLElement,
-  type: string,
-  data: Record<string, unknown>,
-  servers: WebMcpServer[]
-): (() => void) | void
+import { createWebMcpServer } from '@webmcp-auto-ui/core';
+
+const server = createWebMcpServer('myui', {
+  description: 'Custom UI widgets',
+});
+
+// Register recipes (markdown frontmatter)
+server.registerWidget(`
+---
+widget: my-widget
+description: My custom widget
+schema:
+  type: object
+  properties:
+    title: { type: string }
+---
+
+## Usage
+Call widget_display('my-widget', { title: 'Hello' })
+`, myWidgetRenderer);
+
+// Add custom tools
+server.addTool({
+  name: 'custom_action',
+  description: 'Custom action',
+  inputSchema: { type: 'object', properties: {} },
+  execute: async (params) => {
+    return { ok: true };
+  },
+});
+
+// Get the layer for agent loop
+const layer = server.layer();
 ```
 
-Returns cleanup function if widget was mounted.
+### Types
+
+```ts
+export interface WebMcpToolDef {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  execute: (params: Record<string, unknown>) => Promise<unknown>;
+}
+
+export interface WidgetEntry {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  recipe: string;            // Markdown instructions
+  renderer: WidgetRenderer;
+  group?: string;
+  vanilla: boolean;          // true = function, false = framework component
+}
+
+export interface WebMcpServer {
+  readonly name: string;
+  readonly description: string;
+  registerWidget(recipeMarkdown: string, renderer: WidgetRenderer): void;
+  addTool(tool: WebMcpToolDef): void;
+  layer(): { protocol: 'webmcp'; serverName: string; tools: WebMcpToolDef[] };
+  getWidget(name: string): WidgetEntry | undefined;
+  listWidgets(): WidgetEntry[];
+}
+
+export type WidgetRenderer = 
+  | ((container: HTMLElement, data: Record<string, unknown>) => void | (() => void))
+  | unknown;  // Svelte component, React component, etc.
+```
+
+### Frontmatter Parser
+
+```ts
+import { parseFrontmatter } from '@webmcp-auto-ui/core';
+
+const markdown = `
+---
+widget: stat
+description: Key statistic
+schema:
+  type: object
+  properties:
+    label: { type: string }
+---
+
+## Usage
+Call widget_display('stat', { label: 'KPI', value: '42' })
+`;
+
+const { frontmatter, body } = parseFrontmatter(markdown);
+// frontmatter = { widget: 'stat', description: '...', schema: {...} }
+// body = "## Usage\n..."
+```
+
+### `mountWidget()`
+
+Mount a vanilla widget in a DOM element.
+
+```ts
+import { mountWidget } from '@webmcp-auto-ui/core';
+import { autoui } from '@webmcp-auto-ui/agent';
+
+const container = document.getElementById('widget-here');
+const cleanup = mountWidget(container, 'stat', { label: 'KPI', value: '42' }, [autoui]);
+
+// Later
+cleanup?.();
+```
+
+## postMessage Bridge
+
+Communicate with iframes via postMessage (WebMCP cross-window).
+
+### `listenForAgentCalls()`
+
+Listen for tool calls from iframes.
+
+```ts
+import { listenForAgentCalls } from '@webmcp-auto-ui/core';
+
+const unregister = listenForAgentCalls(async (name, args) => {
+  console.log(`Tool called: ${name}`, args);
+  return { result: 'ok' };
+});
+
+// Later
+unregister();
+```
+
+### `callToolViaPostMessage()`
+
+Call a tool in a parent/sibling frame.
+
+```ts
+import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
+
+const result = await callToolViaPostMessage(
+  window.parent,
+  'search_recipes',
+  { query: 'pizza' },
+  'https://example.com'
+);
+```
+
+### Types
+
+```ts
+export interface WebMCPCallToolEvent {
+  type: 'webmcp:call-tool';
+  callId: string;
+  name: string;
+  args?: Record<string, unknown>;
+}
+
+export interface WebMCPToolResultEvent {
+  type: 'webmcp:tool-result';
+  callId: string;
+  result: ToolExecuteResult;
+}
+
+export interface WebMCPToolErrorEvent {
+  type: 'webmcp:tool-error';
+  callId: string;
+  error: string;
+}
+```
+
+## Events and async
+
+### `dispatchAndWait()`
+
+Send an event and wait for response.
+
+```ts
+import { dispatchAndWait } from '@webmcp-auto-ui/core';
+
+const response = await dispatchAndWait(
+  document,
+  new CustomEvent('my-event', { detail: { foo: 'bar' } })
+);
+```
+
+### `signalCompletion()`
+
+Signal that an async operation is complete.
+
+```ts
+import { signalCompletion } from '@webmcp-auto-ui/core';
+
+signalCompletion('task-id', { result: 'ok' });
+```
+
+## Result helpers
+
+Builders for constructing `ToolExecuteResult`.
+
+### `textResult()`
+
+```ts
+import { textResult } from '@webmcp-auto-ui/core';
+
+return textResult('Hello, world!');
+// { content: [{ type: 'text', text: '...' }], isError: false }
+```
+
+### `jsonResult()`
+
+```ts
+import { jsonResult } from '@webmcp-auto-ui/core';
+
+return jsonResult({ message: 'Success', data: [...] });
+// { content: [{ type: 'text', text: '{"message":"..."}' }], isError: false }
+```
+
+## Navigator API (W3C WebMCP)
+
+Polyfill for `navigator.modelContext` (tool registration in browser).
+
+### `initializeWebMCPPolyfill()`
+
+Install the WebMCP polyfill.
+
+```ts
+import { initializeWebMCPPolyfill } from '@webmcp-auto-ui/core';
+
+initializeWebMCPPolyfill({
+  forcePolyfill: false,
+  allowInsecureContext: false,
+  degradeGracefully: true,
+  authContext: { userId: 'user-123' },
+});
+```
+
+### Usage
+
+```ts
+navigator.modelContext?.registerTool({
+  name: 'my_tool',
+  description: 'My custom function',
+  inputSchema: { type: 'object', properties: {} },
+  execute: async (input) => {
+    return {
+      content: [{ type: 'text', text: 'Result' }],
+    };
+  },
+  annotations: { readOnlyHint: true },
+});
+```
+
+## All exports
+
+```ts
+// Types
+export type {
+  JsonSchemaType, JsonSchemaObject, JsonSchema,
+  ToolAnnotations, ModelContextTool,
+  ToolExecuteCallback, ModelContextClient,
+  McpTool, McpToolResult, McpToolResultContent,
+  McpCapabilities, McpServerInfo, McpInitializeResult,
+  ToolContent, ToolExecuteResult, ToolContentText,
+  ToolContentImage, ToolContentResource, ToolContentError,
+  // ...
+};
+
+// MCP
+export { McpClient, McpMultiClient };
+
+// WebMCP
+export { createWebMcpServer, parseFrontmatter, mountWidget };
+
+// Validation
+export { validateJsonSchema };
+
+// Helpers
+export { sanitizeSchema, createToolGroup, textResult, jsonResult };
+
+// Polyfill
+export { initializeWebMCPPolyfill, cleanupWebMCPPolyfill };
+
+// postMessage
+export { listenForAgentCalls, callToolViaPostMessage };
+```

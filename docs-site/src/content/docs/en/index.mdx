@@ -1,150 +1,74 @@
 ---
 title: WebMCP Auto-UI
-description: Automatic user interface generation and orchestration system by AI agents via the Model Context Protocol
+description: Automatic UI generation system by AI agents via Model Context Protocol
 sidebar:
   order: 0
 ---
 
-## About
+## Welcome
 
-**WebMCP Auto-UI** is a complete automatic generation and orchestration system for user interfaces by AI agents using the **Model Context Protocol (MCP)**.
+**WebMCP Auto-UI** is a full-stack framework that enables AI agents (Claude, Gemma, etc.) to **automatically generate user interfaces** by calling tools via [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
 
-The project combines three pillars:
+Instead of returning raw text or JSON, an agent can call `widget_display('chart', {...})` to display an interactive chart. MCP tools (databases, APIs, calculations) are exposed to the agent via a unified abstraction layer.
 
-1. **Agent Loop** — An iterative LLM loop that calls MCP tools to discover and execute recipes
-2. **Tool Layers** — A system of normalized component layers (MCP, WebMCP) with alias resolution and lazy loading
-3. **Canvas & Widgets** — Multi-framework reactive interface rendering with vanilla and Svelte/React/Vue/Astro support
+### Use cases
 
-### Vision
+- **Dynamically generated dashboards** : An agent explores a database and generates visualizations without manual rendering code
+- **Interactive data explorers** : List, filter, display results as charts, tables, maps
+- **Automated workflows** : Orchestrate MCP tools + UI display in an agent loop
+- **Rapid prototyping** : Design skills (workflows) in JSON, execute them instantly
 
-Users ask natural language questions. The agent:
-- 🔍 **Discovers** available tools via MCP
-- 🎯 **Selects** the best recipe/widget
-- ⚙️ **Executes** necessary operations
-- 🎨 **Displays** results in contextual UI
-
-All without manual code — interfaces are generated from **JSON schemas and Markdown recipes**.
-
-## Project Structure
-
-```
-packages/
-  ├── core/              # WebMCP types, validation, streamable HTTP MCP client
-  ├── agent/             # Agent loop, tool layers, autoui server
-  ├── ui/                # Svelte components (WidgetRenderer, primitives)
-  ├── sdk/               # Canvas store, HyperSkill encoding
-  └── widgets-*/         # Specialized widget packs (D3, Three.js, Leaflet, etc.)
-
-apps/
-  ├── flex/              # SvelteKit demo (chat mode)
-  ├── viewer/            # SvelteKit viewer (skill loading)
-  ├── home/              # Astro static homepage
-  ├── multi-*/           # Multi-framework showcases (Astro, React, Vue, WebComponents)
-  └── ...
-```
-
-## Key Concepts
-
-### MCP (Model Context Protocol)
-Standardized protocol for exposing **tools** (functions serialized in JSON Schema) that LLMs can call.
-
-- **MCP Server** : exposes tools (e.g. database, API, computation)
-- **MCP Client** : queries the server, executes tools
-- **Format** : JSON-RPC over streamable HTTP (no polling)
-
-### WebMCP
-Local extension of MCP for the **presentation layer** :
-- Registers **widgets** (UI components) with input schemas
-- Provides **action tools** : `widget_display()`, `canvas()`, `recall()`
-- Rendered by Svelte (native) or vanilla JavaScript
-
-### Tool Layers
-Unified abstraction for tools from multiple sources:
-
-```typescript
-interface ToolLayer {
-  protocol: 'mcp' | 'webmcp';
-  serverName: string;
-  tools: McpToolDef[] | WebMcpToolDef[];
-}
-```
-
-Tools are prefixed: `{serverName}_{protocol}_{toolName}` to avoid collisions.
-
-### Agent Loop
-LLM iteration loop:
-
-```
-LLM.chat(messages, tools) → {text, tool_calls}
-  ↓
-FOR each tool_call:
-  dispatch(tool_call) → result
-  store_result(resultBuffer)
-  add_to_history()
-↓
-COMPRESS old results to save context
-↓
-(repeat until end_turn or max_iterations)
-```
-
-### Recipes
-Markdown document with YAML frontmatter describing a widget:
-
-```markdown
----
-widget: stat
-description: Key statistic (KPI)
-schema:
-  type: object
-  required: [label, value]
-  properties:
-    label: { type: string }
-    value: { type: string }
----
-
-## When to use
-To display a key number (KPI, total, counter).
-
-## How
-Call widget_display('stat', {label: "Total", value: "42"}).
-```
-
-## Typical User Flow
+### Schematic architecture
 
 ```mermaid
-sequenceDiagram
-    participant User
-    participant Agent
-    participant MCP as MCP Server
-    participant LLM
-    participant Canvas
-
-    User->>Agent: "Show top 10 customers"
-    Agent->>LLM: search_recipes() — what do you have available?
-    LLM->>Agent: "Find 'get_customers', 'data_table'"
-    Agent->>MCP: get_customers({limit: 10})
-    MCP-->>Agent: [{name: "Acme", revenue: 1M}, ...]
-    Agent->>LLM: Here's the data. Render it.
-    LLM->>Agent: widget_display('data-table', {rows: [...]})
-    Agent->>Canvas: Display table
-    Canvas-->>User: 📊 Interactive table
+graph TB
+    subgraph "LLM Provider"
+        L["Claude/Gemma/Haiku"]
+    end
+    
+    subgraph "Agent Loop"
+        A["runAgentLoop()"]
+        T["Tool Dispatch"]
+    end
+    
+    subgraph "Data Sources"
+        M["MCP Servers<br/>(remote)"]
+        W["WebMCP Servers<br/>(local)"]
+    end
+    
+    subgraph "UI Rendering"
+        V["30+ Native Widgets<br/>(stat, chart, map,<br/>gallery, ...)"]
+        R["Browser Canvas"]
+    end
+    
+    L -->|"chat(messages, tools)"| A
+    A -->|"tool_call"| T
+    T -->|"MCP protocol"| M
+    T -->|"direct execute"| W
+    W -->|"widget_display()"| V
+    V -->|"render"| R
+    M -->|"tool result"| T
 ```
 
-## Multi-Framework Integration
+### Key points
 
-The project supports multiple renderers:
+1. **Bidirectional** : Agents call tools (MCP), tools return data that agents format for widgets
+2. **Lazy loading** : Tools discovered progressively — system starts with `search_recipes`, `list_recipes`, then activates servers on demand
+3. **Recipe system** : Each widget has a recipe (documentation + JSON schema) that agents use to generate correct calls
+4. **Framework-agnostic** : Svelte, vanilla JS, or React component rendering — logic stays the same
+5. **Context compression** : Old tool results are truncated after use to save tokens
 
-- **Svelte** (`@webmcp-auto-ui/ui`) : `<WidgetRenderer>` with all native widgets
-- **Vanilla JS** (`@webmcp-auto-ui/core`) : `mountWidget()` for direct DOM mounting
-- **Widget Packs** : D3, Three.js, Leaflet, Plotly, Mermaid, Mapbox, etc. registered dynamically
-- **Astro, React, Vue, Web Components** : integration via `multi-*` showcases
+### Key components
 
-## Quick Start
+| Component | Role |
+|-----------|------|
+| `@webmcp-auto-ui/core` | WebMCP polyfill, MCP client, WebMCP server |
+| `@webmcp-auto-ui/agent` | Agent loop, tool layers, system prompt builder |
+| `@webmcp-auto-ui/ui` | 30+ Svelte widgets, dispatcher, SafeImage |
+| `@webmcp-auto-ui/sdk` | Canvas store, HyperSkill encoding, registry |
 
-See [Getting Started](./guide/getting-started/) to install and launch your first demo.
+### Getting started
 
-## Documentation
+See **[Getting Started](./guide/getting-started)** for 5-minute installation.
 
-- **[Architecture](./guide/architecture/)** — Detailed system diagrams
-- **[Tool Calling](./guide/tool-calling/)** — Tool dispatch mechanics and alias resolution
-- **[Deployment](./guide/deploy/)** — Deployment scripts and paths
+Next, consult **[Architecture](./guide/architecture)** to understand how components fit together.

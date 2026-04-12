@@ -1,152 +1,74 @@
 ---
 title: WebMCP Auto-UI
-description: Système d'auto-génération d'interface utilisateur par agents IA via le protocole Model Context Protocol
+description: Système d'auto-génération d'UI par agents IA via Model Context Protocol
 sidebar:
   order: 0
 ---
 
-## À propos
+## Bienvenue
 
-**WebMCP Auto-UI** est un système complet d'auto-génération et d'orchestration d'interfaces utilisateur par agents IA utilisant le protocole **Model Context Protocol (MCP)**.
+**WebMCP Auto-UI** est un framework full-stack qui permet aux agents IA (Claude, Gemma, etc.) de **générer automatiquement des interfaces utilisateur** en appelant des outils via [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
 
-Le projet combine trois piliers :
+Au lieu de renvoyer du texte ou du JSON brut, un agent peut appeler `widget_display('chart', {...})` pour afficher un graphique interactif. Les outils MCP (bases de données, APIs, calculs) sont exposés à l'agent via une couche d'abstraction unifiée.
 
-1. **Agent Loop** — Une boucle LLM itérative qui appelle des outils MCP pour découvrir et exécuter des recettes
-2. **Tool Layers** — Un système de couches de composants normalisés (MCP, WebMCP) avec résolution d'alias et lazy loading
-3. **Canvas & Widgets** — Un rendu multi-framework d'interfaces réactives avec support vanilla et Svelte/React/Vue/Astro
+### Cas d'usage
 
-### Vision
+- **Dashboards générés dynamiquement** : Un agent explore une base de données et génère des visualisations sans code de rendu manuel
+- **Explorateurs de données interactifs** : Lister, filtrer, afficher des résultats en graphiques, tableaux, cartes
+- **Workflows automatisés** : Orchestrer des outils MCP + affichage UI dans une boucle agent
+- **Prototypage rapide** : Designer des skills (workflows) en JSON, les exécuter instantanément
 
-Les utilisateurs posent des questions naturelles. L'agent :
-- 🔍 **Découvre** les outils disponibles via MCP
-- 🎯 **Choisit** la meilleure recette/widget
-- ⚙️ **Exécute** les opérations nécessaires
-- 🎨 **Affiche** les résultats dans une UI contextuelle
-
-Le tout sans code manuel — les interfaces sont générées à partir de **schémas JSON et de recettes Markdown**.
-
-## Structure du projet
-
-```
-packages/
-  ├── core/              # Types WebMCP, validation, client MCP streamable HTTP
-  ├── agent/             # Boucle agent, tool layers, autoui server
-  ├── ui/                # Composants Svelte (WidgetRenderer, primitives)
-  ├── sdk/               # Canvas store, HyperSkill encoding
-  └── widgets-*/         # Packs de widgets spécialisés (D3, Three.js, Leaflet, etc.)
-
-apps/
-  ├── flex/              # SvelteKit demo (mode chat)
-  ├── viewer/            # SvelteKit viewer (skill loading)
-  ├── home/              # Astro homepage statique
-  ├── multi-*/           # Multi-framework showcases (Astro, React, Vue, WebComponents)
-  └── ...
-```
-
-## Concepts clés
-
-### MCP (Model Context Protocol)
-Protocole standardisé pour exposer des **outils** (fonctions sérialisées en JSON Schema) que les LLM peuvent appeler.
-
-- **Serveur MCP** : expose des outils (e.g. base de données, API, calcul)
-- **Client MCP** : interroge le serveur, exécute les outils
-- **Format** : JSON-RPC sur HTTP streamable (sans polling)
-
-### WebMCP
-Extension locale du MCP pour la **couche présentation** :
-- Enregistre des **widgets** (composants UI) avec schémas d'entrée
-- Fournit des **outils d'action** : `widget_display()`, `canvas()`, `recall()`
-- Rendus par Svelte (natif) ou vanilla JavaScript
-
-### Tool Layers
-Abstraction unifiée pour les outils provenant de multiples sources :
-
-```typescript
-interface ToolLayer {
-  protocol: 'mcp' | 'webmcp';
-  serverName: string;
-  tools: McpToolDef[] | WebMcpToolDef[];
-}
-```
-
-Les outils sont préfixés : `{serverName}_{protocol}_{toolName}` pour éviter les collisions.
-
-### Agent Loop
-Boucle d'itération LLM :
-
-```
-LLM.chat(messages, tools) → {text, tool_calls}
-  ↓
-FOR each tool_call:
-  dispatch(tool_call) → result
-  store_result(resultBuffer)
-  add_to_history()
-↓
-COMPRESS old results to save context
-↓
-(repeat until end_turn or max_iterations)
-```
-
-### Recettes
-Document Markdown avec frontmatter YAML décrivant un widget :
-
-```markdown
----
-widget: stat
-description: Statistique clé (KPI)
-schema:
-  type: object
-  required: [label, value]
-  properties:
-    label: { type: string }
-    value: { type: string }
----
-
-## Quand utiliser
-Pour afficher un nombre clé (KPI, total, compteur).
-
-## Comment
-Appeler widget_display('stat', {label: "Total", value: "42"}).
-```
-
-## Flux utilisateur typique
+### Architecture schématique
 
 ```mermaid
-sequenceDiagram
-    participant User
-    participant Agent
-    participant MCP as Serveur MCP
-    participant LLM
-    participant Canvas
-
-    User->>Agent: "Affiche les 10 meilleurs clients"
-    Agent->>LLM: search_recipes() — qu'as-tu de disponible ?
-    LLM->>Agent: "Trouve 'get_clients', 'data_table'"
-    Agent->>MCP: get_clients({limit: 10})
-    MCP-->>Agent: [{name: "Acme", revenue: 1M}, ...]
-    Agent->>LLM: Voici les données. Rends-les.
-    LLM->>Agent: widget_display('data-table', {rows: [...]})
-    Agent->>Canvas: Affiche tableau
-    Canvas-->>User: 📊 Tableau interactif
+graph TB
+    subgraph "LLM Provider"
+        L["Claude/Gemma/Haiku"]
+    end
+    
+    subgraph "Agent Loop"
+        A["runAgentLoop()"]
+        T["Tool Dispatch"]
+    end
+    
+    subgraph "Data Sources"
+        M["MCP Servers<br/>(remote)"]
+        W["WebMCP Servers<br/>(local)"]
+    end
+    
+    subgraph "UI Rendering"
+        V["30+ Widgets natifs<br/>(stat, chart, map,<br/>gallery, ...)"]
+        R["Browser Canvas"]
+    end
+    
+    L -->|"chat(messages, tools)"| A
+    A -->|"tool_call"| T
+    T -->|"MCP protocol"| M
+    T -->|"direct execute"| W
+    W -->|"widget_display()"| V
+    V -->|"render"| R
+    M -->|"tool result"| T
 ```
 
-## Intégration multi-framework
+### Points clés
 
-Le projet supporte plusieurs renderers :
+1. **Bidirectionnel** : Les agents appelent les outils (MCP), les outils renvoient des données que l'agent met en forme pour les widgets
+2. **Lazy loading** : Les outils découverts progressivement — le système commence avec `search_recipes`, `list_recipes`, puis active les serveurs à la demande
+3. **Système de recettes** : Chaque widget a une recette (documentation + schéma JSON) que l'agent utilise pour générer les bons appels
+4. **Framework-agnostic** : Rendus Svelte, vanilla JS, ou composants React — la logique reste la même
+5. **Compression de contexte** : Les anciens résultats d'outils sont tronqués après utilisation pour économiser les tokens
 
-- **Svelte** (`@webmcp-auto-ui/ui`) : `<WidgetRenderer>` avec tous les widgets natifs
-- **Vanilla JS** (`@webmcp-auto-ui/core`) : `mountWidget()` pour montage direct dans un DOM element
-- **Widget Packs** : D3, Three.js, Leaflet, Plotly, Mermaid, Mapbox, etc. enregistrés dynamiquement
-- **Astro, React, Vue, Web Components** : intégration via `multi-*` showcases
+### Composants clés
 
-## Démarrage rapide
+| Composant | Rôle |
+|-----------|------|
+| `@webmcp-auto-ui/core` | Polyfill WebMCP, client MCP, serveur WebMCP |
+| `@webmcp-auto-ui/agent` | Boucle agent, tool layers, system prompt builder |
+| `@webmcp-auto-ui/ui` | 30+ widgets Svelte, dispatcher, SafeImage |
+| `@webmcp-auto-ui/sdk` | Store canvas, HyperSkill encoding, registry |
 
-Voir [Getting Started](./guide/getting-started/) pour installer et lancer votre première démo.
+### Commençons
 
-## Documentation
+Voir **[Getting Started](./guide/getting-started)** pour une installation en 5 minutes.
 
-- **[Architecture](./guide/architecture/)** — Diagrammes détaillés du système
-- **[Tool Calling](./guide/tool-calling/)** — Mécanique de dispatch des outils et résolution d'alias
-- **[Déploiement](./guide/deploy/)** — Scripts et chemins de déploiement
-
-===
+Ensuite, consultez **[Architecture](./guide/architecture)** pour comprendre comment les composants s'assemblent.

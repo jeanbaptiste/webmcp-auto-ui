@@ -1,319 +1,280 @@
 ---
 title: Créer un widget personnalisé
-description: Construire et enregistrer un widget custom pour le système de composants WebMCP Auto-UI
+description: Construire et enregistrer un widget custom dans le système de composants WebMCP Auto-UI
 sidebar:
   order: 1
 ---
 
-Un **widget** dans WebMCP Auto-UI est un composant réutilisable qui affiche des données sur le canvas. Ce tutorial montre comment créer un widget custom, l'enregistrer dans le système, et l'utiliser dans votre application.
+Un widget personnalisé est un composant Svelte qui affiche des données structurées sur le canvas. Ce tutorial montre comment créer, enregistrer et utiliser un widget custom.
 
 ## Architecture des widgets
 
-WebMCP Auto-UI supporte deux modes de rendu :
+Le système de widgets WebMCP Auto-UI comporte trois niveaux :
 
-- **Svelte** (par défaut) : via `<WidgetRenderer>` et `<BlockRenderer>` dans `@webmcp-auto-ui/ui`
-- **Vanilla** : via `mountWidget()` dans `@webmcp-auto-ui/core` (sans dépendance framework)
-
-Les widgets natifs sont définis dans le serveur WebMCP `autoui` (`packages/agent/src/autoui-server.ts`), qui expose environ 30 widgets (stat, chart, gallery, carousel, etc.).
-
-## Exemple : créer un widget "Fiche statistique enrichie"
-
-Supposons que vous voulez un widget qui affiche un titre, une valeur principale, une tendance, et une mini-barre de progression.
-
-### Étape 1 : Définir le schéma JSON
-
-Le schéma définit les paramètres attendus par le widget. Il doit respecter le format JSON Schema :
-
-```typescript
-const widgetSchema = {
-  type: 'object',
-  required: ['title', 'value'],
-  properties: {
-    title: {
-      type: 'string',
-      description: 'Titre du widget'
-    },
-    value: {
-      type: 'number',
-      description: 'Valeur principale affichée'
-    },
-    max: {
-      type: 'number',
-      description: 'Valeur maximale de la barre (par défaut: 100)',
-      default: 100
-    },
-    unit: {
-      type: 'string',
-      description: 'Unité de mesure (ex: "%", "ms")'
-    },
-    color: {
-      type: 'string',
-      description: 'Couleur hexadécimale (ex: "#3b82f6")',
-      default: '#3b82f6'
-    },
-    trend: {
-      type: 'string',
-      enum: ['up', 'down', 'flat'],
-      description: 'Direction de la tendance'
-    }
-  }
-};
+```mermaid
+graph TD
+  A["Serveur WebMCP<br/>createWebMcpServer"] -->|registerWidget| B["Registry de widgets<br/>WidgetEntry"]
+  B -->|getWidget| C["WidgetRenderer<br/>resolution de type"]
+  C -->|render| D["Composant Svelte<br/>ou fonction vanilla"]
 ```
 
-### Étape 2 : Créer le composant Svelte
+**Résumé :**
+1. Un `WebMcpServer` regroupe les widgets et les outils de rendu
+2. Chaque widget est enregistré avec un **frontmatter YAML** (schéma + instructions) + un **composant Svelte**
+3. Au moment du rendu, `WidgetRenderer` recherche le widget dans les serveurs connectés ou utilise les natives
 
-Créez un fichier `StatProgress.svelte` :
+## Exemple complet : widget "notification-feed"
+
+### Étape 1 : Créer le composant Svelte
 
 ```svelte
+<!-- src/lib/widgets/NotificationFeed.svelte -->
 <script lang="ts">
   interface Props {
     data: {
-      title: string;
-      value: number;
-      max?: number;
-      unit?: string;
-      color?: string;
-      trend?: 'up' | 'down' | 'flat';
+      title?: string;
+      notifications: Array<{
+        id: string;
+        timestamp: string;
+        level: 'info' | 'warn' | 'error';
+        message: string;
+      }>;
     };
   }
 
-  let { data }: Props = $props();
+  let { data } = $props();
 
-  const percentage = $derived(Math.min(100, (data.value / (data.max ?? 100)) * 100));
-  
-  const trendIcon = $derived.by(() => {
-    switch (data.trend) {
-      case 'up': return '↗';
-      case 'down': return '↘';
-      default: return '→';
-    }
-  });
+  const colors = {
+    info: 'text-blue-500',
+    warn: 'text-amber-500',
+    error: 'text-red-500',
+  };
 
-  const trendColor = $derived.by(() => {
-    switch (data.trend) {
-      case 'up': return 'text-green-500';
-      case 'down': return 'text-red-500';
-      default: return 'text-gray-500';
-    }
-  });
+  function formatTime(ts: string): string {
+    const date = new Date(ts);
+    return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
 </script>
 
-<div class="p-4 rounded-lg border border-gray-200 bg-white shadow-sm">
-  <div class="flex items-center justify-between mb-2">
-    <h3 class="font-semibold text-gray-900">{data.title}</h3>
-    <span class={`text-lg font-bold ${trendColor}`}>
-      {trendIcon}
-    </span>
+<div class="p-4 bg-surface1 rounded-lg border border-surface2">
+  {#if data.title}
+    <h3 class="font-semibold mb-3 text-text1">{data.title}</h3>
+  {/if}
+  
+  <div class="space-y-2 max-h-64 overflow-y-auto">
+    {#each data.notifications as notif (notif.id)}
+      <div class="flex gap-3 items-start text-sm p-2 rounded bg-surface2">
+        <div class={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${colors[notif.level]}`}></div>
+        <div class="flex-1 min-w-0">
+          <div class="text-text2">{notif.message}</div>
+          <div class="text-xs text-text3 mt-1">{formatTime(notif.timestamp)}</div>
+        </div>
+      </div>
+    {/each}
   </div>
 
-  <div class="flex items-baseline gap-2 mb-3">
-    <span class="text-3xl font-bold" style="color: {data.color ?? '#3b82f6'}">
-      {data.value}
-    </span>
-    {#if data.unit}
-      <span class="text-sm text-gray-600">{data.unit}</span>
-    {/if}
-  </div>
-
-  <div class="w-full bg-gray-100 rounded-full h-2">
-    <div
-      class="h-2 rounded-full transition-all"
-      style="width: {percentage}%; background-color: {data.color ?? '#3b82f6'}"
-    />
-  </div>
-
-  <div class="text-xs text-gray-500 mt-2 text-right">
-    {percentage.toFixed(0)}% de {data.max ?? 100}
-  </div>
+  {#if data.notifications.length === 0}
+    <div class="text-xs text-text3 italic">Aucune notification</div>
+  {/if}
 </div>
 
 <style>
-  :global {
-    /* Optionnel : styles globaux si nécessaire */
+  :global(.dark) {
+    --surface1: #1a1a1a;
+    --surface2: #2d2d2d;
   }
 </style>
 ```
 
-### Étape 3 : Enregistrer le widget
+### Étape 2 : Définir le frontmatter et la recette
 
-#### Option A : Via un serveur WebMCP
-
-Si vous créez un serveur WebMCP personnalisé, enregistrez le widget avec une recette en frontmatter :
+Créer une constante avec le **frontmatter YAML** décrivant le schéma du widget :
 
 ```typescript
-import { createWebMcpServer } from '@webmcp-auto-ui/core';
-import StatProgress from './StatProgress.svelte';
-
-const myServer = createWebMcpServer('my-widgets', {
-  description: 'Mes widgets personnalisés'
-});
-
-const recipe = `---
-widget: stat-progress
-description: Fiche statistique enrichie avec barre de progression et tendance.
+// src/lib/widgets/notification-feed-recipe.ts
+export const NOTIFICATION_FEED_RECIPE = `---
+widget: notification-feed
+description: Flux de notifications en temps réel avec timestamps et niveaux de sévérité.
 schema:
   type: object
   required:
-    - title
-    - value
+    - notifications
   properties:
     title:
       type: string
-    value:
-      type: number
-    max:
-      type: number
-      default: 100
-    unit:
-      type: string
-    color:
-      type: string
-      default: "#3b82f6"
-    trend:
-      type: string
-      enum: [up, down, flat]
+      description: Titre optionnel du flux
+    notifications:
+      type: array
+      description: Liste des notifications
+      items:
+        type: object
+        required:
+          - id
+          - timestamp
+          - level
+          - message
+        properties:
+          id:
+            type: string
+          timestamp:
+            type: string
+            description: ISO 8601 timestamp
+          level:
+            type: string
+            enum: [info, warn, error]
+          message:
+            type: string
 ---
 
 ## Quand utiliser
 
-Pour afficher une métrique principale avec barre de progression et indicateur de tendance.
+Pour afficher un flux de notifications structuré avec tri par timestamp et filtrage par niveau de sévérité.
 
 ## Comment
 
-Appeler widget_display('stat-progress', {title: "Uptime", value: 99.8, max: 100, unit: "%", trend: "up", color: "#10b981"})
-`;
+Appeler \`widget_display('notification-feed', {
+  title: "Événements récents",
+  notifications: [
+    { id: "n1", timestamp: "2024-01-15T14:30:00Z", level: "info", message: "Tâche complétée" }
+  ]
+})\`.
 
-myServer.registerWidget(recipe, StatProgress);
+## Erreurs courantes
+
+- Ne pas oublier les timestamps ISO 8601 — le widget les utilise pour l'ordre d'affichage
+- L'id doit être unique — c'est la clé pour la réactivité Svelte
+`;
 ```
 
-#### Option B : Dans une app (canvas store)
+### Étape 3 : Créer un serveur WebMCP
 
-Si vous utilisez le canvas store, ajoutez le widget à la liste des types et rendez-le via `<WidgetRenderer>` :
+Enregistrer le widget dans un serveur WebMCP custom :
+
+```typescript
+// src/lib/webmcp-server.ts
+import { createWebMcpServer } from '@webmcp-auto-ui/core';
+import NotificationFeed from './widgets/NotificationFeed.svelte';
+import { NOTIFICATION_FEED_RECIPE } from './widgets/notification-feed-recipe';
+
+export const customServer = createWebMcpServer('my-widgets', {
+  description: 'Widgets personnalisés pour l\'application',
+});
+
+// Enregistrer le widget
+customServer.registerWidget(NOTIFICATION_FEED_RECIPE, NotificationFeed);
+
+// Optionnel : ajouter des outils custom (ex: clear-notifications)
+customServer.addTool({
+  name: 'clear-notifications',
+  description: 'Effacer toutes les notifications du flux.',
+  inputSchema: {
+    type: 'object',
+    properties: {},
+  },
+  execute: async () => ({
+    ok: true,
+    message: 'Notifications effacées',
+  }),
+});
+
+// Exporter la couche (pour intégration agent)
+export function getCustomLayer() {
+  return customServer.layer();
+}
+```
+
+### Étape 4 : Utiliser le widget dans une app
+
+Dans un composant Svelte, utiliser `<WidgetRenderer>` avec le serveur custom :
 
 ```svelte
+<!-- routes/+page.svelte -->
 <script lang="ts">
-  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-  import WidgetRenderer from '@webmcp-auto-ui/ui/widgets/WidgetRenderer.svelte';
-  import StatProgress from './StatProgress.svelte';
+  import { WidgetRenderer } from '@webmcp-auto-ui/ui';
+  import { customServer } from '$lib/webmcp-server';
 
-  // Créer une couche WebMCP pour enregistrer le widget
-  function createCustomWidgets() {
-    const server = createWebMcpServer('custom', {
-      description: 'Widgets personnalisés de l\'app'
-    });
+  let widgets = [
+    {
+      id: 'notif-feed-1',
+      type: 'notification-feed',
+      data: {
+        title: 'Événements système',
+        notifications: [
+          {
+            id: 'n1',
+            timestamp: new Date(Date.now() - 300000).toISOString(),
+            level: 'info' as const,
+            message: 'Base de données synchronisée',
+          },
+          {
+            id: 'n2',
+            timestamp: new Date(Date.now() - 60000).toISOString(),
+            level: 'warn' as const,
+            message: 'Utilisation CPU élevée (85%)',
+          },
+        ],
+      },
+    },
+  ];
 
-    const recipe = `---
-widget: stat-progress
-description: Statistique avec barre de progression
-schema:
-  type: object
-  required: [title, value]
-  properties:
-    title: { type: string }
-    value: { type: number }
-    max: { type: number, default: 100 }
-    unit: { type: string }
-    color: { type: string, default: "#3b82f6" }
-    trend: { type: string, enum: [up, down, flat] }
----
-
-Fiche statistique enrichie.`;
-
-    server.registerWidget(recipe, StatProgress);
-    return server;
+  function handleInteraction(type: string, action: string, payload: unknown) {
+    console.log(`Widget ${type} a déclenché:`, action, payload);
   }
-
-  const servers = [createCustomWidgets()];
 </script>
 
-<div class="space-y-4">
-  {#each canvas.blocks as block (block.id)}
-    <WidgetRenderer 
-      id={block.id}
-      type={block.type}
-      data={block.data}
-      {servers}
-      oninteract={(type, action, payload) => {
-        console.log(`Widget ${type} a déclenché l'action ${action}:`, payload);
-      }}
-    />
+<div class="p-6 max-w-2xl mx-auto">
+  <h1 class="text-2xl font-bold mb-6">Dashboard personnel</h1>
+  
+  {#each widgets as widget (widget.id)}
+    <div class="mb-4">
+      <WidgetRenderer
+        id={widget.id}
+        type={widget.type}
+        data={widget.data}
+        servers={[customServer]}
+        oninteract={handleInteraction}
+      />
+    </div>
   {/each}
 </div>
 ```
 
-### Étape 4 : Utiliser le widget dans l'agent
+## Intégration avec le canvas store
 
-Une fois enregistré, l'agent peut appeler le widget via `widget_display()` :
+Pour que le widget s'ajoute au canvas via l'agent :
 
 ```typescript
-import { runAgentLoop } from '@webmcp-auto-ui/agent';
+// Dans un handler d'agent ou un callback
+import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 
-// L'agent appelle automatiquement widget_display() avec les bons paramètres
-const result = await runAgentLoop(
-  'Affiche les statistiques de performance du système',
-  {
-    provider: llmProvider,
-    layers: [
-      myServer.layer() // Inclure la couche WebMCP
-    ],
-    callbacks: {
-      onWidget: (type, data) => {
-        if (type === 'stat-progress') {
-          canvas.addWidget('stat-progress', data);
-        }
-      }
-    }
-  }
-);
+canvas.addWidget('notification-feed', {
+  title: 'Notifications en direct',
+  notifications: [
+    /* ... données du MCP ... */
+  ],
+});
 ```
 
-## Avancé : ajouter des interactions
+## Points clés
 
-Les widgets peuvent émettre des événements et réagir aux interactions utilisateur :
+✅ **Toujours fournir un frontmatter YAML** — le schéma est utilisé pour la validation et la documentation générée automatiquement
 
-```svelte
-<script lang="ts">
-  interface Props {
-    data: Record<string, unknown>;
-    oninteract?: (action: string, payload: unknown) => void;
-  }
+✅ **Exporter le serveur** — pour que les autres modules puissent enregistrer leurs widgets
 
-  let { data, oninteract }: Props = $props();
+✅ **Utiliser Svelte 5 `$props()`** — plus moderne et typé que `export let`
 
-  function handleClick() {
-    oninteract?.('expand', { widgetId: data.id });
-  }
-</script>
+✅ **Gérer les états vides** — afficher un placeholder quand `data.notifications.length === 0`
 
-<div class="cursor-pointer hover:shadow-md transition" onclick={handleClick}>
-  <!-- Contenu du widget -->
-</div>
+❌ **Ne pas laisser `data` sans type** — TypeScript aide à attraper les bugs tôt
+
+❌ **Ne pas enregistrer deux widgets avec le même `widget:` name** — utiliser des noms uniques
+
+## Test en dev
+
+```bash
+npm run dev
+# Naviguer vers http://localhost:5173
+# Ouvrir la console pour voir les logs d'interaction
 ```
 
-Puis dans le parent :
-
-```svelte
-<WidgetRenderer
-  id={block.id}
-  type={block.type}
-  data={block.data}
-  oninteract={(type, action, payload) => {
-    if (action === 'expand') {
-      // Ouvrir un modal, scroller vers le widget, etc.
-      console.log('Widget expand:', payload);
-    }
-  }}
-/>
-```
-
-## Résumé
-
-| Étape | Action |
-|-------|--------|
-| 1 | Définir le schéma JSON des paramètres |
-| 2 | Créer le composant Svelte (reçoit `data` en props) |
-| 3 | Enregistrer via `server.registerWidget(recipe, Component)` |
-| 4 | Rendre via `<WidgetRenderer>` ou l'agent via `widget_display()` |
-| 5 | (Optionnel) Ajouter des interactions avec `oninteract` |
-
-Pour plus de détails, consultez les widgets natifs dans `packages/agent/src/autoui-server.ts` et les composants Svelte dans `packages/ui/src/widgets/`.
+Voir aussi : [Utiliser les widgets existants](./use-existing-widgets.mdx)

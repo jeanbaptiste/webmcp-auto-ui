@@ -1,235 +1,133 @@
 ---
 title: Getting Started
-description: Installation, configuration and first launch of WebMCP Auto-UI
+description: Installation, configuration, and first launch of WebMCP Auto-UI
 sidebar:
   order: 1
 ---
 
-## Prerequisites
-
-- **Node.js** 18+
-- **pnpm** 8+ (recommended package manager)
-- **Git**
-
 ## Installation
 
-### 1. Clone the repository
+### Prerequisites
+
+- **Node.js 18+**
+- **npm 9+** or **pnpm 8+**
+- (Optional) Claude API key (for `RemoteLLMProvider`)
+
+### Clone and install
 
 ```bash
-git clone https://github.com/your-org/webmcp-auto-ui.git
+git clone https://github.com/hyperskills/webmcp-auto-ui.git
 cd webmcp-auto-ui
-```
 
-### 2. Install dependencies
-
-```bash
+# Install dependencies (Turbo monorepo)
+npm install
+# or
 pnpm install
 ```
 
-This installs packages and links monorepo workspaces locally.
+### Monorepo structure
 
-### 3. Verify structure
-
-```bash
-ls packages/      # core, agent, ui, sdk, widgets-*
-ls apps/          # flex, viewer, home, etc.
+```
+webmcp-auto-ui/
+├── packages/
+│   ├── core/          # WebMCP polyfill, MCP client, WebMCP server
+│   ├── agent/         # Agent loop, tool layers, system prompt
+│   ├── ui/            # 30+ Svelte widgets
+│   └── sdk/           # Canvas store, HyperSkill encoding
+├── apps/
+│   ├── flex/          # Online demo (agent chat + widgets)
+│   ├── viewer/        # HyperSkill reader
+│   ├── home/          # Landing page
+│   └── showcase/      # Widget gallery
+└── scripts/
+    └── deploy.sh      # Deploy to server
 ```
 
-## Minimal Configuration
+## Quick setup
 
-### Environment Variables
+### Example 1 : Simple agent loop
 
-Create a `.env.local` file at the project root:
+```typescript
+import { runAgentLoop } from '@webmcp-auto-ui/agent';
+import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
 
-```env
-# LLM (Anthropic)
-VITE_ANTHROPIC_API_KEY=sk-ant-...
+const provider = new RemoteLLMProvider({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  model: 'claude-3-5-sonnet-20241022',
+});
 
-# MCP server (optional for demo)
-VITE_MCP_URL=http://localhost:8000
+const result = await runAgentLoop('Show me a chart of Q1-Q4 sales', {
+  provider,
+  maxIterations: 5,
+});
 
-# Mode (dev/prod)
-NODE_ENV=development
+console.log(result.text); // Final assistant text
+console.log(result.toolCalls); // Tool calls made
 ```
 
-**Note**: Variables starting with `VITE_` are injected at build-time and accessible client-side. **Never commit API keys**.
+### Example 2 : With WebMCP server (widgets)
 
-### App Configuration
+```typescript
+import { createWebMcpServer } from '@webmcp-auto-ui/core';
+import { autoui } from '@webmcp-auto-ui/agent';
 
-Each app has its own `.env`:
+// autoui already contains 30+ native widgets
+const layer = autoui.layer();
 
-```bash
-apps/flex/.env.local
-apps/viewer/.env.local
+const result = await runAgentLoop('Show me stats', {
+  provider,
+  layers: [layer],
+  maxIterations: 5,
+});
 ```
 
-## First Launch
-
-### Option A: Flex (chat mode)
-
-The **flex** demo is the main entry point for testing the agent.
-
-```bash
-cd apps/flex
-pnpm dev
-```
-
-Access: http://localhost:5173
-
-**Features**:
-- LLM selector (Haiku, Sonnet, Gemma)
-- Iterative chat mode
-- Widget display
-- Optional MCP support
-
-### Option B: Viewer (skill loading)
-
-The **viewer** demo loads HyperSkill-encoded skills.
-
-```bash
-cd apps/viewer
-pnpm dev
-```
-
-Access: http://localhost:5173
-
-**Features**:
-- Decode a HyperSkill URL
-- Display content (saved widgets)
-- Export a new version
-
-### Option C: Home (landing page)
-
-Static homepage showcasing capabilities.
-
-```bash
-cd apps/home
-pnpm build
-pnpm preview
-```
-
-Access: http://localhost:5173
-
-## Structure of a Simple App
-
-Here's a minimal example to integrate the agent:
-
-```svelte
-<script lang="ts">
-  import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
-  import { runAgentLoop } from '@webmcp-auto-ui/agent';
-  import { autoui } from '@webmcp-auto-ui/agent';
-
-  const provider = new RemoteLLMProvider({
-    apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
-    model: 'claude-3-5-sonnet-20241022',
-  });
-
-  async function chat(userMessage: string) {
-    const result = await runAgentLoop(userMessage, {
-      provider,
-      layers: [autoui.layer()],
-      maxIterations: 5,
-      callbacks: {
-        onWidget: (type, data) => {
-          console.log('Widget:', type, data);
-          return { id: 'w_' + Date.now().toString(36) };
-        },
-        onText: (text) => console.log(text),
-      },
-    });
-
-    console.log('Result:', result);
-  }
-</script>
-
-<button onclick={() => chat('Show a counter at 42')}>
-  Chat
-</button>
-```
-
-## Development Mode
-
-### Watch Changes (hot reload)
-
-```bash
-pnpm dev
-```
-
-This starts all packages and apps in dev mode. Changes to `packages/*` are automatically recompiled.
-
-### Tests
-
-```bash
-pnpm test
-```
-
-### Linting
-
-```bash
-pnpm lint
-```
-
-### Documentation
-
-```bash
-pnpm docs:build
-pnpm docs:preview
-```
-
-## MCP Integration (optional)
-
-To connect a remote MCP server:
-
-1. **Start an MCP server** (example: Stdio-based)
-
-```bash
-node my-mcp-server.js
-```
-
-2. **Configure the URL in your app**
+### Example 3 : With MCP client (data)
 
 ```typescript
 import { McpClient } from '@webmcp-auto-ui/core';
 
-const mcp = new McpClient({
-  baseUrl: 'http://localhost:3001/sse',
+const mcpClient = new McpClient({
+  url: 'http://localhost:3001',
+  clientName: 'webmcp-auto-ui-demo',
 });
 
-await mcp.initialize();
+await mcpClient.initialize();
 
-const result = await runAgentLoop(userMessage, {
-  client: mcp,
+const result = await runAgentLoop('List recipes', {
   provider,
-  layers: [autoui.layer()],
-  // ...
+  client: mcpClient,
+  layers: [
+    // ... your MCP and WebMCP layers
+  ],
 });
 ```
 
-## Next Steps
+## First launch
 
-1. **Explore architecture** : see [Architecture](./architecture/)
-2. **Understand tool calling** : see [Tool Calling](./tool-calling/)
-3. **Deploy to production** : see [Deployment](./deploy/)
-
-## Troubleshooting
-
-### Error: "Cannot find module '@webmcp-auto-ui/core'"
-
-Re-run `pnpm install` and verify workspace links are established.
+### Run the local demo
 
 ```bash
-pnpm ls @webmcp-auto-ui/core
+# Build all packages
+npm run build
+
+# Launch flex app (agent chat + canvas)
+cd apps/flex
+npm run dev
 ```
 
-### API key rejected
+The app is accessible at `http://localhost:5173`.
 
-Verify that `VITE_ANTHROPIC_API_KEY` is valid and the specified model exists.
+### Configure Claude API key (optional)
 
-### Port 5173 already in use
+```bash
+# In apps/flex/.env.local
+VITE_ANTHROPIC_API_KEY=sk-ant-...
+```
 
-Change the port in `vite.config.ts` or kill the existing process.
+Without a key, you can use Gemma (in-browser WASM).
 
-### Hot reload not working
+## Next steps
 
-Verify the modified file is in `packages/*/src/**` and compilation is in progress.
+1. **[Architecture](./architecture)** — Understand the system in detail
+2. **[Tool Calling](./tool-calling)** — How agents call tools
+3. **[Deploy](./deploy)** — Deploy to server

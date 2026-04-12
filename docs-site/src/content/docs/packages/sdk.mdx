@@ -1,118 +1,84 @@
 ---
-title: '@webmcp-auto-ui/sdk'
-description: 'Canvas store, HyperSkill encode/decode, skills registry, demo servers MCP'
+title: "@webmcp-auto-ui/sdk"
+description: "Canvas store, HyperSkill encoding, skills registry"
 sidebar:
   order: 3
 ---
 
-## Vue d'ensemble
-
-Le package `@webmcp-auto-ui/sdk` fournit la **gestion de l'état canvas** (widgets, chat, mode) et l'**infrastructure HyperSkill** pour la sérialisation et le versioning des competences.
-
-### Composants
-
-- **Canvas store** : état global widgets/messages avec réactivité Svelte 5
-- **HyperSkill** : encode/decode/hash/diff de competences
-- **Skills registry** : persistance locale et gestion CRUD
-- **Demo servers** : liste des serveurs MCP de démonstration
-
----
+Le package `@webmcp-auto-ui/sdk` contient le store canvas (état widgets), l'encoding/decoding HyperSkill, et le registre de skills.
 
 ## Canvas Store
 
-Gestion réactive de l'état interface (widgets, mode, LLM, MCP, chat).
-
-### Utilisation
+### Utilisation Svelte 5
 
 ```svelte
-<script lang="ts">
-  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+<script>
+  import { canvas } from '@webmcp-auto-ui/sdk/canvas';  // Alias
 </script>
 
-<select bind:value={canvas.mode}>
-  <option value="drag">Drag & Drop</option>
-  <option value="chat">Chat Mode</option>
-  <option value="auto">Auto</option>
-</select>
+<div>
+  Widgets: {canvas.blockCount}
+  {#each canvas.blocks as block (block.id)}
+    <div>{block.type}</div>
+  {/each}
+</div>
 
-<p>Mode: {canvas.mode}</p>
-<p>Widgets: {canvas.blockCount}</p>
+<button onclick={() => canvas.addWidget('stat', { label: 'KPI', value: '42' })}>
+  Ajouter
+</button>
 ```
 
-### API
-
-#### Getters (réactifs — supportent `bind:`)
+### API Getters/Setters
 
 ```ts
-canvas.blocks: Widget[]              // Tous les widgets
-canvas.mode: Mode                    // 'auto' | 'drag' | 'chat'
-canvas.llm: LLMId                    // Modèle LLM courant
-canvas.mcpUrl: string                // URL du serveur MCP
-canvas.mcpConnected: boolean         // Connecté?
-canvas.mcpConnecting: boolean        // Connexion en cours?
-canvas.mcpName: string               // Nom du serveur MCP
-canvas.mcpTools: McpToolInfo[]       // Outils MCP disponibles
-canvas.messages: ChatMsg[]           // Historique chat
-canvas.generating: boolean           // Génération en cours?
-canvas.statusText: string            // Texte de statut MCP
-canvas.statusColor: string           // CSS color class
-canvas.themeOverrides: Record<string, string>
-canvas.blockCount: number            // Nombre de widgets
-canvas.isEmpty: boolean              // Pas de widgets?
+// Lecture (reactif en Svelte 5 via $state/$derived)
+canvas.blocks          // Widget[]
+canvas.mode            // Mode (auto, drag, chat)
+canvas.llm             // LLMId
+canvas.mcpUrl          // string
+canvas.mcpConnected    // boolean
+canvas.mcpConnecting   // boolean
+canvas.mcpName         // string
+canvas.mcpTools        // McpToolInfo[]
+canvas.messages        // ChatMsg[]
+canvas.generating      // boolean
+canvas.statusText      // string
+canvas.statusColor     // string
+canvas.blockCount      // number (derived)
+canvas.isEmpty         // boolean (derived)
+canvas.themeOverrides  // Record<string, string>
+
+// Écriture (réactive + notify)
+canvas.mode = 'chat'
+canvas.llm = 'sonnet'
+canvas.mcpUrl = 'http://...'
+canvas.generating = true
 ```
 
-#### Setters (réactifs — supportent `bind:`)
+### Widgets (Blocks)
 
 ```ts
-canvas.mode = 'chat'                 // Changer mode
-canvas.llm = 'sonnet'                // Changer modèle LLM
-canvas.mcpUrl = 'http://...'         // URL MCP
-canvas.generating = true             // Marquer génération
-```
-
-#### Méthodes (mutations)
-
-```ts
-// Widgets
-canvas.addWidget(type, data): Widget
-canvas.removeBlock(id): void         // Supprimer widget
-canvas.updateBlock(id, data): void   // Mettre à jour données
-canvas.moveBlock(fromId, toId): void // Réordonner
-canvas.clearBlocks(): void           // Vider canvas
-canvas.setBlocks(widgets): void      // Remplacer tous
-
-// Chat
-canvas.addMsg(role, content): ChatMsg
-canvas.updateMsg(id, content): void
-canvas.clearMessages(): void         // Effacer chat
-
-// MCP
-canvas.setMcpConnecting(bool): void
-canvas.setMcpConnected(bool, name?, tools?): void
-canvas.setMcpError(message): void
-
-// Theme
-canvas.setThemeOverrides(overrides): void
-
-// HyperSkill
-canvas.buildSkillJSON(): Record<string, unknown>
-canvas.buildHyperskillParam(): Promise<string>
-canvas.loadFromParam(param): Promise<boolean>
-canvas.loadFromUrl(url): Promise<boolean>
-```
-
-### Types
-
-```ts
-type Mode = 'auto' | 'drag' | 'chat';
-type LLMId = 'haiku' | 'sonnet' | 'opus' | 'gemma-2b' | 'gemma-7b';
-
 interface Widget {
   id: string;
   type: WidgetType;
   data: Record<string, unknown>;
 }
 
+// Actions
+canvas.addWidget(type: WidgetType, data?: Record<string, unknown>): Widget
+canvas.removeBlock(id: string): void
+canvas.updateBlock(id: string, data: Record<string, unknown>): void
+canvas.moveBlock(fromId: string, toId: string): void
+canvas.clearBlocks(): void
+canvas.setBlocks(newBlocks: Widget[]): void
+
+// Backward-compat
+canvas.addBlock(type, data)  // Alias de addWidget
+```
+
+### Chat
+
+```ts
 interface ChatMsg {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -120,381 +86,330 @@ interface ChatMsg {
   thinking?: boolean;
 }
 
+// Actions
+canvas.addMsg(role: ChatMsg['role'], content: string, thinking?: boolean): ChatMsg
+canvas.updateMsg(id: string, content: string, thinking?: boolean): void
+canvas.clearMessages(): void
+```
+
+### MCP
+
+```ts
 interface McpToolInfo {
   name: string;
   description: string;
   inputSchema?: Record<string, unknown>;
 }
+
+// Actions
+canvas.setMcpConnecting(connecting: boolean): void
+canvas.setMcpConnected(connected: boolean, name?: string, tools?: McpToolInfo[]): void
+canvas.setMcpError(err: string): void
 ```
 
-### Exemple complet
+Met à jour automatiquement `statusText` et `statusColor`.
 
-```svelte
-<script lang="ts">
-  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-</script>
-
-<!-- Sélecteur mode -->
-<select bind:value={canvas.mode}>
-  <option value="drag">Drag & Drop</option>
-  <option value="chat">Chat</option>
-  <option value="auto">Auto</option>
-</select>
-
-<!-- Affichage widgets -->
-{#each canvas.blocks as widget (widget.id)}
-  <div class="widget">
-    <h3>{widget.type}</h3>
-    <button on:click={() => canvas.removeBlock(widget.id)}>Supprimer</button>
-  </div>
-{/each}
-
-<!-- Ajout widget -->
-<button on:click={() => canvas.addWidget('stat', {label: 'KPI', value: '100'})}>
-  + Widget
-</button>
-
-<!-- Chat -->
-{#each canvas.messages as msg (msg.id)}
-  <div class="message {msg.role}">
-    {msg.content}
-  </div>
-{/each}
-
-<input type="text" on:keydown={(e) => {
-  if (e.key === 'Enter' && e.currentTarget.value) {
-    canvas.addMsg('user', e.currentTarget.value);
-    e.currentTarget.value = '';
-  }
-}} />
-```
-
----
-
-## HyperSkill Encode/Decode
-
-Sérialisation de competences avec compression et versioning.
-
-### encodeHyperSkill
-
-Encode une competence en URL compressée.
+### Thème
 
 ```ts
-export async function encodeHyperSkill(
-  skill: HyperSkill,
-  sourceUrl?: string
-): Promise<string>
+canvas.setThemeOverrides(overrides: Record<string, string>): void
+canvas.themeOverrides  // Getter
 ```
 
-### Parameters
-
-```ts
-interface HyperSkill {
-  meta: HyperSkillMeta;
-  content: unknown;
-}
-
-interface HyperSkillMeta {
-  title?: string;
-  description?: string;
-  version?: string;
-  created?: string;
-  mcp?: string;                // URL serveur MCP
-  mcpName?: string;            // Nom du serveur
-  llm?: string;                // Modèle LLM utilisé
-  tags?: string[];
-  theme?: Record<string, string>;
-  hash?: string;               // Hash unique
-  previousHash?: string;
-  chatSummary?: string;        // Résumé conversation
-  provenance?: {               // Traçabilité
-    mcpServers?: string[];
-    toolsUsed?: string[];
-    toolCallCount?: number;
-    skillsReferenced?: string[];
-    llm?: string;
-    exportedAt?: string;
-  };
-}
-```
-
-### Exemple
-
-```ts
-import { encodeHyperSkill } from '@webmcp-auto-ui/sdk';
-import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-
-async function exportSkill() {
-  const skill = {
-    meta: {
-      title: 'Ma competence',
-      mcp: canvas.mcpUrl,
-      llm: canvas.llm,
-      theme: canvas.themeOverrides,
-    },
-    content: {
-      blocks: canvas.blocks,
-      messages: canvas.messages,
-    },
-  };
-
-  const url = await encodeHyperSkill(skill);
-  console.log('URL partageable:', url);
-  // https://example.com?hs=H4sIAx...
-}
-```
-
-### Comportement
-
-- **Compression** : gzip automatique si > 6 KB
-- **Format** : base64 URL-safe
-- **Paramètre** : `hs=...` dans la query string
-
----
-
-### decodeHyperSkill
-
-Decode une URL ou paramètre HyperSkill.
-
-```ts
-export async function decodeHyperSkill(
-  urlOrParam: string
-): Promise<HyperSkill>
-```
-
-### Exemple
-
-```ts
-import { decodeHyperSkill } from '@webmcp-auto-ui/sdk';
-
-async function importSkill(param: string) {
-  const skill = await decodeHyperSkill(param);
-  console.log(skill.meta.title);
-  // Restaurer
-  canvas.setBlocks(skill.content.blocks ?? []);
-}
-```
-
----
-
-## computeHash
-
-Calcul du hash cryptographique d'une competence.
-
-```ts
-export async function computeHash(
-  sourceUrl: string,
-  content: unknown
-): Promise<string>
-```
-
-### Exemple
-
-```ts
-const hash = await computeHash('https://example.com', {
-  blocks: canvas.blocks,
-});
-console.log('Hash:', hash); // "sha256:abc123..."
-```
-
----
-
-## createVersion
-
-Crée une version avec tracking de diff.
-
-```ts
-export async function createVersion(
-  skill: HyperSkill,
-  sourceUrl: string,
-  previousHash?: string
-): Promise<HyperSkillVersion>
-```
-
-```ts
-interface HyperSkillVersion {
-  hash: string;
-  previousHash?: string;
-  timestamp: number;
-  skill: HyperSkill;
-}
-```
-
-### Exemple
-
-```ts
-const v1 = await createVersion(
-  { meta: {...}, content: {...} },
-  'https://example.com'
-);
-
-// Plus tard, avec changements
-const v2 = await createVersion(
-  { meta: {...}, content: {...} },
-  'https://example.com',
-  v1.hash // previousHash pour tracking
-);
-
-console.log('Diff:', await diffSkills(v1.skill, v2.skill));
-```
-
----
-
-## diffSkills
-
-Calcule les differences entre deux competences.
-
-```ts
-export const diffSkills: (
-  skill1: HyperSkill,
-  skill2: HyperSkill
-) => Promise<unknown>
-```
-
----
-
-## Skills Registry
-
-Gestion CRUD des competences avec persistance localStorage.
-
-### createSkill
-
-```ts
-export async function createSkill(
-  name: string,
-  skill: HyperSkill
-): Promise<Skill>
-```
-
-### updateSkill
-
-```ts
-export async function updateSkill(
-  id: string,
-  skill: HyperSkill
-): Promise<Skill>
-```
-
-### deleteSkill
-
-```ts
-export async function deleteSkill(id: string): Promise<void>
-```
-
-### getSkill
-
-```ts
-export async function getSkill(id: string): Promise<Skill | null>
-```
-
-### listSkills
-
-```ts
-export async function listSkills(): Promise<Skill[]>
-```
-
-### clearSkills
-
-```ts
-export async function clearSkills(): Promise<void>
-```
-
-### loadSkills
-
-Restaure depuis localStorage.
-
-```ts
-export async function loadSkills(): Promise<void>
-```
-
-### loadDemoSkills
-
-Charge des competences de démonstration prédéfinies.
-
-```ts
-export async function loadDemoSkills(): Promise<void>
-```
-
-### onSkillsChange
-
-S'abonne aux changements.
-
-```ts
-export function onSkillsChange(
-  callback: (skills: Skill[]) => void
-): () => void  // Retourne unsubscribe
-```
-
-### Exemple
-
-```ts
-import { createSkill, listSkills, onSkillsChange } from '@webmcp-auto-ui/sdk';
-import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-
-// Sauvegarder
-await createSkill('Ma skill', {
-  meta: { title: 'Ma skill', mcp: canvas.mcpUrl },
-  content: { blocks: canvas.blocks },
-});
-
-// Lister
-const skills = await listSkills();
-skills.forEach(s => console.log(s.name));
-
-// Observer
-onSkillsChange((skills) => {
-  console.log('Skills mises à jour:', skills.length);
-});
-```
-
----
-
-## MCP Demo Servers
-
-Liste préconfigurée de serveurs MCP de démonstration.
-
-```ts
-export const MCP_DEMO_SERVERS: McpDemoServer[]
-
-interface McpDemoServer {
-  name: string;
-  url: string;
-  description: string;
-  region?: string;
-  tools?: string[];
-}
-```
-
-### Exemple
-
-```ts
-import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
-
-MCP_DEMO_SERVERS.forEach(server => {
-  console.log(`${server.name} (${server.region}): ${server.url}`);
-});
-
-// Connecter au premier
-const server = MCP_DEMO_SERVERS[0];
-canvas.mcpUrl = server.url;
-```
-
----
-
-## Framework Agnostic Canvas Store
-
-Pour utiliser le store vanilla (sans réactivité Svelte) :
+### Réactivité (framework-agnostic)
 
 ```ts
 import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas';
 
-// Accès aux mêmes méthodes
-canvasVanilla.addWidget('stat', { label: 'KPI', value: '100' });
-canvasVanilla.setMode('chat');
-
-// Subscribe pattern
+// Subscribe pattern (useSyncExternalStore compatible)
 const unsubscribe = canvasVanilla.subscribe(() => {
   const snapshot = canvasVanilla.getSnapshot();
-  console.log('État mis à jour:', snapshot);
+  console.log(snapshot.blockCount);
 });
+
+unsubscribe();
+```
+
+## HyperSkill Encoding/Decoding
+
+HyperSkill est un format de sérialisation pour les projets (skills) avec compression optionnelle gzip/brotli.
+
+### `encode()` — Créer un URL shareable
+
+```ts
+import { encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+
+const skill: HyperSkill = {
+  meta: {
+    title: 'Mon skill',
+    version: '1.0',
+    llm: 'sonnet',
+    theme: { '--primary': '#ff0000' },
+  },
+  content: {
+    blocks: [
+      { type: 'stat', data: { label: 'KPI', value: '42' } },
+    ],
+  },
+};
+
+const url = await encodeHyperSkill(skill, window.location.href);
+console.log(url);  // https://example.com/app?hs=gz.eJ8z9jAsKCqtzMgvSwEAzVoGZA...
+```
+
+**Compression :**
+- Auto-compressé avec gzip si payload > 6 KB
+- Requête max nginx ~8 KB
+- Format : `gz.` (gzip), `br.` (brotli), ou plain base64
+
+### `decode()` — Parser un URL/param
+
+```ts
+import { decodeHyperSkill } from '@webmcp-auto-ui/sdk';
+
+const url = 'https://example.com/app?hs=gz.eJ8z9js...';
+const skill = await decodeHyperSkill(url);
+
+console.log(skill.meta.title);        // 'Mon skill'
+console.log(skill.content.blocks);    // [...]
+```
+
+Supporte :
+- URLs complètes (`https://...?hs=...`)
+- Params seuls (`gz.eJ8z...`)
+- Legacy base64 (fallback)
+
+### `hash()` — Checksummer un skill
+
+```ts
+import { computeHash } from '@webmcp-auto-ui/sdk';
+
+const h = await computeHash(
+  'https://example.com/app',
+  skill.content
+);
+console.log(h);  // 'sha256_abc123...'
+```
+
+### `diff()` — Comparer deux versions
+
+```ts
+import { diffSkills } from '@webmcp-auto-ui/sdk';
+
+const changes = diffSkills(skill1, skill2);
+console.log(changes);
+// { added: [...], removed: [...], modified: [...] }
+```
+
+## HyperSkill Versioning
+
+### `createVersion()`
+
+Crée une entrée versionnée d'un skill.
+
+```ts
+import { createVersion } from '@webmcp-auto-ui/sdk';
+
+const version = await createVersion(
+  skill,
+  'https://example.com/app',
+  previousHash
+);
+
+console.log(version.hash);          // Hash SHA256
+console.log(version.previousHash);  // Lien à la version antérieure
+console.log(version.timestamp);     // Date création (ms)
+```
+
+## Skills Registry
+
+Registre localStorage des skills (CRUD).
+
+### `createSkill()`
+
+Créer et sauvegarder un skill.
+
+```ts
+import { createSkill } from '@webmcp-auto-ui/sdk';
+
+const skill = await createSkill({
+  title: 'Mon skill',
+  description: 'Description...',
+  blocks: [...],
+  mcpUrl: 'http://localhost:3000/mcp',
+  llm: 'sonnet',
+});
+
+console.log(skill.id);  // Auto-généré UUID
+```
+
+### `getSkill()` / `listSkills()`
+
+Récupérer un ou tous les skills.
+
+```ts
+import { getSkill, listSkills } from '@webmcp-auto-ui/sdk';
+
+const skill = await getSkill('skill-uuid');
+const all = await listSkills();  // Skill[]
+```
+
+### `updateSkill()`
+
+Mettre à jour un skill existant.
+
+```ts
+import { updateSkill } from '@webmcp-auto-ui/sdk';
+
+await updateSkill('skill-uuid', {
+  title: 'Nouveau titre',
+  blocks: [...],
+});
+```
+
+### `deleteSkill()`
+
+Supprimer un skill.
+
+```ts
+import { deleteSkill } from '@webmcp-auto-ui/sdk';
+
+await deleteSkill('skill-uuid');
+```
+
+### `clearSkills()`
+
+Vider tout le registre.
+
+```ts
+import { clearSkills } from '@webmcp-auto-ui/sdk';
+
+await clearSkills();
+```
+
+### `loadSkills()` / `loadDemoSkills()`
+
+Charger depuis file ou démo.
+
+```ts
+import { loadSkills, loadDemoSkills } from '@webmcp-auto-ui/sdk';
+
+await loadDemoSkills();  // Charge les skills d'exemple
+await loadSkills(file);  // From File input
+```
+
+### `onSkillsChange()`
+
+Écouter les mutations du registre.
+
+```ts
+import { onSkillsChange } from '@webmcp-auto-ui/sdk';
+
+const unsubscribe = onSkillsChange((skills) => {
+  console.log('Skills changed:', skills);
+});
+
+unsubscribe();
+```
+
+## Types
+
+```ts
+export type WidgetType =
+  | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
+  | 'stat-card' | 'data-table' | 'timeline' | 'profile' | 'trombinoscope' | 'json-viewer'
+  | 'hemicycle' | 'chart-rich' | 'cards' | 'grid-data' | 'sankey' | 'map' | 'log'
+  | 'gallery' | 'carousel' | 'd3' | 'js-sandbox'
+  | (string & {});  // Accept custom widget types
+
+export type Mode = 'auto' | 'drag' | 'chat';
+export type LLMId = 'haiku' | 'sonnet' | 'opus' | 'gemma-e2b' | 'gemma-e4b';
+
+export interface Widget {
+  id: string;
+  type: WidgetType;
+  data: Record<string, unknown>;
+}
+
+export interface ChatMsg {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  thinking?: boolean;
+}
+
+export interface CanvasSnapshot {
+  blocks: Widget[];
+  mode: Mode;
+  llm: LLMId;
+  mcpUrl: string;
+  mcpConnected: boolean;
+  mcpConnecting: boolean;
+  mcpName: string;
+  mcpTools: McpToolInfo[];
+  messages: ChatMsg[];
+  generating: boolean;
+  statusText: string;
+  statusColor: string;
+  themeOverrides: Record<string, string>;
+  blockCount: number;
+  isEmpty: boolean;
+}
+
+export interface HyperSkill {
+  meta: HyperSkillMeta;
+  content: unknown;
+}
+
+export interface HyperSkillMeta {
+  title?: string;
+  description?: string;
+  version?: string;
+  created?: string;
+  mcp?: string;
+  mcpName?: string;
+  llm?: string;
+  tags?: string[];
+  theme?: Record<string, string>;
+  hash?: string;
+  previousHash?: string;
+  chatSummary?: string;
+  provenance?: { /* ... */ };
+}
+
+export interface Skill {
+  id: string;
+  title: string;
+  description?: string;
+  blocks: SkillBlock[];
+  mcpUrl?: string;
+  llm?: LLMId;
+  theme?: Record<string, string>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SkillBlock {
+  type: WidgetType;
+  data: Record<string, unknown>;
+}
+```
+
+## Snapshot (React useSyncExternalStore compatible)
+
+```ts
+import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+
+// Pour frameworks sans $state (React, Vue, etc.)
+function useCanvasSnapshot() {
+  const [snapshot, setSnapshot] = React.useState(canvas.getSnapshot());
+
+  React.useEffect(() => {
+    return canvas.subscribe(() => {
+      setSnapshot(canvas.getSnapshot());
+    });
+  }, []);
+
+  return snapshot;
+}
 ```
