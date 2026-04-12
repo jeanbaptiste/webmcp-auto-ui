@@ -1,0 +1,500 @@
+---
+title: '@webmcp-auto-ui/sdk'
+description: 'Canvas store, HyperSkill encode/decode, skills registry, demo MCP servers'
+sidebar:
+  order: 3
+---
+
+## Overview
+
+The `@webmcp-auto-ui/sdk` package provides **canvas state management** (widgets, chat, mode) and **HyperSkill infrastructure** for skill serialization and versioning.
+
+### Components
+
+- **Canvas store** : global reactive state for widgets/messages with Svelte 5 reactivity
+- **HyperSkill** : encode/decode/hash/diff of skills
+- **Skills registry** : local persistence and CRUD management
+- **Demo servers** : list of demo MCP servers
+
+---
+
+## Canvas Store
+
+Reactive management of interface state (widgets, mode, LLM, MCP, chat).
+
+### Usage
+
+```svelte
+<script lang="ts">
+  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+</script>
+
+<select bind:value={canvas.mode}>
+  <option value="drag">Drag & Drop</option>
+  <option value="chat">Chat Mode</option>
+  <option value="auto">Auto</option>
+</select>
+
+<p>Mode: {canvas.mode}</p>
+<p>Widgets: {canvas.blockCount}</p>
+```
+
+### API
+
+#### Getters (reactive — support `bind:`)
+
+```ts
+canvas.blocks: Widget[]              // All widgets
+canvas.mode: Mode                    // 'auto' | 'drag' | 'chat'
+canvas.llm: LLMId                    // Current LLM model
+canvas.mcpUrl: string                // MCP server URL
+canvas.mcpConnected: boolean         // Connected?
+canvas.mcpConnecting: boolean        // Connection in progress?
+canvas.mcpName: string               // MCP server name
+canvas.mcpTools: McpToolInfo[]       // Available MCP tools
+canvas.messages: ChatMsg[]           // Chat history
+canvas.generating: boolean           // Generation in progress?
+canvas.statusText: string            // MCP status text
+canvas.statusColor: string           // CSS color class
+canvas.themeOverrides: Record<string, string>
+canvas.blockCount: number            // Number of widgets
+canvas.isEmpty: boolean              // No widgets?
+```
+
+#### Setters (reactive — support `bind:`)
+
+```ts
+canvas.mode = 'chat'                 // Change mode
+canvas.llm = 'sonnet'                // Change LLM model
+canvas.mcpUrl = 'http://...'         // MCP URL
+canvas.generating = true             // Mark generating
+```
+
+#### Methods (mutations)
+
+```ts
+// Widgets
+canvas.addWidget(type, data): Widget
+canvas.removeBlock(id): void         // Remove widget
+canvas.updateBlock(id, data): void   // Update data
+canvas.moveBlock(fromId, toId): void // Reorder
+canvas.clearBlocks(): void           // Clear canvas
+canvas.setBlocks(widgets): void      // Replace all
+
+// Chat
+canvas.addMsg(role, content): ChatMsg
+canvas.updateMsg(id, content): void
+canvas.clearMessages(): void         // Clear chat
+
+// MCP
+canvas.setMcpConnecting(bool): void
+canvas.setMcpConnected(bool, name?, tools?): void
+canvas.setMcpError(message): void
+
+// Theme
+canvas.setThemeOverrides(overrides): void
+
+// HyperSkill
+canvas.buildSkillJSON(): Record<string, unknown>
+canvas.buildHyperskillParam(): Promise<string>
+canvas.loadFromParam(param): Promise<boolean>
+canvas.loadFromUrl(url): Promise<boolean>
+```
+
+### Types
+
+```ts
+type Mode = 'auto' | 'drag' | 'chat';
+type LLMId = 'haiku' | 'sonnet' | 'opus' | 'gemma-2b' | 'gemma-7b';
+
+interface Widget {
+  id: string;
+  type: WidgetType;
+  data: Record<string, unknown>;
+}
+
+interface ChatMsg {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  thinking?: boolean;
+}
+
+interface McpToolInfo {
+  name: string;
+  description: string;
+  inputSchema?: Record<string, unknown>;
+}
+```
+
+### Complete Example
+
+```svelte
+<script lang="ts">
+  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+</script>
+
+<!-- Mode selector -->
+<select bind:value={canvas.mode}>
+  <option value="drag">Drag & Drop</option>
+  <option value="chat">Chat</option>
+  <option value="auto">Auto</option>
+</select>
+
+<!-- Display widgets -->
+{#each canvas.blocks as widget (widget.id)}
+  <div class="widget">
+    <h3>{widget.type}</h3>
+    <button on:click={() => canvas.removeBlock(widget.id)}>Remove</button>
+  </div>
+{/each}
+
+<!-- Add widget -->
+<button on:click={() => canvas.addWidget('stat', {label: 'KPI', value: '100'})}>
+  + Widget
+</button>
+
+<!-- Chat -->
+{#each canvas.messages as msg (msg.id)}
+  <div class="message {msg.role}">
+    {msg.content}
+  </div>
+{/each}
+
+<input type="text" on:keydown={(e) => {
+  if (e.key === 'Enter' && e.currentTarget.value) {
+    canvas.addMsg('user', e.currentTarget.value);
+    e.currentTarget.value = '';
+  }
+}} />
+```
+
+---
+
+## HyperSkill Encode/Decode
+
+Skill serialization with compression and versioning.
+
+### encodeHyperSkill
+
+Encodes a skill into a compressed URL.
+
+```ts
+export async function encodeHyperSkill(
+  skill: HyperSkill,
+  sourceUrl?: string
+): Promise<string>
+```
+
+### Parameters
+
+```ts
+interface HyperSkill {
+  meta: HyperSkillMeta;
+  content: unknown;
+}
+
+interface HyperSkillMeta {
+  title?: string;
+  description?: string;
+  version?: string;
+  created?: string;
+  mcp?: string;                // MCP server URL
+  mcpName?: string;            // Server name
+  llm?: string;                // LLM model used
+  tags?: string[];
+  theme?: Record<string, string>;
+  hash?: string;               // Unique hash
+  previousHash?: string;
+  chatSummary?: string;        // Conversation summary
+  provenance?: {               // Traceability
+    mcpServers?: string[];
+    toolsUsed?: string[];
+    toolCallCount?: number;
+    skillsReferenced?: string[];
+    llm?: string;
+    exportedAt?: string;
+  };
+}
+```
+
+### Example
+
+```ts
+import { encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+
+async function exportSkill() {
+  const skill = {
+    meta: {
+      title: 'My skill',
+      mcp: canvas.mcpUrl,
+      llm: canvas.llm,
+      theme: canvas.themeOverrides,
+    },
+    content: {
+      blocks: canvas.blocks,
+      messages: canvas.messages,
+    },
+  };
+
+  const url = await encodeHyperSkill(skill);
+  console.log('Shareable URL:', url);
+  // https://example.com?hs=H4sIAx...
+}
+```
+
+### Behavior
+
+- **Compression** : automatic gzip if > 6 KB
+- **Format** : base64 URL-safe
+- **Parameter** : `hs=...` in query string
+
+---
+
+### decodeHyperSkill
+
+Decodes a HyperSkill URL or parameter.
+
+```ts
+export async function decodeHyperSkill(
+  urlOrParam: string
+): Promise<HyperSkill>
+```
+
+### Example
+
+```ts
+import { decodeHyperSkill } from '@webmcp-auto-ui/sdk';
+
+async function importSkill(param: string) {
+  const skill = await decodeHyperSkill(param);
+  console.log(skill.meta.title);
+  // Restore
+  canvas.setBlocks(skill.content.blocks ?? []);
+}
+```
+
+---
+
+## computeHash
+
+Computes cryptographic hash of a skill.
+
+```ts
+export async function computeHash(
+  sourceUrl: string,
+  content: unknown
+): Promise<string>
+```
+
+### Example
+
+```ts
+const hash = await computeHash('https://example.com', {
+  blocks: canvas.blocks,
+});
+console.log('Hash:', hash); // "sha256:abc123..."
+```
+
+---
+
+## createVersion
+
+Creates a version with diff tracking.
+
+```ts
+export async function createVersion(
+  skill: HyperSkill,
+  sourceUrl: string,
+  previousHash?: string
+): Promise<HyperSkillVersion>
+```
+
+```ts
+interface HyperSkillVersion {
+  hash: string;
+  previousHash?: string;
+  timestamp: number;
+  skill: HyperSkill;
+}
+```
+
+### Example
+
+```ts
+const v1 = await createVersion(
+  { meta: {...}, content: {...} },
+  'https://example.com'
+);
+
+// Later, with changes
+const v2 = await createVersion(
+  { meta: {...}, content: {...} },
+  'https://example.com',
+  v1.hash // previousHash for tracking
+);
+
+console.log('Diff:', await diffSkills(v1.skill, v2.skill));
+```
+
+---
+
+## diffSkills
+
+Computes differences between two skills.
+
+```ts
+export const diffSkills: (
+  skill1: HyperSkill,
+  skill2: HyperSkill
+) => Promise<unknown>
+```
+
+---
+
+## Skills Registry
+
+CRUD management of skills with localStorage persistence.
+
+### createSkill
+
+```ts
+export async function createSkill(
+  name: string,
+  skill: HyperSkill
+): Promise<Skill>
+```
+
+### updateSkill
+
+```ts
+export async function updateSkill(
+  id: string,
+  skill: HyperSkill
+): Promise<Skill>
+```
+
+### deleteSkill
+
+```ts
+export async function deleteSkill(id: string): Promise<void>
+```
+
+### getSkill
+
+```ts
+export async function getSkill(id: string): Promise<Skill | null>
+```
+
+### listSkills
+
+```ts
+export async function listSkills(): Promise<Skill[]>
+```
+
+### clearSkills
+
+```ts
+export async function clearSkills(): Promise<void>
+```
+
+### loadSkills
+
+Restores from localStorage.
+
+```ts
+export async function loadSkills(): Promise<void>
+```
+
+### loadDemoSkills
+
+Loads predefined demo skills.
+
+```ts
+export async function loadDemoSkills(): Promise<void>
+```
+
+### onSkillsChange
+
+Subscribes to changes.
+
+```ts
+export function onSkillsChange(
+  callback: (skills: Skill[]) => void
+): () => void  // Returns unsubscribe
+```
+
+### Example
+
+```ts
+import { createSkill, listSkills, onSkillsChange } from '@webmcp-auto-ui/sdk';
+import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+
+// Save
+await createSkill('My skill', {
+  meta: { title: 'My skill', mcp: canvas.mcpUrl },
+  content: { blocks: canvas.blocks },
+});
+
+// List
+const skills = await listSkills();
+skills.forEach(s => console.log(s.name));
+
+// Observe
+onSkillsChange((skills) => {
+  console.log('Skills updated:', skills.length);
+});
+```
+
+---
+
+## MCP Demo Servers
+
+Preconfigured list of demo MCP servers.
+
+```ts
+export const MCP_DEMO_SERVERS: McpDemoServer[]
+
+interface McpDemoServer {
+  name: string;
+  url: string;
+  description: string;
+  region?: string;
+  tools?: string[];
+}
+```
+
+### Example
+
+```ts
+import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
+
+MCP_DEMO_SERVERS.forEach(server => {
+  console.log(`${server.name} (${server.region}): ${server.url}`);
+});
+
+// Connect to first
+const server = MCP_DEMO_SERVERS[0];
+canvas.mcpUrl = server.url;
+```
+
+---
+
+## Framework Agnostic Canvas Store
+
+To use the vanilla store (without Svelte reactivity) :
+
+```ts
+import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas';
+
+// Same methods available
+canvasVanilla.addWidget('stat', { label: 'KPI', value: '100' });
+canvasVanilla.setMode('chat');
+
+// Subscribe pattern
+const unsubscribe = canvasVanilla.subscribe(() => {
+  const snapshot = canvasVanilla.getSnapshot();
+  console.log('State updated:', snapshot);
+});
+```

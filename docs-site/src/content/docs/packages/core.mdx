@@ -1,0 +1,351 @@
+---
+title: '@webmcp-auto-ui/core'
+description: 'MCP client, WebMCP server, JSON schema validation, utils, polyfill W3C WebMCP'
+sidebar:
+  order: 4
+---
+
+## Vue d'ensemble
+
+Le package `@webmcp-auto-ui/core` fournit l'**infrastructure MCP** (Model Context Protocol — protocole client/serveur pour LLM), la **validation JSON Schema**, et les **utilitaires bas-niveau**.
+
+### Composants
+
+- **McpClient** : client HTTP JSON-RPC pour serveurs MCP distants
+- **createWebMcpServer** : factory pour serveurs WebMCP (affichage/interaction locale)
+- **validateJsonSchema** : validation stricte des paramètres outils
+- **Polyfill W3C** : implémentation `navigator.modelContext` pour exécution outils LLM
+- **Utilitaires** : sanitization schema, tool groups, résultats formatés
+
+---
+
+## McpClient
+
+Client HTTP pour protocole MCP (initialisation, listing outils, exécution).
+
+```ts
+export class McpClient {
+  constructor(options: McpClientOptions);
+  
+  // Core
+  initialize(): Promise<McpInitializeResult>;
+  listTools(cursor?: string): Promise<McpListToolsResult>;
+  callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult>;
+  
+  // Lifecycle
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+}
+
+interface McpClientOptions {
+  serverUrl: string;                     // URL du serveur MCP
+  clientName?: string;                   // Nom client (défaut: 'webmcp-auto-ui')
+  clientVersion?: string;                // Version client
+  timeout?: number;                      // Timeout (défaut: 30000)
+  headers?: Record<string, string>;      // Headers HTTP custom
+  autoReconnect?: boolean;               // Reconnexion auto (défaut: true)
+  maxReconnectAttempts?: number;         // Max tentatives (défaut: 3)
+}
+```
+
+### Exemple
+
+```ts
+import { McpClient } from '@webmcp-auto-ui/core';
+
+const client = new McpClient({
+  serverUrl: 'http://localhost:3000/mcp',
+  clientName: 'my-app',
+});
+
+// Initialize
+await client.initialize();
+console.log('Prêt!');
+
+// List tools
+const { tools } = await client.listTools();
+tools.forEach(t => console.log(t.name, t.description));
+
+// Call tool
+const result = await client.callTool('search_recipes', {
+  query: 'pizza',
+});
+
+console.log(result.content); // [{type: 'text', text: '...'}, ...]
+```
+
+### Structure réponse tool
+
+```ts
+interface McpToolResult {
+  content: McpToolResultContent[];
+  isError?: boolean;
+}
+
+interface McpToolResultContent {
+  type: 'text' | 'image' | 'resource';
+  text?: string;                  // Pour type: 'text'
+  data?: string;                  // Base64 pour type: 'image'
+  mimeType?: string;
+  resource?: {                    // Pour type: 'resource'
+    uri: string;
+    mimeType?: string;
+    text?: string;
+    blob?: string;
+  };
+}
+```
+
+---
+
+## createWebMcpServer
+
+Factory pour créer un serveur WebMCP (expose outils + widgets pour UI locale).
+
+```ts
+export function createWebMcpServer(
+  name: string,
+  options: WebMcpServerOptions
+): WebMcpServer
+
+interface WebMcpServerOptions {
+  description: string;                   // Description du serveur
+}
+
+interface WebMcpServer {
+  readonly name: string;
+  readonly description: string;
+  
+  registerWidget(recipeMarkdown: string, renderer: WidgetRenderer): void;
+  addTool(tool: WebMcpToolDef): void;
+  
+  layer(): WebMcpLayer;
+  getWidget(name: string): WidgetEntry | undefined;
+  listWidgets(): WidgetEntry[];
+}
+```
+
+### Paramètres
+
+#### WidgetRenderer
+
+```ts
+type WidgetRenderer =
+  | ((container: HTMLElement, data: Record<string, unknown>) => void | (() => void))
+  | unknown;  // Composant framework (Svelte, React, etc.)
+```
+
+#### WebMcpToolDef
+
+```ts
+interface WebMcpToolDef {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  execute: (params: Record<string, unknown>) => Promise<unknown>;
+}
+```
+
+### Exemple
+
+```ts
+import { createWebMcpServer } from '@webmcp-auto-ui/core';
+
+const server = createWebMcpServer('my-widgets', {
+  description: 'Mes widgets custom',
+});
+
+// Enregistrer une recette (markdown avec frontmatter)
+const recipeMarkdown = `---
+widget: my-chart
+description: Graphique custom
+schema:
+  type: object
+  properties:
+    title: { type: string }
+    data: { type: array }
+---
+
+## Comment utiliser
+Appeler widget_display('my-chart', {title: 'Q1', data: [10, 20, 30]})
+`;
+
+server.registerWidget(recipeMarkdown, (container, data) => {
+  // Renderer vanilla (function)
+  container.innerHTML = `<h1>${data.title}</h1>`;
+});
+
+// Ajouter un outil custom
+server.addTool({
+  name: 'custom_action',
+  description: 'Faire une action',
+  inputSchema: { type: 'object', properties: { text: { type: 'string' } } },
+  execute: async (params) => {
+    return { ok: true, text: params.text };
+  },
+});
+
+// Exporter comme couche pour agent
+const layer = server.layer();
+console.log(layer.protocol);    // 'webmcp'
+console.log(layer.tools.length); // 4 (search_recipes, get_recipe, widget_display, custom_action)
+```
+
+---
+
+## parseFrontmatter
+
+Parse une recette markdown avec frontmatter YAML.
+
+```ts
+export function parseFrontmatter(
+  markdown: string
+): ParsedFrontmatter
+
+interface ParsedFrontmatter {
+  frontmatter: Record<string, unknown>;
+  body: string;
+}
+```
+
+### Exemple
+
+```ts
+import { parseFrontmatter } from '@webmcp-auto-ui/core';
+
+const recipe = `---
+widget: stat-card
+description: KPI enrichi
+schema:
+  type: object
+  properties:
+    label: { type: string }
+    value: { type: string }
+---
+
+# Comment utiliser
+
+Appeler \`widget_display('stat-card', {label: 'ROI', value: '42%'})\`
+`;
+
+const { frontmatter, body } = parseFrontmatter(recipe);
+console.log(frontmatter.widget);    // 'stat-card'
+console.log(body.startsWith('# Comment'));  // true
+```
+
+---
+
+## validateJsonSchema
+
+Validation stricte d'un objet contre un schéma JSON Schema.
+
+```ts
+export function validateJsonSchema(
+  value: unknown,
+  schema: JsonSchema
+): ValidationResult
+
+interface ValidationResult {
+  valid: boolean;
+  errors: ValidationError[];
+}
+
+interface ValidationError {
+  path: string;                  // Ex: 'data.items[0].price'
+  message: string;
+  context?: unknown;
+}
+```
+
+### Exemple
+
+```ts
+import { validateJsonSchema } from '@webmcp-auto-ui/core';
+
+const schema = {
+  type: 'object',
+  properties: {
+    name: { type: 'string' },
+    age: { type: 'integer', minimum: 0 },
+  },
+  required: ['name'],
+};
+
+const result = validateJsonSchema({ name: 'Alice', age: 30 }, schema);
+console.log(result.valid);   // true
+
+const badResult = validateJsonSchema({ age: 'wrong' }, schema);
+console.log(badResult.valid); // false
+badResult.errors.forEach(e => console.log(e.message));
+// name: required
+// age: should be integer
+```
+
+---
+
+## createToolGroup
+
+Crée un groupe d'outils avec namespace et metadata.
+
+```ts
+export function createToolGroup(
+  groupName: string,
+  tools: Array<{
+    name: string;
+    description: string;
+    inputSchema?: JsonSchema;
+    execute: (params: Record<string, unknown>) => Promise<unknown>;
+  }>
+): ModelContextTool[] & { groupName: string }
+```
+
+### Exemple
+
+```ts
+import { createToolGroup } from '@webmcp-auto-ui/core';
+
+const calculatorTools = createToolGroup('calculator', [
+  {
+    name: 'add',
+    description: 'Additionner deux nombres',
+    inputSchema: {
+      type: 'object',
+      properties: { a: { type: 'number' }, b: { type: 'number' } },
+    },
+    execute: async (params) => ({
+      result: (params.a as number) + (params.b as number),
+    }),
+  },
+  {
+    name: 'multiply',
+    description: 'Multiplier deux nombres',
+    inputSchema: {
+      type: 'object',
+      properties: { a: { type: 'number' }, b: { type: 'number' } },
+    },
+    execute: async (params) => ({
+      result: (params.a as number) * (params.b as number),
+    }),
+  },
+]);
+
+console.log(calculatorTools.groupName);  // 'calculator'
+console.log(calculatorTools.length);     // 2
+```
+
+---
+
+## mountWidget
+
+Monte un widget vanilla dans un conteneur DOM en cherchant dans les serveurs enregistrés.
+
+```ts
+export function mountWidget(
+  container: HTMLElement,
+  type: string,
+  data: Record<string, unknown>,
+  servers: WebMcpServer[]
+): (() => void) | void
+```
+
+Retourne

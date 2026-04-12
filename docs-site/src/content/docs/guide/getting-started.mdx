@@ -1,0 +1,237 @@
+---
+title: Getting Started
+description: Installation, configuration et premier lancement de WebMCP Auto-UI
+sidebar:
+  order: 1
+---
+
+## Prérequis
+
+- **Node.js** 18+
+- **pnpm** 8+ (package manager recommandé)
+- **Git**
+
+## Installation
+
+### 1. Cloner le dépôt
+
+```bash
+git clone https://github.com/your-org/webmcp-auto-ui.git
+cd webmcp-auto-ui
+```
+
+### 2. Installer les dépendances
+
+```bash
+pnpm install
+```
+
+Cela installe les packages et lie les monorepo workspaces localement.
+
+### 3. Vérifier la structure
+
+```bash
+ls packages/      # core, agent, ui, sdk, widgets-*
+ls apps/          # flex, viewer, home, etc.
+```
+
+## Configuration minimale
+
+### Variables d'environnement
+
+Créer un fichier `.env.local` à la racine du projet :
+
+```env
+# LLM (Anthropic)
+VITE_ANTHROPIC_API_KEY=sk-ant-...
+
+# MCP serveur (optionnel pour démo)
+VITE_MCP_URL=http://localhost:8000
+
+# Mode (dev/prod)
+NODE_ENV=development
+```
+
+**Note** : Les variables commençant par `VITE_` sont injectées au build-time et accessibles côté client. **Ne jamais committer les clés API**.
+
+### Configuration des apps
+
+Chaque app a son propre `.env` :
+
+```bash
+apps/flex/.env.local
+apps/viewer/.env.local
+```
+
+## Premier lancement
+
+### Option A : Flex (mode chat)
+
+La démo **flex** est l'entrée principale pour tester l'agent.
+
+```bash
+cd apps/flex
+pnpm dev
+```
+
+Accès : http://localhost:5173
+
+**Fonctionnalités** :
+- Sélecteur LLM (Haiku, Sonnet, Gemma)
+- Mode chat itératif
+- Affichage de widgets
+- Support MCP optionnel
+
+### Option B : Viewer (skill loading)
+
+La démo **viewer** charge des skills HyperSkill encodées.
+
+```bash
+cd apps/viewer
+pnpm dev
+```
+
+Accès : http://localhost:5173
+
+**Fonctionnalités** :
+- Décoder une URL HyperSkill
+- Afficher le contenu (widgets sauvegardés)
+- Exporter une nouvelle version
+
+### Option C : Home (landing page)
+
+La homepage statique showcase les capacités.
+
+```bash
+cd apps/home
+pnpm build
+pnpm preview
+```
+
+Accès : http://localhost:5173
+
+## Structure d'une app simple
+
+Voici un exemple minimal pour intégrer l'agent :
+
+```svelte
+<script lang="ts">
+  import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
+  import { runAgentLoop } from '@webmcp-auto-ui/agent';
+  import { autoui } from '@webmcp-auto-ui/agent';
+
+  const provider = new RemoteLLMProvider({
+    apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
+    model: 'claude-3-5-sonnet-20241022',
+  });
+
+  async function chat(userMessage: string) {
+    const result = await runAgentLoop(userMessage, {
+      provider,
+      layers: [autoui.layer()],
+      maxIterations: 5,
+      callbacks: {
+        onWidget: (type, data) => {
+          console.log('Widget:', type, data);
+          return { id: 'w_' + Date.now().toString(36) };
+        },
+        onText: (text) => console.log(text),
+      },
+    });
+
+    console.log('Résultat:', result);
+  }
+</script>
+
+<button onclick={() => chat('Affiche un compteur à 42')}>
+  Chat
+</button>
+```
+
+## Mode développement
+
+### Regarder les changements (hot reload)
+
+```bash
+pnpm dev
+```
+
+Cela démarre tous les packages et apps en mode dev. Les changements à `packages/*` sont recompilés automatiquement.
+
+### Tests
+
+```bash
+pnpm test
+```
+
+### Linting
+
+```bash
+pnpm lint
+```
+
+### Documentation
+
+```bash
+pnpm docs:build
+pnpm docs:preview
+```
+
+## Intégration MCP (optionnel)
+
+Pour connecter un serveur MCP distant :
+
+1. **Démarrer un serveur MCP** (exemple : basé sur Stdio)
+
+```bash
+node my-mcp-server.js
+```
+
+2. **Configurer l'URL dans l'app**
+
+```typescript
+import { McpClient } from '@webmcp-auto-ui/core';
+
+const mcp = new McpClient({
+  baseUrl: 'http://localhost:3001/sse',
+});
+
+await mcp.initialize();
+
+const result = await runAgentLoop(userMessage, {
+  client: mcp,
+  provider,
+  layers: [autoui.layer()],
+  // ...
+});
+```
+
+## Prochaines étapes
+
+1. **Explorer l'architecture** : voir [Architecture](/guide/architecture/)
+2. **Comprendre le tool calling** : voir [Tool Calling](/guide/tool-calling/)
+3. **Déployer en production** : voir [Déploiement](/guide/deploy/)
+
+## Troubleshooting
+
+### Erreur : "Cannot find module '@webmcp-auto-ui/core'"
+
+Relancer `pnpm install` et vérifier que le lien workspace est établi.
+
+```bash
+pnpm ls @webmcp-auto-ui/core
+```
+
+### API key rejetée
+
+Vérifier que `VITE_ANTHROPIC_API_KEY` est valide et que le modèle spécifié existe.
+
+### Port 5173 déjà utilisé
+
+Changer le port dans `vite.config.ts` ou tuer le processus existant.
+
+### Hot reload ne fonctionne pas
+
+Vérifier que le fichier modifié est dans `packages/*/src/**` et que la compilation est en cours.
+
+===

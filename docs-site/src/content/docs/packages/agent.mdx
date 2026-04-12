@@ -1,0 +1,585 @@
+---
+title: '@webmcp-auto-ui/agent'
+description: 'Agent loop LLM-powered, providers (Anthropic/Gemma WASM), tool layers, recipes, execution'
+sidebar:
+  order: 1
+---
+
+## Vue d'ensemble
+
+Le package `@webmcp-auto-ui/agent` fournit la **boucle agent** qui orchestre les appels LLM, l'exécution d'outils MCP/WebMCP, et la gestion de la mémoire conversationnelle.
+
+### Concepts clés
+
+- **Agent loop** (`runAgentLoop`) : itération LLM → dispatch outils → feedback jusqu'à `end_turn` ou max itérations
+- **Providers LLM** : abstractions pour Anthropic (remote), Gemma WASM (in-browser), et custom backends
+- **Tool layers** : structuration des outils MCP/WebMCP avec alias canoniques et lazy loading
+- **Recipes** : instructions markdown embarquées dans les widgets pour guider l'agent
+- **Compression d'historique** : troncature intelligente des anciens résultats d'outils pour économiser le contexte
+
+---
+
+## runAgentLoop
+
+Lance la boucle agent sur un message utilisateur.
+
+```ts
+export async function runAgentLoop(
+  userMessage: string,
+  options: AgentLoopOptions
+): Promise<AgentResult>
+```
+
+### Paramètres
+
+#### `AgentLoopOptions`
+
+```ts
+interface AgentLoopOptions {
+  client?: McpClient;                    // Client MCP (optionnel si WebMCP seulement)
+  provider: LLMProvider;                 // Provider LLM (Anthropic, Gemma, custom)
+  layers?: ToolLayer[];                  // Couches outils structurées (remplace mcpTools)
+  maxIterations?: number;                // Max itérations (défaut: 5)
+  maxTokens?: number;                    // Limit réponse LLM (optionnel)
+  maxTools?: number;                     // Max outils à envoyer par iteration (optionnel)
+  temperature?: number;                  // Température LLM (optionnel)
+  topK?: number;                         // Top-K sampling (optionnel)
+  cacheEnabled?: boolean;                // Activation du cache prompt Anthropic (défaut: true)
+  systemPrompt?: string;                 // Custom system prompt (optionnel)
+  initialMessages?: ChatMessage[];       // Historique de tour précédent (optionnel)
+  callbacks?: AgentCallbacks;            // Callbacks streaming (optionnel)
+  signal?: AbortSignal;                  // Cancellation (optionnel)
+  truncateResults?: boolean;             // Troncature résultats outils (défaut: true)
+  compressHistory?: boolean;             // Compression historique (défaut: true)
+  maxResultLength?: number;              // Max longueur résultat (défaut: 10000)
+}
+```
+
+### Retour
+
+```ts
+interface AgentResult {
+  text: string;                          // Texte final de l'assistant
+  toolCalls: ToolCall[];                 // Tous les appels outils exécutés
+  metrics: AgentMetrics;                 // Tokens, latence, cache hits
+  stopReason: 'end_turn' | 'max_iterations';
+  messages: ChatMessage[];               // Historique complet (pour réutilisation)
+}
+```
+
+### Exemple
+
+```ts
+import { runAgentLoop } from '@webmcp-auto-ui/agent';
+import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
+import { McpClient } from '@webmcp-auto-ui/core';
+
+const provider = new RemoteLLMProvider({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  model: 'claude-3-5-sonnet-20241022',
+});
+
+const client = new McpClient({
+  serverUrl: 'http://localhost:3000/mcp',
+});
+
+const result = await runAgentLoop('Trouve une recette avec plus de 500 calories', {
+  provider,
+  client,
+  maxIterations: 5,
+  callbacks: {
+    onToken: (token) => process.stdout.write(token),
+    onToolCall: (call) => console.log(`Outil: ${call.name}`),
+    onDone: (metrics) => console.log(`Tokens: ${metrics.totalTokens}`),
+  },
+});
+
+console.log('Résultat:', result.text);
+```
+
+### Comportement
+
+1. **Phase discovery** : début avec outils de découverte (`search_recipes`, `list_tables`, etc.)
+2. **Activation lazy** : premier appel d'outil d'un serveur active tous ses outils
+3. **Alias canoniques** : `search_recipes_mcp_list_my_recipes()` est automatiquement mappé
+4. **Compression contexte** : après 2 itérations, les anciens `tool_result` sont tronqués à 200 chars + mention `recall(id)`
+5. **Nudge rendering** : après 5 itérations sans rendu, injection d'un message pour forcer `widget_display()`
+
+---
+
+## LLMProvider (interface)
+
+Abstraction pour un provider de modèle LLM.
+
+```ts
+interface LLMProvider {
+  readonly name: string;
+  readonly model: string;
+  chat(
+    messages: ChatMessage[],
+    tools: ProviderTool[],
+    options?: {
+      signal?: AbortSignal;
+      cacheEnabled?: boolean;
+      system?: string;
+      maxTokens?: number;
+      temperature?: number;
+      topK?: number;
+      onToken?: (token: string) => void;
+      maxTools?: number;
+    }
+  ): Promise<LLMResponse>;
+}
+```
+
+---
+
+## RemoteLLMProvider
+
+Provider pour Claude (Anthropic API).
+
+```ts
+export class RemoteLLMProvider implements LLMProvider {
+  constructor(options: RemoteLLMProviderOptions);
+}
+
+interface RemoteLLMProviderOptions {
+  apiKey: string;                        // Clé API Anthropic
+  model: string;                         // Ex: 'claude-3-5-sonnet-20241022'
+  baseUrl?: string;                      // Override d'URL (défaut: Anthropic official)
+  timeout?: number;                      // Timeout en ms (défaut: 120000)
+  retries?: number;                      // Nombre de retries (défaut: 2)
+}
+```
+
+### Exemple
+
+```ts
+const provider = new RemoteLLMProvider({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  model: 'claude-3-5-sonnet-20241022',
+});
+
+const response = await provider.chat([
+  { role: 'user', content: 'Bonjour' }
+], [], {
+  system: 'Tu es un assistant utile.',
+  maxTokens: 1000,
+});
+
+console.log(response.content); // [{type: 'text', text: '...'}]
+console.log(response.usage);   // {input_tokens: 10, output_tokens: 50}
+```
+
+### Avec streaming
+
+```ts
+let collected = '';
+const response = await provider.chat([...], [...], {
+  onToken: (token) => {
+    collected += token;
+    process.stdout.write(token);
+  },
+});
+```
+
+---
+
+## WasmProvider (Gemma in-browser)
+
+Exécute Gemma 2B/7B directement dans le navigateur (WebAssembly).
+
+```ts
+export class WasmProvider implements LLMProvider {
+  constructor(options: WasmProviderOptions);
+  isReady(): boolean;
+  load(): Promise<void>;
+}
+
+interface WasmProviderOptions {
+  model: 'gemma-2b' | 'gemma-7b';        // Variante Gemma
+  wasmUrl?: string;                      // URL du .wasm (auto-détecté depuis package)
+  progress?: (loaded: number, total: number) => void;
+}
+```
+
+### Exemple (React)
+
+```tsx
+import { WasmProvider } from '@webmcp-auto-ui/agent';
+import { useEffect, useState } from 'react';
+
+export function App() {
+  const [provider, setProvider] = useState<WasmProvider | null>(null);
+
+  useEffect(() => {
+    const p = new WasmProvider({ model: 'gemma-2b' });
+    p.load().then(() => setProvider(p));
+  }, []);
+
+  if (!provider?.isReady()) return <div>Chargement Gemma...</div>;
+
+  // Utiliser provider.chat(...) normalement
+  return <YourAgent provider={provider} />;
+}
+```
+
+---
+
+## LocalLLMProvider
+
+Provider pour backends LLM locaux (Ollama, LLaMA.cpp, etc.).
+
+```ts
+export class LocalLLMProvider implements LLMProvider {
+  constructor(options: LocalLLMProviderOptions);
+}
+
+interface LocalLLMProviderOptions {
+  baseUrl: string;                       // Ex: 'http://localhost:11434'
+  model: string;                         // Ex: 'llama2', 'mistral'
+  backend?: 'ollama' | 'llamacpp';       // Type de backend
+  timeout?: number;
+}
+```
+
+---
+
+## Tool Layers
+
+Structures les outils MCP/WebMCP en couches pour distribution et alias canoniques.
+
+### McpLayer
+
+```ts
+interface McpLayer {
+  protocol: 'mcp';
+  serverName: string;
+  description?: string;
+  serverUrl?: string;
+  tools: McpToolDef[];
+  recipes?: McpRecipe[];
+}
+```
+
+### WebMcpLayer
+
+```ts
+interface WebMcpLayer {
+  protocol: 'webmcp';
+  serverName: string;
+  description: string;
+  tools: WebMcpToolDef[];
+}
+```
+
+### Utilisation
+
+```ts
+import { buildDiscoveryTools, buildSystemPrompt, activateServerTools } from '@webmcp-auto-ui/agent';
+
+const layers = [
+  {
+    protocol: 'mcp',
+    serverName: 'recipes',
+    tools: [
+      { name: 'search_recipes', description: '...' },
+      { name: 'get_recipe', description: '...' },
+    ],
+  } as const,
+  {
+    protocol: 'webmcp',
+    serverName: 'autoui',
+    description: 'Widget display',
+    tools: [{ name: 'widget_display', ... }],
+  } as const,
+];
+
+// Générer prompt système avec alias automatiques
+const systemPrompt = buildSystemPrompt(layers);
+
+// Outils de découverte uniquement (lazy loading)
+const discoveryTools = buildDiscoveryTools(layers);
+```
+
+---
+
+## buildSystemPromptWithAliases (parallel-safe)
+
+Génère un prompt système + alias map locaux pour éviter les singleton globaux.
+
+```ts
+export function buildSystemPromptWithAliases(
+  layers: ToolLayer[]
+): SystemPromptResult
+```
+
+```ts
+interface SystemPromptResult {
+  prompt: string;                        // Prompt système complet
+  aliasMap: Map<string, string>;        // Alias canoniques → noms réels
+}
+```
+
+### Exemple
+
+```ts
+const { prompt, aliasMap } = buildSystemPromptWithAliases(layers);
+
+// aliasMap.get('recipes_mcp_search_recipes') → 'recipes_mcp_list_recipes'
+// prompt contient une mention de search_recipes() avec le bon nom
+
+// Utiliser pendant la boucle agent
+for (const toolCall of response.toolBlocks) {
+  const realName = aliasMap.get(toolCall.name) ?? toolCall.name;
+  // Dispatcher avec realName
+}
+```
+
+---
+
+## buildDiscoveryToolsWithAliases (parallel-safe)
+
+Outils de découverte uniquement, avec alias locaux.
+
+```ts
+export function buildDiscoveryToolsWithAliases(
+  layers: ToolLayer[]
+): DiscoveryToolsResult
+
+interface DiscoveryToolsResult {
+  tools: ProviderTool[];
+  aliasMap: Map<string, string>;
+}
+```
+
+---
+
+## buildToolsFromLayers
+
+Tous les outils d'une couche, avec préfixe `{serverName}_{protocol}_{toolName}`.
+
+```ts
+export function buildToolsFromLayers(layers: ToolLayer[]): ProviderTool[]
+```
+
+---
+
+## activateServerTools
+
+Ajoute tous les outils d'un serveur à la liste active (appelé à la première utilisation).
+
+```ts
+export function activateServerTools(
+  currentTools: ProviderTool[],
+  layer: ToolLayer
+): ProviderTool[]
+```
+
+---
+
+## resolveCanonicalTools (4-layer matching)
+
+Détecte les outils `search_recipes` / `get_recipe` par pattern matching intelligent.
+
+```ts
+export function resolveCanonicalTools(
+  tools: McpToolDef[]
+): Array<{ role: 'search_recipes' | 'get_recipe'; realToolName: string }>
+```
+
+### Stratégie
+
+1. **Couche 1** : Correspondance exacte sur le nom (`search_recipes`, `get_recipe`)
+2. **Couche 2** : Décomposition `snake_case` → (action, resource), test tous les couples
+3. **Couche 3** : Scan de la description pour mots-clés (`recipe`, `template`, `workflow`)
+4. **Couche 4** : Fallback — liste les outils bruts si aucun recipe trouvé
+
+---
+
+## Callbacks streaming
+
+Interface `AgentCallbacks` pour mettre à jour l'UI en temps réel.
+
+```ts
+interface AgentCallbacks {
+  onIterationStart?: (iteration: number, maxIterations: number) => void;
+  onLLMRequest?: (messages: ChatMessage[], tools: ProviderTool[]) => void;
+  onLLMResponse?: (response: LLMResponse, latencyMs: number, 
+                   tokens?: { input: number; output: number }) => void;
+  onToolCall?: (call: ToolCall) => void;
+  onWidget?: (type: string, data: Record<string, unknown>) 
+             => { id: string } | void;
+  onClear?: () => void;
+  onText?: (text: string) => void;
+  onToken?: (token: string) => void;
+  onDone?: (metrics: AgentMetrics) => void;
+  onUpdate?: (id: string, data: Record<string, unknown>) => void;
+  onMove?: (id: string, x: number, y: number) => void;
+  onResize?: (id: string, w: number, h: number) => void;
+  onStyle?: (id: string, styles: Record<string, string>) => void;
+  onUserInteraction?: (widgetId: string, widgetType: string, 
+                       action: string, payload: unknown) => void;
+}
+```
+
+---
+
+## TokenTracker
+
+Suivi détaillé des tokens LLM pour budget et analytics.
+
+```ts
+export class TokenTracker {
+  constructor();
+  record(input: number, output: number, cache?: number): void;
+  getMetrics(): TokenMetrics;
+  reset(): void;
+}
+
+interface TokenMetrics {
+  totalInput: number;
+  totalOutput: number;
+  totalCache: number;
+  totalTokens: number;
+  sessions: Array<{
+    id: string;
+    input: number;
+    output: number;
+    cache: number;
+    timestamp: number;
+  }>;
+}
+```
+
+### Exemple
+
+```ts
+const tracker = new TokenTracker();
+
+const result = await runAgentLoop(msg, {
+  provider,
+  callbacks: {
+    onLLMResponse: (response) => {
+      if (response.usage) {
+        tracker.record(
+          response.usage.input_tokens,
+          response.usage.output_tokens,
+          response.usage.cache_read_input_tokens
+        );
+      }
+    },
+  },
+});
+
+console.log(tracker.getMetrics()); // {totalInput: 1000, ...}
+```
+
+---
+
+## autoui (WebMCP Server)
+
+Serveur WebMCP embarqué avec tous les widgets natifs (stat, chart, hemicycle, gallery, etc.).
+
+```ts
+export { autoui } from '@webmcp-auto-ui/agent';
+export const NATIVE_WIDGET_NAMES: string[]; // ['stat', 'kv', 'list', ...]
+```
+
+### Utilisation
+
+```ts
+import { autoui } from '@webmcp-auto-ui/agent';
+
+const layer = autoui.layer(); // WebMcpLayer
+console.log(layer.tools.length); // 3 outils: search_recipes, get_recipe, widget_display
+
+// Ou l'utiliser directement dans une boucle agent
+const result = await runAgentLoop('Affiche un graphique', {
+  layers: [autoui.layer()],
+  ...
+});
+```
+
+---
+
+## Types
+
+### ChatMessage
+
+```ts
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string | ContentBlock[];
+}
+
+type ContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+  | { type: 'tool_result'; tool_use_id: string; content: string };
+```
+
+### ToolCall
+
+```ts
+interface ToolCall {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+  result?: string;
+  error?: string;
+  elapsed?: number;
+  guided?: boolean; // true si précédé par un tool de découverte
+}
+```
+
+### AgentMetrics
+
+```ts
+interface AgentMetrics {
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalLatencyMs: number;
+  toolCalls: number;
+  iterations: number;
+  cacheHits: number;
+}
+```
+
+---
+
+## Utilitaires
+
+### fromMcpTools
+
+Convertit `McpTool[]` (core) → `McpToolDef[]` (agent).
+
+```ts
+export function fromMcpTools(tools: McpTool[]): McpToolDef[]
+```
+
+### trimConversationHistory
+
+Réduit l'historique pour respecter un budget token.
+
+```ts
+export function trimConversationHistory(
+  history: ChatMessage[],
+  maxTokens: number
+): ChatMessage[]
+```
+
+Supprime les paires user+assistant les plus anciennes jusqu'à être sous la limite.
+
+---
+
+## Migration depuis l'ancienne API
+
+| Ancien | Nouveau | Notes |
+|--------|---------|-------|
+| `buildSystemPrompt()` | `buildSystemPromptWithAliases()` | Retourne `{prompt, aliasMap}` |
+| `buildDiscoveryTools()` | `buildDiscoveryToolsWithAliases()` | Retourne `{tools, aliasMap}` |
+| `mcpToolsToAnthropic()` | `toProviderTools()` | Renommé |
+
+L'ancienne API est toujours disponible mais utilise un singleton `toolAliasMap` global (non thread-safe).

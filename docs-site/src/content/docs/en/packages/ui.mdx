@@ -1,0 +1,689 @@
+---
+title: '@webmcp-auto-ui/ui'
+description: 'Svelte components for agent interface: LLMSelector, GemmaLoader, McpStatus, AgentProgress, WidgetRenderer'
+sidebar:
+  order: 2
+---
+
+## Overview
+
+The `@webmcp-auto-ui/ui` package provides a **library of Svelte 5 components** for building complete agent interfaces.
+
+### Categories
+
+- **Selectors** : `<LLMSelector>` — model selection
+- **Indicators** : `<GemmaLoader>`, `<McpStatus>`, `<AgentProgress>` — system state
+- **Widgets** : `<WidgetRenderer>`, `<BlockRenderer>` — dynamic display
+- **Primitives** : `<Card>`, `<Panel>`, `<Window>` — layout
+
+---
+
+## LLMSelector
+
+LLM model selector with Anthropic + Gemma WASM support.
+
+```svelte
+<script lang="ts">
+  import { LLMSelector } from '@webmcp-auto-ui/ui';
+  
+  let selectedModel = 'haiku';
+</script>
+
+<LLMSelector
+  bind:value={selectedModel}
+  showRemote={true}
+  showWasm={true}
+  disabled={false}
+  onModelChange={(model) => console.log('Changed:', model)}
+/>
+```
+
+### Props
+
+```ts
+interface Props {
+  value?: string;                // Selected model (bind:value)
+  showRemote?: boolean;          // Show Anthropic (default: true)
+  showWasm?: boolean;            // Show Gemma (default: true)
+  disabled?: boolean;            // Disable select
+  onModelChange?: (model: string) => void;
+}
+```
+
+### Preset Values
+
+- `haiku` — Claude 3 Haiku (fast)
+- `sonnet` — Claude 3.5 Sonnet (balanced)
+- `opus` — Claude 3 Opus (powerful)
+- `gemma-2b` — Gemma 2B WASM
+- `gemma-7b` — Gemma 7B WASM
+
+### Integration Example
+
+```svelte
+<script lang="ts">
+  import { LLMSelector } from '@webmcp-auto-ui/ui';
+  import { RemoteLLMProvider, WasmProvider } from '@webmcp-auto-ui/agent';
+  
+  let model = 'haiku';
+  
+  async function createProvider() {
+    if (model.startsWith('gemma')) {
+      const p = new WasmProvider({ model: model as 'gemma-2b' | 'gemma-7b' });
+      await p.load();
+      return p;
+    } else {
+      return new RemoteLLMProvider({
+        apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
+        model: `claude-3-${model === 'opus' ? 'opus' : model}-20240229`,
+      });
+    }
+  }
+</script>
+
+<LLMSelector bind:value={model} on:modelChange={createProvider} />
+```
+
+---
+
+## GemmaLoader
+
+Loading indicator and status for Gemma WASM model.
+
+```svelte
+<script lang="ts">
+  import { GemmaLoader } from '@webmcp-auto-ui/ui';
+  
+  let status = 'idle'; // 'idle' | 'loading' | 'ready' | 'error'
+  let error = '';
+</script>
+
+<GemmaLoader {status} {error} />
+```
+
+### Props
+
+```ts
+interface Props {
+  status?: 'idle' | 'loading' | 'ready' | 'error';
+  error?: string;                // Error message if status === 'error'
+  modelName?: string;            // Displayed name (default: 'Gemma')
+}
+```
+
+### Complete Example
+
+```svelte
+<script lang="ts">
+  import { GemmaLoader } from '@webmcp-auto-ui/ui';
+  import { WasmProvider } from '@webmcp-auto-ui/agent';
+  
+  let status = 'idle';
+  let error = '';
+  let provider = null;
+  
+  async function loadGemma() {
+    status = 'loading';
+    try {
+      provider = new WasmProvider({ model: 'gemma-2b' });
+      await provider.load();
+      status = 'ready';
+    } catch (e) {
+      error = e.message;
+      status = 'error';
+    }
+  }
+</script>
+
+<button on:click={loadGemma}>Load Gemma</button>
+<GemmaLoader {status} {error} />
+
+{#if provider}
+  <p>✓ Ready to use</p>
+{/if}
+```
+
+---
+
+## McpStatus
+
+MCP connection and status indicator.
+
+```svelte
+<script lang="ts">
+  import { McpStatus } from '@webmcp-auto-ui/ui';
+</script>
+
+<McpStatus
+  connected={true}
+  connecting={false}
+  serverName="recipes"
+  toolCount={12}
+  error={null}
+/>
+```
+
+### Props
+
+```ts
+interface Props {
+  connected?: boolean;           // Connected to a server
+  connecting?: boolean;          // Connection in progress
+  serverName?: string;           // Server name
+  toolCount?: number;            // Number of available tools
+  error?: string;                // Error message if applicable
+  onRetry?: () => void;         // Retry callback
+  onDisconnect?: () => void;    // Disconnect callback
+}
+```
+
+### Display
+
+```
+🟢 Connected to recipes (12 tools)
+🟡 Connecting…
+🔴 Error: Connection refused
+⚪ No server connected
+```
+
+### Integration Example with McpClient
+
+```svelte
+<script lang="ts">
+  import { McpStatus } from '@webmcp-auto-ui/ui';
+  import { McpClient } from '@webmcp-auto-ui/core';
+  
+  let connected = false;
+  let serverName = '';
+  let toolCount = 0;
+  let error = '';
+  
+  async function connectMcp(url: string) {
+    try {
+      const client = new McpClient({ serverUrl: url });
+      await client.initialize();
+      const { tools } = await client.listTools();
+      
+      connected = true;
+      serverName = 'Custom MCP';
+      toolCount = tools.length;
+      error = '';
+    } catch (e) {
+      connected = false;
+      error = e.message;
+    }
+  }
+</script>
+
+<McpStatus {connected} {serverName} {toolCount} {error} />
+```
+
+---
+
+## AgentProgress
+
+Real-time agent loop progress indicator.
+
+```svelte
+<script lang="ts">
+  import { AgentProgress } from '@webmcp-auto-ui/ui';
+</script>
+
+<AgentProgress
+  iteration={3}
+  maxIterations={5}
+  status="Executing tool…"
+  tokenCount={1250}
+  latencyMs={450}
+/>
+```
+
+### Props
+
+```ts
+interface Props {
+  iteration?: number;            // Current iteration
+  maxIterations?: number;        // Max count (default: 5)
+  status?: string;               // Status message
+  tokenCount?: number;           // Tokens consumed
+  latencyMs?: number;            // Last call latency (ms)
+  isGenerating?: boolean;        // Animation in progress
+}
+```
+
+### Example with runAgentLoop
+
+```svelte
+<script lang="ts">
+  import { AgentProgress } from '@webmcp-auto-ui/ui';
+  import { runAgentLoop } from '@webmcp-auto-ui/agent';
+  
+  let iteration = 0;
+  let status = '';
+  let totalTokens = 0;
+  let lastLatency = 0;
+  
+  async function runAgent() {
+    await runAgentLoop('Your question', {
+      provider,
+      callbacks: {
+        onIterationStart: (iter, max) => {
+          iteration = iter;
+        },
+        onToolCall: (call) => {
+          status = `Tool: ${call.name}`;
+        },
+        onLLMResponse: (resp, latency) => {
+          lastLatency = latency;
+          if (resp.usage) {
+            totalTokens += resp.usage.input_tokens + resp.usage.output_tokens;
+          }
+        },
+      },
+    });
+  }
+</script>
+
+<button on:click={runAgent}>Run</button>
+<AgentProgress {iteration} maxIterations={5} {status} tokenCount={totalTokens} latencyMs={lastLatency} />
+```
+
+---
+
+## WidgetRenderer
+
+Dynamic widget rendering with automatic dispatch.
+
+```svelte
+<script lang="ts">
+  import { WidgetRenderer } from '@webmcp-auto-ui/ui';
+</script>
+
+<WidgetRenderer
+  id="my-widget"
+  type="chart"
+  data={{ bars: [['Jan', 10], ['Feb', 20]] }}
+  on:interact={(e) => console.log('Interaction:', e.detail)}
+/>
+```
+
+### Props
+
+```ts
+interface Props {
+  id?: string;                   // Unique widget ID
+  type: string;                  // Widget type (chart, stat, etc.)
+  data: Record<string, unknown>; // Widget data
+  servers?: WebMcpServer[];      // WebMCP servers for custom widgets
+  oninteract?: (type: string, action: string, payload: unknown) => void;
+}
+```
+
+### Supported Types
+
+**Simple widgets** (prop `data`):
+- `stat`, `kv`, `list`, `chart`, `alert`, `code`, `text`, `actions`, `tags`
+
+**Rich widgets** (prop `spec`):
+- `stat-card`, `data-table`, `timeline`, `profile`, `json-viewer`, `hemicycle`, `chart-rich`, `sankey`, `map`, `d3`, `js-sandbox`, `log`
+
+**Rich widgets with events**:
+- `cards`, `gallery`, `carousel`, `trombinoscope`, `grid-data`
+
+### Complete Example
+
+```svelte
+<script lang="ts">
+  import { WidgetRenderer } from '@webmcp-auto-ui/ui';
+  
+  let widgets = [
+    { id: 'w1', type: 'stat', data: { label: 'Sales', value: '42' } },
+    { id: 'w2', type: 'chart', data: { bars: [['Q1', 100], ['Q2', 150]] } },
+  ];
+  
+  function handleInteraction(id, type, action, payload) {
+    console.log(`Widget ${id} (${type}): ${action}`, payload);
+  }
+</script>
+
+{#each widgets as widget (widget.id)}
+  <WidgetRenderer
+    id={widget.id}
+    type={widget.type}
+    data={widget.data}
+    oninteract={(t, a, p) => handleInteraction(widget.id, t, a, p)}
+  />
+{/each}
+```
+
+---
+
+## BlockRenderer
+
+Rendering of "blocks" (old name for widgets).
+
+```svelte
+<BlockRenderer type="stat" data={{label: 'KPI', value: '99'}} />
+```
+
+Alias for `<WidgetRenderer>` — prefer `WidgetRenderer`.
+
+---
+
+## Simple Widgets
+
+All simple widgets accept a `data: Record<string, unknown>` prop.
+
+### StatBlock
+
+```svelte
+<script lang="ts">
+  import { StatBlock } from '@webmcp-auto-ui/ui';
+</script>
+
+<StatBlock data={{ label: 'Total', value: '1,250', trend: '+12%', trendDir: 'up' }} />
+```
+
+**Schema**:
+```ts
+{
+  label: string;              // Label
+  value: string;              // Displayed value
+  trend?: string;             // Trend (ex: "+12%")
+  trendDir?: 'up' | 'down' | 'neutral';
+}
+```
+
+### ChartBlock
+
+```svelte
+<ChartBlock data={{
+  title: 'Sales',
+  bars: [['Jan', 100], ['Feb', 150], ['Mar', 120]]
+}} />
+```
+
+**Schema**:
+```ts
+{
+  title?: string;
+  bars: Array<[string, number]>;  // Label × value
+}
+```
+
+### CodeBlock
+
+```svelte
+<CodeBlock data={{
+  lang: 'typescript',
+  content: "const x = 42;"
+}} />
+```
+
+**Schema**:
+```ts
+{
+  lang?: string;              // Language (typescript, python, etc.)
+  content: string;            // Source code
+}
+```
+
+### AlertBlock
+
+```svelte
+<AlertBlock data={{
+  title: 'Warning',
+  message: 'Disk almost full',
+  level: 'warn'
+}} />
+```
+
+**Schema**:
+```ts
+{
+  title: string;
+  message?: string;
+  level?: 'info' | 'warn' | 'error';
+}
+```
+
+### KVBlock
+
+```svelte
+<KVBlock data={{
+  rows: [
+    ['Name', 'Alice'],
+    ['Email', 'alice@example.com'],
+  ]
+}} />
+```
+
+---
+
+## Rich Widgets
+
+Rich widgets (using `spec` instead of `data`).
+
+### StatCard
+
+```svelte
+<script lang="ts">
+  import { StatCard } from '@webmcp-auto-ui/ui';
+</script>
+
+<StatCard spec={{
+  label: 'Conversion',
+  value: '24.5',
+  unit: '%',
+  delta: '+2.3%',
+  trend: 'up',
+  variant: 'success'
+}} />
+```
+
+**Variants**: `default`, `success`, `warning`, `error`, `info`
+
+### DataTable
+
+```svelte
+<DataTable
+  spec={{
+    columns: [
+      { key: 'name', label: 'Name', align: 'left' },
+      { key: 'score', label: 'Score', align: 'right' }
+    ],
+    rows: [
+      { name: 'Alice', score: 95 },
+      { name: 'Bob', score: 87 }
+    ]
+  }}
+  on:rowclick={(e) => console.log(e.detail)}
+/>
+```
+
+### JsonViewer
+
+```svelte
+<JsonViewer spec={{
+  title: 'Data',
+  data: { a: 1, b: { c: 2 } },
+  expanded: true
+}} />
+```
+
+### Timeline
+
+```svelte
+<Timeline spec={{
+  title: 'Steps',
+  events: [
+    { title: 'Start', date: '2024-01-01', status: 'done' },
+    { title: 'In progress', date: '2024-01-15', status: 'active' }
+  ]
+}} />
+```
+
+### Cards
+
+```svelte
+<Cards spec={{
+  title: 'Projects',
+  cards: [
+    { title: 'Project A', description: 'In progress' },
+    { title: 'Project B', description: 'Done' }
+  ]
+}} />
+```
+
+### Gallery
+
+```svelte
+<Gallery spec={{
+  title: 'Photos',
+  images: [
+    { src: 'https://...', alt: 'Photo 1', caption: 'Landscape' }
+  ]
+}} />
+```
+
+---
+
+## Primitives
+
+### Card
+
+Container with card styling.
+
+```svelte
+<script lang="ts">
+  import { Card } from '@webmcp-auto-ui/ui';
+</script>
+
+<Card title="My title">
+  <p>Card content</p>
+</Card>
+```
+
+### Panel
+
+Configurable panel.
+
+```svelte
+<Panel title="Results" collapsible={true}>
+  <ul>
+    <li>Result 1</li>
+    <li>Result 2</li>
+  </ul>
+</Panel>
+```
+
+### Window
+
+Floating or docked window.
+
+```svelte
+<Window title="Chat" position={{ x: 100, y: 200 }} width={400} height={600}>
+  <input type="text" placeholder="Message..." />
+</Window>
+```
+
+### GridLayout
+
+Responsive grid layout.
+
+```svelte
+<GridLayout columns={3} gap={16}>
+  <Card>Item 1</Card>
+  <Card>Item 2</Card>
+  <Card>Item 3</Card>
+</GridLayout>
+```
+
+---
+
+## SafeImage
+
+Robust image component with URL validation and fallback.
+
+```svelte
+<script lang="ts">
+  import { SafeImage } from '@webmcp-auto-ui/ui';
+</script>
+
+<SafeImage
+  src="https://example.com/image.jpg"
+  alt="Description"
+  fallbackText="Image"
+  loading="lazy"
+/>
+```
+
+### Props
+
+```ts
+interface Props {
+  src?: string;                  // URL (must start with http://, https://, data: or /)
+  alt?: string;                  // Alt text
+  class?: string;                // CSS classes
+  style?: string;                // Inline CSS
+  loading?: 'lazy' | 'eager';    // Lazy loading (default: lazy)
+  fallbackText?: string;         // Text on error (default: alt)
+  hideOnError?: boolean;         // Hide placeholder (default: false)
+}
+```
+
+### Behavior
+
+- **Invalid URL** → placeholder with icon + text
+- **Valid URL, broken image** → placeholder
+- **Data URI** → accepted and rendered
+- **Relative URLs** → accepted
+
+---
+
+## LinkOverlay
+
+Displays SVG arrows linking widgets in groups.
+
+```svelte
+<script lang="ts">
+  import { LinkOverlay } from '@webmcp-auto-ui/ui';
+  import { bus } from '@webmcp-auto-ui/ui';
+</script>
+
+<LinkOverlay />
+
+<div data-block-id="widget-1">Widget A</div>
+<div data-block-id="widget-2">Widget B</div>
+
+<script>
+  // Link widgets
+  bus.link(['widget-1', 'widget-2'], 'my-group');
+  bus.broadcast('_system', 'show-links', { groupId: 'my-group', visible: true });
+</script>
+```
+
+---
+
+## Theme
+
+Theme configuration.
+
+```svelte
+<script lang="ts">
+  import { ThemeProvider, LIGHT_TOKENS, DARK_TOKENS } from '@webmcp-auto-ui/ui';
+</script>
+
+<ThemeProvider mode="dark">
+  <YourApp />
+</ThemeProvider>
+```
+
+### Props
+
+```ts
+interface Props {
+  mode?: 'light' | 'dark' | 'auto';
+  overrides?: Record<string, string>;    // Custom CSS tokens
+}
+```

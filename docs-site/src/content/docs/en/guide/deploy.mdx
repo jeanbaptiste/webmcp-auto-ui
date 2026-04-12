@@ -1,0 +1,298 @@
+---
+title: Deployment
+description: Scripts and procedures for deploying WebMCP Auto-UI to production
+sidebar:
+  order: 4
+---
+
+## Principles
+
+Deployment is **centralized** via a single script and **app-aware**: each app has different deployment configuration.
+
+**Never deploy manually with `scp` or `rsync`.** Always use `./scripts/deploy.sh`.
+
+## VM Configuration
+
+### SSH Access
+
+```bash
+ssh bot
+```
+
+Deployment directory: `/opt/webmcp-demos/`
+
+### Directory Structure
+
+```
+/opt/webmcp-demos/
+├── flex/                    # SvelteKit App (Node)
+├── viewer/                  # SvelteKit App (Node) → build/
+├── home/                    # Static App (Astro)
+├── todo/                    # Static App
+├── showcase/                # Static App
+├── multi-astro/             # Static App (Astro)
+├── multi-svelte/            # Static App (Svelte)
+├── multi-react/             # Static App (React)
+├── multi-vue/               # Static App (Vue)
+├── multi-webcomponents/     # Static App (Web Components)
+└── nginx/                   # Nginx config (read-only)
+```
+
+## Per-App Deployment Configuration
+
+| App | Type | ExecStart systemd | Destination | Notes |
+|-----|------|-------------------|-------------|-------|
+| **flex** | SvelteKit + Node | `node index.js` | `/opt/webmcp-demos/flex/` | Root; yes `node_modules` |
+| **viewer** | SvelteKit + Node | `node build/index.js` | `/opt/webmcp-demos/viewer/build/` | Subfolder; copy only `build/`, `node_modules/`, `.env` |
+| **home** | Astro (static) | Nginx | `/opt/webmcp-demos/home/` | Root; `PUBLIC_BASE_URL=https://demos.hyperskills.net` |
+| **todo** | Static | Nginx | `/opt/webmcp-demos/todo/` | Root |
+| **showcase** | Static | Nginx | `/opt/webmcp-demos/showcase/` | Root |
+| **multi-astro** | Astro (static) | Nginx | `/opt/webmcp-demos/multi-astro/` | Root |
+| **multi-svelte** | Static | Nginx | `/opt/webmcp-demos/multi-svelte/` | Root |
+| **multi-react** | Static | Nginx | `/opt/webmcp-demos/multi-react/` | Root |
+| **multi-vue** | Static | Nginx | `/opt/webmcp-demos/multi-vue/` | Root |
+| **multi-webcomponents** | Static | Nginx | `/opt/webmcp-demos/multi-webcomponents/` | Root |
+
+## Deployment Script
+
+### Usage
+
+```bash
+./scripts/deploy.sh              # Deploy all apps
+./scripts/deploy.sh flex         # Deploy only flex
+./scripts/deploy.sh viewer home  # Deploy viewer and home
+```
+
+### Script Workflow
+
+For each app:
+
+1. **Determine type** : SvelteKit (Node) or static (nginx)
+2. **Build if necessary** :
+   ```bash
+   pnpm build
+   ```
+3. **Clean server** (before `rsync`) :
+   ```bash
+   ssh bot "rm -rf /opt/webmcp-demos/{app}/build/*"
+   ```
+   Why? Old `.js` chunks remain otherwise and pollute.
+
+4. **Copy files** :
+   ```bash
+   rsync -avz --delete \
+     apps/{app}/dist/ \
+     bot:/opt/webmcp-demos/{app}/
+   ```
+
+5. **Restart service** (if applicable) :
+   ```bash
+   ssh bot systemctl restart webmcp-{app}.service
+   ```
+
+### Environment Variables
+
+**On VM** (in `.env`):
+
+```bash
+# /opt/webmcp-demos/flex/.env
+VITE_ANTHROPIC_API_KEY=sk-ant-...
+VITE_MCP_URL=http://localhost:3001
+```
+
+**Never delete `.env` on server** during deployment. Script doesn't touch existing `.env`.
+
+### Handling BUILD_TIME variables (home)
+
+The `home` app must be built with `PUBLIC_BASE_URL`:
+
+```bash
+# Locally (before deployment)
+PUBLIC_BASE_URL=https://demos.hyperskills.net pnpm build
+```
+
+Or in script (for automated deployment):
+
+```bash
+cd apps/home
+PUBLIC_BASE_URL=https://demos.hyperskills.net pnpm build
+```
+
+**Why?** Astro injects `PUBLIC_*` variables at build-time. If value changes, must rebuild.
+
+## Manual Procedure (if script fails)
+
+### 1. Build locally
+
+```bash
+cd apps/flex
+pnpm install
+pnpm build
+```
+
+### 2. Copy to server
+
+```bash
+# For flex (root)
+rsync -avz --delete \
+  apps/flex/build/ \
+  bot:/opt/webmcp-demos/flex/
+
+# For viewer (subfolder build/)
+rsync -avz --delete \
+  apps/viewer/build/ \
+  bot:/opt/webmcp-demos/viewer/build/
+```
+
+### 3. Copy node_modules (if necessary for Node)
+
+```bash
+# Only for flex, viewer
+rsync -avz \
+  apps/flex/node_modules/ \
+  bot:/opt/webmcp-demos/flex/node_modules/
+```
+
+### 4. Copy .env
+
+```bash
+rsync -avz \
+  .env.production \
+  bot:/opt/webmcp-demos/flex/.env
+```
+
+**Important**: Never use `--delete` for `.env`, it deletes server files.
+
+### 5. Restart service
+
+```bash
+ssh bot systemctl restart webmcp-flex.service
+```
+
+### 6. Check status
+
+```bash
+ssh bot systemctl status webmcp-flex.service
+```
+
+## Common Error Handling
+
+### Error: Old files remain on server
+
+**Symptom**: App shows old interface after deployment.
+
+**Cause**: `rsync --delete` didn't execute or old `.js` chunks remain.
+
+**Solution**:
+
+```bash
+ssh bot "rm -rf /opt/webmcp-demos/flex/dist/*"
+./scripts/deploy.sh flex
+```
+
+### Error: `.env` deleted on production
+
+**Symptom**: App crashes with `undefined VITE_ANTHROPIC_API_KEY`.
+
+**Cause**: Using `rsync --delete` without `.env` exclusion.
+
+**Solution**:
+
+Restore `.env` from backup or regenerate:
+
+```bash
+ssh bot "echo 'VITE_ANTHROPIC_API_KEY=sk-ant-...' > /opt/webmcp-demos/flex/.env"
+```
+
+### Error: Service won't start after deployment
+
+**Symptom**: `systemctl status webmcp-flex.service` shows "Failed".
+
+**Cause**: Missing files or corrupted build.
+
+**Solution**:
+
+```bash
+ssh bot journalctl -u webmcp-flex.service -n 50
+# Read detailed logs
+```
+
+Then:
+```bash
+./scripts/deploy.sh flex
+```
+
+## Post-Deployment Verification
+
+### Checklist
+
+- [ ] App accessible via HTTP (or HTTPS)
+- [ ] No 404 errors on assets
+- [ ] No console errors (DevTools → Console)
+- [ ] Environment variables loaded (check `window.__config__` or `import.meta.env`)
+- [ ] MCP integration functional (if applicable)
+
+### Quick Verification
+
+```bash
+curl -I https://demos.hyperskills.net/flex/
+# Should return 200
+
+ssh bot curl -I http://localhost:3000/flex/
+# Verify local response
+```
+
+## Webhook and CI/CD (optional)
+
+To automate deployments, use GitHub webhook:
+
+```bash
+# On VM
+mkdir -p /opt/webhooks
+cat > /opt/webhooks/deploy-on-push.sh << 'EOF'
+#!/bin/bash
+cd /opt/webmcp-demos/repo
+git pull
+./scripts/deploy.sh
+EOF
+chmod +x /opt/webhooks/deploy-on-push.sh
+```
+
+Then configure GitHub webhook to call:
+```
+https://demos.hyperskills.net/webhook/deploy
+```
+
+(Requires simple webhook server to receive and execute script.)
+
+## Logs and Monitoring
+
+### SvelteKit App Logs
+
+```bash
+ssh bot journalctl -u webmcp-flex.service -f
+# Follow in real-time
+```
+
+### Nginx Logs
+
+```bash
+ssh bot tail -f /var/log/nginx/access.log
+ssh bot tail -f /var/log/nginx/error.log
+```
+
+### Restart Nginx
+
+```bash
+ssh bot systemctl restart nginx
+```
+
+## Best Practices
+
+1. **Always use script** `./scripts/deploy.sh`
+2. **Never delete `.env`** manually
+3. **Clean before copy** : `rm -rf dist/` locally, then rsync
+4. **Test locally first** : `pnpm build && pnpm preview`
+5. **Backup important `.env`** (API keys)
+6. **Check logs** after deployment
+7. **Document changes** : release notes, changelog

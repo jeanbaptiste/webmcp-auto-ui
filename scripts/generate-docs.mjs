@@ -1,15 +1,14 @@
 /**
- * generate-docs.ts
+ * generate-docs.mjs
  *
  * Generates Starlight documentation from source code using Claude API.
  * The documentation is DERIVED from code — never maintained by hand.
  *
  * Usage:
- *   npx tsx scripts/generate-docs.ts            # full generation
- *   npx tsx scripts/generate-docs.ts --dry-run   # list files without calling API
+ *   node scripts/generate-docs.mjs            # full generation
+ *   node scripts/generate-docs.mjs --dry-run   # list files without calling API
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 
@@ -80,8 +79,8 @@ const OUTPUT_FILES = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function readSources(): string {
-  const parts: string[] = [];
+function readSources() {
+  const parts = [];
   for (const f of SOURCE_FILES) {
     const abs = join(ROOT, f);
     try {
@@ -94,7 +93,7 @@ function readSources(): string {
   return parts.join('\n\n');
 }
 
-function writeDoc(base: string, relativePath: string, content: string) {
+function writeDoc(base, relativePath, content) {
   const abs = join(base, relativePath);
   mkdirSync(dirname(abs), { recursive: true });
   writeFileSync(abs, content, 'utf-8');
@@ -105,8 +104,14 @@ function writeDoc(base: string, relativePath: string, content: string) {
  * Normalize a raw file path from Claude's response to match an expected OUTPUT_FILES entry.
  * Claude sometimes returns paths like "docs/packages/agent.mdx" or
  * "src/content/docs/guide/architecture.mdx" instead of "guide/architecture.mdx".
+ *
+ * Strategy:
+ * 1. Direct match against expectedPaths
+ * 2. Strip known prefixes and retry
+ * 3. Match by parent-dir/basename (e.g. "packages/agent.mdx")
+ * 4. Match by basename alone (e.g. "agent.mdx")
  */
-function normalizeFilePath(rawPath: string, expectedPaths: string[]): string | null {
+function normalizeFilePath(rawPath, expectedPaths) {
   // 1. Direct match
   if (expectedPaths.includes(rawPath)) return rawPath;
 
@@ -139,15 +144,16 @@ function normalizeFilePath(rawPath: string, expectedPaths: string[]): string | n
     if (ep.endsWith('/' + basename) || ep === basename) return ep;
   }
 
+  // No match — return null so caller can warn
   return null;
 }
 
 /** Parse Claude response that contains multiple files delimited by markers */
-function parseFiles(response: string, expectedPaths?: string[]): Record<string, string> {
-  const files: Record<string, string> = {};
+function parseFiles(response, expectedPaths) {
+  const files = {};
   // Expected format: === FILE: path/to/file.mdx ===\n<content>\n=== END FILE ===
   const regex = /=== FILE: (.+?) ===\n([\s\S]*?)(?==== END FILE ===|=== FILE:|$)/g;
-  let match: RegExpExecArray | null;
+  let match;
   while ((match = regex.exec(response)) !== null) {
     const rawPath = match[1].trim();
     const content = match[2].trimEnd() + '\n';
@@ -170,23 +176,32 @@ function parseFiles(response: string, expectedPaths?: string[]): Record<string, 
   return files;
 }
 
-async function callClaude(
-  client: Anthropic,
-  systemPrompt: string,
-  userPrompt: string,
-  label: string,
-): Promise<string> {
+async function callClaude(apiKey, systemPrompt, userPrompt, label) {
   console.log(`\n  [${label}] Calling Claude (${MODEL})...`);
   const start = Date.now();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 16000,
-    messages: [{ role: 'user', content: userPrompt }],
-    system: systemPrompt,
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'content-type': 'application/json',
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 16000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
   });
 
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`API error ${res.status}: ${err}`);
+  }
+
+  const response = await res.json();
   const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .filter((b) => b.type === 'text')
     .map((b) => b.text)
     .join('');
 
@@ -215,7 +230,7 @@ Règles :
   === END FILE ===
 - Ne génère RIEN en dehors de ce format (pas de commentaire avant/après)`;
 
-function promptOverviewAndGuide(sources: string): string {
+function promptOverviewAndGuide(sources) {
   return `Voici le code source du projet WebMCP Auto-UI :
 
 ${sources}
@@ -235,7 +250,7 @@ Génère les fichiers suivants en FRANÇAIS :
 Utilise le format === FILE: ... === pour chaque fichier.`;
 }
 
-function promptPackages(sources: string): string {
+function promptPackages(sources) {
   return `Voici le code source du projet WebMCP Auto-UI :
 
 ${sources}
@@ -253,7 +268,7 @@ Génère les fichiers suivants en FRANÇAIS — documentation API de référence
 Utilise le format === FILE: ... === pour chaque fichier.`;
 }
 
-function promptTutorials(sources: string): string {
+function promptTutorials(sources) {
   return `Voici le code source du projet WebMCP Auto-UI :
 
 ${sources}
@@ -269,7 +284,7 @@ Génère les fichiers suivants en FRANÇAIS — tutorials pas-à-pas :
 Utilise le format === FILE: ... === pour chaque fichier.`;
 }
 
-function promptTranslate(frenchDocs: Record<string, string>): string {
+function promptTranslate(frenchDocs) {
   const docsList = Object.entries(frenchDocs)
     .map(([path, content]) => `=== FILE: ${path} ===\n${content}\n=== END FILE ===`)
     .join('\n\n');
@@ -325,7 +340,7 @@ async function main() {
     return;
   }
 
-  const client = new Anthropic({ timeout: 600_000 });
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   const sources = readSources();
   console.log(`Read ${SOURCE_FILES.length} source files as context.`);
 
@@ -351,7 +366,7 @@ async function main() {
   // --- Batch 1: Overview + Guide ---
   console.log('\n--- Batch 1: Overview & Guide (FR) ---');
   const guideRaw = await callClaude(
-    client,
+    apiKey,
     SYSTEM_PROMPT,
     promptOverviewAndGuide(sources),
     'guide',
@@ -360,16 +375,16 @@ async function main() {
 
   // --- Batch 2: Packages ---
   console.log('\n--- Batch 2: Packages API Reference (FR) ---');
-  const pkgRaw = await callClaude(client, SYSTEM_PROMPT, promptPackages(sources), 'packages');
+  const pkgRaw = await callClaude(apiKey, SYSTEM_PROMPT, promptPackages(sources), 'packages');
   const pkgFiles = parseFiles(pkgRaw, OUTPUT_FILES.fr);
 
   // --- Batch 3: Tutorials ---
   console.log('\n--- Batch 3: Tutorials (FR) ---');
-  const tutRaw = await callClaude(client, SYSTEM_PROMPT, promptTutorials(sources), 'tutorials');
+  const tutRaw = await callClaude(apiKey, SYSTEM_PROMPT, promptTutorials(sources), 'tutorials');
   const tutFiles = parseFiles(tutRaw, OUTPUT_FILES.fr);
 
   // Merge all FR files
-  const allFrFiles: Record<string, string> = { ...guideFiles, ...pkgFiles, ...tutFiles };
+  const allFrFiles = { ...guideFiles, ...pkgFiles, ...tutFiles };
 
   // Write FR files
   console.log('\n--- Writing FR docs ---');
@@ -380,7 +395,7 @@ async function main() {
   // --- Batch 4: Translate to English ---
   console.log('\n--- Batch 4: Translation to English ---');
   const enRaw = await callClaude(
-    client,
+    apiKey,
     SYSTEM_PROMPT,
     promptTranslate(allFrFiles),
     'translate',

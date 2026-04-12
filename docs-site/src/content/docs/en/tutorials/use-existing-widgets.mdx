@@ -1,0 +1,398 @@
+---
+title: Using Existing Widgets
+description: Integrating and using 30+ native WebMCP Auto-UI widgets in your application
+sidebar:
+  order: 2
+---
+
+WebMCP Auto-UI provides **30+ native widgets** covering common needs: statistics, data tables, charts, galleries, maps, and more. This tutorial shows how to use them in your application.
+
+## Available Widgets List
+
+### Simple Widgets (data prop)
+
+These widgets display textual or basic data and receive a `data` parameter:
+
+| Widget | Usage | Schema |
+|--------|-------|--------|
+| `stat` | Key statistic (KPI) with label + value | `{ label, value, trend?, trendDir? }` |
+| `kv` | Key-value pairs (properties, metadata) | `{ title?, rows: [["key", "val"], ...] }` |
+| `list` | Ordered list of items | `{ title?, items: ["A", "B", "C"] }` |
+| `chart` | Simple bar chart | `{ title?, bars: [["Label", 10], ...] }` |
+| `alert` | Alert / system notification | `{ title, message?, level: "info"\|"warn"\|"error" }` |
+| `code` | Code block with syntax highlighting | `{ lang?, content: "code string" }` |
+| `text` | Free text paragraph | `{ content: "text" }` |
+| `actions` | Row of action buttons | `{ buttons: [{label: "OK", primary?: true}] }` |
+| `tags` | Group of tags/badges | `{ label?, tags: [{text: "JS", active?: true}] }` |
+
+### Rich Widgets (spec prop)
+
+These widgets handle more complex structured content and receive a `spec` parameter:
+
+| Widget | Usage |
+|--------|-------|
+| `stat-card` | Enhanced KPI with unit, delta, color variant |
+| `data-table` | Sortable data table with configurable columns |
+| `timeline` | Event timeline with statuses |
+| `profile` | Profile card with avatar, fields, statistics |
+| `trombinoscope` | Portrait grid (team, assembly) |
+| `json-viewer` | Interactive explorable JSON tree |
+| `hemicycle` | SVG hemicycle (parliamentary composition) |
+| `chart-rich` | Multi-series charts (bar, line, area, pie, donut) |
+| `cards` | Card grid (results, files, entities) |
+| `grid-data` | Tabular grid with highlights (heatmap) |
+| `sankey` | Sankey flow diagram (votes, journeys) |
+| `map` | Interactive Leaflet map with markers |
+| `log` | Log stream with level, timestamp, source |
+| `gallery` | Image gallery with lightbox |
+| `carousel` | Slide carousel with navigation and auto-play |
+| `d3` | Advanced D3.js visualizations (hex-heatmap, radial, treemap, force graph) |
+| `js-sandbox` | Secure JavaScript sandbox (custom code in iframe) |
+
+## Example 1: Display a Simple Statistic
+
+```svelte
+<script lang="ts">
+  import BlockRenderer from '@webmcp-auto-ui/ui/widgets/BlockRenderer.svelte';
+
+  const statBlock = {
+    id: 'stat_1',
+    type: 'stat' as const,
+    data: {
+      label: 'Active users',
+      value: '2,847',
+      trend: '↗',
+      trendDir: 'up'
+    }
+  };
+</script>
+
+<BlockRenderer type={statBlock.type} data={statBlock.data} />
+```
+
+**Result**: A block displaying "2,847 active users" with a trend indicator ↗.
+
+## Example 2: Interactive Data Table
+
+```svelte
+<script lang="ts">
+  import WidgetRenderer from '@webmcp-auto-ui/ui/widgets/WidgetRenderer.svelte';
+
+  const tableSpec = {
+    columns: [
+      { key: 'name', label: 'Name' },
+      { key: 'email', label: 'Email' },
+      { key: 'role', label: 'Role', align: 'center' }
+    ],
+    rows: [
+      { name: 'Alice Dupont', email: 'alice@example.com', role: 'Admin' },
+      { name: 'Bob Martin', email: 'bob@example.com', role: 'User' },
+      { name: 'Charlie Dubois', email: 'charlie@example.com', role: 'Editor' }
+    ]
+  };
+
+  function handleRowClick(row: Record<string, unknown>) {
+    console.log('Row clicked:', row);
+  }
+</script>
+
+<WidgetRenderer
+  type="data-table"
+  data={tableSpec}
+  oninteract={(type, action, payload) => {
+    if (action === 'rowclick') {
+      handleRowClick(payload as Record<string, unknown>);
+    }
+  }}
+/>
+```
+
+**Result**: A sortable table with configurable columns and click reactions.
+
+## Example 3: Card Grid with Interactions
+
+```svelte
+<script lang="ts">
+  import WidgetRenderer from '@webmcp-auto-ui/ui/widgets/WidgetRenderer.svelte';
+
+  const cardsData = {
+    title: 'Projects in progress',
+    cards: [
+      {
+        title: 'Frontend refactor',
+        description: 'Modernize React stack',
+        subtitle: 'In progress for 2 weeks',
+        tags: ['React', 'TypeScript', 'Styling']
+      },
+      {
+        title: 'API Documentation',
+        description: 'Complete REST endpoints',
+        subtitle: 'Phase 1 complete',
+        tags: ['Documentation', 'API', 'OpenAPI']
+      },
+      {
+        title: 'E2E Tests',
+        description: 'Add Playwright tests',
+        subtitle: 'Planned for Q2',
+        tags: ['Testing', 'Playwright', 'CI/CD']
+      }
+    ]
+  };
+
+  function handleCardClick(card: Record<string, unknown>) {
+    console.log('Card clicked:', card.title);
+    // Open a modal, navigate, etc.
+  }
+</script>
+
+<WidgetRenderer
+  type="cards"
+  data={cardsData}
+  oninteract={(type, action, payload) => {
+    if (action === 'cardclick') {
+      handleCardClick(payload as Record<string, unknown>);
+    }
+  }}
+/>
+```
+
+## Example 4: Rich Multi-Series Chart
+
+```svelte
+<script lang="ts">
+  import WidgetRenderer from '@webmcp-auto-ui/ui/widgets/WidgetRenderer.svelte';
+
+  const chartData = {
+    title: 'Revenue by quarter',
+    type: 'bar', // or 'line', 'area', 'pie', 'donut'
+    labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+    data: [
+      {
+        label: '2023',
+        values: [120, 150, 180, 220],
+        color: '#3b82f6'
+      },
+      {
+        label: '2024',
+        values: [200, 250, 290, 350],
+        color: '#10b981'
+      }
+    ]
+  };
+</script>
+
+<WidgetRenderer type="chart-rich" data={chartData} />
+```
+
+**Result**: A bar chart comparing 2023 vs 2024 revenue.
+
+## Example 5: Image Gallery
+
+```svelte
+<script lang="ts">
+  import WidgetRenderer from '@webmcp-auto-ui/ui/widgets/WidgetRenderer.svelte';
+
+  const galleryData = {
+    title: 'Product gallery',
+    columns: 3,
+    images: [
+      {
+        src: 'https://api.example.com/products/1.jpg',
+        alt: 'Product 1',
+        caption: 'Design chair'
+      },
+      {
+        src: 'https://api.example.com/products/2.jpg',
+        alt: 'Product 2',
+        caption: 'Wood table'
+      },
+      {
+        src: 'https://api.example.com/products/3.jpg',
+        alt: 'Product 3',
+        caption: 'Vintage lamp'
+      }
+    ]
+  };
+</script>
+
+<WidgetRenderer type="gallery" data={galleryData} />
+```
+
+## Example 6: Event Timeline
+
+```svelte
+<script lang="ts">
+  import WidgetRenderer from '@webmcp-auto-ui/ui/widgets/WidgetRenderer.svelte';
+
+  const timelineData = {
+    title: 'Project history',
+    events: [
+      {
+        date: '2024-01-15',
+        title: 'Launch',
+        description: 'Closed beta phase',
+        status: 'done'
+      },
+      {
+        date: '2024-02-20',
+        title: 'Public beta',
+        description: 'Open to 100 users',
+        status: 'done'
+      },
+      {
+        date: '2024-03-01',
+        title: 'GA (General Availability)',
+        description: 'Full public launch',
+        status: 'active'
+      },
+      {
+        date: '2024-04-01',
+        title: 'Premium features',
+        description: 'Paid features',
+        status: 'pending'
+      }
+    ]
+  };
+</script>
+
+<WidgetRenderer type="timeline" data={timelineData} />
+```
+
+## Example 7: Profile Card
+
+```svelte
+<script lang="ts">
+  import WidgetRenderer from '@webmcp-auto-ui/ui/widgets/WidgetRenderer.svelte';
+
+  const profileData = {
+    name: 'Alice Dupont',
+    subtitle: 'Chief Technology Officer',
+    fields: [
+      { label: 'Email', value: 'alice@example.com' },
+      { label: 'Department', value: 'Engineering' },
+      { label: 'Experience', value: '8 years' },
+      { label: 'Languages', value: 'FR, EN, ES' }
+    ],
+    stats: [
+      { label: 'Projects led', value: '12' },
+      { label: 'Team managed', value: '15' },
+      { label: 'Client satisfaction', value: '98%' }
+    ]
+  };
+</script>
+
+<WidgetRenderer type="profile" data={profileData} />
+```
+
+## Example 8: JSON Viewer (for exploring complex structures)
+
+```svelte
+<script lang="ts">
+  import WidgetRenderer from '@webmcp-auto-ui/ui/widgets/WidgetRenderer.svelte';
+
+  const apiResponse = {
+    title: 'API Response',
+    data: {
+      user: {
+        id: 42,
+        name: 'Alice',
+        email: 'alice@example.com',
+        preferences: {
+          theme: 'dark',
+          language: 'fr',
+          notifications: true
+        },
+        tags: ['vip', 'early-adopter']
+      },
+      metadata: {
+        timestamp: '2024-03-15T10:30:00Z',
+        version: 'v2'
+      }
+    },
+    expanded: true // Open tree by default
+  };
+</script>
+
+<WidgetRenderer type="json-viewer" data={apiResponse} />
+```
+
+## Integrate with Canvas Store
+
+To display widgets dynamically via the canvas store:
+
+```svelte
+<script lang="ts">
+  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+  import WidgetRenderer from '@webmcp-auto-ui/ui/widgets/WidgetRenderer.svelte';
+
+  // Add a widget to the canvas
+  function addMetricsWidget() {
+    canvas.addWidget('stat-card', {
+      label: 'Conversions',
+      value: '3,247',
+      unit: '%',
+      delta: '+12%',
+      trend: 'up',
+      variant: 'success'
+    });
+  }
+
+  // Add a table
+  function addTableWidget() {
+    canvas.addWidget('data-table', {
+      title: 'Users',
+      columns: [
+        { key: 'name', label: 'Name' },
+        { key: 'email', label: 'Email' }
+      ],
+      rows: [
+        { name: 'Alice', email: 'alice@example.com' },
+        { name: 'Bob', email: 'bob@example.com' }
+      ]
+    });
+  }
+</script>
+
+<button onclick={addMetricsWidget}>Add a metric</button>
+<button onclick={addTableWidget}>Add a table</button>
+
+<div class="space-y-4">
+  {#each canvas.blocks as block (block.id)}
+    <WidgetRenderer
+      id={block.id}
+      type={block.type}
+      data={block.data}
+      oninteract={(type, action, payload) => {
+        console.log(`${type}: ${action}`, payload);
+      }}
+    />
+  {/each}
+</div>
+```
+
+## Notes on Images
+
+**Important**: Never invent image URLs. Widgets like `profile`, `gallery`, `carousel`, and `cards` accept image URLs, but:
+
+1. ✅ Use only URLs returned by MCP tools
+2. ✅ Prefix with `https://`, `http://`, `data:`, or `/`
+3. ❌ Don't hallucinate URLs (e.g., `https://example.com/fake-image.jpg`)
+4. ❌ If no URL available, don't include the `image` field — the widget will display initials
+
+The `SafeImage` component automatically validates URLs and displays a graceful placeholder on error.
+
+## Summary
+
+| Need | Widget | Prop |
+|------|--------|------|
+| Display a KPI | `stat` or `stat-card` | `data` or `spec` |
+| Data table | `data-table` | `spec` + `oninteract` |
+| Simple chart | `chart` | `data` |
+| Advanced chart | `chart-rich` | `spec` |
+| Image gallery | `gallery` | `spec` |
+| Timeline | `timeline` | `spec` + `oninteract` |
+| Person card | `profile` | `spec` |
+| Card grid | `cards` | `spec` + `oninteract` |
+| JSON data | `json-viewer` | `spec` |
+
+For more details, see the schemas in `packages/agent/src/autoui-server.ts`.

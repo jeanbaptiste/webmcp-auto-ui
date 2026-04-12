@@ -1,0 +1,430 @@
+---
+title: Tool Calling
+description: Mécanique complète du dispatch des outils et résolution d'alias
+sidebar:
+  order: 3
+---
+
+## Vue d'ensemble
+
+Le **tool calling** est le processus par lequel l'agent LLM appelle des outils pour accomplir des tâches. WebMCP Auto-UI fournit un système unifié pour dispatcher des outils provenant de sources hétérogènes (MCP, WebMCP) avec résolution d'alias et lazy loading.
+
+## Nomenclature des outils
+
+Tous les outils sont préfixés selon leur source :
+
+```
+{serverName}_{protocol}_{toolName}
+```
+
+**Exemples** :
+- `recipes_mcp_search_recipes` → MCP serveur "recipes", outil "search_recipes"
+- `db_mcp_query_users` → MCP serveur "db", outil "query_users"
+- `autoui_webmcp_widget_display` → WebMCP server "autoui", outil "widget_display"
+
+**Sanitization du nom serveur** :
+- Minuscule
+- Remplace caractères invalides par `_`
+- Supprime les `_` doublés
+- Fallback : `"mcp"` si vide
+
+## Pipeline de dispatch
+
+```mermaid
+graph LR
+    A["Tool call<br/>from LLM"]
+    B["Parse prefix<br/>{server}_{protocol}_{tool}"]
+    C["Resolve alias<br/>localAliasMap"]
+    D{"Protocol ?"}
+    E["MCP:<br/>client.callTool"]
+    F["WebMCP:<br/>executeTool"]
+    G["Store result<br/>resultBuffer"]
+    H["Return to LLM"]
+
+    A --> B
+    B --> C
+    C --> D
+    D -->|mcp| E
+    D -->|webmcp| F
+    E --> G
+    F --> G
+    G --> H
+```
+
+### Étape 1 : Parse du préfixe
+
+```typescript
+const match = block.name.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
+if (!match) {
+  return `Error: unknown tool format "${name}".`;
+}
+const [, serverName, protocol, realToolName] = match;
+```
+
+### Étape 2 : Résolution d'alias
+
+L'agent maintient une **map d'alias locale** pour mapper les noms canoniques vers les noms réels :
+
+```typescript
+const localAliasMap = new Map<string, string>();
+
+// Exemple :
+// localAliasMap.set('myserver_mcp_search_recipes', 'myserver_mcp_list_all_recipes')
+// localAliasMap.set('myserver_mcp_get_recipe', 'myserver_mcp_fetch_recipe')
+
+const resolvedName = localAliasMap.get(name) ?? name;
+```
+
+Pourquoi ? Parce que différents serveurs MCP utilisent des noms différents pour des concepts similaires. L'agent remplace les noms canoniques par les vrais noms avant dispatch.
+
+### Étape 3 : Dispatch (MCP)
+
+```typescript
+if (protocol === 'mcp') {
+  if (!client) {
+    result = `Error: no MCP client available`;
+  } else {
+    const mcpResult = await client.callTool(realToolName, block.input);
+    const textContent = mcpResult.content?.find(c => c.type === 'text');
+    result = textContent?.text ?? JSON.stringify(mcpResult);
+  }
+}
+```
+
+### Étape 4 : Dispatch (WebMCP)
+
+```typescript
+if (protocol === 'webmcp') {
+  // Interception spéciale pour recall
+  if (realToolName === 'recall' && resultBuffer.size > 0) {
+    const recallId = (block.input as { id: string }).id;
+    result = resultBuffer.get(recallId) ?? `Aucun résultat pour '${recallId}'.`;
+  } else {
+    const webmcpServer = webmcpServers.get(serverName);
+    if (!webmcpServer) {
+      result = `Error: no WebMCP server "${serverName}" found.`;
+    } else {
+      const toolResult = await webmcpServer.executeTool(realToolName, block.input);
+      result = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+
+      // Gestion spéciale pour widget_display
+      if (realToolName === 'widget_display' && toolResult?.widget && !toolResult?.error) {
+        callbacks.onWidget?.(toolResult.widget, toolResult.data);
+      }
+    }
+  }
+}
+```
+
+### Étape 5 : Stockage et compression
+
+Les résultats sont stockés pour rappel futur et compressés pour économiser le contexte :
+
+```typescript
+resultBuffer.set(block.id, result); // Stockage complet
+
+// Compression après itération
+function compressOldToolResults(messages: ChatMessage[], resultBuffer?: Map<string, string>): void {
+  for (let i = 0; i < messages.length - 2; i++) {
+    for (const block of messages[i].content) {
+      if (block.type === 'tool_result' && block.content.length > 300) {
+        const preview = block.content.slice(0, 200);
+        block.content = `${preview}... [recall('${block.tool_use_id}') pour complet]`;
+      }
+    }
+  }
+}
+```
+
+## Tool Layers et résolution canonique
+
+Un **tool layer** décrit une source d'outils :
+
+```typescript
+interface ToolLayer {
+  protocol: 'mcp' | 'webmcp';
+  serverName: string;
+  description?: string;
+  tools: McpToolDef[] | WebMcpToolDef[];
+}
+```
+
+### Construction des layers
+
+**Exemple** :
+
+```typescript
+const layers = [
+  {
+    protocol: 'mcp',
+    serverName: 'recipes',
+    tools: [
+      { name: 'search_recipes', description: 'Search for recipes...' },
+      { name: 'get_recipe', description: 'Get recipe details...' },
+      // ...
+    ],
+  },
+  {
+    protocol: 'webmcp',
+    serverName: 'autoui',
+    tools: [
+      { name: 'widget_display', ... },
+      { name: 'canvas', ... },
+    ],
+  },
+];
+```
+
+### Résolution 4-couche
+
+Quand un MCP serveur expose des outils qui ressemblent à des recettes, l'agent les **normalise** sous les noms canoniques `search_recipes` et `get_recipe` via un processus 4-couche :
+
+#### Layer 1 : Correspondance exacte
+
+```typescript
+if (tool.name === 'search_recipes') {
+  found.set('search_recipes', { role: 'search_recipes', realToolName: tool.name });
+}
+```
+
+#### Layer 2 : Décomposition nom + ressource
+
+Tokenize le nom en tokens, cherche une paire (action, resource) :
+
+```typescript
+const tokens = tokenize('list_recipes'); // ['list', 'recipes']
+for (const a of tokens) {
+  for (const r of tokens) {
+    const role = matchRole(a, r);
+    // matchRole('list', 'recipes') → 'search_recipes'
+  }
+}
+```
+
+Actions de recherche : `search`, `list`, `find`, `browse`, `discover`, `query`, `explore`
+Actions d'obtention : `get`, `read`, `fetch`, `show`, `describe`, `detail`, `view`, `load`
+
+Ressources : `recipe`, `skill`, `template`, `prompt`, `workflow`, `playbook`, `pattern`, `example`
+
+#### Layer 3 : Scan description
+
+Si le nom ne correspond pas, scanner la description pour mots-clés :
+
+```typescript
+if (description.toLowerCase().includes('recipe') || 
+    description.includes('workflow')) {
+  // Identifier comme outil de recette
+}
+```
+
+#### Layer 4 : Fallback
+
+Si aucun outil de recette trouvé, lister les outils bruts du serveur dans le prompt système.
+
+### Exemple concret
+
+Considérons un serveur MCP "cookbook" avec outils :
+
+```json
+[
+  {
+    "name": "list_all_recipes",
+    "description": "Fetch all available recipes from the cookbook"
+  },
+  {
+    "name": "fetch_recipe",
+    "description": "Get the full details of a specific recipe"
+  }
+]
+```
+
+**Résolution** :
+1. Layer 1 : Pas de correspondance exacte
+2. Layer 2 :
+   - `list_all_recipes` → tokens `['list', 'all', 'recipes']` → paire `(list, recipes)` → `search_recipes` ✓
+   - `fetch_recipe` → tokens `['fetch', 'recipe']` → paire `(fetch, recipe)` → `get_recipe` ✓
+3. **Alias map créée** :
+   ```typescript
+   aliasMap.set('cookbook_mcp_search_recipes', 'cookbook_mcp_list_all_recipes');
+   aliasMap.set('cookbook_mcp_get_recipe', 'cookbook_mcp_fetch_recipe');
+   ```
+
+L'agent utilise ensuite les noms canoniques dans le prompt, mais les résout via cette map au dispatch.
+
+## System Prompt et découverte
+
+### Phase de découverte
+
+Au démarrage, l'agent n'a accès qu'aux **outils de découverte** :
+
+```typescript
+const disc = buildDiscoveryToolsWithAliases(layers);
+activeTools = disc.tools;
+```
+
+Outils inclus :
+- `{server}_mcp_search_recipes` (si détecté)
+- `{server}_mcp_get_recipe` (si détecté)
+- `{server}_webmcp_widget_display`
+- `{server}_webmcp_canvas`
+- `{server}_webmcp_recall`
+
+### Activation lazy
+
+Quand l'agent appelle un outil pour la première fois, tous les outils de ce serveur sont activés :
+
+```typescript
+const activateMatch = block.name.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
+if (activateMatch) {
+  const [, serverName, protocol] = activateMatch;
+  const serverKey = `${serverName}_${protocol}`;
+  if (!activatedServers.has(serverKey)) {
+    activatedServers.add(serverKey);
+    const layer = layers.find(l => l.serverName === serverName && l.protocol === protocol);
+    if (layer) {
+      activeTools = activateServerTools(activeTools, layer);
+    }
+  }
+}
+```
+
+**Bénéfice** : Limite la taille du prompt initial, active les outils à la demande.
+
+### System Prompt
+
+Le prompt système inclut :
+
+1. **Consignes métier** : Comment procéder (étapes 1-4)
+2. **Énumération des outils** :
+   ```
+   Découverte: {server}_mcp_search_recipes(), {server}_mcp_get_recipe()
+   Action: {server}_webmcp_widget_display(), {server}_webmcp_canvas()
+   ```
+3. **Fallback serveurs bruts** : Si pas de recettes trouvées
+4. **Gestion d'erreur** : Relancer outils avec schéma corrigé
+
+Voir `buildSystemPromptWithAliases()` pour la génération exacte.
+
+## Callbacks et intégration UI
+
+### Callbacks disponibles
+
+```typescript
+interface AgentCallbacks {
+  onIterationStart?: (iteration: number, maxIterations: number) => void;
+  onLLMRequest?: (messages: ChatMessage[], tools: ProviderTool[]) => void;
+  onLLMResponse?: (response: LLMResponse, latencyMs: number, tokens?: {...}) => void;
+  onToolCall?: (call: ToolCall) => void;
+  onWidget?: (type: string, data: Record<string, unknown>) => { id: string } | void;
+  onText?: (text: string) => void;
+  onToken?: (token: string) => void;
+  onDone?: (metrics: AgentMetrics) => void;
+  // Canvas mutation tools
+  onClear?: () => void;
+  onUpdate?: (id: string, data: Record<string, unknown>) => void;
+  onMove?: (id: string, x: number, y: number) => void;
+  onResize?: (id: string, w: number, h: number) => void;
+  onStyle?: (id: string, styles: Record<string, string>) => void;
+}
+```
+
+### Exemple complet
+
+```typescript
+const result = await runAgentLoop(userMessage, {
+  provider,
+  layers,
+  callbacks: {
+    onToken: (token) => {
+      // Streaming en direct
+      console.log(token);
+    },
+    onWidget: (type, data) => {
+      // Un widget a été affiché
+      canvas.addWidget(type, data);
+      return { id: canvas.blocks[canvas.blocks.length - 1].id };
+    },
+    onToolCall: (call) => {
+      console.log(`✓ ${call.name} → ${call.result}`);
+    },
+    onDone: (metrics) => {
+      console.log(`Agent terminé : ${metrics.totalTokens} tokens, ${metrics.iterations} itérations`);
+    },
+  },
+});
+```
+
+## Gestion des erreurs
+
+### Validation de schéma
+
+Tous les inputs widget sont validés :
+
+```typescript
+const validation = validateJsonSchema(params, widget.inputSchema);
+if (!validation.valid) {
+  return {
+    error: 'Validation failed',
+    details: validation.errors,
+    expected_schema: widget.inputSchema,
+  };
+}
+```
+
+L'agent reçoit le schéma attendu et peut corriger son appel.
+
+### Truncation des résultats
+
+Les résultats longs sont tronqués pour économiser le contexte :
+
+```typescript
+function truncateResult(result: string, maxLen: number = 10_000): string {
+  if (result.length <= maxLen) return result;
+  
+  // Essayer de découper un JSON array intelligemment
+  try {
+    const parsed = JSON.parse(result);
+    if (Array.isArray(parsed)) {
+      let sliced = parsed;
+      while (JSON.stringify(sliced).length > maxLen && sliced.length > 1) {
+        sliced = sliced.slice(0, Math.ceil(sliced.length / 2));
+      }
+      return JSON.stringify(sliced) + `\n... (tronqué, ${parsed.length} items total)`;
+    }
+  } catch { /* not JSON */ }
+  
+  return result.slice(0, maxLen) + '\n... (tronqué)';
+}
+```
+
+## Recall et persistence
+
+### Result Buffer
+
+Chaque itération enregistre ses résultats dans une map :
+
+```typescript
+const resultBuffer = new Map<string, string>();
+
+// Dans le loop
+resultBuffer.set(block.id, result); // Stockage complet
+
+// Compression
+const preview = result.slice(0, 200);
+block.content = `${preview}... [recall('${block.id}') pour le complet]`;
+```
+
+### Tool recall
+
+Quand l'agent appelle `recall(id)`, le résultat complet est récupéré :
+
+```typescript
+if (realToolName === 'recall' && resultBuffer.size > 0) {
+  const recallId = (block.input as { id: string }).id;
+  result = resultBuffer.get(recallId) ?? `Aucun résultat pour '${recallId}'.`;
+}
+```
+
+Utile pour inspecter des résultats anciens sans rejouer l'outil.
+
+===

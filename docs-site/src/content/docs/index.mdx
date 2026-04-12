@@ -1,78 +1,152 @@
 ---
 title: WebMCP Auto-UI
-description: Framework Svelte 5 pour composer des interfaces pilotees par IA via MCP
-template: splash
-hero:
-  tagline: Framework Svelte 5 pour composer des interfaces pilotees par IA via le Model Context Protocol
-  actions:
-    - text: Guide d'installation
-      link: /webmcp-auto-ui/guide/installation/
-      icon: right-arrow
-      variant: primary
-    - text: Demos live
-      link: https://demos.hyperskills.net/
-      icon: external
-      variant: minimal
+description: Système d'auto-génération d'interface utilisateur par agents IA via le protocole Model Context Protocol
+sidebar:
+  order: 0
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+## À propos
 
-## Architecture MVC + LLM + HyperSkills
+**WebMCP Auto-UI** est un système complet d'auto-génération et d'orchestration d'interfaces utilisateur par agents IA utilisant le protocole **Model Context Protocol (MCP)**.
+
+Le projet combine trois piliers :
+
+1. **Agent Loop** — Une boucle LLM itérative qui appelle des outils MCP pour découvrir et exécuter des recettes
+2. **Tool Layers** — Un système de couches de composants normalisés (MCP, WebMCP) avec résolution d'alias et lazy loading
+3. **Canvas & Widgets** — Un rendu multi-framework d'interfaces réactives avec support vanilla et Svelte/React/Vue/Astro
+
+### Vision
+
+Les utilisateurs posent des questions naturelles. L'agent :
+- 🔍 **Découvre** les outils disponibles via MCP
+- 🎯 **Choisit** la meilleure recette/widget
+- ⚙️ **Exécute** les opérations nécessaires
+- 🎨 **Affiche** les résultats dans une UI contextuelle
+
+Le tout sans code manuel — les interfaces sont générées à partir de **schémas JSON et de recettes Markdown**.
+
+## Structure du projet
 
 ```
-User prompt --> Agent Loop --> LLM (Claude/Gemma/Ollama)
-                  |                    |
-                  |              tool_use blocks
-                  |                    |
-         +--------+--------+          |
-         |                  |          v
-    McpLayer (DATA)    UILayer (UI)
-    MCP Servers        component()
-         |                  |
-    Donnees brutes     Blocs rendus
-         |                  |
-         +--------+---------+
-                  |
-            BlockRenderer
-                  |
-            Canvas / UI
+packages/
+  ├── core/              # Types WebMCP, validation, client MCP streamable HTTP
+  ├── agent/             # Boucle agent, tool layers, autoui server
+  ├── ui/                # Composants Svelte (WidgetRenderer, primitives)
+  ├── sdk/               # Canvas store, HyperSkill encoding
+  └── widgets-*/         # Packs de widgets spécialisés (D3, Three.js, Leaflet, etc.)
+
+apps/
+  ├── flex/              # SvelteKit demo (mode chat)
+  ├── viewer/            # SvelteKit viewer (skill loading)
+  ├── home/              # Astro homepage statique
+  ├── multi-*/           # Multi-framework showcases (Astro, React, Vue, WebComponents)
+  └── ...
 ```
 
-<CardGrid stagger>
-  <Card title="Agent LLM" icon="rocket">
-    Boucle agent iterative avec 4 providers LLM : Claude (remote), Gemma LiteRT (WASM in-browser), Ollama et Llamafile (local). Mode smart (`component()` unique) ou explicit (31 `render_*` tools).
-  </Card>
+## Concepts clés
 
-  <Card title="34+ Composants UI" icon="puzzle">
-    Blocs simples (stat, chart, table, kv...), widgets riches (hemicycle, sankey, D3, carte Leaflet...), window manager et theme system complet avec 11 tokens CSS.
-  </Card>
+### MCP (Model Context Protocol)
+Protocole standardisé pour exposer des **outils** (fonctions sérialisées en JSON Schema) que les LLM peuvent appeler.
 
-  <Card title="Serveurs MCP" icon="setting">
-    Client MCP Streamable HTTP avec multi-serveurs simultanes. Decouverte d'outils, recettes serveur, et routage automatique via `McpMultiClient`.
-  </Card>
+- **Serveur MCP** : expose des outils (e.g. base de données, API, calcul)
+- **Client MCP** : interroge le serveur, exécute les outils
+- **Format** : JSON-RPC sur HTTP streamable (sans polling)
 
-  <Card title="HyperSkills" icon="document">
-    Encodage/decodage de skills en URL (`?hs=`), registre CRUD, versioning SHA-256, canvas store reactif (Svelte 5 runes + vanilla).
-  </Card>
-</CardGrid>
+### WebMCP
+Extension locale du MCP pour la **couche présentation** :
+- Enregistre des **widgets** (composants UI) avec schémas d'entrée
+- Fournit des **outils d'action** : `widget_display()`, `canvas()`, `recall()`
+- Rendus par Svelte (natif) ou vanilla JavaScript
 
-## Packages
+### Tool Layers
+Abstraction unifiée pour les outils provenant de multiples sources :
 
-| Package | Description |
-|---------|-------------|
-| [`@webmcp-auto-ui/core`](/webmcp-auto-ui/packages/core/) | W3C WebMCP polyfill + MCP Streamable HTTP client |
-| [`@webmcp-auto-ui/agent`](/webmcp-auto-ui/packages/agent/) | Boucle agent, 4 providers LLM, ToolLayers, recettes, `component()` |
-| [`@webmcp-auto-ui/sdk`](/webmcp-auto-ui/packages/sdk/) | HyperSkill encode/decode, skills registry, canvas store |
-| [`@webmcp-auto-ui/ui`](/webmcp-auto-ui/packages/ui/) | 34+ composants Svelte 5, theme system, window manager |
+```typescript
+interface ToolLayer {
+  protocol: 'mcp' | 'webmcp';
+  serverName: string;
+  tools: McpToolDef[] | WebMcpToolDef[];
+}
+```
 
-## Apps de demonstration
+Les outils sont préfixés : `{serverName}_{protocol}_{toolName}` pour éviter les collisions.
 
-| App | Description |
-|-----|-------------|
-| [flex2](/webmcp-auto-ui/apps/flex2/) | Layers, `component()` unique, debug panel, mode composeur/consommateur |
-| [viewer2](/webmcp-auto-ui/apps/viewer2/) | Lecteur HyperSkills read-only avec CRUD, DAG, paste URI |
-| [showcase2](/webmcp-auto-ui/apps/showcase2/) | Demo dynamique avec agent + MCP + 3 themes |
-| [recipes](/webmcp-auto-ui/apps/recipes/) | Explorateur de recettes MCP + WebMCP avec test live |
-| [todo2](/webmcp-auto-ui/apps/todo2/) | Todo WebMCP, template minimal |
+### Agent Loop
+Boucle d'itération LLM :
 
-Toutes les demos sont deployees sur [demos.hyperskills.net](https://demos.hyperskills.net/).
+```
+LLM.chat(messages, tools) → {text, tool_calls}
+  ↓
+FOR each tool_call:
+  dispatch(tool_call) → result
+  store_result(resultBuffer)
+  add_to_history()
+↓
+COMPRESS old results to save context
+↓
+(repeat until end_turn or max_iterations)
+```
+
+### Recettes
+Document Markdown avec frontmatter YAML décrivant un widget :
+
+```markdown
+---
+widget: stat
+description: Statistique clé (KPI)
+schema:
+  type: object
+  required: [label, value]
+  properties:
+    label: { type: string }
+    value: { type: string }
+---
+
+## Quand utiliser
+Pour afficher un nombre clé (KPI, total, compteur).
+
+## Comment
+Appeler widget_display('stat', {label: "Total", value: "42"}).
+```
+
+## Flux utilisateur typique
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Agent
+    participant MCP as Serveur MCP
+    participant LLM
+    participant Canvas
+
+    User->>Agent: "Affiche les 10 meilleurs clients"
+    Agent->>LLM: search_recipes() — qu'as-tu de disponible ?
+    LLM->>Agent: "Trouve 'get_clients', 'data_table'"
+    Agent->>MCP: get_clients({limit: 10})
+    MCP-->>Agent: [{name: "Acme", revenue: 1M}, ...]
+    Agent->>LLM: Voici les données. Rends-les.
+    LLM->>Agent: widget_display('data-table', {rows: [...]})
+    Agent->>Canvas: Affiche tableau
+    Canvas-->>User: 📊 Tableau interactif
+```
+
+## Intégration multi-framework
+
+Le projet supporte plusieurs renderers :
+
+- **Svelte** (`@webmcp-auto-ui/ui`) : `<WidgetRenderer>` avec tous les widgets natifs
+- **Vanilla JS** (`@webmcp-auto-ui/core`) : `mountWidget()` pour montage direct dans un DOM element
+- **Widget Packs** : D3, Three.js, Leaflet, Plotly, Mermaid, Mapbox, etc. enregistrés dynamiquement
+- **Astro, React, Vue, Web Components** : intégration via `multi-*` showcases
+
+## Démarrage rapide
+
+Voir [Getting Started](/guide/getting-started/) pour installer et lancer votre première démo.
+
+## Documentation
+
+- **[Architecture](/guide/architecture/)** — Diagrammes détaillés du système
+- **[Tool Calling](/guide/tool-calling/)** — Mécanique de dispatch des outils et résolution d'alias
+- **[Déploiement](/guide/deploy/)** — Scripts et chemins de déploiement
+
+===

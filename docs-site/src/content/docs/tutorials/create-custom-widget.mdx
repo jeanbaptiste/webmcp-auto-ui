@@ -1,0 +1,319 @@
+---
+title: Créer un widget personnalisé
+description: Construire et enregistrer un widget custom pour le système de composants WebMCP Auto-UI
+sidebar:
+  order: 1
+---
+
+Un **widget** dans WebMCP Auto-UI est un composant réutilisable qui affiche des données sur le canvas. Ce tutorial montre comment créer un widget custom, l'enregistrer dans le système, et l'utiliser dans votre application.
+
+## Architecture des widgets
+
+WebMCP Auto-UI supporte deux modes de rendu :
+
+- **Svelte** (par défaut) : via `<WidgetRenderer>` et `<BlockRenderer>` dans `@webmcp-auto-ui/ui`
+- **Vanilla** : via `mountWidget()` dans `@webmcp-auto-ui/core` (sans dépendance framework)
+
+Les widgets natifs sont définis dans le serveur WebMCP `autoui` (`packages/agent/src/autoui-server.ts`), qui expose environ 30 widgets (stat, chart, gallery, carousel, etc.).
+
+## Exemple : créer un widget "Fiche statistique enrichie"
+
+Supposons que vous voulez un widget qui affiche un titre, une valeur principale, une tendance, et une mini-barre de progression.
+
+### Étape 1 : Définir le schéma JSON
+
+Le schéma définit les paramètres attendus par le widget. Il doit respecter le format JSON Schema :
+
+```typescript
+const widgetSchema = {
+  type: 'object',
+  required: ['title', 'value'],
+  properties: {
+    title: {
+      type: 'string',
+      description: 'Titre du widget'
+    },
+    value: {
+      type: 'number',
+      description: 'Valeur principale affichée'
+    },
+    max: {
+      type: 'number',
+      description: 'Valeur maximale de la barre (par défaut: 100)',
+      default: 100
+    },
+    unit: {
+      type: 'string',
+      description: 'Unité de mesure (ex: "%", "ms")'
+    },
+    color: {
+      type: 'string',
+      description: 'Couleur hexadécimale (ex: "#3b82f6")',
+      default: '#3b82f6'
+    },
+    trend: {
+      type: 'string',
+      enum: ['up', 'down', 'flat'],
+      description: 'Direction de la tendance'
+    }
+  }
+};
+```
+
+### Étape 2 : Créer le composant Svelte
+
+Créez un fichier `StatProgress.svelte` :
+
+```svelte
+<script lang="ts">
+  interface Props {
+    data: {
+      title: string;
+      value: number;
+      max?: number;
+      unit?: string;
+      color?: string;
+      trend?: 'up' | 'down' | 'flat';
+    };
+  }
+
+  let { data }: Props = $props();
+
+  const percentage = $derived(Math.min(100, (data.value / (data.max ?? 100)) * 100));
+  
+  const trendIcon = $derived.by(() => {
+    switch (data.trend) {
+      case 'up': return '↗';
+      case 'down': return '↘';
+      default: return '→';
+    }
+  });
+
+  const trendColor = $derived.by(() => {
+    switch (data.trend) {
+      case 'up': return 'text-green-500';
+      case 'down': return 'text-red-500';
+      default: return 'text-gray-500';
+    }
+  });
+</script>
+
+<div class="p-4 rounded-lg border border-gray-200 bg-white shadow-sm">
+  <div class="flex items-center justify-between mb-2">
+    <h3 class="font-semibold text-gray-900">{data.title}</h3>
+    <span class={`text-lg font-bold ${trendColor}`}>
+      {trendIcon}
+    </span>
+  </div>
+
+  <div class="flex items-baseline gap-2 mb-3">
+    <span class="text-3xl font-bold" style="color: {data.color ?? '#3b82f6'}">
+      {data.value}
+    </span>
+    {#if data.unit}
+      <span class="text-sm text-gray-600">{data.unit}</span>
+    {/if}
+  </div>
+
+  <div class="w-full bg-gray-100 rounded-full h-2">
+    <div
+      class="h-2 rounded-full transition-all"
+      style="width: {percentage}%; background-color: {data.color ?? '#3b82f6'}"
+    />
+  </div>
+
+  <div class="text-xs text-gray-500 mt-2 text-right">
+    {percentage.toFixed(0)}% de {data.max ?? 100}
+  </div>
+</div>
+
+<style>
+  :global {
+    /* Optionnel : styles globaux si nécessaire */
+  }
+</style>
+```
+
+### Étape 3 : Enregistrer le widget
+
+#### Option A : Via un serveur WebMCP
+
+Si vous créez un serveur WebMCP personnalisé, enregistrez le widget avec une recette en frontmatter :
+
+```typescript
+import { createWebMcpServer } from '@webmcp-auto-ui/core';
+import StatProgress from './StatProgress.svelte';
+
+const myServer = createWebMcpServer('my-widgets', {
+  description: 'Mes widgets personnalisés'
+});
+
+const recipe = `---
+widget: stat-progress
+description: Fiche statistique enrichie avec barre de progression et tendance.
+schema:
+  type: object
+  required:
+    - title
+    - value
+  properties:
+    title:
+      type: string
+    value:
+      type: number
+    max:
+      type: number
+      default: 100
+    unit:
+      type: string
+    color:
+      type: string
+      default: "#3b82f6"
+    trend:
+      type: string
+      enum: [up, down, flat]
+---
+
+## Quand utiliser
+
+Pour afficher une métrique principale avec barre de progression et indicateur de tendance.
+
+## Comment
+
+Appeler widget_display('stat-progress', {title: "Uptime", value: 99.8, max: 100, unit: "%", trend: "up", color: "#10b981"})
+`;
+
+myServer.registerWidget(recipe, StatProgress);
+```
+
+#### Option B : Dans une app (canvas store)
+
+Si vous utilisez le canvas store, ajoutez le widget à la liste des types et rendez-le via `<WidgetRenderer>` :
+
+```svelte
+<script lang="ts">
+  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+  import WidgetRenderer from '@webmcp-auto-ui/ui/widgets/WidgetRenderer.svelte';
+  import StatProgress from './StatProgress.svelte';
+
+  // Créer une couche WebMCP pour enregistrer le widget
+  function createCustomWidgets() {
+    const server = createWebMcpServer('custom', {
+      description: 'Widgets personnalisés de l\'app'
+    });
+
+    const recipe = `---
+widget: stat-progress
+description: Statistique avec barre de progression
+schema:
+  type: object
+  required: [title, value]
+  properties:
+    title: { type: string }
+    value: { type: number }
+    max: { type: number, default: 100 }
+    unit: { type: string }
+    color: { type: string, default: "#3b82f6" }
+    trend: { type: string, enum: [up, down, flat] }
+---
+
+Fiche statistique enrichie.`;
+
+    server.registerWidget(recipe, StatProgress);
+    return server;
+  }
+
+  const servers = [createCustomWidgets()];
+</script>
+
+<div class="space-y-4">
+  {#each canvas.blocks as block (block.id)}
+    <WidgetRenderer 
+      id={block.id}
+      type={block.type}
+      data={block.data}
+      {servers}
+      oninteract={(type, action, payload) => {
+        console.log(`Widget ${type} a déclenché l'action ${action}:`, payload);
+      }}
+    />
+  {/each}
+</div>
+```
+
+### Étape 4 : Utiliser le widget dans l'agent
+
+Une fois enregistré, l'agent peut appeler le widget via `widget_display()` :
+
+```typescript
+import { runAgentLoop } from '@webmcp-auto-ui/agent';
+
+// L'agent appelle automatiquement widget_display() avec les bons paramètres
+const result = await runAgentLoop(
+  'Affiche les statistiques de performance du système',
+  {
+    provider: llmProvider,
+    layers: [
+      myServer.layer() // Inclure la couche WebMCP
+    ],
+    callbacks: {
+      onWidget: (type, data) => {
+        if (type === 'stat-progress') {
+          canvas.addWidget('stat-progress', data);
+        }
+      }
+    }
+  }
+);
+```
+
+## Avancé : ajouter des interactions
+
+Les widgets peuvent émettre des événements et réagir aux interactions utilisateur :
+
+```svelte
+<script lang="ts">
+  interface Props {
+    data: Record<string, unknown>;
+    oninteract?: (action: string, payload: unknown) => void;
+  }
+
+  let { data, oninteract }: Props = $props();
+
+  function handleClick() {
+    oninteract?.('expand', { widgetId: data.id });
+  }
+</script>
+
+<div class="cursor-pointer hover:shadow-md transition" onclick={handleClick}>
+  <!-- Contenu du widget -->
+</div>
+```
+
+Puis dans le parent :
+
+```svelte
+<WidgetRenderer
+  id={block.id}
+  type={block.type}
+  data={block.data}
+  oninteract={(type, action, payload) => {
+    if (action === 'expand') {
+      // Ouvrir un modal, scroller vers le widget, etc.
+      console.log('Widget expand:', payload);
+    }
+  }}
+/>
+```
+
+## Résumé
+
+| Étape | Action |
+|-------|--------|
+| 1 | Définir le schéma JSON des paramètres |
+| 2 | Créer le composant Svelte (reçoit `data` en props) |
+| 3 | Enregistrer via `server.registerWidget(recipe, Component)` |
+| 4 | Rendre via `<WidgetRenderer>` ou l'agent via `widget_display()` |
+| 5 | (Optionnel) Ajouter des interactions avec `oninteract` |
+
+Pour plus de détails, consultez les widgets natifs dans `packages/agent/src/autoui-server.ts` et les composants Svelte dans `packages/ui/src/widgets/`.
