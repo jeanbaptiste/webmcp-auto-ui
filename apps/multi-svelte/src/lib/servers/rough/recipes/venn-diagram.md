@@ -1,5 +1,5 @@
 ---
-id: rough-venn-diagram
+widget: rough-venn-diagram
 name: Venn Diagram
 description: Overlapping circles showing set relationships
 data:

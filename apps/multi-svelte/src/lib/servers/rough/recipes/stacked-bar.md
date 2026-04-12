@@ -1,5 +1,5 @@
 ---
-id: rough-stacked-bar
+widget: rough-stacked-bar
 name: Stacked Bar Chart
 description: Stacked bars showing composition of each category
 data:

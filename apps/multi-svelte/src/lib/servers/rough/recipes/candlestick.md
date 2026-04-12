@@ -1,5 +1,5 @@
 ---
-id: rough-candlestick
+widget: rough-candlestick
 name: Candlestick Chart
 description: Financial OHLC candlestick chart
 data:

@@ -1,5 +1,5 @@
 ---
-id: rough-radar-chart
+widget: rough-radar-chart
 name: Radar Chart
 description: Spider/radar chart showing multivariate data on radial axes
 data:

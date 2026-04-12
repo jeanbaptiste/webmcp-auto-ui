@@ -1,5 +1,5 @@
 ---
-id: rough-bar-chart
+widget: rough-bar-chart
 name: Bar Chart
 description: Vertical bar chart with sketchy hand-drawn style
 data:

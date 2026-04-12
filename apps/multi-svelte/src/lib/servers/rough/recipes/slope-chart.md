@@ -1,5 +1,5 @@
 ---
-id: rough-slope-chart
+widget: rough-slope-chart
 name: Slope Chart
 description: Shows change between two points in time per item
 data:

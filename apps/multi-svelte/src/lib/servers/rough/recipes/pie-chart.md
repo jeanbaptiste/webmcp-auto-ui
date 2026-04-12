@@ -1,5 +1,5 @@
 ---
-id: rough-pie-chart
+widget: rough-pie-chart
 name: Pie Chart
 description: Circular chart showing proportions of a whole
 data:

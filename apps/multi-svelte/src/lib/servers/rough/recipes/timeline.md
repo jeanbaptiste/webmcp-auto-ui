@@ -1,5 +1,5 @@
 ---
-id: rough-timeline
+widget: rough-timeline
 name: Timeline
 description: Vertical timeline of events with dates and descriptions
 data:

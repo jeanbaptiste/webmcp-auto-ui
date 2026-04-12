@@ -1,5 +1,5 @@
 ---
-id: rough-box-plot
+widget: rough-box-plot
 name: Box Plot
 description: Statistical distribution showing median, quartiles, and range
 data:

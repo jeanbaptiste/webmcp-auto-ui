@@ -1,5 +1,5 @@
 ---
-id: rough-waterfall
+widget: rough-waterfall
 name: Waterfall Chart
 description: Shows cumulative effect of sequential positive/negative values
 data:

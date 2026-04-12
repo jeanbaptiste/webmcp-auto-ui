@@ -1,5 +1,5 @@
 ---
-id: rough-gauge
+widget: rough-gauge
 name: Gauge
 description: Semicircular gauge showing a single value against a maximum
 data:

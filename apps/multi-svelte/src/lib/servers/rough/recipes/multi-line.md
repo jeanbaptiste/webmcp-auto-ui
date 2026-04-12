@@ -1,5 +1,5 @@
 ---
-id: rough-multi-line
+widget: rough-multi-line
 name: Multi-Line Chart
 description: Multiple line series on the same axes for comparison
 data:

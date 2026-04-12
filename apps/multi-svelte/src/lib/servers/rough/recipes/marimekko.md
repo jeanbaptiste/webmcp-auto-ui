@@ -1,5 +1,5 @@
 ---
-id: rough-marimekko
+widget: rough-marimekko
 name: Marimekko Chart
 description: Variable-width stacked bar chart showing market share
 data:

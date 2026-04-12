@@ -1,5 +1,5 @@
 ---
-id: rough-bubble-chart
+widget: rough-bubble-chart
 name: Bubble Chart
 description: Scatter plot with variable-size bubbles representing a third dimension
 data:

@@ -1,5 +1,5 @@
 ---
-id: rough-scatter-plot
+widget: rough-scatter-plot
 name: Scatter Plot
 description: XY scatter plot showing relationships between variables
 data:

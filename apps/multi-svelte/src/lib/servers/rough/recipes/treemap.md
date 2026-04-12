@@ -1,5 +1,5 @@
 ---
-id: rough-treemap
+widget: rough-treemap
 name: Treemap
 description: Nested rectangles representing hierarchical data by area
 data:

@@ -1,5 +1,5 @@
 ---
-id: rough-donut-chart
+widget: rough-donut-chart
 name: Donut Chart
 description: Pie chart with hollow center showing total
 data:

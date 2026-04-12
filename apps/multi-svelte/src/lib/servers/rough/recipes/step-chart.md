@@ -1,5 +1,5 @@
 ---
-id: rough-step-chart
+widget: rough-step-chart
 name: Step Chart
 description: Line chart with step transitions instead of diagonal lines
 data:

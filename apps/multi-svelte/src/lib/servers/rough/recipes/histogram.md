@@ -1,5 +1,5 @@
 ---
-id: rough-histogram
+widget: rough-histogram
 name: Histogram
 description: Distribution of values across bins
 data:

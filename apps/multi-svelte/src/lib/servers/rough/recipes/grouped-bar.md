@@ -1,5 +1,5 @@
 ---
-id: rough-grouped-bar
+widget: rough-grouped-bar
 name: Grouped Bar Chart
 description: Side-by-side bars comparing multiple series across categories
 data:

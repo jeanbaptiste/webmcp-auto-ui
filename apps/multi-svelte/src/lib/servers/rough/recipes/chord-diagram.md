@@ -1,5 +1,5 @@
 ---
-id: rough-chord-diagram
+widget: rough-chord-diagram
 name: Chord Diagram
 description: Circular diagram showing flows between groups
 data:

@@ -1,5 +1,5 @@
 ---
-id: rough-network-graph
+widget: rough-network-graph
 name: Network Graph
 description: Nodes and edges arranged in a circle layout
 data:

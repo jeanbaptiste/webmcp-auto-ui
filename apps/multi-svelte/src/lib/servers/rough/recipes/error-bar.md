@@ -1,5 +1,5 @@
 ---
-id: rough-error-bar
+widget: rough-error-bar
 name: Error Bar Chart
 description: Points with error bars showing uncertainty range
 data:

@@ -1,5 +1,5 @@
 ---
-id: rough-tree-diagram
+widget: rough-tree-diagram
 name: Tree Diagram
 description: Hierarchical tree with parent-child node connections
 data:

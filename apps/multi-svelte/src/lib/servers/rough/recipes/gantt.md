@@ -1,5 +1,5 @@
 ---
-id: rough-gantt
+widget: rough-gantt
 name: Gantt Chart
 description: Horizontal bars showing task schedules and durations
 data:

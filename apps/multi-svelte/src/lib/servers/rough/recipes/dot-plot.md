@@ -1,5 +1,5 @@
 ---
-id: rough-dot-plot
+widget: rough-dot-plot
 name: Dot Plot
 description: Horizontal dot plot comparing values across categories
 data:

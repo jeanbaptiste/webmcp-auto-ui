@@ -1,5 +1,5 @@
 ---
-id: rough-sparkline
+widget: rough-sparkline
 name: Sparkline
 description: Tiny inline chart showing trend at a glance
 data:

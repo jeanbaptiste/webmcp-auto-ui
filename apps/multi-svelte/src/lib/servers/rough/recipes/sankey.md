@@ -1,5 +1,5 @@
 ---
-id: rough-sankey
+widget: rough-sankey
 name: Sankey Diagram
 description: Flow diagram showing quantities between nodes
 data:

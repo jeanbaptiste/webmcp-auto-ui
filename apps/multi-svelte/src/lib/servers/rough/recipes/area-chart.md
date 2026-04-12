@@ -1,5 +1,5 @@
 ---
-id: rough-area-chart
+widget: rough-area-chart
 name: Area Chart
 description: Filled area chart showing magnitude over time
 data:

@@ -1,5 +1,5 @@
 ---
-id: rough-line-chart
+widget: rough-line-chart
 name: Line Chart
 description: Single line chart showing trend over time
 data:

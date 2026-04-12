@@ -1,5 +1,5 @@
 ---
-id: rough-progress-bar
+widget: rough-progress-bar
 name: Progress Bar
 description: Horizontal progress bars showing completion percentage
 data:

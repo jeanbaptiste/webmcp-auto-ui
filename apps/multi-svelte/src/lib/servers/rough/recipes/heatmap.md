@@ -1,5 +1,5 @@
 ---
-id: rough-heatmap
+widget: rough-heatmap
 name: Heatmap
 description: Matrix of colored cells representing value intensity
 data:
