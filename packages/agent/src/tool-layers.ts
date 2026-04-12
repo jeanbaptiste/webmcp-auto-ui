@@ -7,7 +7,7 @@ import { sanitizeSchema } from '@webmcp-auto-ui/core';
 
 /** Sanitize a server name for use in tool name prefixes.
  *  Tool names must match ^[a-zA-Z0-9_-]{1,128}$ per the Anthropic API. */
-function sanitizeServerName(name: string): string {
+export function sanitizeServerName(name: string): string {
   let clean = name.replace(/\s*(MCP|mcp)\s*(Server|server)?\s*$/i, '').replace(/[_-]+(mcp|MCP)$/i, '').trim();
   if (!clean) clean = name;
   return clean.toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '') || 'mcp';

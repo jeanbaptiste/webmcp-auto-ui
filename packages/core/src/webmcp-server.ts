@@ -386,6 +386,19 @@ export function createWebMcpServer(
         },
       },
       {
+        name: 'list_recipes',
+        description: 'List all available widget recipes with their name and description.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+        execute: async () => {
+          const results = [...widgets.values()]
+            .map(w => ({ name: w.name, description: w.description, group: w.group }));
+          return results;
+        },
+      },
+      {
         name: 'get_recipe',
         description: 'Get the full recipe for a widget: JSON schema + usage instructions.',
         inputSchema: {

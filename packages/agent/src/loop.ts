@@ -9,7 +9,7 @@ import type {
   LLMProvider, ProviderTool, McpToolDef, AgentCallbacks,
 } from './types.js';
 import type { ToolLayer } from './tool-layers.js';
-import { buildToolsFromLayers, buildSystemPromptWithAliases, buildDiscoveryToolsWithAliases, buildSystemPrompt, buildDiscoveryTools, activateServerTools, toProviderTools } from './tool-layers.js';
+import { buildToolsFromLayers, buildSystemPromptWithAliases, buildDiscoveryToolsWithAliases, buildSystemPrompt, buildDiscoveryTools, activateServerTools, toProviderTools, sanitizeServerName } from './tool-layers.js';
 
 // Re-export buildSystemPrompt for backward compat
 export { buildSystemPrompt } from './tool-layers.js';
@@ -132,7 +132,7 @@ export async function runAgentLoop(
   for (const layer of (options.layers ?? [])) {
     if (layer.protocol === 'webmcp') {
       const toolMap = new Map(layer.tools.map(t => [t.name, t]));
-      webmcpServers.set(layer.serverName, {
+      webmcpServers.set(sanitizeServerName(layer.serverName), {
         executeTool: async (toolName: string, params: Record<string, unknown>) => {
           const tool = toolMap.get(toolName);
           if (!tool) throw new Error(`Tool "${toolName}" not found in WebMCP server "${layer.serverName}"`);
@@ -284,7 +284,7 @@ export async function runAgentLoop(
         // These are read-only discovery operations — do NOT activate the server.
         if (toolMatch && (toolMatch[3] === 'list_tools' || toolMatch[3] === 'search_tools')) {
           const [, serverName, protocol, pseudoTool] = toolMatch;
-          const layer = (options.layers ?? []).find(l => l.serverName === serverName && l.protocol === protocol);
+          const layer = (options.layers ?? []).find(l => sanitizeServerName(l.serverName) === serverName && l.protocol === protocol);
           if (!layer) {
             result = 'Error: server not found';
           } else if (pseudoTool === 'list_tools') {
@@ -315,7 +315,7 @@ export async function runAgentLoop(
             const serverKey = `${serverName}_${protocol}`;
             if (!activatedServers.has(serverKey)) {
               activatedServers.add(serverKey);
-              const layer = (options.layers ?? []).find(l => l.serverName === serverName && l.protocol === protocol);
+              const layer = (options.layers ?? []).find(l => sanitizeServerName(l.serverName) === serverName && l.protocol === protocol);
               if (layer) {
                 activeTools = activateServerTools(activeTools, layer);
               }
