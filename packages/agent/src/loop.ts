@@ -270,22 +270,6 @@ export async function runAgentLoop(
       }
       const t1 = performance.now();
 
-      // Parse tool name to extract server — activate on first contact
-      {
-        const activateMatch = block.name.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
-        if (activateMatch) {
-          const [, serverName, protocol] = activateMatch;
-          const serverKey = `${serverName}_${protocol}`;
-          if (!activatedServers.has(serverKey)) {
-            activatedServers.add(serverKey);
-            const layer = (options.layers ?? []).find(l => l.serverName === serverName && l.protocol === protocol);
-            if (layer) {
-              activeTools = activateServerTools(activeTools, layer);
-            }
-          }
-        }
-      }
-
       try {
         let result: string;
         const name = block.name;
@@ -295,6 +279,49 @@ export async function runAgentLoop(
 
         // Parse tool name: {serverName}_{protocol}_{toolName}
         const toolMatch = resolvedName.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
+
+        // ── Intercept list_tools / search_tools (local pseudo-tools) ──
+        // These are read-only discovery operations — do NOT activate the server.
+        if (toolMatch && (toolMatch[3] === 'list_tools' || toolMatch[3] === 'search_tools')) {
+          const [, serverName, protocol, pseudoTool] = toolMatch;
+          const layer = (options.layers ?? []).find(l => l.serverName === serverName && l.protocol === protocol);
+          if (!layer) {
+            result = 'Error: server not found';
+          } else if (pseudoTool === 'list_tools') {
+            const tools = layer.tools.map(t => ({ name: t.name, description: t.description, inputSchema: (t as any).inputSchema }));
+            result = JSON.stringify(tools, null, 2);
+          } else {
+            // search_tools — filter by query on name or description
+            const query = String((block.input as Record<string, unknown>).query ?? '').toLowerCase();
+            const matches = layer.tools.filter(t =>
+              t.name.toLowerCase().includes(query) ||
+              (t.description ?? '').toLowerCase().includes(query)
+            );
+            if (matches.length === 0) {
+              result = `No tools matching query: ${query}`;
+            } else {
+              const tools = matches.map(t => ({ name: t.name, description: t.description, inputSchema: (t as any).inputSchema }));
+              result = JSON.stringify(tools, null, 2);
+            }
+          }
+        } else {
+        // ── Normal tool dispatch — activate server on first contact ──
+
+        // Parse tool name to extract server — activate on first contact
+        {
+          const activateMatch = block.name.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
+          if (activateMatch) {
+            const [, serverName, protocol] = activateMatch;
+            const serverKey = `${serverName}_${protocol}`;
+            if (!activatedServers.has(serverKey)) {
+              activatedServers.add(serverKey);
+              const layer = (options.layers ?? []).find(l => l.serverName === serverName && l.protocol === protocol);
+              if (layer) {
+                activeTools = activateServerTools(activeTools, layer);
+              }
+            }
+          }
+        }
         if (!toolMatch) {
           result = `Error: unknown tool format "${name}". Expected {source}_{protocol}_{tool}.`;
         } else {
@@ -354,6 +381,7 @@ export async function runAgentLoop(
             result = `Error: unknown protocol "${protocol}" in tool "${name}".`;
           }
         }
+        } // end else (normal dispatch, not list_tools/search_tools)
 
         // Store full result in buffer for later recall
         resultBuffer.set(block.id, result);

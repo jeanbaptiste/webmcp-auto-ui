@@ -8,7 +8,9 @@ import { sanitizeSchema } from '@webmcp-auto-ui/core';
 /** Sanitize a server name for use in tool name prefixes.
  *  Tool names must match ^[a-zA-Z0-9_-]{1,128}$ per the Anthropic API. */
 function sanitizeServerName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '') || 'mcp';
+  let clean = name.replace(/\s*(MCP|mcp)\s*(Server|server)?\s*$/i, '').replace(/[_-]+(mcp|MCP)$/i, '').trim();
+  if (!clean) clean = name;
+  return clean.toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '') || 'mcp';
 }
 
 /** MCP data layer — tools and recipes from a connected MCP server */
@@ -42,7 +44,7 @@ export type ToolLayer = McpLayer | WebMcpLayer;
 // Layer 3 — Scan tool description for keywords
 // Layer 4 — Fallback: no recipe tools found, list raw discovery tools
 
-type CanonicalRole = 'search_recipes' | 'get_recipe';
+type CanonicalRole = 'search_recipes' | 'list_recipes' | 'get_recipe';
 
 interface CanonicalMatch {
   role: CanonicalRole;
@@ -50,7 +52,8 @@ interface CanonicalMatch {
 }
 
 // Action verbs by canonical role
-const SEARCH_ACTIONS = ['search', 'list', 'find', 'browse', 'discover', 'query', 'explore'];
+const SEARCH_ACTIONS = ['search', 'find', 'query'];
+const LIST_ACTIONS = ['list', 'browse', 'explore', 'discover'];
 const GET_ACTIONS = ['get', 'read', 'fetch', 'show', 'describe', 'detail', 'view', 'load'];
 
 // Resource nouns by priority (A = recipe-like, B = template-like)
@@ -74,13 +77,14 @@ function tokenize(name: string): string[] {
 
 function matchRole(action: string, resource: string): CanonicalRole | null {
   const isSearch = SEARCH_ACTIONS.includes(action);
+  const isList = LIST_ACTIONS.includes(action);
   const isGet = GET_ACTIONS.includes(action);
-  if (!isSearch && !isGet) return null;
+  if (!isSearch && !isList && !isGet) return null;
 
   const isResource = ALL_RESOURCES.includes(resource);
   if (!isResource) return null;
 
-  return isSearch ? 'search_recipes' : 'get_recipe';
+  return isSearch ? 'search_recipes' : isList ? 'list_recipes' : 'get_recipe';
 }
 
 /**
@@ -95,10 +99,13 @@ export function resolveCanonicalTools(tools: McpToolDef[]): CanonicalMatch[] {
     if (t.name === 'search_recipes' && !found.has('search_recipes')) {
       found.set('search_recipes', { role: 'search_recipes', realToolName: t.name });
     }
+    if (t.name === 'list_recipes' && !found.has('list_recipes')) {
+      found.set('list_recipes', { role: 'list_recipes', realToolName: t.name });
+    }
     if (t.name === 'get_recipe' && !found.has('get_recipe')) {
       found.set('get_recipe', { role: 'get_recipe', realToolName: t.name });
     }
-    if (found.size === 2) return Array.from(found.values()); // early exit
+    if (found.size === 3) return Array.from(found.values()); // early exit
   }
 
   // Layer 2 — Decompose name into (action, resource), testing all pairs (not just adjacent)
@@ -114,7 +121,7 @@ export function resolveCanonicalTools(tools: McpToolDef[]): CanonicalMatch[] {
         }
       }
     }
-    if (found.size === 2) return Array.from(found.values());
+    if (found.size === 3) return Array.from(found.values());
   }
 
   // Layer 3 — Scan description for keywords
@@ -126,12 +133,14 @@ export function resolveCanonicalTools(tools: McpToolDef[]): CanonicalMatch[] {
 
     const tokens = tokenize(t.name);
     const action = tokens[0];
-    if (SEARCH_ACTIONS.includes(action) && !found.has('search_recipes')) {
+    if (LIST_ACTIONS.includes(action) && !found.has('list_recipes')) {
+      found.set('list_recipes', { role: 'list_recipes', realToolName: t.name });
+    } else if (SEARCH_ACTIONS.includes(action) && !found.has('search_recipes')) {
       found.set('search_recipes', { role: 'search_recipes', realToolName: t.name });
     } else if (GET_ACTIONS.includes(action) && !found.has('get_recipe')) {
       found.set('get_recipe', { role: 'get_recipe', realToolName: t.name });
     }
-    if (found.size === 2) return Array.from(found.values());
+    if (found.size === 3) return Array.from(found.values());
   }
 
   return Array.from(found.values());
@@ -210,29 +219,30 @@ export function buildSystemPromptWithAliases(layers: ToolLayer[]): SystemPromptR
 
   const aliasMap = new Map<string, string>();
 
-  // ── Collect search_recipes / get_recipe from all layers ──
+  // ── Collect search_recipes / list_recipes / get_recipe from all layers ──
   const searchRecipes: string[] = [];
+  const listRecipes: string[] = [];
   const getRecipes: string[] = [];
-  const mcpFallbackServers: McpLayer[] = []; // servers with no recipe tools at all
+  const searchTools: string[] = [];
+  const listTools: string[] = [];
 
   // WebMCP layers: always exact match (we control the naming)
   for (const l of webmcpLayers) {
     const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
     for (const t of l.tools) {
       if (t.name === 'search_recipes') searchRecipes.push(`${prefix}search_recipes()`);
+      if (t.name === 'list_recipes') listRecipes.push(`${prefix}list_recipes()`);
       if (t.name === 'get_recipe') getRecipes.push(`${prefix}get_recipe()`);
     }
+    // Pseudo-tools for tool discovery on WebMCP servers
+    searchTools.push(`${prefix}search_tools(query)`);
+    listTools.push(`${prefix}list_tools()`);
   }
 
   // MCP layers: 4-layer matching + alias registration
   for (const l of mcpLayers) {
     const prefix = `${sanitizeServerName(l.serverName)}_mcp_`;
     const matches = resolveCanonicalTools(l.tools);
-
-    if (matches.length === 0) {
-      mcpFallbackServers.push(l);
-      continue;
-    }
 
     for (const m of matches) {
       const canonicalPrefixed = `${prefix}${m.role}`;
@@ -244,8 +254,13 @@ export function buildSystemPromptWithAliases(layers: ToolLayer[]): SystemPromptR
       }
 
       if (m.role === 'search_recipes') searchRecipes.push(`${canonicalPrefixed}()`);
+      if (m.role === 'list_recipes') listRecipes.push(`${canonicalPrefixed}()`);
       if (m.role === 'get_recipe') getRecipes.push(`${canonicalPrefixed}()`);
     }
+
+    // Pseudo-tools for tool discovery on all MCP servers
+    searchTools.push(`${prefix}search_tools(query)`);
+    listTools.push(`${prefix}list_tools()`);
   }
 
   // ── WebMCP action tools (widget_display, canvas, recall) ──
@@ -258,55 +273,73 @@ export function buildSystemPromptWithAliases(layers: ToolLayer[]): SystemPromptR
     }
   }
 
-  // ── Build prompt (same structure as original) ──
-  let prompt = `Tu es un assistant IA qui aide les utilisateurs en répondant à leurs questions et en accomplissant des tâches à l'aide de recettes. Pour CHAQUE nouvelle tâche, demande ou question, tu DOIS exécuter les étapes suivantes dans l'ordre exact. Tu NE DOIS PAS sauter d'étapes.
+  // ── Build prompt (cascade: search recipes → list recipes → search tools → list tools) ──
+  let prompt = `Tu es un assistant IA qui aide les utilisateurs en répondant à leurs questions et en accomplissant des tâches à l'aide de recettes. Tu NE DOIS PAS sauter d'étapes.
 
-RÈGLE CRITIQUE : Tu DOIS exécuter toutes les étapes en silence. Ne génère et ne produis AUCUNE réflexion interne, raisonnement, explication ou texte intermédiaire, à AUCUNE étape.
+RÈGLE CRITIQUE : Tu DOIS exécuter toutes les étapes en silence. Ne génère AUCUNE réflexion interne, raisonnement ou texte intermédiaire.
 
-1. Tout d'abord, trouve la recette la plus pertinente en utilisant les outils suivants pour découvrir les recettes disponibles.
+ÉTAPE 1 — Recherche de recette
+
+Cherche une recette pertinente avec un mot-clé extrait de la demande :
 
 ${searchRecipes.join('\n')}
 
-Après cette étape, tu DOIS passer à l'étape suivante.
+Si au moins une recette pertinente est trouvée → passe à l'ÉTAPE 2.
+Si aucun résultat → passe à l'ÉTAPE 1b.
 
-2. Si une recette pertinente existe, utilise les outils suivants pour lire ses instructions.
+ÉTAPE 1b — Liste des recettes
+
+Aucune recette trouvée par recherche. Liste toutes les recettes disponibles :
+
+${listRecipes.join('\n')}
+
+Choisis la recette la plus pertinente par rapport à la demande.
+Si une recette correspond → passe à l'ÉTAPE 2.
+Si aucune recette disponible ou pertinente → passe à l'ÉTAPE 1c.
+
+ÉTAPE 1c — Recherche d'outils
+
+Aucune recette applicable. Cherche un outil pertinent :
+
+${searchTools.join('\n')}
+
+Si un outil pertinent est trouvé → utilise-le directement pour répondre (passe à l'ÉTAPE 3).
+Si aucun résultat → passe à l'ÉTAPE 1d.
+
+ÉTAPE 1d — Liste des outils
+
+${listTools.join('\n')}
+
+Choisis le ou les outils les plus pertinents et utilise-les pour répondre (passe à l'ÉTAPE 3).
+
+ÉTAPE 2 — Lecture de la recette
 
 ${getRecipes.join('\n')}
 
-3. Suis les instructions de la recette exactement pour accomplir la tâche. Tu NE DOIS PAS produire de réflexions intermédiaires ni de mises à jour de statut. Aucune exception ! Produis UNIQUEMENT le résultat final en cas de succès. Il doit contenir un résumé en une phrase de l'action effectuée, ainsi que le résultat final de la recette.
+Lis les instructions complètes de la recette sélectionnée.
 
-4. Sauf indication contraire d'une recette, utilise ces outils pour l'affichage de l'UI :
+ÉTAPE 3 — Exécution
 
-${actionTools.join('\n')}`;
+Suis les instructions de la recette exactement si tu en as une. Sinon utilise les outils directement. Produis UNIQUEMENT le résultat final : un résumé en une phrase de l'action effectuée, ainsi que le résultat.
 
-  prompt += `
+ÉTAPE 4 — Affichage UI
+
+Sauf indication contraire d'une recette, utilise ces outils :
+
+${actionTools.join('\n')}
 
 GESTION DES ERREURS D'OUTILS (RÈGLE PRIORITAIRE)
 
 Si un outil retourne une erreur (validation, schéma, type, paramètres invalides ou rejet explicite), tu DOIS d'abord traiter cette erreur avant toute autre action.
 
-1. Tu DOIS analyser uniquement le message d'erreur et le schéma attendu fourni par le tool.
-2. Tu DOIS corriger l'appel en respectant STRICTEMENT le schéma :
-  - seuls les champs définis dans le schéma sont autorisés
-  - aucun champ supplémentaire ne peut être ajouté
-  - les types doivent être respectés (object vs string, array, etc.)
-3. Si une valeur est mal formée (ex: JSON sérialisé en string), tu dois la convertir en la structure attendue sans changer le contenu métier.
+1. Analyse uniquement le message d'erreur et le schéma attendu.
+2. Corrige l'appel en respectant STRICTEMENT le schéma (pas de champs supplémentaires, types respectés).
+3. Si une valeur est mal formée (ex: JSON sérialisé en string), convertis-la sans changer le contenu métier.
 4. Tu n'as PAS le droit d'inventer de nouveaux formats, champs ou structures.
-5. Tu ne dois PAS changer de recette ou de widget tant que l'appel actuel n'a pas été corrigé et retenté au moins une fois.
-6. Si deux échecs consécutifs identiques surviennent avec le même schéma, alors seulement tu peux rechercher une autre recette.`;
+5. Ne change PAS de recette ou de widget tant que l'appel n'a pas été retenté au moins une fois.
+6. Après deux échecs consécutifs identiques, tu peux chercher une autre recette.
 
-  // Layer 4 fallback: servers with no recipe tools — list their raw tools
-  if (mcpFallbackServers.length > 0) {
-    const fallbackLines: string[] = [];
-    for (const l of mcpFallbackServers) {
-      const prefix = `${sanitizeServerName(l.serverName)}_mcp_`;
-      const toolNames = l.tools.map(t => `${prefix}${t.name}()`).join(', ');
-      fallbackLines.push(`- ${l.serverName} : ${toolNames}`);
-    }
-    prompt += `\n\n5. Ces serveurs ne proposent pas de recettes mais exposent ces outils :\n\n${fallbackLines.join('\n')}`;
-  }
-
-  prompt += `\n\nNe fabrique jamais d'URLs d'images — utilise uniquement celles retournées par les outils.`;
+Ne fabrique jamais d'URLs d'images — utilise uniquement celles retournées par les outils.`;
 
   return { prompt, aliasMap };
 }
@@ -360,14 +393,38 @@ export function buildDiscoveryToolsWithAliases(layers: ToolLayer[]): DiscoveryTo
           aliasMap.set(canonicalPrefixed, realPrefixed);
         }
       }
+
+      // Pseudo-tools for tool discovery on MCP servers
+      tools.push({
+        name: `${prefix}search_tools`,
+        description: `Search tools by keyword on ${layer.serverName}`,
+        input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Search keyword' } }, required: ['query'] },
+      });
+      tools.push({
+        name: `${prefix}list_tools`,
+        description: `List all available tools on ${layer.serverName}`,
+        input_schema: { type: 'object', properties: {} },
+      });
     } else {
-      // WebMCP: search_recipes, get_recipe, plus action tools (widget_display, canvas, recall)
+      // WebMCP: search_recipes, list_recipes, get_recipe, plus action tools (widget_display, canvas, recall)
       for (const tool of webmcpToProviderTools(layer.tools)) {
-        if (tool.name === 'search_recipes' || tool.name === 'get_recipe' ||
+        if (tool.name === 'search_recipes' || tool.name === 'list_recipes' || tool.name === 'get_recipe' ||
             tool.name === 'widget_display' || tool.name === 'canvas' || tool.name === 'recall') {
           tools.push({ ...tool, name: `${prefix}${tool.name}` });
         }
       }
+
+      // Pseudo-tools for tool discovery on WebMCP servers
+      tools.push({
+        name: `${prefix}search_tools`,
+        description: `Search tools by keyword on ${layer.serverName}`,
+        input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Search keyword' } }, required: ['query'] },
+      });
+      tools.push({
+        name: `${prefix}list_tools`,
+        description: `List all available tools on ${layer.serverName}`,
+        input_schema: { type: 'object', properties: {} },
+      });
     }
   }
 
