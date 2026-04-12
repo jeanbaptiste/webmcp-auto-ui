@@ -1,0 +1,235 @@
+---
+title: Deployer les proxies MCP
+description: Installer et configurer les ponts MCP stdio-HTTP pour les demos
+sidebar:
+  order: 7
+---
+
+Ce tutoriel explique comment installer et configurer les proxies MCP qui permettent aux apps webmcp-auto-ui d'acceder a des serveurs MCP publics (NASA, iNaturalist, Wikipedia, etc.) depuis le navigateur.
+
+## Introduction
+
+Les serveurs MCP sont des packages npm ou des scripts Python qui communiquent via stdio (stdin/stdout). Les navigateurs ne peuvent pas communiquer en stdio -- ils ont besoin d'endpoints HTTP.
+
+Le pont `mcp-stdio-bridge.py` resout ce probleme : il wrappe chaque serveur MCP en un endpoint HTTP qui accepte des requetes JSON-RPC 2.0, les transmet au processus MCP via stdio, et renvoie la reponse.
+
+---
+
+## Architecture
+
+```
+Browser (McpClient)
+    |
+    v  (HTTPS)
+nginx reverse proxy  (CORS + routing)
+    |
+    v  (HTTP, localhost:900x)
+mcp-stdio-bridge.py  (HTTP → stdio)
+    |
+    v  (stdin/stdout, JSON-RPC 2.0)
+MCP server subprocess  (npx / python3)
+```
+
+Chaque bridge :
+- Spawn le serveur MCP comme processus enfant communicant via stdio
+- Accepte `POST /mcp` avec un body JSON-RPC 2.0
+- Transmet au subprocess via stdin, lit la reponse sur stdout
+- Gere le cycle de vie du subprocess (demarrage paresseux, redemarrage sur crash)
+- Injecte optionnellement des outils "recettes" depuis un fichier JSON
+
+---
+
+## Methode rapide (Docker)
+
+Pour le developpement local, Docker Compose demarre tous les serveurs en une commande :
+
+```bash
+cd mcp-proxies
+docker compose up -d
+```
+
+Tous les serveurs sont alors accessibles sur `localhost:9001` a `localhost:9008`.
+
+Pour demarrer un seul serveur :
+
+```bash
+docker compose up -d hackernews
+```
+
+---
+
+## Methode VM (systemd + nginx)
+
+Pour un deploiement en production sur une VM Ubuntu/Debian :
+
+```bash
+cd mcp-proxies
+sudo ./setup.sh
+```
+
+Le script est idempotent (il peut etre relance sans risque). Il effectue les operations suivantes :
+
+1. Verifie les prerequis (`python3`, `node`, `npm`, `nginx`)
+2. Cree un utilisateur systeme dedie `mcpbridge`
+3. Copie les scripts bridge dans `/opt/mcp-bridge/`
+4. Genere les fichiers unit systemd pour chaque serveur
+5. Genere le bloc de locations nginx
+6. Demarre ou redemarre tous les services
+7. Teste chaque endpoint avec curl
+
+### Cle API NASA
+
+Le proxy NASA necessite une variable d'environnement `NASA_API_KEY`. Definissez-la avant de lancer le setup :
+
+```bash
+export NASA_API_KEY="votre-cle-ici"
+sudo -E ./setup.sh
+```
+
+Ou creez le fichier `/opt/mcp-bridge/.env` sur la VM :
+
+```
+NASA_API_KEY=votre-cle-ici
+```
+
+---
+
+## Ajouter un nouveau serveur MCP
+
+Pour ajouter un serveur MCP au systeme de proxies :
+
+1. Creez un sous-repertoire dans `mcp-proxies/servers/` :
+
+```bash
+mkdir mcp-proxies/servers/mon-serveur
+```
+
+2. Ajoutez les fichiers de configuration :
+
+```
+mcp-proxies/servers/mon-serveur/
+  recipes.json    # Outils "recettes" injectes dans le serveur (optionnel)
+  service.conf    # Configuration systemd (commande, port, env)
+  README.md       # Documentation du serveur
+  examples.md     # Exemples de prompts
+```
+
+3. Relancez le setup pour enregistrer le nouveau service :
+
+```bash
+sudo ./setup.sh
+```
+
+Ou, pour ajouter manuellement le service systemd, creez le fichier unit et rechargez systemd.
+
+---
+
+## Tester un serveur
+
+Envoyez une requete `initialize` pour verifier qu'un serveur repond correctement :
+
+```bash
+curl -s -X POST http://localhost:9001/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {},
+      "clientInfo": { "name": "test", "version": "1.0" }
+    }
+  }'
+```
+
+Une reponse valide contient `"result"` avec les capabilities du serveur. Remplacez le port `9001` par celui du serveur cible (voir la table ci-dessous).
+
+---
+
+## Connecter depuis une app webmcp-auto-ui
+
+Une fois le proxy en marche, connectez-vous depuis votre app avec `McpClient` :
+
+```typescript
+import { McpClient } from '@webmcp-auto-ui/core';
+
+const client = new McpClient({
+  serverUrl: 'http://localhost:9001/mcp',
+});
+await client.initialize();
+const tools = await client.listTools();
+```
+
+En production, utilisez l'URL publique du proxy :
+
+```typescript
+const client = new McpClient({
+  serverUrl: 'https://demos.hyperskills.net/mcp-metmuseum/mcp',
+});
+```
+
+Pour gerer plusieurs serveurs MCP simultanement, utilisez `McpMultiClient` :
+
+```typescript
+import { McpMultiClient } from '@webmcp-auto-ui/core';
+
+const multi = new McpMultiClient();
+await multi.addServer('https://demos.hyperskills.net/mcp-metmuseum/mcp');
+await multi.addServer('https://demos.hyperskills.net/mcp-wikipedia/mcp');
+```
+
+---
+
+## Systeme de recettes
+
+Chaque serveur peut optionnellement inclure un fichier `recipes.json` dans `servers/{nom}/` qui injecte des outils de recettes (`list_recipes`, `get_recipe`, `search_recipes`) dans la liste d'outils du serveur MCP. Le bridge charge ces recettes au demarrage via le flag `--recipes`.
+
+---
+
+## Serveurs disponibles
+
+| Serveur | Outils principaux | Port | URL production | Exemple de prompt |
+|---------|-------------------|------|----------------|-------------------|
+| hackernews | `get-front-page`, `search-posts` | 9006 | `/mcp-hackernews/mcp` | "Top 10 stories on HN today" |
+| metmuseum | `search-museum-objects`, `get-museum-object` | 9001 | `/mcp-metmuseum/mcp` | "Show impressionist paintings" |
+| openmeteo | `weather_forecast`, `geocoding` | 9002 | `/mcp-openmeteo/mcp` | "Weather in Paris this week" |
+| wikipedia | `search`, `readArticle` | 9005 | `/mcp-wikipedia/mcp` | "Article about quantum computing" |
+| inaturalist | `search_observations` | 9007 | `/mcp-inaturalist/mcp` | "Birds spotted near Lyon" |
+| nasa | `nasa_apod`, `nasa_mars_rover`, `nasa_neo` | 9008 | `/mcp-nasa/mcp` | "Latest Mars rover photos" |
+| datagouv | proxy distant (pas de bridge) | -- | `/mcp-datagouv/mcp` | "Transport datasets in France" |
+
+Les URLs de production sont prefixees par `https://demos.hyperskills.net`.
+
+Le serveur `datagouv` est un cas particulier : il n'utilise pas de bridge stdio mais un simple reverse proxy nginx vers un serveur MCP distant deja accessible en HTTP.
+
+---
+
+## Structure des fichiers
+
+```
+mcp-proxies/
+  bridge/
+    mcp-stdio-bridge.py      # Le pont generique stdio-to-HTTP
+    inaturalist-mcp.py        # Serveur MCP Python custom pour iNaturalist
+  nginx/
+    mcp-locations.conf        # Blocs location nginx (CORS + proxy_pass)
+  servers/
+    hackernews/               # Config et recettes par serveur
+    metmuseum/
+    openmeteo/
+    wikipedia/
+    inaturalist/
+    nasa/
+    datagouv/
+  setup.sh                    # Script de provisioning VM
+  docker-compose.yml          # Alternative Docker pour le dev local
+```
+
+---
+
+## Voir aussi
+
+- [Demarrer avec le boilerplate](./boilerplate)
+- [Connecter un serveur MCP](./connect-mcp-server)
+- [Architecture](../guide/architecture)

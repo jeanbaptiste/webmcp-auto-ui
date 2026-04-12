@@ -1,0 +1,23 @@
+[
+  {
+    "name": "nasa-apod-gallery",
+    "description": "nasa_apod returns {hdurl, url, title, explanation, date, media_type, copyright}. hdurl is a direct high-res image URL (JPEG/PNG). Use 'count' param for multiple random APODs or 'start_date'/'end_date' for a date range.",
+    "tools_used": ["nasa_apod"],
+    "data_shape": "array of {hdurl: string, url: string, title: string, explanation: string, date: string, media_type: string, copyright?: string}",
+    "data_type": "images"
+  },
+  {
+    "name": "nasa-mars-rover",
+    "description": "nasa_mars_rover returns photos from Curiosity/Perseverance/Opportunity/Spirit. Each photo has {img_src, earth_date, sol, camera: {name, full_name}, rover: {name}}. img_src is a direct JPEG URL.",
+    "tools_used": ["nasa_mars_rover"],
+    "data_shape": "array of {id: number, img_src: string, earth_date: string, sol: number, camera: {name: string, full_name: string}, rover: {name: string}}",
+    "data_type": "images"
+  },
+  {
+    "name": "nasa-neo-dashboard",
+    "description": "nasa_neo returns near-Earth objects with orbital data and hazard assessment. Each NEO has {name, estimated_diameter (min/max in km/m), is_potentially_hazardous_asteroid, close_approach_data: [{close_approach_date, relative_velocity.kilometers_per_hour, miss_distance.kilometers}]}.",
+    "tools_used": ["nasa_neo"],
+    "data_shape": "array of {name: string, estimated_diameter: {kilometers: {min: number, max: number}}, is_potentially_hazardous_asteroid: boolean, close_approach_data: [{close_approach_date: string, relative_velocity: {kilometers_per_hour: string}, miss_distance: {kilometers: string}}]}",
+    "data_type": "kpi"
+  }
+]

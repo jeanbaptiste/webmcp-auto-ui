@@ -1,0 +1,16 @@
+[
+  {
+    "name": "hn-stories-table",
+    "description": "get-front-page and get-latest-posts return arrays of stories. Each story has {id, title, url, score, by (author), time (unix), descendants (comment count), type}. Display as a sortable table.",
+    "tools_used": ["get-front-page", "get-latest-posts", "search-posts"],
+    "data_shape": "array of {id: number, title: string, url: string, score: number, by: string, time: number, descendants: number, type: string}",
+    "data_type": "table"
+  },
+  {
+    "name": "hn-stats-dashboard",
+    "description": "get-front-page returns scored stories. Aggregate scores, comment counts, and post times for charts. Score distribution, top domains, posting frequency over hours.",
+    "tools_used": ["get-front-page"],
+    "data_shape": "array of {id: number, title: string, score: number, descendants: number, time: number, url: string} — aggregate for charts",
+    "data_type": "chart"
+  }
+]

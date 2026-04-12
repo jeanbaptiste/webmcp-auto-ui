@@ -1,0 +1,16 @@
+[
+  {
+    "name": "inat-species-gallery",
+    "description": "search_observations returns observations with photos. Each observation has {id, species_guess, taxon: {name, preferred_common_name}, photos: [{url}], observed_on, place_guess, quality_grade}. Photo URLs use iNaturalist CDN; replace 'square' with 'medium' or 'large' for higher res.",
+    "tools_used": ["search_observations"],
+    "data_shape": "array of {id: number, species_guess: string, taxon: {name: string, preferred_common_name: string}, photos: [{url: string}], observed_on: string, place_guess: string, quality_grade: string}",
+    "data_type": "images"
+  },
+  {
+    "name": "inat-observations-map",
+    "description": "search_observations with lat/lng returns geolocated wildlife sightings. Each has {id, location: [lat, lng], taxon: {name}, observed_on, place_guess}. Plot on a map to show species distribution.",
+    "tools_used": ["search_observations"],
+    "data_shape": "array of {id: number, location: string (lat,lng), taxon: {name: string, preferred_common_name: string}, observed_on: string, place_guess: string}",
+    "data_type": "geo"
+  }
+]

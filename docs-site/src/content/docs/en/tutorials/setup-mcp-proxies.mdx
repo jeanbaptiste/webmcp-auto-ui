@@ -1,0 +1,235 @@
+---
+title: Deploy MCP Proxies
+description: Install and configure MCP stdio-HTTP bridges for demos
+sidebar:
+  order: 7
+---
+
+This tutorial explains how to install and configure the MCP proxies that allow webmcp-auto-ui apps to access public MCP servers (NASA, iNaturalist, Wikipedia, etc.) from the browser.
+
+## Introduction
+
+MCP servers are npm packages or Python scripts that communicate via stdio (stdin/stdout). Browsers cannot communicate over stdio -- they need HTTP endpoints.
+
+The `mcp-stdio-bridge.py` bridge solves this problem: it wraps each MCP server into an HTTP endpoint that accepts JSON-RPC 2.0 requests, forwards them to the MCP process via stdio, and returns the response.
+
+---
+
+## Architecture
+
+```
+Browser (McpClient)
+    |
+    v  (HTTPS)
+nginx reverse proxy  (CORS + routing)
+    |
+    v  (HTTP, localhost:900x)
+mcp-stdio-bridge.py  (HTTP → stdio)
+    |
+    v  (stdin/stdout, JSON-RPC 2.0)
+MCP server subprocess  (npx / python3)
+```
+
+Each bridge:
+- Spawns the MCP server as a child process communicating via stdio
+- Accepts `POST /mcp` with a JSON-RPC 2.0 body
+- Forwards to the subprocess via stdin, reads the response from stdout
+- Manages the subprocess lifecycle (lazy start, restart on crash)
+- Optionally injects recipe tools from a JSON file
+
+---
+
+## Quick method (Docker)
+
+For local development, Docker Compose starts all servers in a single command:
+
+```bash
+cd mcp-proxies
+docker compose up -d
+```
+
+All servers are then accessible on `localhost:9001` through `localhost:9008`.
+
+To start a single server:
+
+```bash
+docker compose up -d hackernews
+```
+
+---
+
+## VM method (systemd + nginx)
+
+For production deployment on an Ubuntu/Debian VM:
+
+```bash
+cd mcp-proxies
+sudo ./setup.sh
+```
+
+The script is idempotent (it can be re-run safely). It performs the following operations:
+
+1. Checks prerequisites (`python3`, `node`, `npm`, `nginx`)
+2. Creates a dedicated `mcpbridge` system user
+3. Copies bridge scripts to `/opt/mcp-bridge/`
+4. Generates systemd unit files for each server
+5. Generates the nginx location block
+6. Starts or restarts all services
+7. Tests each endpoint with curl
+
+### NASA API key
+
+The NASA proxy requires a `NASA_API_KEY` environment variable. Set it before running setup:
+
+```bash
+export NASA_API_KEY="your-key-here"
+sudo -E ./setup.sh
+```
+
+Or create the `/opt/mcp-bridge/.env` file on the VM:
+
+```
+NASA_API_KEY=your-key-here
+```
+
+---
+
+## Adding a new MCP server
+
+To add an MCP server to the proxy system:
+
+1. Create a subdirectory in `mcp-proxies/servers/`:
+
+```bash
+mkdir mcp-proxies/servers/my-server
+```
+
+2. Add the configuration files:
+
+```
+mcp-proxies/servers/my-server/
+  recipes.json    # Recipe tools injected into the server (optional)
+  service.conf    # systemd configuration (command, port, env)
+  README.md       # Server documentation
+  examples.md     # Prompt examples
+```
+
+3. Re-run the setup to register the new service:
+
+```bash
+sudo ./setup.sh
+```
+
+Or, to manually add the systemd service, create the unit file and reload systemd.
+
+---
+
+## Testing a server
+
+Send an `initialize` request to verify a server is responding correctly:
+
+```bash
+curl -s -X POST http://localhost:9001/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {},
+      "clientInfo": { "name": "test", "version": "1.0" }
+    }
+  }'
+```
+
+A valid response contains `"result"` with the server capabilities. Replace port `9001` with the target server port (see the table below).
+
+---
+
+## Connecting from a webmcp-auto-ui app
+
+Once the proxy is running, connect from your app using `McpClient`:
+
+```typescript
+import { McpClient } from '@webmcp-auto-ui/core';
+
+const client = new McpClient({
+  serverUrl: 'http://localhost:9001/mcp',
+});
+await client.initialize();
+const tools = await client.listTools();
+```
+
+In production, use the public proxy URL:
+
+```typescript
+const client = new McpClient({
+  serverUrl: 'https://demos.hyperskills.net/mcp-metmuseum/mcp',
+});
+```
+
+To manage multiple MCP servers simultaneously, use `McpMultiClient`:
+
+```typescript
+import { McpMultiClient } from '@webmcp-auto-ui/core';
+
+const multi = new McpMultiClient();
+await multi.addServer('https://demos.hyperskills.net/mcp-metmuseum/mcp');
+await multi.addServer('https://demos.hyperskills.net/mcp-wikipedia/mcp');
+```
+
+---
+
+## Recipe system
+
+Each server can optionally include a `recipes.json` file in `servers/{name}/` that injects recipe tools (`list_recipes`, `get_recipe`, `search_recipes`) into the MCP server's tool list. The bridge loads these at startup via the `--recipes` flag.
+
+---
+
+## Available servers
+
+| Server | Main tools | Port | Production URL | Example prompt |
+|--------|-----------|------|----------------|----------------|
+| hackernews | `get-front-page`, `search-posts` | 9006 | `/mcp-hackernews/mcp` | "Top 10 stories on HN today" |
+| metmuseum | `search-museum-objects`, `get-museum-object` | 9001 | `/mcp-metmuseum/mcp` | "Show impressionist paintings" |
+| openmeteo | `weather_forecast`, `geocoding` | 9002 | `/mcp-openmeteo/mcp` | "Weather in Paris this week" |
+| wikipedia | `search`, `readArticle` | 9005 | `/mcp-wikipedia/mcp` | "Article about quantum computing" |
+| inaturalist | `search_observations` | 9007 | `/mcp-inaturalist/mcp` | "Birds spotted near Lyon" |
+| nasa | `nasa_apod`, `nasa_mars_rover`, `nasa_neo` | 9008 | `/mcp-nasa/mcp` | "Latest Mars rover photos" |
+| datagouv | remote proxy (no bridge) | -- | `/mcp-datagouv/mcp` | "Transport datasets in France" |
+
+Production URLs are prefixed with `https://demos.hyperskills.net`.
+
+The `datagouv` server is a special case: it does not use a stdio bridge but a simple nginx reverse proxy to a remote MCP server that is already accessible over HTTP.
+
+---
+
+## File structure
+
+```
+mcp-proxies/
+  bridge/
+    mcp-stdio-bridge.py      # The generic stdio-to-HTTP bridge
+    inaturalist-mcp.py        # Custom Python MCP server for iNaturalist
+  nginx/
+    mcp-locations.conf        # nginx location blocks (CORS + proxy_pass)
+  servers/
+    hackernews/               # Per-server config and recipes
+    metmuseum/
+    openmeteo/
+    wikipedia/
+    inaturalist/
+    nasa/
+    datagouv/
+  setup.sh                    # VM provisioning script
+  docker-compose.yml          # Docker alternative for local dev
+```
+
+---
+
+## See also
+
+- [Getting started with the boilerplate](./boilerplate)
+- [Connect an MCP server](./connect-mcp-server)
+- [Architecture](../guide/architecture)

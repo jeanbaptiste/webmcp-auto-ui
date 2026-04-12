@@ -1,0 +1,16 @@
+[
+  {
+    "name": "met-artwork-gallery",
+    "description": "get-museum-object returns detailed artwork info including {primaryImage, primaryImageSmall, additionalImages[], title, artistDisplayName, objectDate, medium, department, culture, objectURL}. primaryImage is a direct high-res JPEG URL.",
+    "tools_used": ["get-museum-object"],
+    "data_shape": "{objectID: number, primaryImage: string, primaryImageSmall: string, additionalImages: string[], title: string, artistDisplayName: string, objectDate: string, medium: string, department: string, culture: string, objectURL: string}",
+    "data_type": "images"
+  },
+  {
+    "name": "met-search-cards",
+    "description": "search-museum-objects returns {total, objectIDs[]}. Use objectIDs with get-museum-object to fetch details. Each result becomes a card with title, artist, date, thumbnail.",
+    "tools_used": ["search-museum-objects", "get-museum-object"],
+    "data_shape": "{total: number, objectIDs: number[]} then per object: {objectID: number, title: string, artistDisplayName: string, objectDate: string, primaryImageSmall: string, department: string}",
+    "data_type": "cards"
+  }
+]

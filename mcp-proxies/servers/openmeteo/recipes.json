@@ -1,0 +1,23 @@
+[
+  {
+    "name": "meteo-forecast-chart",
+    "description": "weather_forecast returns hourly/daily timeseries for a location. Hourly data includes {time, temperature_2m, relative_humidity_2m, precipitation, wind_speed_10m, weather_code}. Daily includes {time, temperature_2m_max, temperature_2m_min, precipitation_sum}. Use for line/bar charts over time.",
+    "tools_used": ["weather_forecast"],
+    "data_shape": "{hourly: {time: string[], temperature_2m: number[], precipitation: number[], wind_speed_10m: number[]}, daily: {time: string[], temperature_2m_max: number[], temperature_2m_min: number[], precipitation_sum: number[]}}",
+    "data_type": "timeseries"
+  },
+  {
+    "name": "meteo-location-map",
+    "description": "geocoding tool resolves place names to {latitude, longitude, name, country, elevation, timezone}. Combine with weather_forecast which requires lat/lng. Multiple locations can be plotted on a map.",
+    "tools_used": ["geocoding", "weather_forecast"],
+    "data_shape": "array of {latitude: number, longitude: number, name: string, country: string, elevation: number, timezone: string}",
+    "data_type": "geo"
+  },
+  {
+    "name": "meteo-summary-kpi",
+    "description": "weather_forecast current_weather returns {temperature, windspeed, winddirection, weathercode, time}. Use for stat cards showing current conditions at a glance.",
+    "tools_used": ["weather_forecast"],
+    "data_shape": "{current_weather: {temperature: number, windspeed: number, winddirection: number, weathercode: number, time: string}, latitude: number, longitude: number}",
+    "data_type": "stat_card"
+  }
+]

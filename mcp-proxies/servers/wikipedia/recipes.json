@@ -1,0 +1,16 @@
+[
+  {
+    "name": "wiki-article-text",
+    "description": "readArticle returns the full text content of a Wikipedia article. Returns {title, extract (full text), pageid, url}. Best for long-form reading or summarization.",
+    "tools_used": ["readArticle"],
+    "data_shape": "{title: string, extract: string, pageid: number, url: string}",
+    "data_type": "text"
+  },
+  {
+    "name": "wiki-search-cards",
+    "description": "search returns matching Wikipedia articles. Each result has {title, pageid, snippet (HTML excerpt), url}. Display as cards with title and snippet preview.",
+    "tools_used": ["search"],
+    "data_shape": "array of {title: string, pageid: number, snippet: string, url: string}",
+    "data_type": "cards"
+  }
+]
