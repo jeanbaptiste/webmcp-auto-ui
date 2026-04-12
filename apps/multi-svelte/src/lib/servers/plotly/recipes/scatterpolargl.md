@@ -19,5 +19,5 @@ Large polar scatter datasets where SVG is too slow.
 
 ## Example
 ```
-widget_display('plotly-scatterpolargl', { r: [1,2,3,4,5], theta: [0, 72, 144, 216, 288] })
+plotly_webmcp_widget_display({name: "plotly-scatterpolargl", params: { r: [1,2,3,4,5], theta: [0, 72, 144, 216, 288] }})
 ```

@@ -19,5 +19,5 @@ Show joint distribution of two variables as a binned heatmap.
 
 ## Example
 ```
-widget_display('plotly-histogram2d', { x: [1,2,2,3,3,3], y: [1,1,2,2,3,3] })
+plotly_webmcp_widget_display({name: "plotly-histogram2d", params: { x: [1,2,2,3,3,3], y: [1,1,2,2,3,3] }})
 ```

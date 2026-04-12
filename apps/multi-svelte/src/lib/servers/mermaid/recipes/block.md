@@ -36,3 +36,6 @@ schema:
             type: string
 ---
 Renders a block diagram. Provide either a raw `definition` or structured `blocks` and `links` with a column count.
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "block", params: {definition: "block-beta\n  columns 3\n  a[\"A\"] b[\"B\"] c[\"C\"]\n  a --> b"}})`

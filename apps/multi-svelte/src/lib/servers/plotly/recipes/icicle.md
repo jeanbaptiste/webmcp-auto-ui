@@ -19,5 +19,5 @@ Hierarchical data as a flame graph / icicle diagram.
 
 ## Example
 ```
-widget_display('plotly-icicle', { labels: ['Root','A','B','A1','A2'], parents: ['','Root','Root','A','A'], values: [0,10,5,6,4] })
+plotly_webmcp_widget_display({name: "plotly-icicle", params: { labels: ['Root','A','B','A1','A2'], parents: ['','Root','Root','A','A'], values: [0,10,5,6,4] }})
 ```

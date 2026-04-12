@@ -22,7 +22,7 @@ Show how an initial value is affected by sequential positive/negative changes (P
 
 ## How
 ```
-widget_display('canvas2d-waterfall', {
+widget_display({name: "canvas2d-waterfall", params: {
   title: 'Q4 Profit breakdown',
   items: [
     { label: 'Revenue', value: 500 },
@@ -30,5 +30,5 @@ widget_display('canvas2d-waterfall', {
     { label: 'OpEx', value: -150 },
     { label: 'Tax', value: -45 }
   ]
-})
+}})
 ```

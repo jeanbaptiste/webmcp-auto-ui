@@ -36,7 +36,7 @@ Show proportions in 3D. Set innerRadius > 0 for donut style.
 ## How
 
 ```
-widget_display('pie-chart-3d', {
+threejs_webmcp_widget_display({name: "pie-chart-3d", params: {
   title: "Market Share",
   slices: [
     { value: 45, label: "A", color: "#4488ff" },
@@ -44,5 +44,5 @@ widget_display('pie-chart-3d', {
     { value: 25, label: "C", color: "#ff8844" }
   ],
   height: 0.5
-})
+}})
 ```

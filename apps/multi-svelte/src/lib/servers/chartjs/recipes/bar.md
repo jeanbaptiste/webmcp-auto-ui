@@ -47,9 +47,7 @@ Use chartjs-bar for comparing quantities across categories. Ideal for:
 
 ## How
 
-1. Provide `labels` for the categories
-2. Provide `datasets` or `values` + `label`
-3. For horizontal bars, pass `options: { indexAxis: "y" }`
+1. Call `chartjs_webmcp_widget_display({name: "chartjs-bar", params: {labels: ["Paris", "London", "Berlin", "Madrid"], values: [2.1, 8.9, 3.6, 3.2], label: "Population (M)"}})`
 
 ## Examples
 

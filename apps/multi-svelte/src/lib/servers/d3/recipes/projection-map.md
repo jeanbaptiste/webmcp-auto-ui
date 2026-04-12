@@ -37,7 +37,7 @@ For flat world or regional maps with various projections. Use instead of choropl
 
 ## How
 1. Get GeoJSON from MCP
-2. Call `d3_webmcp_widget_display('projection-map', {geojson: worldGeo, projection: "geoNaturalEarth1", values: [{id: "Brazil", value: 210}]})`
+2. Call `d3_webmcp_widget_display({name: "projection-map", params: {geojson: worldGeo, projection: "geoNaturalEarth1", values: [{id: "Brazil", value: 210}]}})`
 
 ## Common errors
 - Available projections: geoMercator, geoNaturalEarth1, geoEquirectangular, geoAlbersUsa, geoConicEqualArea, etc.

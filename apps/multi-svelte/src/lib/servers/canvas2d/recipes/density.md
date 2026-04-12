@@ -17,8 +17,8 @@ Smooth probability distribution from raw samples.
 
 ## How
 ```
-widget_display('canvas2d-density', {
+widget_display({name: "canvas2d-density", params: {
   title: 'Response time distribution',
   values: [12,14,15,13,16,18,20,14,15,22,25,13,14]
-})
+}})
 ```

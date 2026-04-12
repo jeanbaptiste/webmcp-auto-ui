@@ -48,7 +48,7 @@ Like line chart but emphasizes volume/magnitude below the line. Good for showing
 
 ## How
 1. Get time series from MCP
-2. Call `d3_webmcp_widget_display('area-chart', {series: [{label: "Traffic", points: [{x:0,y:100},{x:1,y:250},{x:2,y:180}]}]})`
+2. Call `d3_webmcp_widget_display({name: "area-chart", params: {series: [{label: "Traffic", points: [{x:0,y:100},{x:1,y:250},{x:2,y:180}]}]}})`
 
 ## Common errors
 - Y-axis starts at 0 (unlike line chart which auto-scales)

@@ -27,6 +27,9 @@ Use pixijs-blur-overlay for decorative animated background effects. Ideal for:
 - Ambient visual effects
 - Glassmorphism-style backgrounds
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "blur-overlay", params: {blobs: 6, colors: ["#3b82f6", "#8b5cf6"], speed: 0.8}})`
+
 ## Examples
 
 ```json

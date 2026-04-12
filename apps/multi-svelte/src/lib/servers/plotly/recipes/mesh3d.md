@@ -23,5 +23,5 @@ Render 3D meshes (CAD models, scientific surfaces, polyhedra).
 
 ## Example
 ```
-widget_display('plotly-mesh3d', { x: [0,1,0,0], y: [0,0,1,0], z: [0,0,0,1], i: [0,0,0,1], j: [1,1,2,2], k: [2,3,3,3] })
+plotly_webmcp_widget_display({name: "plotly-mesh3d", params: { x: [0,1,0,0], y: [0,0,1,0], z: [0,0,0,1], i: [0,0,0,1], j: [1,1,2,2], k: [2,3,3,3] }})
 ```

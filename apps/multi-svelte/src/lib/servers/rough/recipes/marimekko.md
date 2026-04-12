@@ -30,3 +30,6 @@ Both width and height encode data — width is category size, height is segment 
 
 - `categories` — array of `{label, total, segments: [{label, value}]}` objects
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "marimekko", params: {categories: [{label: "US", total: 50, segments: [{label: "A", value: 20}, {label: "B", value: 30}]}, {label: "EU", total: 35, segments: [{label: "A", value: 25}, {label: "B", value: 10}]}], title: "Market Share by Region"}})`

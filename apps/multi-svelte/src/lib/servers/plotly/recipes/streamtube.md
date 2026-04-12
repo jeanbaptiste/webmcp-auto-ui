@@ -22,5 +22,5 @@ Visualize 3D fluid flow or wind patterns as tubes following streamlines.
 
 ## Example
 ```
-widget_display('plotly-streamtube', { x: [0,0,0,1,1,1], y: [0,1,2,0,1,2], z: [0,0,0,0,0,0], u: [1,1,1,1,1,1], v: [0,0.1,-0.1,0,0.1,-0.1], w: [0,0,0,0,0,0] })
+plotly_webmcp_widget_display({name: "plotly-streamtube", params: { x: [0,0,0,1,1,1], y: [0,1,2,0,1,2], z: [0,0,0,0,0,0], u: [1,1,1,1,1,1], v: [0,0.1,-0.1,0,0.1,-0.1], w: [0,0,0,0,0,0] }})
 ```

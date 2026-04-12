@@ -19,3 +19,6 @@ Multiple horizontal bars showing completion toward a goal.
 
 - `items` — array of `{label, value, max?}` objects (max defaults to 100)
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "progress-bar", params: {items: [{label: "Backend", value: 85}, {label: "Frontend", value: 60}], title: "Sprint Progress"}})`

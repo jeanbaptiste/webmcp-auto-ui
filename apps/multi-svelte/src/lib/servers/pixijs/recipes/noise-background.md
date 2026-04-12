@@ -28,6 +28,9 @@ Use pixijs-noise-background for organic animated backgrounds. Ideal for:
 - Generative art displays
 - Loading screen aesthetics
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "noise-background", params: {color1: "#1e1b4b", color2: "#7c3aed", speed: 0.5}})`
+
 ## Examples
 
 ```json

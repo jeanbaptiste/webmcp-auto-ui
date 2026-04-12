@@ -19,5 +19,5 @@ Radar/spider charts for multi-axis comparisons (skills, ratings, metrics).
 
 ## Example
 ```
-widget_display('plotly-scatterpolar', { r: [4,3,5,2,4], theta: ['Speed','Power','Range','Defense','Speed'], fill: 'toself' })
+plotly_webmcp_widget_display({name: "plotly-scatterpolar", params: { r: [4,3,5,2,4], theta: ['Speed','Power','Range','Defense','Speed'], fill: 'toself' }})
 ```

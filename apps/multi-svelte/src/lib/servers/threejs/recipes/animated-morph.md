@@ -28,11 +28,11 @@ Animate smooth transitions between 3D shapes for demonstrations or visual effect
 ## How
 
 ```
-widget_display('animated-morph', {
+threejs_webmcp_widget_display({name: "animated-morph", params: {
   title: "Shape Morph",
   fromShape: "sphere",
   toShape: "torusKnot",
   color: "#44aaff",
   speed: 1.5
-})
+}})
 ```

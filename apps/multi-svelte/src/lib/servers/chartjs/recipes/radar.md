@@ -49,9 +49,7 @@ Use chartjs-radar for comparing entities across multiple dimensions. Ideal for:
 
 ## How
 
-1. Provide `labels` (one per axis/dimension)
-2. Provide `datasets` to overlay multiple polygons, or `values` for a single polygon
-3. Use `options.scales.r.min/max` to fix the radial scale
+1. Call `chartjs_webmcp_widget_display({name: "chartjs-radar", params: {labels: ["Pace", "Shooting", "Passing", "Dribbling", "Defense", "Physical"], datasets: [{label: "Player A", data: [85, 90, 78, 88, 40, 65], borderColor: "#3b82f6"}, {label: "Player B", data: [70, 65, 92, 80, 85, 78], borderColor: "#ef4444"}]}})`
 
 ## Examples
 

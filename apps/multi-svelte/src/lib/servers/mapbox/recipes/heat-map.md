@@ -35,6 +35,9 @@ schema:
 
 Visualize point density as a heatmap. Points with higher weight/intensity produce stronger color.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "heat-map", params: {points: [{coordinates: [2.35, 48.85], weight: 5}, {coordinates: [2.36, 48.86], weight: 3}], radius: 20, center: [2.35, 48.85], zoom: 12}})`
+
 ## Example
 
 ```json

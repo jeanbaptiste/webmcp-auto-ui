@@ -26,6 +26,9 @@ schema:
 
 Display a 3D terrain map using Mapbox DEM tiles. The terrain is rendered with actual elevation data and hillshade for depth perception. Ideal for mountainous areas.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "terrain-map", params: {center: [6.8652, 45.8326], zoom: 12, pitch: 65, exaggeration: 2.0}})`
+
 ## Example
 
 ```json

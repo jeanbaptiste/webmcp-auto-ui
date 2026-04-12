@@ -22,8 +22,8 @@ Emphasize volume or cumulative value over time.
 
 ## How
 ```
-widget_display('canvas2d-area-chart', {
+widget_display({name: "canvas2d-area-chart", params: {
   title: 'Revenue trend',
   values: [10, 25, 18, 32, 45, 38]
-})
+}})
 ```

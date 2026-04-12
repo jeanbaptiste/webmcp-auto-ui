@@ -21,5 +21,5 @@ Geographic density heatmap on Mapbox tiles (carto-darkmatter).
 
 ## Example
 ```
-widget_display('plotly-densitymapbox', { lat: [48.85,48.86,48.84], lon: [2.35,2.36,2.34], radius: 15, zoom: 11 })
+plotly_webmcp_widget_display({name: "plotly-densitymapbox", params: { lat: [48.85,48.86,48.84], lon: [2.35,2.36,2.34], radius: 15, zoom: 11 }})
 ```

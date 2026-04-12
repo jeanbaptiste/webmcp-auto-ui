@@ -33,6 +33,9 @@ Use pixijs-bar-chart for animated bar comparisons with GPU acceleration. Ideal f
 - Animated dashboards
 - Presentations
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "bar-chart", params: {labels: ["A", "B", "C"], values: [40, 70, 30], title: "Sales"}})`
+
 ## Examples
 
 ```json

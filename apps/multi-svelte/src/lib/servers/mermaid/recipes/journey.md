@@ -34,3 +34,6 @@ schema:
                     type: string
 ---
 Renders a user journey map. Provide either a raw `definition` or structured `sections` with tasks and satisfaction scores (1-5).
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "journey", params: {definition: "journey\n  title User Flow\n  section Onboarding\n    Sign up: 5: User\n    Tutorial: 3: User"}})`

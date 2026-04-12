@@ -32,7 +32,7 @@ For showing parent-child relationships (org charts, decision trees, taxonomy). U
 
 ## How
 1. Get tree-structured data from MCP
-2. Call `d3_webmcp_widget_display('tree', {root: {name: "CEO", children: [{name: "CTO", children: [{name: "Dev Lead"}]}, {name: "CFO"}]}})`
+2. Call `d3_webmcp_widget_display({name: "tree", params: {root: {name: "CEO", children: [{name: "CTO", children: [{name: "Dev Lead"}]}, {name: "CFO"}]}}})`
 
 ## Common errors
 - Nodes don't need `value` — this is a structural layout, not area-based

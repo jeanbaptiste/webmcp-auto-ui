@@ -29,6 +29,9 @@ Use pixijs-treemap for hierarchical or proportional data. Ideal for:
 - Disk usage
 - Market cap comparisons
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "treemap", params: {data: [{label: "JS", value: 60}, {label: "CSS", value: 25}, {label: "HTML", value: 15}]}})`
+
 ## Examples
 
 ```json

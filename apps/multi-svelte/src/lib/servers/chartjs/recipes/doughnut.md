@@ -47,9 +47,7 @@ Use chartjs-doughnut like a pie chart but when you want the center area for addi
 
 ## How
 
-1. Provide `labels` and `values` (or `datasets`)
-2. Use `options.cutout` to control the ring thickness (default 50%)
-3. Add center text via Chart.js plugins if needed
+1. Call `chartjs_webmcp_widget_display({name: "chartjs-doughnut", params: {labels: ["Rent", "Food", "Transport", "Entertainment", "Savings"], values: [35, 25, 15, 10, 15]}})`
 
 ## Examples
 

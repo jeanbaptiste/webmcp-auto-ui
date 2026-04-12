@@ -26,3 +26,6 @@ schema:
             type: string
 ---
 Renders a Mermaid state diagram (v2). Provide either a raw `definition` or structured `states` and `transitions`.
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "state", params: {definition: "stateDiagram-v2\n  [*] --> Idle\n  Idle --> Running : start\n  Running --> Idle : stop"}})`

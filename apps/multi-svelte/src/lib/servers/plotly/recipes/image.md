@@ -16,5 +16,5 @@ Display raw image data (pixel arrays) directly in a plot.
 
 ## Example
 ```
-widget_display('plotly-image', { z: [[[255,0,0],[0,255,0]],[[0,0,255],[255,255,0]]] })
+plotly_webmcp_widget_display({name: "plotly-image", params: { z: [[[255,0,0],[0,255,0]],[[0,0,255],[255,255,0]]] }})
 ```

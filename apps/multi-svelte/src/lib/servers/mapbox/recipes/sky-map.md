@@ -41,6 +41,9 @@ schema:
 
 Add a realistic sky with sun position and atmospheric scattering. Best combined with terrain for immersive views. Adjust sun position to simulate time of day.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "sky-map", params: {center: [2.2945, 48.8584], zoom: 14, pitch: 75, sunPosition: [200, 30], sunIntensity: 8}})`
+
 ## Example
 
 ```json

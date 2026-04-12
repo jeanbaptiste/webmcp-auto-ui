@@ -34,7 +34,7 @@ Like sunburst but rectangular — easier to read labels. Good for file system vi
 
 ## How
 1. Get hierarchical data from MCP
-2. Call `d3_webmcp_widget_display('icicle', {root: {name: "root", children: [{name: "A", value: 10}, {name: "B", children: [{name: "B1", value: 5}]}]}})`
+2. Call `d3_webmcp_widget_display({name: "icicle", params: {root: {name: "root", children: [{name: "A", value: 10}, {name: "B", children: [{name: "B1", value: 5}]}]}}})`
 
 ## Common errors
 - Same tree structure as treemap/sunburst

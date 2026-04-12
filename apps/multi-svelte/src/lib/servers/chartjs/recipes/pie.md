@@ -47,9 +47,7 @@ Use chartjs-pie when showing how parts make up a whole. Ideal for:
 
 ## How
 
-1. Provide `labels` for each slice
-2. Provide `values` or `datasets` with proportional data
-3. Colors are auto-assigned if not provided
+1. Call `chartjs_webmcp_widget_display({name: "chartjs-pie", params: {labels: ["Chrome", "Safari", "Firefox", "Edge", "Other"], values: [65, 18, 7, 5, 5]}})`
 
 ## Examples
 

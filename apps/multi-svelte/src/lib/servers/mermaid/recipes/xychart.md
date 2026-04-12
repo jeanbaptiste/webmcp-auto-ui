@@ -42,3 +42,6 @@ schema:
               type: number
 ---
 Renders an XY chart with bar and/or line series. Provide either a raw `definition` or structured axes and `series`.
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "xychart", params: {definition: "xychart-beta\n  title Sales\n  x-axis [Q1, Q2, Q3, Q4]\n  y-axis \"Revenue\"\n  bar [10, 25, 15, 30]\n  line [10, 25, 15, 30]"}})`

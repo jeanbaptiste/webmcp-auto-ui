@@ -49,7 +49,7 @@ For relationship networks (social graphs, dependency trees, knowledge graphs). N
 
 ## How
 1. Get graph data from MCP
-2. Call `d3_webmcp_widget_display('force-graph', {nodes: [{id:"a",label:"Alice",group:1},{id:"b",label:"Bob",group:2}], links: [{source:"a",target:"b",value:3}]})`
+2. Call `d3_webmcp_widget_display({name: "force-graph", params: {nodes: [{id:"a",label:"Alice",group:1},{id:"b",label:"Bob",group:2}], links: [{source:"a",target:"b",value:3}]}})`
 
 ## Common errors
 - `source` and `target` in links must match node `id` values

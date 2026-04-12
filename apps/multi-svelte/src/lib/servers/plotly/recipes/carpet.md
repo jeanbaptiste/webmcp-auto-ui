@@ -19,5 +19,5 @@ Display curvilinear grids for aerodynamics, thermodynamics, or parametric studie
 
 ## Example
 ```
-widget_display('plotly-carpet', { a: [1,2,3], b: [1,2,3], x: [[1,2,3],[1.5,2.5,3.5],[2,3,4]], y: [[1,1,1],[2,2,2],[3,3,3]] })
+plotly_webmcp_widget_display({name: "plotly-carpet", params: { a: [1,2,3], b: [1,2,3], x: [[1,2,3],[1.5,2.5,3.5],[2,3,4]], y: [[1,1,1],[2,2,2],[3,3,3]] }})
 ```

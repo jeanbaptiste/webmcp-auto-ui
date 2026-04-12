@@ -21,5 +21,5 @@ Color regions on a tile map using custom GeoJSON boundaries.
 
 ## Example
 ```
-widget_display('plotly-choroplethmap', { geojson: {...}, locations: ['01','02'], z: [100, 200], zoom: 5 })
+plotly_webmcp_widget_display({name: "plotly-choroplethmap", params: { geojson: {...}, locations: ['01','02'], z: [100, 200], zoom: 5 }})
 ```

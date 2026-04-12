@@ -18,5 +18,5 @@ Show how individual values contribute to a running total (P&L, budgets).
 
 ## Example
 ```
-widget_display('plotly-waterfall', { x: ['Revenue','Costs','Tax','Profit'], y: [100,-30,-10,0], measure: ['relative','relative','relative','total'] })
+plotly_webmcp_widget_display({name: "plotly-waterfall", params: { x: ['Revenue','Costs','Tax','Profit'], y: [100,-30,-10,0], measure: ['relative','relative','relative','total'] }})
 ```

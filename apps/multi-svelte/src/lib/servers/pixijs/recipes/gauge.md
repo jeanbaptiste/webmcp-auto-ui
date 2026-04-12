@@ -32,6 +32,9 @@ Use pixijs-gauge for animated meter/speedometer displays. Ideal for:
 - Performance metrics
 - Real-time sensor readings
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "gauge", params: {value: 73, max: 100, title: "CPU", unit: "%"}})`
+
 ## Examples
 
 ```json

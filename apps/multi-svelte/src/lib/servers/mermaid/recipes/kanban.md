@@ -21,3 +21,6 @@ schema:
               type: string
 ---
 Renders a Kanban board. Provide either a raw `definition` or structured `columns` with titles and item lists.
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "kanban", params: {definition: "kanban\n  Todo\n    Task 1\n    Task 2\n  Done\n    Task 3"}})`

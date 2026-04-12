@@ -37,6 +37,9 @@ Use pixijs-heatmap for 2D data grids with color intensity. Ideal for:
 - Activity heatmaps (hours × days)
 - Spatial data grids
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "heatmap", params: {data: [[1, 5, 3], [8, 2, 7]], rowLabels: ["Mon", "Tue"], colLabels: ["AM", "PM", "Eve"]}})`
+
 ## Examples
 
 ```json

@@ -38,6 +38,9 @@ schema:
 
 Fill polygons with a repeating pattern instead of solid color. Useful for distinguishing zones on maps where color alone is insufficient (accessibility, print-friendly).
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "background-pattern-map", params: {geojson: {type: "FeatureCollection", features: [{type: "Feature", properties: {}, geometry: {type: "Polygon", coordinates: [[[2.3,48.8],[2.4,48.8],[2.4,48.9],[2.3,48.9],[2.3,48.8]]]}}]}, patternType: "crosshatch", patternColor: "#ef4444", center: [2.35, 48.85], zoom: 11}})`
+
 ## Example
 
 ```json

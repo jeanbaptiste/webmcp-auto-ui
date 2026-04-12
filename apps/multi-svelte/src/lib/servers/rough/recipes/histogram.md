@@ -20,3 +20,6 @@ Frequency distribution shown as adjacent bars.
 
 - `bins` — array of `{min, max, count}` objects
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "histogram", params: {bins: [{min: 0, max: 20, count: 5}, {min: 20, max: 40, count: 12}, {min: 40, max: 60, count: 25}], title: "Score Distribution"}})`

@@ -17,3 +17,6 @@ A single-series line chart with sketchy connectors and dots.
 - `labels` — x-axis labels (e.g., dates, categories)
 - `values` — numeric values
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "line-chart", params: {labels: ["Mon","Tue","Wed","Thu","Fri"], values: [12,19,15,25,22], title: "Weekly Visitors"}})`

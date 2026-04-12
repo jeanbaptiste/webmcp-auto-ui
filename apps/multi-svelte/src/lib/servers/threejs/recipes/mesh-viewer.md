@@ -34,11 +34,11 @@ Display arbitrary 3D meshes from vertex/face data. CAD models, generated geometr
 ## How
 
 ```
-widget_display('mesh-viewer', {
+threejs_webmcp_widget_display({name: "mesh-viewer", params: {
   title: "Tetrahedron",
   vertices: [0,1,0, -1,-1,1, 1,-1,1, 0,-1,-1],
   faces: [0,1,2, 0,2,3, 0,3,1, 1,3,2],
   color: "#6688cc",
   wireframe: true
-})
+}})
 ```

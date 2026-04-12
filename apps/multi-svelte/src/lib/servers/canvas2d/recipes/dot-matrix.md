@@ -25,7 +25,7 @@ Visual representation of proportions as discrete units (pictogram-style).
 
 ## How
 ```
-widget_display('canvas2d-dot-matrix', {
+widget_display({name: "canvas2d-dot-matrix", params: {
   title: 'Survey results (100 respondents)',
   total: 100,
   segments: [
@@ -33,5 +33,5 @@ widget_display('canvas2d-dot-matrix', {
     { label: 'Neutral', count: 23 },
     { label: 'Disagree', count: 15 }
   ]
-})
+}})
 ```

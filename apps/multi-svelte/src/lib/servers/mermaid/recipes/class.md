@@ -40,3 +40,6 @@ schema:
             type: string
 ---
 Renders a UML class diagram. Provide either a raw `definition` or structured `classes` and `relations`.
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "class", params: {definition: "classDiagram\n  class Animal {\n    +name: string\n    +speak()\n  }\n  class Dog\n  Animal <|-- Dog"}})`

@@ -32,6 +32,9 @@ schema:
 
 Display travel time zones as concentric polygons around an origin point. Each zone represents how far you can travel in a given time. Without zone data, generates sample circular isochrones.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "isochrone-map", params: {center: [2.3522, 48.8566], zoom: 12, zones: [{minutes: 15, coordinates: [[[2.3,48.83],[2.4,48.83],[2.4,48.88],[2.3,48.88],[2.3,48.83]]]}, {minutes: 5, coordinates: [[[2.33,48.84],[2.37,48.84],[2.37,48.87],[2.33,48.87],[2.33,48.84]]]}]}})`
+
 ## Example
 
 ```json

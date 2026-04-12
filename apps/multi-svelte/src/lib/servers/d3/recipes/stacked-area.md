@@ -44,7 +44,7 @@ For showing how multiple categories contribute to a total over time (market shar
 
 ## How
 1. Get multi-series data from MCP (all series must share the same x values)
-2. Call `d3_webmcp_widget_display('stacked-area', {series: [{label: "Organic", points: [{x:1,y:10},{x:2,y:15}]}, {label: "Paid", points: [{x:1,y:5},{x:2,y:8}]}]})`
+2. Call `d3_webmcp_widget_display({name: "stacked-area", params: {series: [{label: "Organic", points: [{x:1,y:10},{x:2,y:15}]}, {label: "Paid", points: [{x:1,y:5},{x:2,y:8}]}]}})`
 
 ## Common errors
 - All series MUST have the same x values (same length, same positions)

@@ -18,5 +18,5 @@ Wind roses, directional frequency data, cyclic data by angle.
 
 ## Example
 ```
-widget_display('plotly-barpolar', { r: [5,8,3,6,4,7,2,9], theta: ['N','NE','E','SE','S','SW','W','NW'] })
+plotly_webmcp_widget_display({name: "plotly-barpolar", params: { r: [5,8,3,6,4,7,2,9], theta: ['N','NE','E','SE','S','SW','W','NW'] }})
 ```

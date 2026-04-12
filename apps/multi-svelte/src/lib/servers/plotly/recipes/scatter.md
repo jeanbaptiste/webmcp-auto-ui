@@ -22,5 +22,5 @@ Display correlations, clusters, or time-series as a 2D scatter plot.
 
 ## Example
 ```
-widget_display('plotly-scatter', { x: [1,2,3,4,5], y: [2,4,1,5,3], mode: 'lines+markers', title: 'Sample' })
+plotly_webmcp_widget_display({name: "plotly-scatter", params: { x: [1,2,3,4,5], y: [2,4,1,5,3], mode: 'lines+markers', title: 'Sample' }})
 ```

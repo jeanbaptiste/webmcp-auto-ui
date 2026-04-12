@@ -25,3 +25,6 @@ Hierarchical tree structure with nodes and connecting lines.
 
 - `root` — recursive `{label, children?}` object
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "tree-diagram", params: {root: {label: "CEO", children: [{label: "CTO"}, {label: "CFO"}]}, title: "Org Chart"}})`

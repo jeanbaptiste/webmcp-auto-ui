@@ -48,7 +48,7 @@ For time series, trends, and comparing multiple series over a continuous axis.
 
 ## How
 1. Get time series from MCP
-2. Call `d3_webmcp_widget_display('line-chart', {series: [{label: "Revenue", points: [{x:1,y:10},{x:2,y:15},{x:3,y:12}]}], xLabel: "Month", yLabel: "Revenue ($K)"})`
+2. Call `d3_webmcp_widget_display({name: "line-chart", params: {series: [{label: "Revenue", points: [{x:1,y:10},{x:2,y:15},{x:3,y:12}]}], xLabel: "Month", yLabel: "Revenue ($K)"}})`
 
 ## Common errors
 - Points must be sorted by x for line to render correctly

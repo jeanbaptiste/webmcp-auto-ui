@@ -43,7 +43,7 @@ Display planetary orbits, satellite paths, or any orbital system.
 ## How
 
 ```
-widget_display('orbit-diagram', {
+threejs_webmcp_widget_display({name: "orbit-diagram", params: {
   title: "Solar System",
   centralBody: { radius: 0.4, color: "#ffcc00" },
   orbits: [
@@ -51,5 +51,5 @@ widget_display('orbit-diagram', {
     { radius: 2.5, color: "#ff8844", planetRadius: 0.12, speed: 1 },
     { radius: 4, color: "#4488ff", planetRadius: 0.15, speed: 0.5 }
   ]
-})
+}})
 ```

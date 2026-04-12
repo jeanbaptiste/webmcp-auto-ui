@@ -21,5 +21,5 @@ Color GeoJSON regions on a Mapbox map (uses carto-darkmatter free tiles).
 
 ## Example
 ```
-widget_display('plotly-choroplethmapbox', { geojson: {...}, locations: ['01','02'], z: [50, 80], zoom: 5 })
+plotly_webmcp_widget_display({name: "plotly-choroplethmapbox", params: { geojson: {...}, locations: ['01','02'], z: [50, 80], zoom: 5 }})
 ```

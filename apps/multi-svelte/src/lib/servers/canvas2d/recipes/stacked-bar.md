@@ -23,12 +23,12 @@ Compare composition across categories.
 
 ## How
 ```
-widget_display('canvas2d-stacked-bar', {
+widget_display({name: "canvas2d-stacked-bar", params: {
   title: 'Revenue by product',
   labels: ['Q1','Q2','Q3'],
   series: [
     { name: 'Product A', values: [30,40,50] },
     { name: 'Product B', values: [20,30,25] }
   ]
-})
+}})
 ```

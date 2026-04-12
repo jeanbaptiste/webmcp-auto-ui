@@ -41,6 +41,9 @@ schema:
 
 Place a 3D extruded shape on the map representing a model or building footprint. Useful for architectural visualization or point-of-interest highlighting.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "model-3d-map", params: {center: [2.2945, 48.8584], modelCenter: [2.2945, 48.8584], modelHeight: 330, modelColor: "#f97316", label: "Eiffel Tower", zoom: 16}})`
+
 ## Example
 
 ```json

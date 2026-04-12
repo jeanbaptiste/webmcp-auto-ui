@@ -45,7 +45,7 @@ For comparing totals and their composition across discrete categories (revenue b
 
 ## How
 1. Get categorical data from MCP
-2. Call `d3_webmcp_widget_display('stacked-bar', {categories: ["Q1","Q2","Q3"], series: [{label: "Product A", values: [10,15,12]}, {label: "Product B", values: [5,8,9]}]})`
+2. Call `d3_webmcp_widget_display({name: "stacked-bar", params: {categories: ["Q1","Q2","Q3"], series: [{label: "Product A", values: [10,15,12]}, {label: "Product B", values: [5,8,9]}]}})`
 
 ## Common errors
 - Each series.values must have the same length as categories

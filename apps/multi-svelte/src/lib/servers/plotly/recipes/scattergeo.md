@@ -21,5 +21,5 @@ Plot geographic points on a world/regional map (cities, events, stations).
 
 ## Example
 ```
-widget_display('plotly-scattergeo', { lat: [48.85, 40.71, 35.68], lon: [2.35, -74.01, 139.69], text: ['Paris','NYC','Tokyo'] })
+plotly_webmcp_widget_display({name: "plotly-scattergeo", params: { lat: [48.85, 40.71, 35.68], lon: [2.35, -74.01, 139.69], text: ['Paris','NYC','Tokyo'] }})
 ```

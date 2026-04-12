@@ -18,5 +18,5 @@ Show bivariate density as smooth contour lines.
 
 ## Example
 ```
-widget_display('plotly-histogram2dcontour', { x: [1,2,2,3,3,3,4], y: [1,1,2,2,3,3,3] })
+plotly_webmcp_widget_display({name: "plotly-histogram2dcontour", params: { x: [1,2,2,3,3,3,4], y: [1,1,2,2,3,3,3] }})
 ```

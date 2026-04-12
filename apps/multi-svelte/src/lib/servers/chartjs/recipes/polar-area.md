@@ -46,9 +46,7 @@ Use chartjs-polar-area when you want to compare magnitudes across categories on 
 
 ## How
 
-1. Provide `labels` for each radial segment
-2. Provide `values` or `datasets`
-3. Each segment extends from center; radius is proportional to value
+1. Call `chartjs_webmcp_widget_display({name: "chartjs-polar-area", params: {labels: ["Speed", "Strength", "Agility", "Endurance", "Flexibility"], values: [8, 6, 9, 7, 5]}})`
 
 ## Examples
 

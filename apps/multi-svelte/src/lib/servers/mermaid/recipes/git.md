@@ -31,3 +31,6 @@ schema:
             enum: [NORMAL, REVERSE, HIGHLIGHT]
 ---
 Renders a git graph. Provide either a raw `definition` or an `actions` array describing commits, branches, checkouts, and merges.
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "git", params: {definition: "gitGraph\n  commit\n  branch feature\n  checkout feature\n  commit\n  checkout main\n  merge feature"}})`

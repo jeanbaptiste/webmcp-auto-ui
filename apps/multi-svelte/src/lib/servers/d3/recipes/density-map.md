@@ -34,7 +34,7 @@ For showing hot spots in 2D data as a pixelated heatmap. Faster and simpler than
 
 ## How
 1. Get 2D point data from MCP
-2. Call `d3_webmcp_widget_display('density-map', {points: [[1,2],[1.1,2.1],[5,6],[5.2,5.8]], binsX: 20, binsY: 20})`
+2. Call `d3_webmcp_widget_display({name: "density-map", params: {points: [[1,2],[1.1,2.1],[5,6],[5.2,5.8]], binsX: 20, binsY: 20}})`
 
 ## Common errors
 - Points are `[x, y]` arrays

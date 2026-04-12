@@ -37,7 +37,7 @@ For showing progress/completion of multiple KPIs in a compact gauge format (CPU 
 
 ## How
 1. Get metric data from MCP
-2. Call `d3_webmcp_widget_display('arc-chart', {arcs: [{label: "CPU", value: 0.72, max: 1}, {label: "Memory", value: 6.4, max: 8}]})`
+2. Call `d3_webmcp_widget_display({name: "arc-chart", params: {arcs: [{label: "CPU", value: 0.72, max: 1}, {label: "Memory", value: 6.4, max: 8}]}})`
 
 ## Common errors
 - `value` should be between 0 and `max`; values are clamped

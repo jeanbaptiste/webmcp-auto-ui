@@ -38,6 +38,9 @@ schema:
 
 Display labeled points on the map. Each point has a circle marker and a text label beneath it.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "label-map", params: {points: [{coordinates: [2.3522, 48.8566], label: "Paris"}, {coordinates: [-0.1276, 51.5074], label: "London"}], circleColor: "#6366f1"}})`
+
 ## Example
 
 ```json

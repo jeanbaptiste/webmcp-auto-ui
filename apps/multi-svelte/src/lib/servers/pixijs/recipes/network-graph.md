@@ -40,6 +40,9 @@ Use pixijs-network-graph for animated force-directed layouts. Ideal for:
 - Dependency graphs
 - Any relational data
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "network-graph", params: {nodes: [{id: "a", label: "Alice"}, {id: "b", label: "Bob"}], edges: [{source: "a", target: "b"}]}})`
+
 ## Examples
 
 ```json

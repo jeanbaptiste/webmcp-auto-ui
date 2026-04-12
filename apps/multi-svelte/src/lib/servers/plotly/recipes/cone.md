@@ -22,5 +22,5 @@ Visualize 3D vector fields (flow, magnetic fields, gradients).
 
 ## Example
 ```
-widget_display('plotly-cone', { x: [1,2], y: [1,2], z: [1,2], u: [1,0], v: [0,1], w: [0,0] })
+plotly_webmcp_widget_display({name: "plotly-cone", params: { x: [1,2], y: [1,2], z: [1,2], u: [1,0], v: [0,1], w: [0,0] }})
 ```

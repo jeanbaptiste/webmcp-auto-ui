@@ -19,5 +19,5 @@ Show geographic data intensity by country/region (GDP, population, etc.).
 
 ## Example
 ```
-widget_display('plotly-choropleth', { locations: ['FRA','USA','JPN'], z: [67, 331, 125], locationmode: 'ISO-3', title: 'Population (M)' })
+plotly_webmcp_widget_display({name: "plotly-choropleth", params: { locations: ['FRA','USA','JPN'], z: [67, 331, 125], locationmode: 'ISO-3', title: 'Population (M)' }})
 ```

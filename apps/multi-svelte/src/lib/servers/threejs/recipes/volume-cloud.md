@@ -50,12 +50,12 @@ Visualize volumetric data, 3D density distributions, or scientific point clouds 
 ## How
 
 ```
-widget_display('volume-cloud', {
+threejs_webmcp_widget_display({name: "volume-cloud", params: {
   title: "Density Field",
   density: 2000,
   bounds: { x: 3, y: 3, z: 3 },
   colorLow: "#0044aa",
   colorHigh: "#ff4400",
   autoRotate: true
-})
+}})
 ```

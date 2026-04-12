@@ -35,10 +35,7 @@ Use pixijs-line-chart for GPU-accelerated line charts with smooth drawing animat
 - Presentations where visual impact matters
 
 ## How
-
-1. Provide `values` as the data points
-2. Optionally provide `labels` for the X-axis
-3. Set `color` and `lineWidth` for styling
+1. Call `pixijs_webmcp_widget_display({name: "line-chart", params: {labels: ["Jan", "Feb", "Mar"], values: [10, 25, 15], title: "Revenue"}})`
 
 ## Examples
 

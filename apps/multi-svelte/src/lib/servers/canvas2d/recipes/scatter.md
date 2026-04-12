@@ -27,12 +27,12 @@ Visualize distribution and clusters in bivariate data. Pure Canvas 2D, handles 1
 
 ## How
 ```
-widget_display('canvas2d-scatter', {
+widget_display({name: "canvas2d-scatter", params: {
   title: 'Iris dataset',
   points: [
     { x: 5.1, y: 3.5, category: 'setosa' },
     { x: 7.0, y: 3.2, category: 'versicolor' }
   ],
   xLabel: 'Sepal length', yLabel: 'Sepal width'
-})
+}})
 ```

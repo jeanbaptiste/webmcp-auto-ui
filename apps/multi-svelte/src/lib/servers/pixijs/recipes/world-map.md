@@ -35,6 +35,9 @@ Use pixijs-world-map for geographic point visualization. Ideal for:
 - Event distribution
 - Global data points
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "world-map", params: {highlights: [{lat: 48.85, lon: 2.35, label: "Paris"}], title: "Offices"}})`
+
 ## Examples
 
 ```json

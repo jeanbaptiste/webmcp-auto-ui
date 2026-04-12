@@ -24,5 +24,5 @@ Explore categorical data relationships (like a Sankey for categories).
 
 ## Example
 ```
-widget_display('plotly-parcats', { dimensions: [{ label: 'Gender', values: ['M','F','M','F'] }, { label: 'Class', values: ['A','B','A','A'] }] })
+plotly_webmcp_widget_display({name: "plotly-parcats", params: { dimensions: [{ label: 'Gender', values: ['M','F','M','F'] }, { label: 'Class', values: ['A','B','A','A'] }] }})
 ```

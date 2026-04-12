@@ -35,6 +35,9 @@ schema:
 
 Visualize wind or ocean current patterns with animated particles flowing across the map. The particle motion is derived from a flow field.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "wind-particle-map", params: {center: [2.35, 48.85], zoom: 6, particleCount: 300, particleColor: "#64b5f6", speed: 0.004}})`
+
 ## Example
 
 ```json

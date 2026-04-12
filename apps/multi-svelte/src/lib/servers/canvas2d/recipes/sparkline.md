@@ -16,8 +16,8 @@ Compact trend indicator embedded in text or table cells.
 
 ## How
 ```
-widget_display('canvas2d-sparkline', {
+widget_display({name: "canvas2d-sparkline", params: {
   values: [5, 8, 3, 12, 7, 15, 10],
   color: '#3b82f6'
-})
+}})
 ```

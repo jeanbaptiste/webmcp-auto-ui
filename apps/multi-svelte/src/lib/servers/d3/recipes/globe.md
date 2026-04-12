@@ -42,7 +42,7 @@ For showing global data with a 3D perspective. Supports drag-to-rotate interacti
 
 ## How
 1. Get world GeoJSON and point data from MCP
-2. Call `d3_webmcp_widget_display('globe', {geojson: worldGeo, points: [{lat: 48.8, lon: 2.3, label: "Paris"}, {lat: 40.7, lon: -74, label: "NYC"}], rotate: [-2, -48, 0]})`
+2. Call `d3_webmcp_widget_display({name: "globe", params: {geojson: worldGeo, points: [{lat: 48.8, lon: 2.3, label: "Paris"}, {lat: 40.7, lon: -74, label: "NYC"}], rotate: [-2, -48, 0]}})`
 
 ## Common errors
 - Points on the back side of the globe are automatically hidden

@@ -22,5 +22,5 @@ Plot points on an interactive tile map (OpenStreetMap-style).
 
 ## Example
 ```
-widget_display('plotly-scattermap', { lat: [48.85, 45.76], lon: [2.35, 4.83], text: ['Paris','Lyon'], zoom: 5 })
+plotly_webmcp_widget_display({name: "plotly-scattermap", params: { lat: [48.85, 45.76], lon: [2.35, 4.83], text: ['Paris','Lyon'], zoom: 5 }})
 ```

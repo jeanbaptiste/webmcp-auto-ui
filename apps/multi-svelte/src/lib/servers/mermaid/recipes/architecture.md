@@ -51,3 +51,6 @@ schema:
             description: "Connection direction"
 ---
 Renders an architecture diagram. Provide either a raw `definition` or structured `groups`, `services`, and `edges`.
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "architecture", params: {definition: "architecture-beta\n  service api(server)[API]\n  service db(database)[DB]\n  api:R --> L:db"}})`

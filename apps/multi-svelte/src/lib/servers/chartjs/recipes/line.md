@@ -51,9 +51,7 @@ Use chartjs-line when data represents a trend over time or ordered categories. I
 
 ## How
 
-1. Provide `labels` as the x-axis categories
-2. Provide either `datasets` (multiple series) or `values` + `label` (single series)
-3. Optionally pass `options` to customize scales, tooltips, legend position
+1. Call `chartjs_webmcp_widget_display({name: "chartjs-line", params: {labels: ["Jan", "Feb", "Mar", "Apr", "May"], values: [10, 25, 15, 30, 22], label: "Revenue (k€)"}})`
 
 ## Examples
 

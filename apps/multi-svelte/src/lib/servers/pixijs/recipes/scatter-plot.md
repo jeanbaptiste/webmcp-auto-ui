@@ -38,6 +38,9 @@ Use pixijs-scatter-plot for large scatter datasets rendered on the GPU. Ideal fo
 - Cluster visualization
 - Large point clouds (1000+ points)
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "scatter-plot", params: {points: [{x: 1, y: 5}, {x: 3, y: 8}, {x: 5, y: 2}], title: "Correlation"}})`
+
 ## Examples
 
 ```json

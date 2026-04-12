@@ -19,5 +19,5 @@ Explore hierarchical data with drill-down (org charts, file sizes, budgets).
 
 ## Example
 ```
-widget_display('plotly-sunburst', { labels: ['Root','A','B','A1','A2'], parents: ['','Root','Root','A','A'], values: [0,10,5,6,4] })
+plotly_webmcp_widget_display({name: "plotly-sunburst", params: { labels: ['Root','A','B','A1','A2'], parents: ['','Root','Root','A','A'], values: [0,10,5,6,4] }})
 ```

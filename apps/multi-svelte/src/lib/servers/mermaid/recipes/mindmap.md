@@ -32,3 +32,6 @@ schema:
                   type: object
 ---
 Renders a mind map. Provide either a raw `definition` or a `root` node with nested `children` arrays.
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "mindmap", params: {definition: "mindmap\n  root((Project))\n    Frontend\n      React\n      Svelte\n    Backend\n      Node\n      Python"}})`

@@ -20,5 +20,5 @@ Show hierarchical part-of-whole relationships (disk usage, budgets, org).
 
 ## Example
 ```
-widget_display('plotly-treemap', { labels: ['Root','A','B','A1','A2'], parents: ['','Root','Root','A','A'], values: [0,10,5,6,4] })
+plotly_webmcp_widget_display({name: "plotly-treemap", params: { labels: ['Root','A','B','A1','A2'], parents: ['','Root','Root','A','A'], values: [0,10,5,6,4] }})
 ```

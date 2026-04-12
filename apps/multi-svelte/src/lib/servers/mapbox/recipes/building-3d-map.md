@@ -32,6 +32,9 @@ schema:
 
 Display Mapbox's built-in 3D buildings layer. Works best at zoom 14+ in urban areas. Buildings are extruded using their actual height data from OpenStreetMap.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "building-3d-map", params: {center: [-73.9857, 40.7484], zoom: 16, pitch: 60, buildingColor: "#667eea"}})`
+
 ## Example
 
 ```json

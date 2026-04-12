@@ -21,7 +21,7 @@ Show hierarchical part-to-whole with space-efficient nested rectangles.
 
 ## How
 ```
-widget_display('canvas2d-treemap', {
+widget_display({name: "canvas2d-treemap", params: {
   title: 'Disk usage',
   root: {
     name: 'root',
@@ -31,5 +31,5 @@ widget_display('canvas2d-treemap', {
       { name: 'assets', value: 200 }
     ]
   }
-})
+}})
 ```

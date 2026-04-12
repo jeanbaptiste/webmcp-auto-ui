@@ -49,6 +49,9 @@ Use pixijs-render-snapshot for declarative scene rendering. Ideal for:
 - Wireframes
 - Custom infographics
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "render-snapshot", params: {elements: [{type: "rect", x: 50, y: 50, width: 200, height: 100, color: "#3b82f6"}]}})`
+
 ## Examples
 
 ```json

@@ -29,3 +29,6 @@ schema:
             enum: [solid, dotted]
 ---
 Renders a Mermaid sequence diagram. Provide either a raw `definition` string or structured `participants` and `messages`.
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "sequence", params: {definition: "sequenceDiagram\n  Alice->>Bob: Hello\n  Bob-->>Alice: Hi"}})`

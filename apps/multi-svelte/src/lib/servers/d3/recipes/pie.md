@@ -33,7 +33,7 @@ For showing part-to-whole relationships with few categories (3-7 ideal). Use don
 
 ## How
 1. Get category data from MCP
-2. Call `d3_webmcp_widget_display('pie', {slices: [{label: "A", value: 30}, {label: "B", value: 50}, {label: "C", value: 20}]})`
+2. Call `d3_webmcp_widget_display({name: "pie", params: {slices: [{label: "A", value: 30}, {label: "B", value: 50}, {label: "C", value: 20}]}})`
 
 ## Common errors
 - Too many slices (>7) make the chart unreadable; group small values into "Other"

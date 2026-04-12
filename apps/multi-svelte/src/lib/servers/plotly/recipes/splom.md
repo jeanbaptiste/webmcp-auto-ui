@@ -25,5 +25,5 @@ Explore correlations between multiple variables simultaneously.
 
 ## Example
 ```
-widget_display('plotly-splom', { dimensions: [{ label: 'X', values: [1,2,3] }, { label: 'Y', values: [4,5,6] }, { label: 'Z', values: [7,8,9] }] })
+plotly_webmcp_widget_display({name: "plotly-splom", params: { dimensions: [{ label: 'X', values: [1,2,3] }, { label: 'Y', values: [4,5,6] }, { label: 'Z', values: [7,8,9] }] }})
 ```

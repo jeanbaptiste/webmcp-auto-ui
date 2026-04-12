@@ -28,6 +28,9 @@ Use pixijs-particle-flow for mesmerizing animated backgrounds or data metaphors.
 - Animated backgrounds
 - Data stream metaphors
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "particle-flow", params: {count: 300, color: "#3b82f6", direction: "radial"}})`
+
 ## Examples
 
 ```json

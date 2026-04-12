@@ -37,6 +37,9 @@ schema:
 
 Renders a density heatmap using leaflet.heat. Points can optionally include an intensity value as a third element.
 
+## How
+1. Call `leaflet_webmcp_widget_display({name: "leaflet-heatmap", params: {center: [48.85, 2.35], zoom: 13, points: [[48.856, 2.352, 0.8], [48.857, 2.354, 0.5]], radius: 30, blur: 20}})`
+
 ### Example
 
 ```json

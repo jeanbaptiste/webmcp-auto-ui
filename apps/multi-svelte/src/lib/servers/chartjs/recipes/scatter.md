@@ -56,9 +56,7 @@ Use chartjs-scatter for visualizing relationships between two numeric variables.
 
 ## How
 
-1. Provide `datasets` with arrays of `{x, y}` objects, or use `points` shorthand
-2. Each dataset is rendered with different colors
-3. Use `options.scales.x/y` to set axis titles and ranges
+1. Call `chartjs_webmcp_widget_display({name: "chartjs-scatter", params: {datasets: [{label: "Students", data: [{x: 2, y: 55}, {x: 4, y: 70}, {x: 6, y: 78}, {x: 8, y: 85}], backgroundColor: "#8b5cf6"}]}})`
 
 ## Examples
 

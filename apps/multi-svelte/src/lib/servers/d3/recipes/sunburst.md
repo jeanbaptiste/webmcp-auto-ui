@@ -31,7 +31,7 @@ For hierarchical data with multiple levels (org charts, file systems, budgets by
 
 ## How
 1. Get hierarchical data from MCP
-2. Call `d3_webmcp_widget_display('sunburst', {root: {name: "root", children: [{name: "A", value: 10}, {name: "B", children: [{name: "B1", value: 5}]}]}})`
+2. Call `d3_webmcp_widget_display({name: "sunburst", params: {root: {name: "root", children: [{name: "A", value: 10}, {name: "B", children: [{name: "B1", value: 5}]}]}}})`
 
 ## Common errors
 - Data must be a tree with `name` and `children` properties

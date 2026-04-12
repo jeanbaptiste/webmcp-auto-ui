@@ -36,3 +36,7 @@ schema:
 ## Usage
 
 Renders a force-directed graph with positioning constraints. Uses the Cola layout engine to enforce alignment rules (e.g. nodes at the same vertical or horizontal level). Provide constraints as an array of alignment objects.
+
+## How
+
+1. Call `cytoscape_webmcp_widget_display({name: "constrained-layout", params: {elements: [{data: {id: "a", label: "A"}}, {data: {id: "b", label: "B"}}, {data: {id: "c", label: "C"}}, {data: {source: "a", target: "b"}}, {data: {source: "b", target: "c"}}], constraints: [{type: "alignment", axis: "y", offsets: [{node: "a", offset: 0}, {node: "b", offset: 0}]}]}})`

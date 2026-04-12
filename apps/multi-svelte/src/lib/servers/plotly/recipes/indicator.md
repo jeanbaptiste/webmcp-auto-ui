@@ -23,5 +23,5 @@ Display a single KPI with optional gauge arc and delta from reference.
 
 ## Example
 ```
-widget_display('plotly-indicator', { value: 72, title: 'Score', delta: { reference: 60 } })
+plotly_webmcp_widget_display({name: "plotly-indicator", params: { value: 72, title: 'Score', delta: { reference: 60 } }})
 ```

@@ -35,3 +35,7 @@ schema:
 ## Usage
 
 Renders a hierarchical tree where nodes can contain other nodes (compound structure). Uses CoSE-Bilkent for layout. The `parent` field in node data defines containment relationships.
+
+## How
+
+1. Call `cytoscape_webmcp_widget_display({name: "compound-tree", params: {elements: [{data: {id: "root", label: "App"}}, {data: {id: "ui", label: "UI", parent: "root"}}, {data: {id: "api", label: "API", parent: "root"}}, {data: {id: "btn", label: "Button", parent: "ui"}}, {data: {source: "btn", target: "api"}}]}})`

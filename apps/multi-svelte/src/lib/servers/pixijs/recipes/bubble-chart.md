@@ -29,6 +29,9 @@ Use pixijs-bubble-chart for proportional comparisons with animated circles. Idea
 - Population comparisons
 - Budget proportions
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "bubble-chart", params: {bubbles: [{label: "A", value: 65}, {label: "B", value: 25}], title: "Share"}})`
+
 ## Examples
 
 ```json

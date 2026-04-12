@@ -60,9 +60,7 @@ Use chartjs-bubble for three-dimensional comparisons where the third variable is
 
 ## How
 
-1. Provide `datasets` with arrays of `{x, y, r}` objects (r = bubble radius in pixels)
-2. Or use `points` shorthand for a single dataset
-3. Radius is in pixels — normalize your data to a reasonable range (2-30)
+1. Call `chartjs_webmcp_widget_display({name: "chartjs-bubble", params: {datasets: [{label: "Countries", data: [{x: 45000, y: 82, r: 15}, {x: 12000, y: 74, r: 25}, {x: 35000, y: 80, r: 8}], backgroundColor: "rgba(59,130,246,0.5)"}]}})`
 
 ## Examples
 

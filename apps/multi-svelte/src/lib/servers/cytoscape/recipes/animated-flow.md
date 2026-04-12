@@ -35,3 +35,7 @@ schema:
 ## Usage
 
 Renders a graph with animated dashed edges that show the direction of flow. Edge width can be scaled by a `flow` data attribute. The animation creates a "marching ants" effect along edges.
+
+## How
+
+1. Call `cytoscape_webmcp_widget_display({name: "animated-flow", params: {elements: [{data: {id: "src", label: "Source"}}, {data: {id: "proc", label: "Processor"}}, {data: {id: "sink", label: "Sink"}}, {data: {source: "src", target: "proc", flow: 10}}, {data: {source: "proc", target: "sink", flow: 8}}]}})`

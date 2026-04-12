@@ -26,5 +26,5 @@ Display tabular data with formatting. Each column in cells.values is an array.
 
 ## Example
 ```
-widget_display('plotly-table', { header: { values: ['Name','Age'] }, cells: { values: [['Alice','Bob'],[30,25]] } })
+plotly_webmcp_widget_display({name: "plotly-table", params: { header: { values: ['Name','Age'] }, cells: { values: [['Alice','Bob'],[30,25]] } }})
 ```

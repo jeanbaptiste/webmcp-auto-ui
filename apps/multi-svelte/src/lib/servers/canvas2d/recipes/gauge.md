@@ -26,10 +26,10 @@ Display a single KPI against a scale (speed, health score, progress).
 
 ## How
 ```
-widget_display('canvas2d-gauge', {
+widget_display({name: "canvas2d-gauge", params: {
   title: 'Server load',
   value: 72,
   min: 0, max: 100,
   label: 'CPU %'
-})
+}})
 ```

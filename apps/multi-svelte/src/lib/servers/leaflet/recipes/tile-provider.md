@@ -20,6 +20,9 @@ schema:
 
 Uses the leaflet-providers plugin to load named basemaps. Common providers: CartoDB.Positron, CartoDB.DarkMatter, Stamen.Watercolor, Stamen.Toner, Esri.WorldImagery, OpenTopoMap.
 
+## How
+1. Call `leaflet_webmcp_widget_display({name: "leaflet-tile-provider", params: {center: [40.71, -74.00], zoom: 12, provider: "CartoDB.DarkMatter"}})`
+
 ### Example
 
 ```json

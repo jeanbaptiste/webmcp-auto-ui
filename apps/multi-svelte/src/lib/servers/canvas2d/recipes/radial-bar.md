@@ -23,12 +23,12 @@ Compare multiple metrics against their maximum as circular progress.
 
 ## How
 ```
-widget_display('canvas2d-radial-bar', {
+widget_display({name: "canvas2d-radial-bar", params: {
   title: 'Sprint progress',
   items: [
     { label: 'Stories', value: 8, max: 12 },
     { label: 'Bugs', value: 3, max: 5 },
     { label: 'Tasks', value: 15, max: 20 }
   ]
-})
+}})
 ```

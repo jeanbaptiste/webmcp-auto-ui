@@ -35,3 +35,7 @@ schema:
 ## Usage
 
 Groups nodes into clusters based on a `group` data attribute, then arranges each cluster in a circular pattern. Uses the CoSE layout with compound nodes to visually separate clusters.
+
+## How
+
+1. Call `cytoscape_webmcp_widget_display({name: "cluster-circles", params: {elements: [{data: {id: "a", label: "A", group: "frontend"}}, {data: {id: "b", label: "B", group: "frontend"}}, {data: {id: "c", label: "C", group: "backend"}}, {data: {id: "d", label: "D", group: "backend"}}, {data: {source: "a", target: "c"}}, {data: {source: "b", target: "d"}}]}})`

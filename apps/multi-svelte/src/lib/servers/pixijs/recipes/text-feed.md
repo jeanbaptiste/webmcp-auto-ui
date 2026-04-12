@@ -31,6 +31,9 @@ Use pixijs-text-feed for scrolling text displays. Ideal for:
 - Log/event feeds
 - Notification streams
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "text-feed", params: {messages: ["Server deployed", "New user registered", "Backup completed"]}})`
+
 ## Examples
 
 ```json

@@ -31,6 +31,9 @@ Use pixijs-sparkline for compact inline trend indicators. Ideal for:
 - Table cell visualizations
 - Compact trend displays
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "sparkline", params: {values: [5, 10, 8, 15, 12, 20], color: "#3b82f6", fill: true}})`
+
 ## Examples
 
 ```json

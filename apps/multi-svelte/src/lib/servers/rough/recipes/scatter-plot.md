@@ -20,3 +20,6 @@ Individual data points plotted by x/y coordinates.
 
 - `points` — array of `{x, y, label?}` objects
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "scatter-plot", params: {points: [{x: 10, y: 20}, {x: 30, y: 45}, {x: 50, y: 35}], title: "Correlation Study"}})`

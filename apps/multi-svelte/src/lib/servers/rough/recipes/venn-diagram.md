@@ -18,3 +18,6 @@ Overlapping circles representing set sizes and intersections.
 
 - `sets` — array of `{label, size}` objects
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "venn-diagram", params: {sets: [{label: "JavaScript", size: 100}, {label: "TypeScript", size: 60}, {label: "Python", size: 80}], title: "Language Skills"}})`

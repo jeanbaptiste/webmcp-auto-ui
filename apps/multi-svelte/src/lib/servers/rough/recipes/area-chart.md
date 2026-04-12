@@ -17,3 +17,6 @@ Line chart with filled area beneath, using Rough.js hachure fill.
 - `labels` — x-axis labels
 - `values` — numeric values
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "area-chart", params: {labels: ["Jan","Feb","Mar","Apr"], values: [10,25,18,35], title: "Growth Trend"}})`

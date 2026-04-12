@@ -44,3 +44,6 @@ schema:
             description: "0.0 to 1.0"
 ---
 Renders a quadrant chart. Provide either a raw `definition` or structured axes, quadrant labels, and data points with x/y coordinates (0-1).
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "quadrant", params: {definition: "quadrantChart\n  x-axis Low --> High\n  y-axis Low --> High\n  quadrant-1 Do First\n  quadrant-2 Schedule\n  quadrant-3 Delegate\n  quadrant-4 Delete\n  Task A: [0.8, 0.9]\n  Task B: [0.3, 0.2]"}})`

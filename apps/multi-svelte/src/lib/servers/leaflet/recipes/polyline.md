@@ -32,6 +32,9 @@ schema:
 
 Draws a connected series of line segments on the map. Auto-fits the map bounds to the line.
 
+## How
+1. Call `leaflet_webmcp_widget_display({name: "leaflet-polyline", params: {latlngs: [[48.856, 2.352], [48.858, 2.355], [48.860, 2.350]], color: "#e74c3c", weight: 4}})`
+
 ### Example
 
 ```json

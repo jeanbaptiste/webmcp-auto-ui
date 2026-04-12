@@ -34,12 +34,12 @@ Compare time series as 3D ribbons with depth separation between series.
 ## How
 
 ```
-widget_display('ribbon-chart', {
+threejs_webmcp_widget_display({name: "ribbon-chart", params: {
   title: "Revenue Trends",
   ribbons: [
     { points: [{x:0,y:1},{x:1,y:3},{x:2,y:2},{x:3,y:4}], color: "#4488ff" },
     { points: [{x:0,y:2},{x:1,y:1},{x:2,y:3},{x:3,y:2}], color: "#44cc88" }
   ],
   ribbonWidth: 0.4
-})
+}})
 ```

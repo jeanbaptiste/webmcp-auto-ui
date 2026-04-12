@@ -21,3 +21,6 @@ Multiple series displayed as adjacent bars per category.
 - `labels` — category names
 - `series` — array of `{name, values}` objects
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "grouped-bar", params: {labels: ["Jan","Feb","Mar"], series: [{name: "A", values: [30,45,60]}, {name: "B", values: [50,35,70]}], title: "Sales Comparison"}})`

@@ -42,3 +42,6 @@ schema:
 ---
 Renders a Mermaid flowchart. Provide either a raw `definition` string or structured `nodes` and `edges` arrays.
 Supports node shapes (rect, round, stadium, diamond, circle, hexagon) and edge styles (solid, dotted, thick).
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "flowchart", params: {definition: "flowchart TD\n  A[Start] --> B[End]"}})`

@@ -21,5 +21,5 @@ Visualize geographic density (earthquakes, crime, population density).
 
 ## Example
 ```
-widget_display('plotly-densitymap', { lat: [48.85,48.86,48.84], lon: [2.35,2.36,2.34], radius: 15, zoom: 11 })
+plotly_webmcp_widget_display({name: "plotly-densitymap", params: { lat: [48.85,48.86,48.84], lon: [2.35,2.36,2.34], radius: 15, zoom: 11 }})
 ```

@@ -28,6 +28,9 @@ schema:
 
 Organizes map features into named groups with a layer control panel. Users can toggle visibility of each group.
 
+## How
+1. Call `leaflet_webmcp_widget_display({name: "leaflet-layer-group", params: {center: [48.85, 2.35], zoom: 13, layers: [{name: "Hotels", markers: [{latlng: [48.856, 2.352], popup: "Hotel A"}]}, {name: "Restaurants", markers: [{latlng: [48.858, 2.354], popup: "Cafe B"}]}]}})`
+
 ### Example
 
 ```json

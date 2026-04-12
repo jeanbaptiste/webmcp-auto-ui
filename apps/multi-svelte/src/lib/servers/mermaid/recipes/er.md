@@ -45,3 +45,6 @@ schema:
             type: string
 ---
 Renders an Entity-Relationship diagram. Provide either a raw `definition` or structured `entities` and `relations` with cardinality.
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "er", params: {definition: "erDiagram\n  CUSTOMER ||--o{ ORDER : places\n  ORDER ||--|{ LINE-ITEM : contains"}})`

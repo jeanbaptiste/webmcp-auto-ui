@@ -17,5 +17,5 @@ Show conversion funnel (marketing, sales pipeline).
 
 ## Example
 ```
-widget_display('plotly-funnel', { x: [1000, 600, 400, 200, 50], y: ['Visits','Signups','Trials','Paid','Enterprise'] })
+plotly_webmcp_widget_display({name: "plotly-funnel", params: { x: [1000, 600, 400, 200, 50], y: ['Visits','Signups','Trials','Paid','Enterprise'] }})
 ```

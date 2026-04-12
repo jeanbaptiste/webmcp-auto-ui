@@ -31,6 +31,9 @@ schema:
 
 Draws a closed polygon shape on the map. Auto-fits bounds.
 
+## How
+1. Call `leaflet_webmcp_widget_display({name: "leaflet-polygon", params: {latlngs: [[48.85, 2.34], [48.86, 2.36], [48.87, 2.35], [48.86, 2.33]], color: "#2c3e50", fillColor: "#3498db", fillOpacity: 0.4}})`
+
 ### Example
 
 ```json

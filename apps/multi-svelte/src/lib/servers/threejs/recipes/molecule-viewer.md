@@ -51,7 +51,7 @@ Display molecular structures with atoms and bonds.
 ## How
 
 ```
-widget_display('molecule-viewer', {
+threejs_webmcp_widget_display({name: "molecule-viewer", params: {
   title: "Water (H2O)",
   atoms: [
     { x: 0, y: 0, z: 0, element: "O" },
@@ -62,5 +62,5 @@ widget_display('molecule-viewer', {
     { from: 0, to: 1 },
     { from: 0, to: 2 }
   ]
-})
+}})
 ```

@@ -52,3 +52,6 @@ schema:
             enum: [satisfies, traces, contains, refines, copies, derives, verifies]
 ---
 Renders a requirement diagram. Provide either a raw `definition` or structured `requirements`, `elements`, and `relations`.
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "requirement", params: {definition: "requirementDiagram\n  requirement req1 {\n    id: 1\n    text: Must be fast\n    risk: high\n  }\n  element app {\n    type: application\n  }\n  app - satisfies -> req1"}})`

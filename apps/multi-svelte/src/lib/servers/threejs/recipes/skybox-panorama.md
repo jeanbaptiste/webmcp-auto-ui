@@ -28,11 +28,11 @@ Create atmospheric sky backgrounds, day/night scenes, space environments.
 ## How
 
 ```
-widget_display('skybox-panorama', {
+threejs_webmcp_widget_display({name: "skybox-panorama", params: {
   title: "Sunset Sky",
   topColor: "#000022",
   horizonColor: "#ff6600",
   bottomColor: "#001144",
   starCount: 300
-})
+}})
 ```

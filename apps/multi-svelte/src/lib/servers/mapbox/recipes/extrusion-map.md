@@ -50,6 +50,9 @@ schema:
 
 Display 3D extruded polygons where height and color represent data values. Great for population density, building heights, or any area-based quantitative data.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "extrusion-map", params: {geojson: {type: "FeatureCollection", features: [{type: "Feature", properties: {height: 200, name: "District A"}, geometry: {type: "Polygon", coordinates: [[[2.3,48.8],[2.4,48.8],[2.4,48.9],[2.3,48.9],[2.3,48.8]]]}}]}, heightProperty: "height", pitch: 50, center: [2.35, 48.85], zoom: 11}})`
+
 ## Example
 
 ```json

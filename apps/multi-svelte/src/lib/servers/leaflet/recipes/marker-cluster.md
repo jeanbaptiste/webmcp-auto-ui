@@ -27,6 +27,9 @@ schema:
 
 Groups nearby markers into clusters that expand on click/zoom. Uses leaflet.markercluster plugin. Ideal for large datasets (100+ points).
 
+## How
+1. Call `leaflet_webmcp_widget_display({name: "leaflet-marker-cluster", params: {center: [48.85, 2.35], zoom: 5, markers: [{latlng: [48.856, 2.352], popup: "Paris"}, {latlng: [51.505, -0.09], popup: "London"}]}})`
+
 ### Example
 
 ```json

@@ -31,6 +31,9 @@ Use pixijs-calendar-heatmap for daily activity visualization. Ideal for:
 - Habit tracking
 - Daily metrics
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "calendar-heatmap", params: {data: [{date: "2025-01-01", value: 3}, {date: "2025-01-02", value: 7}], color: "#22c55e"}})`
+
 ## Examples
 
 ```json

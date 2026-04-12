@@ -24,3 +24,6 @@ Weighted flow between source and target nodes.
 - `nodes` — array of node names (strings)
 - `links` — array of `{source, target, value}` objects (indices into nodes)
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "sankey", params: {nodes: ["Budget","Marketing","Engineering"], links: [{source: 0, target: 1, value: 40}, {source: 0, target: 2, value: 50}], title: "Budget Allocation"}})`

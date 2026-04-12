@@ -26,6 +26,9 @@ schema:
 
 When multiple markers overlap at the same location, clicking spiderfies them outward in a circle so each can be selected individually.
 
+## How
+1. Call `leaflet_webmcp_widget_display({name: "leaflet-spider-marker", params: {center: [48.85, 2.35], zoom: 15, markers: [{latlng: [48.8566, 2.3522], popup: "Restaurant A"}, {latlng: [48.8566, 2.3522], popup: "Restaurant B"}]}})`
+
 ### Example
 
 ```json

@@ -38,6 +38,9 @@ schema:
 
 Display many points with automatic clustering. Clusters show point count and expand on click. Individual points appear at higher zoom levels.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "cluster-map", params: {points: [{coordinates: [2.35, 48.85], label: "Point 1"}, {coordinates: [2.36, 48.86], label: "Point 2"}], clusterRadius: 40, center: [2.35, 48.85], zoom: 10}})`
+
 ## Example
 
 ```json

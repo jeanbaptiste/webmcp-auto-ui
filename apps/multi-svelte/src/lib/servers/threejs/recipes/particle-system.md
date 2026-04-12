@@ -30,11 +30,11 @@ Create animated particle effects: fountains, explosions, swirling vortexes.
 ## How
 
 ```
-widget_display('particle-system', {
+threejs_webmcp_widget_display({name: "particle-system", params: {
   title: "Fountain",
   count: 3000,
   color: "#ff8844",
   pattern: "fountain",
   speed: 2
-})
+}})
 ```

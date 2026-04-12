@@ -29,6 +29,9 @@ schema:
 
 Display satellite imagery. Optionally overlay markers or polygons on the satellite base layer.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "satellite-map", params: {center: [2.2945, 48.8584], zoom: 15, markers: [{coordinates: [2.2945, 48.8584], label: "Eiffel Tower", color: "#ef4444"}]}})`
+
 ## Example
 
 ```json

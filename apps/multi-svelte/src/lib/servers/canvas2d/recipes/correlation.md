@@ -19,7 +19,7 @@ Visualize pairwise correlations between variables.
 
 ## How
 ```
-widget_display('canvas2d-correlation', {
+widget_display({name: "canvas2d-correlation", params: {
   title: 'Feature correlations',
   labels: ['height', 'weight', 'age'],
   matrix: [
@@ -27,5 +27,5 @@ widget_display('canvas2d-correlation', {
     [0.8, 1.0, 0.3],
     [0.2, 0.3, 1.0]
   ]
-})
+}})
 ```

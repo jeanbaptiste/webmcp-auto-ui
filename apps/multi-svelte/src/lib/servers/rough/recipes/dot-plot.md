@@ -20,3 +20,6 @@ Horizontal positions of dots on category rows.
 
 - `items` — array of `{label, value}` objects
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "dot-plot", params: {items: [{label: "Marketing", value: 85}, {label: "Engineering", value: 92}], title: "Team Satisfaction"}})`

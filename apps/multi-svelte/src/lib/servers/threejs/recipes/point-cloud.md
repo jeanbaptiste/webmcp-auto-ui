@@ -36,7 +36,7 @@ Render thousands of 3D points: LiDAR scans, sensor data, statistical distributio
 ## How
 
 ```
-widget_display('point-cloud', {
+threejs_webmcp_widget_display({name: "point-cloud", params: {
   title: "Sensor Data",
   points: [
     { x: 0, y: 1, z: 0, color: "#ff0000" },
@@ -44,5 +44,5 @@ widget_display('point-cloud', {
     { x: -1, y: 0.5, z: -0.5 }
   ],
   pointSize: 0.03
-})
+}})
 ```

@@ -32,6 +32,9 @@ schema:
 
 Animate a line drawing itself along a path. Useful for showing travel routes, data flows, or migration paths.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "animated-line-map", params: {coordinates: [[2.35, 48.85], [4.83, 45.76], [7.26, 43.71]], lineColor: "#f97316", lineWidth: 4, duration: 4000}})`
+
 ## Example
 
 ```json

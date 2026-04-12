@@ -43,7 +43,7 @@ Visualize network graphs, social networks, dependency trees in 3D space.
 ## How
 
 ```
-widget_display('force-graph-3d', {
+threejs_webmcp_widget_display({name: "force-graph-3d", params: {
   title: "Network",
   nodes: [
     { id: "A", color: "#ff4444" },
@@ -55,5 +55,5 @@ widget_display('force-graph-3d', {
     { source: 1, target: 2 },
     { source: 0, target: 2 }
   ]
-})
+}})
 ```

@@ -35,6 +35,9 @@ schema:
 
 Display an indoor floor plan as polygons on the map. Each room/space is a colored polygon with a label. Optionally overlay a raster floor plan image.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "floor-plan-map", params: {rooms: [{name: "Office A", color: "#6366f1", coordinates: [[[2.352,48.856],[2.353,48.856],[2.353,48.857],[2.352,48.857],[2.352,48.856]]]}, {name: "Meeting Room", color: "#22c55e", coordinates: [[[2.353,48.856],[2.354,48.856],[2.354,48.857],[2.353,48.857],[2.353,48.856]]]}], center: [2.353, 48.856], zoom: 18}})`
+
 ## Example
 
 ```json

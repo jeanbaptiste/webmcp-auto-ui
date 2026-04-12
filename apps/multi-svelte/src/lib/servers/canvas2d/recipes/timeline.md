@@ -24,12 +24,12 @@ Visualize scheduled events, Gantt-style tasks, or time ranges.
 
 ## How
 ```
-widget_display('canvas2d-timeline', {
+widget_display({name: "canvas2d-timeline", params: {
   title: 'Project phases',
   events: [
     { label: 'Design', start: 0, end: 3, category: 'plan' },
     { label: 'Dev', start: 2, end: 8, category: 'build' },
     { label: 'Test', start: 7, end: 10, category: 'qa' }
   ]
-})
+}})
 ```

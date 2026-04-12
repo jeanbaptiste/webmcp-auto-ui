@@ -19,5 +19,5 @@ Visualize mathematical surfaces, terrain, or any z = f(x,y) function.
 
 ## Example
 ```
-widget_display('plotly-surface', { z: [[1,2,3],[4,5,6],[7,8,9]] })
+plotly_webmcp_widget_display({name: "plotly-surface", params: { z: [[1,2,3],[4,5,6],[7,8,9]] }})
 ```

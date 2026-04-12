@@ -19,3 +19,6 @@ Polygon on radial axes, ideal for comparing multiple attributes.
 - `values` — values per axis
 - `max` — maximum scale value (optional, defaults to max of values)
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "radar-chart", params: {labels: ["Speed","Power","Range","Durability","Accuracy"], values: [8,6,9,4,7], max: 10, title: "Character Stats"}})`

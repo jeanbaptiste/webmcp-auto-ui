@@ -30,6 +30,9 @@ schema:
 
 Combines Leaflet maps with D3.js SVG rendering. Points are rendered as D3 circles that reposition on map pan/zoom. Useful for custom data-driven visualizations.
 
+## How
+1. Call `leaflet_webmcp_widget_display({name: "leaflet-d3-overlay", params: {center: [48.85, 2.35], zoom: 12, points: [[48.856, 2.352], [48.858, 2.355]], radius: 8, color: "#e74c3c"}})`
+
 ### Example
 
 ```json

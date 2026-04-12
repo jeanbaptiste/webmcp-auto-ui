@@ -20,10 +20,10 @@ Show intensity/magnitude across two categorical dimensions.
 
 ## How
 ```
-widget_display('canvas2d-heatmap', {
+widget_display({name: "canvas2d-heatmap", params: {
   title: 'Temperature by hour/day',
   values: [[10,15,20],[12,18,25],[8,14,22]],
   xLabels: ['Mon','Tue','Wed'],
   yLabels: ['Morning','Afternoon','Evening']
-})
+}})
 ```

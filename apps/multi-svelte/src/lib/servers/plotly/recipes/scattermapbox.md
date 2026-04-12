@@ -22,5 +22,5 @@ Plot points on a Mapbox tile map (uses carto-darkmatter free tiles).
 
 ## Example
 ```
-widget_display('plotly-scattermapbox', { lat: [48.85, 40.71], lon: [2.35, -74.01], text: ['Paris','NYC'], zoom: 2 })
+plotly_webmcp_widget_display({name: "plotly-scattermapbox", params: { lat: [48.85, 40.71], lon: [2.35, -74.01], text: ['Paris','NYC'], zoom: 2 }})
 ```

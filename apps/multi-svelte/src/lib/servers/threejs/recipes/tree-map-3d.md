@@ -36,7 +36,7 @@ Display hierarchical size data as extruded 3D blocks. File sizes, budgets, propo
 ## How
 
 ```
-widget_display('tree-map-3d', {
+threejs_webmcp_widget_display({name: "tree-map-3d", params: {
   title: "Disk Usage",
   items: [
     { label: "src", value: 500 },
@@ -44,5 +44,5 @@ widget_display('tree-map-3d', {
     { label: "dist", value: 300 },
     { label: "docs", value: 100 }
   ]
-})
+}})
 ```

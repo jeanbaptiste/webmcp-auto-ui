@@ -39,7 +39,7 @@ Like pie but cleaner, with space in the center for a summary stat (total, percen
 
 ## How
 1. Get category data from MCP
-2. Call `d3_webmcp_widget_display('donut', {slices: [{label: "Active", value: 75}, {label: "Inactive", value: 25}], centerText: "75%"})`
+2. Call `d3_webmcp_widget_display({name: "donut", params: {slices: [{label: "Active", value: 75}, {label: "Inactive", value: 25}], centerText: "75%"}})`
 
 ## Common errors
 - Same as pie: keep slices under 7, all values positive

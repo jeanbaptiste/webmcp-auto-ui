@@ -20,5 +20,5 @@ Visualize 3D point clouds, trajectories, or clustered data in 3 dimensions.
 
 ## Example
 ```
-widget_display('plotly-scatter3d', { x: [1,2,3], y: [4,5,6], z: [7,8,9], mode: 'markers' })
+plotly_webmcp_widget_display({name: "plotly-scatter3d", params: { x: [1,2,3], y: [4,5,6], z: [7,8,9], mode: 'markers' }})
 ```

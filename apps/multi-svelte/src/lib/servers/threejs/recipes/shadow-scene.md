@@ -38,11 +38,11 @@ Display 3D objects with realistic shadows on a ground plane. Scene composition.
 ## How
 
 ```
-widget_display('shadow-scene', {
+threejs_webmcp_widget_display({name: "shadow-scene", params: {
   title: "Shadow Demo",
   objects: [
     { shape: "sphere", x: 0, y: 1, z: 0, color: "#4488ff", size: 1 },
     { shape: "box", x: 2, y: 0.5, z: 1, color: "#ff4488", size: 1 }
   ]
-})
+}})
 ```

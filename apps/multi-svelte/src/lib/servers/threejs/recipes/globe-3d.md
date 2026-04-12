@@ -56,11 +56,11 @@ Display geographic data on an interactive 3D globe: cities, flight routes, netwo
 
 ## How
 
-Call `widget_display('globe-3d', { points: [...], arcs: [...] })`.
+Call `threejs_webmcp_widget_display({name: "globe-3d", params: { points: [...], arcs: [...] }})`.
 
 Example:
 ```
-widget_display('globe-3d', {
+threejs_webmcp_widget_display({name: "globe-3d", params: {
   title: "Flight Routes",
   points: [
     { lat: 48.86, lon: 2.35, label: "Paris" },
@@ -71,5 +71,5 @@ widget_display('globe-3d', {
     { from: 0, to: 1, color: "#ff8800" },
     { from: 1, to: 2, color: "#00ff88" }
   ]
-})
+}})
 ```

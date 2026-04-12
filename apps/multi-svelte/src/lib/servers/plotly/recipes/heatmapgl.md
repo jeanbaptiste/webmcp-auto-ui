@@ -19,5 +19,5 @@ Large matrices (1000x1000+) where SVG heatmap is too slow.
 
 ## Example
 ```
-widget_display('plotly-heatmapgl', { z: [[...large matrix...]] })
+plotly_webmcp_widget_display({name: "plotly-heatmapgl", params: { z: [[...large matrix...]] }})
 ```

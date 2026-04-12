@@ -20,5 +20,5 @@ Show iso-lines of a 2D function or density estimation.
 
 ## Example
 ```
-widget_display('plotly-contour', { z: [[1,2,3],[4,5,6],[7,8,9]], colorscale: 'Hot' })
+plotly_webmcp_widget_display({name: "plotly-contour", params: { z: [[1,2,3],[4,5,6],[7,8,9]], colorscale: 'Hot' }})
 ```

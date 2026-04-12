@@ -29,6 +29,9 @@ Use pixijs-funnel-chart for conversion/pipeline visualizations. Ideal for:
 - User onboarding steps
 - Any narrowing process
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "funnel-chart", params: {stages: [{label: "Visitors", value: 10000}, {label: "Signups", value: 3000}, {label: "Paid", value: 400}]}})`
+
 ## Examples
 
 ```json

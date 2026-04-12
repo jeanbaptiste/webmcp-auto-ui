@@ -28,6 +28,9 @@ Use pixijs-waveform for audio-like animated wave displays. Ideal for:
 - Signal representations
 - Ambient animated backgrounds
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "waveform", params: {waves: 4, amplitude: 60, frequency: 1.5, color: "#8b5cf6"}})`
+
 ## Examples
 
 ```json

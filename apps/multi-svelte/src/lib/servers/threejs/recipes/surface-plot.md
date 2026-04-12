@@ -33,10 +33,10 @@ Visualize mathematical surfaces, 2D functions f(x,y)=z, or gridded height data.
 ## How
 
 ```
-widget_display('surface-plot', {
+threejs_webmcp_widget_display({name: "surface-plot", params: {
   title: "sin(x)*cos(y)",
   zValues: [[0, 0.5, 0], [-0.5, 1, 0.5], [0, -0.5, 0]],
   colorLow: "#0000ff",
   colorHigh: "#ff0000"
-})
+}})
 ```

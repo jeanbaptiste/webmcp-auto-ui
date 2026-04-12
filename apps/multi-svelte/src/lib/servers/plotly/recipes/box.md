@@ -19,5 +19,5 @@ Compare distributions across groups. Shows median, quartiles, outliers.
 
 ## Example
 ```
-widget_display('plotly-box', { y: [[1,2,3,4,5,6,7],[3,4,5,6,7,8,9]], name: ['A','B'], title: 'Distribution' })
+plotly_webmcp_widget_display({name: "plotly-box", params: { y: [[1,2,3,4,5,6,7],[3,4,5,6,7,8,9]], name: ['A','B'], title: 'Distribution' }})
 ```

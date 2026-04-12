@@ -33,7 +33,7 @@ For showing flows or relationships between groups (trade between countries, migr
 ## How
 1. Get flow data from MCP
 2. Build a square matrix where matrix[i][j] = flow from group i to group j
-3. Call `d3_webmcp_widget_display('chord', {labels: ['A','B','C'], matrix: [[0,5,2],[3,0,4],[1,2,0]]})`
+3. Call `d3_webmcp_widget_display({name: "chord", params: {labels: ['A','B','C'], matrix: [[0,5,2],[3,0,4],[1,2,0]]}})`
 
 ## Common errors
 - The matrix must be square (N x N where N = labels.length)

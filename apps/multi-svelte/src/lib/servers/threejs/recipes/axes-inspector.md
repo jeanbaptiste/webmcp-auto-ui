@@ -45,7 +45,7 @@ Display a coordinate system with labeled axes, grid, and optional reference obje
 ## How
 
 ```
-widget_display('axes-inspector', {
+threejs_webmcp_widget_display({name: "axes-inspector", params: {
   title: "3D Space",
   range: 5,
   xLabel: "X", yLabel: "Y", zLabel: "Z",
@@ -53,5 +53,5 @@ widget_display('axes-inspector', {
     { x: 2, y: 3, z: 1, color: "#ff0000", size: 0.2 },
     { x: -1, y: 1, z: 4, color: "#00ff00" }
   ]
-})
+}})
 ```

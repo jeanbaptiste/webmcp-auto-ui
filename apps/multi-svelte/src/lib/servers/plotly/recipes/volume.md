@@ -23,5 +23,5 @@ Visualize 3D scalar fields (medical imaging, simulations, weather data).
 
 ## Example
 ```
-widget_display('plotly-volume', { x: [0,0,0,0,1,1,1,1], y: [0,0,1,1,0,0,1,1], z: [0,1,0,1,0,1,0,1], value: [1,2,3,4,5,6,7,8], isomin: 2, isomax: 7 })
+plotly_webmcp_widget_display({name: "plotly-volume", params: { x: [0,0,0,0,1,1,1,1], y: [0,0,1,1,0,0,1,1], z: [0,1,0,1,0,1,0,1], value: [1,2,3,4,5,6,7,8], isomin: 2, isomax: 7 }})
 ```

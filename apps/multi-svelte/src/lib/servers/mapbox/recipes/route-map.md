@@ -35,6 +35,9 @@ schema:
 
 Display a route as a colored line on the map. Start point gets a green marker, end point a red marker. Optionally add labeled waypoints along the route.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "route-map", params: {coordinates: [[2.35, 48.85], [2.36, 48.86], [2.40, 48.88]], lineColor: "#3b82f6", lineWidth: 4}})`
+
 ## Example
 
 ```json

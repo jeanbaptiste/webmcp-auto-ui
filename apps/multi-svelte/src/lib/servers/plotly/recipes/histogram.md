@@ -20,5 +20,5 @@ Show frequency distribution of a continuous variable.
 
 ## Example
 ```
-widget_display('plotly-histogram', { x: [1,1,2,2,2,3,3,4,5,5,5,5], nbinsx: 5, title: 'Distribution' })
+plotly_webmcp_widget_display({name: "plotly-histogram", params: { x: [1,1,2,2,2,3,3,4,5,5,5,5], nbinsx: 5, title: 'Distribution' }})
 ```

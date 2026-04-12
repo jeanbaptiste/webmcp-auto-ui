@@ -41,6 +41,9 @@ schema:
 
 Display an interactive globe with atmosphere effects. Markers can be placed anywhere on Earth. The globe auto-rotates by default and stops on interaction.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "globe-map", params: {markers: [{coordinates: [2.35, 48.85], label: "Paris", color: "#ef4444"}, {coordinates: [-73.98, 40.74], label: "New York"}], starIntensity: 0.8}})`
+
 ## Example
 
 ```json

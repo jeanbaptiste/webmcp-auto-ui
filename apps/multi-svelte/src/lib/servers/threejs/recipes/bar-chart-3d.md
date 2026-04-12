@@ -42,12 +42,12 @@ Compare categorical values in 3D. Multi-row bars for grouped comparisons.
 ## How
 
 ```
-widget_display('bar-chart-3d', {
+threejs_webmcp_widget_display({name: "bar-chart-3d", params: {
   title: "Sales by Region",
   bars: [
     { label: "US", value: 120, color: "#4488ff" },
     { label: "EU", value: 95, color: "#44cc88" },
     { label: "Asia", value: 150, color: "#ff8844" }
   ]
-})
+}})
 ```

@@ -46,7 +46,7 @@ For showing point-level geographic data where size encodes quantity (city popula
 
 ## How
 1. Get GeoJSON base map and point data from MCP
-2. Call `d3_webmcp_widget_display('symbol-map', {geojson: countryGeo, points: [{lat:48.8,lon:2.3,label:"Paris",value:2100000},{lat:45.7,lon:4.8,label:"Lyon",value:500000}]})`
+2. Call `d3_webmcp_widget_display({name: "symbol-map", params: {geojson: countryGeo, points: [{lat:48.8,lon:2.3,label:"Paris",value:2100000},{lat:45.7,lon:4.8,label:"Lyon",value:500000}]}})`
 
 ## Common errors
 - `value` controls circle size via square root scaling

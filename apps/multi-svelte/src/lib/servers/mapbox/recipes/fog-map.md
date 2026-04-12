@@ -44,6 +44,9 @@ schema:
 
 Add atmospheric fog to create depth and mood. Combined with terrain for a cinematic look.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "fog-map", params: {center: [-122.4194, 37.7749], zoom: 13, pitch: 60, terrain: true}})`
+
 ## Example
 
 ```json

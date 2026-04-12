@@ -24,3 +24,6 @@ schema:
             type: number
 ---
 Renders a pie chart. Provide either a raw `definition` or structured `slices` with labels and values.
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "pie", params: {definition: "pie title Languages\n  \"JS\" : 60\n  \"Python\" : 25\n  \"Go\" : 15"}})`

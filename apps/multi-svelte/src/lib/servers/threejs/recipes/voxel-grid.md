@@ -36,7 +36,7 @@ Display discrete 3D grid data, building structures, or boolean 3D arrays.
 ## How
 
 ```
-widget_display('voxel-grid', {
+threejs_webmcp_widget_display({name: "voxel-grid", params: {
   title: "3D Structure",
   voxels: [
     { x: 0, y: 0, z: 0, color: "#ff0000" },
@@ -44,5 +44,5 @@ widget_display('voxel-grid', {
     { x: 0, y: 1, z: 0, color: "#0000ff" },
     { x: 0, y: 0, z: 1, color: "#ffff00" }
   ]
-})
+}})
 ```

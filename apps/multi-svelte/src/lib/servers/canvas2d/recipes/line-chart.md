@@ -23,11 +23,11 @@ Show trends over sequential data points.
 
 ## How
 ```
-widget_display('canvas2d-line-chart', {
+widget_display({name: "canvas2d-line-chart", params: {
   title: 'Monthly users',
   series: [
     { name: 'Desktop', values: [100,120,115,140,160] },
     { name: 'Mobile', values: [80,95,110,130,150] }
   ]
-})
+}})
 ```

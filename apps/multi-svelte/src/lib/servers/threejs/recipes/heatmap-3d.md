@@ -33,7 +33,7 @@ Display matrix data as a 3D elevated heatmap where height and color encode value
 ## How
 
 ```
-widget_display('heatmap-3d', {
+threejs_webmcp_widget_display({name: "heatmap-3d", params: {
   title: "Correlation Matrix",
   values: [
     [1.0, 0.8, 0.2],
@@ -42,5 +42,5 @@ widget_display('heatmap-3d', {
   ],
   colorLow: "#000066",
   colorHigh: "#ff4400"
-})
+}})
 ```

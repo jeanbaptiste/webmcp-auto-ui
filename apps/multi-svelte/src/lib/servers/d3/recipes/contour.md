@@ -34,7 +34,7 @@ For showing density/concentration of scattered 2D data (event hotspots, populati
 
 ## How
 1. Get 2D point data from MCP
-2. Call `d3_webmcp_widget_display('contour', {points: [[10,20],[12,22],[11,19],[50,60],[52,58]], bandwidth: 15})`
+2. Call `d3_webmcp_widget_display({name: "contour", params: {points: [[10,20],[12,22],[11,19],[50,60],[52,58]], bandwidth: 15}})`
 
 ## Common errors
 - Points are `[x, y]` arrays, not objects

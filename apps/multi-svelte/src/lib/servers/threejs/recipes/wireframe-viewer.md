@@ -37,11 +37,11 @@ Inspect geometry topology, display wireframe shapes, or show custom meshes as wi
 ## How
 
 ```
-widget_display('wireframe-viewer', {
+threejs_webmcp_widget_display({name: "wireframe-viewer", params: {
   title: "Torus Knot",
   shape: "torusKnot",
   color: "#44aaff",
   scale: 1.5,
   autoRotate: true
-})
+}})
 ```

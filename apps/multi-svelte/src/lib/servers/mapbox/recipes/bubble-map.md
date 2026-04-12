@@ -38,6 +38,9 @@ schema:
 
 Display proportionally sized circles on the map. Circle size scales linearly with the value property.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "bubble-map", params: {points: [{coordinates: [2.35, 48.85], label: "Paris", value: 2100000}, {coordinates: [-3.70, 40.41], label: "Madrid", value: 3200000}], color: "#f97316", maxRadius: 50}})`
+
 ## Example
 
 ```json

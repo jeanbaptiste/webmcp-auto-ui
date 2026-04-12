@@ -33,3 +33,7 @@ schema:
 ## Usage
 
 Renders a force-directed graph using fCoSE (fast Compound Spring Embedder), optimized for large graphs with hundreds of nodes. Significantly faster than standard CoSE while maintaining quality.
+
+## How
+
+1. Call `cytoscape_webmcp_widget_display({name: "graph-force-fast", params: {elements: [{data: {id: "a", label: "A"}}, {data: {id: "b", label: "B"}}, {data: {id: "c", label: "C"}}, {data: {id: "d", label: "D"}}, {data: {source: "a", target: "b"}}, {data: {source: "b", target: "c"}}, {data: {source: "c", target: "d"}}, {data: {source: "a", target: "d"}}]}})`

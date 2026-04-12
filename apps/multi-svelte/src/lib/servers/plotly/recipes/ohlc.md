@@ -19,5 +19,5 @@ Financial data — OHLC bars showing price range per period.
 
 ## Example
 ```
-widget_display('plotly-ohlc', { x: ['2024-01','2024-02','2024-03'], open: [100,110,105], high: [115,120,112], low: [95,105,100], close: [110,105,108] })
+plotly_webmcp_widget_display({name: "plotly-ohlc", params: { x: ['2024-01','2024-02','2024-03'], open: [100,110,105], high: [115,120,112], low: [95,105,100], close: [110,105,108] }})
 ```

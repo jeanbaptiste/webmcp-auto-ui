@@ -27,6 +27,9 @@ Use pixijs-animated-sprite for playful bouncing shape animations. Ideal for:
 - Loading screens
 - Decorative animated elements
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "animated-sprite", params: {count: 15, shapes: "mixed"}})`
+
 ## Examples
 
 ```json

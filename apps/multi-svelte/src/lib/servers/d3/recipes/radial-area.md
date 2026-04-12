@@ -43,7 +43,7 @@ Like radial-line but with filled areas — better for comparing overall "area" b
 
 ## How
 1. Get multi-dimensional data from MCP
-2. Call `d3_webmcp_widget_display('radial-area', {labels: ["Attack","Defense","Speed","HP","Magic"], series: [{label: "Warrior", points: [{value:9},{value:8},{value:5},{value:7},{value:2}]}, {label: "Mage", points: [{value:3},{value:4},{value:6},{value:5},{value:10}]}]})`
+2. Call `d3_webmcp_widget_display({name: "radial-area", params: {labels: ["Attack","Defense","Speed","HP","Magic"], series: [{label: "Warrior", points: [{value:9},{value:8},{value:5},{value:7},{value:2}]}, {label: "Mage", points: [{value:3},{value:4},{value:6},{value:5},{value:10}]}]}})`
 
 ## Common errors
 - Same as radial-line: all series must have equal number of points

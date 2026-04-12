@@ -40,7 +40,7 @@ For geographic influence zones, nearest-neighbor visualization, or artistic spac
 
 ## How
 1. Get point data from MCP
-2. Call `d3_webmcp_widget_display('voronoi', {points: [{x:10,y:20,label:"A"},{x:50,y:60,label:"B"},{x:80,y:30,label:"C"}]})`
+2. Call `d3_webmcp_widget_display({name: "voronoi", params: {points: [{x:10,y:20,label:"A"},{x:50,y:60,label:"B"},{x:80,y:30,label:"C"}]}})`
 
 ## Common errors
 - Need at least 3 points to form meaningful cells

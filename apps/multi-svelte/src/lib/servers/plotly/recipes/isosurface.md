@@ -23,5 +23,5 @@ Extract and render surfaces at specific threshold values in volumetric data.
 
 ## Example
 ```
-widget_display('plotly-isosurface', { x: [0,0,0,0,1,1,1,1], y: [0,0,1,1,0,0,1,1], z: [0,1,0,1,0,1,0,1], value: [1,2,3,4,5,6,7,8], isomin: 3, isomax: 6 })
+plotly_webmcp_widget_display({name: "plotly-isosurface", params: { x: [0,0,0,0,1,1,1,1], y: [0,0,1,1,0,0,1,1], z: [0,1,0,1,0,1,0,1], value: [1,2,3,4,5,6,7,8], isomin: 3, isomax: 6 }})
 ```

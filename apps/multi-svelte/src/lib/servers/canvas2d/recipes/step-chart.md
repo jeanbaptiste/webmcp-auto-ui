@@ -17,9 +17,9 @@ Data that changes in discrete steps (pricing tiers, inventory levels, state tran
 
 ## How
 ```
-widget_display('canvas2d-step-chart', {
+widget_display({name: "canvas2d-step-chart", params: {
   title: 'Pricing tiers',
   values: [10, 10, 15, 15, 20, 25, 25],
   labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul']
-})
+}})
 ```

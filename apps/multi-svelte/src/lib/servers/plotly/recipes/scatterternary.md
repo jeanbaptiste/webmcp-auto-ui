@@ -20,5 +20,5 @@ Composition data where a+b+c = constant (chemistry, geology, material science).
 
 ## Example
 ```
-widget_display('plotly-scatterternary', { a: [0.5, 0.3, 0.2], b: [0.3, 0.4, 0.5], c: [0.2, 0.3, 0.3], text: ['Mix1','Mix2','Mix3'] })
+plotly_webmcp_widget_display({name: "plotly-scatterternary", params: { a: [0.5, 0.3, 0.2], b: [0.3, 0.4, 0.5], c: [0.2, 0.3, 0.3], text: ['Mix1','Mix2','Mix3'] }})
 ```

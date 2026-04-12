@@ -34,7 +34,7 @@ For hierarchical data where you want to compare leaf sizes (disk usage, budget b
 
 ## How
 1. Get hierarchical data from MCP
-2. Call `d3_webmcp_widget_display('treemap', {root: {name: "Budget", children: [{name: "R&D", value: 500}, {name: "Marketing", children: [{name: "Ads", value: 200}, {name: "Events", value: 100}]}]}})`
+2. Call `d3_webmcp_widget_display({name: "treemap", params: {root: {name: "Budget", children: [{name: "R&D", value: 500}, {name: "Marketing", children: [{name: "Ads", value: 200}, {name: "Events", value: 100}]}]}}})`
 
 ## Common errors
 - Leaf nodes must have a `value` property

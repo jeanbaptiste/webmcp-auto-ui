@@ -21,5 +21,5 @@ Compare values across categories. Use orientation 'h' for long category names.
 
 ## Example
 ```
-widget_display('plotly-bar', { x: ['A','B','C'], y: [10, 20, 15], title: 'Sales' })
+plotly_webmcp_widget_display({name: "plotly-bar", params: { x: ['A','B','C'], y: [10, 20, 15], title: 'Sales' }})
 ```

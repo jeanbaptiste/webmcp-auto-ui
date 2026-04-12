@@ -38,3 +38,6 @@ schema:
                   enum: [done, active, crit]
 ---
 Renders a Gantt chart. Provide either a raw `definition` or structured `sections` with tasks specifying start dates and durations.
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "gantt", params: {definition: "gantt\n  title Project\n  dateFormat YYYY-MM-DD\n  section Dev\n  Task A :a1, 2025-01-01, 5d\n  Task B :after a1, 3d"}})`

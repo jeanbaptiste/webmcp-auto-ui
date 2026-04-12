@@ -25,6 +25,9 @@ schema:
 
 Places custom SVG graphics on the map within geographic bounds. Useful for diagrams, annotations, or custom visualizations tied to geography.
 
+## How
+1. Call `leaflet_webmcp_widget_display({name: "leaflet-svg-overlay", params: {svgContent: "<circle cx='50' cy='50' r='40' fill='blue'/>", bounds: [[48.84, 2.33], [48.87, 2.37]], opacity: 0.8}})`
+
 ### Example
 
 ```json

@@ -34,7 +34,7 @@ schema:
 Pour afficher un chiffre cle unique (KPI, total, compteur).
 
 ## Comment
-Appeler widget_display('stat', {label: "Total", value: "42"}).
+Appeler widget_display({name: "stat", params: {label: "Total", value: "42"}}).
 `,
 
   // ── kv ──────────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ schema:
 Pour afficher des proprietes ou metadonnees sous forme de paires cle/valeur.
 
 ## Comment
-Appeler widget_display('kv', {rows: [["Nom", "Dupont"], ["Age", "42"]]}).
+Appeler widget_display({name: "kv", params: {rows: [["Nom", "Dupont"], ["Age", "42"]]}}).
 `,
 
   // ── list ─────────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ schema:
 Pour afficher une liste simple d'elements textuels.
 
 ## Comment
-Appeler widget_display('list', {items: ["A", "B", "C"]}).
+Appeler widget_display({name: "list", params: {items: ["A", "B", "C"]}}).
 `,
 
   // ── chart ────────────────────────────────────────────────────────────────
@@ -110,7 +110,7 @@ schema:
 Pour un graphique a barres simple avec des labels et valeurs numeriques.
 
 ## Comment
-Appeler widget_display('chart', {bars: [["Jan", 10], ["Fev", 20]]}).
+Appeler widget_display({name: "chart", params: {bars: [["Jan", 10], ["Fev", 20]]}}).
 `,
 
   // ── alert ────────────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ schema:
 Pour afficher une alerte, un avertissement ou une notification.
 
 ## Comment
-Appeler widget_display('alert', {title: "Attention", message: "Disque plein", level: "warn"}).
+Appeler widget_display({name: "alert", params: {title: "Attention", message: "Disque plein", level: "warn"}}).
 `,
 
   // ── code ─────────────────────────────────────────────────────────────────
@@ -157,7 +157,7 @@ schema:
 Pour afficher un extrait de code source avec coloration syntaxique.
 
 ## Comment
-Appeler widget_display('code', {lang: "python", content: "print('hello')"}).
+Appeler widget_display({name: "code", params: {lang: "python", content: "print('hello')"}}).
 `,
 
   // ── text ─────────────────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ schema:
 Pour afficher un bloc de texte libre.
 
 ## Comment
-Appeler widget_display('text', {content: "Texte explicatif..."}).
+Appeler widget_display({name: "text", params: {content: "Texte explicatif..."}}).
 `,
 
   // ── actions ──────────────────────────────────────────────────────────────
@@ -206,7 +206,7 @@ schema:
 Pour proposer des actions cliquables a l'utilisateur.
 
 ## Comment
-Appeler widget_display('actions', {buttons: [{label: "OK", primary: true}, {label: "Annuler"}]}).
+Appeler widget_display({name: "actions", params: {buttons: [{label: "OK", primary: true}, {label: "Annuler"}]}}).
 `,
 
   // ── tags ─────────────────────────────────────────────────────────────────
@@ -237,7 +237,7 @@ schema:
 Pour afficher des tags, categories ou badges.
 
 ## Comment
-Appeler widget_display('tags', {tags: [{text: "JS", active: true}, {text: "TS"}]}).
+Appeler widget_display({name: "tags", params: {tags: [{text: "JS", active: true}, {text: "TS"}]}}).
 `,
 
   // ── data-table ───────────────────────────────────────────────────────────
@@ -276,7 +276,7 @@ schema:
 Pour afficher des donnees structurees en tableau avec tri par colonne.
 
 ## Comment
-Appeler widget_display('data-table', {columns: [{key:"name",label:"Nom"}], rows: [{name:"Alice"}]}).
+Appeler widget_display({name: "data-table", params: {columns: [{key:"name",label:"Nom"}], rows: [{name:"Alice"}]}}).
 `,
 
   // ── timeline ─────────────────────────────────────────────────────────────
@@ -312,7 +312,7 @@ schema:
 Pour afficher une sequence d'evenements dans le temps.
 
 ## Comment
-Appeler widget_display('timeline', {events: [{title: "Debut", date: "2024-01", status: "done"}]}).
+Appeler widget_display({name: "timeline", params: {events: [{title: "Debut", date: "2024-01", status: "done"}]}}).
 `,
 
   // ── profile ──────────────────────────────────────────────────────────────
@@ -358,7 +358,7 @@ schema:
 Pour afficher une fiche personne ou entite avec champs structures.
 
 ## Comment
-Appeler widget_display('profile', {name: "Alice", fields: [{label:"Role", value:"Dev"}]}).
+Appeler widget_display({name: "profile", params: {name: "Alice", fields: [{label:"Role", value:"Dev"}]}}).
 
 ## Erreurs courantes
 - Ne JAMAIS inventer d'URLs pour l'avatar — utiliser uniquement celles retournées par les outils MCP. Sans URL, le widget affiche les initiales automatiquement.
@@ -398,7 +398,7 @@ schema:
 Pour afficher une grille de personnes (equipe, assemblee, etc.).
 
 ## Comment
-Appeler widget_display('trombinoscope', {people: [{name: "Alice", badge: "Lead"}]}).
+Appeler widget_display({name: "trombinoscope", params: {people: [{name: "Alice", badge: "Lead"}]}}).
 
 ## Erreurs courantes
 - Ne JAMAIS inventer d'URLs pour le champ avatar — utiliser uniquement celles retournées par les outils MCP. Sans URL, le widget affiche les initiales automatiquement.
@@ -426,7 +426,7 @@ schema:
 Pour afficher une structure JSON complexe de maniere interactive.
 
 ## Comment
-Appeler widget_display('json-viewer', {data: {a: 1, b: {c: 2}}}).
+Appeler widget_display({name: "json-viewer", params: {data: {a: 1, b: {c: 2}}}}).
 `,
 
   // ── hemicycle ────────────────────────────────────────────────────────────
@@ -466,7 +466,7 @@ schema:
 Pour visualiser la composition d'une assemblee parlementaire.
 
 ## Comment
-Appeler widget_display('hemicycle', {groups: [{id:"g1", label:"Parti A", seats:120, color:"#e63946"}]}).
+Appeler widget_display({name: "hemicycle", params: {groups: [{id:"g1", label:"Parti A", seats:120, color:"#e63946"}]}}).
 `,
 
   // ── chart-rich ───────────────────────────────────────────────────────────
@@ -508,7 +508,7 @@ schema:
 Pour des graphiques multi-series (barres, lignes, aires, camembert, donut).
 
 ## Comment
-Appeler widget_display('chart-rich', {type: "bar", labels: ["Q1","Q2"], data: [{label:"Ventes", values:[10,20]}]}).
+Appeler widget_display({name: "chart-rich", params: {type: "bar", labels: ["Q1","Q2"], data: [{label:"Ventes", values:[10,20]}]}}).
 `,
 
   // ── cards ────────────────────────────────────────────────────────────────
@@ -545,7 +545,7 @@ schema:
 Pour afficher des resultats, dossiers ou entites en grille de cartes.
 
 ## Comment
-Appeler widget_display('cards', {cards: [{title: "Projet A", description: "En cours"}]}).
+Appeler widget_display({name: "cards", params: {cards: [{title: "Projet A", description: "En cours"}]}}).
 
 ## Erreurs courantes
 - Ne JAMAIS inventer d'URLs d'images pour le champ image — utiliser uniquement celles retournées par les outils MCP. Si aucune URL n'est disponible, ne pas inclure de champ image.
@@ -598,7 +598,7 @@ schema:
 Pour visualiser des flux entre categories (votes, parcours, transferts).
 
 ## Comment
-Appeler widget_display('sankey', {nodes: [{id:"a", label:"A"}], links: [{source:"a", target:"b", value:10}]}).
+Appeler widget_display({name: "sankey", params: {nodes: [{id:"a", label:"A"}], links: [{source:"a", target:"b", value:10}]}}).
 `,
 
   // ── log ──────────────────────────────────────────────────────────────────
@@ -634,7 +634,7 @@ schema:
 Pour afficher un flux de logs ou d'evenements systeme.
 
 ## Comment
-Appeler widget_display('log', {entries: [{message: "Started", level: "info", timestamp: "12:00"}]}).
+Appeler widget_display({name: "log", params: {entries: [{message: "Started", level: "info", timestamp: "12:00"}]}}).
 `,
 
   // ── gallery ──────────────────────────────────────────────────────────────
@@ -669,7 +669,7 @@ schema:
 Pour afficher une collection d'images avec navigation lightbox.
 
 ## Comment
-Appeler widget_display('gallery', {images: [{src: "https://...", alt: "Photo 1"}]}).
+Appeler widget_display({name: "gallery", params: {images: [{src: "https://...", alt: "Photo 1"}]}}).
 
 ## Erreurs courantes
 - Ne JAMAIS fabriquer d'URLs d'images — utiliser uniquement celles retournées par les outils MCP
@@ -710,7 +710,7 @@ schema:
 Pour presenter du contenu en diaporama avec navigation.
 
 ## Comment
-Appeler widget_display('carousel', {slides: [{src: "https://...", title: "Slide 1"}]}).
+Appeler widget_display({name: "carousel", params: {slides: [{src: "https://...", title: "Slide 1"}]}}).
 
 ## Erreurs courantes
 - Ne JAMAIS fabriquer d'URLs d'images pour src — utiliser uniquement celles retournées par les outils MCP
@@ -764,7 +764,7 @@ schema:
 Pour afficher une carte geographique avec des marqueurs.
 
 ## Comment
-Appeler widget_display('map', {center: {lat: 48.8, lng: 2.3}, zoom: 12, markers: [{lat: 48.8, lng: 2.3, label: "Paris"}]}).
+Appeler widget_display({name: "map", params: {center: {lat: 48.8, lng: 2.3}, zoom: 12, markers: [{lat: 48.8, lng: 2.3, label: "Paris"}]}}).
 `,
 
   // ── stat-card ────────────────────────────────────────────────────────────
@@ -801,7 +801,7 @@ schema:
 Pour un KPI enrichi avec delta, unite et variante de couleur.
 
 ## Comment
-Appeler widget_display('stat-card', {label: "Uptime", value: "99.9", unit: "%", trend: "up", variant: "success"}).
+Appeler widget_display({name: "stat-card", params: {label: "Uptime", value: "99.9", unit: "%", trend: "up", variant: "success"}}).
 `,
 
   // ── grid-data ────────────────────────────────────────────────────────────
@@ -855,7 +855,7 @@ schema:
 Pour des grilles de donnees avec mise en valeur de cellules (heatmap, comparaison).
 
 ## Comment
-Appeler widget_display('grid-data', {columns: [{key:"a",label:"A"}], rows: [[1,2],[3,4]], highlights: [{row:0,col:1,color:"#ff0"}]}).
+Appeler widget_display({name: "grid-data", params: {columns: [{key:"a",label:"A"}], rows: [[1,2],[3,4]], highlights: [{row:0,col:1,color:"#ff0"}]}}).
 `,
 
   // ── d3 ───────────────────────────────────────────────────────────────────
@@ -883,7 +883,7 @@ schema:
 Pour des visualisations avancees D3.js (heatmap hexagonale, radial, treemap, graphe de force).
 
 ## Comment
-Appeler widget_display('d3', {preset: "treemap", data: {name: "root", children: [...]}}).
+Appeler widget_display({name: "d3", params: {preset: "treemap", data: {name: "root", children: [...]}}}).
 `,
 
   // ── js-sandbox ───────────────────────────────────────────────────────────
@@ -916,7 +916,7 @@ schema:
 Pour des visualisations custom, animations, ou prototypes interactifs en JS pur.
 
 ## Comment
-Appeler widget_display('js-sandbox', {code: "document.getElementById('root').innerHTML = '<h1>Hello</h1>'"}).
+Appeler widget_display({name: "js-sandbox", params: {code: "document.getElementById('root').innerHTML = '<h1>Hello</h1>'"}}).
 `,
 
   // ── recipe-browser ──────────────────────────────────────────────────────
@@ -966,8 +966,8 @@ Quand l'utilisateur veut voir les recettes disponibles, explorer les possibilite
 Appelle search_recipes() sur chaque serveur connecte (MCP et WebMCP) pour obtenir la liste des recettes.
 
 ### Etape 2 — Afficher en cartes interactives
-Utilise widget_display('cards', ...) avec le parametre interactive: true pour rendre les cartes cliquables :
-widget_display('cards', {title: "Recettes disponibles", cards: [{title: "Nom", description: "Description", tags: ["serveur"], meta: {recipe_name: "nom_technique", server: "nom_serveur"}}], interactive: true})
+Utilise widget_display({name: "cards", params: {...}}) avec le parametre interactive: true pour rendre les cartes cliquables :
+widget_display({name: "cards", params: {title: "Recettes disponibles", cards: [{title: "Nom", description: "Description", tags: ["serveur"], meta: {recipe_name: "nom_technique", server: "nom_serveur"}}], interactive: true}})
 
 Le champ meta est important : il sera renvoye dans l'evenement d'interaction quand l'utilisateur clique sur la carte.
 

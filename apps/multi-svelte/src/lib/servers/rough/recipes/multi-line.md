@@ -21,3 +21,6 @@ Compare multiple trends on a shared axis.
 - `labels` — shared x-axis labels
 - `series` — array of `{name, values}` objects
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "multi-line", params: {labels: ["Q1","Q2","Q3","Q4"], series: [{name: "Revenue", values: [100,150,130,200]}, {name: "Costs", values: [80,90,110,120]}], title: "Revenue vs Costs"}})`

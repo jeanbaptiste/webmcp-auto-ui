@@ -35,7 +35,7 @@ Display 3D printable models, STL-like geometry from triangle or vertex/face data
 ## How
 
 ```
-widget_display('stl-viewer', {
+threejs_webmcp_widget_display({name: "stl-viewer", params: {
   title: "Pyramid",
   triangles: [
     [[0,0,0],[1,0,0],[0.5,1,0]],
@@ -44,5 +44,5 @@ widget_display('stl-viewer', {
     [[0,0,0],[1,0,0],[0.5,0.5,1]]
   ],
   color: "#8899bb"
-})
+}})
 ```

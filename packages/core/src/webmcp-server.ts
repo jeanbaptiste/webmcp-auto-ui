@@ -425,14 +425,14 @@ export function createWebMcpServer(
       {
         name: 'widget_display',
         // Description is dynamic — rebuilt in layer()
-        description: 'Display a widget on the canvas.',
+        description: 'Display a widget on the canvas. REQUIRED: {name: "widget_type", params: {…}}. Example: {name: "text", params: {content: "Hello world"}}',
         inputSchema: {
           type: 'object',
           properties: {
-            name: { type: 'string', description: 'Widget name' },
+            name: { type: 'string', description: 'Widget name (e.g. "text", "stat", "list", "chart", "data-table")' },
             params: {
               type: 'object',
-              description: 'Widget parameters (call get_recipe for the schema)',
+              description: 'Widget parameters as JSON object (call get_recipe for the full schema). Example for text: {content: "Hello"}',
             },
           },
           required: ['name'],
@@ -507,7 +507,7 @@ export function createWebMcpServer(
         // Rebuild widget_display description with current widget names
         const names = [...widgets.keys()];
         const displayTool = builtinTools.find(t => t.name === 'widget_display')!;
-        displayTool.description = `Display a widget on the canvas. Available widgets: ${names.join(', ')}.`;
+        displayTool.description = `Display a widget on the canvas. REQUIRED: {name: "widget_type", params: {…}}. Example: {name: "text", params: {content: "Hello"}}. Available widgets: ${names.join(', ')}.`;
 
         allTools.push(...builtinTools);
       }

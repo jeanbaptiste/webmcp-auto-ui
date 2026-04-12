@@ -35,6 +35,9 @@ schema:
 
 Add a hillshade relief layer to the map. Shows terrain through shading without 3D perspective — useful for topographic visualization in 2D.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "hillshade-map", params: {center: [7.36, 46.49], zoom: 10, exaggeration: 0.7, illuminationDirection: 315}})`
+
 ## Example
 
 ```json

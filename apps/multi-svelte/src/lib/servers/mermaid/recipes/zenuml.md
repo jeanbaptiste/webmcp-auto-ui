@@ -23,3 +23,6 @@ schema:
             type: string
 ---
 Renders a ZenUML diagram. Provide either a raw `definition` or structured `messages` with method calls.
+
+## How
+1. Call `mermaid_webmcp_widget_display({name: "zenuml", params: {definition: "zenuml\n  Client.call() {\n    Server.process() {\n      DB.query()\n    }\n  }"}})`

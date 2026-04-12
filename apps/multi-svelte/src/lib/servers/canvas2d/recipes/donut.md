@@ -23,7 +23,7 @@ Part-to-whole with a central KPI or label.
 
 ## How
 ```
-widget_display('canvas2d-donut', {
+widget_display({name: "canvas2d-donut", params: {
   title: 'Budget allocation',
   centerLabel: '$1.2M',
   slices: [
@@ -31,5 +31,5 @@ widget_display('canvas2d-donut', {
     { label: 'Marketing', value: 300 },
     { label: 'Operations', value: 400 }
   ]
-})
+}})
 ```

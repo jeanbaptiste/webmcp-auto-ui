@@ -37,3 +37,7 @@ schema:
 ## Usage
 
 Arranges nodes in a regular grid pattern. Optionally specify `layout.rows` or `layout.cols` to control the grid shape. Useful for matrix-like visualizations or structured networks.
+
+## How
+
+1. Call `cytoscape_webmcp_widget_display({name: "grid-map", params: {elements: [{data: {id: "a", label: "A"}}, {data: {id: "b", label: "B"}}, {data: {id: "c", label: "C"}}, {data: {id: "d", label: "D"}}, {data: {source: "a", target: "b"}}, {data: {source: "c", target: "d"}}], layout: {rows: 2}}})`

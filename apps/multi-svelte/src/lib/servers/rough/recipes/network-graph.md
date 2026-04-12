@@ -25,3 +25,6 @@ Nodes connected by edges, arranged in a radial layout.
 - `nodes` — array of `{id, label?, x?, y?}` objects
 - `edges` — array of `{source, target}` objects (ids)
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "network-graph", params: {nodes: [{id: "a", label: "Server"}, {id: "b", label: "Client"}, {id: "c", label: "DB"}], edges: [{source: "a", target: "b"}, {source: "a", target: "c"}], title: "System Architecture"}})`

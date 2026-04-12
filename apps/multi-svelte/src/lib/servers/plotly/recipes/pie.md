@@ -18,5 +18,5 @@ Show proportions of a whole. Use hole > 0 for donut style.
 
 ## Example
 ```
-widget_display('plotly-pie', { values: [40, 30, 20, 10], labels: ['A','B','C','D'], hole: 0.4 })
+plotly_webmcp_widget_display({name: "plotly-pie", params: { values: [40, 30, 20, 10], labels: ['A','B','C','D'], hole: 0.4 }})
 ```

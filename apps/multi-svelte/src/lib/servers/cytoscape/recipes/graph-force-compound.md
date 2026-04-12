@@ -35,3 +35,7 @@ schema:
 ## Usage
 
 Renders a force-directed graph with compound nodes (groups). Nodes with a `parent` field are visually nested inside the parent node. Uses the CoSE-Bilkent layout for better compound node handling.
+
+## How
+
+1. Call `cytoscape_webmcp_widget_display({name: "graph-force-compound", params: {elements: [{data: {id: "g1", label: "Team A"}}, {data: {id: "g2", label: "Team B"}}, {data: {id: "a", label: "Alice", parent: "g1"}}, {data: {id: "b", label: "Bob", parent: "g1"}}, {data: {id: "c", label: "Carol", parent: "g2"}}, {data: {source: "a", target: "c"}}]}})`

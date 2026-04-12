@@ -19,3 +19,6 @@ Data points with vertical error bars indicating uncertainty.
 
 - `points` — array of `{label, value, error}` objects
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "error-bar", params: {points: [{label: "Exp 1", value: 45, error: 8}, {label: "Exp 2", value: 52, error: 5}], title: "Measurement Uncertainty"}})`

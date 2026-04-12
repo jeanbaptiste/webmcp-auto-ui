@@ -28,5 +28,5 @@ Visualize flows between categories (energy, money, materials, users).
 
 ## Example
 ```
-widget_display('plotly-sankey', { nodes: { label: ['A','B','C','D'] }, links: { source: [0,0,1,2], target: [1,2,3,3], value: [8,4,6,3] } })
+plotly_webmcp_widget_display({name: "plotly-sankey", params: { nodes: { label: ['A','B','C','D'] }, links: { source: [0,0,1,2], target: [1,2,3,3], value: [8,4,6,3] } }})
 ```

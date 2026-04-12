@@ -21,5 +21,5 @@ Display matrix data, correlation matrices, confusion matrices, or 2D density.
 
 ## Example
 ```
-widget_display('plotly-heatmap', { z: [[1,2,3],[4,5,6],[7,8,9]], x: ['A','B','C'], y: ['X','Y','Z'] })
+plotly_webmcp_widget_display({name: "plotly-heatmap", params: { z: [[1,2,3],[4,5,6],[7,8,9]], x: ['A','B','C'], y: ['X','Y','Z'] }})
 ```

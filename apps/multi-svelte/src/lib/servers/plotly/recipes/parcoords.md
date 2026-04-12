@@ -25,5 +25,5 @@ Explore high-dimensional data, find patterns and filter interactively.
 
 ## Example
 ```
-widget_display('plotly-parcoords', { dimensions: [{ label: 'A', values: [1,4,2] }, { label: 'B', values: [3,1,5] }], lineColor: [1, 2, 3] })
+plotly_webmcp_widget_display({name: "plotly-parcoords", params: { dimensions: [{ label: 'A', values: [1,4,2] }, { label: 'B', values: [3,1,5] }], lineColor: [1, 2, 3] }})
 ```

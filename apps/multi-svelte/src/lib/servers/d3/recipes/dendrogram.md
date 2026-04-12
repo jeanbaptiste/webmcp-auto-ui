@@ -32,7 +32,7 @@ For hierarchical clustering results, phylogenetic trees, or any dendrogram where
 
 ## How
 1. Get clustering result from MCP
-2. Call `d3_webmcp_widget_display('dendrogram', {root: {name: "root", children: [{name: "Cluster A", children: [{name: "Item 1"}, {name: "Item 2"}]}, {name: "Item 3"}]}})`
+2. Call `d3_webmcp_widget_display({name: "dendrogram", params: {root: {name: "root", children: [{name: "Cluster A", children: [{name: "Item 1"}, {name: "Item 2"}]}, {name: "Item 3"}]}}})`
 
 ## Common errors
 - Unlike tree, dendrogram aligns all leaves at the same radius/x-position

@@ -43,7 +43,7 @@ For comparing multiple entities across several dimensions (skill radar, product 
 
 ## How
 1. Get multi-dimensional data from MCP
-2. Call `d3_webmcp_widget_display('radial-line', {labels: ["Speed","Power","Range","Efficiency"], series: [{label: "Model A", points: [{value:8},{value:6},{value:9},{value:7}]}]})`
+2. Call `d3_webmcp_widget_display({name: "radial-line", params: {labels: ["Speed","Power","Range","Efficiency"], series: [{label: "Model A", points: [{value:8},{value:6},{value:9},{value:7}]}]}})`
 
 ## Common errors
 - All series must have the same number of points (matching labels length)

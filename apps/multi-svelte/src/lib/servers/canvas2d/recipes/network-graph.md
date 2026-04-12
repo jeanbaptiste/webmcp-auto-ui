@@ -31,7 +31,7 @@ Show relationships between entities (social networks, dependencies, knowledge gr
 
 ## How
 ```
-widget_display('canvas2d-network-graph', {
+widget_display({name: "canvas2d-network-graph", params: {
   title: 'Team connections',
   nodes: [
     { id: 'a', label: 'Alice', group: 0 },
@@ -39,5 +39,5 @@ widget_display('canvas2d-network-graph', {
     { id: 'c', label: 'Charlie', group: 1 }
   ],
   edges: [{ source: 'a', target: 'b' }, { source: 'b', target: 'c' }]
-})
+}})
 ```

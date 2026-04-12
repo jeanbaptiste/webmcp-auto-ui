@@ -19,5 +19,5 @@ RF engineering — plot impedance/admittance on a Smith chart.
 
 ## Example
 ```
-widget_display('plotly-scattersmith', { real: [0.5, 1.0, 1.5], imag: [0.2, -0.3, 0.5] })
+plotly_webmcp_widget_display({name: "plotly-scattersmith", params: { real: [0.5, 1.0, 1.5], imag: [0.2, -0.3, 0.5] }})
 ```

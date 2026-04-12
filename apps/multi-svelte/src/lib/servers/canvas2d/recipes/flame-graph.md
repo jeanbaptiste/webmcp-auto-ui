@@ -21,7 +21,7 @@ Visualize call stacks, CPU profiles, or any hierarchical time breakdown.
 
 ## How
 ```
-widget_display('canvas2d-flame-graph', {
+widget_display({name: "canvas2d-flame-graph", params: {
   title: 'CPU Profile',
   root: {
     name: 'main', value: 100,
@@ -30,5 +30,5 @@ widget_display('canvas2d-flame-graph', {
       { name: 'render', value: 60 }
     ]
   }
-})
+}})
 ```

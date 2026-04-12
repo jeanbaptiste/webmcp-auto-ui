@@ -38,7 +38,7 @@ For showing regional statistics on a map (GDP by country, temperature by state, 
 
 ## How
 1. Get GeoJSON and values from MCP
-2. Call `d3_webmcp_widget_display('choropleth', {geojson: {...}, values: [{id: "France", value: 67}, {id: "Germany", value: 83}]})`
+2. Call `d3_webmcp_widget_display({name: "choropleth", params: {geojson: {...}, values: [{id: "France", value: 67}, {id: "Germany", value: 83}]}})`
 
 ## Common errors
 - `values[].id` must match `feature.properties.name` or `feature.properties.id` in the GeoJSON

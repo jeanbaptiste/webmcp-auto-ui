@@ -32,6 +32,9 @@ Use pixijs-progress-ring for animated circular progress indicators. Ideal for:
 - Upload/download progress
 - Score displays
 
+## How
+1. Call `pixijs_webmcp_widget_display({name: "progress-ring", params: {value: 73, color: "#10b981", title: "Progress"}})`
+
 ## Examples
 
 ```json

@@ -31,6 +31,9 @@ schema:
 
 Renders a WMS layer from a standards-compliant Web Map Service.
 
+## How
+1. Call `leaflet_webmcp_widget_display({name: "leaflet-tile-wms", params: {center: [47.0, 2.0], zoom: 6, url: "https://ows.mundialis.de/services/service", layers: "TOPO-OSM-WMS", format: "image/png", transparent: true}})`
+
 ### Example
 
 ```json

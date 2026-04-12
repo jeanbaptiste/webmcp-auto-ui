@@ -35,6 +35,9 @@ schema:
 
 Draws geographic circles with a radius in meters. The circle scales with zoom level to represent real-world distance.
 
+## How
+1. Call `leaflet_webmcp_widget_display({name: "leaflet-circle", params: {center: [48.85, 2.35], zoom: 12, circles: [{latlng: [48.8566, 2.3522], radius: 1000, color: "#e74c3c", fillOpacity: 0.2}]}})`
+
 ### Example
 
 ```json

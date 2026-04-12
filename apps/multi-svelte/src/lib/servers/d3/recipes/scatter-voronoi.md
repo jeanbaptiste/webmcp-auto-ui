@@ -47,7 +47,7 @@ For scatter plots with many points where precise hover detection matters. Vorono
 
 ## How
 1. Get scatter data from MCP
-2. Call `d3_webmcp_widget_display('scatter-voronoi', {points: [{x:1,y:2,label:"A"},{x:3,y:5,label:"B"},{x:2,y:3,label:"C"}], xLabel: "Height", yLabel: "Weight"})`
+2. Call `d3_webmcp_widget_display({name: "scatter-voronoi", params: {points: [{x:1,y:2,label:"A"},{x:3,y:5,label:"B"},{x:2,y:3,label:"C"}], xLabel: "Height", yLabel: "Weight"}})`
 
 ## Common errors
 - Works best with >10 points

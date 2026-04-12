@@ -22,7 +22,7 @@ Show part-to-whole relationships (few categories, <8 ideal).
 
 ## How
 ```
-widget_display('canvas2d-pie', {
+widget_display({name: "canvas2d-pie", params: {
   title: 'Market share',
   slices: [
     { label: 'Chrome', value: 65 },
@@ -30,5 +30,5 @@ widget_display('canvas2d-pie', {
     { label: 'Safari', value: 12 },
     { label: 'Other', value: 8 }
   ]
-})
+}})
 ```

@@ -17,5 +17,5 @@ Like funnel but with proportional areas (pie-like segments stacked).
 
 ## Example
 ```
-widget_display('plotly-funnelarea', { values: [5, 4, 3, 2, 1], labels: ['A','B','C','D','E'] })
+plotly_webmcp_widget_display({name: "plotly-funnelarea", params: { values: [5, 4, 3, 2, 1], labels: ['A','B','C','D','E'] }})
 ```

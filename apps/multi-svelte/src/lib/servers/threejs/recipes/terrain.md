@@ -37,10 +37,10 @@ Display terrain, elevation data, or any heightmap as a colored 3D surface.
 ## How
 
 ```
-widget_display('terrain', {
+threejs_webmcp_widget_display({name: "terrain", params: {
   title: "Mountain",
   width: 5, depth: 5,
   heights: [0,1,2,1,0, 1,3,5,3,1, 2,5,8,5,2, 1,3,5,3,1, 0,1,2,1,0],
   heightScale: 0.5
-})
+}})
 ```

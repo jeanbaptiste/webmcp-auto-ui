@@ -23,3 +23,6 @@ Bars stacked to show part-to-whole relationships per category.
 - `labels` — category names
 - `series` — array of `{name, values}` objects
 - `title` — optional chart title
+
+## How
+1. Call `rough_webmcp_widget_display({name: "stacked-bar", params: {labels: ["2021","2022","2023"], series: [{name: "Web", values: [40,55,70]}, {name: "Mobile", values: [30,45,50]}], title: "Revenue by Platform"}})`

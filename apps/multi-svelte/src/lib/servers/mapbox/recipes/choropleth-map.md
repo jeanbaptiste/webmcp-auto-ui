@@ -44,6 +44,9 @@ schema:
 
 Display geographic data as colored regions. Provide a GeoJSON FeatureCollection where each polygon has a numeric property used for color interpolation.
 
+## How
+1. Call `mapbox_webmcp_widget_display({name: "choropleth-map", params: {geojson: {type: "FeatureCollection", features: [{type: "Feature", properties: {name: "Region A", value: 75}, geometry: {type: "Polygon", coordinates: [[[2.0,48.5],[2.5,48.5],[2.5,49.0],[2.0,49.0],[2.0,48.5]]]}}]}, property: "value", colors: ["#f7fbff", "#4292c6", "#084594"], stops: [0, 50, 100], fitBounds: true}})`
+
 ## Example
 
 ```json

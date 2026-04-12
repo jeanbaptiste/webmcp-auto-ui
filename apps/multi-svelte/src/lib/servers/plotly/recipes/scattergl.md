@@ -22,5 +22,5 @@ Use for large datasets where SVG scatter would be too slow. Same API as scatter 
 
 ## Example
 ```
-widget_display('plotly-scattergl', { x: [...1000 points], y: [...1000 points], mode: 'markers' })
+plotly_webmcp_widget_display({name: "plotly-scattergl", params: { x: [...1000 points], y: [...1000 points], mode: 'markers' }})
 ```
