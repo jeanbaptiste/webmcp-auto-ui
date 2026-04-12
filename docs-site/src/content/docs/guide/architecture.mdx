@@ -1,342 +1,338 @@
 ---
-title: Architecture
-description: Composants et flows du système WebMCP Auto-UI
+title: Architecture du système
+description: Vue détaillée de la boucle agent, tool layers, component registry et canvas réactif
 sidebar:
   order: 2
 ---
 
-## Vue d'ensemble
+WebMCP Auto-UI utilise une **architecture modulaire** basée sur quatre concepts fondamentaux : la **boucle agentic**, les **tool layers**, le **composant registry** et le **canvas réactif**.
 
-WebMCP Auto-UI est composé de **4 couches** :
-
-1. **LLM Provider** : Interface avec Claude, Gemma, ou Haiku
-2. **Agent Loop** : Orchestration des appels d'outils et gestion du contexte
-3. **Tool Layers** : Abstraction unifiée des outils MCP + WebMCP
-4. **UI Rendering** : Widgets natifs + dispatcher
-
-### Diagramme architectural complet
+## Architecture globale
 
 ```mermaid
 graph TB
-    subgraph "1. LLM Provider Layer"
-        RA["RemoteLLMProvider<br/>(Claude via API)"]
-        WA["WasmProvider<br/>(Gemma in-browser)"]
-        LA["LocalLLMProvider<br/>(Ollama local)"]
+    subgraph "Frontend (Svelte 5)"
+        Canvas["Canvas Réactif\n(store + widgets)"]
+        Chat["Chat Panel\n(messages)"]
+        Settings["Settings\n(LLM, MCP)"]
+        Canvas -->|broadcast| Bus["FONC Message Bus"]
+        Chat -->|send| Bus
     end
     
-    subgraph "2. Agent Loop"
-        AL["runAgentLoop()"]
-        SP["buildSystemPrompt()"]
-        TL["buildToolsFromLayers()"]
-        CM["compressOldToolResults()"]
+    subgraph "Agent (boucle agentic)"
+        Prompt["User Prompt\n(ou interaction)"]
+        LLM["LLM Provider\n(Claude/Gemma)"]
+        Prompt -->|entrée| LLM
+        LLM -->|tool_use| Dispatch["Tool Dispatcher"]
+        Dispatch -->|résultats| LLM
+        LLM -->|comprendre| SysPrompt["System Prompt\n(avec tool listing)"]
     end
     
-    subgraph "3. Tool Layers"
-        DT["Discovery Tools<br/>(search_recipes,<br/>list_recipes,<br/>list_tools)"]
-        AT["Activation<br/>(lazy loading)"]
-        AR["Tool Alias Registry<br/>(4-layer matching)"]
+    subgraph "Tool Routing"
+        TL["Tool Layers\n(MCP + WebMCP)"]
+        MCP["MCP Servers\n(SSE/HTTP)"]
+        WebMCP["WebMCP Servers\n(local)"]
+        TL -->|route| MCP
+        TL -->|route| WebMCP
+        MCP -->|données| Dispatch
+        WebMCP -->|widgets| Dispatch
     end
     
-    subgraph "4a. MCP Data Sources"
-        MC["MCP Client"]
-        MS["Remote Servers<br/>(db, api, ...)"]
-    end
-    
-    subgraph "4b. WebMCP Display"
-        WS["WebMCP Servers<br/>(autoui + custom)"]
-        WD["widget_display()"]
-    end
-    
-    subgraph "5. UI Rendering"
-        WR["WidgetRenderer"]
-        NM["Native Map<br/>(stat, chart,<br/>map, gallery, ...)"]
-        CV["Canvas + Bus"]
-    end
-    
-    RA --> AL
-    WA --> AL
-    LA --> AL
-    
-    AL --> SP
-    AL --> TL
-    
-    SP --> AR
-    TL --> DT
-    DT --> AT
-    AT --> AR
-    
-    AR -->|"resolve alias"| MC
-    MC --> MS
-    
-    AL -->|"dispatch tool_use"| MC
-    AL -->|"dispatch tool_use"| WS
-    
-    WS --> WD
-    WD --> WR
-    WR --> NM
-    NM --> CV
-    
-    CM -->|"compress ctx"| AL
+    Chat -->|prompt| Prompt
+    Dispatch -->|widget_display| Canvas
+    Dispatch -->|canvas tools| Bus
+    Canvas -->|onWidget callback| Dispatch
 ```
 
-## Agent Loop Flow
+## Boucle agentic détaillée
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Agent as runAgentLoop()
+    participant Chat as Chat Panel
+    participant Agent as Agent Loop
     participant LLM as LLM Provider
-    participant Tools as Tool Dispatch
-    participant MCP as MCP Client
-    participant WebMCP as WebMCP Server
-    participant UI as Widget Renderer
+    participant Dispatcher as Tool Dispatcher
+    participant ToolLayer as Tool Layers
+    participant Canvas as Canvas / UI
     
-    User->>Agent: chat message
-    Agent->>Agent: Build discovery tools
+    User->>Chat: Écrit un prompt
+    Chat->>Agent: runAgentLoop(prompt)
     
-    loop Until end_turn or max_iterations
-        Agent->>LLM: chat(messages, activeTools)
-        LLM-->>Agent: response + tool_calls
+    loop Jusqu'à end_turn ou max_iterations
+        Agent->>LLM: POST /chat (messages, tools, system)
+        LLM-->>Agent: response (text + tool_use blocks)
         
-        alt No tool calls
-            Agent->>Agent: finishedNormally = true
-            break
-        end
-        
-        Agent->>Agent: Add assistant response to messages
-        
-        for each tool_call
-            Agent->>Tools: Resolve alias + dispatch
+        alt Pas de tool_use
+            Agent->>Chat: texte final
+            Agent->>Canvas: onDone(metrics)
+            break Agent terminé
+        else tool_use présent
+            Agent->>Dispatcher: Traiter chaque block
             
-            alt MCP tool
-                Tools->>MCP: callTool(name, args)
-                MCP-->>Tools: result
-            else WebMCP tool (widget_display)
-                Tools->>WebMCP: executeTool(name, args)
-                WebMCP-->>Tools: {widget, data, id}
-                Tools->>UI: onWidget callback
-                UI-->>Tools: widgetId
-            else WebMCP tool (recall)
-                Tools->>Agent: resultBuffer[id]
-                Agent-->>Tools: full result
+            par Dispatch parallèle
+                Dispatcher->>ToolLayer: Résoudre alias + activer serveur
+                ToolLayer->>ToolLayer: resolveCanonicalTools()
+                
+                Dispatcher->>ToolLayer: Appeler outil
+                alt MCP
+                    ToolLayer->>ToolLayer: client.callTool()
+                else WebMCP
+                    ToolLayer->>ToolLayer: server.executeTool()
+                end
+                
+                ToolLayer-->>Dispatcher: résultat
             end
             
-            Tools-->>Agent: tool_result (truncated if > 10KB)
-            Agent->>Agent: Store in resultBuffer[tool_use_id]
-        end
-        
-        Agent->>Agent: Add tool_results to messages
-        Agent->>Agent: compressOldToolResults(messages)
-        
-        alt No render yet && iterationsWithoutRender >= 4
-            Agent->>Agent: Strip discovery tools to force render
-        end
-        
-        alt No render yet && iterationsWithoutRender >= 5
-            Agent->>Agent: Nudge: "Call widget_display() NOW"
+            Dispatcher->>Dispatcher: Compresser anciens tool_results
+            Dispatcher->>Agent: tool_result blocks
+            Agent->>Agent: compressHistory si contexte trop grand
         end
     end
-    
-    Agent-->>User: AgentResult {text, toolCalls, metrics}
 ```
 
-## Tool Layers — Résolution et Dispatch
+## Tool Layers (couches d'outils)
 
-### Qu'est-ce qu'une Tool Layer ?
-
-Une **ToolLayer** encapsule un serveur d'outils (MCP ou WebMCP) :
+Chaque **couche** représente un **serveur** (MCP ou WebMCP) :
 
 ```typescript
 interface ToolLayer {
   protocol: 'mcp' | 'webmcp';
   serverName: string;
   description?: string;
-  tools: McpToolDef[] | WebMcpToolDef[];
+  tools: WebMcpToolDef[] | McpToolDef[];
 }
 ```
 
-### Nommage unifié : `{serverName}_{protocol}_{toolName}`
+### Phase 1 : Discovery (démarrage)
 
-Tous les outils reçoivent un préfixe unique :
-- `recipes_mcp_search_recipes` → MCP server "recipes"
-- `autoui_webmcp_stat` → WebMCP server "autoui"
-- `autoui_webmcp_widget_display` → Built-in display tool
-
-### 4-layer Canonical Tool Matching
-
-L'agent doit connaître quels outils correspondent à :
-- `search_recipes` — Chercher une recette
-- `list_recipes` — Lister toutes les recettes
-- `get_recipe` — Lire une recette complète
-
-Le système les trouve via 4 couches de heuristique :
+Au lancement, seuls les **outils de discovery** sont disponibles :
 
 ```typescript
-// Layer 1 — Exact match par nom
-if (toolName === 'search_recipes') → found!
-
-// Layer 2 — Décomposer nom en tokens (action, resource)
-'find_templates' → action='find' + resource='templates'
-if (action in SEARCH_ACTIONS && resource in RESOURCES) → found!
-
-// Layer 3 — Scanner la description
-if (description.includes('recipe')) → likely a recipe tool
-
-// Layer 4 — Fallback : pas de recettes trouvées
-// → lister les outils bruts disponibles
+const discoveryTools = buildDiscoveryToolsWithAliases(layers);
+// Retourne : [ {name: "server_mcp_search_recipes", ...}, 
+//              {name: "server_mcp_list_tools", ...}, ... ]
 ```
 
-### Lazy Loading et Activation
+**Outils discovery** :
+- `{server}_{protocol}_search_recipes(query)` — cherche par mot-clé
+- `{server}_{protocol}_list_recipes()` — liste toutes les recettes
+- `{server}_{protocol}_get_recipe(name)` — charge une recette complète
+- `{server}_{protocol}_search_tools(query)` — cherche les outils
+- `{server}_{protocol}_list_tools()` — liste les outils disponibles
 
-Au démarrage, seuls les **discovery tools** sont actifs :
-```typescript
-const disc = buildDiscoveryToolsWithAliases(layers);
-// → [search_recipes, list_recipes, search_tools, list_tools, ...]
-```
+### Phase 2 : Activation (lazy loading)
 
-Quand l'agent appelle un outil d'un serveur pour la première fois :
+Quand l'agent appelle un outil **réel** (non-discovery) :
+
 ```typescript
-// Détecter: "autoui_webmcp_stat" → serverName="autoui", protocol="webmcp"
-if (!activatedServers.has("autoui_webmcp")) {
-  activateServerTools(currentTools, layer); // Ajouter tous les outils du serveur
+// Dispatcher détecte que c'est la 1ère fois
+if (!activatedServers.has(serverKey)) {
+  activatedServers.add(serverKey);
+  const layer = layers.find(l => l.serverName === serverName);
+  activeTools = activateServerTools(activeTools, layer);
+  // ✅ Tous les outils du serveur deviennent disponibles
 }
 ```
 
-Cela économise le contexte initial en masquant les implémentations détaillées.
+### Phase 3 : Canonical tool resolution (4-layer matching)
 
-## Compression du contexte
+Pour les **MCP servers**, les outils sont matchés à des **rôles canoniques** :
 
-Après 2+ itérations, les anciens résultats d'outils sont tronqués :
-
-```typescript
-// Avant (300+ chars)
-{
-  "content": "SELECT * FROM users;... [5000 rows] ...",
-  "type": "tool_result"
-}
-
-// Après (économise ~2KB)
-{
-  "content": "SELECT * FROM users;... [recall('toolu_xxx') pour résultat complet, 125000 chars]",
-  "type": "tool_result"
-}
+```mermaid
+graph LR
+    A["Tool MCP:\nfind_recipes_by_keyword"] -->|Couche 1| B["Match exact\nsearch_recipes?"]
+    A -->|Couche 2| C["Tokenize\n+ action×resource\nmatching"]
+    A -->|Couche 3| D["Description keywords\n(recipe, template, ...)"]
+    A -->|Couche 4| E["Fallback\nRaw tool names"]
+    
+    B -->|✓| F["search_recipes alias"]
+    C -->|✓ search+recipes| F
+    D -->|✓ contient recipe| F
+    E -->|pas de match| F
 ```
 
-L'agent peut appeler `recall('toolu_xxx')` pour récupérer le résultat complet.
+**Couche 1** : Nom exact (`search_recipes`, `list_recipes`, `get_recipe`)
 
-## Widget Registry et Rendering
-
-### Native Map
-
-La UI expose une **static map** de 30+ widgets natifs :
-
+**Couche 2** : Décomposition en tokens + matching action/ressource
 ```typescript
-const NATIVE_MAP = {
-  'stat': { component: StatBlock, props: (data) => ({ data }) },
-  'chart': { component: ChartBlock, ... },
-  'map': { component: MapView, ... },
-  'gallery': { component: Gallery, ... },
-  // ...
-};
+// Exemple : "find_recipe_by_keyword"
+// → tokens: ["find", "recipe", "by", "keyword"]
+// → test toutes les paires (find, recipe) → SEARCH + RECIPE = "search_recipes" ✓
 ```
 
-### Résolution de rendering
-
-Quand un widget doit être rendu :
-
-1. **Chercher dans les serveurs WebMCP connectés** → custom renderers
-2. **Sinon chercher dans NATIVE_MAP** → widgets natifs
-3. **Sinon** → placeholder `[widget_type]`
-
+**Couche 3** : Keywords dans la description
 ```typescript
-// WidgetRenderer.svelte
-const customRenderer = servers?.find(s => s.getWidget(type))?.renderer;
-const nativeEntry = NATIVE_MAP[type];
-
-if (customRenderer) {
-  // Renderer custom (framework component ou vanilla)
-} else if (nativeEntry) {
-  // Widget natif
-} else {
-  // Fallback
-}
+// Exemple : "Query our template library" 
+// → contient "template" → LIST + template = "list_recipes" ✓
 ```
 
-### SafeImage — Validation d'URLs
+**Couche 4** : Fallback (pas d'alias, utiliser le nom brut)
 
-Puisque les agents peuvent halluciner des URLs d'images, **SafeImage** valide les URLs :
+### Aliasing et dispatch transparent
 
-```typescript
-const VALID_PREFIXES = ['http://', 'https://', 'data:', '/'];
-
-if (!src?.startsWith(...VALID_PREFIXES)) {
-  // Afficher placeholder au lieu de <img src="hallucination">
-}
-```
-
-## System Prompt — Cascade de découverte
-
-Le prompt généré suit une cascade de 4 étapes :
-
-```text
-ÉTAPE 1 — Recherche de recette (search_recipes)
-   ↓ Si pas de résultat
-ÉTAPE 1b — Liste des recettes (list_recipes)
-   ↓ Si pas de recettes
-ÉTAPE 1c — Recherche d'outils (search_tools)
-   ↓ Si pas d'outils
-ÉTAPE 1d — Liste des outils (list_tools)
-   ↓
-ÉTAPE 2 — Lecture recette (get_recipe)
-   ↓
-ÉTAPE 3 — Exécution (utiliser recette ou outil)
-   ↓
-ÉTAPE 4 — Affichage UI (widget_display)
-```
-
-Ceci garantit que :
-- L'agent cherche d'abord des **recettes** (workflows pré-définis)
-- En fallback, il cherche des **outils bruts**
-- Il lit la documentation complète avant d'exécuter
-- Il affiche toujours un résultat UI (pas juste du texte)
-
-## Canvas Store — État UI
-
-Le canvas centralise l'état UI :
+Une fois résolu, les **alias** sont stockés localement (thread-safe) :
 
 ```typescript
-// @webmcp-auto-ui/sdk
-const canvas = {
-  blocks: [], // Widgets actuels
-  mode: 'chat' | 'drag',
-  llm: 'claude-3-5-sonnet-20241022',
-  mcpUrl: 'http://localhost:3001',
-  mcpConnected: boolean,
-  messages: [], // Historique chat
-  
-  // Méthodes
-  addWidget(type, data),
-  removeBlock(id),
-  updateBlock(id, data),
-  addMsg(role, content),
-};
+const { prompt, aliasMap } = buildSystemPromptWithAliases(layers);
+// aliasMap: {
+//   "myserver_mcp_search_recipes" → "myserver_mcp_find_recipes_by_keyword"
+// }
+
+// Dans le dispatcher :
+const resolvedName = aliasMap.get(toolName) ?? toolName;
+// "myserver_mcp_search_recipes" → "myserver_mcp_find_recipes_by_keyword"
 ```
 
-## FONC Message Bus
+## Component Registry (WebMCP)
 
-Composants communiquent via un message bus inspiré par Smalltalk (FONC) :
+Un **WebMCP server** expose des **widgets** + **outils de rendu** :
 
 ```typescript
-// Envoyer un message
-bus.broadcast('myComponent', 'data-changed', { newValue: 42 });
-
-// Écouter
-const unsub = bus.subscribe(['data-changed'], (msg) => {
-  console.log(msg.payload);
+// Création du serveur
+const autoui = createWebMcpServer('autoui', {
+  description: 'Built-in UI widgets'
 });
 
-// Lier des widgets (visualiser les relations)
-bus.link(['widget1_id', 'widget2_id'], 'groupId');
+// Enregistrement des widgets (via recette markdown avec frontmatter)
+autoui.registerWidget(`
+---
+widget: stat
+description: Statistique clé (KPI, compteur)
+schema:
+  type: object
+  required: [label, value]
+  properties:
+    label: { type: string }
+    value: { type: string }
+---
+## Comment utiliser
+Appeler widget_display('stat', {label: "X", value: "Y"})
+`, vanillaStatRenderer);
+
+// Outils natifs (built-in)
+autoui.addTool({
+  name: 'widget_display',
+  description: 'Afficher un widget sur le canvas',
+  inputSchema: { ... },
+  execute: async (params) => {
+    // Valide le widget + renvoie { widget, data, id }
+  }
+});
+
+autoui.addTool({
+  name: 'canvas',
+  description: 'Manipuler les widgets (move, resize, style, update)',
+  execute: async (params) => { ... }
+});
+
+autoui.addTool({
+  name: 'recall',
+  description: 'Relire un résultat complet après compression',
+  execute: async (params) => { ... }
+});
 ```
 
-Cette approche découple les composants et permet les interactions sans props drilling.
+## System Prompt construction
+
+Le **system prompt** est construit dynamiquement à partir des outils disponibles :
+
+```typescript
+const systemPrompt = buildSystemPromptWithAliases(layers).prompt;
+// Contient :
+// 1. Instructions générales (agent = IA qui aide via recettes)
+// 2. ÉTAPE 1 — Recherche de recette : liste search_recipes()
+// 3. ÉTAPE 1b — Liste des recettes : liste list_recipes()
+// 4. ÉTAPE 1c — Recherche d'outils : liste search_tools()
+// 5. ÉTAPE 1d — Liste des outils : liste list_tools()
+// 6. ÉTAPE 2 — Lecture de recette : liste get_recipe()
+// 7. ÉTAPE 3 — Exécution : instructions précises
+// 8. ÉTAPE 4 — Affichage UI : liste widget_display(), canvas()
+```
+
+**Avantage** : L'agent suit toujours un schéma logique sans deviation.
+
+## Canvas réactif (Svelte 5)
+
+Le **canvas** est un **store réactif** avec gestion d'état centralisée :
+
+```mermaid
+graph LR
+    VanillaStore["canvasVanilla\n(framework-agnostic)"] -->|subscribe| SvelteRunes["canvas (Svelte 5)\n($state runes)"]
+    
+    SvelteRunes -->|get/set| UI["UI Components\n(WidgetRenderer, etc.)"]
+    
+    Callbacks["Agent callbacks\nonWidget, onClear, etc."] -->|update| VanillaStore
+```
+
+### Réactivité
+
+```typescript
+// Store vanilla (framework-agnostic)
+const canvasVanilla = createCanvasVanilla();
+canvasVanilla.addWidget('stat', { label: 'Visiteurs', value: '1,234' });
+// → déclenche notify() → listeners reçoivent changement
+
+// Wrapper Svelte 5
+const canvas = createCanvas(); // subscribed to canvasVanilla
+// canvas.blocks est un $state qui reflète canvasVanilla.blocks
+```
+
+### Message Bus FONC
+
+Pour l'**inter-composants** sans appels directs :
+
+```typescript
+// Component A : émettre un message
+bus.broadcast('component_a', 'data-update', { newValue: 42 });
+
+// Component B : écouter
+bus.subscribe(['data-update'], (msg) => {
+  console.log('Reçu:', msg.payload);
+});
+
+// Linking widgets (FONC links)
+bus.link(['widget_1', 'widget_2', 'widget_3'], 'group_sales');
+// → affiche des flèches SVG entre les widgets
+```
+
+## Compression d'historique et recall
+
+Pour économiser le **contexte LLM** :
+
+```typescript
+// Après 2 itérations, ancien tool_result > 300 chars est compressé
+compressOldToolResults(messages, resultBuffer);
+// Avant : { content: "très long résultat json..." }
+// Après : { content: "premiers 200 chars... [recall('id_xyz') pour le complet]" }
+
+// Si l'agent a besoin du résultat complet :
+const fullResult = await client.callTool('recall', { id: 'id_xyz' });
+// → intercepté par le dispatcher, utilise resultBuffer
+```
+
+## Flux widget_display
+
+```mermaid
+graph LR
+    A["Agent appelle\nwidget_display"] -->|params| B["WebMCP\nexecuteTool"]
+    B -->|valide schema| C["Sanitize\nimage URLs"]
+    C -->|callback| D["onWidget\ncallback"]
+    D -->|id généré| E["Canvas\nreçoit widget"]
+    E -->|render| F["WidgetRenderer"]
+    F -->|mount| G["DOM\n(Svelte/Vanilla)"]
+```
+
+## Résumé architectural
+
+| Composant | Responsabilité |
+|-----------|-----------------|
+| **Agent Loop** | Boucle LLM → tools → LLM |
+| **Tool Layers** | Structuration MCP + WebMCP |
+| **Dispatcher** | Routing + activation lazy |
+| **Tool Resolver** | Matching canonique (4 couches) |
+| **System Prompt** | Instructions + tool listing |
+| **Canvas Store** | État centralisé widgets |
+| **FONC Bus** | Communication inter-composants |
+| **Compression** | Économie contexte + recall |
+| **Widget Registry** | Découverte + validation schemas |

@@ -1,74 +1,98 @@
 ---
 title: WebMCP Auto-UI
-description: Automatic UI generation system by AI agents via Model Context Protocol
+description: Automatic user interface generation system by AI agents using the Model Context Protocol
 sidebar:
   order: 0
 ---
 
-## Welcome
+WebMCP Auto-UI is an automatic user interface generation platform driven by AI agents. It combines the **Model Context Protocol (MCP)** for data integration, an **LLM agent engine** for orchestration, and a **declarative widget system** for client-side rendering.
 
-**WebMCP Auto-UI** is a full-stack framework that enables AI agents (Claude, Gemma, etc.) to **automatically generate user interfaces** by calling tools via [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
-
-Instead of returning raw text or JSON, an agent can call `widget_display('chart', {...})` to display an interactive chart. MCP tools (databases, APIs, calculations) are exposed to the agent via a unified abstraction layer.
-
-### Use cases
-
-- **Dynamically generated dashboards** : An agent explores a database and generates visualizations without manual rendering code
-- **Interactive data explorers** : List, filter, display results as charts, tables, maps
-- **Automated workflows** : Orchestrate MCP tools + UI display in an agent loop
-- **Rapid prototyping** : Design skills (workflows) in JSON, execute them instantly
-
-### Schematic architecture
+## Overview
 
 ```mermaid
-graph TB
-    subgraph "LLM Provider"
-        L["Claude/Gemma/Haiku"]
-    end
-    
-    subgraph "Agent Loop"
-        A["runAgentLoop()"]
-        T["Tool Dispatch"]
-    end
-    
-    subgraph "Data Sources"
-        M["MCP Servers<br/>(remote)"]
-        W["WebMCP Servers<br/>(local)"]
-    end
-    
-    subgraph "UI Rendering"
-        V["30+ Native Widgets<br/>(stat, chart, map,<br/>gallery, ...)"]
-        R["Browser Canvas"]
-    end
-    
-    L -->|"chat(messages, tools)"| A
-    A -->|"tool_call"| T
-    T -->|"MCP protocol"| M
-    T -->|"direct execute"| W
-    W -->|"widget_display()"| V
-    V -->|"render"| R
-    M -->|"tool result"| T
+graph LR
+    A["🧠 Agent LLM\n(Claude, Gemma)"] -->|calls| B["🔧 Tool Calling"]
+    B -->|dispatch| C["📊 MCP Servers\n(data)"]
+    B -->|dispatch| D["🎨 WebMCP Servers\n(UI)"]
+    C -->|results| A
+    D -->|widgets| E["🖥️ Canvas\n(Svelte + Vanilla)"]
+    A -->|loop| B
+    F["💾 HyperSkills\n(serialization)"] -.->|load/save| E
 ```
 
-### Key points
+## Key Features
 
-1. **Bidirectional** : Agents call tools (MCP), tools return data that agents format for widgets
-2. **Lazy loading** : Tools discovered progressively — system starts with `search_recipes`, `list_recipes`, then activates servers on demand
-3. **Recipe system** : Each widget has a recipe (documentation + JSON schema) that agents use to generate correct calls
-4. **Framework-agnostic** : Svelte, vanilla JS, or React component rendering — logic stays the same
-5. **Context compression** : Old tool results are truncated after use to save tokens
+- **Autonomous agents**: Native agentic loop with support for Claude (API) and Gemma (in-browser WASM)
+- **Multi-protocol tool calling**: Transparent dispatch to MCP (network protocol) and WebMCP (local)
+- **30+ native widgets**: Stat, chart, timeline, map, gallery, hemicycle, etc.
+- **Lazy loading**: Load tools on demand to optimize LLM context
+- **Skill serialization**: Export/import via HyperSkills with gzip compression
+- **Reactive canvas**: Svelte 5 rendering with FONC message bus for inter-component communication
 
-### Key components
+## Key Concepts
 
-| Component | Role |
-|-----------|------|
-| `@webmcp-auto-ui/core` | WebMCP polyfill, MCP client, WebMCP server |
-| `@webmcp-auto-ui/agent` | Agent loop, tool layers, system prompt builder |
-| `@webmcp-auto-ui/ui` | 30+ Svelte widgets, dispatcher, SafeImage |
-| `@webmcp-auto-ui/sdk` | Canvas store, HyperSkill encoding, registry |
+### 1. Tool Layers (tool stacks)
 
-### Getting started
+Tools are organized in **structured layers**:
+- **MCP Layers**: Remote MCP servers (data, external APIs)
+- **WebMCP Layers**: Local servers (widgets, UI actions, storage)
 
-See **[Getting Started](./guide/getting-started)** for 5-minute installation.
+Each tool receives a canonical prefix: `{serverName}_{protocol}_{toolName}`
 
-Next, consult **[Architecture](./guide/architecture)** to understand how components fit together.
+### 2. Agent Loop (agentic loop)
+
+The agent executes a loop until `end_turn` or `max_iterations`:
+
+```
+1. LLM generates tool_use blocks
+2. Dispatcher routes to MCP or WebMCP
+3. Compressed results return to agent
+4. Back to step 1
+```
+
+### 3. Widget Discovery (lazy discovery)
+
+On startup, only **discovery tools** are available:
+- `search_recipes()` / `list_recipes()` / `get_recipe()`
+- `search_tools()` / `list_tools()`
+
+When the agent calls a real tool for the 1st time, the server **activates** and all its tools become available.
+
+### 4. HyperSkills (serialization)
+
+Canvases are exported as **skills** JSON, compressed into short URLs via gzip/Brotli:
+- `encodeHyperSkill()`: canvas → shareable URL
+- `decodeHyperSkill()`: URL → restored canvas
+
+## Packages
+
+| Package | Responsibility |
+|---------|-----------------|
+| `@webmcp-auto-ui/core` | WebMCP types, polyfill, MCP client, validation |
+| `@webmcp-auto-ui/agent` | Agent loop, LLM providers, tool layers, recipes |
+| `@webmcp-auto-ui/ui` | Svelte components (30+ widgets), canvas store |
+| `@webmcp-auto-ui/sdk` | HyperSkills, skills registry, canvas store |
+
+## Tech Stack
+
+- **Frontend framework**: Svelte 5 (runes)
+- **Styling**: UnoCSS (dark/light themes)
+- **LLM**: Anthropic Claude (API) + Google Gemma 2 (WASM)
+- **Worker**: Web Worker for Gemma (non-blocking UI)
+- **Schema**: JSON Schema (agent-side validation)
+- **Communication**: postMessage bridge (cross-document WebMCP)
+
+## Use Cases
+
+- **Data explorers**: Agent navigates database, displays results in charts/tables
+- **Creative assistants**: LLM generates content, auto-arranges UI in grid/carousel
+- **Smart dashboards**: Agent collects KPIs, builds reactive dashboard
+- **Interactive configurators**: Agent guides users via generated forms
+- **Skill sharing**: Export canvas → short URL → share with collaborators
+
+## Next Steps
+
+- **[Getting Started Guide](./guide/getting-started)**: Installation and first launch
+- **[Detailed Architecture](./guide/architecture)**: Internal flow and components
+- **[Tool Calling](./guide/tool-calling)**: How to dispatch tools
+- **[Deployment](./guide/deploy)**: Production hosting

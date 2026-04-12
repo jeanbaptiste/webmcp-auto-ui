@@ -1,271 +1,358 @@
 ---
-title: Deploy
-description: Deploy WebMCP Auto-UI applications to server
+title: Deployment Guide
+description: Production deployment with scripts, per-app paths, and best practices
 sidebar:
   order: 4
 ---
 
-## Overview
+WebMCP Auto-UI deployment uses a **centralized script** (`scripts/deploy.sh`) that handles different apps with their specific paths and configurations.
 
-The project contains several apps (flex, viewer, home, showcase, etc.) with different deployment paths. **Always use the `scripts/deploy.sh` script** — paths are complex and vary by app.
+## Golden Rule
 
-## Deployment script
+**ALWAYS use the deployment script, never `scp` or `rsync` manually.**
 
-### Usage
+The script knows the correct paths and configurations for each app.
+
+## Target Infrastructure
+
+- **Server**: `demo.hyperskills.net` (via SSH alias `ssh bot`)
+- **User**: `webmcp` (non-root)
+- **Base**: `/opt/webmcp-demos/`
+- **Ports**: 
+  - `3000`: flex (Node.js)
+  - `3001`–`3010`: reserved for future Node apps
+  - `80` / `443`: nginx (reverse proxy)
+
+## Applications and Their Paths
+
+```mermaid
+graph TB
+    Repo["Local Repo\n(monorepo)"] -->|./scripts/deploy.sh| Script["Deploy script"]
+    
+    Script -->|pnpm build| Build["Build artifacts"]
+    
+    Build -->|Flex\n(Node.js)| FD["flex/\nindex.js"]
+    FD -->|deploy to| FP["/opt/webmcp-demos/flex/\nindex.js"]
+    
+    Build -->|Viewer\n(static)| VD["dist/\nbuild/"]
+    VD -->|deploy to| VP["/opt/webmcp-demos/viewer/\nbuild/"]
+    
+    Build -->|Home\n(static)| HD["dist/"]
+    HD -->|deploy to| HP["/opt/webmcp-demos/home/"]
+    
+    Build -->|Multi-Svelte\n(static)| MD["build/"]
+    MD -->|deploy to| MP["/opt/webmcp-demos/multi-svelte/"]
+```
+
+### Detailed Table
+
+| App | Type | Build dir | Deploy dest | ExecStart systemd | Notes |
+|-----|------|-----------|-------------|------------------|-------|
+| **flex** | Node.js (SvelteKit) | `flex/.build/` | `/opt/webmcp-demos/flex/` | `node index.js` | Port 3000 |
+| **viewer** | Static (SvelteKit) | `viewer/build/` | `/opt/webmcp-demos/viewer/build/` | N/A (nginx) | HyperSkills viewer |
+| **home** | Static (Astro) | `home/dist/` | `/opt/webmcp-demos/home/` | N/A (nginx) | Homepage + docs |
+| **todo** | Static (Svelte) | `todo/build/` | `/opt/webmcp-demos/todo/` | N/A (nginx) | Todo demo |
+| **showcase** | Static (Svelte) | `showcase/build/` | `/opt/webmcp-demos/showcase/` | N/A (nginx) | Widget gallery |
+| **multi-svelte** | Static (Svelte) | `multi/build/` | `/opt/webmcp-demos/multi-svelte/` | N/A (nginx) | Multi-tab app |
+
+## Deployment
+
+### Step 1: Build locally
 
 ```bash
-# Deploy all apps
+# At monorepo root
+pnpm build
+```
+
+This builds all apps in parallel.
+
+### Step 2: Deploy via script
+
+```bash
+# Deploy everything
 ./scripts/deploy.sh
 
-# Deploy a single app
+# Or a specific app
 ./scripts/deploy.sh flex
 ./scripts/deploy.sh viewer
 ./scripts/deploy.sh home
 ```
 
-### Why not manual `scp` / `rsync`?
-
-1. **Different paths per app** — each app has a different destination
-2. **Critical cleanup** — `rsync --delete` has deleted production `.env`
-3. **Pre-build required** — some apps require build before deploy
-4. **Operation order** — systemd restart can interfere with file copies
-
-## App mapping
-
-| App | Type | ExecStart systemd | Deploy destination | Preparation |
-|-----|------|-------------------|--------------------|-------------|
-| **flex** | Node.js | `node index.js` | `/opt/webmcp-demos/flex/` | `npm run build` |
-| **viewer** | Node.js (SvelteKit) | `node build/index.js` | `/opt/webmcp-demos/viewer/build/` | `npm run build` |
-| **home** | Static (nginx) | N/A | `/opt/webmcp-demos/home/` | `npm run build` + `PUBLIC_BASE_URL=...` |
-| **showcase** | Static (nginx) | N/A | `/opt/webmcp-demos/showcase/` | `npm run build` |
-| **multi-svelte** | Static (nginx) | N/A | `/opt/webmcp-demos/multi-svelte/` | `npm run build` |
-| **todo** | Static (nginx) | N/A | `/opt/webmcp-demos/todo/` | `npm run build` |
-
-### **Special case: home** — Required environment variable
-
-The home app generates absolute URLs for demos. It MUST be built with :
+### Step 3: Verify on server
 
 ```bash
-PUBLIC_BASE_URL=https://demos.hyperskills.net npm run build
+ssh bot
+
+# For flex (Node.js)
+ps aux | grep "node index.js"
+curl http://localhost:3000
+
+# For nginx (static apps)
+sudo systemctl status nginx
+curl http://localhost/home/
 ```
 
-Without this variable, URLs will be `http://localhost:5173/...` in production.
+## The Deployment Script
 
-## Detailed deployment process
-
-### 1. Build locally
-
-```bash
-# At monorepo root
-npm install
-npm run build
-
-# Or for a single app
-cd apps/flex
-npm run build
-```
-
-### 2. Execute deployment script
-
-```bash
-./scripts/deploy.sh flex
-```
-
-The script :
-- ✅ Checks that build exists
-- ✅ Cleans old destination (except `.env`)
-- ✅ Copies new files
-- ✅ Restarts systemd if it's a Node.js service
-- ✅ Displays final status
-
-### 3. Verify deployment
-
-```bash
-# Access the app
-curl https://demos.hyperskills.net/flex
-
-# Check logs (if Node.js)
-ssh bot systemctl status webmcp-demos-flex
-ssh bot journalctl -u webmcp-demos-flex -f
-
-# Or for a static app
-ssh bot ls -la /opt/webmcp-demos/home/
-```
-
-## Critical rules
-
-### ❌ NEVER
-
-1. **Use `rsync --delete` directly** — deletes production `.env`
-   ```bash
-   # ❌ BAD
-   rsync -av --delete build/ bot:/opt/webmcp-demos/flex/
-   ```
-
-2. **Copy `.env` from local** — overwrites production API keys
-   ```bash
-   # ❌ BAD
-   scp .env.local bot:/opt/webmcp-demos/flex/.env
-   ```
-
-3. **Deploy without cleaning old JS chunks**
-   ```bash
-   # ❌ BAD (old chunks remain)
-   scp -r build/* bot:/opt/webmcp-demos/flex/
-   ```
-
-4. **Modify deploy directory directly**
-   ```bash
-   # ❌ BAD
-   ssh bot "cd /opt/webmcp-demos/flex && npm install"
-   ```
-
-### ✅ ALWAYS
-
-1. **Use `./scripts/deploy.sh`**
-   ```bash
-   # ✅ GOOD
-   ./scripts/deploy.sh flex
-   ```
-
-2. **Build locally before deploying**
-   ```bash
-   npm run build
-   ./scripts/deploy.sh flex
-   ```
-
-3. **Check access before deploying**
-   ```bash
-   ssh bot "ls /opt/webmcp-demos/flex/.env"
-   # If "No such file", create from template
-   ```
-
-4. **Keep `.env` and secrets in place**
-   ```bash
-   # Script preserves existing .env
-   ```
-
-## Troubleshooting
-
-### Error: "Old app still running"
-
-Old code still running even after deployment.
-
-**Causes** :
-- Old JS chunks not cleaned
-- systemd/nginx cache
-- Port still listened to by old process
-
-**Solutions** :
-```bash
-# Force systemd restart
-ssh bot systemctl restart webmcp-demos-flex
-
-# Or (static) reload nginx
-ssh bot systemctl reload nginx
-
-# Check port
-ssh bot lsof -i :3000
-```
-
-### Error: ".env not found"
-
-App won't start because `.env` is missing.
-
-**Solution** : Create from server
-```bash
-ssh bot "cat > /opt/webmcp-demos/flex/.env" << EOF
-VITE_ANTHROPIC_API_KEY=sk-ant-...
-DATABASE_URL=...
-EOF
-```
-
-Or copy a secure template (NEVER copy from `.env.local`).
-
-### Error: "Cannot GET /flex"
-
-nginx returns 404.
-
-**Causes** :
-- Static app not built
-- Wrong nginx path
-- Old cache
-
-**Solutions** :
-```bash
-# Check app is built
-ls -la apps/home/dist/
-
-# Check nginx config
-ssh bot "grep -A5 '/home' /etc/nginx/sites-available/demos.hyperskills.net"
-
-# Purge cache
-ssh bot "systemctl reload nginx"
-```
-
-## Pre-deployment checklist
-
-- [ ] Code committed and pushed
-- [ ] Local tests pass (`npm run test`)
-- [ ] Local build succeeds (`npm run build`)
-- [ ] Environment variables correct
-  - [ ] `PUBLIC_BASE_URL=https://demos.hyperskills.net` for home
-  - [ ] Other apps have no restrictions
-- [ ] `.env` file exists on server
-- [ ] Sufficient disk space: `ssh bot df -h /opt`
-- [ ] No one else deploying
-
-## Complete deployment script
+### What it does
 
 ```bash
 #!/bin/bash
-# scripts/deploy.sh — Secure multi-app deployment
 
-APP="${1:-all}"
-HOST="bot"
-BASE_PATH="/opt/webmcp-demos"
-
-case "$APP" in
-  flex)
-    BUILD_DIR="apps/flex/dist"
-    DEST_PATH="$BASE_PATH/flex"
-    SERVICE="webmcp-demos-flex"
-    ;;
-  viewer)
-    BUILD_DIR="apps/viewer/build"
-    DEST_PATH="$BASE_PATH/viewer/build"
-    SERVICE="webmcp-demos-viewer"
-    ;;
-  home)
-    BUILD_DIR="apps/home/dist"
-    DEST_PATH="$BASE_PATH/home"
-    SERVICE=""
-    ;;
-  *)
-    echo "Usage: $0 {flex|viewer|home|showcase|all}"
-    exit 1
-    ;;
-esac
-
-# Check build
-if [ ! -d "$BUILD_DIR" ]; then
-  echo "❌ Build not found: $BUILD_DIR"
-  exit 1
-fi
-
-echo "📦 Deploying $APP..."
-
-# Copy (preserve .env and secrets)
-ssh "$HOST" "mkdir -p $DEST_PATH && rm -rf $DEST_PATH/* && ([ -f $DEST_PATH/.env ] && mv $DEST_PATH/.env /tmp/.env.bak)"
-scp -r "$BUILD_DIR/"* "$HOST:$DEST_PATH/" 2>/dev/null
-ssh "$HOST" "[ -f /tmp/.env.bak ] && mv /tmp/.env.bak $DEST_PATH/.env"
-
-# Restart if it's a Node.js service
-if [ -n "$SERVICE" ]; then
-  ssh "$HOST" "systemctl restart $SERVICE && sleep 2 && systemctl is-active $SERVICE"
-else
-  ssh "$HOST" "systemctl reload nginx"
-fi
-
-echo "✅ $APP deployed successfully!"
+# 1. Verify SSH access
+# 2. Clean old builds on target (no JS pollution)
+# 3. Copy build artifacts ONLY (via rsync)
+# 4. Restart services (flex via systemd, nginx reload)
+# 5. Verify health (curl http://localhost)
 ```
+
+### Script Structure
+
+```bash
+# Configuration per app
+declare -A APPS=(
+  [flex]="apps/flex/.svelte-kit:index.js"
+  [viewer]="apps/viewer/build:static"
+  [home]="apps/home/dist:static"
+  [todo]="apps/todo/build:static"
+  [showcase]="apps/showcase/build:static"
+  [multi-svelte]="apps/multi/build:static"
+)
+
+# For each app: build → clean → rsync → restart
+for app in "${!APPS[@]}"; do
+  src=$(echo ${APPS[$app]} | cut -d: -f1)
+  type=$(echo ${APPS[$app]} | cut -d: -f2)
+  
+  # Clean before copy (avoid orphaned JS chunks)
+  ssh bot "rm -rf /opt/webmcp-demos/$app/*"
+  
+  # Copy artifacts
+  rsync -avz --delete "$src/" "webmcp@demo.hyperskills.net:/opt/webmcp-demos/$app/"
+  
+  # Restart if Node.js
+  if [ "$type" = "node" ]; then
+    ssh bot "systemctl restart webmcp-$app"
+  fi
+done
+
+# nginx reload (for static apps)
+ssh bot "systemctl reload nginx"
+```
+
+## Environment Variables (production)
+
+### On Server
+
+`.env.production` files must exist **before deployment**:
+
+```bash
+# /opt/webmcp-demos/flex/.env
+NODE_ENV=production
+ANTHROPIC_API_KEY=sk-ant-...
+LOG_LEVEL=info
+
+# /opt/webmcp-demos/home/.env  (optional for static, but useful for build-time)
+PUBLIC_BASE_URL=https://demos.hyperskills.net
+PUBLIC_GA_ID=G-XXXXXX
+```
+
+**NEVER** deploy `.env` files — they already exist on server (created manually once).
+
+### Build-time Variables (home)
+
+`home` is an **Astro** app that requires `PUBLIC_BASE_URL` at **build** time:
+
+```bash
+# Before build locally
+export PUBLIC_BASE_URL=https://demos.hyperskills.net
+
+# Then build
+pnpm build
+```
+
+The script **assumes** it's already defined globally. If missing locally:
+
+```bash
+# Fallback
+PUBLIC_BASE_URL=https://demos.hyperskills.net pnpm build
+```
+
+## Networking (nginx)
+
+**nginx** reverse-proxies each app:
+
+```nginx
+# /etc/nginx/sites-available/default
+
+# Flex (Node.js → port 3000)
+location /flex/ {
+  proxy_pass http://localhost:3000/;
+}
+
+# Static apps → serve from /opt/webmcp-demos/
+location /viewer/ {
+  alias /opt/webmcp-demos/viewer/;
+  try_files $uri $uri/index.html =404;
+}
+
+location /home/ {
+  alias /opt/webmcp-demos/home/;
+  try_files $uri $uri/index.html =404;
+}
+
+location / {
+  alias /opt/webmcp-demos/home/;  # Default = home
+  try_files $uri $uri/index.html =404;
+}
+```
+
+## Rollback
+
+If a deployment breaks something:
+
+```bash
+# Git history
+git log --oneline | head -20
+
+# Checkout previous version
+git checkout <commit_before>
+
+# Rebuild + redeploy
+pnpm build
+./scripts/deploy.sh
+```
+
+**Attention**: Script does `rm -rf` before copy, so old files are lost. Rollback must be **fast**.
+
+## Monitoring in Production
+
+### Logs (flex)
+
+```bash
+ssh bot
+
+# Journalctl (systemd)
+journalctl -u webmcp-flex -f
+
+# Application logs (if stdout captured)
+tail -f /var/log/webmcp-flex.log
+```
+
+### Health Checks
+
+```bash
+# All services
+curl http://demo.hyperskills.net/
+curl http://demo.hyperskills.net/home/
+curl http://demo.hyperskills.net/flex/
+curl http://demo.hyperskills.net/viewer/
+
+# nginx status
+ssh bot "sudo systemctl status nginx"
+
+# flex status
+ssh bot "sudo systemctl status webmcp-flex"
+```
+
+### Disk & Memory
+
+```bash
+ssh bot
+df -h
+free -h
+```
+
+## Troubleshooting
+
+### App shows old code after deploy
+
+**Cause**: Orphaned JS chunks after build. Script `deploy.sh` does `rm -rf` to prevent this, but if deployed manually:
+
+**Solution**:
+```bash
+ssh bot
+rm -rf /opt/webmcp-demos/{app}/*.js /opt/webmcp-demos/{app}/*.map
+systemctl restart nginx  # or restart webmcp-flex
+```
+
+### `.env` missing after deploy
+
+**Cause**: `.env` should NEVER be in git or deployed via script.
+
+**Solution**: Recreate manually on server
+```bash
+ssh bot
+cat > /opt/webmcp-demos/flex/.env << EOF
+NODE_ENV=production
+ANTHROPIC_API_KEY=sk-ant-...
+EOF
+systemctl restart webmcp-flex
+```
+
+### nginx returns 404
+
+**Cause**: Wrong alias or missing `try_files`.
+
+**Debug**:
+```bash
+ssh bot
+# Verify deployed content
+ls -la /opt/webmcp-demos/home/
+ls -la /opt/webmcp-demos/viewer/build/
+
+# Test nginx config
+sudo nginx -t
+
+# Reload
+sudo systemctl reload nginx
+
+# Check paths in config
+grep -A 5 "location /home/" /etc/nginx/sites-available/default
+```
+
+### API rate-limited (Anthropic)
+
+**Symptom**: 429 errors from Claude.
+
+**Solution**: 
+1. Wait (exponential backoff handled by client)
+2. Verify API key not leaked
+3. Increase `maxTokens` / reduce `maxIterations`
+
+## Maintenance
+
+### Restart all services
+
+```bash
+ssh bot
+sudo systemctl restart webmcp-flex nginx
+```
+
+### Clean old logs
+
+```bash
+ssh bot
+journalctl --vacuum-time=7d  # Keep 7 days
+```
+
+### Update dependencies
+
+```bash
+# Locally
+pnpm update
+pnpm build
+
+# Deploy
+./scripts/deploy.sh
+```
+
+## Summary Checklist
+
+- ✅ Always use `./scripts/deploy.sh`
+- ✅ Never deploy `.env` files (create manually on server)
+- ✅ Build `home` with `PUBLIC_BASE_URL=https://demos.hyperskills.net`
+- ✅ Verify build locally succeeds before deploying
+- ✅ After deploy, test on server (curl, browser)
+- ✅ Monitor logs initially (5 min after deploy)
+- ✅ Fast rollback if needed (git checkout + deploy)

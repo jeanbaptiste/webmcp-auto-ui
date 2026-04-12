@@ -1,74 +1,98 @@
 ---
 title: WebMCP Auto-UI
-description: Système d'auto-génération d'UI par agents IA via Model Context Protocol
+description: Système d'auto-génération d'interface utilisateur par agents IA utilisant le Model Context Protocol
 sidebar:
   order: 0
 ---
 
-## Bienvenue
+WebMCP Auto-UI est une plateforme de génération automatique d'interfaces utilisateur pilotées par des agents IA. Elle combine le **Model Context Protocol (MCP)** pour l'intégration de données, un **moteur d'agents LLM** pour l'orchestration, et un **système de widgets déclaratifs** pour le rendu côté client.
 
-**WebMCP Auto-UI** est un framework full-stack qui permet aux agents IA (Claude, Gemma, etc.) de **générer automatiquement des interfaces utilisateur** en appelant des outils via [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
-
-Au lieu de renvoyer du texte ou du JSON brut, un agent peut appeler `widget_display('chart', {...})` pour afficher un graphique interactif. Les outils MCP (bases de données, APIs, calculs) sont exposés à l'agent via une couche d'abstraction unifiée.
-
-### Cas d'usage
-
-- **Dashboards générés dynamiquement** : Un agent explore une base de données et génère des visualisations sans code de rendu manuel
-- **Explorateurs de données interactifs** : Lister, filtrer, afficher des résultats en graphiques, tableaux, cartes
-- **Workflows automatisés** : Orchestrer des outils MCP + affichage UI dans une boucle agent
-- **Prototypage rapide** : Designer des skills (workflows) en JSON, les exécuter instantanément
-
-### Architecture schématique
+## Vue d'ensemble
 
 ```mermaid
-graph TB
-    subgraph "LLM Provider"
-        L["Claude/Gemma/Haiku"]
-    end
-    
-    subgraph "Agent Loop"
-        A["runAgentLoop()"]
-        T["Tool Dispatch"]
-    end
-    
-    subgraph "Data Sources"
-        M["MCP Servers<br/>(remote)"]
-        W["WebMCP Servers<br/>(local)"]
-    end
-    
-    subgraph "UI Rendering"
-        V["30+ Widgets natifs<br/>(stat, chart, map,<br/>gallery, ...)"]
-        R["Browser Canvas"]
-    end
-    
-    L -->|"chat(messages, tools)"| A
-    A -->|"tool_call"| T
-    T -->|"MCP protocol"| M
-    T -->|"direct execute"| W
-    W -->|"widget_display()"| V
-    V -->|"render"| R
-    M -->|"tool result"| T
+graph LR
+    A["🧠 Agent LLM\n(Claude, Gemma)"] -->|appelle| B["🔧 Tool Calling"]
+    B -->|dispatch| C["📊 MCP Servers\n(données)"]
+    B -->|dispatch| D["🎨 WebMCP Servers\n(UI)"]
+    C -->|résultats| A
+    D -->|widgets| E["🖥️ Canvas\n(Svelte + Vanilla)"]
+    A -->|boucle| B
+    F["💾 HyperSkills\n(sérialisation)"] -.->|charge/sauve| E
 ```
 
-### Points clés
+## Caractéristiques principales
 
-1. **Bidirectionnel** : Les agents appelent les outils (MCP), les outils renvoient des données que l'agent met en forme pour les widgets
-2. **Lazy loading** : Les outils découverts progressivement — le système commence avec `search_recipes`, `list_recipes`, puis active les serveurs à la demande
-3. **Système de recettes** : Chaque widget a une recette (documentation + schéma JSON) que l'agent utilise pour générer les bons appels
-4. **Framework-agnostic** : Rendus Svelte, vanilla JS, ou composants React — la logique reste la même
-5. **Compression de contexte** : Les anciens résultats d'outils sont tronqués après utilisation pour économiser les tokens
+- **Agents autonomes** : Boucle agentic native avec support pour Claude (API) et Gemma (in-browser WASM)
+- **Tool calling multi-protocoles** : Dispatch transparent vers MCP (protocole réseau) et WebMCP (local)
+- **30+ widgets natifs** : Stat, chart, timeline, carte, galerie, hemicycle parlementaire, etc.
+- **Lazy loading** : Charge les outils à la demande pour optimiser le contexte LLM
+- **Skill sérialisation** : Export/import via HyperSkills avec compression gzip
+- **Canvas réactif** : Rendu Svelte 5 avec message bus FONC pour l'inter-composants
 
-### Composants clés
+## Concepts clés
 
-| Composant | Rôle |
-|-----------|------|
-| `@webmcp-auto-ui/core` | Polyfill WebMCP, client MCP, serveur WebMCP |
-| `@webmcp-auto-ui/agent` | Boucle agent, tool layers, system prompt builder |
-| `@webmcp-auto-ui/ui` | 30+ widgets Svelte, dispatcher, SafeImage |
-| `@webmcp-auto-ui/sdk` | Store canvas, HyperSkill encoding, registry |
+### 1. Tool Layers (couches d'outils)
 
-### Commençons
+Les outils sont organisés en **couches structurées** :
+- **MCP Layers** : Serveurs MCP distants (données, APIs externes)
+- **WebMCP Layers** : Serveurs locaux (widgets, actions UI, stockage)
 
-Voir **[Getting Started](./guide/getting-started)** pour une installation en 5 minutes.
+Chaque outil reçoit un préfixe canonique : `{serverName}_{protocol}_{toolName}`
 
-Ensuite, consultez **[Architecture](./guide/architecture)** pour comprendre comment les composants s'assemblent.
+### 2. Agent Loop (boucle agentic)
+
+L'agent exécute une boucle jusqu'à `end_turn` ou `max_iterations` :
+
+```
+1. LLM génère tool_use blocks
+2. Dispatcher route vers MCP ou WebMCP
+3. Résultats compressés reviennent à l'agent
+4. Retour à l'étape 1
+```
+
+### 3. Widget Discovery (découverte lazy)
+
+Au démarrage, seuls les outils de **discovery** sont disponibles :
+- `search_recipes()` / `list_recipes()` / `get_recipe()`
+- `search_tools()` / `list_tools()`
+
+Quand l'agent appelle un outil réel pour la 1ère fois, le serveur s'**active** et tous ses outils deviennent disponibles.
+
+### 4. HyperSkills (sérialisation)
+
+Les canvas sont exportés en tant que **skills** JSON, compressés en URLs courtes via gzip/Brotli :
+- `encodeHyperSkill()` : canvas → URL shareable
+- `decodeHyperSkill()` : URL → canvas restauré
+
+## Packages
+
+| Package | Responsabilité |
+|---------|-----------------|
+| `@webmcp-auto-ui/core` | Types WebMCP, polyfill, MCP client, validation |
+| `@webmcp-auto-ui/agent` | Boucle agent, providers LLM, tool layers, recipes |
+| `@webmcp-auto-ui/ui` | Composants Svelte (30+ widgets), canvas store |
+| `@webmcp-auto-ui/sdk` | HyperSkills, skills registry, canvas store |
+
+## Stack technique
+
+- **Framework frontend** : Svelte 5 (runes)
+- **Styling** : UnoCSS (dark/light themes)
+- **LLM** : Anthropic Claude (API) + Google Gemma 2 (WASM)
+- **Worker** : Web Worker pour Gemma (sans blocage UI)
+- **Schéma** : JSON Schema (validation côté agent)
+- **Communication** : postMessage bridge (cross-document WebMCP)
+
+## Cas d'usage
+
+- **Explorateurs de données** : agent navigue une base de données, affiche résultats en charts/tables
+- **Assistants créatifs** : LLM génère contenus, arrange UI automatiquement en grille/carousel
+- **Dashboards intelligents** : agent collecte KPIs, construit tableau de bord réactif
+- **Configurateurs interactifs** : agent guident utilisateur via des formulaires générés
+- **Skill sharing** : exporte canvas → URL courte → partage avec collaborateurs
+
+## Prochaines étapes
+
+- **[Guide de démarrage](./guide/getting-started)** : Installation et premier lancement
+- **[Architecture détaillée](./guide/architecture)** : Flux interne et composants
+- **[Tool calling](./guide/tool-calling)** : Comment dispatcher les outils
+- **[Déploiement](./guide/deploy)** : Hébergement production

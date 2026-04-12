@@ -1,403 +1,458 @@
 ---
-title: Connecter un serveur MCP externe
-description: Intégrer un serveur Model Context Protocol (MCP) et ses outils à votre agent
+title: Connecter un serveur MCP
+description: Intégrer un serveur MCP externe et utiliser ses outils dans l'agent
 sidebar:
   order: 3
 ---
 
-Les serveurs MCP fournissent des **outils de données** (récupérer des infos, interroger des BDs, appeler des APIs) et des **recettes** (procédures automatisées). Ce tutorial montre comment connecter un serveur MCP à l'agent WebMCP Auto-UI.
+Ce tutoriel montre comment connecter un **serveur MCP externe** (Model Context Protocol) et l'intégrer avec la boucle agent pour exécuter des outils à distance.
 
-## Architecture du protocole MCP
+## Concepts clés
+
+**MCP** (Model Context Protocol) est un protocole client-serveur qui permet à un LLM d'accéder à des outils distants :
 
 ```mermaid
 graph LR
-  A["Agent loop<br/>runAgentLoop"] -->|McpClient| B["Serveur MCP<br/>Streamable HTTP"]
-  B -->|list_tools| C["Outils MCP<br/>search, get, etc"]
-  C -->|call_tool| D["Résultat<br/>JSON + texte"]
-  A -->|ToolLayer| E["Dispatcher<br/>mcp vs webmcp"]
+    A["Agent<br/>runAgentLoop()"]
+    B["MCP Client<br/>McpClient"]
+    C["Serveur MCP<br/>(données distantes)"]
+    D["Outils exposés<br/>(API, DB)"]
+
+    A -->|Appelle outil| B
+    B -->|JSON-RPC via HTTP| C
+    C -->|Exécute| D
 ```
 
-**Flux :**
-1. Agent découvre les outils via `list_tools()`
-2. Agent appelle les outils en fonction des réponses du LLM
-3. Résultats comprimés et injectés dans l'historique de conversation
-4. LLM utilise les données pour la prochaine itération
-
-## Étape 1 : Configurer le client MCP
+## Étape 1 : Initialiser le client MCP
 
 ```typescript
-// src/lib/mcp-client.ts
 import { McpClient } from '@webmcp-auto-ui/core';
 
-export const mcpClient = new McpClient('http://localhost:3001/mcp', {
-  clientName: 'my-app',
+const mcpClient = new McpClient('http://localhost:3000/mcp', {
+  clientName: 'WebMCP Auto-UI',
   clientVersion: '1.0.0',
   timeout: 30000,
-  autoReconnect: true,
-  maxReconnectAttempts: 5,
 });
 
-export async function initMcp() {
-  try {
-    await mcpClient.initialize();
-    console.log('MCP initialisé');
-    return true;
-  } catch (err) {
-    console.error('Erreur MCP:', err);
-    return false;
-  }
-}
+// Initialiser la connexion
+await mcpClient.initialize();
+
+// Récupérer la liste des outils disponibles
+const tools = await mcpClient.listTools();
+console.log('Outils disponibles :', tools);
 ```
 
-## Étape 2 : Découvrir les outils
+## Étape 2 : Créer une couche d'outils (ToolLayer)
+
+Une `ToolLayer` encapsule un serveur MCP avec ses outils dans le format attendu par l'agent :
 
 ```typescript
-// src/lib/mcp-tools.ts
-import { mcpClient } from './mcp-client';
-import type { McpToolDef } from '@webmcp-auto-ui/agent';
-
-export async function listMcpTools(): Promise<McpToolDef[]> {
-  const result = await mcpClient.listTools();
-  return result.tools.map(t => ({
-    name: t.name,
-    description: t.description ?? '',
-    inputSchema: t.inputSchema as Record<string, unknown> | undefined,
-  }));
-}
-
-export async function getToolDescription(toolName: string): Promise<string | null> {
-  const tools = await listMcpTools();
-  const tool = tools.find(t => t.name === toolName);
-  return tool?.description ?? null;
-}
-```
-
-## Étape 3 : Créer la couche ToolLayer
-
-Une `ToolLayer` encapsule un serveur MCP dans un format exploitable par l'agent :
-
-```typescript
-// src/lib/mcp-layer.ts
-import { mcpClient } from './mcp-client';
 import type { ToolLayer } from '@webmcp-auto-ui/agent';
-import type { McpToolDef } from '@webmcp-auto-ui/agent';
+import { McpClient } from '@webmcp-auto-ui/core';
 
-export async function createMcpLayer(serverName: string): Promise<ToolLayer> {
-  const tools = await mcpClient.listTools();
-  
-  const mcpTools: McpToolDef[] = tools.tools.map(t => ({
-    name: t.name,
-    description: t.description ?? '',
-    inputSchema: t.inputSchema as Record<string, unknown> | undefined,
-  }));
+// Récupérer les outils du serveur
+async function createMcpLayer(): Promise<ToolLayer> {
+  const client = new McpClient('https://api.example.com/mcp');
+  await client.initialize();
+
+  const tools = await client.listTools();
 
   return {
     protocol: 'mcp',
-    serverName, // ex: 'recipes', 'knowledge-base', 'api'
-    description: `Outils fournis par le serveur ${serverName}`,
-    tools: mcpTools,
+    serverName: 'example-api',
+    description: 'Outils d\'accès à l\'API Example',
+    serverUrl: 'https://api.example.com/mcp',
+    tools: tools.map(t => ({
+      name: t.name,
+      description: t.description ?? '',
+      inputSchema: t.inputSchema,
+    })),
   };
 }
+
+// Créer la couche
+const exampleLayer = await createMcpLayer();
 ```
 
-## Étape 4 : Intégrer avec l'agent loop
+## Étape 3 : Intégrer avec l'agent loop
+
+Passez le client MCP et les couches d'outils à `runAgentLoop()` :
 
 ```typescript
-// src/lib/agent-setup.ts
-import { runAgentLoop, buildSystemPromptWithAliases } from '@webmcp-auto-ui/agent';
-import { mcpClient, initMcp } from './mcp-client';
-import { createMcpLayer } from './mcp-layer';
-import type { LLMProvider } from '@webmcp-auto-ui/agent';
+import { runAgentLoop } from '@webmcp-auto-ui/agent';
+import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
 
-export async function setupAgent(provider: LLMProvider) {
-  // 1. Initialiser MCP
-  const mcpReady = await initMcp();
-  if (!mcpReady) {
-    throw new Error('MCP non disponible');
-  }
+const provider = new RemoteLLMProvider({
+  proxyUrl: '/api/chat',
+  model: 'sonnet',  // résout en claude-sonnet-4-6
+});
 
-  // 2. Créer les couches (MCP + WebMCP natif)
-  const mcpLayer = await createMcpLayer('recipes');
-  
-  const layers = [
-    mcpLayer,
-    // Optionnel: ajouter d'autres serveurs
-    // await createMcpLayer('knowledge-base'),
-  ];
+const result = await runAgentLoop('Cherche les articles sur Svelte', {
+  client: mcpClient,  // ← Passer le client MCP
+  provider,
+  layers: [exampleLayer],  // ← Passer les couches d'outils
+  maxIterations: 5,
+  callbacks: {
+    onToolCall: (call) => {
+      console.log(`Outil appelé : ${call.name}`);
+      if (call.result) console.log('Résultat :', call.result);
+      if (call.error) console.log('Erreur :', call.error);
+    },
+    onText: (text) => {
+      console.log('Agent dit :', text);
+    },
+  },
+});
+```
 
-  // 3. Construire le système prompt (avec aliases canoniques)
-  const { prompt: systemPrompt, aliasMap } = buildSystemPromptWithAliases(layers);
+## Exemple complet : Connecter une API Wikipedia
 
-  return {
-    provider,
-    client: mcpClient,
-    layers,
-    systemPrompt,
-    aliasMap,
+```typescript
+import { McpClient } from '@webmcp-auto-ui/core';
+import { runAgentLoop } from '@webmcp-auto-ui/agent';
+import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
+import type { ToolLayer } from '@webmcp-auto-ui/agent';
+
+async function queryWikipedia(topic: string) {
+  // Initialiser le client MCP pointant vers un serveur Wikipedia
+  const client = new McpClient('https://mcp-wikipedia.example.com');
+  await client.initialize();
+
+  // Créer la couche d'outils
+  const tools = await client.listTools();
+  const wikiLayer: ToolLayer = {
+    protocol: 'mcp',
+    serverName: 'wikipedia',
+    description: 'Accès à Wikipedia',
+    tools: tools.map(t => ({
+      name: t.name,
+      description: t.description ?? '',
+      inputSchema: t.inputSchema,
+    })),
   };
+
+  // Initialiser le LLM
+  const provider = new RemoteLLMProvider({
+    proxyUrl: '/api/chat',
+    model: 'sonnet',
+  });
+
+  // Lancer la boucle agent
+  const result = await runAgentLoop(
+    `Récupère des informations détaillées sur : ${topic}`,
+    {
+      client,
+      provider,
+      layers: [wikiLayer],
+      maxIterations: 5,
+      callbacks: {
+        onToolCall: (call) => {
+          console.log(`[${call.name}]`, call.args);
+        },
+        onText: (text) => {
+          console.log('>', text);
+        },
+        onDone: (metrics) => {
+          console.log(`Terminé en ${metrics.totalTokens} tokens`);
+        },
+      },
+    }
+  );
+
+  return result.text;
+}
+
+// Utilisation
+const answer = await queryWikipedia('Révolution française');
+console.log(answer);
+```
+
+## Étape 4 : Gérer plusieurs serveurs MCP
+
+Vous pouvez combiner plusieurs serveurs MCP dans une seule session agent :
+
+```typescript
+async function createMultiServerSetup() {
+  // Serveur 1 : API de données
+  const dataClient = new McpClient('https://api.data.example.com/mcp');
+  await dataClient.initialize();
+  const dataTools = await dataClient.listTools();
+  const dataLayer: ToolLayer = {
+    protocol: 'mcp',
+    serverName: 'data-api',
+    description: 'Accès aux données',
+    tools: dataTools.map(t => ({
+      name: t.name,
+      description: t.description ?? '',
+      inputSchema: t.inputSchema,
+    })),
+  };
+
+  // Serveur 2 : Recherche
+  const searchClient = new McpClient('https://search.example.com/mcp');
+  await searchClient.initialize();
+  const searchTools = await searchClient.listTools();
+  const searchLayer: ToolLayer = {
+    protocol: 'mcp',
+    serverName: 'search-engine',
+    description: 'Moteur de recherche',
+    tools: searchTools.map(t => ({
+      name: t.name,
+      description: t.description ?? '',
+      inputSchema: t.inputSchema,
+    })),
+  };
+
+  // Lancer l'agent avec les deux serveurs
+  return await runAgentLoop(
+    'Trouve et analyse les dernières tendances',
+    {
+      client: dataClient,  // Utilise le client primaire
+      provider: new RemoteLLMProvider({ /* ... */ }),
+      layers: [dataLayer, searchLayer],  // Combiner les couches
+      maxIterations: 10,
+    }
+  );
 }
 ```
 
-## Étape 5 : Exécuter l'agent loop
+## Gestion des erreurs
 
-```svelte
-<!-- routes/chat/+page.svelte -->
-<script lang="ts">
-  import { runAgentLoop } from '@webmcp-auto-ui/agent';
-  import { setupAgent } from '$lib/agent-setup';
-  import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
-  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+```typescript
+async function safeConnectMcp(url: string) {
+  try {
+    const client = new McpClient(url, {
+      timeout: 10000,
+      autoReconnect: true,
+      maxReconnectAttempts: 3,
+    });
 
-  let messages: Array<{ role: string; content: string }> = [];
-  let userInput = '';
-  let isRunning = false;
+    await client.initialize();
+    console.log('✓ Connexion établie');
+    return client;
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.includes('timeout')) {
+        console.error('⚠ Serveur MCP inaccessible (timeout)');
+      } else if (error.message.includes('404')) {
+        console.error('⚠ Endpoint MCP non trouvé');
+      } else {
+        console.error('✗ Erreur de connexion :', error.message);
+      }
+    }
+    return null;
+  }
+}
 
-  const provider = new RemoteLLMProvider({
-    apiKey: import.meta.env.VITE_ANTHROPIC_KEY,
-    model: 'claude-3-5-sonnet-20241022',
+// Utilisation
+const client = await safeConnectMcp('https://api.example.com/mcp');
+if (client) {
+  // Continuer avec le client
+}
+```
+
+## Lazy loading des outils
+
+Pour les serveurs avec de nombreux outils, utilisez le lazy loading avec `buildDiscoveryTools` :
+
+```typescript
+import { buildDiscoveryTools, activateServerTools } from '@webmcp-auto-ui/agent';
+
+// Créer d'abord la couche découverte (tools légers)
+const discoveryTools = buildDiscoveryTools([mcpLayer]);
+
+// Passer au runAgentLoop
+const result = await runAgentLoop('...', {
+  client: mcpClient,
+  provider,
+  layers: [mcpLayer],
+  // Les outils complets seront activés à la demande
+});
+
+// En interne, l'agent activera les outils complets quand un outil de ce serveur est appelé
+```
+
+## Pattern : Boucle agent avec MCP dans une API
+
+```typescript
+// api/agent/+server.ts
+import { json } from '@sveltejs/kit';
+import { runAgentLoop } from '@webmcp-auto-ui/agent';
+import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
+import { McpClient } from '@webmcp-auto-ui/core';
+
+export async function POST({ request }) {
+  const { message, mcpUrl } = await request.json();
+
+  const mcpClient = new McpClient(mcpUrl);
+  await mcpClient.initialize();
+
+  const tools = await mcpClient.listTools();
+  const layer = {
+    protocol: 'mcp' as const,
+    serverName: new URL(mcpUrl).hostname,
+    description: 'MCP Server',
+    tools: tools.map(t => ({
+      name: t.name,
+      description: t.description ?? '',
+      inputSchema: t.inputSchema,
+    })),
+  };
+
+  const result = await runAgentLoop(message, {
+    client: mcpClient,
+    provider: new RemoteLLMProvider({
+      proxyUrl: '/api/chat',
+      model: 'sonnet',
+    }),
+    layers: [layer],
+    maxIterations: 5,
   });
 
-  async function sendMessage() {
-    if (!userInput.trim() || isRunning) return;
+  return json({
+    text: result.text,
+    toolCalls: result.toolCalls,
+    metrics: result.metrics,
+  });
+}
+```
 
-    const msg = userInput;
-    userInput = '';
-    isRunning = true;
+## Intégration avec l'UI Svelte
+
+```svelte
+<script lang="ts">
+  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+  import { BlockRenderer } from '@webmcp-auto-ui/ui';
+  import { AgentProgress } from '@webmcp-auto-ui/ui';
+
+  let mcpUrl = 'https://api.example.com/mcp';
+  let userMessage = '';
+  let loading = false;
+
+  async function runAgent() {
+    if (!userMessage.trim()) return;
+
+    loading = true;
+    canvas.setGenerating(true);
 
     try {
-      const { provider: llm, client, layers } = await setupAgent(provider);
-
-      const result = await runAgentLoop(msg, {
-        provider: llm,
-        client,
-        layers,
-        maxIterations: 5,
-        callbacks: {
-          // Mise à jour UI en temps réel
-          onIterationStart: (iter, max) => {
-            console.log(`Itération ${iter}/${max}`);
-          },
-          onLLMResponse: (response) => {
-            console.log('LLM répondu:', response.content);
-          },
-          onToolCall: (call) => {
-            console.log(`Outil appelé: ${call.name}`);
-            if (call.result) {
-              console.log('Résultat:', call.result.slice(0, 200));
-            }
-          },
-          onWidget: (type, data) => {
-            // Agent demande d'afficher un widget
-            canvas.addWidget(type as any, data);
-            return { id: 'auto' };
-          },
-          onText: (text) => {
-            // Afficher le texte au fur et à mesure
-            messages = [...messages, { role: 'assistant', content: text }];
-          },
-          onDone: (metrics) => {
-            console.log('Agent terminé:', metrics);
-          },
-        },
+      const response = await fetch('/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMessage, mcpUrl }),
       });
 
-      // Afficher résumé final
-      messages = [
-        ...messages,
-        { role: 'assistant', content: `✅ Terminé en ${result.metrics.iterations} itérations` },
-      ];
-    } catch (err) {
-      messages = [
-        ...messages,
-        { role: 'system', content: `❌ Erreur: ${err instanceof Error ? err.message : String(err)}` },
-      ];
+      const result = await response.json();
+
+      // Ajouter le résultat au canvas
+      canvas.addMsg('user', userMessage);
+      canvas.addMsg('assistant', result.text);
+
+      // Ajouter les widgets générés
+      result.toolCalls.forEach((call: any) => {
+        if (call.name.includes('widget_display')) {
+          canvas.addWidget('json-viewer', {
+            data: call.result,
+          });
+        }
+      });
+
+      userMessage = '';
+    } catch (error) {
+      console.error('Erreur agent :', error);
+      canvas.addMsg('assistant', '❌ Erreur lors de l\'exécution');
     } finally {
-      isRunning = false;
+      loading = false;
+      canvas.setGenerating(false);
     }
   }
 </script>
 
-<div class="chat-container">
-  <div class="messages">
-    {#each messages as msg}
-      <div class="message {msg.role}">
-        {msg.content}
-      </div>
-    {/each}
-  </div>
+<div class="agent-panel">
+  <input
+    bind:value={mcpUrl}
+    placeholder="URL du serveur MCP"
+    disabled={loading}
+  />
+  <textarea
+    bind:value={userMessage}
+    placeholder="Votre question..."
+    disabled={loading}
+  />
+  <button onclick={runAgent} disabled={loading}>
+    {loading ? 'En cours...' : 'Envoyer'}
+  </button>
 
-  <div class="input-area">
-    <input
-      type="text"
-      bind:value={userInput}
-      placeholder="Écrivez votre demande..."
-      disabled={isRunning}
-      on:keydown={(e) => e.key === 'Enter' && sendMessage()}
-    />
-    <button on:click={sendMessage} disabled={isRunning || !userInput.trim()}>
-      {isRunning ? 'En cours...' : 'Envoyer'}
-    </button>
+  {#if loading}
+    <AgentProgress />
+  {/if}
+
+  <div class="results">
+    {#each canvas.blocks as block (block.id)}
+      <BlockRenderer id={block.id} type={block.type} data={block.data} />
+    {/each}
   </div>
 </div>
 
 <style>
-  .chat-container {
+  .agent-panel {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    gap: 1rem;
+    padding: 1.5rem;
   }
-  .messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem;
-  }
-  .message {
-    margin: 0.5rem 0;
-    padding: 0.75rem;
-    border-radius: 0.5rem;
-  }
-  .message.user {
-    background: #3b82f6;
-    color: white;
-    text-align: right;
-  }
-  .message.assistant {
-    background: #e5e7eb;
-    color: #1f2937;
-  }
-  .input-area {
-    display: flex;
-    gap: 0.5rem;
-    padding: 1rem;
-    border-top: 1px solid #e5e7eb;
-  }
-  input {
-    flex: 1;
+
+  input, textarea {
     padding: 0.5rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.25rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
   }
-  button {
-    padding: 0.5rem 1rem;
-    background: #3b82f6;
-    color: white;
-    border: none;
-    border-radius: 0.25rem;
-    cursor: pointer;
+
+  textarea {
+    min-height: 80px;
+    resize: vertical;
   }
+
   button:disabled {
     opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .results {
+    display: grid;
+    gap: 1rem;
   }
 </style>
 ```
 
-## Exemple complet : Serveur MCP "Recipes"
+## Débogage
 
-Si votre serveur MCP expose `search_recipes` et `get_recipe` :
-
-```typescript
-// src/lib/recipes-mcp.ts
-import type { McpToolDef } from '@webmcp-auto-ui/agent';
-
-export const RECIPES_TOOLS: McpToolDef[] = [
-  {
-    name: 'search_recipes',
-    description: 'Chercher des recettes par mot-clé',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string' },
-      },
-      required: ['query'],
-    },
-  },
-  {
-    name: 'get_recipe',
-    description: 'Récupérer une recette complète par ID',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string' },
-      },
-      required: ['id'],
-    },
-  },
-];
-```
-
-Le système prompt sera automatiquement généré pour **guider l'agent** à :
-1. Chercher une recette pertinente (`search_recipes`)
-2. Récupérer le texte complet (`get_recipe`)
-3. Suivre les instructions de la recette
-
-## Gestion des erreurs et reconnexion
+Pour inspecter les appels MCP en détail :
 
 ```typescript
-export async function safeCallTool(
-  mcpClient: McpClient,
-  toolName: string,
-  args: Record<string, unknown>,
-): Promise<string> {
-  try {
-    const result = await mcpClient.callTool(toolName, args);
-    const text = result.content.find((c: any) => c.type === 'text')?.text ?? '';
-    return text;
-  } catch (err) {
-    if (err instanceof Error && err.message.includes('404')) {
-      // Reconnecter si session expirée
-      await initMcp();
-      return '❌ Session expirée, reconnexion effectuée. Réessayez.';
-    }
-    throw err;
-  }
-}
+// Ajouter du logging au client
+const client = new McpClient(url);
+
+// Les résultats des outils sont dans AgentResult.toolCalls
+const result = await runAgentLoop(message, {
+  client,
+  provider,
+  layers,
+  callbacks: {
+    onToolCall: (call) => {
+      console.log('=== APPEL OUTIL ===');
+      console.log('Nom :', call.name);
+      console.log('Args :', JSON.stringify(call.args, null, 2));
+      console.log('Résultat :', call.result);
+      console.log('Durée :', call.elapsed, 'ms');
+    },
+  },
+});
 ```
-
-## Monitorer les outils disponibles
-
-Afficher l'état MCP dans l'UI :
-
-```svelte
-<script lang="ts">
-  import { McpStatus } from '@webmcp-auto-ui/ui';
-  import { mcpClient } from '$lib/mcp-client';
-
-  let tools = [];
-  let isConnected = false;
-
-  onMount(async () => {
-    try {
-      await mcpClient.initialize();
-      const result = await mcpClient.listTools();
-      tools = result.tools;
-      isConnected = true;
-    } catch (err) {
-      isConnected = false;
-    }
-  });
-</script>
-
-<McpStatus {isConnected} toolCount={tools.length} serverName="recipes" />
-```
-
-## Points clés
-
-✅ **Utiliser `buildSystemPromptWithAliases()`** — injection automatique de l'ordre d'exploration (search → list → search_tools)
-
-✅ **Encapsuler chaque serveur dans une ToolLayer** — permet la composition et la réutilisabilité
-
-✅ **Implémenter `autoReconnect`** — gère les sessions expirées du protocole Streamable HTTP
-
-✅ **Compresser l'historique** — l'agent limite les résultats longs pour économiser le contexte
-
-❌ **Ne pas appeler `listTools()` à chaque itération** — mettre en cache au démarrage
-
-❌ **Ne pas exposer les clés API MCP au client** — les proxifier côté serveur (Node.js)
-
-❌ **Ne pas supposer que tous les serveurs ont `search_recipes`** — vérifier la documentation du serveur
 
 ## Voir aussi
 
-- [Utiliser les widgets existants](./use-existing-widgets.mdx)
-- [Architecture](../guide/architecture) — Architecture du système et agent loop
-- [Tool Calling](../guide/tool-calling) — Fonctionnement des tool layers
+- [Créer un widget custom](./create-custom-widget)
+- [Utiliser les widgets existants](./use-existing-widgets)
+- [Référence API McpClient](/api/mcpclient)
+- [Spécification MCP officielle](https://modelcontextprotocol.io)
