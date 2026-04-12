@@ -1,6 +1,17 @@
 import type { WebMcpServer } from '@webmcp-auto-ui/core';
 import type { ToolLayer } from '@webmcp-auto-ui/agent';
 import { autoui } from '@webmcp-auto-ui/agent';
+import { d3server } from './servers/d3/server.js';
+import { threejsServer } from './servers/threejs/server.js';
+import { mermaidServer } from './servers/mermaid/server.js';
+import { plotlyServer } from './servers/plotly/server.js';
+import { leafletServer } from './servers/leaflet/server.js';
+import { mapboxServer } from './servers/mapbox/server.js';
+import { canvas2dServer } from './servers/canvas2d/server.js';
+import { chartjsServer } from './servers/chartjs/server.js';
+import { cytoscapeServer } from './servers/cytoscape/server.js';
+import { roughServer } from './servers/rough/server.js';
+import { pixijsServer } from './servers/pixijs/server.js';
 
 export interface ServerPack {
   id: string;
@@ -9,9 +20,19 @@ export interface ServerPack {
   server: WebMcpServer;
 }
 
-/** All available server packs */
 export const ALL_PACKS: ServerPack[] = [
-  { id: 'autoui', label: 'Svelte Native', description: 'Built-in Svelte widgets (stat, chart, table, etc.)', server: autoui },
+  { id: 'autoui', label: 'AutoUI (Svelte)', description: 'Built-in Svelte widgets (stat, chart, table, etc.)', server: autoui },
+  { id: 'd3', label: 'D3.js', description: 'Advanced data visualizations (treemap, sunburst, chord, force graph, etc.)', server: d3server },
+  { id: 'threejs', label: 'Three.js', description: '3D visualizations (globe, terrain, scatter 3D, mesh viewer, etc.)', server: threejsServer },
+  { id: 'mermaid', label: 'Mermaid', description: 'Diagrams (flowchart, sequence, gantt, ER, class, mindmap, etc.)', server: mermaidServer },
+  { id: 'plotly', label: 'Plotly', description: 'Scientific charts (scatter, heatmap, 3D surface, sankey, etc.)', server: plotlyServer },
+  { id: 'leaflet', label: 'Leaflet', description: 'Maps and geospatial (markers, choropleth, heatmap, routing, etc.)', server: leafletServer },
+  { id: 'mapbox', label: 'Mapbox GL', description: '3D maps (buildings, terrain, globe, animated lines, etc.)', server: mapboxServer },
+  { id: 'canvas2d', label: 'Canvas 2D', description: 'Lightweight charts with native Canvas API (bar, line, flame graph, etc.)', server: canvas2dServer },
+  { id: 'chartjs', label: 'Chart.js', description: 'Simple charts (line, bar, pie, doughnut, radar, scatter, bubble)', server: chartjsServer },
+  { id: 'cytoscape', label: 'Cytoscape', description: 'Graph and network visualizations (force, DAG, hierarchy, etc.)', server: cytoscapeServer },
+  { id: 'rough', label: 'Rough.js', description: 'Hand-drawn style charts (sketch bar, pie, line, network, etc.)', server: roughServer },
+  { id: 'pixijs', label: 'PixiJS', description: 'Animated WebGL visualizations (particles, waveform, gauge, etc.)', server: pixijsServer },
 ];
 
 /** Build the agent tool layers from a set of enabled pack IDs */

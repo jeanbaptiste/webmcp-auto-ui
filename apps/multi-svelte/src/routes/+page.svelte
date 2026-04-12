@@ -21,7 +21,7 @@
   import { ALL_PACKS, buildLayers, getActiveServers } from '$lib/agent-setup';
 
   // ── Server packs state ────────────────────────────────────────────
-  let enabledPacks = $state<Set<string>>(new Set(['autoui', 'vanilla']));
+  let enabledPacks = $state<Set<string>>(new Set(['autoui']));
 
   let serverOptions = $derived(
     ALL_PACKS.map(p => ({
@@ -168,6 +168,13 @@
     } else {
       const allTools = multiClient.listAllTools();
       canvas.setMcpConnected(true, multiClient.listServers().map(s => s.name).join(', '), allTools as Parameters<typeof canvas.setMcpConnected>[2]);
+    }
+  }
+
+  async function addAllServers() {
+    const { MCP_DEMO_SERVERS } = await import('@webmcp-auto-ui/sdk');
+    for (const server of MCP_DEMO_SERVERS) {
+      await addMcpServer(server.url);
     }
   }
 
@@ -408,6 +415,12 @@
             class="w-full px-2 py-1.5 rounded bg-accent/10 border border-accent/30 text-accent font-mono text-xs
                    hover:bg-accent/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
             {loadingUrls.includes(mcpUrl) ? 'Connecting...' : 'Connect'}
+          </button>
+          <button onclick={addAllServers}
+            disabled={loadingUrls.length > 0}
+            class="w-full px-2 py-1.5 rounded bg-teal/10 border border-teal/30 text-teal font-mono text-xs
+                   hover:bg-teal/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            Connect all MCP demos
           </button>
         </div>
         {#if connectedUrls.length > 0}

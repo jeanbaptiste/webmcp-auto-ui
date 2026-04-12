@@ -1,0 +1,23 @@
+---
+widget: plotly-icicle
+description: Icicle chart — hierarchical data as stacked rectangles (top-down).
+group: plotly
+schema:
+  type: object
+  required: [labels, parents]
+  properties:
+    title: { type: string, description: Chart title }
+    ids: { type: array, items: { type: string }, description: Unique node IDs }
+    labels: { type: array, items: { type: string }, description: Display labels }
+    parents: { type: array, items: { type: string }, description: "Parent ID per node ('' for root)" }
+    values: { type: array, items: { type: number }, description: Values per node }
+    branchvalues: { type: string, description: "'total' (default) or 'remainder'" }
+---
+
+## When to use
+Hierarchical data as a flame graph / icicle diagram.
+
+## Example
+```
+widget_display('plotly-icicle', { labels: ['Root','A','B','A1','A2'], parents: ['','Root','Root','A','A'], values: [0,10,5,6,4] })
+```

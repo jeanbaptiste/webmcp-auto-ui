@@ -9,6 +9,20 @@ export default defineConfig({
     __GIT_HASH__: JSON.stringify(process.env.GIT_HASH || execSync('git rev-parse --short=8 HEAD').toString().trim()),
   },
   plugins: [sveltekit()],
+  build: {
+    rollupOptions: {
+      external: [
+        'd3', 'three', 'three/addons/controls/OrbitControls.js',
+        'mermaid', 'plotly.js-dist-min',
+        'leaflet', 'leaflet.heat', 'leaflet.markercluster', 'leaflet-draw', 'leaflet-routing-machine', 'leaflet.glify',
+        'mapbox-gl',
+        'chart.js',
+        'cytoscape', 'cytoscape-dagre', 'cytoscape-cola', 'cytoscape-cose-bilkent', 'cytoscape-fcose',
+        'roughjs',
+        'pixi.js',
+      ],
+    },
+  },
   resolve: {
     alias: {
       '@webmcp-auto-ui/sdk/canvas': path.resolve('../../packages/sdk/src/canvas.ts'),
