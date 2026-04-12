@@ -14,17 +14,17 @@ export default defineConfig({
           content: `
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
 mermaid.initialize({ startOnLoad: false, theme: 'default' });
-const blocks = document.querySelectorAll('pre > code.language-mermaid');
-for (const code of blocks) {
+const pres = document.querySelectorAll('pre[data-language="mermaid"]');
+for (const pre of pres) {
   try {
-    const pre = code.parentElement;
-    const text = code.textContent;
+    const text = pre.textContent;
     const id = 'mermaid-' + Math.random().toString(36).slice(2, 9);
     const { svg } = await mermaid.render(id, text);
     const div = document.createElement('div');
     div.className = 'mermaid';
     div.innerHTML = svg;
-    pre.replaceWith(div);
+    const wrapper = pre.closest('.expressive-code') || pre.parentElement;
+    wrapper.replaceWith(div);
   } catch (e) { console.warn('Mermaid render error:', e); }
 }
 `,
