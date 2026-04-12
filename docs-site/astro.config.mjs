@@ -22,7 +22,10 @@ for (const pre of pres) {
     const { svg } = await mermaid.render(id, text);
     const div = document.createElement('div');
     div.className = 'mermaid';
+    div.style.cssText = 'width:100%;overflow-x:auto;text-align:center;margin:1.5rem 0;';
     div.innerHTML = svg;
+    const s = div.querySelector('svg');
+    if (s) { s.style.maxWidth = '100%'; s.style.height = 'auto'; }
     const wrapper = pre.closest('.expressive-code') || pre.parentElement;
     wrapper.replaceWith(div);
   } catch (e) { console.warn('Mermaid render error:', e); }
