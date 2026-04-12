@@ -81,6 +81,12 @@ deploy_node_root() {
   (cd "$LOCAL_ROOT/apps/$app" && npm run build > /dev/null 2>&1)
   echo "  [$app] cleaning old files on server..."
   ssh "$SSH_HOST" "cd $REMOTE_BASE/$app && rm -f index.js handler.js env.js shims.js && rm -rf client server build"
+  # Recreate subdirectory structure so scp can copy files into nested dirs
+  local subdirs
+  subdirs=$(cd "$LOCAL_ROOT/apps/$app/build" && find . -type d | sed 's|^\./||' | grep -v '^\.$' || true)
+  if [ -n "$subdirs" ]; then
+    ssh "$SSH_HOST" "cd $REMOTE_BASE/$app && echo '$subdirs' | xargs -I{} mkdir -p '{}'"
+  fi
   echo "  [$app] copying build..."
   scp -r "$LOCAL_ROOT/apps/$app/build/"* "$SSH_HOST:$REMOTE_BASE/$app/"
   echo "  [$app] verifying deploy integrity..."
