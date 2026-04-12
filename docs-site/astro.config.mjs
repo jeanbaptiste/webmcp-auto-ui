@@ -7,6 +7,29 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'WebMCP Auto-UI',
+      head: [
+        {
+          tag: 'script',
+          attrs: { type: 'module' },
+          content: `
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({ startOnLoad: false, theme: 'default' });
+document.addEventListener('DOMContentLoaded', async () => {
+  const blocks = document.querySelectorAll('pre > code.language-mermaid');
+  for (const code of blocks) {
+    const pre = code.parentElement;
+    const text = code.textContent;
+    const id = 'mermaid-' + Math.random().toString(36).slice(2, 9);
+    const { svg } = await mermaid.render(id, text);
+    const div = document.createElement('div');
+    div.className = 'mermaid';
+    div.innerHTML = svg;
+    pre.replaceWith(div);
+  }
+});
+`,
+        },
+      ],
       defaultLocale: 'root',
       locales: {
         root: { label: 'Français', lang: 'fr' },
