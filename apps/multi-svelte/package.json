@@ -15,13 +15,7 @@
     "@webmcp-auto-ui/agent": "file:../../packages/agent",
     "@webmcp-auto-ui/core": "file:../../packages/core",
     "@webmcp-auto-ui/sdk": "file:../../packages/sdk",
-    "@webmcp-auto-ui/ui": "file:../../packages/ui",
-    "@webmcp-auto-ui/widgets-vanilla": "file:../../packages/widgets-vanilla",
-    "@webmcp-auto-ui/widgets-d3": "file:../../packages/widgets-d3",
-    "@webmcp-auto-ui/widgets-canvas2d": "file:../../packages/widgets-canvas2d",
-    "@webmcp-auto-ui/widgets-mermaid": "file:../../packages/widgets-mermaid",
-    "@webmcp-auto-ui/widgets-plotly": "file:../../packages/widgets-plotly",
-    "@webmcp-auto-ui/widgets-leaflet": "file:../../packages/widgets-leaflet"
+    "@webmcp-auto-ui/ui": "file:../../packages/ui"
   },
   "devDependencies": {
     "@huggingface/transformers": "^4.0.1",

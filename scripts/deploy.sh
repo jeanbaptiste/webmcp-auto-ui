@@ -226,12 +226,8 @@ deploy_app() {
     todo2)               deploy_static "todo2" ;;
     showcase2)           deploy_node_root "showcase2" ;;
     multi-svelte)        deploy_node_root "multi-svelte" ;;
-    multi-react)         deploy_vite_static "multi-react" ;;
-    multi-vue)           deploy_vite_static "multi-vue" ;;
-    multi-webcomponents) deploy_vite_static "multi-webcomponents" ;;
-    multi-astro)         deploy_astro_node "multi-astro" ;;
     *)
-      echo "  [$app] ✗ unknown app (valid: home, flex2, viewer2, showcase2, todo2, recipes, multi-svelte, multi-react, multi-vue, multi-webcomponents, multi-astro)"
+      echo "  [$app] ✗ unknown app (valid: home, flex2, viewer2, showcase2, todo2, recipes, multi-svelte)"
       return 1
       ;;
   esac
@@ -243,7 +239,7 @@ echo "webmcp-auto-ui deploy"
 echo ""
 
 if [ $# -eq 0 ]; then
-  APPS="home flex2 viewer2 showcase2 todo2 recipes multi-svelte multi-react multi-vue multi-webcomponents multi-astro"
+  APPS="home flex2 viewer2 showcase2 todo2 recipes multi-svelte"
 else
   APPS="$*"
 fi
@@ -266,7 +262,7 @@ echo ""
 echo "Verifying..."
 for app in $APPS; do
   case "$app" in
-    flex2|viewer2|recipes|showcase2|multi-svelte|multi-astro)
+    flex2|viewer2|recipes|showcase2|multi-svelte)
       status=$(ssh "$SSH_HOST" "systemctl is-active webmcp-$app 2>/dev/null" || echo "inactive")
       echo "  $app: $status"
       ;;
