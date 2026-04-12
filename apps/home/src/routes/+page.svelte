@@ -28,7 +28,7 @@
       accent: '#10b981',
     },
     {
-      title: 'Todo',
+      title: 'Todo-WebMCP',
       desc: 'Template minimal de référence pour démarrer une app webmcp-auto-ui.',
       url: `${base}/todo2`,
       accent: '#14b8a6',
@@ -40,34 +40,10 @@
       accent: '#ec4899',
     },
     {
-      title: 'Multi — Svelte',
-      desc: 'Multi-framework demo: Svelte 5 + SvelteKit, all widget families, WASM agent.',
+      title: 'Multi-WebMCP-UI',
+      desc: 'Intégration multi-framework : Svelte 5 + SvelteKit, serveur MCP, agent IA, widgets natifs.',
       url: `${base}/multi-svelte`,
       accent: '#ff3e00',
-    },
-    {
-      title: 'Multi — React',
-      desc: 'Multi-framework demo: React 19 + MUI, D3/Plotly/Mermaid widgets, Claude API.',
-      url: `${base}/multi-react`,
-      accent: '#61dafb',
-    },
-    {
-      title: 'Multi — Vue',
-      desc: 'Multi-framework demo: Vue 3 Composition API, vanilla/D3/Plotly/Mermaid widgets.',
-      url: `${base}/multi-vue`,
-      accent: '#42b883',
-    },
-    {
-      title: 'Multi — Web Components',
-      desc: 'Multi-framework demo: pure Web Components, zero-framework vanilla widgets.',
-      url: `${base}/multi-webcomponents`,
-      accent: '#f7df1e',
-    },
-    {
-      title: 'Multi — Astro',
-      desc: 'Multi-framework demo: Astro SSR + islands, Canvas2D/D3/Plotly/Mermaid widgets.',
-      url: `${base}/multi-astro`,
-      accent: '#bc52ee',
     },
   ];
 
