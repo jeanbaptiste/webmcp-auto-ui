@@ -17,10 +17,12 @@ mermaid.initialize({ startOnLoad: false, theme: 'default' });
 const pres = document.querySelectorAll('pre[data-language="mermaid"]');
 for (const pre of pres) {
   try {
-    const lines = pre.querySelectorAll('.ec-line');
-    const text = lines.length > 0
-      ? Array.from(lines).map(l => l.textContent).join('\n')
-      : pre.textContent;
+    const code = pre.querySelector('code');
+    const raw = code ? code.innerHTML : pre.innerHTML;
+    const text = raw.replace(/<\\/div><div class="ec-line">/g, '\\n<div class="ec-line">')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&#x3C;/g, '<')
+      .trim();
     const id = 'mermaid-' + Math.random().toString(36).slice(2, 9);
     const { svg } = await mermaid.render(id, text);
     const div = document.createElement('div');
