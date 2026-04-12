@@ -32,6 +32,13 @@
   let blocks = $state<Block[]>([]);
   let ephemeralText = $state('');
 
+  // ── WebMCP local servers (toggleable) ──────────────────────────────────
+  interface LocalWebMcpEntry { server: WebMcpServer; label: string; enabled: boolean; }
+  let localWebMcpServers = $state<LocalWebMcpEntry[]>([
+    { server: tricoteusesServer, label: 'Tricoteuses', enabled: true },
+    { server: autoui, label: 'AutoUI', enabled: false },
+  ]);
+
   // ── Theme ─────────────────────────────────────────────────────────────
   const theme = getTheme();
 
@@ -61,17 +68,17 @@
         result.push(mcpLayer);
       }
     }
-    // Local WebMCP — tricoteuses widgets
-    result.push(tricoteusesServer.layer());
-    // AutoUI native widgets
-    result.push(autoui.layer());
+    // Local WebMCP servers (only enabled ones)
+    for (const entry of localWebMcpServers) {
+      if (entry.enabled) result.push(entry.server.layer());
+    }
     return result;
   });
 
   const systemPrompt = $derived(buildSystemPrompt(layers));
 
   // ── Servers: custom WebMCP servers for WidgetRenderer ─────────────────
-  const servers: WebMcpServer[] = [tricoteusesServer];
+  const servers = $derived(localWebMcpServers.filter(e => e.enabled).map(e => e.server));
 
   // ── MCP connect ───────────────────────────────────────────────────────
   async function connectMcp() {
@@ -184,6 +191,26 @@
                  disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0">
           {connecting ? '...' : 'Connecter'}
         </button>
+      </div>
+    </div>
+
+    <!-- WebMCP local servers -->
+    <div class="max-w-2xl mx-auto mb-4">
+      <div class="flex items-center gap-3 flex-wrap">
+        <span class="text-[10px] font-mono text-text2 uppercase tracking-wider">WebMCP</span>
+        {#each localWebMcpServers as entry, i}
+          <button
+            onclick={() => { localWebMcpServers[i].enabled = !localWebMcpServers[i].enabled; }}
+            class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono transition-colors
+                   {entry.enabled
+                     ? 'border-accent/50 bg-accent/10 text-accent'
+                     : 'border-border2 bg-surface2 text-text2 hover:text-text1 hover:border-border'}"
+          >
+            <span class="w-1.5 h-1.5 rounded-full {entry.enabled ? 'bg-accent' : 'bg-text2/30'}"></span>
+            {entry.label}
+            <span class="text-[10px] text-text2/60">{entry.server.listWidgets().length} widgets</span>
+          </button>
+        {/each}
       </div>
     </div>
 
