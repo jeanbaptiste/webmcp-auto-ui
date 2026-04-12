@@ -14,9 +14,9 @@ export default defineConfig({
           content: `
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
 mermaid.initialize({ startOnLoad: false, theme: 'default' });
-document.addEventListener('DOMContentLoaded', async () => {
-  const blocks = document.querySelectorAll('pre > code.language-mermaid');
-  for (const code of blocks) {
+const blocks = document.querySelectorAll('pre > code.language-mermaid');
+for (const code of blocks) {
+  try {
     const pre = code.parentElement;
     const text = code.textContent;
     const id = 'mermaid-' + Math.random().toString(36).slice(2, 9);
@@ -25,8 +25,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     div.className = 'mermaid';
     div.innerHTML = svg;
     pre.replaceWith(div);
-  }
-});
+  } catch (e) { console.warn('Mermaid render error:', e); }
+}
 `,
         },
       ],
