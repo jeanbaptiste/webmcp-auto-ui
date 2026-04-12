@@ -1,11 +1,7 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
-import remarkMermaid from 'remark-mermaidjs';
 
 export default defineConfig({
-  markdown: {
-    remarkPlugins: [remarkMermaid],
-  },
   site: 'https://jeanbaptiste.github.io',
   base: '/webmcp-auto-ui',
   integrations: [
