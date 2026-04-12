@@ -14,6 +14,7 @@
     "apps/showcase2",
     "apps/recipes",
     "apps/multi-svelte",
+    "apps/boilerplate",
     "docs-site"
   ],
   "scripts": {

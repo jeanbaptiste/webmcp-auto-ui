@@ -1,280 +1,852 @@
 ---
-title: Créer un widget personnalisé
-description: Construire et enregistrer un widget custom dans le système de composants WebMCP Auto-UI
+title: Créer des widgets personnalisés — Exemple Tricoteuses
+description: Tutorial complet pour créer des widgets custom avec composant Svelte + recette YAML, illustré par 3 widgets parlementaires inspirés de tricoteuses.fr
 sidebar:
   order: 1
 ---
 
-Un widget personnalisé est un composant Svelte qui affiche des données structurées sur le canvas. Ce tutorial montre comment créer, enregistrer et utiliser un widget custom.
+Un widget personnalisé dans WebMCP Auto-UI, c'est deux choses :
 
-## Architecture des widgets
+1. **Un composant Svelte** qui affiche des données structurées
+2. **Une recette YAML** qui décrit au LLM quand et comment utiliser ce widget
 
-Le système de widgets WebMCP Auto-UI comporte trois niveaux :
+L'agent IA lit la recette pour comprendre le schéma de données attendu, puis appelle `widget_display` avec les bons paramètres. Le composant Svelte reçoit ces données et les affiche sur le canvas.
+
+Ce tutorial crée 3 widgets inspirés de [tricoteuses.fr](https://tricoteuses.fr) (données parlementaires françaises) :
+
+- **Fiche Député** -- carte de profil avec photo, groupe politique, statistiques de vote
+- **Résultat de Scrutin** -- résultat d'un vote avec barre proportionnelle pour/contre/abstention
+- **Amendement** -- texte d'amendement avec exposé des motifs et sort
+
+
+## Étape 1 -- Comprendre l'architecture
 
 ```mermaid
 graph TD
-  A["Serveur WebMCP<br/>createWebMcpServer"] -->|registerWidget| B["Registry de widgets<br/>WidgetEntry"]
-  B -->|getWidget| C["WidgetRenderer<br/>resolution de type"]
-  C -->|render| D["Composant Svelte<br/>ou fonction vanilla"]
+  A["Serveur WebMCP<br/>createWebMcpServer()"] -->|registerWidget| B["Registry interne<br/>Map&lt;name, WidgetEntry&gt;"]
+  B -->|search_recipes / get_recipe| C["Agent LLM<br/>lit le schema + instructions"]
+  C -->|widget_display(name, params)| D["WidgetRenderer<br/>résolution du composant"]
+  D -->|render| E["Composant Svelte<br/>affichage sur le canvas"]
 ```
 
-**Résumé :**
-1. Un `WebMcpServer` regroupe les widgets et les outils de rendu
-2. Chaque widget est enregistré avec un **frontmatter YAML** (schéma + instructions) + un **composant Svelte**
-3. Au moment du rendu, `WidgetRenderer` recherche le widget dans les serveurs connectés ou utilise les natives
+Le flux complet :
 
-## Exemple complet : widget "notification-feed"
+1. `createWebMcpServer` crée un serveur local qui expose 3 outils intégrés : `search_recipes`, `get_recipe`, `widget_display`
+2. `registerWidget(recetteYAML, ComposantSvelte)` parse le frontmatter YAML et enregistre le widget dans la map interne
+3. L'agent appelle `search_recipes` pour découvrir les widgets disponibles
+4. Il appelle `get_recipe("fiche-depute")` pour lire le schema JSON et les instructions d'usage
+5. Il appelle `widget_display("fiche-depute", { nom: "...", ... })` -- le serveur valide les params contre le schema, puis retourne les données au renderer
+6. `WidgetRenderer` trouve le composant Svelte associé et le monte sur le canvas
 
-### Étape 1 : Créer le composant Svelte
+
+## Étape 2 -- Premier widget : Fiche Député
+
+### 2a. Le composant Svelte
 
 ```svelte
-<!-- src/lib/widgets/NotificationFeed.svelte -->
+<!-- src/lib/widgets/FicheDepute.svelte -->
 <script lang="ts">
   interface Props {
     data: {
-      title?: string;
-      notifications: Array<{
-        id: string;
-        timestamp: string;
-        level: 'info' | 'warn' | 'error';
-        message: string;
-      }>;
+      nom: string;
+      prenom: string;
+      photo?: string;
+      groupe: {
+        nom: string;
+        sigle: string;
+        couleur: string;
+      };
+      circonscription: string;
+      dateDebutMandat: string;
+      profession?: string;
+      votes?: {
+        pour: number;
+        contre: number;
+        abstention: number;
+        absent: number;
+      };
     };
   }
 
   let { data } = $props();
 
-  const colors = {
-    info: 'text-blue-500',
-    warn: 'text-amber-500',
-    error: 'text-red-500',
-  };
+  const totalVotes = $derived(
+    data.votes
+      ? data.votes.pour + data.votes.contre + data.votes.abstention + data.votes.absent
+      : 0,
+  );
 
-  function formatTime(ts: string): string {
-    const date = new Date(ts);
-    return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  function pct(n: number): string {
+    if (totalVotes === 0) return '0';
+    return ((n / totalVotes) * 100).toFixed(1);
+  }
+
+  function initiales(): string {
+    return `${data.prenom[0]}${data.nom[0]}`.toUpperCase();
   }
 </script>
 
-<div class="p-4 bg-surface1 rounded-lg border border-surface2">
-  {#if data.title}
-    <h3 class="font-semibold mb-3 text-text1">{data.title}</h3>
-  {/if}
-  
-  <div class="space-y-2 max-h-64 overflow-y-auto">
-    {#each data.notifications as notif (notif.id)}
-      <div class="flex gap-3 items-start text-sm p-2 rounded bg-surface2">
-        <div class={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${colors[notif.level]}`}></div>
-        <div class="flex-1 min-w-0">
-          <div class="text-text2">{notif.message}</div>
-          <div class="text-xs text-text3 mt-1">{formatTime(notif.timestamp)}</div>
-        </div>
+<div class="p-5 bg-surface1 rounded-xl border border-surface2 max-w-md">
+  <!-- En-tête : photo + identité -->
+  <div class="flex gap-4 items-start mb-4">
+    {#if data.photo}
+      <img
+        src={data.photo}
+        alt="{data.prenom} {data.nom}"
+        class="w-20 h-20 rounded-full object-cover border-2"
+        style="border-color: {data.groupe.couleur}"
+      />
+    {:else}
+      <div
+        class="w-20 h-20 rounded-full flex items-center justify-center text-white text-xl font-bold"
+        style="background-color: {data.groupe.couleur}"
+      >
+        {initiales()}
       </div>
-    {/each}
+    {/if}
+
+    <div class="flex-1 min-w-0">
+      <h3 class="text-lg font-bold text-text1 leading-tight">
+        {data.prenom} {data.nom}
+      </h3>
+      <div class="flex items-center gap-2 mt-1">
+        <span
+          class="w-3 h-3 rounded-full inline-block flex-shrink-0"
+          style="background-color: {data.groupe.couleur}"
+        ></span>
+        <span class="text-sm text-text2 truncate">
+          {data.groupe.nom} ({data.groupe.sigle})
+        </span>
+      </div>
+      <div class="text-sm text-text3 mt-1">{data.circonscription}</div>
+      {#if data.profession}
+        <div class="text-xs text-text3 mt-0.5">{data.profession}</div>
+      {/if}
+      <div class="text-xs text-text3 mt-0.5">
+        Mandat depuis le {data.dateDebutMandat}
+      </div>
+    </div>
   </div>
 
-  {#if data.notifications.length === 0}
-    <div class="text-xs text-text3 italic">Aucune notification</div>
+  <!-- Statistiques de vote -->
+  {#if data.votes && totalVotes > 0}
+    <div class="mt-3 pt-3 border-t border-surface2">
+      <div class="text-xs font-medium text-text2 mb-2">
+        Participation aux scrutins ({totalVotes} votes)
+      </div>
+      <!-- Barre proportionnelle -->
+      <div class="flex h-3 rounded-full overflow-hidden">
+        <div
+          class="bg-emerald-500"
+          style="width: {pct(data.votes.pour)}%"
+          title="Pour : {data.votes.pour} ({pct(data.votes.pour)}%)"
+        ></div>
+        <div
+          class="bg-red-500"
+          style="width: {pct(data.votes.contre)}%"
+          title="Contre : {data.votes.contre} ({pct(data.votes.contre)}%)"
+        ></div>
+        <div
+          class="bg-amber-400"
+          style="width: {pct(data.votes.abstention)}%"
+          title="Abstention : {data.votes.abstention} ({pct(data.votes.abstention)}%)"
+        ></div>
+        <div
+          class="bg-gray-300 dark:bg-gray-600"
+          style="width: {pct(data.votes.absent)}%"
+          title="Absent : {data.votes.absent} ({pct(data.votes.absent)}%)"
+        ></div>
+      </div>
+      <!-- Légende -->
+      <div class="flex gap-3 mt-2 text-xs text-text3 flex-wrap">
+        <span class="flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Pour {pct(data.votes.pour)}%
+        </span>
+        <span class="flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-red-500"></span> Contre {pct(data.votes.contre)}%
+        </span>
+        <span class="flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-amber-400"></span> Abst. {pct(data.votes.abstention)}%
+        </span>
+        <span class="flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600"></span> Abs. {pct(data.votes.absent)}%
+        </span>
+      </div>
+    </div>
   {/if}
 </div>
-
-<style>
-  :global(.dark) {
-    --surface1: #1a1a1a;
-    --surface2: #2d2d2d;
-  }
-</style>
 ```
 
-### Étape 2 : Définir le frontmatter et la recette
+### 2b. La recette YAML
 
-Créer une constante avec le **frontmatter YAML** décrivant le schéma du widget :
+La recette est une string Markdown avec un frontmatter YAML. Le frontmatter contient le nom du widget, sa description et son schema JSON. Le corps Markdown donne des instructions à l'agent.
 
 ```typescript
-// src/lib/widgets/notification-feed-recipe.ts
-export const NOTIFICATION_FEED_RECIPE = `---
-widget: notification-feed
-description: Flux de notifications en temps réel avec timestamps et niveaux de sévérité.
+// src/lib/widgets/fiche-depute-recipe.ts
+export const FICHE_DEPUTE_RECIPE = `---
+widget: fiche-depute
+description: Carte de profil d'un député français — photo, groupe politique, circonscription, statistiques de vote.
 schema:
   type: object
   required:
-    - notifications
+    - nom
+    - prenom
+    - groupe
+    - circonscription
+    - dateDebutMandat
   properties:
-    title:
+    nom:
       type: string
-      description: Titre optionnel du flux
-    notifications:
-      type: array
-      description: Liste des notifications
-      items:
-        type: object
-        required:
-          - id
-          - timestamp
-          - level
-          - message
-        properties:
-          id:
-            type: string
-          timestamp:
-            type: string
-            description: ISO 8601 timestamp
-          level:
-            type: string
-            enum: [info, warn, error]
-          message:
-            type: string
+      description: Nom de famille du député
+    prenom:
+      type: string
+      description: Prénom du député
+    photo:
+      type: string
+      description: URL de la photo officielle (ne pas inventer, utiliser uniquement les données MCP)
+    groupe:
+      type: object
+      required:
+        - nom
+        - sigle
+        - couleur
+      properties:
+        nom:
+          type: string
+          description: "Nom complet du groupe parlementaire (ex: Renaissance)"
+        sigle:
+          type: string
+          description: "Sigle du groupe (ex: RE, LFI, RN)"
+        couleur:
+          type: string
+          description: "Couleur hex du groupe (ex: #FFD600)"
+    circonscription:
+      type: string
+      description: "Département et numéro (ex: Bouches-du-Rhône, 4e)"
+    dateDebutMandat:
+      type: string
+      description: "Date au format JJ/MM/AAAA"
+    profession:
+      type: string
+      description: Profession déclarée du député (optionnel)
+    votes:
+      type: object
+      description: Statistiques de participation aux scrutins (optionnel)
+      properties:
+        pour:
+          type: number
+        contre:
+          type: number
+        abstention:
+          type: number
+        absent:
+          type: number
 ---
 
 ## Quand utiliser
 
-Pour afficher un flux de notifications structuré avec tri par timestamp et filtrage par niveau de sévérité.
+Pour afficher la fiche d'un député de l'Assemblée nationale française.
+Utiliser quand l'utilisateur demande des informations sur un député, son profil,
+son groupe politique ou ses statistiques de vote.
 
 ## Comment
 
-Appeler \`widget_display('notification-feed', {
-  title: "Événements récents",
-  notifications: [
-    { id: "n1", timestamp: "2024-01-15T14:30:00Z", level: "info", message: "Tâche complétée" }
-  ]
-})\`.
+Appeler widget_display('fiche-depute', {
+  nom: "Mélenchon",
+  prenom: "Jean-Luc",
+  groupe: { nom: "La France Insoumise", sigle: "LFI", couleur: "#CC2443" },
+  circonscription: "Bouches-du-Rhône, 4e",
+  dateDebutMandat: "22/06/2022",
+  votes: { pour: 412, contre: 287, abstention: 34, absent: 189 }
+}).
 
 ## Erreurs courantes
 
-- Ne pas oublier les timestamps ISO 8601 — le widget les utilise pour l'ordre d'affichage
-- L'id doit être unique — c'est la clé pour la réactivité Svelte
+- Ne JAMAIS inventer d'URL pour la photo — utiliser uniquement les URLs retournées par les outils MCP. Sans URL, le widget affiche les initiales automatiquement.
+- La couleur du groupe doit être un code hex valide (avec #).
+- Le champ votes est optionnel — le widget s'adapte et n'affiche pas la barre si absent.
 `;
 ```
 
-### Étape 3 : Créer un serveur WebMCP
+### 2c. L'enregistrement
 
-Enregistrer le widget dans un serveur WebMCP custom :
+Créer un serveur WebMCP et y enregistrer le widget :
 
 ```typescript
-// src/lib/webmcp-server.ts
+// src/lib/tricoteuses-server.ts
 import { createWebMcpServer } from '@webmcp-auto-ui/core';
-import NotificationFeed from './widgets/NotificationFeed.svelte';
-import { NOTIFICATION_FEED_RECIPE } from './widgets/notification-feed-recipe';
+import FicheDepute from './widgets/FicheDepute.svelte';
+import { FICHE_DEPUTE_RECIPE } from './widgets/fiche-depute-recipe';
 
-export const customServer = createWebMcpServer('my-widgets', {
-  description: 'Widgets personnalisés pour l\'application',
+export const tricoteusesServer = createWebMcpServer('tricoteuses-widgets', {
+  description: 'Widgets de visualisation parlementaire inspirés de tricoteuses.fr',
 });
 
-// Enregistrer le widget
-customServer.registerWidget(NOTIFICATION_FEED_RECIPE, NotificationFeed);
-
-// Optionnel : ajouter des outils custom (ex: clear-notifications)
-customServer.addTool({
-  name: 'clear-notifications',
-  description: 'Effacer toutes les notifications du flux.',
-  inputSchema: {
-    type: 'object',
-    properties: {},
-  },
-  execute: async () => ({
-    ok: true,
-    message: 'Notifications effacées',
-  }),
-});
-
-// Exporter la couche (pour intégration agent)
-export function getCustomLayer() {
-  return customServer.layer();
-}
+tricoteusesServer.registerWidget(FICHE_DEPUTE_RECIPE, FicheDepute);
 ```
 
-### Étape 4 : Utiliser le widget dans une app
+`registerWidget` fait tout le travail :
+- Parse le frontmatter YAML (extraction de `widget`, `description`, `schema`)
+- Stocke le composant Svelte dans la map interne
+- Active automatiquement les 3 outils intégrés (`search_recipes`, `get_recipe`, `widget_display`) dès le premier widget enregistré
 
-Dans un composant Svelte, utiliser `<WidgetRenderer>` avec le serveur custom :
+### 2d. Tester avec l'agent
+
+Voici ce qui se passe quand un utilisateur demande "montre-moi la fiche de Jean-Luc Mélenchon" :
+
+```
+Utilisateur : "Montre-moi la fiche de Jean-Luc Mélenchon"
+
+Agent → search_recipes({ query: "député" })
+     ← [{ name: "fiche-depute", description: "Carte de profil d'un député..." }]
+
+Agent → get_recipe({ name: "fiche-depute" })
+     ← { schema: { ... }, recipe: "## Quand utiliser\nPour afficher..." }
+
+Agent → [appelle les outils MCP tricoteuses pour obtenir les données réelles]
+
+Agent → widget_display("fiche-depute", {
+          nom: "Mélenchon",
+          prenom: "Jean-Luc",
+          groupe: { nom: "La France Insoumise", sigle: "LFI", couleur: "#CC2443" },
+          circonscription: "Bouches-du-Rhône, 4e",
+          dateDebutMandat: "22/06/2022",
+          votes: { pour: 412, contre: 287, abstention: 34, absent: 189 }
+        })
+     ← { widget: "fiche-depute", data: { ... }, id: "w_a3k9f2" }
+```
+
+Le `WidgetRenderer` reçoit la réponse, trouve le composant `FicheDepute.svelte` dans le registry, et le monte sur le canvas avec les données validées.
+
+
+## Étape 3 -- Deuxième widget : Résultat de Scrutin
+
+Le pattern est le même : un composant Svelte + une recette YAML + `registerWidget`.
+
+### Composant Svelte
 
 ```svelte
-<!-- routes/+page.svelte -->
+<!-- src/lib/widgets/ResultatScrutin.svelte -->
 <script lang="ts">
-  import { WidgetRenderer } from '@webmcp-auto-ui/ui';
-  import { customServer } from '$lib/webmcp-server';
-
-  let widgets = [
-    {
-      id: 'notif-feed-1',
-      type: 'notification-feed',
-      data: {
-        title: 'Événements système',
-        notifications: [
-          {
-            id: 'n1',
-            timestamp: new Date(Date.now() - 300000).toISOString(),
-            level: 'info' as const,
-            message: 'Base de données synchronisée',
-          },
-          {
-            id: 'n2',
-            timestamp: new Date(Date.now() - 60000).toISOString(),
-            level: 'warn' as const,
-            message: 'Utilisation CPU élevée (85%)',
-          },
-        ],
-      },
-    },
-  ];
-
-  function handleInteraction(type: string, action: string, payload: unknown) {
-    console.log(`Widget ${type} a déclenché:`, action, payload);
+  interface Props {
+    data: {
+      numero: number;
+      titre: string;
+      dateScrutin: string;
+      sort: 'adopté' | 'rejeté';
+      pour: number;
+      contre: number;
+      abstention: number;
+      nonVotants?: number;
+      seuilMajorite: number;
+      legislature?: number;
+    };
   }
+
+  let { data } = $props();
+
+  const total = $derived(data.pour + data.contre + data.abstention);
+
+  function pct(n: number): string {
+    if (total === 0) return '0';
+    return ((n / total) * 100).toFixed(1);
+  }
+
+  const adopte = $derived(data.sort === 'adopté');
 </script>
 
-<div class="p-6 max-w-2xl mx-auto">
-  <h1 class="text-2xl font-bold mb-6">Dashboard personnel</h1>
-  
-  {#each widgets as widget (widget.id)}
-    <div class="mb-4">
-      <WidgetRenderer
-        id={widget.id}
-        type={widget.type}
-        data={widget.data}
-        servers={[customServer]}
-        oninteract={handleInteraction}
-      />
+<div class="p-5 bg-surface1 rounded-xl border border-surface2 max-w-lg">
+  <!-- En-tête -->
+  <div class="flex items-start justify-between gap-3 mb-3">
+    <div class="flex-1 min-w-0">
+      <div class="text-xs text-text3 mb-1">
+        Scrutin n&deg;{data.numero}
+        {#if data.legislature}
+          &mdash; {data.legislature}e législature
+        {/if}
+        &mdash; {data.dateScrutin}
+      </div>
+      <h3 class="text-base font-semibold text-text1 leading-snug">{data.titre}</h3>
     </div>
-  {/each}
+    <span
+      class="flex-shrink-0 px-3 py-1 rounded-full text-sm font-bold text-white"
+      class:bg-emerald-600={adopte}
+      class:bg-red-600={!adopte}
+    >
+      {data.sort.charAt(0).toUpperCase() + data.sort.slice(1)}
+    </span>
+  </div>
+
+  <!-- Barre proportionnelle -->
+  <div class="flex h-5 rounded-full overflow-hidden text-xs font-medium text-white">
+    {#if data.pour > 0}
+      <div
+        class="bg-emerald-500 flex items-center justify-center"
+        style="width: {pct(data.pour)}%"
+      >
+        {data.pour > total * 0.08 ? data.pour : ''}
+      </div>
+    {/if}
+    {#if data.contre > 0}
+      <div
+        class="bg-red-500 flex items-center justify-center"
+        style="width: {pct(data.contre)}%"
+      >
+        {data.contre > total * 0.08 ? data.contre : ''}
+      </div>
+    {/if}
+    {#if data.abstention > 0}
+      <div
+        class="bg-amber-400 flex items-center justify-center text-gray-800"
+        style="width: {pct(data.abstention)}%"
+      >
+        {data.abstention > total * 0.08 ? data.abstention : ''}
+      </div>
+    {/if}
+  </div>
+
+  <!-- Détail chiffré -->
+  <div class="flex gap-4 mt-3 text-sm">
+    <div class="text-center flex-1">
+      <div class="text-emerald-500 font-bold text-lg">{data.pour}</div>
+      <div class="text-text3 text-xs">Pour</div>
+    </div>
+    <div class="text-center flex-1">
+      <div class="text-red-500 font-bold text-lg">{data.contre}</div>
+      <div class="text-text3 text-xs">Contre</div>
+    </div>
+    <div class="text-center flex-1">
+      <div class="text-amber-500 font-bold text-lg">{data.abstention}</div>
+      <div class="text-text3 text-xs">Abstention</div>
+    </div>
+  </div>
+
+  <!-- Seuil de majorité -->
+  <div class="mt-3 pt-2 border-t border-surface2 text-xs text-text3 text-center">
+    Majorité requise : {data.seuilMajorite} voix
+    {#if data.nonVotants}
+      &mdash; Non-votants : {data.nonVotants}
+    {/if}
+  </div>
 </div>
 ```
 
-## Intégration avec le canvas store
-
-Pour que le widget s'ajoute au canvas via l'agent :
+### Recette YAML
 
 ```typescript
-// Dans un handler d'agent ou un callback
+// src/lib/widgets/resultat-scrutin-recipe.ts
+export const RESULTAT_SCRUTIN_RECIPE = `---
+widget: resultat-scrutin
+description: Résultat d'un scrutin parlementaire — barre proportionnelle pour/contre/abstention, badge adopté ou rejeté.
+schema:
+  type: object
+  required:
+    - numero
+    - titre
+    - dateScrutin
+    - sort
+    - pour
+    - contre
+    - abstention
+    - seuilMajorite
+  properties:
+    numero:
+      type: number
+      description: Numéro du scrutin
+    titre:
+      type: string
+      description: Intitulé du scrutin (texte voté)
+    dateScrutin:
+      type: string
+      description: "Date au format JJ/MM/AAAA"
+    sort:
+      type: string
+      enum:
+        - adopté
+        - rejeté
+      description: Résultat du scrutin
+    pour:
+      type: number
+      description: Nombre de votes pour
+    contre:
+      type: number
+      description: Nombre de votes contre
+    abstention:
+      type: number
+      description: Nombre d'abstentions
+    nonVotants:
+      type: number
+      description: Nombre de non-votants (optionnel)
+    seuilMajorite:
+      type: number
+      description: Seuil de majorité absolue
+    legislature:
+      type: number
+      description: "Numéro de la législature (ex: 16)"
+---
+
+## Quand utiliser
+
+Pour afficher le résultat d'un vote solennel ou d'un scrutin public à l'Assemblée nationale.
+Utiliser quand l'utilisateur demande le résultat d'un vote, les chiffres d'un scrutin,
+ou si une loi a été adoptée ou rejetée.
+
+## Comment
+
+Appeler widget_display('resultat-scrutin', {
+  numero: 1523,
+  titre: "Projet de loi de finances pour 2025",
+  dateScrutin: "19/12/2024",
+  sort: "rejeté",
+  pour: 192,
+  contre: 362,
+  abstention: 12,
+  seuilMajorite: 289,
+  legislature: 16
+}).
+
+## Erreurs courantes
+
+- Le sort doit être exactement "adopté" ou "rejeté" (en minuscules, avec accents).
+- Le seuilMajorite est obligatoire — c'est la majorité absolue, pas la moitié des votants.
+`;
+```
+
+### Enregistrement
+
+Ajouter le widget au serveur existant :
+
+```typescript
+// src/lib/tricoteuses-server.ts (suite)
+import ResultatScrutin from './widgets/ResultatScrutin.svelte';
+import { RESULTAT_SCRUTIN_RECIPE } from './widgets/resultat-scrutin-recipe';
+
+tricoteusesServer.registerWidget(RESULTAT_SCRUTIN_RECIPE, ResultatScrutin);
+```
+
+
+## Étape 4 -- Troisième widget : Amendement
+
+### Composant Svelte
+
+```svelte
+<!-- src/lib/widgets/Amendement.svelte -->
+<script lang="ts">
+  interface Props {
+    data: {
+      numero: string;
+      texteVise: string;
+      article: string;
+      auteurs: string[];
+      groupeAuteur?: string;
+      dispositif: string;
+      exposeSommaire: string;
+      sort: 'adopté' | 'rejeté' | 'retiré' | 'tombé' | 'non soutenu' | 'irrecevable';
+      commission?: string;
+      dateDepot?: string;
+    };
+  }
+
+  let { data } = $props();
+
+  const sortColors: Record<string, string> = {
+    'adopté': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
+    'rejeté': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+    'retiré': 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+    'tombé': 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+    'non soutenu': 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
+    'irrecevable': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  };
+
+  const expanded = $state({ dispositif: false, expose: true });
+</script>
+
+<div class="p-5 bg-surface1 rounded-xl border border-surface2 max-w-xl">
+  <!-- En-tête -->
+  <div class="flex items-start justify-between gap-3 mb-3">
+    <div class="flex-1 min-w-0">
+      <div class="text-xs text-text3 mb-1">
+        Amendement n&deg;{data.numero}
+        {#if data.dateDepot}&mdash; déposé le {data.dateDepot}{/if}
+      </div>
+      <h3 class="text-base font-semibold text-text1 leading-snug">
+        {data.texteVise} &mdash; {data.article}
+      </h3>
+      <div class="text-sm text-text2 mt-1">
+        {data.auteurs.join(', ')}
+        {#if data.groupeAuteur}
+          <span class="text-text3">({data.groupeAuteur})</span>
+        {/if}
+      </div>
+      {#if data.commission}
+        <div class="text-xs text-text3 mt-0.5">Commission : {data.commission}</div>
+      {/if}
+    </div>
+    <span class="flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold {sortColors[data.sort] ?? ''}">
+      {data.sort.charAt(0).toUpperCase() + data.sort.slice(1)}
+    </span>
+  </div>
+
+  <!-- Dispositif (texte de l'amendement) -->
+  <div class="mt-3 pt-3 border-t border-surface2">
+    <button
+      class="text-xs font-medium text-text2 hover:text-text1 cursor-pointer flex items-center gap-1"
+      onclick={() => expanded.dispositif = !expanded.dispositif}
+    >
+      {expanded.dispositif ? '▾' : '▸'} Dispositif
+    </button>
+    {#if expanded.dispositif}
+      <div class="mt-2 text-sm text-text2 leading-relaxed whitespace-pre-line bg-surface2 rounded-lg p-3">
+        {data.dispositif}
+      </div>
+    {/if}
+  </div>
+
+  <!-- Exposé sommaire -->
+  <div class="mt-2">
+    <button
+      class="text-xs font-medium text-text2 hover:text-text1 cursor-pointer flex items-center gap-1"
+      onclick={() => expanded.expose = !expanded.expose}
+    >
+      {expanded.expose ? '▾' : '▸'} Exposé sommaire
+    </button>
+    {#if expanded.expose}
+      <div class="mt-2 text-sm text-text2 leading-relaxed italic bg-surface2 rounded-lg p-3">
+        {data.exposeSommaire}
+      </div>
+    {/if}
+  </div>
+</div>
+```
+
+### Recette YAML
+
+```typescript
+// src/lib/widgets/amendement-recipe.ts
+export const AMENDEMENT_RECIPE = `---
+widget: amendement
+description: Amendement parlementaire avec dispositif, exposé des motifs et sort.
+schema:
+  type: object
+  required:
+    - numero
+    - texteVise
+    - article
+    - auteurs
+    - dispositif
+    - exposeSommaire
+    - sort
+  properties:
+    numero:
+      type: string
+      description: "Numéro de l'amendement (ex: 42, CL231)"
+    texteVise:
+      type: string
+      description: "Texte de loi visé (ex: Projet de loi immigration)"
+    article:
+      type: string
+      description: "Article visé (ex: Article 3, Article additionnel après l'article 7)"
+    auteurs:
+      type: array
+      items:
+        type: string
+      description: "Liste des auteurs (noms des députés)"
+    groupeAuteur:
+      type: string
+      description: "Groupe politique de l'auteur principal (optionnel)"
+    dispositif:
+      type: string
+      description: Texte de l'amendement (les modifications proposées au texte de loi)
+    exposeSommaire:
+      type: string
+      description: Exposé des motifs justifiant l'amendement
+    sort:
+      type: string
+      enum:
+        - adopté
+        - rejeté
+        - retiré
+        - tombé
+        - non soutenu
+        - irrecevable
+      description: Sort de l'amendement
+    commission:
+      type: string
+      description: "Commission saisie (ex: Commission des lois)"
+    dateDepot:
+      type: string
+      description: "Date de dépôt au format JJ/MM/AAAA"
+---
+
+## Quand utiliser
+
+Pour afficher le détail d'un amendement parlementaire : son texte, sa justification et son sort.
+Utiliser quand l'utilisateur demande un amendement spécifique, les modifications proposées
+à un article, ou le sort d'un amendement.
+
+## Comment
+
+Appeler widget_display('amendement', {
+  numero: "CL231",
+  texteVise: "Projet de loi immigration",
+  article: "Article 3",
+  auteurs: ["Éric Ciotti", "Annie Genevard"],
+  groupeAuteur: "LR",
+  dispositif: "Après l'alinéa 4, insérer l'alinéa suivant :\\n...",
+  exposeSommaire: "Cet amendement vise à renforcer les conditions...",
+  sort: "rejeté",
+  commission: "Commission des lois",
+  dateDepot: "15/11/2024"
+}).
+
+## Erreurs courantes
+
+- Le sort doit être exactement une des valeurs de l'enum (minuscules, avec accents).
+- Le champ auteurs est un tableau, même s'il n'y a qu'un seul auteur.
+- Le dispositif et l'exposé peuvent être longs — le widget gère le scroll.
+`;
+```
+
+### Enregistrement
+
+```typescript
+// src/lib/tricoteuses-server.ts (version finale complète)
+import { createWebMcpServer } from '@webmcp-auto-ui/core';
+import FicheDepute from './widgets/FicheDepute.svelte';
+import ResultatScrutin from './widgets/ResultatScrutin.svelte';
+import Amendement from './widgets/Amendement.svelte';
+import { FICHE_DEPUTE_RECIPE } from './widgets/fiche-depute-recipe';
+import { RESULTAT_SCRUTIN_RECIPE } from './widgets/resultat-scrutin-recipe';
+import { AMENDEMENT_RECIPE } from './widgets/amendement-recipe';
+
+export const tricoteusesServer = createWebMcpServer('tricoteuses-widgets', {
+  description: 'Widgets de visualisation parlementaire inspirés de tricoteuses.fr',
+});
+
+tricoteusesServer.registerWidget(FICHE_DEPUTE_RECIPE, FicheDepute);
+tricoteusesServer.registerWidget(RESULTAT_SCRUTIN_RECIPE, ResultatScrutin);
+tricoteusesServer.registerWidget(AMENDEMENT_RECIPE, Amendement);
+```
+
+Les 3 widgets sont maintenant disponibles. L'agent peut les combiner dans une seule réponse :
+
+```
+Utilisateur : "Comment le groupe LFI a voté sur le budget ?"
+
+Agent → search_recipes({ query: "scrutin" })
+Agent → search_recipes({ query: "député" })
+Agent → [appelle les outils MCP tricoteuses pour les données]
+Agent → widget_display("resultat-scrutin", { ... })  // le vote global
+Agent → widget_display("fiche-depute", { ... })       // un député clé du groupe
+```
+
+Le canvas affiche les deux widgets empilés. L'agent choisit automatiquement les bons widgets grâce aux descriptions des recettes.
+
+
+## Étape 5 -- Bonnes pratiques
+
+### Ajouter un champ optionnel
+
+Ajouter un champ au schema, et l'agent s'adapte automatiquement. Par exemple, ajouter un lien vers la fiche officielle du député :
+
+```yaml
+# Dans le schema de fiche-depute, ajouter :
+    lienFiche:
+      type: string
+      description: "URL vers la fiche AN officielle (ex: https://www.assemblee-nationale.fr/dyn/deputes/PA...)"
+```
+
+Et dans le composant Svelte :
+
+```svelte
+{#if data.lienFiche}
+  <a href={data.lienFiche} target="_blank" class="text-xs text-blue-500 hover:underline mt-1 block">
+    Voir la fiche officielle
+  </a>
+{/if}
+```
+
+Pas besoin de mettre le champ dans `required` -- l'agent le remplira s'il a l'information, et le widget s'adapte s'il est absent.
+
+### Rédiger de bonnes descriptions de recettes
+
+La qualité de la recette détermine la qualité du comportement de l'agent. Trois sections importantes :
+
+1. **description** (frontmatter) -- une phrase courte et précise. C'est ce que `search_recipes` retourne. L'agent s'en sert pour décider quel widget utiliser.
+
+2. **Quand utiliser** -- contextes d'usage. Aide l'agent à comprendre les intentions utilisateur qui déclenchent ce widget.
+
+3. **Erreurs courantes** -- les pièges connus. L'agent lit cette section et évite les erreurs de formatage.
+
+Exemple de mauvaise description :
+
+```yaml
+# Trop vague — l'agent ne sait pas quand l'utiliser
+description: Widget de données
+```
+
+Exemple de bonne description :
+
+```yaml
+# Précis — l'agent comprend le contexte
+description: Carte de profil d'un député français — photo, groupe politique, circonscription, statistiques de vote.
+```
+
+### Tester sans serveur MCP externe
+
+Pour tester les widgets en développement sans données réelles, injecter des données mockées directement dans le canvas :
+
+```typescript
 import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 
-canvas.addWidget('notification-feed', {
-  title: 'Notifications en direct',
-  notifications: [
-    /* ... données du MCP ... */
-  ],
+// Mock fiche député
+canvas.addWidget('fiche-depute', {
+  nom: 'Dupont',
+  prenom: 'Marie',
+  groupe: { nom: 'Renaissance', sigle: 'RE', couleur: '#FFD600' },
+  circonscription: 'Paris, 1re',
+  dateDebutMandat: '22/06/2022',
+  votes: { pour: 350, contre: 120, abstention: 45, absent: 60 },
+});
+
+// Mock scrutin
+canvas.addWidget('resultat-scrutin', {
+  numero: 42,
+  titre: 'Motion de censure',
+  dateScrutin: '20/03/2025',
+  sort: 'rejeté',
+  pour: 197,
+  contre: 319,
+  abstention: 8,
+  seuilMajorite: 289,
 });
 ```
 
-## Points clés
 
-✅ **Toujours fournir un frontmatter YAML** — le schéma est utilisé pour la validation et la documentation générée automatiquement
+## Étape 6 -- Partager
 
-✅ **Exporter le serveur** — pour que les autres modules puissent enregistrer leurs widgets
+Les widgets custom sont embarqués dans l'URL HyperSkill quand vous exportez une session. L'utilisateur qui ouvre le lien récupère les widgets et les données, sans avoir besoin d'installer quoi que ce soit.
 
-✅ **Utiliser Svelte 5 `$props()`** — plus moderne et typé que `export let`
+```typescript
+import { encode } from '@webmcp-auto-ui/sdk';
 
-✅ **Gérer les états vides** — afficher un placeholder quand `data.notifications.length === 0`
-
-❌ **Ne pas laisser `data` sans type** — TypeScript aide à attraper les bugs tôt
-
-❌ **Ne pas enregistrer deux widgets avec le même `widget:` name** — utiliser des noms uniques
-
-## Test en dev
-
-```bash
-npm run dev
-# Naviguer vers http://localhost:5173
-# Ouvrir la console pour voir les logs d'interaction
+// L'encodage inclut les widgets custom du canvas
+const url = encode(canvasState);
+// → https://demos.hyperskills.net/viewer?hs=...
 ```
+
+Le destinataire voit les widgets Fiche Député, Résultat de Scrutin et Amendement rendus exactement comme sur votre écran, widgets custom compris.
+
+
+## Résumé
+
+| Concept | Fichier | Rôle |
+|---------|---------|------|
+| Composant Svelte | `FicheDepute.svelte` | Rendu visuel, props typées via `interface Props` |
+| Recette YAML | `fiche-depute-recipe.ts` | Schema JSON + instructions pour l'agent LLM |
+| Serveur WebMCP | `tricoteuses-server.ts` | Conteneur qui expose `search_recipes`, `get_recipe`, `widget_display` |
+| `registerWidget(recette, composant)` | -- | Lie la recette au composant dans le registry |
+| `WidgetRenderer` | `@webmcp-auto-ui/ui` | Résout le type de widget et monte le composant Svelte |
+| Canvas store | `@webmcp-auto-ui/sdk/canvas` | Stocke les widgets affichés, permet l'ajout programmatique |
 
 Voir aussi : [Utiliser les widgets existants](./use-existing-widgets.mdx)

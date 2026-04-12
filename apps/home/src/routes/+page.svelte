@@ -45,6 +45,12 @@
       url: `${base}/multi-svelte`,
       accent: '#ff3e00',
     },
+    {
+      title: 'Boilerplate',
+      desc: 'Template d\'intégration Svelte + 3 widgets Tricoteuses custom. Point de départ pour votre projet.',
+      url: `${base}/boilerplate`,
+      accent: '#e11d48',
+    },
   ];
 
   const mcpServers = [

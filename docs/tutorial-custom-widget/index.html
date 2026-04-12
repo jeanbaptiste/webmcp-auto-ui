@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Créer des widgets custom — WebMCP Auto-UI</title>
+<meta name="description" content="Guide technique pour créer des widgets custom avec WebMCP Auto-UI, illustré avec les widgets Tricoteuses pour les données parlementaires françaises.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f172a;--fg:#e2e8f0;--accent:#818cf8;--accent2:#a78bfa;--muted:#64748b;--surface:#1e293b;--surface2:#334155;--border:#475569;--code-bg:#1e293b;--code-kw:#c084fc;--code-str:#34d399;--code-num:#fbbf24;--code-cmt:#64748b;--code-tag:#60a5fa;--code-attr:#f472b6;--success:#34d399;--danger:#f87171;--warning:#fbbf24;--radius:8px;--transition:0.3s ease}
+[data-theme="light"]{--bg:#ffffff;--fg:#1e293b;--accent:#6366f1;--accent2:#7c3aed;--muted:#94a3b8;--surface:#f1f5f9;--surface2:#e2e8f0;--border:#cbd5e1;--code-bg:#f8fafc;--code-kw:#7c3aed;--code-str:#059669;--code-num:#d97706;--code-cmt:#94a3b8;--code-tag:#2563eb;--code-attr:#db2777}
+body{font-family:system-ui,-apple-system,sans-serif;font-size:18px;line-height:1.7;color:var(--fg);background:var(--bg);transition:background var(--transition),color var(--transition)}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+h1,h2,h3,h4{font-weight:700;line-height:1.3;margin:2em 0 .5em}
+h1{font-size:2em}h2{font-size:1.6em;border-bottom:2px solid var(--border);padding-bottom:.3em}h3{font-size:1.25em}
+p{margin:.8em 0}
+/* Header */
+.header{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);padding:.6em 1.2em;display:flex;align-items:center;gap:1em;flex-wrap:wrap;backdrop-filter:blur(8px)}
+.header-title{font-size:1em;font-weight:700;flex:1;min-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.toggle-btn{background:var(--surface2);border:1px solid var(--border);color:var(--fg);border-radius:var(--radius);padding:.35em .7em;cursor:pointer;font-size:.85em;display:flex;align-items:center;gap:.3em;transition:background var(--transition)}
+.toggle-btn:hover{background:var(--accent);color:#fff}
+/* Layout */
+.wrapper{display:flex;max-width:1200px;margin:0 auto;padding:1em}
+.toc{display:none;position:sticky;top:70px;align-self:flex-start;width:220px;flex-shrink:0;padding:1em;font-size:.82em;max-height:calc(100vh - 80px);overflow-y:auto}
+@media(min-width:1025px){.toc{display:block}}
+.toc ul{list-style:none;padding-left:.8em;border-left:2px solid var(--border)}
+.toc li{margin:.4em 0}.toc a{color:var(--muted)}.toc a:hover{color:var(--accent)}
+.main{max-width:780px;width:100%;margin:0 auto;padding:0 1.2em 4em}
+/* Code */
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:var(--radius);padding:1em;overflow-x:auto;font-size:.85em;line-height:1.5;position:relative;margin:1em 0}
+code{font-family:'JetBrains Mono',monospace;font-size:.9em}
+pre code{font-size:1em}
+.copy-btn{position:absolute;top:.5em;right:.5em;background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:.2em .5em;cursor:pointer;font-size:.75em}
+.copy-btn:hover{color:var(--accent)}
+.kw{color:var(--code-kw)}.str{color:var(--code-str)}.num{color:var(--code-num)}.cmt{color:var(--code-cmt)}.tag{color:var(--code-tag)}.attr{color:var(--code-attr)}
+/* SVG */
+svg text{fill:var(--fg)}svg .box{fill:var(--surface);stroke:var(--accent);stroke-width:1.5}svg .arrow{stroke:var(--accent);fill:none;stroke-width:1.5;marker-end:url(#ah)}svg .arrow-head{fill:var(--accent)}
+.svg-wrap{margin:2em 0;text-align:center;overflow-x:auto}
+.svg-wrap svg{max-width:100%;height:auto}
+/* Cards */
+.card-row{display:flex;gap:1em;flex-wrap:wrap;margin:1.5em 0}
+.card{flex:1;min-width:200px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1em}
+.card h4{margin:.2em 0 .4em;font-size:1em}
+.badge{display:inline-block;padding:.15em .5em;border-radius:4px;font-size:.78em;font-weight:600}
+.badge-green{background:#065f4620;color:var(--success)}.badge-red{background:#dc262620;color:var(--danger)}.badge-yellow{background:#d9770620;color:var(--warning)}
+.bar{height:12px;border-radius:6px;display:flex;overflow:hidden;margin:.4em 0}
+.bar-for{background:var(--success)}.bar-against{background:var(--danger)}.bar-abs{background:var(--warning)}
+.photo-placeholder{width:56px;height:56px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:1.4em;color:var(--muted)}
+/* Best practices */
+.tip{background:var(--surface);border-left:4px solid var(--accent);padding:.8em 1em;border-radius:0 var(--radius) var(--radius) 0;margin:1em 0}
+/* Footer */
+.footer{text-align:center;padding:2em;color:var(--muted);font-size:.85em;border-top:1px solid var(--border);margin-top:3em}
+.footer a{color:var(--accent)}
+/* Lang toggle */
+[data-lang]{display:none}[data-lang="fr"]{display:revert}
+/* Utilities */
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="header" role="banner">
+  <span class="header-title" data-lang="fr">WebMCP Auto-UI — Guide Tricoteuses</span>
+  <span class="header-title" data-lang="en">WebMCP Auto-UI — Tricoteuses Guide</span>
+  <button class="toggle-btn" id="langToggle" aria-label="Switch language" onclick="toggleLang()">
+    <span id="langLabel">EN</span>
+  </button>
+  <button class="toggle-btn" id="themeToggle" aria-label="Toggle dark/light mode" onclick="toggleTheme()">
+    <span id="themeIcon">&#9788;</span>
+  </button>
+</header>
+
+<div class="wrapper">
+
+<!-- ===== TOC ===== -->
+<nav class="toc" aria-label="Table of contents">
+  <ul data-lang="fr">
+    <li><a href="#intro">Introduction</a></li>
+    <li><a href="#how">Fonctionnement</a></li>
+    <li><a href="#w1">Fiche Depute</a></li>
+    <li><a href="#w2">Resultat Scrutin</a></li>
+    <li><a href="#w3">Amendement</a></li>
+    <li><a href="#lifecycle">Cycle de vie</a></li>
+    <li><a href="#bp">Bonnes pratiques</a></li>
+  </ul>
+  <ul data-lang="en">
+    <li><a href="#intro">Introduction</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#w1">Deputy Card</a></li>
+    <li><a href="#w2">Vote Result</a></li>
+    <li><a href="#w3">Amendment</a></li>
+    <li><a href="#lifecycle">Lifecycle</a></li>
+    <li><a href="#bp">Best practices</a></li>
+  </ul>
+</nav>
+
+<!-- ===== MAIN ===== -->
+<main class="main">
+
+<!-- INTRO -->
+<section id="intro">
+<h1 data-lang="fr">Creer des widgets custom avec WebMCP Auto-UI</h1>
+<h1 data-lang="en">Creating Custom Widgets with WebMCP Auto-UI</h1>
+
+<p data-lang="fr">WebMCP Auto-UI permet de creer des composants UI que l'IA sait utiliser automatiquement. Chaque widget est accompagne d'une <strong>recette</strong> &mdash; un fichier YAML qui decrit son schema de donnees et son contexte d'utilisation. L'agent IA lit ces recettes, comprend quand afficher chaque widget et le remplit avec les bonnes donnees.</p>
+<p data-lang="fr">Ce guide montre comment creer <strong>3 widgets</strong> pour afficher des donnees parlementaires francaises, inspires du projet <em>Tricoteuses</em> (open data Assemblee nationale).</p>
+
+<p data-lang="en">WebMCP Auto-UI lets you create UI components that AI agents can use automatically. Each widget comes with a <strong>recipe</strong> &mdash; a YAML file describing its data schema and usage context. The AI agent reads these recipes, understands when to display each widget, and fills it with the right data.</p>
+<p data-lang="en">This guide walks through creating <strong>3 widgets</strong> for displaying French parliamentary data, inspired by the <em>Tricoteuses</em> project (National Assembly open data).</p>
+</section>
+
+<!-- SECTION 1 — HOW IT WORKS -->
+<section id="how">
+<h2 data-lang="fr">Fonctionnement</h2>
+<h2 data-lang="en">How it works</h2>
+
+<p data-lang="fr">Le flux complet : un serveur MCP expose des donnees, l'agent cherche une recette adaptee, lit le schema, appelle les outils MCP, puis affiche le widget.</p>
+<p data-lang="en">The full flow: an MCP server exposes data, the agent searches for a matching recipe, reads its schema, calls MCP tools, then displays the widget.</p>
+
+<!-- SVG 1 — Architecture -->
+<div class="svg-wrap" role="img" aria-label="Architecture flow diagram">
+<svg viewBox="0 0 760 80" xmlns="http://www.w3.org/2000/svg">
+  <defs><marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" class="arrow-head"/></marker></defs>
+  <rect class="box" x="2" y="15" width="120" height="50" rx="10"/>
+  <text x="62" y="45" text-anchor="middle" font-size="13">MCP Server</text>
+  <line class="arrow" x1="125" y1="40" x2="160" y2="40"/>
+  <rect class="box" x="163" y="15" width="100" height="50" rx="10"/>
+  <text x="213" y="45" text-anchor="middle" font-size="13">AI Agent</text>
+  <line class="arrow" x1="266" y1="40" x2="300" y2="40"/>
+  <rect class="box" x="303" y="15" width="100" height="50" rx="10"/>
+  <text x="353" y="45" text-anchor="middle" font-size="13">Recipe</text>
+  <line class="arrow" x1="406" y1="40" x2="440" y2="40"/>
+  <rect class="box" x="443" y="15" width="130" height="50" rx="10"/>
+  <text x="508" y="45" text-anchor="middle" font-size="13">Svelte Widget</text>
+  <line class="arrow" x1="576" y1="40" x2="610" y2="40"/>
+  <rect class="box" x="613" y="15" width="100" height="50" rx="10"/>
+  <text x="663" y="45" text-anchor="middle" font-size="13">Canvas</text>
+</svg>
+</div>
+
+<p data-lang="fr">Chaque widget se compose de <strong>3 parties</strong> : le composant Svelte (rendu), la recette YAML (contrat de donnees), et l'appel <code>registerWidget()</code> (enregistrement).</p>
+<p data-lang="en">Each widget has <strong>3 parts</strong>: the Svelte component (rendering), the YAML recipe (data contract), and the <code>registerWidget()</code> call (registration).</p>
+
+<!-- SVG 2 — Anatomy -->
+<div class="svg-wrap" role="img" aria-label="Widget anatomy diagram">
+<svg viewBox="0 0 400 280" xmlns="http://www.w3.org/2000/svg">
+  <rect x="100" y="10" width="200" height="70" rx="10" fill="#3b82f620" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="200" y="50" text-anchor="middle" font-size="14" font-weight="bold">Svelte Component</text>
+  <text x="320" y="45" font-size="11" fill="var(--muted)">.svelte file</text>
+  <line x1="200" y1="80" x2="200" y2="100" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="4"/>
+  <rect x="100" y="105" width="200" height="70" rx="10" fill="#8b5cf620" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="200" y="145" text-anchor="middle" font-size="14" font-weight="bold">YAML Recipe</text>
+  <text x="320" y="140" font-size="11" fill="var(--muted)">schema + description</text>
+  <line x1="200" y1="175" x2="200" y2="195" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="4"/>
+  <rect x="100" y="200" width="200" height="70" rx="10" fill="#22c55e20" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="200" y="240" text-anchor="middle" font-size="14" font-weight="bold">registerWidget()</text>
+  <text x="320" y="235" font-size="11" fill="var(--muted)">runtime registration</text>
+</svg>
+</div>
+</section>
+
+<!-- SECTION 2 — WIDGET 1 : FICHE DEPUTE -->
+<section id="w1">
+<h2 data-lang="fr">Widget 1 : Fiche Depute</h2>
+<h2 data-lang="en">Widget 1: Deputy Card</h2>
+
+<p data-lang="fr">Ce widget affiche la fiche complete d'un depute : photo, groupe parlementaire, circonscription et statistiques de vote.</p>
+<p data-lang="en">This widget displays a deputy's full card: photo, parliamentary group, constituency, and voting statistics.</p>
+
+<!-- SVG 4 — 3 Widget previews -->
+<div class="svg-wrap" role="img" aria-label="Preview of the 3 Tricoteuses widgets">
+<svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Card 1: Fiche Depute -->
+  <rect class="box" x="5" y="5" width="225" height="190" rx="10"/>
+  <circle cx="60" cy="55" r="25" fill="var(--surface2)"/>
+  <text x="60" y="60" text-anchor="middle" font-size="18" fill="var(--muted)">&#128100;</text>
+  <text x="100" y="42" font-size="12" font-weight="bold">Jean Dupont</text>
+  <rect x="100" y="50" width="60" height="16" rx="4" fill="#6366f130" stroke="#6366f1" stroke-width="1"/>
+  <text x="130" y="62" text-anchor="middle" font-size="9" fill="var(--accent)">RE</text>
+  <text x="100" y="85" font-size="10" fill="var(--muted)">Paris 5e</text>
+  <rect x="20" y="110" width="195" height="8" rx="4" fill="var(--surface2)"/>
+  <rect x="20" y="110" width="140" height="8" rx="4" fill="var(--success)"/>
+  <text x="20" y="135" font-size="9" fill="var(--muted)">Pour 72% | Contre 18% | Abs 10%</text>
+  <text x="117" y="175" text-anchor="middle" font-size="11" font-weight="bold" fill="var(--accent)">fiche-depute</text>
+  <!-- Card 2: Scrutin -->
+  <rect class="box" x="248" y="5" width="225" height="190" rx="10"/>
+  <text x="360" y="35" text-anchor="middle" font-size="11" font-weight="bold">Scrutin n.42</text>
+  <text x="360" y="55" text-anchor="middle" font-size="10" fill="var(--muted)">Projet de loi finances 2025</text>
+  <rect x="268" y="70" width="185" height="14" rx="7" fill="var(--surface2)"/>
+  <rect x="268" y="70" width="120" height="14" rx="7" fill="var(--success)"/>
+  <rect x="388" y="70" width="40" height="14" fill="var(--danger)"/>
+  <text x="268" y="105" font-size="10" fill="var(--success)">Pour : 312</text>
+  <text x="348" y="105" font-size="10" fill="var(--danger)">Contre : 98</text>
+  <text x="268" y="125" font-size="10" fill="var(--warning)">Abstentions : 45</text>
+  <rect x="300" y="140" width="120" height="24" rx="12" fill="#22c55e20" stroke="#22c55e" stroke-width="1"/>
+  <text x="360" y="157" text-anchor="middle" font-size="11" fill="var(--success)" font-weight="bold">ADOPTE</text>
+  <text x="360" y="180" text-anchor="middle" font-size="11" font-weight="bold" fill="var(--accent)">resultat-scrutin</text>
+  <!-- Card 3: Amendement -->
+  <rect class="box" x="491" y="5" width="225" height="190" rx="10"/>
+  <text x="603" y="35" text-anchor="middle" font-size="11" font-weight="bold">Amendement CL-42</text>
+  <text x="603" y="55" text-anchor="middle" font-size="10" fill="var(--muted)">Article 3 bis</text>
+  <text x="511" y="80" font-size="10">Auteur : M. Martin</text>
+  <text x="511" y="100" font-size="10" fill="var(--muted)">Groupe : LFI-NUPES</text>
+  <rect x="511" y="115" width="195" height="40" rx="6" fill="var(--surface2)"/>
+  <text x="521" y="133" font-size="9" fill="var(--muted)">Cet amendement vise a...</text>
+  <text x="521" y="148" font-size="9" fill="var(--muted)">renforcer les garanties</text>
+  <rect x="550" y="162" width="106" height="20" rx="10" fill="#f8717120" stroke="#f87171" stroke-width="1"/>
+  <text x="603" y="176" text-anchor="middle" font-size="10" fill="var(--danger)" font-weight="bold">REJETE</text>
+  <text x="603" y="193" text-anchor="middle" font-size="11" font-weight="bold" fill="var(--accent)">amendement</text>
+</svg>
+</div>
+
+<h3 data-lang="fr">Recette YAML</h3>
+<h3 data-lang="en">YAML Recipe</h3>
+<pre><code><span class="tag">widget</span>: fiche-depute
+<span class="tag">description</span>: <span class="str">Fiche d'un depute de l'Assemblee nationale. Photo, groupe, circonscription, stats de vote.</span>
+<span class="tag">schema</span>:
+  <span class="tag">type</span>: object
+  <span class="tag">required</span>: [nom, prenom, groupe]
+  <span class="tag">properties</span>:
+    <span class="tag">nom</span>:            { <span class="tag">type</span>: string }
+    <span class="tag">prenom</span>:         { <span class="tag">type</span>: string }
+    <span class="tag">photo</span>:          { <span class="tag">type</span>: string }
+    <span class="tag">groupe</span>:         { <span class="tag">type</span>: string }
+    <span class="tag">groupeCouleur</span>:  { <span class="tag">type</span>: string }
+    <span class="tag">circonscription</span>: { <span class="tag">type</span>: string }
+    <span class="tag">mandatDebut</span>:    { <span class="tag">type</span>: string }
+    <span class="tag">mandatFin</span>:      { <span class="tag">type</span>: string }
+    <span class="tag">actif</span>:          { <span class="tag">type</span>: boolean }
+    <span class="tag">participation</span>:  { <span class="tag">type</span>: number }
+    <span class="tag">votePour</span>:       { <span class="tag">type</span>: number }
+    <span class="tag">voteContre</span>:     { <span class="tag">type</span>: number }
+    <span class="tag">voteAbstention</span>: { <span class="tag">type</span>: number }</code><button class="copy-btn" onclick="copyCode(this)" aria-label="Copy code">Copy</button></pre>
+
+<h3 data-lang="fr">Composant Svelte</h3>
+<h3 data-lang="en">Svelte Component</h3>
+<pre><code><span class="cmt">&lt;!-- FicheDepute.svelte --&gt;</span>
+<span class="tag">&lt;script&gt;</span>
+  <span class="kw">export let</span> data;
+  $: total = (data.votePour || <span class="num">0</span>) + (data.voteContre || <span class="num">0</span>) + (data.voteAbstention || <span class="num">0</span>);
+  $: pct = (v) =&gt; total ? Math.round(v / total * <span class="num">100</span>) : <span class="num">0</span>;
+<span class="tag">&lt;/script&gt;</span>
+
+<span class="tag">&lt;div</span> <span class="attr">class</span>=<span class="str">"fiche"</span><span class="tag">&gt;</span>
+  {<span class="kw">#if</span> data.photo}
+    <span class="tag">&lt;img</span> <span class="attr">src</span>={data.photo} <span class="attr">alt</span>=<span class="str">"{data.prenom} {data.nom}"</span> <span class="attr">class</span>=<span class="str">"photo"</span> /&gt;
+  {:<span class="kw">else</span>}
+    <span class="tag">&lt;div</span> <span class="attr">class</span>=<span class="str">"photo placeholder"</span>&gt;{data.prenom?.[<span class="num">0</span>]}{data.nom?.[<span class="num">0</span>]}<span class="tag">&lt;/div&gt;</span>
+  {/<span class="kw">if</span>}
+  <span class="tag">&lt;h3&gt;</span>{data.prenom} {data.nom}<span class="tag">&lt;/h3&gt;</span>
+  <span class="tag">&lt;span</span> <span class="attr">class</span>=<span class="str">"badge"</span> <span class="attr">style</span>=<span class="str">"background:{data.groupeCouleur || '#6366f1'}30"</span>&gt;
+    {data.groupe}
+  <span class="tag">&lt;/span&gt;</span>
+  {<span class="kw">#if</span> data.circonscription}
+    <span class="tag">&lt;p</span> <span class="attr">class</span>=<span class="str">"circ"</span>&gt;{data.circonscription}<span class="tag">&lt;/p&gt;</span>
+  {/<span class="kw">if</span>}
+  {<span class="kw">#if</span> total}
+    <span class="tag">&lt;div</span> <span class="attr">class</span>=<span class="str">"bar"</span>&gt;
+      <span class="tag">&lt;div</span> <span class="attr">style</span>=<span class="str">"width:{pct(data.votePour)}%;background:#22c55e"</span>&gt;<span class="tag">&lt;/div&gt;</span>
+      <span class="tag">&lt;div</span> <span class="attr">style</span>=<span class="str">"width:{pct(data.voteContre)}%;background:#ef4444"</span>&gt;<span class="tag">&lt;/div&gt;</span>
+      <span class="tag">&lt;div</span> <span class="attr">style</span>=<span class="str">"width:{pct(data.voteAbstention)}%;background:#f59e0b"</span>&gt;<span class="tag">&lt;/div&gt;</span>
+    <span class="tag">&lt;/div&gt;</span>
+  {/<span class="kw">if</span>}
+<span class="tag">&lt;/div&gt;</span></code><button class="copy-btn" onclick="copyCode(this)" aria-label="Copy code">Copy</button></pre>
+
+<h3 data-lang="fr">Enregistrement</h3>
+<h3 data-lang="en">Registration</h3>
+<pre><code><span class="kw">import</span> { registerWidget } <span class="kw">from</span> <span class="str">'@webmcp-auto-ui/core'</span>;
+<span class="kw">import</span> FicheDepute <span class="kw">from</span> <span class="str">'./FicheDepute.svelte'</span>;
+
+registerWidget(<span class="str">'fiche-depute'</span>, FicheDepute);</code><button class="copy-btn" onclick="copyCode(this)" aria-label="Copy code">Copy</button></pre>
+</section>
+
+<!-- SECTION 3 — WIDGET 2 : RESULTAT SCRUTIN -->
+<section id="w2">
+<h2 data-lang="fr">Widget 2 : Resultat de Scrutin</h2>
+<h2 data-lang="en">Widget 2: Vote Result</h2>
+
+<p data-lang="fr">Affiche le resultat d'un vote a l'Assemblee nationale avec une barre proportionnelle pour/contre/abstentions.</p>
+<p data-lang="en">Displays the result of a National Assembly vote with a proportional for/against/abstention bar.</p>
+
+<h3 data-lang="fr">Recette YAML</h3>
+<h3 data-lang="en">YAML Recipe</h3>
+<pre><code><span class="tag">widget</span>: resultat-scrutin
+<span class="tag">description</span>: <span class="str">Resultat d'un scrutin de l'Assemblee nationale.</span>
+<span class="tag">schema</span>:
+  <span class="tag">type</span>: object
+  <span class="tag">required</span>: [titre, pour, contre]
+  <span class="tag">properties</span>:
+    <span class="tag">titre</span>:       { <span class="tag">type</span>: string }
+    <span class="tag">numero</span>:      { <span class="tag">type</span>: number }
+    <span class="tag">date</span>:        { <span class="tag">type</span>: string }
+    <span class="tag">pour</span>:        { <span class="tag">type</span>: number }
+    <span class="tag">contre</span>:      { <span class="tag">type</span>: number }
+    <span class="tag">abstentions</span>: { <span class="tag">type</span>: number }
+    <span class="tag">votants</span>:     { <span class="tag">type</span>: number }
+    <span class="tag">adopte</span>:      { <span class="tag">type</span>: boolean }</code><button class="copy-btn" onclick="copyCode(this)" aria-label="Copy code">Copy</button></pre>
+
+<h3 data-lang="fr">Composant Svelte</h3>
+<h3 data-lang="en">Svelte Component</h3>
+<pre><code><span class="cmt">&lt;!-- ResultatScrutin.svelte --&gt;</span>
+<span class="tag">&lt;script&gt;</span>
+  <span class="kw">export let</span> data;
+  $: total = (data.pour||<span class="num">0</span>) + (data.contre||<span class="num">0</span>) + (data.abstentions||<span class="num">0</span>);
+  $: w = (v) =&gt; total ? (v/total*<span class="num">100</span>).toFixed(<span class="num">1</span>) : <span class="num">0</span>;
+<span class="tag">&lt;/script&gt;</span>
+
+<span class="tag">&lt;div</span> <span class="attr">class</span>=<span class="str">"scrutin"</span>&gt;
+  <span class="tag">&lt;h3&gt;</span>{data.titre}<span class="tag">&lt;/h3&gt;</span>
+  {<span class="kw">#if</span> data.numero}<span class="tag">&lt;p</span> <span class="attr">class</span>=<span class="str">"sub"</span>&gt;Scrutin n.{data.numero}<span class="tag">&lt;/p&gt;</span>{/<span class="kw">if</span>}
+  <span class="tag">&lt;div</span> <span class="attr">class</span>=<span class="str">"bar"</span>&gt;
+    <span class="tag">&lt;div</span> <span class="attr">class</span>=<span class="str">"for"</span> <span class="attr">style</span>=<span class="str">"width:{w(data.pour)}%"</span>&gt;<span class="tag">&lt;/div&gt;</span>
+    <span class="tag">&lt;div</span> <span class="attr">class</span>=<span class="str">"against"</span> <span class="attr">style</span>=<span class="str">"width:{w(data.contre)}%"</span>&gt;<span class="tag">&lt;/div&gt;</span>
+    <span class="tag">&lt;div</span> <span class="attr">class</span>=<span class="str">"abs"</span> <span class="attr">style</span>=<span class="str">"width:{w(data.abstentions)}%"</span>&gt;<span class="tag">&lt;/div&gt;</span>
+  <span class="tag">&lt;/div&gt;</span>
+  <span class="tag">&lt;div</span> <span class="attr">class</span>=<span class="str">"result"</span> <span class="attr">class:adopted</span>={data.adopte}&gt;
+    {data.adopte ? <span class="str">'ADOPTE'</span> : <span class="str">'REJETE'</span>}
+  <span class="tag">&lt;/div&gt;</span>
+<span class="tag">&lt;/div&gt;</span></code><button class="copy-btn" onclick="copyCode(this)" aria-label="Copy code">Copy</button></pre>
+
+<pre><code><span class="kw">import</span> { registerWidget } <span class="kw">from</span> <span class="str">'@webmcp-auto-ui/core'</span>;
+<span class="kw">import</span> ResultatScrutin <span class="kw">from</span> <span class="str">'./ResultatScrutin.svelte'</span>;
+
+registerWidget(<span class="str">'resultat-scrutin'</span>, ResultatScrutin);</code><button class="copy-btn" onclick="copyCode(this)" aria-label="Copy code">Copy</button></pre>
+</section>
+
+<!-- SECTION 4 — WIDGET 3 : AMENDEMENT -->
+<section id="w3">
+<h2 data-lang="fr">Widget 3 : Amendement</h2>
+<h2 data-lang="en">Widget 3: Amendment</h2>
+
+<p data-lang="fr">Affiche un amendement parlementaire avec son auteur, son article cible et son sort.</p>
+<p data-lang="en">Displays a parliamentary amendment with its author, target article, and outcome.</p>
+
+<h3 data-lang="fr">Recette YAML</h3>
+<h3 data-lang="en">YAML Recipe</h3>
+<pre><code><span class="tag">widget</span>: amendement
+<span class="tag">description</span>: <span class="str">Amendement parlementaire.</span>
+<span class="tag">schema</span>:
+  <span class="tag">type</span>: object
+  <span class="tag">required</span>: [numero, article, auteur, sort]
+  <span class="tag">properties</span>:
+    <span class="tag">numero</span>:       { <span class="tag">type</span>: string }
+    <span class="tag">article</span>:      { <span class="tag">type</span>: string }
+    <span class="tag">auteur</span>:       { <span class="tag">type</span>: string }
+    <span class="tag">groupe</span>:       { <span class="tag">type</span>: string }
+    <span class="tag">exposeMotifs</span>: { <span class="tag">type</span>: string }
+    <span class="tag">sort</span>:         { <span class="tag">type</span>: string, <span class="tag">enum</span>: [adopte, rejete, retire, non_soutenu] }
+    <span class="tag">date</span>:         { <span class="tag">type</span>: string }</code><button class="copy-btn" onclick="copyCode(this)" aria-label="Copy code">Copy</button></pre>
+
+<h3 data-lang="fr">Composant Svelte</h3>
+<h3 data-lang="en">Svelte Component</h3>
+<pre><code><span class="cmt">&lt;!-- Amendement.svelte --&gt;</span>
+<span class="tag">&lt;script&gt;</span>
+  <span class="kw">export let</span> data;
+  <span class="kw">const</span> colors = {
+    adopte: <span class="str">'#22c55e'</span>, rejete: <span class="str">'#ef4444'</span>,
+    retire: <span class="str">'#f59e0b'</span>, non_soutenu: <span class="str">'#94a3b8'</span>
+  };
+  $: color = colors[data.sort] || <span class="str">'#94a3b8'</span>;
+  $: label = data.sort?.replace(<span class="str">'_'</span>, <span class="str">' '</span>).toUpperCase();
+<span class="tag">&lt;/script&gt;</span>
+
+<span class="tag">&lt;div</span> <span class="attr">class</span>=<span class="str">"amendement"</span>&gt;
+  <span class="tag">&lt;h3&gt;</span>Amendement {data.numero}<span class="tag">&lt;/h3&gt;</span>
+  <span class="tag">&lt;p</span> <span class="attr">class</span>=<span class="str">"article"</span>&gt;Article {data.article}<span class="tag">&lt;/p&gt;</span>
+  <span class="tag">&lt;p&gt;</span>{data.auteur} {<span class="kw">#if</span> data.groupe}<span class="tag">&lt;span</span> <span class="attr">class</span>=<span class="str">"grp"</span>&gt;({data.groupe})<span class="tag">&lt;/span&gt;</span>{/<span class="kw">if</span>}<span class="tag">&lt;/p&gt;</span>
+  {<span class="kw">#if</span> data.exposeMotifs}<span class="tag">&lt;blockquote&gt;</span>{data.exposeMotifs}<span class="tag">&lt;/blockquote&gt;</span>{/<span class="kw">if</span>}
+  <span class="tag">&lt;span</span> <span class="attr">class</span>=<span class="str">"badge"</span> <span class="attr">style</span>=<span class="str">"background:{color}30;color:{color}"</span>&gt;{label}<span class="tag">&lt;/span&gt;</span>
+<span class="tag">&lt;/div&gt;</span></code><button class="copy-btn" onclick="copyCode(this)" aria-label="Copy code">Copy</button></pre>
+
+<pre><code><span class="kw">import</span> { registerWidget } <span class="kw">from</span> <span class="str">'@webmcp-auto-ui/core'</span>;
+<span class="kw">import</span> Amendement <span class="kw">from</span> <span class="str">'./Amendement.svelte'</span>;
+
+registerWidget(<span class="str">'amendement'</span>, Amendement);</code><button class="copy-btn" onclick="copyCode(this)" aria-label="Copy code">Copy</button></pre>
+</section>
+
+<!-- SECTION 5 — LIFECYCLE -->
+<section id="lifecycle">
+<h2 data-lang="fr">Cycle de vie de l'agent</h2>
+<h2 data-lang="en">Agent Lifecycle</h2>
+
+<p data-lang="fr">Voici le cycle complet, de la question utilisateur jusqu'au rendu du widget.</p>
+<p data-lang="en">Here is the full cycle, from user question to widget rendering.</p>
+
+<!-- SVG 3 — Lifecycle circle -->
+<div class="svg-wrap" role="img" aria-label="Agent lifecycle circular diagram">
+<svg viewBox="0 0 420 420" xmlns="http://www.w3.org/2000/svg">
+  <defs><marker id="ah2" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" class="arrow-head"/></marker></defs>
+  <!-- Circle path labels at clock positions -->
+  <!-- 1 - top (12 o'clock) -->
+  <rect class="box" x="145" y="8" width="130" height="40" rx="8"/>
+  <text x="210" y="23" text-anchor="middle" font-size="10" font-weight="bold" fill="var(--accent)">1</text>
+  <text x="210" y="38" text-anchor="middle" font-size="11">User asks</text>
+  <!-- 2 - top right (2 o'clock) -->
+  <rect class="box" x="300" y="75" width="115" height="40" rx="8"/>
+  <text x="357" y="90" text-anchor="middle" font-size="10" font-weight="bold" fill="var(--accent)">2</text>
+  <text x="357" y="105" text-anchor="middle" font-size="11">Search recipes</text>
+  <!-- 3 - right (4 o'clock) -->
+  <rect class="box" x="315" y="195" width="100" height="40" rx="8"/>
+  <text x="365" y="210" text-anchor="middle" font-size="10" font-weight="bold" fill="var(--accent)">3</text>
+  <text x="365" y="225" text-anchor="middle" font-size="11">Read schema</text>
+  <!-- 4 - bottom right (6 o'clock) -->
+  <rect class="box" x="270" y="310" width="115" height="40" rx="8"/>
+  <text x="327" y="325" text-anchor="middle" font-size="10" font-weight="bold" fill="var(--accent)">4</text>
+  <text x="327" y="340" text-anchor="middle" font-size="11">Call MCP tools</text>
+  <!-- 5 - bottom left (8 o'clock) -->
+  <rect class="box" x="35" y="310" width="130" height="40" rx="8"/>
+  <text x="100" y="325" text-anchor="middle" font-size="10" font-weight="bold" fill="var(--accent)">5</text>
+  <text x="100" y="340" text-anchor="middle" font-size="11">widget_display()</text>
+  <!-- 6 - left (10 o'clock) -->
+  <rect class="box" x="5" y="195" width="120" height="40" rx="8"/>
+  <text x="65" y="210" text-anchor="middle" font-size="10" font-weight="bold" fill="var(--accent)">6</text>
+  <text x="65" y="225" text-anchor="middle" font-size="11">Widget renders</text>
+  <!-- Arrows connecting boxes in a circle -->
+  <path d="M275 35 Q310 40 310 75" stroke="var(--accent)" fill="none" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <path d="M405 115 Q420 160 405 195" stroke="var(--accent)" fill="none" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <path d="M395 235 Q400 280 375 310" stroke="var(--accent)" fill="none" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <path d="M270 340 Q220 370 165 340" stroke="var(--accent)" fill="none" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <path d="M45 310 Q15 280 15 235" stroke="var(--accent)" fill="none" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <path d="M25 195 Q15 140 145 45" stroke="var(--accent)" fill="none" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <!-- Top-left (return to 1) -->
+</svg>
+</div>
+
+<p data-lang="fr">L'agent ne connait pas a l'avance les widgets disponibles. Il decouvre les recettes via l'outil <code>buildDiscoveryTools</code>, puis active les outils du serveur MCP avec <code>activateServerTools</code>. Le rendu est declenche par <code>widget_display</code> qui passe les donnees au composant Svelte enregistre.</p>
+<p data-lang="en">The agent does not know available widgets in advance. It discovers recipes via <code>buildDiscoveryTools</code>, then activates MCP server tools with <code>activateServerTools</code>. Rendering is triggered by <code>widget_display</code> which passes data to the registered Svelte component.</p>
+</section>
+
+<!-- SECTION 6 — BEST PRACTICES -->
+<section id="bp">
+<h2 data-lang="fr">Bonnes pratiques</h2>
+<h2 data-lang="en">Best Practices</h2>
+
+<div class="tip" data-lang="fr">
+  <strong>Descriptions claires.</strong> La description de la recette est ce que le LLM lit pour decider quel widget utiliser. Soyez precis sur le contexte d'usage.
+</div>
+<div class="tip" data-lang="en">
+  <strong>Clear descriptions.</strong> The recipe description is what the LLM reads to decide which widget to use. Be specific about the usage context.
+</div>
+
+<div class="tip" data-lang="fr">
+  <strong>Schemas stricts.</strong> Declarez les champs <code>required</code> pour que l'agent sache quelles donnees sont indispensables. Utilisez les champs optionnels pour l'enrichissement (photo, couleur du groupe, etc.).
+</div>
+<div class="tip" data-lang="en">
+  <strong>Strict schemas.</strong> Declare <code>required</code> fields so the agent knows which data is mandatory. Use optional fields for enrichment (photo, group color, etc.).
+</div>
+
+<div class="tip" data-lang="fr">
+  <strong>Enums pour les choix fermes.</strong> Utilisez <code>enum</code> pour les valeurs a choix restreint (comme <code>sort</code> dans l'amendement). Cela guide l'agent vers des valeurs valides.
+</div>
+<div class="tip" data-lang="en">
+  <strong>Enums for closed choices.</strong> Use <code>enum</code> for constrained values (like <code>sort</code> in the amendment widget). This guides the agent toward valid values.
+</div>
+
+<div class="tip" data-lang="fr">
+  <strong>Test sans serveur MCP.</strong> Vous pouvez tester un widget en passant des donnees statiques au composant Svelte directement, sans avoir besoin d'un serveur MCP fonctionnel.
+</div>
+<div class="tip" data-lang="en">
+  <strong>Test without MCP server.</strong> You can test a widget by passing static data to the Svelte component directly, without needing a running MCP server.
+</div>
+
+<pre><code><span class="cmt">// Quick test — pass static data</span>
+<span class="kw">import</span> FicheDepute <span class="kw">from</span> <span class="str">'./FicheDepute.svelte'</span>;
+
+<span class="kw">new</span> FicheDepute({
+  target: document.getElementById(<span class="str">'test'</span>),
+  props: {
+    data: {
+      nom: <span class="str">'Dupont'</span>, prenom: <span class="str">'Jean'</span>,
+      groupe: <span class="str">'RE'</span>, circonscription: <span class="str">'Paris 5e'</span>,
+      votePour: <span class="num">72</span>, voteContre: <span class="num">18</span>, voteAbstention: <span class="num">10</span>
+    }
+  }
+});</code><button class="copy-btn" onclick="copyCode(this)" aria-label="Copy code">Copy</button></pre>
+</section>
+
+</main>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <p data-lang="fr">
+    <a href="https://github.com/anthropics/webmcp-auto-ui">GitHub</a> &middot;
+    <a href="https://demos.hyperskills.net/multi-astro/">Documentation</a> &middot;
+    <a href="https://demos.hyperskills.net/flex/">Demo live</a>
+  </p>
+  <p data-lang="en">
+    <a href="https://github.com/anthropics/webmcp-auto-ui">GitHub</a> &middot;
+    <a href="https://demos.hyperskills.net/multi-astro/">Documentation</a> &middot;
+    <a href="https://demos.hyperskills.net/flex/">Live demo</a>
+  </p>
+  <p data-lang="fr">Construit avec WebMCP Auto-UI &mdash; les widgets que l'IA comprend.</p>
+  <p data-lang="en">Built with WebMCP Auto-UI &mdash; widgets that AI understands.</p>
+</footer>
+
+<script>
+// Language toggle
+let lang = 'fr';
+function toggleLang() {
+  lang = lang === 'fr' ? 'en' : 'fr';
+  document.querySelectorAll('[data-lang]').forEach(el => {
+    el.style.display = el.getAttribute('data-lang') === lang ? '' : 'none';
+  });
+  document.getElementById('langLabel').textContent = lang === 'fr' ? 'EN' : 'FR';
+  document.documentElement.lang = lang;
+}
+
+// Theme toggle
+function toggleTheme() {
+  const html = document.documentElement;
+  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  document.getElementById('themeIcon').innerHTML = next === 'dark' ? '&#9788;' : '&#9790;';
+}
+
+// Copy button
+function copyCode(btn) {
+  const code = btn.parentElement.querySelector('code');
+  navigator.clipboard.writeText(code.textContent).then(() => {
+    btn.textContent = 'OK!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+// Init: hide EN content
+document.querySelectorAll('[data-lang="en"]').forEach(el => el.style.display = 'none');
+</script>
+</body>
+</html>
