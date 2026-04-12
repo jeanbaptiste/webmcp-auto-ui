@@ -8,7 +8,7 @@
   import { McpMultiClient } from '@webmcp-auto-ui/core';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
   import {
-    AnthropicProvider, GemmaProvider, runAgentLoop, buildSystemPrompt,
+    RemoteLLMProvider, WasmProvider, runAgentLoop, buildSystemPrompt,
     WEBMCP_RECIPES, recipeRegistry,
     fromMcpTools, trimConversationHistory, TokenTracker,
   } from '@webmcp-auto-ui/agent';
@@ -97,11 +97,11 @@
   let mobileTab = $state<'list' | 'detail' | 'preview'>('list');
 
   // Provider
-  const anthropicProvider = new AnthropicProvider({ proxyUrl: `${base}/api/chat` });
+  const anthropicProvider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
   const tokenTracker = new TokenTracker();
 
   // Gemma WASM state
-  let gemmaProvider = $state<GemmaProvider | null>(null);
+  let gemmaProvider = $state<WasmProvider | null>(null);
   let gemmaStatus = $state<'idle'|'loading'|'ready'|'error'>('idle');
   let gemmaProgress = $state(0);
   let gemmaElapsed = $state(0);
@@ -117,7 +117,7 @@
       }
       if (!gemmaProvider) {
         const wasmContext = 32_768;
-        gemmaProvider = new GemmaProvider({
+        gemmaProvider = new WasmProvider({
           model: canvas.llm,
           contextSize: wasmContext,
           onProgress: (p, _s, loaded, total) => {
@@ -160,7 +160,7 @@
     untrack(() => {
       if ((llm === 'gemma-e2b' || llm === 'gemma-e4b') && gemmaStatus === 'idle') {
         const p = getProvider();
-        if (p instanceof GemmaProvider) p.initialize();
+        if (p instanceof WasmProvider) p.initialize();
       }
     });
   });

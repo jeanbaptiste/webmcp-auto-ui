@@ -42,7 +42,7 @@
   onDestroy(() => layoutAdapter.unregister());
 
   export function addBlock(type: string, data: Record<string, unknown>, server?: string, component?: string) {
-    const block = canvas.addBlock(type as Parameters<typeof canvas.addBlock>[0], data);
+    const block = canvas.addWidget(type as Parameters<typeof canvas.addBlock>[0], data);
     if (server || component) {
       provenance = { ...provenance, [block.id]: { server, component } };
     }

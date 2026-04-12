@@ -1,6 +1,6 @@
 import { McpMultiClient } from '@webmcp-auto-ui/core';
 import {
-  AnthropicProvider, runAgentLoop, buildSystemPrompt,
+  RemoteLLMProvider, runAgentLoop, buildSystemPrompt,
   fromMcpTools, autoui,
 } from '@webmcp-auto-ui/agent';
 import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
@@ -12,7 +12,7 @@ export const multiClient = new McpMultiClient();
 
 // ── Anthropic provider via local proxy ────────────────────────────────
 export function createProvider(proxyUrl: string) {
-  return new AnthropicProvider({ proxyUrl });
+  return new RemoteLLMProvider({ proxyUrl });
 }
 
 // ── Build tool layers from connected MCP servers + local WebMCP ───────

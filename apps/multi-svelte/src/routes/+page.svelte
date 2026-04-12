@@ -5,7 +5,7 @@
   import { McpMultiClient } from '@webmcp-auto-ui/core';
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import {
-    AnthropicProvider, GemmaProvider, runAgentLoop, buildSystemPrompt,
+    RemoteLLMProvider, WasmProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, trimConversationHistory, TokenTracker,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
@@ -88,7 +88,7 @@
   onDestroy(() => layoutAdapter.unregister());
 
   function addBlock(type: string, data: Record<string, unknown>) {
-    const block = canvas.addBlock(type as Parameters<typeof canvas.addBlock>[0], data);
+    const block = canvas.addWidget(type as Parameters<typeof canvas.addBlock>[0], data);
     windows = [...windows, {
       id: block.id,
       title: type,
@@ -172,7 +172,7 @@
   }
 
   // ── Gemma ─────────────────────────────────────────────────────────
-  let gemmaProvider = $state<GemmaProvider | null>(null);
+  let gemmaProvider = $state<WasmProvider | null>(null);
   let gemmaStatus = $state<'idle'|'loading'|'ready'|'error'>('idle');
   let gemmaProgress = $state(0);
   let gemmaElapsed = $state(0);
@@ -181,14 +181,14 @@
   let gemmaTotalMB = $state(0);
   let gemmaTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
 
-  const anthropicProvider = new AnthropicProvider({ proxyUrl: `${base}/api/chat` });
+  const anthropicProvider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
 
   function getProvider() {
     if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
       if (gemmaProvider && gemmaProvider.model !== canvas.llm) unloadGemma();
       if (!gemmaProvider) {
         const wasmContext = Math.min(maxContextTokens, 32768);
-        gemmaProvider = new GemmaProvider({
+        gemmaProvider = new WasmProvider({
           model: canvas.llm,
           contextSize: wasmContext,
           onProgress: (p, _s, loaded, total) => {
@@ -229,7 +229,7 @@
     untrack(() => {
       if ((llm === 'gemma-e2b' || llm === 'gemma-e4b') && gemmaStatus === 'idle') {
         const p = getProvider();
-        if (p instanceof GemmaProvider) p.initialize();
+        if (p instanceof WasmProvider) p.initialize();
       }
     });
   });

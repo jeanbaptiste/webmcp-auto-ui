@@ -8,7 +8,7 @@
   import { McpMultiClient } from '@webmcp-auto-ui/core';
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import {
-    AnthropicProvider, runAgentLoop, buildSystemPrompt,
+    RemoteLLMProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, autoui,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
@@ -42,7 +42,7 @@
   let mcpName = $state('');
 
   // ── Provider ──────────────────────────────────────────────────────────
-  const provider = new AnthropicProvider({ proxyUrl: `${base}/api/chat` });
+  const provider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
 
   $effect(() => {
     provider.setModel(canvas.llm as any);

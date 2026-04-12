@@ -6,8 +6,8 @@
 import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 import { McpMultiClient } from '@webmcp-auto-ui/core';
 import {
-  AnthropicProvider,
-  GemmaProvider,
+  RemoteLLMProvider,
+  WasmProvider,
   runAgentLoop,
   buildSystemPrompt,
   fromMcpTools,
@@ -40,7 +40,7 @@ let elapsed = $state(0);
 let abortController = $state<AbortController | null>(null);
 
 // Gemma state
-let gemmaProvider = $state<GemmaProvider | null>(null);
+let gemmaProvider = $state<WasmProvider | null>(null);
 let gemmaStatus = $state<'idle' | 'loading' | 'ready' | 'error'>('idle');
 let gemmaProgress = $state(0);
 let gemmaElapsed = $state(0);
@@ -55,7 +55,7 @@ let tokenMetrics = $state(tokenTracker.metrics);
 tokenTracker.subscribe(m => { tokenMetrics = m; });
 
 // Provider singleton
-const anthropicProvider = new AnthropicProvider({ proxyUrl: `${base}/api/chat` });
+const anthropicProvider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 let blockCounter = 0;
@@ -70,7 +70,7 @@ function getProvider() {
       unloadGemma();
     }
     if (!gemmaProvider) {
-      gemmaProvider = new GemmaProvider({
+      gemmaProvider = new WasmProvider({
         model: llm,
         contextSize: 32_768,
         onProgress: (p, _s, loaded, total) => {
@@ -166,7 +166,7 @@ export const agentStore = {
     const llm = canvas.llm;
     if ((llm === 'gemma-e2b' || llm === 'gemma-e4b') && gemmaStatus === 'idle') {
       const p = getProvider();
-      if (p instanceof GemmaProvider) p.initialize();
+      if (p instanceof WasmProvider) p.initialize();
     }
   },
 
