@@ -134,7 +134,7 @@ deploy_node_build() {
 deploy_static() {
   local app=$1
   local env_prefix=""
-  if [ "$app" = "home" ] || [ "$app" = "todo2" ] || [ "$app" = "boilerplate" ]; then
+  if [ "$app" = "home" ] || [ "$app" = "todo2" ]; then
     env_prefix="PUBLIC_BASE_URL=https://demos.hyperskills.net "
   fi
   if [ "$DRY_RUN" = "1" ]; then
@@ -224,7 +224,7 @@ deploy_app() {
     recipes)             deploy_node_root "recipes" ;;
     home)                deploy_static "home" ;;
     todo2)               deploy_static "todo2" ;;
-    boilerplate)         deploy_static "boilerplate" ;;
+    boilerplate)         deploy_node_root "boilerplate" ;;
     showcase2)           deploy_node_root "showcase2" ;;
     multi-svelte)        deploy_node_root "multi-svelte" ;;
     *)
@@ -263,7 +263,7 @@ echo ""
 echo "Verifying..."
 for app in $APPS; do
   case "$app" in
-    flex2|viewer2|recipes|showcase2|multi-svelte)
+    flex2|viewer2|recipes|showcase2|multi-svelte|boilerplate)
       status=$(ssh "$SSH_HOST" "systemctl is-active webmcp-$app 2>/dev/null" || echo "inactive")
       echo "  $app: $status"
       ;;
