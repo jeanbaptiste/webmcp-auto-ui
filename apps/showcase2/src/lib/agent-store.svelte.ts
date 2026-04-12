@@ -194,12 +194,14 @@ export const agentStore = {
     const layers: ToolLayer[] = [];
 
     if (canvas.mcpConnected) {
-      const mcpLayer: McpLayer = {
-        protocol: 'mcp',
-        serverName: canvas.mcpName ?? 'mcp',
-        tools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
-      };
-      layers.push(mcpLayer);
+      for (const server of multiClient.listServers()) {
+        const mcpLayer: McpLayer = {
+          protocol: 'mcp',
+          serverName: server.name,
+          tools: fromMcpTools(server.tools as Parameters<typeof fromMcpTools>[0]),
+        };
+        layers.push(mcpLayer);
+      }
     }
 
     layers.push(autoui.layer());

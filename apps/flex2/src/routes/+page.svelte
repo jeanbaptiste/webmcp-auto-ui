@@ -243,13 +243,17 @@
   const layers = $derived.by((): ToolLayer[] => {
     const result: ToolLayer[] = [];
     if (canvas.mcpConnected) {
-      const mcpLayer: McpLayer = {
-        protocol: 'mcp',
-        serverName: canvas.mcpName ?? 'mcp',
-        tools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
-        recipes: mcpRecipes.length > 0 ? mcpRecipes : undefined,
-      };
-      result.push(mcpLayer);
+      let recipesAttached = false;
+      for (const server of multiClient.listServers()) {
+        const mcpLayer: McpLayer = {
+          protocol: 'mcp',
+          serverName: server.name,
+          tools: fromMcpTools(server.tools as Parameters<typeof fromMcpTools>[0]),
+          recipes: !recipesAttached && mcpRecipes.length > 0 ? mcpRecipes : undefined,
+        };
+        if (mcpLayer.recipes) recipesAttached = true;
+        result.push(mcpLayer);
+      }
     }
     result.push(autoui.layer());
     return result;

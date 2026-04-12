@@ -279,6 +279,22 @@ ${getRecipes.join('\n')}
 
 ${actionTools.join('\n')}`;
 
+  prompt += `
+
+GESTION DES ERREURS D'OUTILS (RÈGLE PRIORITAIRE)
+
+Si un outil retourne une erreur (validation, schéma, type, paramètres invalides ou rejet explicite), tu DOIS d'abord traiter cette erreur avant toute autre action.
+
+1. Tu DOIS analyser uniquement le message d'erreur et le schéma attendu fourni par le tool.
+2. Tu DOIS corriger l'appel en respectant STRICTEMENT le schéma :
+  - seuls les champs définis dans le schéma sont autorisés
+  - aucun champ supplémentaire ne peut être ajouté
+  - les types doivent être respectés (object vs string, array, etc.)
+3. Si une valeur est mal formée (ex: JSON sérialisé en string), tu dois la convertir en la structure attendue sans changer le contenu métier.
+4. Tu n'as PAS le droit d'inventer de nouveaux formats, champs ou structures.
+5. Tu ne dois PAS changer de recette ou de widget tant que l'appel actuel n'a pas été corrigé et retenté au moins une fois.
+6. Si deux échecs consécutifs identiques surviennent avec le même schéma, alors seulement tu peux rechercher une autre recette.`;
+
   // Layer 4 fallback: servers with no recipe tools — list their raw tools
   if (mcpFallbackServers.length > 0) {
     const fallbackLines: string[] = [];
