@@ -73,7 +73,14 @@ for server_dir in "$SCRIPT_DIR"/servers/*/; do
     server_name="$(basename "$server_dir")"
     if [[ -f "$server_dir/recipes.json" ]]; then
         cp "$server_dir/recipes.json" "$BRIDGE_DIR/recipes/${server_name}.json"
-        echo "  Copied recipes for $server_name"
+        echo "  Copied recipes.json for $server_name"
+    fi
+    # Copy .md recipe files if directory exists
+    if [ -d "$server_dir/recipes" ]; then
+        mkdir -p "$BRIDGE_DIR/recipes/$server_name"
+        cp "$server_dir/recipes/"*.md "$BRIDGE_DIR/recipes/$server_name/"
+        count=$(ls "$server_dir/recipes/"*.md 2>/dev/null | wc -l | tr -d ' ')
+        echo "  Copied $count .md recipes for $server_name"
     fi
 done
 
@@ -106,7 +113,10 @@ generate_unit() {
     local unit_file="/etc/systemd/system/mcp-${name}.service"
 
     local recipes_flag=""
-    if [[ -f "$BRIDGE_DIR/recipes/${name}.json" ]]; then
+    if [[ -d "$BRIDGE_DIR/recipes/${name}" ]]; then
+        # Prefer .md recipe directory over legacy JSON
+        recipes_flag="--recipes-dir $BRIDGE_DIR/recipes/${name}"
+    elif [[ -f "$BRIDGE_DIR/recipes/${name}.json" ]]; then
         recipes_flag="--recipes $BRIDGE_DIR/recipes/${name}.json"
     fi
 

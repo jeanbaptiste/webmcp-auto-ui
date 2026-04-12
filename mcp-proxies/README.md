@@ -89,7 +89,44 @@ NASA_API_KEY=your-key-here
 
 ### Recipes
 
-Each server can optionally have a `recipes.json` file in `servers/{name}/` that injects recipe tools (`list_recipes`, `get_recipe`, `search_recipes`) into the MCP server's tool list. The bridge loads these at startup via the `--recipes` flag.
+Recipes are pre-authored tool-call sequences that the bridge injects as virtual MCP tools (`list_recipes`, `get_recipe`, `search_recipes`). Two formats are supported:
+
+#### Markdown recipes (recommended)
+
+Each recipe is a standalone `.md` file with YAML frontmatter, placed in `servers/{name}/recipes/`:
+
+```
+servers/nasa/recipes/nasa-apod-gallery.md
+servers/nasa/recipes/nasa-mars-rover.md
+```
+
+Frontmatter format:
+
+```yaml
+---
+name: nasa-apod-gallery
+title: NASA Astronomy Picture of the Day Gallery
+description: Fetches recent APOD entries and displays them in a card gallery
+tools:
+  - apod_getApod
+widget: cards
+tags: [nasa, astronomy, images]
+---
+```
+
+The body of the `.md` file (below the frontmatter) contains the prompt that the agent will use when the recipe is invoked.
+
+The bridge loads them via the `--recipes-dir` flag:
+
+```
+python3 mcp-stdio-bridge.py --cmd "npx ..." --port 9008 --recipes-dir /opt/mcp-bridge/recipes/nasa
+```
+
+#### Legacy JSON recipes
+
+Each server can also have a `recipes.json` file in `servers/{name}/` loaded via the `--recipes` flag. This format is still supported but new recipes should use the `.md` format.
+
+When both exist, `--recipes-dir` takes priority over `--recipes`.
 
 ## File structure
 
@@ -101,12 +138,19 @@ mcp-proxies/
   nginx/
     mcp-locations.conf     -- nginx location blocks (generated or manual)
   servers/
-    hackernews/            -- per-server config and recipes
+    hackernews/
+      service.conf         -- server metadata (CMD, PORT)
+      recipes.json         -- legacy JSON recipes
+      recipes/             -- .md recipe files (recommended)
+        hn-stories-table.md
     metmuseum/
     openmeteo/
     wikipedia/
     inaturalist/
     nasa/
+      recipes/
+        nasa-apod-gallery.md
+        nasa-mars-rover.md
     datagouv/
   setup.sh                 -- VM provisioning script
   docker-compose.yml       -- local dev alternative

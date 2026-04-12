@@ -8,6 +8,7 @@ compatible with McpClient (Streamable HTTP transport).
 Usage:
     python3 mcp-stdio-bridge.py --cmd "npx @mikechao/metmuseum-mcp" --port 9001
     python3 mcp-stdio-bridge.py --cmd "npx @mikechao/metmuseum-mcp" --port 9001 --recipes /opt/mcp-bridge/recipes/metmuseum.json
+    python3 mcp-stdio-bridge.py --cmd "npx @mikechao/metmuseum-mcp" --port 9001 --recipes-dir /opt/mcp-bridge/recipes/metmuseum/
 
 The bridge:
 - Accepts POST /mcp with JSON-RPC 2.0 body
@@ -20,6 +21,7 @@ The bridge:
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -31,7 +33,67 @@ proc_lock = threading.Lock()
 session_id = "bridge-" + str(int(time.time()))
 
 # ── Recipes ───────────────────────────────────────────────────────────────────
-recipes_data = []  # loaded from --recipes file
+recipes_data = []  # loaded from --recipes or --recipes-dir
+
+
+def parse_frontmatter(text):
+    """Parse YAML frontmatter from a markdown string. Minimal parser — no external deps.
+
+    Supports: scalar values, single-line lists (``[a, b]``), and indented
+    dash-lists (``- item``). Returns (meta_dict, body_string).
+    """
+    if not text.startswith('---'):
+        return {}, text
+    parts = text.split('---', 2)
+    if len(parts) < 3:
+        return {}, text
+
+    meta = {}
+    current_key = None
+    for line in parts[1].strip().split('\n'):
+        stripped = line.strip()
+        if not stripped or stripped.startswith('#'):
+            continue
+        # Indented list item belonging to current_key
+        if stripped.startswith('- ') and current_key is not None and line[0] in (' ', '\t'):
+            val = stripped[2:].strip().strip('"').strip("'")
+            if not isinstance(meta[current_key], list):
+                meta[current_key] = [meta[current_key]]
+            meta[current_key].append(val)
+            continue
+        if ':' in stripped:
+            key, val = stripped.split(':', 1)
+            key = key.strip()
+            val = val.strip()
+            current_key = key
+            # Inline list: [a, b, c]
+            if val.startswith('[') and val.endswith(']'):
+                meta[key] = [v.strip().strip('"').strip("'") for v in val[1:-1].split(',') if v.strip()]
+            elif val == '':
+                meta[key] = []
+            else:
+                meta[key] = val.strip('"').strip("'")
+        else:
+            current_key = None
+
+    body = parts[2].strip()
+    return meta, body
+
+
+def load_recipes_from_dir(recipes_dir):
+    """Load .md recipe files with YAML frontmatter from a directory."""
+    recipes = []
+    for f in sorted(os.listdir(recipes_dir)):
+        if not f.endswith('.md'):
+            continue
+        with open(os.path.join(recipes_dir, f)) as fh:
+            content = fh.read()
+        meta, body = parse_frontmatter(content)
+        if meta.get('name'):
+            recipe = {**meta, 'content': body}
+            recipes.append(recipe)
+    return recipes
+
 
 RECIPE_TOOLS = [
     {
@@ -63,20 +125,31 @@ RECIPE_TOOLS = [
 def handle_recipe_call(name, arguments):
     """Handle recipe tool calls locally, return MCP tool result content."""
     if name == "list_recipes":
-        summary = [{"name": r["name"], "description": r["description"], "data_type": r["data_type"]} for r in recipes_data]
+        summary = [{"name": r["name"], "description": r.get("description", ""), "data_type": r.get("data_type", "")} for r in recipes_data]
         return {"content": [{"type": "text", "text": json.dumps(summary, indent=2)}]}
 
     if name == "get_recipe":
         rname = arguments.get("name", "")
         for r in recipes_data:
             if r["name"] == rname:
+                # Markdown recipes: return the body content directly
+                if "content" in r:
+                    return {"content": [{"type": "text", "text": r["content"]}]}
                 return {"content": [{"type": "text", "text": json.dumps(r, indent=2)}]}
         return {"content": [{"type": "text", "text": "Recipe not found: " + rname}], "isError": True}
 
     if name == "search_recipes":
         query = arguments.get("query", "").lower()
-        matches = [r for r in recipes_data if query in r["name"].lower() or query in r["description"].lower() or query in r.get("data_type", "").lower()]
-        return {"content": [{"type": "text", "text": json.dumps(matches, indent=2)}]}
+        matches = [
+            r for r in recipes_data
+            if query in r.get("name", "").lower()
+            or query in r.get("description", "").lower()
+            or query in r.get("data_type", "").lower()
+            or query in r.get("content", "").lower()
+        ]
+        # Return summary for search results (not full content)
+        summary = [{"name": r["name"], "description": r.get("description", ""), "data_type": r.get("data_type", "")} for r in matches]
+        return {"content": [{"type": "text", "text": json.dumps(summary, indent=2)}]}
 
     return {"content": [{"type": "text", "text": "Unknown recipe tool: " + name}], "isError": True}
 
@@ -223,10 +296,17 @@ def main():
     parser.add_argument("--port", type=int, default=9001, help="HTTP port (default: 9001)")
     parser.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
     parser.add_argument("--recipes", default=None, help="Path to recipes JSON file")
+    parser.add_argument("--recipes-dir", default=None, help="Path to directory of .md recipe files with YAML frontmatter")
     args = parser.parse_args()
 
     global recipes_data
-    if args.recipes:
+    if args.recipes_dir:
+        try:
+            recipes_data = load_recipes_from_dir(args.recipes_dir)
+            print("Loaded %d recipes from %s" % (len(recipes_data), args.recipes_dir), file=sys.stderr)
+        except Exception as e:
+            print("Warning: could not load recipes from %s: %s" % (args.recipes_dir, e), file=sys.stderr)
+    elif args.recipes:
         try:
             with open(args.recipes) as f:
                 recipes_data = json.load(f)
