@@ -16,8 +16,8 @@ User prompt --> Agent Loop --> LLM (Claude/Gemma/Ollama)
                   |                    |
          +--------+--------+          |
          |                  |          v
-    McpLayer 1         McpLayer 2     UILayer
-    (Tricoteuses)      (iNaturalist)  (component())
+    McpLayer 1         McpLayer 2     WebMcpLayer
+    (Tricoteuses)      (iNaturalist)  (autoui)
          |                  |
     MCP Client 1       MCP Client 2
          |                  |
@@ -76,11 +76,11 @@ await multi.disconnectAll();
 ## Construction des layers MCP
 
 ```ts
-import type { McpLayer, UILayer } from '@webmcp-auto-ui/agent';
+import type { McpLayer } from '@webmcp-auto-ui/agent';
 import { WEBMCP_RECIPES, filterRecipesByServer } from '@webmcp-auto-ui/agent';
 
 const mcpLayer: McpLayer = {
-  source: 'mcp',
+  protocol: 'mcp',
   serverUrl: 'https://mcp.code4code.eu/mcp',
   serverName: 'Tricoteuses',
   tools: await client.listTools(),
@@ -89,10 +89,7 @@ const mcpLayer: McpLayer = {
   ],
 };
 
-const uiLayer: UILayer = {
-  source: 'ui',
-  recipes: filterRecipesByServer(WEBMCP_RECIPES, ['Tricoteuses']),
-};
+const uiLayer = autoui.layer();
 
 const layers = [mcpLayer, uiLayer];
 ```
@@ -143,7 +140,7 @@ const mcpRecipes: McpRecipe[] = JSON.parse(recipesResult.content[0].text);
 ```
 1. L'utilisateur connecte un serveur MCP
 2. L'app appelle client.listTools() -> decouverte des outils
-3. L'app construit les ToolLayers (McpLayer + UILayer)
+3. L'app construit les ToolLayers (McpLayer + autoui.layer())
 4. L'utilisateur pose une question en langage naturel
 5. runAgentLoop:
    - LLM appelle un outil MCP (donnees)
@@ -156,31 +153,27 @@ const mcpRecipes: McpRecipe[] = JSON.parse(recipesResult.content[0].text);
 
 ```ts
 import { McpClient } from '@webmcp-auto-ui/core';
-import { runAgentLoop, WEBMCP_RECIPES, filterRecipesByServer } from '@webmcp-auto-ui/agent';
-import type { McpLayer, UILayer } from '@webmcp-auto-ui/agent';
+import { runAgentLoop, autoui } from '@webmcp-auto-ui/agent';
+import type { McpLayer } from '@webmcp-auto-ui/agent';
 
 const client = new McpClient('https://mcp.code4code.eu/mcp');
 await client.connect();
 const tools = await client.listTools();
 
 const mcpLayer: McpLayer = {
-  source: 'mcp',
+  protocol: 'mcp',
   serverUrl: 'https://mcp.code4code.eu/mcp',
   serverName: 'Tricoteuses',
   tools,
 };
 
-const uiLayer: UILayer = {
-  source: 'ui',
-  recipes: filterRecipesByServer(WEBMCP_RECIPES, ['Tricoteuses']),
-};
+const uiLayer = autoui.layer();
 
 const result = await runAgentLoop('Liste les deputes ecologistes', {
   provider: claudeProvider,
   layers: [mcpLayer, uiLayer],
-  toolMode: 'smart',
   callbacks: {
-    onBlock: (type, data) => blocks.push({ type, data }),
+    onWidget: (type, data) => { blocks.push({ type, data }); return { id: 'w_1' }; },
     onText: (text) => console.log('Assistant:', text),
   },
 });

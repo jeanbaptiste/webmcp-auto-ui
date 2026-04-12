@@ -1,0 +1,406 @@
+---
+title: Construire une demo themee
+description: Creer un dashboard complet avec theme custom, widgets, interactions inter-composants et export HyperSkill
+sidebar:
+  order: 6
+---
+
+Ce tutoriel montre comment construire un dashboard theme de A a Z en utilisant webmcp-auto-ui. L'exemple est un "Nature Observatory" -- un tableau de bord de suivi de la faune dans une reserve naturelle.
+
+## Pre-requis
+
+- Le monorepo est clone et `npm install` a ete execute
+- Les packages sont buildes (`npm run build` a la racine)
+- Familiarite de base avec Svelte 5 et JSON
+
+---
+
+## Etape 1 : Creer le theme
+
+Creez un fichier `theme.json` a la racine de votre app (ex: `apps/showcase/theme.json`) :
+
+```json
+{
+  "name": "nature-observatory",
+  "tokens": {
+    "color-bg":       "#f4f1eb",
+    "color-surface":  "#ffffff",
+    "color-surface2": "#ede8df",
+    "color-border":   "rgba(101, 78, 50, 0.10)",
+    "color-border2":  "rgba(101, 78, 50, 0.20)",
+    "color-accent":   "#2d6a4f",
+    "color-accent2":  "#bc4749",
+    "color-amber":    "#b07d1e",
+    "color-teal":     "#40916c",
+    "color-text1":    "#2b2118",
+    "color-text2":    "#7a6e5d"
+  },
+  "dark": {
+    "color-bg":       "#1a1612",
+    "color-surface":  "#252019",
+    "color-surface2": "#302a21",
+    "color-border":   "rgba(210, 190, 160, 0.10)",
+    "color-border2":  "rgba(210, 190, 160, 0.20)",
+    "color-accent":   "#52b788",
+    "color-text1":    "#ede8df",
+    "color-text2":    "#a89b88"
+  }
+}
+```
+
+Ce theme utilise des verts et bruns :
+- **accent** (`#2d6a4f`) : vert foret profond pour les actions primaires
+- **accent2** (`#bc4749`) : rouge chaud pour les alertes
+- **teal** (`#40916c`) : vert clair pour les etats de succes
+- **amber** (`#b07d1e`) : brun dore pour les avertissements
+- **bg/surface** : blanc casse evoquant du parchemin
+- **text** : brun fonce au lieu de noir pur
+
+---
+
+## Etape 2 : Creer un skill
+
+Un skill definit un ensemble d'instructions pour l'agent, incluant les blocs a produire avec leurs donnees. Creez `nature-observatory.skill.json` :
+
+```json
+{
+  "name": "nature-observatory",
+  "description": "Dashboard de suivi de la faune pour une reserve naturelle",
+  "tags": ["nature", "wildlife", "dashboard"],
+  "theme": {
+    "color-bg": "#f4f1eb",
+    "color-accent": "#2d6a4f",
+    "color-accent2": "#bc4749"
+  },
+  "blocks": [
+    {
+      "type": "stat",
+      "data": {
+        "label": "Especes observees",
+        "value": "347",
+        "trend": "+12",
+        "trendDir": "up"
+      }
+    },
+    {
+      "type": "stat",
+      "data": {
+        "label": "Observations cette semaine",
+        "value": "1 204",
+        "trend": "+8.3%",
+        "trendDir": "up"
+      }
+    },
+    {
+      "type": "stat",
+      "data": {
+        "label": "Alertes especes menacees",
+        "value": "3",
+        "trend": "+1",
+        "trendDir": "up"
+      }
+    },
+    {
+      "type": "chart-rich",
+      "data": {
+        "title": "Observations par mois",
+        "type": "area",
+        "labels": ["Jan", "Fev", "Mar", "Avr", "Mai", "Jun"],
+        "data": [
+          { "label": "Oiseaux", "values": [120, 145, 210, 320, 410, 380], "color": "#2d6a4f" },
+          { "label": "Mammiferes", "values": [45, 52, 68, 95, 110, 102], "color": "#b07d1e" },
+          { "label": "Reptiles", "values": [15, 18, 35, 55, 72, 68], "color": "#40916c" }
+        ]
+      }
+    },
+    {
+      "type": "data-table",
+      "data": {
+        "title": "Observations recentes",
+        "columns": [
+          { "key": "species", "label": "Espece" },
+          { "key": "location", "label": "Lieu" },
+          { "key": "date", "label": "Date" },
+          { "key": "observer", "label": "Observateur" },
+          { "key": "status", "label": "Statut" }
+        ],
+        "rows": [
+          { "species": "Buse a queue rousse", "location": "Crete Nord", "date": "2026-04-05", "observer": "A. Muir", "status": "Confirme" },
+          { "species": "Loutre de riviere", "location": "Ruisseau des Saules", "date": "2026-04-05", "observer": "B. Carson", "status": "Confirme" },
+          { "species": "Crotale des bois", "location": "Falaise Rocheuse", "date": "2026-04-04", "observer": "C. Leopold", "status": "En attente" },
+          { "species": "Pygargue a tete blanche", "location": "Pointe de l'Aigle", "date": "2026-04-04", "observer": "A. Muir", "status": "Confirme" },
+          { "species": "Ours noir", "location": "Vallon des Pins", "date": "2026-04-03", "observer": "D. Thoreau", "status": "Confirme" }
+        ]
+      }
+    },
+    {
+      "type": "profile",
+      "data": {
+        "name": "Reserve de la Crete Nord",
+        "subtitle": "Fondee en 1987 -- 5 000 hectares",
+        "badge": { "text": "Active", "variant": "success" },
+        "fields": [
+          { "label": "Region", "value": "Hauts plateaux" },
+          { "label": "Altitude", "value": "800-2 200m" },
+          { "label": "Habitats", "value": "Foret, Zone humide, Alpin" }
+        ],
+        "stats": [
+          { "label": "Especes", "value": "347" },
+          { "label": "Observateurs", "value": "24" },
+          { "label": "Observations", "value": "18.4K" }
+        ]
+      }
+    }
+  ]
+}
+```
+
+Ce skill utilise 6 blocs : 3 stat pour les KPI, un graphique en aires pour les tendances, un tableau de donnees pour les observations recentes, et une fiche profil pour la reserve.
+
+---
+
+## Etape 3 : Monter la page SvelteKit
+
+Creez une nouvelle route dans votre app.
+
+### 3a. Creer le repertoire
+
+```bash
+mkdir -p apps/showcase/src/routes/nature
+```
+
+### 3b. Creer la page
+
+Creez `apps/showcase/src/routes/nature/+page.svelte` :
+
+```svelte
+<script lang="ts">
+  import { ThemeProvider, BlockRenderer } from '@webmcp-auto-ui/ui';
+  import themeJson from '../../../theme.json';
+  import skillJson from '../../../nature-observatory.skill.json';
+</script>
+
+<ThemeProvider defaultMode="light" overrides={themeJson.tokens}>
+  <div class="min-h-screen bg-bg p-6">
+    <header class="max-w-6xl mx-auto mb-8">
+      <h1 class="text-3xl font-bold text-text1">Nature Observatory</h1>
+      <p class="text-text2 mt-1">Dashboard de suivi de la faune -- Reserve de la Crete Nord</p>
+    </header>
+
+    <main class="max-w-6xl mx-auto space-y-6">
+      <!-- KPI : 3 blocs stat cote a cote -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {#each skillJson.blocks.slice(0, 3) as block}
+          <BlockRenderer type={block.type} data={block.data} />
+        {/each}
+      </div>
+
+      <!-- Graphique -->
+      <BlockRenderer
+        type={skillJson.blocks[3].type}
+        data={skillJson.blocks[3].data}
+      />
+
+      <!-- Tableau de donnees -->
+      <BlockRenderer
+        type={skillJson.blocks[4].type}
+        data={skillJson.blocks[4].data}
+      />
+
+      <!-- Fiche de la reserve -->
+      <BlockRenderer
+        type={skillJson.blocks[5].type}
+        data={skillJson.blocks[5].data}
+      />
+    </main>
+  </div>
+</ThemeProvider>
+```
+
+### 3c. Lancer le serveur de dev
+
+```bash
+npm -w apps/showcase run dev
+```
+
+Ouvrez `http://localhost:5177/nature` dans le navigateur. Le dashboard complet s'affiche avec le theme nature applique.
+
+---
+
+## Etape 4 : Ajouter des composants supplementaires
+
+Ajoutez une carte des observations et une timeline d'activite. Completez le tableau `blocks` du skill JSON :
+
+```json
+{
+  "type": "map",
+  "data": {
+    "title": "Lieux d'observation",
+    "center": { "lat": 35.6, "lng": -83.5 },
+    "zoom": 10,
+    "markers": [
+      { "lat": 35.65, "lng": -83.48, "label": "Buse a queue rousse" },
+      { "lat": 35.58, "lng": -83.52, "label": "Loutre de riviere" },
+      { "lat": 35.62, "lng": -83.45, "label": "Pygargue a tete blanche" },
+      { "lat": 35.55, "lng": -83.55, "label": "Ours noir" }
+    ]
+  }
+}
+```
+
+```json
+{
+  "type": "timeline",
+  "data": {
+    "title": "Activite de l'observatoire",
+    "events": [
+      { "date": "2026-04-05", "title": "Nidification confirmee", "description": "Couple de buses en nidification sur la Crete Nord", "status": "active" },
+      { "date": "2026-04-03", "title": "Ours repere pres du sentier", "description": "Ours noir au Vallon des Pins, avis de prudence emis", "status": "done" },
+      { "date": "2026-03-28", "title": "Debut de la migration", "description": "Premiere vague de passereaux migrateurs en zone humide", "status": "done" },
+      { "date": "2026-03-15", "title": "Reseau de capteurs mis a jour", "description": "12 nouveaux pieges photographiques dans le secteur sud", "status": "done" }
+    ]
+  }
+}
+```
+
+Puis ajoutez-les au layout de la page :
+
+```svelte
+<!-- Carte -->
+<BlockRenderer
+  type={skillJson.blocks[6].type}
+  data={skillJson.blocks[6].data}
+/>
+
+<!-- Timeline -->
+<BlockRenderer
+  type={skillJson.blocks[7].type}
+  data={skillJson.blocks[7].data}
+/>
+```
+
+---
+
+## Etape 5 : Interactions inter-composants
+
+Chaque bloc rendu via `BlockRenderer` expose des outils WebMCP quand `navigator.modelContext` est disponible :
+- `block_<id>_get` -- lire les donnees courantes du bloc
+- `block_<id>_update` -- mettre a jour les donnees
+- `block_<id>_remove` -- supprimer le bloc
+
+Pour relier les blocs entre eux manuellement (sans passer par l'agent), utilisez l'etat reactif Svelte :
+
+```svelte
+<script lang="ts">
+  import { BlockRenderer } from '@webmcp-auto-ui/ui';
+
+  let selectedSpecies = $state('all');
+  let allRows = skillJson.blocks[4].data.rows;
+
+  let tableData = $derived(
+    selectedSpecies === 'all'
+      ? skillJson.blocks[4].data
+      : {
+          ...skillJson.blocks[4].data,
+          rows: allRows.filter(r => r.species === selectedSpecies),
+        }
+  );
+</script>
+
+<!-- Bloc tags pour le filtrage -->
+<BlockRenderer
+  type="tags"
+  data={{
+    label: "Filtrer par espece",
+    tags: [
+      { text: "Toutes", active: selectedSpecies === 'all' },
+      { text: "Buse a queue rousse", active: selectedSpecies === 'Buse a queue rousse' },
+      { text: "Loutre de riviere", active: selectedSpecies === 'Loutre de riviere' },
+      { text: "Pygargue a tete blanche", active: selectedSpecies === 'Pygargue a tete blanche' },
+    ]
+  }}
+/>
+
+<!-- Tableau filtre -->
+<BlockRenderer type="data-table" data={tableData} />
+```
+
+Ce pattern permet de construire des dashboards interactifs ou la selection d'un tag filtre le tableau, le clic sur un marqueur de carte met en evidence une ligne, etc.
+
+---
+
+## Etape 6 : Exporter en URL HyperSkill
+
+Une fois le dashboard pret, exportez-le en URL portable que n'importe qui peut ouvrir.
+
+Le SDK re-exporte `encode` et `decode` depuis le package [`hyperskills`](https://www.npmjs.com/package/hyperskills) :
+
+```typescript
+import { encode } from '@webmcp-auto-ui/sdk';
+
+const skill = {
+  version: '1.0',
+  name: 'nature-observatory',
+  description: 'Dashboard de suivi de la faune',
+  theme: themeJson.tokens,
+  blocks: skillJson.blocks,
+};
+
+const shareUrl = await encode(
+  'https://demos.hyperskills.net/viewer',
+  JSON.stringify(skill),
+);
+
+console.log(shareUrl);
+// N'importe qui peut ouvrir cette URL pour voir le dashboard theme complet
+```
+
+### Fonctionnement de l'URL
+
+```
+https://demos.hyperskills.net/viewer?hs=eyJ2ZXJzaW9uIjoiMS4wI...
+
+                                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+                                        base64(JSON.stringify(skill))
+                                        ou gz.base64(gzip(...)) si > 6 KB
+```
+
+Quand quelqu'un ouvre l'URL :
+1. Le Viewer lit le parametre `hs`
+2. Decode le base64 (decompresse gzip si prefixe `gz.`)
+3. Parse le JSON du skill
+4. `ThemeProvider` applique les tokens de theme embarques
+5. `BlockRenderer` rend chaque bloc
+
+---
+
+## Etape 7 : Deployer
+
+Suivez le tutoriel [Deploiement](/guide/deploy) pour pousser votre demo en production. Pour un deploy rapide de l'app showcase :
+
+```bash
+./scripts/deploy.sh showcase
+```
+
+Le script gere le build des packages, le build de l'app, le nettoyage des anciens fichiers, la copie au bon endroit, et la verification d'integrite.
+
+---
+
+## Resume
+
+Ce que nous avons construit :
+1. Une palette de couleurs nature dans `theme.json`
+2. Un skill avec 8 blocs (stats, graphique, tableau, profil, carte, timeline)
+3. Une page SvelteKit avec `ThemeProvider` et `BlockRenderer`
+4. Du filtrage interactif entre composants
+5. Une URL HyperSkill partageable
+6. Un deploiement en production
+
+Le meme pattern fonctionne pour n'importe quel theme et n'importe quelle combinaison des 26 types de widgets disponibles. Changez les couleurs dans `theme.json`, remplacez les blocs, et vous obtenez un dashboard completement different.
+
+## Voir aussi
+
+- [Demarrer avec le boilerplate](./boilerplate)
+- [Creer un widget custom](./create-custom-widget)
+- [Utiliser les widgets existants](./use-existing-widgets)
+- [Deploiement](/guide/deploy)

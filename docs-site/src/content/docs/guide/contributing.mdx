@@ -1,0 +1,234 @@
+---
+title: "Patterns et pieges"
+description: "Guide contributeur : bugs reels rencontres en production et patterns a suivre pour les eviter."
+sidebar:
+  order: 5
+---
+
+Ce document compile les bugs reels rencontres en production et les patterns a suivre pour les eviter. Mis a jour au fil des incidents.
+
+## Svelte 5 -- Reactivite
+
+### Regle 1 : un `$effect` ne doit pas lire ET ecrire les memes states
+
+**Symptome** : `effect_update_depth_exceeded` en console, la page entiere se bloque
+(boutons sans effet, modals qui n'ouvrent pas).
+
+**Cause** : Svelte 5 re-execute un `$effect` chaque fois qu'une de ses
+dependances reactives change. Si l'effet ecrit une valeur qu'il lit aussi,
+il se re-declenche lui-meme -- boucle infinie -- arret au bout de 5 iterations.
+
+```svelte
+<!-- BAD -- lit gemmaStatus ET l'ecrit -->
+$effect(() => {
+  const llm = canvas.llm;
+  if (gemmaStatus === 'ready') {   // lit gemmaStatus -> tracke
+    gemmaStatus = 'idle';          // ecrit gemmaStatus -> re-run !
+  }
+  canvas.addMsg('system', llm);   // ecrit canvas.messages
+});
+
+<!-- GOOD -- untrack() pour les lectures non-declencheuses -->
+import { untrack } from 'svelte';
+
+$effect(() => {
+  const llm = canvas.llm;         // seule dependance trackee
+  untrack(() => {
+    if (gemmaStatus === 'ready') { // lu mais pas tracke
+      gemmaStatus = 'idle';
+    }
+    canvas.addMsg('system', llm);
+  });
+});
+```
+
+**Regle** : dans un `$effect`, isoler la/les dependances qui doivent declencher
+le re-run, et wrapper tout le reste dans `untrack()`.
+
+---
+
+### Regle 2 : preferer `$derived` a `$effect` + `$state` pour les valeurs calculees
+
+```svelte
+<!-- BAD -- $state ecrit dans un $effect -->
+let paletteOpen = $state(true);
+$effect(() => { paletteOpen = canvas.mode === 'drag'; });
+
+<!-- GOOD si la valeur est read-only -->
+const paletteOpen = $derived(canvas.mode === 'drag');
+
+<!-- GOOD si la valeur est aussi ecrite manuellement (toggle utilisateur) -->
+<!-- garder $state + $effect, mais s'assurer que l'effet ne lit pas paletteOpen -->
+let paletteOpen = $state(true);
+$effect(() => { paletteOpen = canvas.mode === 'drag'; }); // ok : ne lit pas paletteOpen
+```
+
+---
+
+### Regle 3 : eviter les `$effect` redondants avec `onMount`
+
+```svelte
+<!-- BAD -- double initialisation inutile -->
+let skills = $state([]);
+$effect(() => { skills = listSkills(); });   // court-circuite par onMount
+onMount(() => { skills = listSkills(); });
+
+<!-- GOOD -- une seule source de verite -->
+let skills = $state([]);
+onMount(() => { skills = listSkills(); });
+```
+
+Si `listSkills()` ne lit aucun state reactif, le `$effect` ne se re-declenchera
+jamais apres le premier run -- il est strictement equivalent a `onMount`, mais
+plus trompeur.
+
+---
+
+### Regle 4 : passer le modele LLM explicitement au provider
+
+```ts
+// BAD -- utilise toujours 'haiku' par defaut
+return new AnthropicProvider({ proxyUrl: `${base}/api/chat` });
+
+// GOOD -- transmet le choix utilisateur
+return new AnthropicProvider({
+  proxyUrl: `${base}/api/chat`,
+  model: canvas.llm,
+});
+```
+
+`AnthropicProvider` a `model ?? 'haiku'` comme defaut. Si l'utilisateur
+selectionne `sonnet`, il recevra quand meme `haiku` sans message d'erreur.
+
+---
+
+## Agent loop -- `loop.ts`
+
+### `onText` n'est appele qu'a la derniere iteration sans tools
+
+Par defaut, `callbacks.onText` est appele uniquement quand le LLM repond
+sans `tool_use`. Comme le system prompt force l'usage de `render_*` tools,
+ce callback n'est jamais atteint dans le flow normal.
+
+**Consequence** : la bulle "thinking" reste figee sur le dernier tool et
+ne se met jamais a jour avec le texte final.
+
+**Fix applique dans `loop.ts`** : appeler `onText` aussi quand il y a du
+texte intermediaire avant les tool_use (reasoning du LLM) :
+
+```ts
+// Intermediate text before tool_use -- live update
+if (lastText) callbacks.onText?.(lastText);
+```
+
+---
+
+## Deploy -- Integrite du build
+
+### Regle : verifier le sha256 apres chaque deploy node
+
+Le deploy script (`deploy.sh`) integre maintenant une verification d'integrite
+automatique apres `scp`. En cas de mismatch, le deploy echoue avec une erreur
+explicite.
+
+**Pourquoi c'est necessaire** : sans cette verification, un deploy peut
+"reussir" (pas d'erreur scp, service `active`) mais servir l'ancien code si :
+- le build local etait perime
+- le scp a ete interrompu silencieusement
+- le fichier cible etait en read-only et scp a echoue sans bruit
+
+**Ce que ca ne remplace pas** : les tests fonctionnels (Playwright). Le sha256
+verifie que le fichier est bien transfere, pas qu'il fait ce qu'on attend.
+
+---
+
+### Regle : toujours rebuilder les apps avant de deployer
+
+Le deploy script (`deploy_node_root`, `deploy_node_build`) rebuild maintenant
+automatiquement les apps via `npm run build` avant de copier.
+
+**Historique** : avant ce fix, les packages (`@webmcp-auto-ui/*`) etaient
+recompiles par le script, mais les apps (flex, viewer) etaient
+deployees avec leur ancien `build/`. Tous les fixes Svelte appliques dans
+`apps/*/src/` etaient donc perdus.
+
+```
+build packages   ->  packages/*/dist/ mis a jour
+build apps       ->  apps/*/build/ = ancien code
+scp apps/*/build/*  ->  l'ancien code est deploye
+```
+
+---
+
+## Debug -- Checklist quand "le fix n'est pas en prod"
+
+1. **Le build local est-il a jour ?**
+   ```bash
+   ls -la apps/flex/build/index.js   # date de modification
+   ```
+
+2. **Le fichier deploye correspond-il au build local ?**
+   ```bash
+   sha256sum apps/flex/build/index.js
+   ssh bot "sha256sum /opt/webmcp-demos/flex/index.js"
+   ```
+
+3. **Y a-t-il des erreurs JS cote client ?**
+   ```bash
+   # Via Playwright (headless)
+   node -e "
+   const {chromium} = require('playwright');
+   (async () => {
+     const b = await chromium.launch();
+     const p = await b.newPage();
+     p.on('pageerror', e => console.error('JS ERROR:', e.message));
+     await p.goto('https://demos.hyperskills.net/flex/');
+     await p.waitForTimeout(3000);
+     await b.close();
+   })();"
+   ```
+
+4. **Le service a-t-il redemarre avec le bon fichier ?**
+   ```bash
+   ssh bot "systemctl status webmcp-flex --no-pager | head -20"
+   ```
+
+---
+
+## Tests -- Playwright
+
+Les tests e2e sont dans `tests/e2e/smoke.spec.ts`. Ils testent les apps
+deployees sur `https://demos.hyperskills.net`.
+
+```bash
+npx playwright test                    # tous les tests
+npx playwright test --grep "Composer"  # une suite
+npx playwright test --grep "export"    # un test precis
+```
+
+**Quand lancer les tests** :
+- Apres chaque deploy important
+- Avant de marquer un bug comme resolu
+- Apres un refactor qui touche plusieurs composants
+
+**Ce que les tests ne verifient pas** :
+- Que le code deploye correspond au code local (sha256)
+- Les erreurs JS silencieuses cote client (ajouter `page.on('pageerror')`)
+- Les loops reactives Svelte qui n'affectent pas les selecteurs CSS testes
+
+**Attention a l'hydratation SvelteKit** : les composants SSR sont dans le DOM
+des le chargement, mais les event handlers Svelte ne sont attaches qu'apres
+hydratation JS. Un `page.click()` immediat apres `page.goto()` peut frapper
+un bouton non-hydrate.
+
+```ts
+// BAD -- peut cliquer avant hydratation
+await page.goto(url);
+await page.click('button:has-text("export")');
+
+// GOOD -- attendre un element client-side (seulement visible apres hydratation)
+await page.goto(url);
+await page.waitForSelector('select', { state: 'visible' });
+await page.waitForTimeout(500);   // tick d'hydratation
+await page.click('button:has-text("export")');
+```

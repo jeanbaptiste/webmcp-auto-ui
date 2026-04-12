@@ -9,7 +9,7 @@ Flex (`apps/flex2/`) is the main demo app for the v0.8 architecture. It combines
 
 ## Features
 
-- **ToolLayers**: automatic `McpLayer` and `UILayer` construction on MCP connection
+- **ToolLayers**: automatic `McpLayer` and `WebMcpLayer` construction on MCP connection
 - **Single component()**: smart mode by default, one UI tool for the LLM
 - **Debug panel**: real-time visualization of the generated prompt, tool calls, and metrics
 - **Provenance badges**: each block displays its origin (which tool, which server)

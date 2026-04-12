@@ -23,6 +23,8 @@ An agent (Claude or Gemma WASM) reads available tools and recipes from MCP + Web
 | `recipes` | 3009 | MCP + WebMCP recipe explorer with live agent testing |
 | `showcase2` | 3010 | Dynamic demo: all components with 3 themes, or agent-driven generation from an MCP server |
 | `todo2` | static | Minimal WebMCP todo |
+| `boilerplate` | 3011 | Starter template with 3 Tricoteuses widgets, tutorial-ready |
+| `multi-svelte` | 3012 | Multi-tab Svelte app with shadcn-ui integration |
 
 ## Architecture
 

@@ -43,7 +43,7 @@ MCP Connection                 buildSystemPrompt()              Agent loop (LLM)
      |                              |   <- full MCP server recipe   |
      |                              |                               |
      |                              |   8. component("table",{...}) |
-     |                              |   -> onBlock -> Canvas        |
+     |                              |   -> onWidget -> Canvas       |
 ```
 
 ### Step 1: Connection and collection
@@ -111,7 +111,7 @@ The LLM sees names and descriptions in the prompt, then requests the detail only
 
 ## WebMCP Recipes (UI)
 
-WebMCP recipes guide the LLM on component selection. They are `.md` files with YAML frontmatter, parsed at build time and injected into the prompt via `UILayer.recipes`.
+WebMCP recipes guide the LLM on component selection. They are `.md` files with YAML frontmatter, parsed at build time and injected into the prompt via the tool layers.
 
 ### Format
 
@@ -220,7 +220,7 @@ const recipesResult = await client.callTool('list_recipes', {});
 const mcpRecipes: McpRecipe[] = JSON.parse(recipesResult.content[0].text);
 
 const mcpLayer: McpLayer = {
-  source: 'mcp',
+  protocol: 'mcp',
   serverUrl: 'https://mcp.code4code.eu/mcp',
   serverName: 'Tricoteuses',
   tools: await client.listTools(),
@@ -256,7 +256,7 @@ The server decides the content of `body` — workflow, examples, recommended par
 | **Content** | How to present with component() | What tools return, how to combine them |
 | **Prompt section** | `## webmcp > UI recipes` | `## mcp > server recipes` |
 | **Type** | `Recipe` | `McpRecipe` |
-| **Carried by** | `UILayer.recipes` | `McpLayer.recipes` |
+| **Carried by** | `WebMcpLayer` (autoui) | `McpLayer.recipes` |
 | **Lazy loading** | `get_component("id")` or `component("id")` | `get_recipe(name)` (MCP tool) |
 | **Guides what** | The **View** (how to display) | The **Model/Data** (what to request) |
 | **Body in prompt** | No (summaries only) | No (summaries only) |

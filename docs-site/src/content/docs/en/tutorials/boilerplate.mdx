@@ -1,0 +1,287 @@
+---
+title: Getting started with the boilerplate
+description: Install the Svelte 5 / SvelteKit / shadcn-svelte boilerplate and connect webmcp-auto-ui in 10 minutes
+sidebar:
+  order: 0
+---
+
+This tutorial walks you step by step through installing the webmcp-auto-ui boilerplate, connecting to an MCP server, and creating your first custom widget.
+
+## Overview
+
+The boilerplate provides a SvelteKit 5 app pre-wired with:
+
+- **shadcn-svelte** for the design system
+- **@webmcp-auto-ui/core** for the MCP client and WebMCP server
+- **@webmcp-auto-ui/agent** for the agent loop and LLM provider
+- **@webmcp-auto-ui/sdk** for the canvas store and HyperSkill encoding
+- **@webmcp-auto-ui/ui** for components (LLMSelector, McpStatus, WidgetRenderer, etc.)
+
+The app includes 3 custom widgets (MP profiles, ballots, amendments) as integration examples.
+
+---
+
+## Step 1: Scaffolding
+
+Clone the boilerplate with degit:
+
+```bash
+npx degit hyperskills/webmcp-auto-ui/apps/boilerplate my-app
+cd my-app
+npm install
+```
+
+---
+
+## Step 2: Configure the API proxy
+
+Create the file `src/routes/api/chat/+server.ts` (already present in the boilerplate):
+
+```ts
+import { env } from '$env/dynamic/private';
+import type { RequestHandler } from '@sveltejs/kit';
+import { anthropicProxy } from '@webmcp-auto-ui/agent/server';
+
+export const POST: RequestHandler = async ({ request }) => {
+  const body = await request.json() as Record<string, unknown>;
+  const apiKey = (body.__apiKey as string | undefined) || env.ANTHROPIC_API_KEY || '';
+  delete body.__apiKey;
+  return anthropicProxy(body, apiKey, request.headers.get('X-Model'));
+};
+```
+
+Add your API key in `.env`:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+The proxy relays requests to the Claude API. The model is selected dynamically via the `X-Model` header (aliases: `'haiku'`, `'sonnet'`, `'opus'`).
+
+---
+
+## Step 3: Connect an MCP server
+
+The boilerplate uses `McpMultiClient` to manage multiple MCP servers:
+
+```ts
+import { McpMultiClient } from '@webmcp-auto-ui/core';
+
+const multiClient = new McpMultiClient();
+await multiClient.addServer('https://mcp.code4code.eu/mcp');
+```
+
+In the main component, the connection is already wired with a URL field and a "Connect" button. On page load, the app automatically connects to the default URL.
+
+To hardcode a server:
+
+```ts
+await multiClient.addServer('https://your-mcp-server.example/mcp');
+```
+
+---
+
+## Step 4: Understand the LLM provider
+
+The boilerplate uses `RemoteLLMProvider` to communicate with Claude via the proxy:
+
+```ts
+import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
+
+const provider = new RemoteLLMProvider({ proxyUrl: '/api/chat' });
+```
+
+The model is changed dynamically via the `<LLMSelector>` component which exposes the aliases `'haiku'`, `'sonnet'` and `'opus'`.
+
+---
+
+## Step 5: Run the agent loop
+
+The agent loop orchestrates the LLM, MCP tools and WebMCP widgets:
+
+```ts
+import { runAgentLoop, buildSystemPrompt, fromMcpTools, autoui } from '@webmcp-auto-ui/agent';
+import type { ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
+
+// Build layers (remote MCP + local WebMCP)
+const layers: ToolLayer[] = [];
+
+// MCP layer (remote data)
+for (const server of multiClient.listServers()) {
+  const mcpLayer: McpLayer = {
+    protocol: 'mcp',
+    serverName: server.name,
+    tools: fromMcpTools(server.tools),
+  };
+  layers.push(mcpLayer);
+}
+
+// WebMCP layer (native widgets)
+layers.push(autoui.layer());
+
+// Dynamic system prompt
+const systemPrompt = buildSystemPrompt(layers);
+
+// Run the loop
+const result = await runAgentLoop(userMessage, {
+  provider,
+  systemPrompt,
+  layers,
+  maxIterations: 10,
+  maxTokens: 4096,
+  callbacks: {
+    onWidget: (type, data) => {
+      // Add the widget to the canvas
+      const id = 'b_' + Date.now().toString(36);
+      blocks = [...blocks, { id, type, data }];
+      return { id };
+    },
+    onText: (text) => { ephemeralText = text; },
+    onToolCall: (call) => { console.log('Tool:', call.name); },
+  },
+});
+```
+
+---
+
+## Step 6: Display widgets
+
+Widget rendering is done via `<WidgetRenderer>`:
+
+```svelte
+<script lang="ts">
+  import { WidgetRenderer } from '@webmcp-auto-ui/ui';
+</script>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+  {#each blocks as block (block.id)}
+    <WidgetRenderer
+      id={block.id}
+      type={block.type}
+      data={block.data}
+      {servers}
+    />
+  {/each}
+</div>
+```
+
+`WidgetRenderer` automatically resolves the Svelte component matching the widget `type`, by looking in:
+1. Custom WebMCP servers (passed via `servers`)
+2. Native autoui widgets (stat, chart, table, map, etc.)
+
+---
+
+## Step 7: Add UI components
+
+The boilerplate integrates pre-built UI components:
+
+```svelte
+<script lang="ts">
+  import {
+    LLMSelector,     // Model selector (haiku/sonnet/opus)
+    McpStatus,       // MCP connection indicator
+    AgentProgress,   // Agent loop progress
+    WidgetRenderer,  // Widget rendering
+    getTheme,        // Light/dark theme
+  } from '@webmcp-auto-ui/ui';
+</script>
+
+<!-- Top bar -->
+<header class="flex items-center gap-3 px-4 border-b">
+  <McpStatus
+    connecting={canvas.mcpConnecting}
+    connected={canvas.mcpConnected}
+    name={mcpName}
+    servers={multiClient.listServers().map(s => ({
+      url: s.url, name: s.name, toolCount: s.tools.length
+    }))}
+  />
+  <LLMSelector />
+</header>
+
+<!-- Agent progress -->
+<AgentProgress
+  active={canvas.generating}
+  elapsed={chatTimer}
+  toolCalls={chatToolCount}
+  lastTool={chatLastTool}
+/>
+```
+
+---
+
+## Step 8: Add a custom widget
+
+To register your own widgets, create a local WebMCP server:
+
+```ts
+import { createWebMcpServer } from '@webmcp-auto-ui/core';
+import MyWidget from './widgets/MyWidget.svelte';
+import myWidgetRecipe from './recipes/my-widget.md?raw';
+
+const myServer = createWebMcpServer('my-app', {
+  description: 'Custom widgets for my application',
+});
+
+myServer.registerWidget(myWidgetRecipe, MyWidget);
+```
+
+Then add the layer to the agent loop:
+
+```ts
+layers.push(myServer.layer());
+```
+
+And pass the server to WidgetRenderer:
+
+```svelte
+<WidgetRenderer
+  id={block.id}
+  type={block.type}
+  data={block.data}
+  servers={[myServer]}
+/>
+```
+
+For details on creating custom widgets, see the tutorial [Create a custom widget](./create-custom-widget).
+
+---
+
+## Start the development server
+
+```bash
+npm run dev
+```
+
+The app is accessible at `http://localhost:5173`. Type a question in the chat to trigger the agent loop.
+
+---
+
+## Project structure
+
+```
+my-app/
+  src/
+    routes/
+      +page.svelte          # Main page (chat + canvas)
+      api/chat/+server.ts   # Claude API proxy
+    lib/
+      widgets/
+        register.ts         # WebMCP server + widget registration
+        MyWidget.svelte     # Custom widget component
+      recipes/
+        my-widget.md        # Widget recipe (frontmatter + instructions)
+  .env                      # ANTHROPIC_API_KEY
+  package.json
+  svelte.config.js
+  vite.config.ts
+```
+
+---
+
+## See also
+
+- [Create a custom widget](./create-custom-widget)
+- [Use existing widgets](./use-existing-widgets)
+- [Connect an MCP server](./connect-mcp-server)
+- [MCP / WebMCP Architecture](./architecture-mcp-webmcp)

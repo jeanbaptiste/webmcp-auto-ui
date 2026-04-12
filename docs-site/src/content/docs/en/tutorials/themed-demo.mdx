@@ -1,0 +1,406 @@
+---
+title: Build a themed demo
+description: Create a complete dashboard with custom theme, widgets, cross-component interactions and HyperSkill export
+sidebar:
+  order: 6
+---
+
+This tutorial shows how to build a themed dashboard from scratch using webmcp-auto-ui. The example is a "Nature Observatory" -- a wildlife tracking dashboard for a nature reserve.
+
+## Prerequisites
+
+- The monorepo is cloned and `npm install` has been run
+- Packages are built (`npm run build` at the root)
+- Basic familiarity with Svelte 5 and JSON
+
+---
+
+## Step 1: Create the theme
+
+Create a `theme.json` file at the root of your app (e.g. `apps/showcase/theme.json`):
+
+```json
+{
+  "name": "nature-observatory",
+  "tokens": {
+    "color-bg":       "#f4f1eb",
+    "color-surface":  "#ffffff",
+    "color-surface2": "#ede8df",
+    "color-border":   "rgba(101, 78, 50, 0.10)",
+    "color-border2":  "rgba(101, 78, 50, 0.20)",
+    "color-accent":   "#2d6a4f",
+    "color-accent2":  "#bc4749",
+    "color-amber":    "#b07d1e",
+    "color-teal":     "#40916c",
+    "color-text1":    "#2b2118",
+    "color-text2":    "#7a6e5d"
+  },
+  "dark": {
+    "color-bg":       "#1a1612",
+    "color-surface":  "#252019",
+    "color-surface2": "#302a21",
+    "color-border":   "rgba(210, 190, 160, 0.10)",
+    "color-border2":  "rgba(210, 190, 160, 0.20)",
+    "color-accent":   "#52b788",
+    "color-text1":    "#ede8df",
+    "color-text2":    "#a89b88"
+  }
+}
+```
+
+This theme uses greens and browns:
+- **accent** (`#2d6a4f`): deep forest green for primary actions
+- **accent2** (`#bc4749`): warm red for alerts
+- **teal** (`#40916c`): light green for success states
+- **amber** (`#b07d1e`): golden brown for warnings
+- **bg/surface**: off-white evoking parchment
+- **text**: dark brown instead of pure black
+
+---
+
+## Step 2: Create a skill
+
+A skill defines a set of instructions for the agent, including the blocks to produce with their data. Create `nature-observatory.skill.json`:
+
+```json
+{
+  "name": "nature-observatory",
+  "description": "Wildlife tracking dashboard for a nature reserve",
+  "tags": ["nature", "wildlife", "dashboard"],
+  "theme": {
+    "color-bg": "#f4f1eb",
+    "color-accent": "#2d6a4f",
+    "color-accent2": "#bc4749"
+  },
+  "blocks": [
+    {
+      "type": "stat",
+      "data": {
+        "label": "Species observed",
+        "value": "347",
+        "trend": "+12",
+        "trendDir": "up"
+      }
+    },
+    {
+      "type": "stat",
+      "data": {
+        "label": "Observations this week",
+        "value": "1,204",
+        "trend": "+8.3%",
+        "trendDir": "up"
+      }
+    },
+    {
+      "type": "stat",
+      "data": {
+        "label": "Endangered species alerts",
+        "value": "3",
+        "trend": "+1",
+        "trendDir": "up"
+      }
+    },
+    {
+      "type": "chart-rich",
+      "data": {
+        "title": "Observations by month",
+        "type": "area",
+        "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+        "data": [
+          { "label": "Birds", "values": [120, 145, 210, 320, 410, 380], "color": "#2d6a4f" },
+          { "label": "Mammals", "values": [45, 52, 68, 95, 110, 102], "color": "#b07d1e" },
+          { "label": "Reptiles", "values": [15, 18, 35, 55, 72, 68], "color": "#40916c" }
+        ]
+      }
+    },
+    {
+      "type": "data-table",
+      "data": {
+        "title": "Recent observations",
+        "columns": [
+          { "key": "species", "label": "Species" },
+          { "key": "location", "label": "Location" },
+          { "key": "date", "label": "Date" },
+          { "key": "observer", "label": "Observer" },
+          { "key": "status", "label": "Status" }
+        ],
+        "rows": [
+          { "species": "Red-tailed hawk", "location": "North Ridge", "date": "2026-04-05", "observer": "A. Muir", "status": "Confirmed" },
+          { "species": "River otter", "location": "Willow Creek", "date": "2026-04-05", "observer": "B. Carson", "status": "Confirmed" },
+          { "species": "Timber rattlesnake", "location": "Rocky Bluff", "date": "2026-04-04", "observer": "C. Leopold", "status": "Pending" },
+          { "species": "Bald eagle", "location": "Eagle Point", "date": "2026-04-04", "observer": "A. Muir", "status": "Confirmed" },
+          { "species": "Black bear", "location": "Pine Hollow", "date": "2026-04-03", "observer": "D. Thoreau", "status": "Confirmed" }
+        ]
+      }
+    },
+    {
+      "type": "profile",
+      "data": {
+        "name": "North Ridge Reserve",
+        "subtitle": "Founded in 1987 -- 5,000 hectares",
+        "badge": { "text": "Active", "variant": "success" },
+        "fields": [
+          { "label": "Region", "value": "Highland plateaus" },
+          { "label": "Elevation", "value": "800-2,200m" },
+          { "label": "Habitats", "value": "Forest, Wetland, Alpine" }
+        ],
+        "stats": [
+          { "label": "Species", "value": "347" },
+          { "label": "Observers", "value": "24" },
+          { "label": "Observations", "value": "18.4K" }
+        ]
+      }
+    }
+  ]
+}
+```
+
+This skill uses 6 blocks: 3 stat for KPIs, an area chart for trends, a data table for recent observations, and a profile card for the reserve.
+
+---
+
+## Step 3: Set up the SvelteKit page
+
+Create a new route in your app.
+
+### 3a. Create the directory
+
+```bash
+mkdir -p apps/showcase/src/routes/nature
+```
+
+### 3b. Create the page
+
+Create `apps/showcase/src/routes/nature/+page.svelte`:
+
+```svelte
+<script lang="ts">
+  import { ThemeProvider, BlockRenderer } from '@webmcp-auto-ui/ui';
+  import themeJson from '../../../theme.json';
+  import skillJson from '../../../nature-observatory.skill.json';
+</script>
+
+<ThemeProvider defaultMode="light" overrides={themeJson.tokens}>
+  <div class="min-h-screen bg-bg p-6">
+    <header class="max-w-6xl mx-auto mb-8">
+      <h1 class="text-3xl font-bold text-text1">Nature Observatory</h1>
+      <p class="text-text2 mt-1">Wildlife tracking dashboard -- North Ridge Reserve</p>
+    </header>
+
+    <main class="max-w-6xl mx-auto space-y-6">
+      <!-- KPI: 3 stat blocks side by side -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {#each skillJson.blocks.slice(0, 3) as block}
+          <BlockRenderer type={block.type} data={block.data} />
+        {/each}
+      </div>
+
+      <!-- Chart -->
+      <BlockRenderer
+        type={skillJson.blocks[3].type}
+        data={skillJson.blocks[3].data}
+      />
+
+      <!-- Data table -->
+      <BlockRenderer
+        type={skillJson.blocks[4].type}
+        data={skillJson.blocks[4].data}
+      />
+
+      <!-- Reserve profile card -->
+      <BlockRenderer
+        type={skillJson.blocks[5].type}
+        data={skillJson.blocks[5].data}
+      />
+    </main>
+  </div>
+</ThemeProvider>
+```
+
+### 3c. Start the dev server
+
+```bash
+npm -w apps/showcase run dev
+```
+
+Open `http://localhost:5177/nature` in your browser. The complete dashboard is displayed with the nature theme applied.
+
+---
+
+## Step 4: Add additional components
+
+Add an observation map and an activity timeline. Complete the `blocks` array in the skill JSON:
+
+```json
+{
+  "type": "map",
+  "data": {
+    "title": "Observation locations",
+    "center": { "lat": 35.6, "lng": -83.5 },
+    "zoom": 10,
+    "markers": [
+      { "lat": 35.65, "lng": -83.48, "label": "Red-tailed hawk" },
+      { "lat": 35.58, "lng": -83.52, "label": "River otter" },
+      { "lat": 35.62, "lng": -83.45, "label": "Bald eagle" },
+      { "lat": 35.55, "lng": -83.55, "label": "Black bear" }
+    ]
+  }
+}
+```
+
+```json
+{
+  "type": "timeline",
+  "data": {
+    "title": "Observatory activity",
+    "events": [
+      { "date": "2026-04-05", "title": "Nesting confirmed", "description": "Hawk pair nesting on North Ridge", "status": "active" },
+      { "date": "2026-04-03", "title": "Bear spotted near trail", "description": "Black bear at Pine Hollow, caution advisory issued", "status": "done" },
+      { "date": "2026-03-28", "title": "Migration begins", "description": "First wave of migratory songbirds in wetland area", "status": "done" },
+      { "date": "2026-03-15", "title": "Sensor network updated", "description": "12 new camera traps in the southern sector", "status": "done" }
+    ]
+  }
+}
+```
+
+Then add them to the page layout:
+
+```svelte
+<!-- Map -->
+<BlockRenderer
+  type={skillJson.blocks[6].type}
+  data={skillJson.blocks[6].data}
+/>
+
+<!-- Timeline -->
+<BlockRenderer
+  type={skillJson.blocks[7].type}
+  data={skillJson.blocks[7].data}
+/>
+```
+
+---
+
+## Step 5: Cross-component interactions
+
+Each block rendered via `BlockRenderer` exposes WebMCP tools when `navigator.modelContext` is available:
+- `block_<id>_get` -- read the current block data
+- `block_<id>_update` -- update the data
+- `block_<id>_remove` -- remove the block
+
+To link blocks together manually (without going through the agent), use Svelte reactive state:
+
+```svelte
+<script lang="ts">
+  import { BlockRenderer } from '@webmcp-auto-ui/ui';
+
+  let selectedSpecies = $state('all');
+  let allRows = skillJson.blocks[4].data.rows;
+
+  let tableData = $derived(
+    selectedSpecies === 'all'
+      ? skillJson.blocks[4].data
+      : {
+          ...skillJson.blocks[4].data,
+          rows: allRows.filter(r => r.species === selectedSpecies),
+        }
+  );
+</script>
+
+<!-- Tags block for filtering -->
+<BlockRenderer
+  type="tags"
+  data={{
+    label: "Filter by species",
+    tags: [
+      { text: "All", active: selectedSpecies === 'all' },
+      { text: "Red-tailed hawk", active: selectedSpecies === 'Red-tailed hawk' },
+      { text: "River otter", active: selectedSpecies === 'River otter' },
+      { text: "Bald eagle", active: selectedSpecies === 'Bald eagle' },
+    ]
+  }}
+/>
+
+<!-- Filtered table -->
+<BlockRenderer type="data-table" data={tableData} />
+```
+
+This pattern allows building interactive dashboards where selecting a tag filters the table, clicking a map marker highlights a row, etc.
+
+---
+
+## Step 6: Export as a HyperSkill URL
+
+Once the dashboard is ready, export it as a portable URL that anyone can open.
+
+The SDK re-exports `encode` and `decode` from the [`hyperskills`](https://www.npmjs.com/package/hyperskills) package:
+
+```typescript
+import { encode } from '@webmcp-auto-ui/sdk';
+
+const skill = {
+  version: '1.0',
+  name: 'nature-observatory',
+  description: 'Wildlife tracking dashboard',
+  theme: themeJson.tokens,
+  blocks: skillJson.blocks,
+};
+
+const shareUrl = await encode(
+  'https://demos.hyperskills.net/viewer',
+  JSON.stringify(skill),
+);
+
+console.log(shareUrl);
+// Anyone can open this URL to see the full themed dashboard
+```
+
+### How the URL works
+
+```
+https://demos.hyperskills.net/viewer?hs=eyJ2ZXJzaW9uIjoiMS4wI...
+
+                                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+                                        base64(JSON.stringify(skill))
+                                        or gz.base64(gzip(...)) if > 6 KB
+```
+
+When someone opens the URL:
+1. The Viewer reads the `hs` parameter
+2. Decodes the base64 (decompresses gzip if prefixed with `gz.`)
+3. Parses the skill JSON
+4. `ThemeProvider` applies the embedded theme tokens
+5. `BlockRenderer` renders each block
+
+---
+
+## Step 7: Deploy
+
+Follow the [Deployment](/guide/deploy) tutorial to push your demo to production. For a quick deploy of the showcase app:
+
+```bash
+./scripts/deploy.sh showcase
+```
+
+The script handles package builds, app build, old file cleanup, copying to the correct location, and integrity verification.
+
+---
+
+## Summary
+
+What we built:
+1. A nature color palette in `theme.json`
+2. A skill with 8 blocks (stats, chart, table, profile, map, timeline)
+3. A SvelteKit page with `ThemeProvider` and `BlockRenderer`
+4. Interactive filtering between components
+5. A shareable HyperSkill URL
+6. A production deployment
+
+The same pattern works for any theme and any combination of the 26 available widget types. Change the colors in `theme.json`, swap the blocks, and you get a completely different dashboard.
+
+## See also
+
+- [Getting started with the boilerplate](./boilerplate)
+- [Create a custom widget](./create-custom-widget)
+- [Use existing widgets](./use-existing-widgets)
+- [Deployment](/guide/deploy)

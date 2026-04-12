@@ -1,6 +1,6 @@
 ---
 title: ToolLayers
-description: Structuration des outils en couches McpLayer et UILayer (v0.8)
+description: Structuration des outils en couches McpLayer et WebMcpLayer
 sidebar:
   order: 1
 ---
@@ -13,11 +13,11 @@ Les ToolLayers sont l'API v0.8 qui structure les outils en couches typees. Ils r
 +--------------------------------------------------+
 |                    ToolLayer[]                     |
 |                                                    |
-|  +-- McpLayer (par serveur) ---+  +-- UILayer --+ |
-|  |  tools: MCP tools           |  | component() | |
-|  |  recipes: MCP recipes       |  | adapter?    | |
-|  |  serverName, serverUrl      |  | recipes: UI | |
-|  +-----------------------------+  +-------------+ |
+|  +-- McpLayer (par serveur) ---+  +-- WebMcpLayer ----+ |
+|  |  tools: MCP tools           |  | tools: widget_display | |
+|  |  recipes: MCP recipes       |  | canvas, recall        | |
+|  |  serverName, serverUrl      |  | recipes: UI           | |
+|  +-----------------------------+  +----------------------+ |
 +--------------------------------------------------+
          |                               |
     buildSystemPrompt()          buildToolsFromLayers()
@@ -31,7 +31,7 @@ Un `McpLayer` est cree pour chaque serveur MCP connecte. Il porte les outils DAT
 import type { McpLayer } from '@webmcp-auto-ui/agent';
 
 const mcpLayer: McpLayer = {
-  source: 'mcp',
+  protocol: 'mcp',
   serverUrl: 'https://mcp.code4code.eu/mcp',
   serverName: 'Tricoteuses',
   tools: await client.listTools(),
@@ -46,7 +46,7 @@ const mcpLayer: McpLayer = {
 
 ```ts
 interface McpLayer {
-  source: 'mcp';
+  protocol: 'mcp';
   serverUrl: string;
   serverName?: string;
   tools: McpToolDef[];
@@ -54,42 +54,26 @@ interface McpLayer {
 }
 ```
 
-## UILayer
+## WebMcpLayer (autoui)
 
-Un seul `UILayer` par app. Porte `component()`, le `ComponentAdapter` optionnel, et les recettes WebMCP.
-
-```ts
-import type { UILayer } from '@webmcp-auto-ui/agent';
-import { WEBMCP_RECIPES, filterRecipesByServer } from '@webmcp-auto-ui/agent';
-
-const uiLayer: UILayer = {
-  source: 'ui',
-  recipes: filterRecipesByServer(WEBMCP_RECIPES, ['Tricoteuses']),
-};
-```
-
-### Avec ComponentAdapter (mode explicit)
+Le serveur `autoui` fournit une `WebMcpLayer` pre-configuree avec tous les widgets natifs et les recettes WebMCP.
 
 ```ts
-import { ComponentAdapter, minimalPreset } from '@webmcp-auto-ui/agent';
+import { autoui } from '@webmcp-auto-ui/agent';
 
-const adapter = new ComponentAdapter();
-adapter.registerAll(minimalPreset());
-
-const uiLayer: UILayer = {
-  source: 'ui',
-  adapter,
-  recipes: filterRecipesByServer(WEBMCP_RECIPES, ['Tricoteuses']),
-};
+// autoui.layer() genere une WebMcpLayer prete a l'emploi
+const uiLayer = autoui.layer();
+// { protocol: 'webmcp', serverName: 'autoui', description: '...', tools: [...] }
 ```
 
 ### Interface
 
 ```ts
-interface UILayer {
-  source: 'ui';
-  adapter?: ComponentAdapter;
-  recipes?: Recipe[];
+interface WebMcpLayer {
+  protocol: 'webmcp';
+  serverName: string;
+  description: string;
+  tools: WebMcpToolDef[];
 }
 ```
 
@@ -106,7 +90,7 @@ Genere un prompt structure en sections markdown :
 ```ts
 import { buildSystemPrompt } from '@webmcp-auto-ui/agent';
 
-const prompt = buildSystemPrompt(layers, { toolMode: 'smart' });
+const prompt = buildSystemPrompt(layers);
 ```
 
 Resultat :
@@ -149,9 +133,8 @@ import { runAgentLoop } from '@webmcp-auto-ui/agent';
 const result = await runAgentLoop('Liste les deputes ecologistes', {
   provider,
   layers,
-  toolMode: 'smart',
   callbacks: {
-    onBlock: (type, data) => canvas.addBlock(type, data),
+    onWidget: (type, data) => { canvas.addWidget(type, data); return { id: 'w_1' }; },
   },
 });
 ```
@@ -162,8 +145,8 @@ Plusieurs `McpLayer` peuvent coexister. Les outils sont agreges et le LLM voit t
 
 ```ts
 const layers: ToolLayer[] = [
-  mcpLayer1,  // Tricoteuses -- politique
-  mcpLayer2,  // iNaturalist -- biodiversite
-  uiLayer,    // component() + recettes
+  mcpLayer1,       // Tricoteuses -- politique
+  mcpLayer2,       // iNaturalist -- biodiversite
+  autoui.layer(),  // widgets + recettes
 ];
 ```

@@ -43,7 +43,7 @@ Connexion MCP                  buildSystemPrompt()              Agent loop (LLM)
      |                              |   <- body recette MCP serveur |
      |                              |                               |
      |                              |   8. component("table",{...}) |
-     |                              |   -> onBlock -> Canvas        |
+     |                              |   -> onWidget -> Canvas       |
 ```
 
 ### Etape 1 : Connexion et collecte
@@ -111,7 +111,7 @@ Le LLM voit les noms et descriptions dans le prompt, puis demande le detail uniq
 
 ## Recettes WebMCP (UI)
 
-Les recettes WebMCP guident le LLM sur le choix des composants. Ce sont des fichiers `.md` avec frontmatter YAML, parses au build et injectes dans le prompt via `UILayer.recipes`.
+Les recettes WebMCP guident le LLM sur le choix des composants. Ce sont des fichiers `.md` avec frontmatter YAML, parses au build et injectes dans le prompt via les tool layers.
 
 ### Format
 
@@ -220,7 +220,7 @@ const recipesResult = await client.callTool('list_recipes', {});
 const mcpRecipes: McpRecipe[] = JSON.parse(recipesResult.content[0].text);
 
 const mcpLayer: McpLayer = {
-  source: 'mcp',
+  protocol: 'mcp',
   serverUrl: 'https://mcp.code4code.eu/mcp',
   serverName: 'Tricoteuses',
   tools: await client.listTools(),
@@ -256,7 +256,7 @@ C'est le serveur qui decide du contenu de `body` — workflow, exemples, paramet
 | **Contenu** | Comment presenter avec component() | Ce que les outils retournent, comment les combiner |
 | **Section prompt** | `## webmcp > recettes UI` | `## mcp > recettes serveur` |
 | **Type** | `Recipe` | `McpRecipe` |
-| **Porte par** | `UILayer.recipes` | `McpLayer.recipes` |
+| **Porte par** | `WebMcpLayer` (autoui) | `McpLayer.recipes` |
 | **Lazy loading** | `get_component("id")` ou `component("id")` | `get_recipe(name)` (outil MCP) |
 | **Guide quoi** | Le **View** (comment afficher) | Le **Model/Data** (quoi demander) |
 | **Body dans le prompt** | Non (resumes uniquement) | Non (resumes uniquement) |

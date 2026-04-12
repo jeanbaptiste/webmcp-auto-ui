@@ -1,0 +1,446 @@
+---
+title: "@webmcp-auto-ui/sdk"
+description: "Application SDK: canvas store, HyperSkill encoding, skills registry."
+sidebar:
+  order: 3
+---
+
+The `@webmcp-auto-ui/sdk` package provides application state (canvas store), HyperSkill orchestration, and skills registration.
+
+## Canvas Store
+
+Reactive application state store for managing widgets, mode, MCP connection, and chat history.
+
+### Accessing the Store
+
+```ts
+import { canvas } from '@webmcp-auto-ui/sdk';
+// OR (in Svelte)
+import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+```
+
+### State Getters/Setters
+
+```ts
+// Widgets
+canvas.blocks: Widget[];                      // Read: widget list
+canvas.addWidget(type, data): Widget;         // Add a widget
+canvas.removeBlock(id): void;                 // Remove by ID
+canvas.updateBlock(id, data): void;           // Update data
+canvas.moveBlock(fromId, toId): void;         // Move widget
+canvas.clearBlocks(): void;                   // Clear the canvas
+canvas.setBlocks(widgets): void;              // Replace all
+
+// Mode
+canvas.mode: 'auto' | 'drag' | 'chat';
+canvas.setMode(mode): void;
+
+// LLM
+canvas.llm: 'haiku' | 'sonnet' | 'gemma-e2b' | 'gemma-e4b';
+canvas.setLlm(model): void;
+
+// MCP
+canvas.mcpUrl: string;
+canvas.setMcpUrl(url): void;
+canvas.mcpConnected: boolean;
+canvas.mcpConnecting: boolean;
+canvas.mcpName: string;
+canvas.mcpTools: McpToolInfo[];
+canvas.setMcpConnecting(bool): void;
+canvas.setMcpConnected(connected, name?, tools?): void;
+canvas.setMcpError(error): void;
+
+// Chat
+canvas.messages: ChatMsg[];
+canvas.addMsg(role, content, thinking?): ChatMsg;
+canvas.updateMsg(id, content, thinking?): void;
+canvas.clearMessages(): void;
+
+// Theme
+canvas.themeOverrides: Record<string, string>;
+canvas.setThemeOverrides(overrides): void;
+
+// Metrics
+canvas.blockCount: number;
+canvas.isEmpty: boolean;
+canvas.generating: boolean;
+```
+
+### Svelte Example
+
+```svelte
+<script lang="ts">
+  import { canvas } from '@webmcp-auto-ui/sdk';
+</script>
+
+<!-- Svelte 5 binding -->
+<select bind:value={canvas.llm}>
+  <option value="haiku">Haiku</option>
+  <option value="sonnet">Sonnet</option>
+</select>
+
+<button onclick={() => {
+  canvas.addWidget('stat', {
+    label: 'Sales',
+    value: '1000'
+  })
+}}>Add widget</button>
+
+<div class="widgets">
+  {#each canvas.blocks as widget (widget.id)}
+    <WidgetRenderer type={widget.type} data={widget.data} />
+  {/each}
+</div>
+```
+
+### Reactivity
+
+The store supports two reactivity models:
+
+**1. Svelte 5 (runes):**
+
+```ts
+// canvas.svelte.ts - with $state/$derived
+import { canvas } from '@webmcp-auto-ui/sdk';
+
+let blocks = $derived(canvas.blocks);
+let empty = $derived(canvas.isEmpty);
+```
+
+**2. Framework-agnostic (subscribe):**
+
+```ts
+// canvas.ts - useSyncExternalStore pattern
+const unsubscribe = canvas.subscribe(() => {
+  const snapshot = canvas.getSnapshot();
+  console.log(snapshot.blocks);
+});
+```
+
+## HyperSkill: Encoding/Decoding
+
+The HyperSkill system allows encoding/decoding skill configurations into short, shareable URLs.
+
+### Encode
+
+Serialize a skill into a URL parameter (auto-compression if >6KB).
+
+```ts
+import { encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+
+const skill = {
+  meta: {
+    title: 'My Skill',
+    llm: 'sonnet',
+    mcp: 'http://localhost:3000/mcp',
+  },
+  content: {
+    blocks: [
+      { type: 'stat', data: { label: 'Revenue', value: '$42k' } },
+    ]
+  }
+};
+
+const url = await encodeHyperSkill(skill, sourceUrl);
+// https://example.com?hs=g_qs9K2w... (gzip if >6KB)
+```
+
+**HyperSkill interface:**
+
+```ts
+interface HyperSkill {
+  meta: HyperSkillMeta;
+  content: unknown;  // Arbitrary data (blocks, etc.)
+}
+
+interface HyperSkillMeta {
+  title?: string;
+  description?: string;
+  version?: string;
+  created?: string;
+  mcp?: string;
+  mcpName?: string;
+  llm?: string;
+  tags?: string[];
+  theme?: Record<string, string>;
+  hash?: string;
+  previousHash?: string;
+  chatSummary?: string;
+  provenance?: {
+    mcpServers?: string[];
+    toolsUsed?: string[];
+    toolCallCount?: number;
+    skillsReferenced?: string[];
+    llm?: string;
+    exportedAt?: string;
+  };
+}
+```
+
+### Decode
+
+Parse a HyperSkill URL into a skill object.
+
+```ts
+import { decodeHyperSkill } from '@webmcp-auto-ui/sdk';
+
+const skill = await decodeHyperSkill(urlOrParam);
+// { meta: {...}, content: {...} }
+```
+
+Automatically supports:
+- Gzip compression (`gz.` prefix)
+- Brotli compression (`br.` prefix)
+- Plain Base64
+- `?hs=...` parameter
+
+### Hash & Versioning
+
+Create a hashed version for version control.
+
+```ts
+import { computeHash, createVersion } from '@webmcp-auto-ui/sdk';
+
+const hash = await computeHash(sourceUrl, skillContent);
+// "c7d3e2a1f4..."
+
+const version = await createVersion(skill, sourceUrl, previousHash);
+// { hash, previousHash, timestamp, skill }
+```
+
+### Diff
+
+Compare two skill versions.
+
+```ts
+import { diffSkills } from '@webmcp-auto-ui/sdk';
+
+const changes = await diffSkills(oldSkill, newSkill);
+// { added: [...], modified: [...], removed: [...] }
+```
+
+## Canvas Store x HyperSkill
+
+Direct integration of the canvas store with HyperSkill:
+
+```ts
+import { canvas } from '@webmcp-auto-ui/sdk';
+
+// Export the current configuration
+const skill = canvas.buildSkillJSON();
+// {
+//   version: '1.0',
+//   name: 'skill-...',
+//   created: '2024-01-15T...',
+//   mcp: canvas.mcpUrl,
+//   llm: canvas.llm,
+//   blocks: canvas.blocks.map(b => ({type, data})),
+//   theme: canvas.themeOverrides
+// }
+
+// Generate a short HyperSkill URL
+const param = await canvas.buildHyperskillParam();
+// "g_qs9K2wZqE..." (compressed)
+
+const url = `https://demos.hyperskills.net?hs=${param}`;
+
+// Load from a parameter
+await canvas.loadFromParam(param);
+
+// Or from a full URL
+await canvas.loadFromUrl(url);
+```
+
+## Skills Registry
+
+Manage a collection of skills in localStorage + API.
+
+### Registry API
+
+```ts
+import {
+  createSkill,
+  updateSkill,
+  deleteSkill,
+  getSkill,
+  listSkills,
+  clearSkills,
+  loadSkills,
+  onSkillsChange,
+} from '@webmcp-auto-ui/sdk';
+
+// Types
+interface Skill {
+  id: string;
+  name: string;
+  description?: string;
+  content: any;
+  created: number;
+  updated: number;
+  version?: string;
+  tags?: string[];
+}
+
+interface SkillBlock {
+  type: string;
+  data: Record<string, unknown>;
+}
+
+// CRUD
+const skill = createSkill('my-skill', {
+  description: 'My awesome skill',
+  content: { blocks: [...] },
+});
+
+updateSkill(skill.id, { name: 'New Name' });
+deleteSkill(skill.id);
+const retrieved = getSkill(skill.id);
+const all = listSkills();
+
+// Batch
+await loadSkills(skillObjects);
+clearSkills();
+
+// Reactivity
+onSkillsChange((skills) => {
+  console.log('Skills changed:', skills);
+});
+```
+
+### Example: Auto-Save
+
+```svelte
+<script lang="ts">
+  import { canvas } from '@webmcp-auto-ui/sdk';
+  import { createSkill, updateSkill, listSkills } from '@webmcp-auto-ui/sdk';
+
+  let currentSkillId: string | null = null;
+
+  function autoSave() {
+    const skill = canvas.buildSkillJSON();
+    if (!currentSkillId) {
+      const created = createSkill(`skill_${Date.now()}`, skill);
+      currentSkillId = created.id;
+    } else {
+      updateSkill(currentSkillId, skill);
+    }
+  }
+
+  function loadAll() {
+    return listSkills();
+  }
+
+  // Save every 5s if modified
+  $effect(() => {
+    canvas.blocks; // Dependency
+    const timer = setTimeout(autoSave, 5000);
+    return () => clearTimeout(timer);
+  });
+</script>
+
+<div>
+  <button onclick={autoSave}>Save</button>
+  <button onclick={() => {
+    const skills = loadAll();
+    skills.forEach(s => console.log(s.name));
+  }}>List skills</button>
+</div>
+```
+
+## MCP Demo Servers
+
+List available MCP demo servers.
+
+```ts
+import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
+
+interface McpDemoServer {
+  name: string;
+  description: string;
+  url: string;
+  tools: string[];
+}
+
+MCP_DEMO_SERVERS.forEach(server => {
+  console.log(`${server.name}: ${server.url}`);
+  console.log(`Tools: ${server.tools.join(', ')}`);
+});
+```
+
+## Full Example: Multi-Skills Application
+
+```svelte
+<script lang="ts">
+  import { canvas } from '@webmcp-auto-ui/sdk';
+  import { listSkills, createSkill, getSkill } from '@webmcp-auto-ui/sdk';
+  import { WidgetRenderer, LLMSelector } from '@webmcp-auto-ui/ui';
+
+  let skills = listSkills();
+  let selectedSkillId: string | null = null;
+
+  async function selectSkill(id: string) {
+    selectedSkillId = id;
+    const skill = getSkill(id);
+    if (skill?.content?.blocks) {
+      canvas.setBlocks(skill.content.blocks);
+    }
+    if (skill?.content?.llm) {
+      canvas.llm = skill.content.llm;
+    }
+  }
+
+  function saveAsNew() {
+    const skill = canvas.buildSkillJSON();
+    const created = createSkill(
+      `skill_${Date.now()}`,
+      skill
+    );
+    skills = listSkills();
+    selectedSkillId = created.id;
+  }
+</script>
+
+<div class="flex h-screen">
+  <!-- Sidebar: Skills list -->
+  <aside class="w-64 p-4 bg-gray-100">
+    <h2 class="font-bold mb-4">Skills</h2>
+    <ul>
+      {#each skills as skill (skill.id)}
+        <li class="mb-2">
+          <button
+            class:selected={selectedSkillId === skill.id}
+            onclick={() => selectSkill(skill.id)}
+          >
+            {skill.name}
+          </button>
+        </li>
+      {/each}
+    </ul>
+    <button onclick={saveAsNew}>New skill</button>
+  </aside>
+
+  <!-- Main: Canvas + Controls -->
+  <main class="flex-1 flex flex-col">
+    <div class="p-4 border-b flex gap-4">
+      <LLMSelector bind:value={canvas.llm} />
+    </div>
+    <div class="flex-1 p-4 overflow-auto">
+      <div class="grid grid-cols-2 gap-4">
+        {#each canvas.blocks as widget (widget.id)}
+          <WidgetRenderer
+            id={widget.id}
+            type={widget.type}
+            data={widget.data}
+          />
+        {/each}
+      </div>
+    </div>
+  </main>
+</div>
+
+<style>
+  button.selected {
+    @apply bg-blue-500 text-white;
+  }
+</style>
+```

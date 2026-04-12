@@ -19,8 +19,8 @@ The script knows the correct paths and configurations for each app.
 - **User**: `webmcp` (non-root)
 - **Base**: `/opt/webmcp-demos/`
 - **Ports**: 
-  - `3000`: flex (Node.js)
-  - `3001`–`3010`: reserved for future Node apps
+  - `3007`: flex2 (Node.js)
+  - `3008`–`3012`: viewer2, recipes, showcase2, boilerplate, multi-svelte
   - `80` / `443`: nginx (reverse proxy)
 
 ## Applications and Their Paths
@@ -29,13 +29,13 @@ The script knows the correct paths and configurations for each app.
 graph TB
     Repo["Local Repo\n(monorepo)"] -->|./scripts/deploy.sh| Script["Deploy script"]
     
-    Script -->|pnpm build| Build["Build artifacts"]
+    Script -->|npm build| Build["Build artifacts"]
     
-    Build -->|Flex\n(Node.js)| FD["flex/\nindex.js"]
-    FD -->|deploy to| FP["/opt/webmcp-demos/flex/\nindex.js"]
+    Build -->|Flex2\n(Node.js)| FD["flex2/build/\nindex.js"]
+    FD -->|deploy to| FP["/opt/webmcp-demos/flex2/\nindex.js"]
     
-    Build -->|Viewer\n(static)| VD["dist/\nbuild/"]
-    VD -->|deploy to| VP["/opt/webmcp-demos/viewer/\nbuild/"]
+    Build -->|Viewer2\n(Node.js)| VD["viewer2/build/"]
+    VD -->|deploy to| VP["/opt/webmcp-demos/viewer2/"]
     
     Build -->|Home\n(static)| HD["dist/"]
     HD -->|deploy to| HP["/opt/webmcp-demos/home/"]
@@ -48,12 +48,14 @@ graph TB
 
 | App | Type | Build dir | Deploy dest | ExecStart systemd | Notes |
 |-----|------|-----------|-------------|------------------|-------|
-| **flex** | Node.js (SvelteKit) | `flex/.build/` | `/opt/webmcp-demos/flex/` | `node index.js` | Port 3000 |
-| **viewer** | Static (SvelteKit) | `viewer/build/` | `/opt/webmcp-demos/viewer/build/` | N/A (nginx) | HyperSkills viewer |
-| **home** | Static (Astro) | `home/dist/` | `/opt/webmcp-demos/home/` | N/A (nginx) | Homepage + docs |
-| **todo** | Static (Svelte) | `todo/build/` | `/opt/webmcp-demos/todo/` | N/A (nginx) | Todo demo |
-| **showcase** | Static (Svelte) | `showcase/build/` | `/opt/webmcp-demos/showcase/` | N/A (nginx) | Widget gallery |
-| **multi-svelte** | Static (Svelte) | `multi/build/` | `/opt/webmcp-demos/multi-svelte/` | N/A (nginx) | Multi-tab app |
+| **flex2** | Node.js (SvelteKit) | `flex2/build/` | `/opt/webmcp-demos/flex2/` | `node index.js` | Main composer |
+| **viewer2** | Node.js (SvelteKit) | `viewer2/build/` | `/opt/webmcp-demos/viewer2/` | `node index.js` | HyperSkills viewer |
+| **showcase2** | Node.js (SvelteKit) | `showcase2/build/` | `/opt/webmcp-demos/showcase2/` | `node index.js` | Widget gallery |
+| **recipes** | Node.js (SvelteKit) | `recipes/build/` | `/opt/webmcp-demos/recipes/` | `node index.js` | Recipe explorer |
+| **home** | Static (Svelte) | `home/dist/` | `/opt/webmcp-demos/home/` | N/A (nginx) | Homepage |
+| **todo2** | Static (Svelte) | `todo2/build/` | `/opt/webmcp-demos/todo2/` | N/A (nginx) | Todo demo |
+| **boilerplate** | Node.js (SvelteKit) | `boilerplate/build/` | `/opt/webmcp-demos/boilerplate/` | `node index.js` | Starter template |
+| **multi-svelte** | Node.js (SvelteKit) | `multi-svelte/build/` | `/opt/webmcp-demos/multi-svelte/` | `node index.js` | Multi-tab app |
 
 ## Deployment
 
@@ -61,7 +63,7 @@ graph TB
 
 ```bash
 # At monorepo root
-pnpm build
+npm run build
 ```
 
 This builds all apps in parallel.
@@ -83,9 +85,9 @@ This builds all apps in parallel.
 ```bash
 ssh bot
 
-# For flex (Node.js)
+# For flex2 (Node.js)
 ps aux | grep "node index.js"
-curl http://localhost:3000
+curl http://localhost:3007
 
 # For nginx (static apps)
 sudo systemctl status nginx
@@ -109,35 +111,26 @@ curl http://localhost/home/
 ### Script Structure
 
 ```bash
-# Configuration per app
-declare -A APPS=(
-  [flex]="apps/flex/.svelte-kit:index.js"
-  [viewer]="apps/viewer/build:static"
-  [home]="apps/home/dist:static"
-  [todo]="apps/todo/build:static"
-  [showcase]="apps/showcase/build:static"
-  [multi-svelte]="apps/multi/build:static"
-)
+# Valid apps: home, flex2, viewer2, showcase2, todo2, recipes, multi-svelte, boilerplate
 
-# For each app: build → clean → rsync → restart
-for app in "${!APPS[@]}"; do
-  src=$(echo ${APPS[$app]} | cut -d: -f1)
-  type=$(echo ${APPS[$app]} | cut -d: -f2)
-  
-  # Clean before copy (avoid orphaned JS chunks)
-  ssh bot "rm -rf /opt/webmcp-demos/$app/*"
-  
-  # Copy artifacts
-  rsync -avz --delete "$src/" "webmcp@demo.hyperskills.net:/opt/webmcp-demos/$app/"
-  
-  # Restart if Node.js
-  if [ "$type" = "node" ]; then
-    ssh bot "systemctl restart webmcp-$app"
-  fi
-done
-
-# nginx reload (for static apps)
-ssh bot "systemctl reload nginx"
+# For each app: build → clean → scp → restart
+deploy_app() {
+  local app=$1
+  case "$app" in
+    flex2|viewer2|recipes|showcase2|multi-svelte|boilerplate)
+      # Node.js: build + scp build/ → root + restart systemd
+      (cd apps/$app && npm run build)
+      ssh bot "cd /opt/webmcp-demos/$app && rm -f index.js handler.js"
+      scp -r apps/$app/build/* bot:/opt/webmcp-demos/$app/
+      ssh bot "systemctl restart webmcp-$app"
+      ;;
+    home|todo2)
+      # Static: build + scp dist/ → root
+      (cd apps/$app && npm run build)
+      scp -r apps/$app/dist/* bot:/opt/webmcp-demos/$app/
+      ;;
+  esac
+}
 ```
 
 ## Environment Variables (production)
@@ -147,7 +140,7 @@ ssh bot "systemctl reload nginx"
 `.env.production` files must exist **before deployment**:
 
 ```bash
-# /opt/webmcp-demos/flex/.env
+# /opt/webmcp-demos/flex2/.env
 NODE_ENV=production
 ANTHROPIC_API_KEY=sk-ant-...
 LOG_LEVEL=info
@@ -168,14 +161,14 @@ PUBLIC_GA_ID=G-XXXXXX
 export PUBLIC_BASE_URL=https://demos.hyperskills.net
 
 # Then build
-pnpm build
+npm run build
 ```
 
 The script **assumes** it's already defined globally. If missing locally:
 
 ```bash
 # Fallback
-PUBLIC_BASE_URL=https://demos.hyperskills.net pnpm build
+PUBLIC_BASE_URL=https://demos.hyperskills.net npm run build
 ```
 
 ## Networking (nginx)
@@ -185,9 +178,9 @@ PUBLIC_BASE_URL=https://demos.hyperskills.net pnpm build
 ```nginx
 # /etc/nginx/sites-available/default
 
-# Flex (Node.js → port 3000)
-location /flex/ {
-  proxy_pass http://localhost:3000/;
+# Flex2 (Node.js → port 3007)
+location /flex2/ {
+  proxy_pass http://localhost:3007/;
 }
 
 # Static apps → serve from /opt/webmcp-demos/
@@ -219,7 +212,7 @@ git log --oneline | head -20
 git checkout <commit_before>
 
 # Rebuild + redeploy
-pnpm build
+npm run build
 ./scripts/deploy.sh
 ```
 
@@ -233,10 +226,10 @@ pnpm build
 ssh bot
 
 # Journalctl (systemd)
-journalctl -u webmcp-flex -f
+journalctl -u webmcp-flex2 -f
 
 # Application logs (if stdout captured)
-tail -f /var/log/webmcp-flex.log
+tail -f /var/log/webmcp-flex2.log
 ```
 
 ### Health Checks
@@ -245,14 +238,14 @@ tail -f /var/log/webmcp-flex.log
 # All services
 curl http://demo.hyperskills.net/
 curl http://demo.hyperskills.net/home/
-curl http://demo.hyperskills.net/flex/
+curl http://demo.hyperskills.net/flex2/
 curl http://demo.hyperskills.net/viewer/
 
 # nginx status
 ssh bot "sudo systemctl status nginx"
 
 # flex status
-ssh bot "sudo systemctl status webmcp-flex"
+ssh bot "sudo systemctl status webmcp-flex2"
 ```
 
 ### Disk & Memory
@@ -273,7 +266,7 @@ free -h
 ```bash
 ssh bot
 rm -rf /opt/webmcp-demos/{app}/*.js /opt/webmcp-demos/{app}/*.map
-systemctl restart nginx  # or restart webmcp-flex
+systemctl restart nginx  # or restart webmcp-flex2
 ```
 
 ### `.env` missing after deploy
@@ -283,11 +276,11 @@ systemctl restart nginx  # or restart webmcp-flex
 **Solution**: Recreate manually on server
 ```bash
 ssh bot
-cat > /opt/webmcp-demos/flex/.env << EOF
+cat > /opt/webmcp-demos/flex2/.env << EOF
 NODE_ENV=production
 ANTHROPIC_API_KEY=sk-ant-...
 EOF
-systemctl restart webmcp-flex
+systemctl restart webmcp-flex2
 ```
 
 ### nginx returns 404
@@ -326,7 +319,7 @@ grep -A 5 "location /home/" /etc/nginx/sites-available/default
 
 ```bash
 ssh bot
-sudo systemctl restart webmcp-flex nginx
+sudo systemctl restart webmcp-flex2 nginx
 ```
 
 ### Clean old logs
@@ -340,8 +333,8 @@ journalctl --vacuum-time=7d  # Keep 7 days
 
 ```bash
 # Locally
-pnpm update
-pnpm build
+npm update
+npm run build
 
 # Deploy
 ./scripts/deploy.sh

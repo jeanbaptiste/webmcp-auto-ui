@@ -40,7 +40,7 @@ Retourne le schema JSON detaille, la description et la renderability d'un compos
 component("stat-card", { label: "Revenue", value: "$142K" })
 ```
 
-Rend le composant sur le canvas via le callback `onBlock`. Appeler `get_component(nom)` d'abord pour connaitre les parametres attendus.
+Rend le composant sur le canvas via le callback `onWidget`. Appeler `get_component(nom)` d'abord pour connaitre les parametres attendus.
 
 ## Noms de composants
 
@@ -100,7 +100,7 @@ Composants Svelte (primitives, base UI, layouts, agent UI, theme). Retournent le
 ## API
 
 ```ts
-import { COMPONENT_TOOL, executeComponent, componentRegistry } from '@webmcp-auto-ui/agent';
+import { autoui, NATIVE_WIDGET_NAMES } from '@webmcp-auto-ui/agent';
 ```
 
 ### Enregistrer un composant custom
@@ -115,22 +115,15 @@ componentRegistry.set('my-widget', {
 });
 ```
 
-## ComponentAdapter
+## Serveur autoui
 
-Filtre les composants exposes au LLM en mode explicit. Presets disponibles :
+Le serveur `autoui` pre-enregistre tous les widgets natifs. Utiliser `autoui.layer()` pour obtenir une WebMcpLayer :
 
 ```ts
-import { ComponentAdapter, minimalPreset, nativePreset, allNativePreset } from '@webmcp-auto-ui/agent';
+import { autoui } from '@webmcp-auto-ui/agent';
 
-// Minimal : stat, kv, chart, table, text + clear, update
-const adapter = new ComponentAdapter();
-adapter.registerAll(minimalPreset());
-
-// Par groupes
-adapter.registerAll(nativePreset('simple', 'rich', 'canvas'));
-
-// Complet
-adapter.registerAll(allNativePreset());
+const layer = autoui.layer();
+// { protocol: 'webmcp', serverName: 'autoui', tools: [...] }
 ```
 
 ### Groupes
@@ -146,11 +139,9 @@ adapter.registerAll(allNativePreset());
 ## Flux complet
 
 ```
-1. App cree UILayer avec ou sans ComponentAdapter
-2. buildToolsFromLayers() genere les AnthropicTool[]
-3. LLM recoit list_components(), get_component(), component() (mode smart)
-4. LLM appelle list_components() -> decouverte
-5. LLM appelle get_component("stat-card") -> schema detaille
-6. LLM appelle component("stat-card", {label, value}) -> rendu
-7. onBlock callback -> canvas affiche le bloc
+1. App ajoute autoui.layer() aux layers
+2. buildToolsFromLayers() genere les ProviderTool[]
+3. LLM recoit les outils de decouverte (search_recipes, list_recipes, etc.)
+4. LLM appelle widget_display("stat-card", {label, value}) -> rendu
+5. onWidget callback -> canvas affiche le widget
 ```
