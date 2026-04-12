@@ -134,7 +134,7 @@ deploy_node_build() {
 deploy_static() {
   local app=$1
   local env_prefix=""
-  if [ "$app" = "home" ] || [ "$app" = "todo2" ]; then
+  if [ "$app" = "home" ] || [ "$app" = "todo2" ] || [ "$app" = "boilerplate" ]; then
     env_prefix="PUBLIC_BASE_URL=https://demos.hyperskills.net "
   fi
   if [ "$DRY_RUN" = "1" ]; then
@@ -224,10 +224,11 @@ deploy_app() {
     recipes)             deploy_node_root "recipes" ;;
     home)                deploy_static "home" ;;
     todo2)               deploy_static "todo2" ;;
+    boilerplate)         deploy_static "boilerplate" ;;
     showcase2)           deploy_node_root "showcase2" ;;
     multi-svelte)        deploy_node_root "multi-svelte" ;;
     *)
-      echo "  [$app] ✗ unknown app (valid: home, flex2, viewer2, showcase2, todo2, recipes, multi-svelte)"
+      echo "  [$app] ✗ unknown app (valid: home, flex2, viewer2, showcase2, todo2, recipes, multi-svelte, boilerplate)"
       return 1
       ;;
   esac
@@ -239,7 +240,7 @@ echo "webmcp-auto-ui deploy"
 echo ""
 
 if [ $# -eq 0 ]; then
-  APPS="home flex2 viewer2 showcase2 todo2 recipes multi-svelte"
+  APPS="home flex2 viewer2 showcase2 todo2 recipes multi-svelte boilerplate"
 else
   APPS="$*"
 fi
