@@ -1,15 +1,37 @@
 ---
 widget: rough-grouped-bar
-name: Grouped Bar Chart
 description: Side-by-side bars comparing multiple series across categories
-data:
-  labels: ["Jan", "Feb", "Mar", "Apr"]
-  series:
-    - name: "Product A"
-      values: [30, 45, 60, 40]
-    - name: "Product B"
-      values: [50, 35, 70, 55]
-  title: "Monthly Sales Comparison"
+schema:
+  type: object
+  required:
+    - labels
+    - series
+  properties:
+    labels:
+      type: array
+      items:
+        type: string
+      description: Category names
+    series:
+      type: array
+      items:
+        type: object
+        required:
+          - name
+          - values
+        properties:
+          name:
+            type: string
+            description: Series name
+          values:
+            type: array
+            items:
+              type: number
+            description: Values for each category
+      description: Data series to compare
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Grouped Bar Chart

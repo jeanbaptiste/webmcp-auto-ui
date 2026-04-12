@@ -1,11 +1,25 @@
 ---
 widget: rough-line-chart
-name: Line Chart
 description: Single line chart showing trend over time
-data:
-  labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-  values: [12, 19, 15, 25, 22, 30, 28]
-  title: "Weekly Visitors"
+schema:
+  type: object
+  required:
+    - labels
+    - values
+  properties:
+    labels:
+      type: array
+      items:
+        type: string
+      description: X-axis labels (e.g. dates, categories)
+    values:
+      type: array
+      items:
+        type: number
+      description: Numeric values for each point
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Line Chart

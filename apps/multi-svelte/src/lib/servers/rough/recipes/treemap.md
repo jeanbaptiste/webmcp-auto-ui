@@ -1,15 +1,29 @@
 ---
 widget: rough-treemap
-name: Treemap
 description: Nested rectangles representing hierarchical data by area
-data:
-  items:
-    - { label: "JavaScript", value: 40 }
-    - { label: "Python", value: 30 }
-    - { label: "TypeScript", value: 20 }
-    - { label: "Rust", value: 10 }
-    - { label: "Go", value: 8 }
-  title: "Language Popularity"
+schema:
+  type: object
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      items:
+        type: object
+        required:
+          - label
+          - value
+        properties:
+          label:
+            type: string
+            description: Item name
+          value:
+            type: number
+            description: Numeric value (determines area)
+      description: Items sized by value
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Treemap

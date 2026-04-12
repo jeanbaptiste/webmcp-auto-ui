@@ -1,20 +1,35 @@
 ---
 widget: rough-tree-diagram
-name: Tree Diagram
 description: Hierarchical tree with parent-child node connections
-data:
-  root:
-    label: "CEO"
-    children:
-      - label: "CTO"
+schema:
+  type: object
+  required:
+    - root
+  properties:
+    root:
+      type: object
+      required:
+        - label
+      properties:
+        label:
+          type: string
+          description: Node label
         children:
-          - { label: "Dev Lead" }
-          - { label: "QA Lead" }
-      - label: "CFO"
-        children:
-          - { label: "Accounting" }
-      - label: "CMO"
-  title: "Org Chart"
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              children:
+                type: array
+                items:
+                  type: object
+          description: Child nodes (recursive structure)
+      description: Root node of the tree hierarchy
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Tree Diagram

@@ -1,14 +1,32 @@
 ---
 widget: rough-timeline
-name: Timeline
 description: Vertical timeline of events with dates and descriptions
-data:
-  events:
-    - { date: "2024-01", label: "Founded", description: "Company incorporated" }
-    - { date: "2024-06", label: "Seed Round", description: "$2M raised" }
-    - { date: "2025-01", label: "Launch", description: "Public beta released" }
-    - { date: "2025-09", label: "Series A", description: "$15M raised" }
-  title: "Company Milestones"
+schema:
+  type: object
+  required:
+    - events
+  properties:
+    events:
+      type: array
+      items:
+        type: object
+        required:
+          - date
+          - label
+        properties:
+          date:
+            type: string
+            description: Date or period label
+          label:
+            type: string
+            description: Event name
+          description:
+            type: string
+            description: Optional event details
+      description: Timeline events in chronological order
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Timeline

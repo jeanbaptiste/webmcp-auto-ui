@@ -1,15 +1,32 @@
 ---
 widget: rough-scatter-plot
-name: Scatter Plot
 description: XY scatter plot showing relationships between variables
-data:
-  points:
-    - { x: 10, y: 20, label: "A" }
-    - { x: 30, y: 45, label: "B" }
-    - { x: 50, y: 35, label: "C" }
-    - { x: 70, y: 60, label: "D" }
-    - { x: 90, y: 80, label: "E" }
-  title: "Correlation Study"
+schema:
+  type: object
+  required:
+    - points
+  properties:
+    points:
+      type: array
+      items:
+        type: object
+        required:
+          - x
+          - "y"
+        properties:
+          x:
+            type: number
+            description: X coordinate
+          "y":
+            type: number
+            description: Y coordinate
+          label:
+            type: string
+            description: Optional point label
+      description: Data points to plot
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Scatter Plot

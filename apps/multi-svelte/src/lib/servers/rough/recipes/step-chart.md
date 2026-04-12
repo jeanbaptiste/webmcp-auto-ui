@@ -1,11 +1,25 @@
 ---
 widget: rough-step-chart
-name: Step Chart
 description: Line chart with step transitions instead of diagonal lines
-data:
-  labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
-  values: [10, 10, 25, 25, 40, 35]
-  title: "Pricing Tiers"
+schema:
+  type: object
+  required:
+    - labels
+    - values
+  properties:
+    labels:
+      type: array
+      items:
+        type: string
+      description: X-axis labels
+    values:
+      type: array
+      items:
+        type: number
+      description: Numeric values for each step
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Step Chart

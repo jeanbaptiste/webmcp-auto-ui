@@ -1,14 +1,32 @@
 ---
 widget: rough-progress-bar
-name: Progress Bar
 description: Horizontal progress bars showing completion percentage
-data:
-  items:
-    - { label: "Backend", value: 85, max: 100 }
-    - { label: "Frontend", value: 60, max: 100 }
-    - { label: "Testing", value: 30, max: 100 }
-    - { label: "Docs", value: 45, max: 100 }
-  title: "Sprint Progress"
+schema:
+  type: object
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      items:
+        type: object
+        required:
+          - label
+          - value
+        properties:
+          label:
+            type: string
+            description: Progress item name
+          value:
+            type: number
+            description: Current value
+          max:
+            type: number
+            description: Maximum value (defaults to 100)
+      description: Progress items to display
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Progress Bar

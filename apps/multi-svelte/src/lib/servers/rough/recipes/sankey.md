@@ -1,18 +1,39 @@
 ---
 widget: rough-sankey
-name: Sankey Diagram
 description: Flow diagram showing quantities between nodes
-data:
-  nodes: ["Budget", "Marketing", "Engineering", "Sales", "Ads", "Events", "Backend", "Frontend"]
-  links:
-    - { source: 0, target: 1, value: 40 }
-    - { source: 0, target: 2, value: 50 }
-    - { source: 0, target: 3, value: 30 }
-    - { source: 1, target: 4, value: 25 }
-    - { source: 1, target: 5, value: 15 }
-    - { source: 2, target: 6, value: 30 }
-    - { source: 2, target: 7, value: 20 }
-  title: "Budget Allocation"
+schema:
+  type: object
+  required:
+    - nodes
+    - links
+  properties:
+    nodes:
+      type: array
+      items:
+        type: string
+      description: Node names
+    links:
+      type: array
+      items:
+        type: object
+        required:
+          - source
+          - target
+          - value
+        properties:
+          source:
+            type: number
+            description: Source node index
+          target:
+            type: number
+            description: Target node index
+          value:
+            type: number
+            description: Flow quantity
+      description: Weighted links between nodes
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Sankey Diagram

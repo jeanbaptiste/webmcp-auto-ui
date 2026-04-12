@@ -1,17 +1,37 @@
 ---
 widget: rough-stacked-bar
-name: Stacked Bar Chart
 description: Stacked bars showing composition of each category
-data:
-  labels: ["2021", "2022", "2023"]
-  series:
-    - name: "Web"
-      values: [40, 55, 70]
-    - name: "Mobile"
-      values: [30, 45, 50]
-    - name: "Desktop"
-      values: [20, 15, 10]
-  title: "Revenue by Platform"
+schema:
+  type: object
+  required:
+    - labels
+    - series
+  properties:
+    labels:
+      type: array
+      items:
+        type: string
+      description: Category names
+    series:
+      type: array
+      items:
+        type: object
+        required:
+          - name
+          - values
+        properties:
+          name:
+            type: string
+            description: Series name
+          values:
+            type: array
+            items:
+              type: number
+            description: Values for each category
+      description: Stacked data series
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Stacked Bar Chart

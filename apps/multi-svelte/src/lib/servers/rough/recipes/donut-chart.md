@@ -1,11 +1,25 @@
 ---
 widget: rough-donut-chart
-name: Donut Chart
 description: Pie chart with hollow center showing total
-data:
-  labels: ["Rent", "Food", "Transport", "Entertainment"]
-  values: [1200, 400, 200, 150]
-  title: "Monthly Budget"
+schema:
+  type: object
+  required:
+    - labels
+    - values
+  properties:
+    labels:
+      type: array
+      items:
+        type: string
+      description: Segment labels
+    values:
+      type: array
+      items:
+        type: number
+      description: Numeric values for each segment
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Donut Chart

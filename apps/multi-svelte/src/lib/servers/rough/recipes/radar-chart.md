@@ -1,12 +1,28 @@
 ---
 widget: rough-radar-chart
-name: Radar Chart
 description: Spider/radar chart showing multivariate data on radial axes
-data:
-  labels: ["Speed", "Power", "Range", "Durability", "Accuracy"]
-  values: [8, 6, 9, 4, 7]
-  max: 10
-  title: "Character Stats"
+schema:
+  type: object
+  required:
+    - labels
+    - values
+  properties:
+    labels:
+      type: array
+      items:
+        type: string
+      description: Axis names
+    values:
+      type: array
+      items:
+        type: number
+      description: Values per axis
+    max:
+      type: number
+      description: Maximum scale value (defaults to max of values)
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Radar Chart

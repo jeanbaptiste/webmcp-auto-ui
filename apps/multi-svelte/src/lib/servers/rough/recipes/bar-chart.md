@@ -1,11 +1,30 @@
 ---
 widget: rough-bar-chart
-name: Bar Chart
 description: Vertical bar chart with sketchy hand-drawn style
-data:
-  labels: ["Q1", "Q2", "Q3", "Q4"]
-  values: [120, 200, 150, 280]
-  title: "Quarterly Revenue"
+schema:
+  type: object
+  required:
+    - labels
+    - values
+  properties:
+    labels:
+      type: array
+      items:
+        type: string
+      description: Category labels for each bar
+    values:
+      type: array
+      items:
+        type: number
+      description: Numeric values for each bar
+    title:
+      type: string
+      description: Chart title
+    colors:
+      type: array
+      items:
+        type: string
+      description: Custom color palette (hex)
 ---
 
 ## Bar Chart

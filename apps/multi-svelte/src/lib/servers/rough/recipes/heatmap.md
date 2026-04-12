@@ -1,17 +1,33 @@
 ---
 widget: rough-heatmap
-name: Heatmap
 description: Matrix of colored cells representing value intensity
-data:
-  rows: ["Mon", "Tue", "Wed", "Thu", "Fri"]
-  cols: ["9am", "12pm", "3pm", "6pm"]
-  values:
-    - [2, 5, 8, 3]
-    - [4, 7, 6, 2]
-    - [1, 9, 5, 4]
-    - [6, 3, 7, 8]
-    - [3, 4, 2, 9]
-  title: "Activity Heatmap"
+schema:
+  type: object
+  required:
+    - rows
+    - cols
+    - values
+  properties:
+    rows:
+      type: array
+      items:
+        type: string
+      description: Row labels
+    cols:
+      type: array
+      items:
+        type: string
+      description: Column labels
+    values:
+      type: array
+      items:
+        type: array
+        items:
+          type: number
+      description: 2D array of numbers (rows x cols)
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Heatmap

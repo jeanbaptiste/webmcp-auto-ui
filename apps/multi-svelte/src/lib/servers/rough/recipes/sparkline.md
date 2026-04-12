@@ -1,9 +1,16 @@
 ---
 widget: rough-sparkline
-name: Sparkline
 description: Tiny inline chart showing trend at a glance
-data:
-  values: [5, 8, 3, 12, 7, 10, 15, 9, 11, 14]
+schema:
+  type: object
+  required:
+    - values
+  properties:
+    values:
+      type: array
+      items:
+        type: number
+      description: Numeric data points for the sparkline
 ---
 
 ## Sparkline

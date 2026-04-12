@@ -1,11 +1,25 @@
 ---
 widget: rough-pie-chart
-name: Pie Chart
 description: Circular chart showing proportions of a whole
-data:
-  labels: ["Desktop", "Mobile", "Tablet"]
-  values: [55, 35, 10]
-  title: "Device Usage"
+schema:
+  type: object
+  required:
+    - labels
+    - values
+  properties:
+    labels:
+      type: array
+      items:
+        type: string
+      description: Slice labels
+    values:
+      type: array
+      items:
+        type: number
+      description: Numeric values (proportions)
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Pie Chart

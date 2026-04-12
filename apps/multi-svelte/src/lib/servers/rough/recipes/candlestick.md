@@ -1,15 +1,40 @@
 ---
 widget: rough-candlestick
-name: Candlestick Chart
 description: Financial OHLC candlestick chart
-data:
-  candles:
-    - { date: "Mon", open: 100, high: 115, low: 95, close: 110 }
-    - { date: "Tue", open: 110, high: 120, low: 105, close: 108 }
-    - { date: "Wed", open: 108, high: 125, low: 100, close: 122 }
-    - { date: "Thu", open: 122, high: 130, low: 118, close: 119 }
-    - { date: "Fri", open: 119, high: 128, low: 112, close: 126 }
-  title: "Stock Price"
+schema:
+  type: object
+  required:
+    - candles
+  properties:
+    candles:
+      type: array
+      items:
+        type: object
+        required:
+          - open
+          - high
+          - low
+          - close
+        properties:
+          date:
+            type: string
+            description: Period label (e.g. day name or date)
+          open:
+            type: number
+            description: Opening price
+          high:
+            type: number
+            description: Highest price
+          low:
+            type: number
+            description: Lowest price
+          close:
+            type: number
+            description: Closing price
+      description: OHLC candle data per period
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Candlestick Chart

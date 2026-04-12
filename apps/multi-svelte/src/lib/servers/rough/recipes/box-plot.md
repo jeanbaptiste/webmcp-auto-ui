@@ -1,13 +1,45 @@
 ---
 widget: rough-box-plot
-name: Box Plot
 description: Statistical distribution showing median, quartiles, and range
-data:
-  groups:
-    - { label: "Team A", min: 10, q1: 25, median: 40, q3: 55, max: 70 }
-    - { label: "Team B", min: 20, q1: 35, median: 50, q3: 65, max: 80 }
-    - { label: "Team C", min: 5, q1: 15, median: 30, q3: 45, max: 60 }
-  title: "Performance Distribution"
+schema:
+  type: object
+  required:
+    - groups
+  properties:
+    groups:
+      type: array
+      items:
+        type: object
+        required:
+          - label
+          - min
+          - q1
+          - median
+          - q3
+          - max
+        properties:
+          label:
+            type: string
+            description: Group name
+          min:
+            type: number
+            description: Minimum value
+          q1:
+            type: number
+            description: First quartile
+          median:
+            type: number
+            description: Median value
+          q3:
+            type: number
+            description: Third quartile
+          max:
+            type: number
+            description: Maximum value
+      description: Statistical groups with box plot data
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Box Plot

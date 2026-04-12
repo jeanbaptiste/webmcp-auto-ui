@@ -1,15 +1,27 @@
 ---
 widget: rough-chord-diagram
-name: Chord Diagram
 description: Circular diagram showing flows between groups
-data:
-  labels: ["A", "B", "C", "D"]
-  matrix:
-    - [0, 10, 5, 3]
-    - [10, 0, 8, 2]
-    - [5, 8, 0, 6]
-    - [3, 2, 6, 0]
-  title: "Inter-department Flow"
+schema:
+  type: object
+  required:
+    - labels
+    - matrix
+  properties:
+    labels:
+      type: array
+      items:
+        type: string
+      description: Group names
+    matrix:
+      type: array
+      items:
+        type: array
+        items:
+          type: number
+      description: NxN adjacency matrix of flow values
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Chord Diagram

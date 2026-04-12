@@ -1,15 +1,33 @@
 ---
 widget: rough-gantt
-name: Gantt Chart
 description: Horizontal bars showing task schedules and durations
-data:
-  tasks:
-    - { name: "Research", start: 0, end: 3 }
-    - { name: "Design", start: 2, end: 5 }
-    - { name: "Development", start: 4, end: 9 }
-    - { name: "Testing", start: 8, end: 11 }
-    - { name: "Launch", start: 11, end: 12 }
-  title: "Project Timeline"
+schema:
+  type: object
+  required:
+    - tasks
+  properties:
+    tasks:
+      type: array
+      items:
+        type: object
+        required:
+          - name
+          - start
+          - end
+        properties:
+          name:
+            type: string
+            description: Task name
+          start:
+            type: number
+            description: Start position (numeric scale)
+          end:
+            type: number
+            description: End position (numeric scale)
+      description: Task items with duration
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Gantt Chart

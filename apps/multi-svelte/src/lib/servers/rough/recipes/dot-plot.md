@@ -1,15 +1,29 @@
 ---
 widget: rough-dot-plot
-name: Dot Plot
 description: Horizontal dot plot comparing values across categories
-data:
-  items:
-    - { label: "Marketing", value: 85 }
-    - { label: "Engineering", value: 92 }
-    - { label: "Sales", value: 78 }
-    - { label: "Support", value: 88 }
-    - { label: "Design", value: 95 }
-  title: "Team Satisfaction"
+schema:
+  type: object
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      items:
+        type: object
+        required:
+          - label
+          - value
+        properties:
+          label:
+            type: string
+            description: Category name
+          value:
+            type: number
+            description: Numeric value
+      description: Data points to plot
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Dot Plot

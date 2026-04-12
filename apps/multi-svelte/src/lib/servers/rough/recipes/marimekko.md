@@ -1,25 +1,45 @@
 ---
 widget: rough-marimekko
-name: Marimekko Chart
 description: Variable-width stacked bar chart showing market share
-data:
-  categories:
-    - label: "US"
-      total: 50
-      segments:
-        - { label: "Product A", value: 20 }
-        - { label: "Product B", value: 30 }
-    - label: "EU"
-      total: 35
-      segments:
-        - { label: "Product A", value: 25 }
-        - { label: "Product B", value: 10 }
-    - label: "Asia"
-      total: 40
-      segments:
-        - { label: "Product A", value: 15 }
-        - { label: "Product B", value: 25 }
-  title: "Market Share by Region"
+schema:
+  type: object
+  required:
+    - categories
+  properties:
+    categories:
+      type: array
+      items:
+        type: object
+        required:
+          - label
+          - total
+          - segments
+        properties:
+          label:
+            type: string
+            description: Category name
+          total:
+            type: number
+            description: Total width value for this category
+          segments:
+            type: array
+            items:
+              type: object
+              required:
+                - label
+                - value
+              properties:
+                label:
+                  type: string
+                  description: Segment name
+                value:
+                  type: number
+                  description: Segment value
+            description: Sub-segments within the category
+      description: Categories with variable width and stacked segments
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Marimekko Chart

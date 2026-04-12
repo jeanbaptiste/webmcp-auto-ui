@@ -1,15 +1,37 @@
 ---
 widget: rough-multi-line
-name: Multi-Line Chart
 description: Multiple line series on the same axes for comparison
-data:
-  labels: ["Q1", "Q2", "Q3", "Q4"]
-  series:
-    - name: "Revenue"
-      values: [100, 150, 130, 200]
-    - name: "Costs"
-      values: [80, 90, 110, 120]
-  title: "Revenue vs Costs"
+schema:
+  type: object
+  required:
+    - labels
+    - series
+  properties:
+    labels:
+      type: array
+      items:
+        type: string
+      description: Shared x-axis labels
+    series:
+      type: array
+      items:
+        type: object
+        required:
+          - name
+          - values
+        properties:
+          name:
+            type: string
+            description: Series name
+          values:
+            type: array
+            items:
+              type: number
+            description: Values for each label
+      description: Line series to plot
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Multi-Line Chart

@@ -1,11 +1,25 @@
 ---
 widget: rough-area-chart
-name: Area Chart
 description: Filled area chart showing magnitude over time
-data:
-  labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
-  values: [10, 25, 18, 35, 28, 42]
-  title: "Growth Trend"
+schema:
+  type: object
+  required:
+    - labels
+    - values
+  properties:
+    labels:
+      type: array
+      items:
+        type: string
+      description: X-axis labels (e.g. months, dates)
+    values:
+      type: array
+      items:
+        type: number
+      description: Numeric values for each point
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Area Chart

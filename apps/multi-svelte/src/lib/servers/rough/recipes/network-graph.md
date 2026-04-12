@@ -1,19 +1,50 @@
 ---
 widget: rough-network-graph
-name: Network Graph
 description: Nodes and edges arranged in a circle layout
-data:
-  nodes:
-    - { id: "a", label: "Server" }
-    - { id: "b", label: "Client" }
-    - { id: "c", label: "DB" }
-    - { id: "d", label: "Cache" }
-  edges:
-    - { source: "a", target: "b" }
-    - { source: "a", target: "c" }
-    - { source: "a", target: "d" }
-    - { source: "c", target: "d" }
-  title: "System Architecture"
+schema:
+  type: object
+  required:
+    - nodes
+    - edges
+  properties:
+    nodes:
+      type: array
+      items:
+        type: object
+        required:
+          - id
+        properties:
+          id:
+            type: string
+            description: Unique node identifier
+          label:
+            type: string
+            description: Display label
+          x:
+            type: number
+            description: Optional x position
+          "y":
+            type: number
+            description: Optional y position
+      description: Graph nodes
+    edges:
+      type: array
+      items:
+        type: object
+        required:
+          - source
+          - target
+        properties:
+          source:
+            type: string
+            description: Source node id
+          target:
+            type: string
+            description: Target node id
+      description: Connections between nodes
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Network Graph

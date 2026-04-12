@@ -1,11 +1,25 @@
 ---
 widget: rough-waterfall
-name: Waterfall Chart
 description: Shows cumulative effect of sequential positive/negative values
-data:
-  labels: ["Start", "Sales", "Returns", "Costs", "Tax", "Net"]
-  values: [100, 60, -20, -40, -15, 0]
-  title: "Profit Breakdown"
+schema:
+  type: object
+  required:
+    - labels
+    - values
+  properties:
+    labels:
+      type: array
+      items:
+        type: string
+      description: Step labels
+    values:
+      type: array
+      items:
+        type: number
+      description: Incremental values (positive adds, negative subtracts)
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Waterfall Chart

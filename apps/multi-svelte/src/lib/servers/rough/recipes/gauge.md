@@ -1,12 +1,24 @@
 ---
 widget: rough-gauge
-name: Gauge
 description: Semicircular gauge showing a single value against a maximum
-data:
-  value: 72
-  max: 100
-  label: "CPU Usage"
-  title: "System Monitor"
+schema:
+  type: object
+  required:
+    - value
+    - max
+  properties:
+    value:
+      type: number
+      description: Current value to display
+    max:
+      type: number
+      description: Maximum scale value
+    label:
+      type: string
+      description: What is being measured
+    title:
+      type: string
+      description: Chart title
 ---
 
 ## Gauge
