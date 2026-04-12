@@ -10,10 +10,15 @@ export default defineConfig({
       head: [
         {
           tag: 'script',
+          content: `if (!localStorage.getItem('starlight-theme')) { document.documentElement.dataset.theme = 'light'; }`,
+        },
+        {
+          tag: 'script',
           attrs: { type: 'module' },
           content: `
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-mermaid.initialize({ startOnLoad: false, theme: 'default' });
+const isDark = document.documentElement.dataset.theme === 'dark' || document.documentElement.classList.contains('sl-theme-dark');
+mermaid.initialize({ startOnLoad: false, theme: isDark ? 'dark' : 'default' });
 const pres = document.querySelectorAll('pre[data-language="mermaid"]');
 for (const pre of pres) {
   try {
