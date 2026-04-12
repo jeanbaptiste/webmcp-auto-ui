@@ -23,7 +23,7 @@
 #   ./scripts/docs-update.sh --all            # regenerate everything
 #   ./scripts/docs-update.sh --dry-run        # show manifest without applying
 #   ./scripts/docs-update.sh --file guide/getting-started
-#                                              # update a single file
+#                                              # update a single file (no confirmation)
 #   ./scripts/docs-update.sh --svg-only       # only re-render Mermaid SVGs
 #
 # ============================================================================
@@ -36,7 +36,6 @@ set -euo pipefail
 # DOCS_FR     — Starlight French docs (root locale)
 # DOCS_EN     — Starlight English docs
 # DIAGRAMS    — where pre-rendered SVGs live (served by Astro as static assets)
-# SNAPSHOT    — repomix output (gitignored, recreated each run)
 # MANIFEST    — JSON file listing which docs need updating (gitignored)
 # LASTRUN     — timestamp file to track when the last run happened
 
@@ -44,7 +43,6 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DOCS_FR="$ROOT/docs-site/src/content/docs"
 DOCS_EN="$ROOT/docs-site/src/content/docs/en"
 DIAGRAMS="$ROOT/docs-site/public/diagrams"
-SNAPSHOT="$ROOT/.docs-snapshot.txt"
 SNAPSHOT_LIGHT="$ROOT/.docs-snapshot-light.txt"
 MANIFEST="$ROOT/.docs-manifest.json"
 LASTRUN="$ROOT/.docs-lastrun"
@@ -52,6 +50,11 @@ LASTRUN="$ROOT/.docs-lastrun"
 # Claude model for each pass
 MODEL_ANALYZE="opus"
 MODEL_WRITE="opus"
+
+# Parallelism — how many files to update concurrently.
+# Each worker runs claude -p independently. 4-6 is safe for most plans.
+# Set to 1 for sequential (easier to debug).
+PARALLEL=4
 
 # ─── Argument parsing ──────────────────────────────────────────────────────
 #
@@ -64,6 +67,7 @@ MODEL_WRITE="opus"
 
 MODE="auto"
 DRY_RUN=false
+AUTO_YES=false
 TARGET_FILE=""
 
 while [[ $# -gt 0 ]]; do
@@ -71,6 +75,7 @@ while [[ $# -gt 0 ]]; do
     --all)      MODE="all";      shift ;;
     --dry-run)  DRY_RUN=true;    shift ;;
     --svg-only) MODE="svg-only"; shift ;;
+    --yes|-y)   AUTO_YES=true;   shift ;;
     --file)     MODE="file"; TARGET_FILE="$2"; shift 2 ;;
     *)          echo "Unknown option: $1"; exit 1 ;;
   esac
@@ -93,6 +98,35 @@ require() {
 # ─── Preflight checks ──────────────────────────────────────────────────────
 #
 # Make sure all tools are available before doing any work.
+# CRITICAL: test write permissions FIRST, before spending tokens on Claude.
+# Without this, the script can run for hours generating content and then
+# fail silently when it tries to write the results.
+
+preflight_write_test() {
+  local test_file="$DOCS_FR/.write-test-$$"
+  if ! echo "write-test" > "$test_file" 2>/dev/null; then
+    die "Cannot write to $DOCS_FR — check permissions."
+  fi
+  rm -f "$test_file"
+
+  local test_svg="$DIAGRAMS/.write-test-$$"
+  mkdir -p "$DIAGRAMS"
+  if ! echo "write-test" > "$test_svg" 2>/dev/null; then
+    die "Cannot write to $DIAGRAMS — check permissions."
+  fi
+  rm -f "$test_svg"
+
+  local test_en="$DOCS_EN/.write-test-$$"
+  mkdir -p "$DOCS_EN"
+  if ! echo "write-test" > "$test_en" 2>/dev/null; then
+    die "Cannot write to $DOCS_EN — check permissions."
+  fi
+  rm -f "$test_en"
+
+  log "Write permissions OK (FR, EN, diagrams)"
+}
+
+preflight_write_test
 
 require claude  "https://docs.anthropic.com/en/docs/claude-code"
 require jq      "brew install jq"
@@ -113,17 +147,7 @@ require node "brew install node"
 create_snapshot() {
   step "Step 1 — Creating codebase snapshot with repomix"
 
-  # Full snapshot — used for targeted file updates (Step 5)
-  npx --yes repomix \
-    --output "$SNAPSHOT" \
-    --ignore "docs-site/dist/**,docs-site/.astro/**,**/node_modules/**,**/*.svg,docs/diagrams/svg/**,.docs-*" \
-    2>&1 | tail -5
-
-  local size
-  size=$(wc -c < "$SNAPSHOT" | tr -d ' ')
-  log "Full snapshot: $(wc -l < "$SNAPSHOT" | tr -d ' ') lines, $((size / 1024))KB"
-
-  # Light snapshot — used for manifest analysis (Step 3)
+  # Light snapshot — used for manifest analysis (Step 3) and targeted updates (Step 5)
   # Only includes barrel exports, types, configs, and key source files.
   # This keeps the prompt under ~200K chars so claude -p doesn't choke.
   npx --yes repomix \
@@ -201,7 +225,7 @@ generate_manifest() {
 
   # List all existing doc files (just paths, no content)
   local doc_list
-  doc_list=$(find "$DOCS_FR" -name '*.mdx' -o -name '*.md' | sed "s|$DOCS_FR/||" | sort)
+  doc_list=$(find "$DOCS_FR" -path "$DOCS_EN" -prune -o \( -name '*.mdx' -o -name '*.md' \) -print | sed "s|$DOCS_FR/||" | sort)
 
   # Also list READMEs
   local readmes
@@ -310,6 +334,11 @@ validate_manifest() {
     exit 0
   fi
 
+  if $AUTO_YES; then
+    log "Auto-yes mode — skipping manual validation."
+    return
+  fi
+
   echo ""
   echo "Review the manifest above."
   echo "  - Edit $MANIFEST to remove entries you don't want to update."
@@ -334,36 +363,56 @@ validate_manifest() {
 # Both FR and EN versions are handled: FR is written/updated first,
 # then EN is translated from the FR version.
 
-apply_updates() {
-  step "Step 5 — Applying updates"
+# ── Worker: process a single manifest entry (FR update/create + EN translate)
+#
+# Designed to be called from xargs -P for parallel execution.
+# Each invocation is self-contained: reads the manifest, calls Claude,
+# writes both FR and EN files. Output is buffered per-worker to avoid
+# interleaved logs from parallel processes.
+#
+# Usage: process_entry <action> <index>
+#   action = "update" or "create"
+#   index  = numeric index into manifest.update[] or manifest.create[]
 
-  local n_update n_create
-  n_update=$(jq '.update | length' "$MANIFEST")
-  n_create=$(jq '.create | length' "$MANIFEST")
+process_entry() {
+  set +e  # workers must not die on non-zero exits
+  local action="$1" index="$2"
+  local file reason sections fr_path en_path
 
-  # Process updates
-  for i in $(seq 0 $((n_update - 1))); do
-    local file reason sections
-    file=$(jq -r ".update[$i].file" "$MANIFEST")
-    reason=$(jq -r ".update[$i].reason" "$MANIFEST")
-    sections=$(jq -r ".update[$i].sections | join(\", \")" "$MANIFEST")
+  # ── Read manifest entry ──
+  if [[ "$action" == "update" ]]; then
+    file=$(jq -r ".update[$index].file" "$MANIFEST")
+    reason=$(jq -r ".update[$index].reason" "$MANIFEST")
+    sections=$(jq -r ".update[$index].sections | join(\", \")" "$MANIFEST")
+  else
+    file=$(jq -r ".create[$index].file" "$MANIFEST")
+    reason=$(jq -r ".create[$index].reason" "$MANIFEST")
+    sections="(new file)"
+  fi
 
-    log "Updating: $file (reason: $reason)"
+  if [[ "$file" == "null" || -z "$file" ]]; then
+    echo "  [worker $index] SKIP: null/empty file entry"
+    return
+  fi
 
-    local fr_path="$DOCS_FR/$file"
-    local en_path="$DOCS_EN/$file"
+  if [[ "$file" == en/* ]]; then
+    echo "  [worker $index] SKIP (EN mirror, auto-translated from FR): $file"
+    return
+  fi
 
+  fr_path="$DOCS_FR/$file"
+  en_path="$DOCS_EN/$file"
+
+  # ── UPDATE: patch existing file ──
+  if [[ "$action" == "update" ]]; then
     if [[ ! -f "$fr_path" ]]; then
-      log "  WARNING: $fr_path not found, skipping"
-      continue
+      echo "  [worker $index] SKIP (not found): $file"
+      return
     fi
 
-    # Read existing content
-    local existing
+    local existing prompt updated
     existing=$(cat "$fr_path")
 
-    # Ask Claude to update it
-    local prompt
     prompt="You are updating a documentation file for the webmcp-auto-ui project.
 
 REASON FOR UPDATE: $reason
@@ -373,7 +422,7 @@ EXISTING FILE ($file):
 $existing
 
 CODEBASE (source of truth):
-$(cat "$SNAPSHOT")
+$(cat "$SNAPSHOT_LIGHT")
 
 YOUR TASK:
 Update ONLY the sections listed above. Do NOT rewrite sections that are correct.
@@ -389,56 +438,33 @@ Rules:
 - Escape < in MDX (use &lt; or backticks)
 - Return ONLY the file content, no explanation before or after"
 
-    local updated
-    updated=$(echo "$prompt" | claude -p --model "$MODEL_WRITE" 2>/dev/null)
-
-    # Write FR
-    echo "$updated" > "$fr_path"
-    log "  Wrote FR: $fr_path"
-
-    # Translate to EN (if EN version exists or should exist)
-    if [[ -f "$en_path" ]] || [[ -d "$DOCS_EN/$(dirname "$file")" ]]; then
-      local en_prompt
-      en_prompt="Translate this documentation file from French to English.
-Keep the MDX structure, frontmatter, and code blocks identical.
-Translate title and description in frontmatter.
-Only translate comments inside code blocks, not the code itself.
-Translate Mermaid diagram labels.
-Return ONLY the translated file, no explanation.
-
-$updated"
-
-      local translated
-      translated=$(echo "$en_prompt" | claude -p --model "$MODEL_WRITE" 2>/dev/null)
-      mkdir -p "$(dirname "$en_path")"
-      echo "$translated" > "$en_path"
-      log "  Wrote EN: $en_path"
+    local stderr_file="/tmp/docs-update-stderr-$$-$index"
+    updated=$(echo "$prompt" | claude -p --model "$MODEL_WRITE" 2>"$stderr_file")
+    if [[ $? -ne 0 ]]; then
+      echo "  [worker $index] ERROR: claude -p failed: $(cat "$stderr_file")"
+      rm -f "$stderr_file"
+      return
     fi
-  done
+    rm -f "$stderr_file"
 
-  # Process creates
-  for i in $(seq 0 $((n_create - 1))); do
-    local file reason
-    file=$(jq -r ".create[$i].file" "$MANIFEST")
-    reason=$(jq -r ".create[$i].reason" "$MANIFEST")
+    # Safety: don't overwrite with garbage if Claude failed
+    if [[ -z "$updated" ]] \
+      || echo "$updated" | head -1 | grep -qv '^---' \
+      || echo "$updated" | grep -q "Prompt is too long"; then
+      echo "  [worker $index] ERROR: Claude returned garbage for $file — file NOT overwritten"
+      return
+    fi
 
-    log "Creating: $file (reason: $reason)"
+    printf '%s\n' "$updated" > "$fr_path"
+    echo "  [worker $index] Wrote FR: $file"
 
-    local fr_path="$DOCS_FR/$file"
-
-    # Find a similar existing file to use as template
-    local template_dir
-    template_dir=$(dirname "$file")
-    local template
-    template=$(find "$DOCS_FR/$template_dir" -name '*.md' -o -name '*.mdx' 2>/dev/null | head -1)
-
-    local template_content=""
-    if [[ -n "$template" ]]; then
-      template_content="USE THIS EXISTING FILE AS FORMAT TEMPLATE:
+  # ── CREATE: generate from scratch ──
+  else
+    local template_content="" template prompt content
+    template=$(find "$DOCS_FR/$(dirname "$file")" -name '*.md' -o -name '*.mdx' 2>/dev/null | head -1)
+    [[ -n "$template" ]] && template_content="USE THIS EXISTING FILE AS FORMAT TEMPLATE:
 $(cat "$template")"
-    fi
 
-    local prompt
     prompt="You are creating a new documentation file for the webmcp-auto-ui project.
 
 FILE TO CREATE: $file
@@ -447,45 +473,93 @@ REASON: $reason
 $template_content
 
 CODEBASE (source of truth):
-$(cat "$SNAPSHOT")
+$(cat "$SNAPSHOT_LIGHT")
 
 YOUR TASK:
 Create the documentation file in French. Follow the format of the template if provided.
 Include: frontmatter (title, description, sidebar order), features, architecture, usage.
 
 Rules:
-- npm not pnpm
-- RemoteLLMProvider uses proxyUrl, not apiKey
-- Model aliases: 'haiku', 'sonnet', 'opus'
-- Relative links only
-- No emojis
-- Escape < in MDX
+- npm not pnpm, proxyUrl not apiKey, model aliases not full names
+- Relative links only, no emojis, escape < in MDX
 - Return ONLY the file content, no explanation"
 
-    local content
-    content=$(echo "$prompt" | claude -p --model "$MODEL_WRITE" 2>/dev/null)
+    local stderr_file="/tmp/docs-update-stderr-$$-$index"
+    content=$(echo "$prompt" | claude -p --model "$MODEL_WRITE" 2>"$stderr_file")
+    if [[ $? -ne 0 ]]; then
+      echo "  [worker $index] ERROR: claude -p failed: $(cat "$stderr_file")"
+      rm -f "$stderr_file"
+      return
+    fi
+    rm -f "$stderr_file"
+
+    if [[ -z "$content" ]] \
+      || echo "$content" | head -1 | grep -qv '^---' \
+      || echo "$content" | grep -q "Prompt is too long"; then
+      echo "  [worker $index] ERROR: Claude returned garbage for $file — file NOT created"
+      return
+    fi
 
     mkdir -p "$(dirname "$fr_path")"
-    echo "$content" > "$fr_path"
-    log "  Wrote FR: $fr_path"
+    printf '%s\n' "$content" > "$fr_path"
+    echo "  [worker $index] Wrote FR (new): $file"
+  fi
 
-    # Translate to EN
-    local en_path="$DOCS_EN/$file"
-    local en_prompt
+  # ── Translate to EN ──
+  if [[ -f "$en_path" ]] || [[ -d "$DOCS_EN/$(dirname "$file")" ]]; then
+    local en_prompt translated
     en_prompt="Translate this documentation file from French to English.
 Keep the MDX structure, frontmatter, and code blocks identical.
 Translate title and description in frontmatter.
-Only translate comments inside code blocks.
-Return ONLY the translated file.
+Only translate comments inside code blocks, not the code itself.
+Translate Mermaid diagram labels.
+Return ONLY the translated file, no explanation.
 
-$content"
+$(cat "$fr_path")"
 
-    local translated
-    translated=$(echo "$en_prompt" | claude -p --model "$MODEL_WRITE" 2>/dev/null)
-    mkdir -p "$(dirname "$en_path")"
-    echo "$translated" > "$en_path"
-    log "  Wrote EN: $en_path"
-  done
+    local stderr_file_en="/tmp/docs-update-stderr-$$-$index-en"
+    translated=$(echo "$en_prompt" | claude -p --model "$MODEL_WRITE" 2>"$stderr_file_en")
+    if [[ $? -ne 0 ]]; then
+      echo "  [worker $index] ERROR: EN translation claude -p failed: $(cat "$stderr_file_en")"
+      rm -f "$stderr_file_en"
+    fi
+    rm -f "$stderr_file_en"
+
+    if [[ -n "$translated" ]] \
+      && echo "$translated" | head -1 | grep -q '^---' \
+      && ! echo "$translated" | grep -q "Prompt is too long"; then
+      mkdir -p "$(dirname "$en_path")"
+      printf '%s\n' "$translated" > "$en_path"
+      echo "  [worker $index] Wrote EN: $file"
+    else
+      echo "  [worker $index] ERROR: EN translation failed for $file — skipped"
+    fi
+  fi
+
+  echo "  [worker $index] DONE: $file"
+}
+
+# Export everything workers need (xargs -P spawns subshells)
+export DOCS_FR DOCS_EN MANIFEST SNAPSHOT_LIGHT MODEL_WRITE ROOT DIAGRAMS
+export -f process_entry
+
+apply_updates() {
+  step "Step 5 — Applying updates ($PARALLEL workers in parallel)"
+
+  local n_update n_create total
+  n_update=$(jq '.update | length' "$MANIFEST")
+  n_create=$(jq '.create | length' "$MANIFEST")
+  total=$((n_update + n_create))
+
+  echo "  [docs] $n_update updates + $n_create creates = $total files, $PARALLEL parallel workers"
+
+  # Build task list: one line per entry, format "action index"
+  {
+    for i in $(seq 0 $((n_update - 1))); do echo "update $i"; done
+    for i in $(seq 0 $((n_create - 1))); do echo "create $i"; done
+  } | xargs -P "$PARALLEL" -L1 bash -c 'process_entry "$@"' _
+
+  echo "  [docs] All $total files processed."
 }
 
 # ============================================================================
@@ -512,7 +586,7 @@ EXISTING FILE ($TARGET_FILE):
 $existing
 
 CODEBASE (source of truth):
-$(cat "$SNAPSHOT")
+$(cat "$SNAPSHOT_LIGHT")
 
 YOUR TASK:
 Compare the existing documentation against the codebase. Update any sections
@@ -528,10 +602,18 @@ Rules:
 - Return ONLY the file content, no explanation"
 
   log "Calling Claude ($MODEL_WRITE)..."
-  local updated
-  updated=$(echo "$prompt" | claude -p --model "$MODEL_WRITE" 2>/dev/null)
+  local updated exit_code=0
+  updated=$(echo "$prompt" | claude -p --model "$MODEL_WRITE" 2>/dev/null) || exit_code=$?
 
-  echo "$updated" > "$fr_path"
+  if [[ $exit_code -ne 0 ]]; then
+    die "Claude exited with code $exit_code for $TARGET_FILE"
+  fi
+
+  if [[ -z "$updated" ]] || echo "$updated" | head -1 | grep -qv '^---'; then
+    die "Claude returned invalid content for $TARGET_FILE — file NOT overwritten"
+  fi
+
+  printf '%s\n' "$updated" > "$fr_path"
   log "Wrote FR: $fr_path"
 
   # EN translation
@@ -544,11 +626,18 @@ frontmatter. Translate title, description, comments. Return ONLY the file.
 
 $updated"
 
-    local translated
-    translated=$(echo "$en_prompt" | claude -p --model "$MODEL_WRITE" 2>/dev/null)
-    mkdir -p "$(dirname "$en_path")"
-    echo "$translated" > "$en_path"
-    log "Wrote EN: $en_path"
+    local translated exit_code_en=0
+    translated=$(echo "$en_prompt" | claude -p --model "$MODEL_WRITE" 2>/dev/null) || exit_code_en=$?
+
+    if [[ $exit_code_en -ne 0 ]]; then
+      log "WARNING: EN translation Claude exited with code $exit_code_en"
+    elif [[ -z "$translated" ]] || echo "$translated" | head -1 | grep -qv '^---'; then
+      die "Claude returned invalid content for EN translation of $TARGET_FILE — file NOT overwritten"
+    else
+      mkdir -p "$(dirname "$en_path")"
+      printf '%s\n' "$translated" > "$en_path"
+      log "Wrote EN: $en_path"
+    fi
   fi
 }
 
