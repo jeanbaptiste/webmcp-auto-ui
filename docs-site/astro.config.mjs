@@ -17,7 +17,10 @@ mermaid.initialize({ startOnLoad: false, theme: 'default' });
 const pres = document.querySelectorAll('pre[data-language="mermaid"]');
 for (const pre of pres) {
   try {
-    const text = pre.textContent;
+    const lines = pre.querySelectorAll('.ec-line');
+    const text = lines.length > 0
+      ? Array.from(lines).map(l => l.textContent).join('\n')
+      : pre.textContent;
     const id = 'mermaid-' + Math.random().toString(36).slice(2, 9);
     const { svg } = await mermaid.render(id, text);
     const div = document.createElement('div');
