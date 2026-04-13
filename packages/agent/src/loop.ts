@@ -348,7 +348,13 @@ export async function runAgentLoop(
               if (!webmcpServer) {
                 result = `Error: no WebMCP server "${serverName}" found.`;
               } else {
-                const toolResult = await webmcpServer.executeTool(realToolName, block.input);
+                // Fix flat params from small LLMs (Gemma): {name:"text", content:"..."} → {name:"text", params:{content:"..."}}
+                let toolInput = block.input as Record<string, unknown>;
+                if (realToolName === 'widget_display' && toolInput.name && !toolInput.params) {
+                  const { name, ...rest } = toolInput;
+                  toolInput = { name, params: rest };
+                }
+                const toolResult = await webmcpServer.executeTool(realToolName, toolInput);
                 result = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
 
                 // Special handling for widget_display — notify via onWidget callback

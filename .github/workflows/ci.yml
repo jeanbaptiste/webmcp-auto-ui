@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check (flex2)
+        run: npx svelte-check --workspace apps/flex2 --fail-on-warnings false --threshold error
+
+      - name: Type check (multi-svelte)
+        run: npx svelte-check --workspace apps/multi-svelte --fail-on-warnings false --threshold error

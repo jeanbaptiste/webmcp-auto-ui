@@ -9,6 +9,7 @@ set -euo pipefail
 #   ./scripts/deploy.sh viewer       # deploy one app
 #   ./scripts/deploy.sh home flex    # deploy specific apps
 #   ./scripts/deploy.sh --dry-run    # show what would be deployed (no changes)
+#   ./scripts/deploy.sh --with-docs  # deploy + update documentation
 #
 # IMPORTANT: This script knows the correct deploy path for each app.
 # DO NOT deploy manually with scp — use this script instead.
@@ -20,10 +21,12 @@ LOCAL_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Parse flags
 DRY_RUN=0
+WITH_DOCS=false
 REAL_ARGS=()
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
+    --with-docs) WITH_DOCS=true ;;
     *) REAL_ARGS+=("$arg") ;;
   esac
 done
@@ -291,3 +294,11 @@ done
 
 echo ""
 echo "Deploy complete."
+
+# ── Documentation update (optional) ──────────────────────────────────────────
+if $WITH_DOCS; then
+  echo ""
+  echo "Updating documentation..."
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  "$SCRIPT_DIR/docs-update.sh" --all -y
+fi
