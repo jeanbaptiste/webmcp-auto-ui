@@ -20,6 +20,14 @@ jobs:
       - name: Install dependencies
         run: rm -rf node_modules package-lock.json && npm install --no-audit --no-fund
 
+      - name: Build packages
+        run: |
+          npm run build --workspace=packages/core
+          npm run build --workspace=packages/sdk &
+          npm run build --workspace=packages/agent &
+          npm run build --workspace=packages/ui &
+          wait
+
       - name: Generate SvelteKit types
         run: |
           npx -w apps/flex2 svelte-kit sync
