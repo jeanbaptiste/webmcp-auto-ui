@@ -26,7 +26,7 @@
     maxTools = $bindable(8),
     maxResultLength = $bindable(10000),
     compressHistory = $bindable(false),
-    compressPreview = $bindable(200),
+    compressPreview = $bindable(500),
     cacheEnabled = $bindable(true),
     temperature = $bindable(0.7),
     topK = $bindable(10),

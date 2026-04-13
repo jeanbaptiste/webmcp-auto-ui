@@ -32,6 +32,19 @@
     return d.toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
 
+  let copyLabel = $state('copy');
+
+  async function copyLogs() {
+    const text = logs.map(l => {
+      const time = fmtTime(l.ts);
+      const ctx = l.ctxSize != null ? ` [${l.ctxSize >= 1000 ? (l.ctxSize / 1000).toFixed(1) + 'K' : l.ctxSize}]` : '';
+      return `${time}${ctx} ${l.type} ${l.detail}`;
+    }).join('\n');
+    await navigator.clipboard.writeText(text);
+    copyLabel = '✓';
+    setTimeout(() => { copyLabel = 'copy'; }, 2000);
+  }
+
   /** Extract provenance tag from tool log detail */
   function parseProvenance(detail: string): { tag: 'recette' | 'impro' | null; rest: string } {
     if (detail.startsWith('[recette] ')) return { tag: 'recette', rest: detail.slice(10) };
@@ -46,6 +59,9 @@
     <span class="ac-title">Agent logs</span>
     <span class="ac-count">{logs.length}</span>
     <div class="ac-spacer"></div>
+    {#if logs.length > 0}
+      <button class="ac-clear" onclick={copyLogs}>{copyLabel}</button>
+    {/if}
     {#if logs.length > 0 && onclear}
       <button class="ac-clear" onclick={onclear}>clear</button>
     {/if}

@@ -61,7 +61,7 @@
   let maxResultLength = $state(10000);
   let truncateResults = $state(false);
   let compressHistory = $state(false);
-  let compressPreview = $state(200);
+  let compressPreview = $state(500);
   let schemaSanitize = $state(true);
   let schemaFlatten = $state(false);
   let localUrl = $state('http://localhost:11434');
