@@ -12,6 +12,8 @@ import {
   buildSystemPrompt,
   fromMcpTools,
   TokenTracker,
+  buildDiscoveryCache,
+  ContextRAG,
 } from '@webmcp-auto-ui/agent';
 import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
 import { autoui } from '@webmcp-auto-ui/agent';
@@ -48,6 +50,20 @@ let gemmaLoadedMB = $state(0);
 let gemmaTotalMB = $state(0);
 let gemmaTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
 let gemmaLoadStart = $state(0);
+
+// Nano-RAG (experimental, off by default)
+let contextRAGEnabled = $state(false);
+let contextRAG = $state<ContextRAG | null>(null);
+
+$effect(() => {
+  if (contextRAGEnabled && !contextRAG) {
+    contextRAG = new ContextRAG({ topK: 5 });
+  }
+  if (!contextRAGEnabled && contextRAG) {
+    contextRAG.destroy();
+    contextRAG = null;
+  }
+});
 
 // Token tracking
 const tokenTracker = new TokenTracker();
@@ -128,6 +144,8 @@ export const agentStore = {
   get gemmaLoadedMB() { return gemmaLoadedMB; },
   get gemmaTotalMB() { return gemmaTotalMB; },
   get multiClient() { return multiClient; },
+  get contextRAGEnabled() { return contextRAGEnabled; },
+  set contextRAGEnabled(v: boolean) { contextRAGEnabled = v; },
 
   /** Connect to an MCP server */
   async connect(url: string) {
@@ -207,6 +225,7 @@ export const agentStore = {
     layers.push(autoui.layer());
 
     const systemPrompt = buildSystemPrompt(layers);
+    const discoveryCache = buildDiscoveryCache(layers);
 
     try {
       const result = await runAgentLoop(
@@ -220,6 +239,9 @@ export const agentStore = {
           cacheEnabled: true,
           signal: abortController!.signal,
           layers,
+          discoveryCache,
+          contextRAG: contextRAG ?? undefined,
+          schemaOptions: { sanitize: true, flatten: false },
           callbacks: {
             onLLMResponse: (response, latencyMs) => {
               if (response.usage) {

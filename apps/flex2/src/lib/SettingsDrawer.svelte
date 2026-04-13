@@ -33,6 +33,7 @@
     maxResultLength?: number;
     compressHistory?: boolean;
     compressPreview?: number;
+    contextRAGEnabled?: boolean;
     cacheEnabled?: boolean;
     temperature?: number;
     topK?: number;
@@ -70,6 +71,7 @@
     maxResultLength = $bindable(10000),
     compressHistory = $bindable(false),
     compressPreview = $bindable(500),
+    contextRAGEnabled = $bindable(false),
     cacheEnabled = $bindable(true),
     temperature = $bindable(1.0),
     topK = $bindable(64),
@@ -190,6 +192,7 @@
         bind:maxResultLength
         bind:compressHistory
         bind:compressPreview
+        bind:contextRAGEnabled
         bind:cacheEnabled
         bind:temperature
         bind:topK

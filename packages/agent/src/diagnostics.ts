@@ -75,7 +75,16 @@ export function runDiagnostics(
   }
 
   // 4. Prompt references non-existent tools
+  // Include discovery tools (search_tools, list_tools) which are generated dynamically
   const toolNames = new Set(tools.map(t => t.name));
+  for (const layer of layers) {
+    const prefix = `${sanitizeServerName(layer.serverName)}_${layer.protocol}_`;
+    toolNames.add(`${prefix}search_tools`);
+    toolNames.add(`${prefix}list_tools`);
+    toolNames.add(`${prefix}search_recipes`);
+    toolNames.add(`${prefix}list_recipes`);
+    toolNames.add(`${prefix}get_recipe`);
+  }
   const toolPattern = /\b([a-z][a-z0-9_]{2,})_(mcp|webmcp)_([a-z][a-z0-9_]+)\b/g;
   let match;
   while ((match = toolPattern.exec(systemPrompt)) !== null) {

@@ -561,6 +561,10 @@
           <input type="checkbox" bind:checked={cacheEnabled} class="accent-accent" />
           <span>Prompt cache</span>
         </label>
+        <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+          <input type="checkbox" bind:checked={contextRAGEnabled} class="accent-accent w-3.5 h-3.5" />
+          Nano-RAG <span class="text-[8px] text-text2/40">(experimental)</span>
+        </label>
       </div>
 
       <!-- Custom system prompt -->

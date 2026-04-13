@@ -10,6 +10,7 @@
     maxResultLength?: number;
     compressHistory?: boolean;
     compressPreview?: number;
+    contextRAGEnabled?: boolean;
     cacheEnabled?: boolean;
     temperature?: number;
     topK?: number;
@@ -27,6 +28,7 @@
     maxResultLength = $bindable(10000),
     compressHistory = $bindable(false),
     compressPreview = $bindable(500),
+    contextRAGEnabled = $bindable(false),
     cacheEnabled = $bindable(true),
     temperature = $bindable(0.7),
     topK = $bindable(10),
@@ -220,6 +222,18 @@
              class="w-full accent-accent" />
       {/if}
     </div>
+
+    <!-- Nano-RAG -->
+    <label class="flex items-center gap-2.5 cursor-pointer select-none">
+      <input type="checkbox" bind:checked={contextRAGEnabled} class="accent-accent w-3.5 h-3.5" />
+      <span class="text-xs font-mono text-text1">Nano-RAG</span>
+      <span class="text-[8px] font-mono text-text2/40 ml-auto">experimental</span>
+    </label>
+    {#if contextRAGEnabled}
+      <div class="text-[9px] font-mono text-text2/60 pl-5">
+        Compaction sémantique du contexte via embeddings vectoriels
+      </div>
+    {/if}
   </section>
 
   <!-- Cache -->

@@ -620,6 +620,7 @@
   bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools bind:maxResultLength
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON
   bind:schemaSanitize bind:schemaFlatten bind:compressHistory bind:compressPreview
+  bind:contextRAGEnabled
   bind:localUrl bind:localModel
   onconnect={() => addMcpServer(canvas.mcpUrl)}
   {connectedUrls} {loadingUrls}

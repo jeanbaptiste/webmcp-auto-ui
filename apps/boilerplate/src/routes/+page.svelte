@@ -10,6 +10,7 @@
   import {
     RemoteLLMProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, autoui,
+    buildDiscoveryCache, ContextRAG,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
   import { LLMSelector, McpStatus, AgentProgress, WidgetRenderer, getTheme } from '@webmcp-auto-ui/ui';
@@ -75,6 +76,21 @@
     return result;
   });
 
+  // Nano-RAG (experimental, off by default)
+  let contextRAGEnabled = $state(false);
+  let contextRAG = $state<ContextRAG | null>(null);
+
+  $effect(() => {
+    if (contextRAGEnabled && !contextRAG) {
+      contextRAG = new ContextRAG({ topK: 5 });
+    }
+    if (!contextRAGEnabled && contextRAG) {
+      contextRAG.destroy();
+      contextRAG = null;
+    }
+  });
+
+  const discoveryCache = $derived(buildDiscoveryCache(layers));
   const systemPrompt = $derived(buildSystemPrompt(layers));
 
   // ── Servers: custom WebMCP servers for WidgetRenderer ─────────────────
@@ -115,6 +131,9 @@
         maxIterations: 10,
         maxTokens: 4096,
         layers,
+        discoveryCache,
+        contextRAG: contextRAG ?? undefined,
+        schemaOptions: { sanitize: true, flatten: false },
         initialMessages: conversationHistory,
         callbacks: {
           onWidget: (type, data) => {
@@ -165,6 +184,10 @@
       name={mcpName || 'non connecte'}
       servers={multiClient.listServers().map(s => ({ url: s.url, name: s.name, toolCount: s.tools.length }))}
     />
+    <label class="flex items-center gap-1.5 font-mono text-xs text-text2 cursor-pointer flex-shrink-0">
+      <input type="checkbox" bind:checked={contextRAGEnabled} class="accent-accent w-3.5 h-3.5" />
+      Nano-RAG <span class="text-[8px] text-text2/40">(exp.)</span>
+    </label>
     <LLMSelector />
     <button class="h-7 w-7 flex items-center justify-center rounded border border-border2 text-text2 hover:text-text1 transition-colors flex-shrink-0"
             onclick={theme.toggle} aria-label="Toggle theme">

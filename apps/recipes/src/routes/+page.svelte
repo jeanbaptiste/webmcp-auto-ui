@@ -11,6 +11,7 @@
     RemoteLLMProvider, WasmProvider, runAgentLoop, buildSystemPrompt,
     WEBMCP_RECIPES, recipeRegistry,
     fromMcpTools, trimConversationHistory, TokenTracker,
+    buildDiscoveryCache, ContextRAG,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, Recipe, McpRecipe, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
   import { autoui } from '@webmcp-auto-ui/agent';
@@ -92,6 +93,20 @@
 
   // Settings panel
   let settingsOpen = $state(false);
+
+  // Nano-RAG (experimental, off by default)
+  let contextRAGEnabled = $state(false);
+  let contextRAG = $state<ContextRAG | null>(null);
+
+  $effect(() => {
+    if (contextRAGEnabled && !contextRAG) {
+      contextRAG = new ContextRAG({ topK: 5 });
+    }
+    if (!contextRAGEnabled && contextRAG) {
+      contextRAG.destroy();
+      contextRAG = null;
+    }
+  });
 
   // Mobile tabs
   let mobileTab = $state<'list' | 'detail' | 'preview'>('list');
@@ -250,6 +265,8 @@
     return result;
   });
 
+  const discoveryCache = $derived(buildDiscoveryCache(layers));
+
   // ── Placeholder contextuel ──────────────────────────────────────────────────
   const PLACEHOLDER_MAP: Record<string, string> = {
     'inaturalist': 'Quels oiseaux observe-t-on a Paris ?',
@@ -330,6 +347,9 @@
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, 150_000),
         layers,
+        discoveryCache,
+        contextRAG: contextRAG ?? undefined,
+        schemaOptions: { sanitize: true, flatten: false },
         callbacks: {
           onIterationStart: (i: number, max: number) => {
             pushLog('iteration', `Iteration ${i}/${max}`);
@@ -469,6 +489,11 @@
     >
       MCP
     </button>
+
+    <label class="flex items-center gap-1.5 font-mono text-xs text-text2 cursor-pointer flex-shrink-0">
+      <input type="checkbox" bind:checked={contextRAGEnabled} class="accent-accent w-3.5 h-3.5" />
+      Nano-RAG <span class="text-[8px] text-text2/40">(exp.)</span>
+    </label>
 
     <LLMSelector value={canvas.llm} onchange={(v) => canvas.setLlm(v)} />
 

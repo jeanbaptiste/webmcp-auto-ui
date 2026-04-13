@@ -128,6 +128,14 @@
         <LLMSelector value={canvas.llm} onchange={onLlmChange} class="text-xs" />
       </div>
 
+      <!-- Nano-RAG toggle -->
+      <label class="flex items-center gap-1.5 font-mono text-xs text-text2 cursor-pointer">
+        <input type="checkbox" checked={agentStore.contextRAGEnabled}
+               onchange={(e) => { agentStore.contextRAGEnabled = (e.target as HTMLInputElement).checked; }}
+               class="accent-accent w-3.5 h-3.5" />
+        Nano-RAG <span class="text-[8px] text-text2/40">(exp.)</span>
+      </label>
+
       <!-- Generate / Stop / Demo buttons -->
       <div class="flex items-center gap-2 ml-auto">
         {#if agentStore.generating}
