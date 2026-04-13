@@ -477,7 +477,13 @@ export async function runAgentLoop(
           const toolMatch2 = resolvedName.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
           const realName = toolMatch2 ? toolMatch2[3] : block.name;
           const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
-          contextRAG.ingest(realName, block.id, resultStr).then((chunkCount) => {
+          // Find the last user message for contextual embeddings
+          const lastUserText = [...messages].reverse()
+            .find(m => m.role === 'user')?.content;
+          const userQuery = typeof lastUserText === 'string'
+            ? lastUserText
+            : (lastUserText as any[])?.find((b: any) => b.type === 'text')?.text ?? '';
+          contextRAG.ingest(realName, block.id, resultStr, userQuery).then((chunkCount) => {
             if (chunkCount > 0) {
               callbacks.onText?.(`[nano-rag] ingested ${chunkCount} chunks from ${realName} (${resultStr.length} chars)`);
             }

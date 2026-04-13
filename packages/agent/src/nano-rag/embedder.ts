@@ -4,8 +4,8 @@
  *
  * Model is downloaded from HuggingFace and cached in OPFS (same pattern as Gemma WASM).
  *
- * Tokenization: uses @huggingface/transformers AutoTokenizer when available,
- * falls back to a hash-based SimpleTokenizer (consistent within a session).
+ * Tokenization: requires @huggingface/transformers AutoTokenizer —
+ * throws if unavailable (no fallback, hash tokenizers produce invalid embeddings).
  */
 
 import type * as OrtTypes from 'onnxruntime-web';
@@ -16,18 +16,22 @@ export interface EmbedderOptions {
   onProgress?: (status: string, loaded?: number, total?: number) => void;
 }
 
-interface Tokenized {
-  ids: number[];
-  mask: number[];
-}
-
-interface Tokenizer {
-  encode(text: string, maxLen: number): Tokenized;
-}
+// HF tokenizer instance (opaque — we only need encode())
+type HFTokenizer = {
+  (text: string, opts: Record<string, unknown>): {
+    input_ids: { data: ArrayLike<number | bigint> };
+    attention_mask: { data: ArrayLike<number | bigint> };
+  };
+  encode: (text: string, opts: Record<string, unknown>) => Promise<{
+    input_ids?: ArrayLike<number | bigint>;
+    attention_mask?: ArrayLike<number | bigint>;
+    [key: string]: unknown;
+  }>;
+};
 
 export class Embedder {
   private session: OrtTypes.InferenceSession | null = null;
-  private tokenizer: Tokenizer | null = null;
+  private tokenizer: HFTokenizer | null = null;
   private initPromise: Promise<void> | null = null;
 
   constructor(private opts?: EmbedderOptions) {}
@@ -65,42 +69,18 @@ export class Embedder {
       executionProviders: ['wasm'],
     });
 
-    // Try @huggingface/transformers for proper WordPiece tokenization
-    this.tokenizer = await this.loadTokenizer();
-
-    this.opts?.onProgress?.('ready', modelSize, modelSize);
-  }
-
-  /** Try to load HF AutoTokenizer, fall back to hash-based SimpleTokenizer */
-  private async loadTokenizer(): Promise<Tokenizer> {
+    // Require @huggingface/transformers for proper WordPiece tokenization
     try {
       const { AutoTokenizer } = await import('@huggingface/transformers');
-      const hfTokenizer = await AutoTokenizer.from_pretrained('Xenova/all-MiniLM-L6-v2');
-
-      return {
-        encode(text: string, maxLen: number): Tokenized {
-          const encoded = hfTokenizer(text, {
-            padding: true,
-            truncation: true,
-            max_length: maxLen,
-          });
-          // HF tokenizer returns BigInt64Arrays or typed arrays
-          const rawIds = encoded.input_ids.data;
-          const rawMask = encoded.attention_mask.data;
-
-          const ids: number[] = [];
-          const mask: number[] = [];
-          for (let i = 0; i < rawIds.length; i++) {
-            ids.push(Number(rawIds[i]));
-            mask.push(Number(rawMask[i]));
-          }
-          return { ids, mask };
-        },
-      };
+      this.tokenizer = await AutoTokenizer.from_pretrained('Xenova/all-MiniLM-L6-v2') as unknown as HFTokenizer;
     } catch {
-      // @huggingface/transformers not available — use hash-based fallback
-      return new SimpleTokenizer();
+      throw new Error(
+        '[nano-rag] @huggingface/transformers is required for valid embeddings. ' +
+        'Install it or disable nano-RAG.'
+      );
     }
+
+    this.opts?.onProgress?.('ready', modelSize, modelSize);
   }
 
   /**
@@ -110,24 +90,33 @@ export class Embedder {
     if (!this.session) await this.initialize();
     const ort = await import('onnxruntime-web');
 
-    // Tokenize
-    const tokens = this.tokenizer!.encode(text, 128); // max 128 tokens for MiniLM
+    const maxLen = 128;
+
+    // Tokenize using HF AutoTokenizer
+    const encoded = this.tokenizer!(text, {
+      padding: true,
+      truncation: true,
+      max_length: maxLen,
+    });
+    const rawIds = encoded.input_ids.data;
+    const rawMask = encoded.attention_mask.data;
+    const seqLen = rawIds.length;
 
     // Create input tensors
     const inputIds = new ort.Tensor(
       'int64',
-      BigInt64Array.from(tokens.ids.map(BigInt)),
-      [1, tokens.ids.length],
+      BigInt64Array.from(Array.from(rawIds, v => BigInt(Number(v)))),
+      [1, seqLen],
     );
     const attentionMask = new ort.Tensor(
       'int64',
-      BigInt64Array.from(tokens.mask.map(BigInt)),
-      [1, tokens.mask.length],
+      BigInt64Array.from(Array.from(rawMask, v => BigInt(Number(v)))),
+      [1, seqLen],
     );
     const tokenTypeIds = new ort.Tensor(
       'int64',
-      new BigInt64Array(tokens.ids.length),
-      [1, tokens.ids.length],
+      new BigInt64Array(seqLen),
+      [1, seqLen],
     );
 
     // Run inference
@@ -140,13 +129,12 @@ export class Embedder {
     // Mean pooling over token embeddings (masked)
     const lastHidden = output['last_hidden_state'] ?? output[Object.keys(output)[0]];
     const data = lastHidden.data as Float32Array;
-    const seqLen = tokens.ids.length;
     const dims = EMBEDDING_DIMS;
 
     const pooled = new Float32Array(dims);
     let count = 0;
     for (let t = 0; t < seqLen; t++) {
-      if (tokens.mask[t] === 1) {
+      if (Number(rawMask[t]) === 1) {
         for (let d = 0; d < dims; d++) {
           pooled[d] += data[t * dims + d];
         }
@@ -169,14 +157,71 @@ export class Embedder {
   }
 
   /**
-   * Embed multiple texts in batch.
-   * Processes sequentially (batch requires padding logic).
+   * Embed multiple texts — real ONNX batching with padding.
+   * Falls back to sequential for single text.
    */
   async embedBatch(texts: string[]): Promise<Float32Array[]> {
-    const results: Float32Array[] = [];
-    for (const text of texts) {
-      results.push(await this.embed(text));
+    if (!this.session) await this.initialize();
+    if (texts.length === 0) return [];
+    if (texts.length === 1) return [await this.embed(texts[0])];
+
+    const ort = await import('onnxruntime-web');
+    const maxLen = 128;
+
+    // Tokenize all texts
+    const allEncoded = texts.map(t => this.tokenizer!(t, {
+      padding: true,
+      truncation: true,
+      max_length: maxLen,
+    }));
+
+    // Build batch tensors
+    const batchSize = texts.length;
+    const inputIds = new BigInt64Array(batchSize * maxLen);
+    const attentionMask = new BigInt64Array(batchSize * maxLen);
+    const tokenTypeIds = new BigInt64Array(batchSize * maxLen);
+
+    for (let b = 0; b < batchSize; b++) {
+      const ids = allEncoded[b].input_ids.data;
+      const mask = allEncoded[b].attention_mask.data;
+      for (let t = 0; t < maxLen; t++) {
+        inputIds[b * maxLen + t] = BigInt(Number(ids[t] ?? 0));
+        attentionMask[b * maxLen + t] = BigInt(Number(mask[t] ?? (t < ids.length ? 1 : 0)));
+      }
     }
+
+    const output = await this.session!.run({
+      input_ids: new ort.Tensor('int64', inputIds, [batchSize, maxLen]),
+      attention_mask: new ort.Tensor('int64', attentionMask, [batchSize, maxLen]),
+      token_type_ids: new ort.Tensor('int64', tokenTypeIds, [batchSize, maxLen]),
+    });
+
+    const lastHidden = output['last_hidden_state'] ?? output[Object.keys(output)[0]];
+    const data = lastHidden.data as Float32Array;
+    const dims = EMBEDDING_DIMS;
+
+    // Extract per-text embeddings with mean pooling + L2 norm
+    const results: Float32Array[] = [];
+    for (let b = 0; b < batchSize; b++) {
+      const pooled = new Float32Array(dims);
+      let count = 0;
+      for (let t = 0; t < maxLen; t++) {
+        if (attentionMask[b * maxLen + t] === 1n) {
+          for (let d = 0; d < dims; d++) {
+            pooled[d] += data[(b * maxLen + t) * dims + d];
+          }
+          count++;
+        }
+      }
+      if (count > 0) for (let d = 0; d < dims; d++) pooled[d] /= count;
+      // L2 normalize
+      let norm = 0;
+      for (let d = 0; d < dims; d++) norm += pooled[d] * pooled[d];
+      norm = Math.sqrt(norm);
+      if (norm > 0) for (let d = 0; d < dims; d++) pooled[d] /= norm;
+      results.push(pooled);
+    }
+
     return results;
   }
 
@@ -225,47 +270,3 @@ export class Embedder {
   }
 }
 
-/**
- * SimpleTokenizer — hash-based fallback tokenizer for MiniLM.
- *
- * Not a real WordPiece tokenizer, but produces consistent token IDs
- * (same text → same hash → same embedding) which is sufficient for
- * similarity comparison within a session. The model still produces
- * meaningful embeddings because the attention mechanism operates on
- * positional patterns, not just token IDs.
- *
- * Prefer @huggingface/transformers AutoTokenizer when available
- * (see loadTokenizer above).
- */
-class SimpleTokenizer implements Tokenizer {
-  // Token IDs: [CLS]=101, [SEP]=102, [UNK]=100, [PAD]=0
-  encode(text: string, maxLen: number): Tokenized {
-    const words = text
-      .toLowerCase()
-      .replace(/[^\w\s'-]/g, ' ')
-      .split(/\s+/)
-      .filter((w) => w.length > 0);
-
-    // Hash-based token IDs in vocab range (1000-30000)
-    const ids: number[] = [101]; // [CLS]
-    for (const word of words) {
-      if (ids.length >= maxLen - 1) break;
-      let hash = 0;
-      for (let i = 0; i < word.length; i++) {
-        hash = ((hash << 5) - hash + word.charCodeAt(i)) | 0;
-      }
-      ids.push(1000 + (Math.abs(hash) % 29000));
-    }
-    ids.push(102); // [SEP]
-
-    const mask = new Array(ids.length).fill(1);
-
-    // Pad to maxLen
-    while (ids.length < maxLen) {
-      ids.push(0);
-      mask.push(0);
-    }
-
-    return { ids: ids.slice(0, maxLen), mask: mask.slice(0, maxLen) };
-  }
-}

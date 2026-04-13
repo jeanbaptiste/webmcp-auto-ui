@@ -122,6 +122,16 @@ function chunkPlainText(text: string, max: number): string[] {
   return mergeSentences(sentences, max).map(s => truncate(s, max));
 }
 
+// ── Contextual embedding prefix ─────────────────────────────────────
+
+/** Prefix a chunk with tool name + optional user query for contextual embeddings */
+export function contextualizeChunk(chunk: Chunk, toolName: string, userQuery?: string): string {
+  const parts = [`[Tool: ${toolName}`];
+  if (userQuery) parts.push(`| Query: ${userQuery.slice(0, 60)}`);
+  parts.push(']');
+  return `${parts.join('')} ${chunk.text}`;
+}
+
 // ── Main entry point ────────────────────────────────────────────────
 
 export function chunkToolResult(

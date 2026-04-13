@@ -102,7 +102,9 @@ void dequantize(unsigned char* input, float* output, int d, int bits_per_dim) {
     }
 }
 
-/* ── Dot products ───────────────────────────────────────────────── */
+/* ── Dot products (WASM SIMD) ──────────────────────────────────── */
+
+#include <wasm_simd128.h>
 
 float dot_quantized(unsigned char* a, unsigned char* b, int d, int bits_per_dim) {
     int i;
@@ -116,8 +118,27 @@ float dot_quantized(unsigned char* a, unsigned char* b, int d, int bits_per_dim)
     float inv_a = range_a / (float)levels;
     float inv_b = range_b / (float)levels;
 
-    float sum = 0.0f;
-    for (i = 0; i < d; i++) {
+    v128_t sum_vec = wasm_f32x4_splat(0.0f);
+    v128_t mn_a_vec = wasm_f32x4_splat(mn_a);
+    v128_t mn_b_vec = wasm_f32x4_splat(mn_b);
+    v128_t inv_a_vec = wasm_f32x4_splat(inv_a);
+    v128_t inv_b_vec = wasm_f32x4_splat(inv_b);
+
+    i = 0;
+    for (; i + 3 < d; i += 4) {
+        v128_t va = wasm_f32x4_add(mn_a_vec, wasm_f32x4_mul(
+            wasm_f32x4_make((float)a[i], (float)a[i+1], (float)a[i+2], (float)a[i+3]),
+            inv_a_vec));
+        v128_t vb = wasm_f32x4_add(mn_b_vec, wasm_f32x4_mul(
+            wasm_f32x4_make((float)b[i], (float)b[i+1], (float)b[i+2], (float)b[i+3]),
+            inv_b_vec));
+        sum_vec = wasm_f32x4_add(sum_vec, wasm_f32x4_mul(va, vb));
+    }
+
+    float sum = wasm_f32x4_extract_lane(sum_vec, 0) + wasm_f32x4_extract_lane(sum_vec, 1) +
+                wasm_f32x4_extract_lane(sum_vec, 2) + wasm_f32x4_extract_lane(sum_vec, 3);
+
+    for (; i < d; i++) {
         float va = mn_a + (float)a[i] * inv_a;
         float vb = mn_b + (float)b[i] * inv_b;
         sum += va * vb;
@@ -132,8 +153,24 @@ float dot_asymmetric(float* query, unsigned char* quantized, int d, int bits_per
     float range    = *((float*)(quantized + d + 4));
     float inv_scale = range / (float)levels;
 
-    float sum = 0.0f;
-    for (i = 0; i < d; i++) {
+    v128_t sum_vec = wasm_f32x4_splat(0.0f);
+    v128_t mn_vec = wasm_f32x4_splat(mn);
+    v128_t inv_vec = wasm_f32x4_splat(inv_scale);
+
+    i = 0;
+    for (; i + 3 < d; i += 4) {
+        v128_t q = wasm_v128_load(&query[i]);
+        v128_t vals = wasm_f32x4_add(mn_vec, wasm_f32x4_mul(
+            wasm_f32x4_make((float)quantized[i], (float)quantized[i+1],
+                           (float)quantized[i+2], (float)quantized[i+3]),
+            inv_vec));
+        sum_vec = wasm_f32x4_add(sum_vec, wasm_f32x4_mul(q, vals));
+    }
+
+    float sum = wasm_f32x4_extract_lane(sum_vec, 0) + wasm_f32x4_extract_lane(sum_vec, 1) +
+                wasm_f32x4_extract_lane(sum_vec, 2) + wasm_f32x4_extract_lane(sum_vec, 3);
+
+    for (; i < d; i++) {
         float val = mn + (float)quantized[i] * inv_scale;
         sum += query[i] * val;
     }
