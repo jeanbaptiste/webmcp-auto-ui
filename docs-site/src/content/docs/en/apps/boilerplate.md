@@ -44,7 +44,7 @@ The app uses the packages:
 Clone the template:
 
 ```bash
-npx degit hyperskills/webmcp-auto-ui/apps/boilerplate my-app
+npx degit jeanbaptiste/webmcp-auto-ui/apps/boilerplate my-app
 cd my-app
 npm install
 npm run dev

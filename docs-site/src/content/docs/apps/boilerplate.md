@@ -39,12 +39,34 @@ L'app utilise les packages :
 - `@webmcp-auto-ui/sdk` : canvas store pour l'etat reactif
 - `@webmcp-auto-ui/ui` : `LLMSelector`, `McpStatus`, `AgentProgress`, `WidgetRenderer`, `getTheme`
 
+## Lancement
+
+| Environnement | Port | Commande |
+|---------------|------|----------|
+| Dev           | 5178 | `npm -w apps/boilerplate run dev` |
+| Production    | 3011 | `node index.js` (via systemd) |
+
+En developpement :
+
+```bash
+npm -w apps/boilerplate run dev
+# Accessible sur http://localhost:5178
+```
+
+En production, l'app est deployee sur `/opt/webmcp-demos/boilerplate/` et servie par systemd sur le port 3011. Utiliser le script de deploy :
+
+```bash
+./scripts/deploy.sh boilerplate
+```
+
+Le toggle de theme utilise `getTheme()` importe depuis `@webmcp-auto-ui/ui` (voir la documentation du package `ui` pour les details de l'API `getTheme`).
+
 ## Utilisation
 
 Cloner le template :
 
 ```bash
-npx degit hyperskills/webmcp-auto-ui/apps/boilerplate my-app
+npx degit jeanbaptiste/webmcp-auto-ui/apps/boilerplate my-app
 cd my-app
 npm install
 npm run dev
