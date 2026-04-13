@@ -78,7 +78,6 @@
              role={log.detail.length > 80 ? 'button' : undefined}
              tabindex={log.detail.length > 80 ? 0 : undefined}>
           <span class="ac-ts">{fmtTime(log.ts)}</span>
-          {#if log.ctxSize != null}<span class="ac-ctx">{log.ctxSize >= 1000 ? (log.ctxSize / 1000).toFixed(1) + 'K' : log.ctxSize}</span>{/if}
           <span class="ac-type" style="color:{typeColor[log.type] ?? 'var(--color-text2, #888)'}">{log.type}</span>
           {#if log.type === 'tool'}
             {@const prov = parseProvenance(log.detail)}
@@ -87,7 +86,12 @@
             {/if}
             <span class="ac-detail">{prov.rest}</span>
           {:else}
-            <span class="ac-detail">{log.detail}</span>
+            <span class="ac-detail">
+              {log.detail}
+              {#if log.ctxSize != null}
+                <span class="ac-ctx-badge">{log.ctxSize >= 1000 ? (log.ctxSize / 1000).toFixed(1) + 'K' : log.ctxSize} ctx</span>
+              {/if}
+            </span>
           {/if}
         </div>
       {/each}
@@ -193,13 +197,18 @@
     opacity: 0.5;
   }
 
-  .ac-ctx {
-    flex-shrink: 0;
+  .ac-ctx-badge {
+    display: inline-block;
     font-size: 7px;
+    font-weight: 600;
     color: #a78bfa;
-    opacity: 0.7;
-    min-width: 28px;
-    text-align: right;
+    background: rgba(167, 139, 250, 0.12);
+    border: 1px solid rgba(167, 139, 250, 0.25);
+    border-radius: 8px;
+    padding: 0 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+    line-height: 1.6;
   }
 
   .ac-type {
