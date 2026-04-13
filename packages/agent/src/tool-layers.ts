@@ -172,15 +172,28 @@ export function resolveCanonicalTools(tools: McpToolDef[]): CanonicalMatch[] {
  */
 export const toolAliasMap = new Map<string, string>();
 
+/** Check if a schema is compatible with strict tool use (no additionalProperties: true anywhere) */
+function isStrictCompatible(schema: Record<string, unknown>): boolean {
+  if (schema.additionalProperties === true) return false;
+  if (schema.properties) {
+    for (const prop of Object.values(schema.properties as Record<string, Record<string, unknown>>)) {
+      if (prop && typeof prop === 'object' && !isStrictCompatible(prop)) return false;
+    }
+  }
+  return true;
+}
+
 /** Convert McpToolDef[] to ProviderTool[] */
 export function toProviderTools(tools: McpToolDef[], schemaOptions?: SchemaTransformOptions): ProviderTool[] {
   return tools.map(t => {
     let schema = (t.inputSchema ?? { type: 'object', properties: {} }) as import('@webmcp-auto-ui/core').JsonSchema;
     if (schemaOptions?.sanitize !== false) schema = sanitizeSchema(schema);
+    const schemaObj = schema as Record<string, unknown>;
     return {
       name: t.name,
       description: t.description ?? t.name,
-      input_schema: schema as Record<string, unknown>,
+      input_schema: schemaObj,
+      strict: isStrictCompatible(schemaObj) ? true : undefined,
     };
   });
 }
@@ -190,10 +203,12 @@ function webmcpToProviderTools(tools: WebMcpToolDef[], schemaOptions?: SchemaTra
   return tools.map(t => {
     let schema = (t.inputSchema ?? { type: 'object', properties: {} }) as import('@webmcp-auto-ui/core').JsonSchema;
     if (schemaOptions?.sanitize !== false) schema = sanitizeSchema(schema);
+    const schemaObj = schema as Record<string, unknown>;
     return {
       name: t.name,
       description: t.description,
-      input_schema: schema as Record<string, unknown>,
+      input_schema: schemaObj,
+      strict: isStrictCompatible(schemaObj) ? true : undefined,
     };
   });
 }

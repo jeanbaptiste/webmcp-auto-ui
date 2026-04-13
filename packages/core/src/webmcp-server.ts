@@ -376,6 +376,7 @@ export function createWebMcpServer(
               description: 'Optional search term to filter recipes',
             },
           },
+          additionalProperties: false,
         },
         execute: async (params: Record<string, unknown>) => {
           const query = (params.query as string | undefined)?.toLowerCase();
@@ -391,6 +392,7 @@ export function createWebMcpServer(
         inputSchema: {
           type: 'object',
           properties: {},
+          additionalProperties: false,
         },
         execute: async () => {
           const results = [...widgets.values()]
@@ -407,6 +409,7 @@ export function createWebMcpServer(
             name: { type: 'string', description: 'Widget name' },
           },
           required: ['name'],
+          additionalProperties: false,
         },
         execute: async (params: Record<string, unknown>) => {
           const widgetName = params.name as string;
@@ -433,9 +436,11 @@ export function createWebMcpServer(
             params: {
               type: 'object',
               description: 'Widget parameters as JSON object (call get_recipe for the full schema). Example for text: {content: "Hello"}',
+              additionalProperties: true,
             },
           },
           required: ['name'],
+          additionalProperties: false,
         },
         execute: async (params: Record<string, unknown>) => {
           const widgetName = params.name as string;

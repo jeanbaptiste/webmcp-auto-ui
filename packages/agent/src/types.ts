@@ -35,6 +35,7 @@ export interface ProviderTool {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
+  strict?: boolean;  // Anthropic strict tool use — grammar-constrained sampling
 }
 
 /** @deprecated Use ProviderTool */

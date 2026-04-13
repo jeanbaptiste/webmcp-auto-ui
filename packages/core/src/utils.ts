@@ -129,6 +129,11 @@ function sanitizeSchemaObject(obj: JsonSchemaObject, seen: WeakSet<object>): Jso
     }
   }
 
+  // Strict tool use: ensure additionalProperties is set on object types
+  if (result.type === 'object' && result.properties && !('additionalProperties' in result)) {
+    result.additionalProperties = false;
+  }
+
   if (result.additionalProperties && typeof result.additionalProperties === 'object') {
     result.additionalProperties = sanitizeSchemaObject(
       { ...result.additionalProperties } as JsonSchemaObject,
