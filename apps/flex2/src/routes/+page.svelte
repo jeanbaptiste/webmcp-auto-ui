@@ -39,6 +39,9 @@
   let temperature = $state(1.0);
   let topK = $state(64);
   let maxTools = $state(8);
+  let maxResultLength = $state(10000);
+  let truncateResults = $state(false);
+  let compressHistory = $state(false);
   let systemPrompt = $state('');
   let localUrl = $state('http://localhost:11434');
   let localModel = $state('');
@@ -82,7 +85,7 @@
   let showToolJSON = $state(false);
   tokenTracker.subscribe(m => { tokenMetrics = m; });
 
-  let agentLogs = $state<{ ts: number; type: string; detail: string }[]>([]);
+  let agentLogs = $state<{ ts: number; type: string; detail: string; ctxSize?: number }[]>([]);
   let abortController = $state<AbortController | null>(null);
   let exportCopied = $state(false);
   let exportState = $state<'idle' | 'loading' | 'done'>('idle');
@@ -252,6 +255,11 @@
     const isLocal = canvas.llm === 'local';
     schemaSanitize = isLocal ? true : !isGemma;
     schemaFlatten = isGemma || isLocal;
+    truncateResults = isGemma || isLocal;
+    compressHistory = isGemma || isLocal;
+    if (isGemma) maxResultLength = 2000;
+    else if (isLocal) maxResultLength = 3000;
+    else maxResultLength = 10000;
   });
 
   // ── Layers & prompt ────────────────────────────────────────────────
@@ -357,8 +365,8 @@
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
-        maxIterations: 15, maxTokens, maxTools, temperature, topK, cacheEnabled,
-        truncateResults: false, compressHistory: false,
+        maxIterations: 15, maxTokens, maxTools, maxResultLength, temperature, topK, cacheEnabled,
+        truncateResults, compressHistory,
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         layers,
@@ -372,10 +380,15 @@
             }
           },
           onLLMRequest: (messages, tools) => {
-            agentLogs = [...agentLogs, { ts: Date.now(), type: 'request', detail: `${messages.length} messages, ${tools.length} tools` }];
+            const ctxChars = messages.reduce((sum, m) => {
+              if (typeof m.content === 'string') return sum + m.content.length;
+              return sum + (m.content as any[]).reduce((s, b) => s + (b.text?.length ?? JSON.stringify(b).length ?? 0), 0);
+            }, 0);
+            const ctxTokens = Math.round(ctxChars / 4);
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'request', detail: `${messages.length} messages, ${tools.length} tools`, ctxSize: ctxTokens }];
           },
           onLLMResponse: (response, latencyMs, tokens) => {
-            agentLogs = [...agentLogs, { ts: Date.now(), type: 'response', detail: `${tokens?.input ?? '?'}in ${tokens?.output ?? '?'}out, ${Math.round(latencyMs)}ms, ${response.stopReason}` }];
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'response', detail: `${tokens?.input ?? '?'}in ${tokens?.output ?? '?'}out, ${Math.round(latencyMs)}ms, ${response.stopReason}`, ctxSize: tokens?.input }];
             if (response.usage) tokenTracker.record(response.usage, latencyMs);
             else if (response.stats) tokenTracker.recordEstimate(0, response.stats.totalTokens * 4, latencyMs);
           },
@@ -586,7 +599,7 @@
   bind:open={settingsOpen}
   bind:composerMode bind:layoutMode bind:includeSummary
   onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true}
-  bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools
+  bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools bind:maxResultLength
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON
   bind:schemaSanitize bind:schemaFlatten
   bind:localUrl bind:localModel

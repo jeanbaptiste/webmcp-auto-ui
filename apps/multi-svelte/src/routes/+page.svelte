@@ -58,6 +58,9 @@
   let cacheEnabled = $state(true);
   let temperature = $state(1.0);
   let maxTools = $state(8);
+  let maxResultLength = $state(10000);
+  let truncateResults = $state(false);
+  let compressHistory = $state(false);
   let schemaSanitize = $state(true);
   let schemaFlatten = $state(false);
   let localUrl = $state('http://localhost:11434');
@@ -72,7 +75,7 @@
   let tokenMetrics = $state(tokenTracker.metrics);
   tokenTracker.subscribe(m => { tokenMetrics = m; });
 
-  let agentLogs = $state<{ ts: number; type: string; detail: string }[]>([]);
+  let agentLogs = $state<{ ts: number; type: string; detail: string; ctxSize?: number }[]>([]);
   let abortController = $state<AbortController | null>(null);
   let allToolsUsed = $state<string[]>([]);
 
@@ -256,6 +259,11 @@
     const isLocal = canvas.llm === 'local';
     schemaSanitize = isLocal ? true : !isGemma;
     schemaFlatten = isGemma || isLocal;
+    truncateResults = isGemma || isLocal;
+    compressHistory = isGemma || isLocal;
+    if (isGemma) maxResultLength = 2000;
+    else if (isLocal) maxResultLength = 3000;
+    else maxResultLength = 10000;
   });
 
   // ── Layers & prompt ───────────────────────────────────────────────
@@ -315,7 +323,8 @@
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
-        maxIterations: 15, maxTokens, maxTools, temperature, cacheEnabled,
+        maxIterations: 15, maxTokens, maxTools, maxResultLength, temperature, cacheEnabled,
+        truncateResults, compressHistory,
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         layers,
@@ -324,8 +333,16 @@
           onIterationStart: (i, max) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'iteration', detail: `Iteration ${i}/${max}` }];
           },
+          onLLMRequest: (messages, tools) => {
+            const ctxChars = messages.reduce((sum, m) => {
+              if (typeof m.content === 'string') return sum + m.content.length;
+              return sum + (m.content as any[]).reduce((s, b) => s + (b.text?.length ?? JSON.stringify(b).length ?? 0), 0);
+            }, 0);
+            const ctxTokens = Math.round(ctxChars / 4);
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'request', detail: `${messages.length} messages, ${tools.length} tools`, ctxSize: ctxTokens }];
+          },
           onLLMResponse: (response, latencyMs, tokens) => {
-            agentLogs = [...agentLogs, { ts: Date.now(), type: 'response', detail: `${tokens?.input ?? '?'}in ${tokens?.output ?? '?'}out, ${Math.round(latencyMs)}ms` }];
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'response', detail: `${tokens?.input ?? '?'}in ${tokens?.output ?? '?'}out, ${Math.round(latencyMs)}ms`, ctxSize: tokens?.input }];
             if (response.usage) tokenTracker.record(response.usage, latencyMs);
           },
           onWidget: (type, data) => {
