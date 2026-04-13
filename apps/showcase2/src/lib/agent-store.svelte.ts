@@ -51,6 +51,27 @@ let gemmaTotalMB = $state(0);
 let gemmaTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
 let gemmaLoadStart = $state(0);
 
+// LLM optimization options (smart defaults via $effect below)
+let schemaSanitize = $state(true);
+let schemaFlatten = $state(false);
+let maxResultLength = $state(10000);
+let truncateResults = $state(false);
+let compressHistory = $state(false);
+let compressPreview = $state(500);
+
+// Smart defaults: adjust optimization options when LLM model changes
+$effect(() => {
+  const isGemma = canvas.llm.startsWith('gemma');
+  const isLocal = canvas.llm === 'local';
+  schemaSanitize = isLocal ? true : !isGemma;
+  schemaFlatten = isGemma || isLocal;
+  truncateResults = isGemma || isLocal;
+  compressHistory = isGemma || isLocal;
+  if (isGemma) maxResultLength = 2000;
+  else if (isLocal) maxResultLength = 3000;
+  else maxResultLength = 10000;
+});
+
 // Nano-RAG (experimental, off by default)
 let contextRAGEnabled = $state(false);
 let contextRAG = $state<ContextRAG | null>(null);
@@ -146,6 +167,18 @@ export const agentStore = {
   get multiClient() { return multiClient; },
   get contextRAGEnabled() { return contextRAGEnabled; },
   set contextRAGEnabled(v: boolean) { contextRAGEnabled = v; },
+  get schemaSanitize() { return schemaSanitize; },
+  set schemaSanitize(v: boolean) { schemaSanitize = v; },
+  get schemaFlatten() { return schemaFlatten; },
+  set schemaFlatten(v: boolean) { schemaFlatten = v; },
+  get maxResultLength() { return maxResultLength; },
+  set maxResultLength(v: number) { maxResultLength = v; },
+  get truncateResults() { return truncateResults; },
+  set truncateResults(v: boolean) { truncateResults = v; },
+  get compressHistory() { return compressHistory; },
+  set compressHistory(v: boolean) { compressHistory = v; },
+  get compressPreview() { return compressPreview; },
+  set compressPreview(v: number) { compressPreview = v; },
 
   /** Connect to an MCP server */
   async connect(url: string) {
@@ -236,12 +269,15 @@ export const agentStore = {
           systemPrompt,
           maxIterations: 15,
           maxTokens: 4096,
+          maxResultLength,
+          truncateResults,
+          compressHistory: compressHistory ? compressPreview : false,
           cacheEnabled: true,
           signal: abortController!.signal,
           layers,
           discoveryCache,
           contextRAG: contextRAG ?? undefined,
-          schemaOptions: { sanitize: true, flatten: false },
+          schemaOptions: { sanitize: schemaSanitize, flatten: schemaFlatten },
           callbacks: {
             onLLMResponse: (response, latencyMs) => {
               if (response.usage) {

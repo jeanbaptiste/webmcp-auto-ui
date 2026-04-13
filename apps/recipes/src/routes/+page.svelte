@@ -94,6 +94,27 @@
   // Settings panel
   let settingsOpen = $state(false);
 
+  // LLM optimization options (smart defaults via $effect below)
+  let schemaSanitize = $state(true);
+  let schemaFlatten = $state(false);
+  let maxResultLength = $state(10000);
+  let truncateResults = $state(false);
+  let compressHistory = $state(false);
+  let compressPreview = $state(500);
+
+  // Smart defaults: adjust optimization options when LLM model changes
+  $effect(() => {
+    const isGemma = canvas.llm.startsWith('gemma');
+    const isLocal = canvas.llm === 'local';
+    schemaSanitize = isLocal ? true : !isGemma;
+    schemaFlatten = isGemma || isLocal;
+    truncateResults = isGemma || isLocal;
+    compressHistory = isGemma || isLocal;
+    if (isGemma) maxResultLength = 2000;
+    else if (isLocal) maxResultLength = 3000;
+    else maxResultLength = 10000;
+  });
+
   // Nano-RAG (experimental, off by default)
   let contextRAGEnabled = $state(false);
   let contextRAG = $state<ContextRAG | null>(null);
@@ -342,6 +363,9 @@
         systemPrompt: systemPrompt || undefined,
         maxIterations: 15,
         maxTokens: 4096,
+        maxResultLength,
+        truncateResults,
+        compressHistory: compressHistory ? compressPreview : false,
         temperature: 1.0,
         cacheEnabled: true,
         signal: abortController!.signal,
@@ -349,7 +373,7 @@
         layers,
         discoveryCache,
         contextRAG: contextRAG ?? undefined,
-        schemaOptions: { sanitize: true, flatten: false },
+        schemaOptions: { sanitize: schemaSanitize, flatten: schemaFlatten },
         callbacks: {
           onIterationStart: (i: number, max: number) => {
             pushLog('iteration', `Iteration ${i}/${max}`);
