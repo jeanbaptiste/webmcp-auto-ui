@@ -22,7 +22,8 @@
     "access": "public"
   },
   "devDependencies": {
-    "typescript": "^5.0.0",
-    "@webmcp-auto-ui/core": "file:../core"
+    "@webmcp-auto-ui/core": "file:../core",
+    "onnxruntime-web": "^1.24.3",
+    "typescript": "^5.0.0"
   }
 }
