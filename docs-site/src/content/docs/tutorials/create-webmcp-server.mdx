@@ -9,7 +9,7 @@ Ce tutoriel explique comment exposer vos propres widgets via le protocole WebMCP
 
 ## Vue d'ensemble
 
-<img src="/diagrams/tut-webmcp-server-1.svg" alt="Pipeline complet : composant, recette, serveur WebMCP, agent loop, LLM" />
+<img src="/webmcp-auto-ui/diagrams/tut-webmcp-server-1.svg" alt="Pipeline complet : composant, recette, serveur WebMCP, agent loop, LLM" />
 
 Le pipeline complet part d'un composant UI, passe par une recette declarative, puis est enregistre dans un serveur WebMCP qui expose les outils au LLM.
 
@@ -296,7 +296,7 @@ Ce prefixage evite les collisions quand plusieurs serveurs (MCP + WebMCP) coexis
 
 ### Architecture multi-serveurs
 
-<img src="/diagrams/tut-webmcp-server-2.svg" alt="Architecture multi-serveurs MCP et WebMCP" />
+<img src="/webmcp-auto-ui/diagrams/tut-webmcp-server-2.svg" alt="Architecture multi-serveurs MCP et WebMCP" />
 
 ---
 
@@ -312,11 +312,11 @@ User: "Montre-moi un kanban de mon sprint"
 
 Le LLM va suivre cette sequence :
 
-<img src="/diagrams/tut-webmcp-server-3.svg" alt="Sequence de decouverte et rendu d'un widget kanban" />
+<img src="/webmcp-auto-ui/diagrams/tut-webmcp-server-3.svg" alt="Sequence de decouverte et rendu d'un widget kanban" />
 
 ### Le dispatch widget_display
 
-<img src="/diagrams/tut-webmcp-server-4.svg" alt="Dispatch widget_display avec validation et rendu" />
+<img src="/webmcp-auto-ui/diagrams/tut-webmcp-server-4.svg" alt="Dispatch widget_display avec validation et rendu" />
 
 ### Verifier le rendu
 

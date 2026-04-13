@@ -16,7 +16,7 @@ Le systeme repose sur deux protocoles symetriques :
 
 Chacun expose des **tools** (actions atomiques) et des **recettes** (guides de composition).
 
-<img src="/diagrams/tut-arch-mcp-1.svg" alt="Comparaison MCP (donnees distantes) et WebMCP (affichage local)" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-1.svg" alt="Comparaison MCP (donnees distantes) et WebMCP (affichage local)" />
 
 ### Tableau comparatif
 
@@ -42,7 +42,7 @@ Le design fondamental est la **symetrie** : le LLM ne distingue pas un tool MCP 
 
 Du point de vue du LLM, un appel MCP et un appel WebMCP suivent le meme cycle : decouverte, lecture du schema, execution. Seul le routage interne differe -- la boucle agent dispatche vers le bon serveur selon le prefixe.
 
-<img src="/diagrams/tut-arch-mcp-2.svg" alt="Symetrie du routage : MCP via HTTP, WebMCP via JS local" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-2.svg" alt="Symetrie du routage : MCP via HTTP, WebMCP via JS local" />
 
 ---
 
@@ -114,7 +114,7 @@ Au demarrage, la boucle agent n'expose **pas** tous les tools de tous les serveu
 
 Les tools WebMCP d'action (`widget_display`, `canvas`, `recall`) sont toujours presents car ils sont necessaires pour afficher des resultats.
 
-<img src="/diagrams/tut-arch-mcp-3.svg" alt="Lazy loading : discovery puis activation des outils MCP" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-3.svg" alt="Lazy loading : discovery puis activation des outils MCP" />
 
 Quand le LLM appelle un tool d'un serveur pour la premiere fois, `activateServerTools()` ajoute tous les tools de ce serveur au jeu actif. Le serveur n'est active qu'une seule fois.
 
@@ -128,7 +128,7 @@ Avec 4 serveurs et 50 tools au total, le mode discovery expose environ 20 tools 
 
 Les schemas des widgets suivent un pipeline en 4 etapes, du composant Svelte au runtime :
 
-<img src="/diagrams/tut-arch-mcp-4.svg" alt="Pipeline des schemas : composant Svelte vers WebMCP Server" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-4.svg" alt="Pipeline des schemas : composant Svelte vers WebMCP Server" />
 
 Le script `sync-schemas.ts` maintient un mapping explicite entre chaque nom de widget et son fichier `.svelte` (ex: `"stat"` ↔ `StatBlock.svelte`, `"profile"` ↔ `ProfileCard.svelte`).
 
@@ -136,7 +136,7 @@ Le script `sync-schemas.ts` maintient un mapping explicite entre chaque nom de w
 
 Quand le LLM appelle `widget_display(name, params)`, le serveur WebMCP valide les params contre le JSON Schema **avant** de les passer au renderer :
 
-<img src="/diagrams/tut-arch-mcp-5.svg" alt="Validation JSON Schema au runtime avant rendu du widget" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-5.svg" alt="Validation JSON Schema au runtime avant rendu du widget" />
 
 Si la validation echoue, le LLM recoit un message d'erreur avec le schema attendu, ce qui lui permet de corriger son appel.
 
@@ -146,7 +146,7 @@ Si la validation echoue, le LLM recoit un message d'erreur avec le schema attend
 
 Sequence diagram d'une conversation typique. L'utilisateur demande : "Montre-moi le profil du depute Jean Dupont".
 
-<img src="/diagrams/tut-arch-mcp-6.svg" alt="Flow complet d'une conversation : discovery, data, schema, display" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-6.svg" alt="Flow complet d'une conversation : discovery, data, schema, display" />
 
 ### Mecanismes de securite
 
@@ -166,7 +166,7 @@ Apres chaque iteration, les anciens `tool_result` sont comprimes : les textes de
 
 Plusieurs serveurs MCP et WebMCP coexistent grace au prefixage uniforme.
 
-<img src="/diagrams/tut-arch-mcp-7.svg" alt="Multi-serveurs : agent loop avec MCP et WebMCP layers" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-7.svg" alt="Multi-serveurs : agent loop avec MCP et WebMCP layers" />
 
 ### Isolation des namespaces
 
@@ -228,7 +228,7 @@ export type ToolLayer = McpLayer | WebMcpLayer | WasmLayer;
 
 ## Architecture globale
 
-<img src="/diagrams/tut-arch-mcp-8.svg" alt="Architecture globale : navigateur (app, agent, widgets) et serveurs distants" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-8.svg" alt="Architecture globale : navigateur (app, agent, widgets) et serveurs distants" />
 
 ---
 

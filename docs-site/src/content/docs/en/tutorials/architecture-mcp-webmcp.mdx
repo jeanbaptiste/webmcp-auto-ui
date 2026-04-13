@@ -16,7 +16,7 @@ The system relies on two symmetric protocols:
 
 Each exposes **tools** (atomic actions) and **recipes** (composition guides).
 
-<img src="/diagrams/tut-arch-mcp-1.svg" alt="MCP (remote data) vs WebMCP (local display) comparison" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-1.svg" alt="MCP (remote data) vs WebMCP (local display) comparison" />
 
 ### Comparison table
 
@@ -42,7 +42,7 @@ The fundamental design is **symmetry**: the LLM does not distinguish an MCP tool
 
 From the LLM's perspective, an MCP call and a WebMCP call follow the same cycle: discovery, schema reading, execution. Only the internal routing differs -- the agent loop dispatches to the correct server based on the prefix.
 
-<img src="/diagrams/tut-arch-mcp-2.svg" alt="Routing symmetry: MCP via HTTP, WebMCP via local JS" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-2.svg" alt="Routing symmetry: MCP via HTTP, WebMCP via local JS" />
 
 ---
 
@@ -114,7 +114,7 @@ At startup, the agent loop does **not** expose all tools from all servers. It on
 
 WebMCP action tools (`widget_display`, `canvas`, `recall`) are always present because they are needed to display results.
 
-<img src="/diagrams/tut-arch-mcp-3.svg" alt="Lazy loading: discovery then MCP tool activation" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-3.svg" alt="Lazy loading: discovery then MCP tool activation" />
 
 When the LLM calls a tool from a server for the first time, `activateServerTools()` adds all tools from that server to the active set. The server is activated only once.
 
@@ -128,7 +128,7 @@ With 4 servers and 50 tools total, discovery mode exposes about 20 tools instead
 
 Widget schemas follow a 4-step pipeline, from Svelte component to runtime:
 
-<img src="/diagrams/tut-arch-mcp-4.svg" alt="Schema pipeline: Svelte component to WebMCP Server" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-4.svg" alt="Schema pipeline: Svelte component to WebMCP Server" />
 
 The `sync-schemas.ts` script maintains an explicit mapping between each widget name and its `.svelte` file (e.g. `"stat"` ↔ `StatBlock.svelte`, `"profile"` ↔ `ProfileCard.svelte`).
 
@@ -136,7 +136,7 @@ The `sync-schemas.ts` script maintains an explicit mapping between each widget n
 
 When the LLM calls `widget_display(name, params)`, the WebMCP server validates the params against the JSON Schema **before** passing them to the renderer:
 
-<img src="/diagrams/tut-arch-mcp-5.svg" alt="Runtime JSON Schema validation before widget rendering" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-5.svg" alt="Runtime JSON Schema validation before widget rendering" />
 
 If validation fails, the LLM receives an error message with the expected schema, allowing it to correct its call.
 
@@ -146,7 +146,7 @@ If validation fails, the LLM receives an error message with the expected schema,
 
 Sequence diagram of a typical conversation. The user asks: "Show me the profile of MP Jean Dupont".
 
-<img src="/diagrams/tut-arch-mcp-6.svg" alt="Full conversation flow: discovery, data, schema, display" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-6.svg" alt="Full conversation flow: discovery, data, schema, display" />
 
 ### Safety mechanisms
 
@@ -166,7 +166,7 @@ After each iteration, previous `tool_result` entries are compressed: texts longe
 
 Multiple MCP and WebMCP servers coexist thanks to uniform prefixing.
 
-<img src="/diagrams/tut-arch-mcp-7.svg" alt="Multi-server: agent loop with MCP and WebMCP layers" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-7.svg" alt="Multi-server: agent loop with MCP and WebMCP layers" />
 
 ### Namespace isolation
 
@@ -228,7 +228,7 @@ export type ToolLayer = McpLayer | WebMcpLayer | WasmLayer;
 
 ## Overall architecture
 
-<img src="/diagrams/tut-arch-mcp-8.svg" alt="Overall architecture: browser (app, agent, widgets) and remote servers" />
+<img src="/webmcp-auto-ui/diagrams/tut-arch-mcp-8.svg" alt="Overall architecture: browser (app, agent, widgets) and remote servers" />
 
 ---
 

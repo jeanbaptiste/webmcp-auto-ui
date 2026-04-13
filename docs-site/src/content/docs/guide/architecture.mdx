@@ -9,11 +9,11 @@ WebMCP Auto-UI utilise une **architecture modulaire** basée sur quatre concepts
 
 ## Architecture globale
 
-<img src="/diagrams/architecture-1.svg" alt="Architecture globale : Frontend Svelte 5, boucle agent et routage des outils" />
+<img src="/webmcp-auto-ui/diagrams/architecture-1.svg" alt="Architecture globale : Frontend Svelte 5, boucle agent et routage des outils" />
 
 ## Boucle agentic détaillée
 
-<img src="/diagrams/architecture-2.svg" alt="Sequence diagram de la boucle agentic detaillee" />
+<img src="/webmcp-auto-ui/diagrams/architecture-2.svg" alt="Sequence diagram de la boucle agentic detaillee" />
 
 ## Providers LLM
 
@@ -162,7 +162,7 @@ if (!activatedServers.has(serverKey)) {
 
 Pour les **MCP servers**, les outils sont matchés à des **rôles canoniques** :
 
-<img src="/diagrams/architecture-3.svg" alt="Resolution canonique des outils MCP en 4 couches de matching" />
+<img src="/webmcp-auto-ui/diagrams/architecture-3.svg" alt="Resolution canonique des outils MCP en 4 couches de matching" />
 
 **Couche 1** : Nom exact (`search_recipes`, `list_recipes`, `get_recipe`)
 
@@ -268,7 +268,7 @@ const systemPrompt = buildSystemPromptWithAliases(layers).prompt;
 
 Le **canvas** est un **store réactif** avec gestion d'état centralisée :
 
-<img src="/diagrams/architecture-4.svg" alt="Canvas reactif : store vanilla, wrapper Svelte 5 et callbacks agent" />
+<img src="/webmcp-auto-ui/diagrams/architecture-4.svg" alt="Canvas reactif : store vanilla, wrapper Svelte 5 et callbacks agent" />
 
 ### Réactivité
 
@@ -318,7 +318,7 @@ const fullResult = await client.callTool('recall', { id: 'id_xyz' });
 
 ## Flux widget_display
 
-<img src="/diagrams/architecture-5.svg" alt="Flux widget_display de la validation au montage DOM" />
+<img src="/webmcp-auto-ui/diagrams/architecture-5.svg" alt="Flux widget_display de la validation au montage DOM" />
 
 ## Résumé architectural
 
