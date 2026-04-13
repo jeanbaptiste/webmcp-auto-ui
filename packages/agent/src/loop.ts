@@ -10,7 +10,10 @@ import type {
 } from './types.js';
 import type { ToolLayer, SchemaTransformOptions } from './tool-layers.js';
 import { buildToolsFromLayers, buildSystemPromptWithAliases, buildDiscoveryToolsWithAliases, buildSystemPrompt, buildDiscoveryTools, activateServerTools, toProviderTools, sanitizeServerName, flattenPathMaps } from './tool-layers.js';
-import { unflattenParams } from '@webmcp-auto-ui/core';
+import type { DiscoveryCache } from './discovery-cache.js';
+import { unflattenParams, validateJsonSchema } from '@webmcp-auto-ui/core';
+import type { JsonSchema } from '@webmcp-auto-ui/core';
+import { autoRepairParams } from './auto-repair.js';
 
 // Re-export buildSystemPrompt for backward compat
 export { buildSystemPrompt } from './tool-layers.js';
@@ -105,6 +108,8 @@ export interface AgentLoopOptions {
   maxResultLength?: number;
   /** Schema transform options — sanitize strips complex keywords, flatten simplifies nested objects */
   schemaOptions?: SchemaTransformOptions;
+  /** Pre-fetched discovery cache for instant recipe/tool lookups */
+  discoveryCache?: DiscoveryCache;
 }
 
 export async function runAgentLoop(
@@ -127,6 +132,7 @@ export async function runAgentLoop(
     compressHistory = true,
     maxResultLength = MAX_RESULT_LEN,
     schemaOptions,
+    discoveryCache,
   } = options;
 
   // Buffer for recall — stores full tool results keyed by tool_use_id
@@ -285,6 +291,23 @@ export async function runAgentLoop(
         // Parse tool name: {serverName}_{protocol}_{toolName}
         const toolMatch = resolvedName.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
 
+        // ── Discovery cache — resolve search/list/get locally if cached ──
+        if (discoveryCache && toolMatch) {
+          const cached = discoveryCache.resolve(toolMatch[1], toolMatch[3], block.input as Record<string, unknown>);
+          if (cached !== null) {
+            result = cached;
+            // Store + push result, then continue to next tool block
+            resultBuffer.set(block.id, result);
+            call.result = result;
+            toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result });
+            call.elapsed = Math.round(performance.now() - t1);
+            metrics.toolCalls++;
+            allToolCalls.push(call);
+            callbacks.onToolCall?.(call);
+            continue;
+          }
+        }
+
         // ── Intercept list_tools / search_tools (local pseudo-tools) ──
         // These are read-only discovery operations — do NOT activate the server.
         if (toolMatch && (toolMatch[3] === 'list_tools' || toolMatch[3] === 'search_tools')) {
@@ -332,12 +355,37 @@ export async function runAgentLoop(
         } else {
           const [, serverName, protocol, realToolName] = toolMatch;
 
+          // Auto-repair + validate params before dispatch
+          let toolInput = block.input as Record<string, unknown>;
+          const toolDef = iterationTools.find(t => t.name === block.name);
+          if (toolDef?.input_schema) {
+            const repair = autoRepairParams(toolInput, toolDef.input_schema, realToolName);
+            if (repair.fixes.length > 0) {
+              toolInput = repair.params;
+              callbacks.onText?.(`[auto-repair] ${repair.fixes.join(', ')}`);
+            }
+            // Validate after repair
+            const validation = validateJsonSchema(toolInput, toolDef.input_schema as JsonSchema);
+            if (!validation.valid) {
+              const errors = validation.errors?.map((e: { message?: string }) => e.message ?? String(e)).join(', ') ?? 'unknown';
+              result = `Validation error: ${errors}. Expected schema: ${JSON.stringify(toolDef.input_schema)}`;
+              // Push error as tool_result and skip to next block
+              toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result });
+              call.result = result;
+              call.elapsed = Math.round(performance.now() - t1);
+              metrics.toolCalls++;
+              allToolCalls.push(call);
+              callbacks.onToolCall?.(call);
+              continue;
+            }
+          }
+
           if (protocol === 'mcp') {
             // Route to MCP client
             if (!client) {
               result = `Error: no MCP client available for tool ${name}`;
             } else {
-              const mcpResult = await client.callTool(realToolName, block.input);
+              const mcpResult = await client.callTool(realToolName, toolInput);
               const textContent = mcpResult.content?.find((c: { type: string }) => c.type === 'text') as { text?: string } | undefined;
               const rawResult = textContent?.text ?? JSON.stringify(mcpResult);
               result = truncateResults ? truncateResult(rawResult, maxResultLength) : rawResult;
@@ -345,7 +393,7 @@ export async function runAgentLoop(
           } else if (protocol === 'webmcp') {
             // Intercept recall BEFORE hitting executeTool — use the local resultBuffer directly
             if (realToolName === 'recall' && resultBuffer.size > 0) {
-              const recallId = (block.input as { id: string }).id;
+              const recallId = (toolInput as { id: string }).id;
               result = resultBuffer.get(recallId) ?? `Aucun résultat trouvé pour l'id '${recallId}'.`;
             } else {
               // Route to WebMCP server
@@ -354,17 +402,11 @@ export async function runAgentLoop(
                 result = `Error: no WebMCP server "${serverName}" found.`;
               } else {
                 // Unflatten params if schema was flattened
-                let toolInput = block.input as Record<string, unknown>;
                 if (schemaOptions?.flatten) {
                   const pathMap = flattenPathMaps.get(block.name);
                   if (pathMap) {
                     toolInput = unflattenParams(toolInput, pathMap);
                   }
-                }
-                // Fix flat params from small LLMs (Gemma): {name:"text", content:"..."} → {name:"text", params:{content:"..."}}
-                if (realToolName === 'widget_display' && toolInput.name && !toolInput.params) {
-                  const { name, ...rest } = toolInput;
-                  toolInput = { name, params: rest };
                 }
                 const toolResult = await webmcpServer.executeTool(realToolName, toolInput);
                 result = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);

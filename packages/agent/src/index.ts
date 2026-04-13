@@ -47,6 +47,10 @@ export type { TokenMetrics } from './token-tracker.js';
 export { runDiagnostics } from './diagnostics.js';
 export type { Diagnostic } from './diagnostics.js';
 
+// Auto-repair
+export { autoRepairParams } from './auto-repair.js';
+export type { RepairResult } from './auto-repair.js';
+
 // Types
 export type {
   RemoteModelId, WasmModelId, LLMId, ModelId,
