@@ -228,6 +228,10 @@ export async function runAgentLoop(
         : (lastUserMsg?.content as any[])?.find((b: any) => b.type === 'text')?.text ?? '';
       if (queryText) {
         try {
+          const ragResults = await contextRAG.query(queryText);
+          if (ragResults.length > 0) {
+            callbacks.onText?.(`[nano-rag] query "${queryText.slice(0, 40)}${queryText.length > 40 ? '…' : ''}" → ${ragResults.length} results (${ragResults.map(r => r.score.toFixed(2)).join(', ')})`);
+          }
           const ragContext = await contextRAG.buildContext(queryText);
           if (ragContext) {
             iterationSystemPrompt = iterationSystemPrompt
@@ -472,7 +476,12 @@ export async function runAgentLoop(
         if (contextRAG && result) {
           const toolMatch2 = resolvedName.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
           const realName = toolMatch2 ? toolMatch2[3] : block.name;
-          contextRAG.ingest(realName, block.id, typeof result === 'string' ? result : JSON.stringify(result)).catch(() => {});
+          const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
+          contextRAG.ingest(realName, block.id, resultStr).then((chunkCount) => {
+            if (chunkCount > 0) {
+              callbacks.onText?.(`[nano-rag] ingested ${chunkCount} chunks from ${realName} (${resultStr.length} chars)`);
+            }
+          }).catch(() => {});
         }
 
         call.result = result;
