@@ -19,6 +19,11 @@ jobs:
 
       - run: npm ci
 
+      - name: Generate SvelteKit types
+        run: |
+          npx svelte-kit sync --cwd apps/flex2
+          npx svelte-kit sync --cwd apps/multi-svelte
+
       - name: Type check (flex2)
         run: npx svelte-check --workspace apps/flex2 --fail-on-warnings false --threshold error
 
