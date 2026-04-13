@@ -20,6 +20,7 @@ export default defineConfig({
         'cytoscape', 'cytoscape-dagre', 'cytoscape-cola', 'cytoscape-cose-bilkent', 'cytoscape-fcose',
         'roughjs',
         'pixi.js',
+        'onnxruntime-web',
       ],
     },
   },

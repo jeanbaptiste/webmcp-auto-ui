@@ -45,8 +45,9 @@ export class Embedder {
   private async _init(): Promise<void> {
     const ort = await import('onnxruntime-web');
 
-    // Use WASM backend (WebGPU not yet stable for ONNX)
+    // Use WASM backend, load WASM binaries from CDN (avoids bundling 70MB in builds)
     ort.env.wasm.numThreads = 1;
+    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/';
 
     const modelUrl =
       'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model_quantized.onnx';

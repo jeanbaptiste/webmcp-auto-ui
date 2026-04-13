@@ -9,6 +9,11 @@ export default defineConfig({
     __GIT_HASH__: JSON.stringify(process.env.GIT_HASH || execSync('git rev-parse --short=8 HEAD').toString().trim()),
   },
   plugins: [sveltekit()],
+  build: {
+    rollupOptions: {
+      external: ['onnxruntime-web'],
+    },
+  },
   resolve: {
     alias: {
       '@webmcp-auto-ui/sdk/canvas': path.resolve('../../packages/sdk/src/canvas.ts'),
