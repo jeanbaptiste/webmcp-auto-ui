@@ -1,53 +1,130 @@
-import type { LLMProvider, LLMResponse, ChatMessage, AnthropicTool, ContentBlock } from '../types.js';
+import type { LLMProvider, LLMResponse, ChatMessage, ProviderTool, ContentBlock } from '../types.js';
 
-export type LocalBackend = 'ollama' | 'llamafile' | 'lm-studio' | string;
+export type LocalBackend = 'ollama' | 'vllm' | 'lm-studio' | 'llamafile' | string;
 
 export interface LocalLLMProviderOptions {
-  baseUrl: string;       // e.g. 'http://localhost:11434' (Ollama) or 'http://localhost:8080' (Llamafile)
-  model: string;         // e.g. 'llama3.2', 'mistral', 'phi4-mini'
+  baseUrl: string;       // e.g. 'http://localhost:11434' (Ollama), 'http://localhost:8000' (vLLM)
+  model: string;         // e.g. 'llama3.2', 'qwen2.5', 'mistral'
   backend?: LocalBackend;
 }
+
+// ── OpenAI-compatible types ─────────────────────────────────────────
+
+interface OaiTool {
+  type: 'function';
+  function: { name: string; description: string; parameters: Record<string, unknown> };
+}
+
+interface OaiMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content?: string | null;
+  tool_calls?: { id: string; type: 'function'; function: { name: string; arguments: string } }[];
+  tool_call_id?: string;
+}
+
+interface OaiChoice {
+  message: {
+    content?: string | null;
+    tool_calls?: { id: string; type: 'function'; function: { name: string; arguments: string } }[];
+  };
+  finish_reason: string;
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────
+
+let _counter = 0;
+function localId(): string {
+  return 'local_' + (++_counter).toString(36) + '_' + Date.now().toString(36);
+}
+
+function toOaiTools(tools: ProviderTool[]): OaiTool[] {
+  return tools.map(t => ({
+    type: 'function' as const,
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: t.input_schema,
+    },
+  }));
+}
+
+function toOaiMessages(messages: ChatMessage[], system?: string): OaiMessage[] {
+  const out: OaiMessage[] = [];
+
+  if (system) out.push({ role: 'system', content: system });
+
+  for (const msg of messages) {
+    if (typeof msg.content === 'string') {
+      out.push({ role: msg.role === 'assistant' ? 'assistant' : 'user', content: msg.content });
+      continue;
+    }
+
+    const blocks = msg.content as ContentBlock[];
+    const textParts = blocks.filter(b => b.type === 'text').map(b => (b as { type: 'text'; text: string }).text);
+    const toolUses = blocks.filter(b => b.type === 'tool_use') as { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }[];
+    const toolResults = blocks.filter(b => b.type === 'tool_result') as { type: 'tool_result'; tool_use_id: string; content: string }[];
+
+    if (msg.role === 'assistant') {
+      const oai: OaiMessage = { role: 'assistant', content: textParts.join('\n') || null };
+      if (toolUses.length > 0) {
+        oai.tool_calls = toolUses.map(tu => ({
+          id: tu.id,
+          type: 'function' as const,
+          function: { name: tu.name, arguments: JSON.stringify(tu.input) },
+        }));
+      }
+      out.push(oai);
+    } else {
+      // User turn — may contain tool_result blocks (sent back after assistant tool_use)
+      for (const tr of toolResults) {
+        out.push({ role: 'tool', tool_call_id: tr.tool_use_id, content: tr.content });
+      }
+      if (textParts.length > 0) {
+        out.push({ role: 'user', content: textParts.join('\n') });
+      }
+      // If only tool_results and no text, we've already pushed them
+      if (toolResults.length === 0 && textParts.length === 0) {
+        out.push({ role: 'user', content: '' });
+      }
+    }
+  }
+  return out;
+}
+
+function parseArguments(raw: string): Record<string, unknown> {
+  try { return JSON.parse(raw); } catch { return { _raw: raw }; }
+}
+
+// ── Provider ────────────────────────────────────────────────────────
 
 export class LocalLLMProvider implements LLMProvider {
   readonly name = 'local';
   readonly model: string;
   private baseUrl: string;
-  private backend: LocalBackend;
 
   constructor(options: LocalLLMProviderOptions) {
     this.model = options.model;
     this.baseUrl = options.baseUrl.replace(/\/$/, '');
-    this.backend = options.backend ?? 'ollama';
   }
 
   async chat(
     messages: ChatMessage[],
-    _tools: AnthropicTool[],
-    options?: { signal?: AbortSignal; system?: string }
+    tools: ProviderTool[],
+    options?: { signal?: AbortSignal; system?: string; maxTokens?: number; temperature?: number },
   ): Promise<LLMResponse> {
-    // OpenAI-compatible chat completions endpoint
-    const openaiMessages: { role: string; content: string }[] = [];
+    const oaiMessages = toOaiMessages(messages, options?.system);
+    const oaiTools = tools.length > 0 ? toOaiTools(tools) : undefined;
 
-    if (options?.system) {
-      openaiMessages.push({ role: 'system', content: options.system });
-    }
+    const body: Record<string, unknown> = {
+      model: this.model,
+      messages: oaiMessages,
+      stream: false,
+    };
+    if (oaiTools) body.tools = oaiTools;
+    if (options?.maxTokens) body.max_tokens = options.maxTokens;
+    if (options?.temperature != null) body.temperature = options.temperature;
 
-    for (const msg of messages) {
-      const text = typeof msg.content === 'string'
-        ? msg.content
-        : (msg.content as ContentBlock[]).filter(b => b.type === 'text').map(b => (b as { type: 'text'; text: string }).text).join('\n');
-      openaiMessages.push({ role: msg.role === 'assistant' ? 'assistant' : 'user', content: text });
-    }
-
-    const endpoint = this.backend === 'ollama'
-      ? `${this.baseUrl}/api/chat`
-      : `${this.baseUrl}/v1/chat/completions`;
-
-    const body = this.backend === 'ollama'
-      ? { model: this.model, messages: openaiMessages, stream: false }
-      : { model: this.model, messages: openaiMessages };
-
-    const response = await fetch(endpoint, {
+    const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -59,16 +136,45 @@ export class LocalLLMProvider implements LLMProvider {
       throw new Error(`Local LLM ${response.status}${txt ? ': ' + txt.slice(0, 200) : ''}`);
     }
 
-    const data = await response.json() as Record<string, unknown>;
+    const data = await response.json() as { choices?: OaiChoice[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+    const choice = data.choices?.[0];
+    if (!choice) throw new Error('Local LLM returned no choices');
 
-    // Ollama: data.message.content; OpenAI: data.choices[0].message.content
-    const text = this.backend === 'ollama'
-      ? ((data.message as { content?: string })?.content ?? '')
-      : (((data.choices as { message: { content?: string } }[])?.[0])?.message?.content ?? '');
+    const content: ContentBlock[] = [];
+    const toolCalls = choice.message.tool_calls;
+
+    if (choice.message.content) {
+      content.push({ type: 'text', text: choice.message.content });
+    }
+
+    if (toolCalls && toolCalls.length > 0) {
+      for (const tc of toolCalls) {
+        content.push({
+          type: 'tool_use',
+          id: tc.id || localId(),
+          name: tc.function.name,
+          input: parseArguments(tc.function.arguments),
+        });
+      }
+    }
+
+    // Ensure at least one block
+    if (content.length === 0) {
+      content.push({ type: 'text', text: '' });
+    }
+
+    const hasToolUse = content.some(b => b.type === 'tool_use');
+    const stopReason = hasToolUse ? 'tool_use'
+      : choice.finish_reason === 'tool_calls' ? 'tool_use'
+      : 'end_turn';
 
     return {
-      content: [{ type: 'text', text }],
-      stopReason: 'end_turn',
+      content,
+      stopReason,
+      usage: data.usage ? {
+        input_tokens: data.usage.prompt_tokens ?? 0,
+        output_tokens: data.usage.completion_tokens ?? 0,
+      } : undefined,
     };
   }
 }

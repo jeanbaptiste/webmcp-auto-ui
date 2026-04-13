@@ -22,7 +22,7 @@ export type WidgetType =
 export type BlockType = WidgetType;
 
 export type Mode = 'auto' | 'drag' | 'chat';
-export type LLMId = 'haiku' | 'sonnet' | 'gemma-e2b' | 'gemma-e4b';
+export type LLMId = 'haiku' | 'sonnet' | 'gemma-e2b' | 'gemma-e4b' | 'local';
 
 export interface Widget {
   id: string;

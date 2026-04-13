@@ -43,6 +43,10 @@ export type { SummarizeOptions, ChatSummaryResult } from './summarize.js';
 export { TokenTracker } from './token-tracker.js';
 export type { TokenMetrics } from './token-tracker.js';
 
+// Diagnostics
+export { runDiagnostics } from './diagnostics.js';
+export type { Diagnostic } from './diagnostics.js';
+
 // Types
 export type {
   RemoteModelId, WasmModelId, LLMId, ModelId,

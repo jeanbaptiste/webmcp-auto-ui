@@ -89,3 +89,5 @@ export { default as SettingsPanel } from './agent/SettingsPanel.svelte';
 export { default as RemoteMCPserversDemo } from './agent/RemoteMCPserversDemo.svelte';
 export { default as EphemeralBubble } from './agent/EphemeralBubble.svelte';
 export { default as TokenBubble } from './agent/TokenBubble.svelte';
+export { default as DiagnosticModal } from './agent/DiagnosticModal.svelte';
+export { default as DiagnosticIcon } from './agent/DiagnosticIcon.svelte';

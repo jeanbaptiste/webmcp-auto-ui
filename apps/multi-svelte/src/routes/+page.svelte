@@ -5,8 +5,9 @@
   import { McpMultiClient } from '@webmcp-auto-ui/core';
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import {
-    RemoteLLMProvider, WasmProvider, runAgentLoop, buildSystemPrompt,
+    RemoteLLMProvider, WasmProvider, LocalLLMProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, trimConversationHistory, TokenTracker,
+    buildToolsFromLayers, runDiagnostics,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
   import {
@@ -14,6 +15,7 @@
     TokenBubble, LLMSelector, bus, layoutAdapter,
     FloatingLayout, FlexLayout, WidgetRenderer,
     LinkIndicators, linkGroupColor, RemoteMCPserversDemo,
+    DiagnosticIcon, DiagnosticModal,
   } from '@webmcp-auto-ui/ui';
   import type { ManagedWindow } from '@webmcp-auto-ui/ui';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
@@ -58,6 +60,8 @@
   let maxTools = $state(8);
   let schemaSanitize = $state(true);
   let schemaFlatten = $state(false);
+  let localUrl = $state('http://localhost:11434');
+  let localModel = $state('');
   let systemPrompt = $state('');
   let layoutMode = $state<'float' | 'grid'>('float');
   let sidebarOpen = $state(true);
@@ -193,6 +197,9 @@
   const anthropicProvider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
 
   function getProvider() {
+    if (canvas.llm === 'local') {
+      return new LocalLLMProvider({ baseUrl: localUrl, model: localModel || 'llama3.2' });
+    }
     if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
       if (gemmaProvider && gemmaProvider.model !== canvas.llm) unloadGemma();
       if (!gemmaProvider) {
@@ -243,11 +250,12 @@
     });
   });
 
-  // Smart defaults: sanitize ON for Claude, flatten ON for Gemma
+  // Smart defaults: sanitize ON for Claude/local, flatten ON for Gemma/local
   $effect(() => {
     const isGemma = canvas.llm.startsWith('gemma');
-    schemaSanitize = !isGemma;
-    schemaFlatten = isGemma;
+    const isLocal = canvas.llm === 'local';
+    schemaSanitize = isLocal ? true : !isGemma;
+    schemaFlatten = isGemma || isLocal;
   });
 
   // ── Layers & prompt ───────────────────────────────────────────────
@@ -272,6 +280,10 @@
     const hasCustom = systemPrompt && systemPrompt.trim().length > 0;
     return hasCustom ? `${systemPrompt}\n\n${b}` : b;
   });
+
+  const providerTools = $derived(buildToolsFromLayers(layers, { sanitize: schemaSanitize, flatten: schemaFlatten }));
+  const diagnostics = $derived(runDiagnostics(layers, providerTools, effectivePrompt ?? '', { sanitize: schemaSanitize, flatten: schemaFlatten }));
+  let diagModalOpen = $state(false);
 
   // ── Helpers ────────────────────────────────────────────────────────
   function uid() { return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
@@ -414,9 +426,28 @@
             { value: 'opus', label: 'claude-opus-4-6', group: 'remote' },
             { value: 'gemma-e2b', label: 'Gemma E2B (WASM)', group: 'wasm' },
             { value: 'gemma-e4b', label: 'Gemma E4B (WASM)', group: 'wasm' },
+            { value: 'local', label: 'Local (Ollama/vLLM)', group: 'local' },
           ]}
         />
       </div>
+
+      <!-- Local LLM config -->
+      {#if canvas.llm === 'local'}
+      <div class="px-3 py-3 border-b border-border">
+        <span class="text-[10px] uppercase tracking-wider text-text2 mb-2 block">LLM local</span>
+        <div class="flex flex-col gap-1.5">
+          <input type="text" bind:value={localUrl} placeholder="http://localhost:11434"
+            class="w-full bg-surface2 border border-border2 rounded px-2 py-1.5 text-xs font-mono text-text1
+                   outline-none placeholder:text-text2/50 focus:border-accent/60 transition-colors" />
+          <input type="text" bind:value={localModel} placeholder="llama3.2, qwen2.5, mistral..."
+            class="w-full bg-surface2 border border-border2 rounded px-2 py-1.5 text-xs font-mono text-text1
+                   outline-none placeholder:text-text2/50 focus:border-accent/60 transition-colors" />
+          <div class="text-[9px] font-mono text-text2/60">
+            Compatible Ollama, vLLM, LM Studio, llama.cpp
+          </div>
+        </div>
+      </div>
+      {/if}
 
       <!-- MCP Connection (URL manuelle) -->
       <div class="px-3 py-3 border-b border-border">
@@ -472,7 +503,10 @@
 
       <!-- Settings -->
       <div class="px-3 py-3 flex flex-col gap-2">
-        <span class="text-[10px] uppercase tracking-wider text-text2 mb-1">Settings</span>
+        <div class="flex items-center gap-2 mb-1">
+          <span class="text-[10px] uppercase tracking-wider text-text2">Settings</span>
+          <DiagnosticIcon count={diagnostics.length} onclick={() => diagModalOpen = true} />
+        </div>
         <label class="flex items-center justify-between text-xs font-mono text-text2">
           <span>Max tokens</span>
           <input type="number" bind:value={maxTokens} min={256} max={16384} step={256}
@@ -669,3 +703,5 @@
     </div>
   </div>
 </div>
+
+<DiagnosticModal bind:open={diagModalOpen} {diagnostics} onclose={() => diagModalOpen = false} />

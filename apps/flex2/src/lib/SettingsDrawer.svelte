@@ -6,7 +6,7 @@
 <script lang="ts">
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
-  import { McpConnector, LLMSelector, SettingsPanel, RemoteMCPserversDemo } from '@webmcp-auto-ui/ui';
+  import { McpConnector, LLMSelector, SettingsPanel, RemoteMCPserversDemo, DiagnosticModal, DiagnosticIcon } from '@webmcp-auto-ui/ui';
   import RecipeModal from './RecipeModal.svelte';
 
   const buildStamp = typeof __BUILD_TIME__ === 'string'
@@ -45,6 +45,9 @@
     onremoveserver?: (url: string) => void;
     mcpRecipes?: McpRecipe[];
     webmcpRecipes?: WebmcpRecipe[];
+    localUrl?: string;
+    localModel?: string;
+    diagnostics?: Array<{ severity: 'error' | 'warning'; title: string; detail: string; quickFix?: string; codeFix?: string }>;
   }
 
   let {
@@ -76,10 +79,14 @@
     onremoveserver,
     mcpRecipes = [],
     webmcpRecipes = [],
+    localUrl = $bindable('http://localhost:11434'),
+    localModel = $bindable(''),
+    diagnostics = [],
   }: Props = $props();
 
   let selectedRecipe = $state<McpRecipe | WebmcpRecipe | null>(null);
   let recipeModalOpen = $state(false);
+  let diagModalOpen = $state(false);
 
   function openRecipe(recipe: McpRecipe | WebmcpRecipe) {
     selectedRecipe = recipe;
@@ -140,9 +147,34 @@
       />
     </section>
 
+    <!-- Local LLM -->
+    {#if canvas.llm === 'local'}
+    <section class="flex flex-col gap-2">
+      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">LLM local</div>
+      <input
+        type="text"
+        bind:value={localUrl}
+        placeholder="http://localhost:11434"
+        class="font-mono text-xs h-7 px-2 rounded border border-border2 bg-surface2 text-text1 w-full"
+      />
+      <input
+        type="text"
+        bind:value={localModel}
+        placeholder="llama3.2, qwen2.5, mistral..."
+        class="font-mono text-xs h-7 px-2 rounded border border-border2 bg-surface2 text-text1 w-full"
+      />
+      <div class="text-[9px] font-mono text-text2/60">
+        Compatible Ollama, vLLM, LM Studio, llama.cpp
+      </div>
+    </section>
+    {/if}
+
     <!-- Agent settings -->
     <section class="flex flex-col gap-2">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Agent</div>
+      <div class="flex items-center gap-2">
+        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Agent</span>
+        <DiagnosticIcon count={diagnostics.length} onclick={() => diagModalOpen = true} />
+      </div>
       <SettingsPanel
         bind:systemPrompt
         {effectivePrompt}
@@ -279,6 +311,7 @@
 </aside>
 
 <RecipeModal bind:open={recipeModalOpen} recipe={selectedRecipe} onclose={() => { selectedRecipe = null; }} />
+<DiagnosticModal bind:open={diagModalOpen} {diagnostics} onclose={() => diagModalOpen = false} />
 
 <style>
   .settings-drawer {

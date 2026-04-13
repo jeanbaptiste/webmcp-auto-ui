@@ -6,16 +6,18 @@ import type { WebMcpToolDef } from '@webmcp-auto-ui/core';
 import { sanitizeSchema, flattenSchema } from '@webmcp-auto-ui/core';
 
 /** Sanitize a server name for use in tool name prefixes.
- *  Tool names must match ^[a-zA-Z0-9_-]{1,128}$ per the Anthropic API. */
+ *  Returns a clean underscore-separated identifier with no "mcp"/"server" noise.
+ *  Final tool names follow {server}_{protocol}_{tool} convention. */
 export function sanitizeServerName(name: string): string {
-  // Strip all trailing variants: "MCP Server", "MCP-Server", "-mcp-server", "-mcp", "_mcp" etc.
-  let clean = name.replace(/[\s_-]*(mcp[\s_-]*server|mcp)\s*$/i, '').trim();
-  if (!clean) clean = name;
-  return clean.toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, '_')  // invalid chars → underscore
-    .replace(/[_-]{2,}/g, '_')       // collapse any separator runs (including -_ or _-)
-    .replace(/^[_-]+|[_-]+$/g, '')   // strip leading/trailing separators
-    || 'mcp';
+  let result = name.toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')       // all non-alphanumeric → underscore
+    .replace(/_{2,}/g, '_')             // collapse runs
+    .replace(/^_|_$/g, '');             // trim edges
+  // Remove noise segments: mcp, server, srv (anywhere in the name)
+  result = result.split('_').filter(seg => !['mcp', 'server', 'srv'].includes(seg)).join('_');
+  // Final cleanup
+  result = result.replace(/^_|_$/g, '');
+  return result || 'mcp';
 }
 
 /** MCP data layer — tools and recipes from a connected MCP server */
