@@ -64,16 +64,18 @@ done
 
 # ── Timer helpers ───────────────────────────────────────────────────────────
 
-declare -A STEP_TIMES
 TOTAL_START=$(date +%s)
 
 step_start() {
-  STEP_TIMES["$1"]=$(date +%s)
+  local key="${1//[^a-zA-Z0-9]/_}"
+  eval "_STEP_TIME_${key}=$(date +%s)"
 }
 
 step_end() {
   local name=$1
-  local start=${STEP_TIMES[$name]}
+  local key="${1//[^a-zA-Z0-9]/_}"
+  local start
+  eval "start=\${_STEP_TIME_${key}}"
   local elapsed=$(( $(date +%s) - start ))
   echo -e "  ${CYAN}⏱${NC}  ${name}: ${elapsed}s"
 }

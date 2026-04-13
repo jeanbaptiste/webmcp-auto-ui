@@ -3,7 +3,7 @@
 import type { McpToolDef, ProviderTool } from './types.js';
 import type { McpRecipe } from './recipes/types.js';
 import type { WebMcpToolDef } from '@webmcp-auto-ui/core';
-import { sanitizeSchema } from '@webmcp-auto-ui/core';
+import { sanitizeSchema, flattenSchema } from '@webmcp-auto-ui/core';
 
 /** Sanitize a server name for use in tool name prefixes.
  *  Tool names must match ^[a-zA-Z0-9_-]{1,128}$ per the Anthropic API. */
@@ -32,6 +32,17 @@ export interface WebMcpLayer {
 }
 
 export type ToolLayer = McpLayer | WebMcpLayer;
+
+/** Options controlling how tool schemas are transformed before sending to the LLM */
+export interface SchemaTransformOptions {
+  /** Strip oneOf/anyOf/allOf/not/if-then-else/$ref (default: true) */
+  sanitize?: boolean;
+  /** Flatten nested object properties using key__subkey convention (default: false) */
+  flatten?: boolean;
+}
+
+/** Path maps for flattened schemas — keyed by prefixed tool name */
+export const flattenPathMaps = new Map<string, Record<string, string[]>>();
 
 // ── Canonical tool resolution (4-layer matching) ─────────────────────
 //
@@ -154,42 +165,46 @@ export function resolveCanonicalTools(tools: McpToolDef[]): CanonicalMatch[] {
 export const toolAliasMap = new Map<string, string>();
 
 /** Convert McpToolDef[] to ProviderTool[] */
-export function toProviderTools(tools: McpToolDef[]): ProviderTool[] {
-  return tools.map(t => ({
-    name: t.name,
-    description: t.description ?? t.name,
-    input_schema: sanitizeSchema(
-      (t.inputSchema ?? { type: 'object', properties: {} }) as import('@webmcp-auto-ui/core').JsonSchema
-    ) as Record<string, unknown>,
-  }));
+export function toProviderTools(tools: McpToolDef[], schemaOptions?: SchemaTransformOptions): ProviderTool[] {
+  return tools.map(t => {
+    let schema = (t.inputSchema ?? { type: 'object', properties: {} }) as import('@webmcp-auto-ui/core').JsonSchema;
+    if (schemaOptions?.sanitize !== false) schema = sanitizeSchema(schema);
+    return {
+      name: t.name,
+      description: t.description ?? t.name,
+      input_schema: schema as Record<string, unknown>,
+    };
+  });
 }
 
 /** Convert WebMcpToolDef[] to ProviderTool[] (Fix 12: sanitize schemas) */
-function webmcpToProviderTools(tools: WebMcpToolDef[]): ProviderTool[] {
-  return tools.map(t => ({
-    name: t.name,
-    description: t.description,
-    input_schema: sanitizeSchema(
-      (t.inputSchema ?? { type: 'object', properties: {} }) as import('@webmcp-auto-ui/core').JsonSchema
-    ) as Record<string, unknown>,
-  }));
+function webmcpToProviderTools(tools: WebMcpToolDef[], schemaOptions?: SchemaTransformOptions): ProviderTool[] {
+  return tools.map(t => {
+    let schema = (t.inputSchema ?? { type: 'object', properties: {} }) as import('@webmcp-auto-ui/core').JsonSchema;
+    if (schemaOptions?.sanitize !== false) schema = sanitizeSchema(schema);
+    return {
+      name: t.name,
+      description: t.description,
+      input_schema: schema as Record<string, unknown>,
+    };
+  });
 }
 
 /** Build ProviderTool[] from structured layers.
  *  ALL tools are prefixed: {serverName}_{protocol}_{toolName}
  */
-export function buildToolsFromLayers(layers: ToolLayer[]): ProviderTool[] {
+export function buildToolsFromLayers(layers: ToolLayer[], schemaOptions?: SchemaTransformOptions): ProviderTool[] {
   const tools: ProviderTool[] = [];
 
   for (const layer of layers) {
     const prefix = `${sanitizeServerName(layer.serverName)}_${layer.protocol}_`;
 
     if (layer.protocol === 'mcp') {
-      for (const tool of toProviderTools(layer.tools)) {
+      for (const tool of toProviderTools(layer.tools, schemaOptions)) {
         tools.push({ ...tool, name: `${prefix}${tool.name}` });
       }
     } else {
-      for (const tool of webmcpToProviderTools(layer.tools)) {
+      for (const tool of webmcpToProviderTools(layer.tools, schemaOptions)) {
         tools.push({ ...tool, name: `${prefix}${tool.name}` });
       }
     }
@@ -200,6 +215,21 @@ export function buildToolsFromLayers(layers: ToolLayer[]): ProviderTool[] {
   for (const tool of tools) {
     seen.set(tool.name, tool);
   }
+
+  // Apply flatten if requested
+  if (schemaOptions?.flatten) {
+    flattenPathMaps.clear();
+    const result = Array.from(seen.values());
+    for (const tool of result) {
+      const { schema: flatSchema, pathMap } = flattenSchema(tool.input_schema as import('@webmcp-auto-ui/core').JsonSchema);
+      if (Object.keys(pathMap).length > 0) {
+        tool.input_schema = flatSchema as Record<string, unknown>;
+        flattenPathMaps.set(tool.name, pathMap);
+      }
+    }
+    return result;
+  }
+
   return Array.from(seen.values());
 }
 

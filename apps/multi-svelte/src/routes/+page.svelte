@@ -56,6 +56,8 @@
   let cacheEnabled = $state(true);
   let temperature = $state(1.0);
   let maxTools = $state(8);
+  let schemaSanitize = $state(true);
+  let schemaFlatten = $state(false);
   let systemPrompt = $state('');
   let layoutMode = $state<'float' | 'grid'>('float');
   let sidebarOpen = $state(true);
@@ -241,6 +243,13 @@
     });
   });
 
+  // Smart defaults: sanitize ON for Claude, flatten ON for Gemma
+  $effect(() => {
+    const isGemma = canvas.llm.startsWith('gemma');
+    schemaSanitize = !isGemma;
+    schemaFlatten = isGemma;
+  });
+
   // ── Layers & prompt ───────────────────────────────────────────────
   const layers = $derived.by((): ToolLayer[] => {
     const result: ToolLayer[] = [];
@@ -298,6 +307,7 @@
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         layers,
+        schemaOptions: { sanitize: schemaSanitize, flatten: schemaFlatten },
         callbacks: {
           onIterationStart: (i, max) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'iteration', detail: `Iteration ${i}/${max}` }];

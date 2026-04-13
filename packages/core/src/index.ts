@@ -76,6 +76,8 @@ export {
   dispatchAndWait,
   signalCompletion,
   sanitizeSchema,
+  flattenSchema,
+  unflattenParams,
   createToolGroup,
 } from './utils.js';
 

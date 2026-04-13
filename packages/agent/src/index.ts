@@ -25,8 +25,8 @@ export type { AgentLoopOptions } from './loop.js';
 export { autoui, NATIVE_WIDGET_NAMES } from './autoui-server.js';
 
 // Tool layers
-export { buildToolsFromLayers, buildDiscoveryTools, buildDiscoveryToolsWithAliases, activateServerTools, resolveCanonicalTools, toolAliasMap, buildSystemPromptWithAliases } from './tool-layers.js';
-export type { ToolLayer, McpLayer, WebMcpLayer, SystemPromptResult, DiscoveryToolsResult } from './tool-layers.js';
+export { buildToolsFromLayers, buildDiscoveryTools, buildDiscoveryToolsWithAliases, activateServerTools, resolveCanonicalTools, toolAliasMap, buildSystemPromptWithAliases, flattenPathMaps } from './tool-layers.js';
+export type { ToolLayer, McpLayer, WebMcpLayer, SystemPromptResult, DiscoveryToolsResult, SchemaTransformOptions } from './tool-layers.js';
 
 // Re-export core WebMCP types
 export type { WebMcpServer, WebMcpToolDef, WidgetEntry } from '@webmcp-auto-ui/core';

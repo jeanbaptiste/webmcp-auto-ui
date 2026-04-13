@@ -8,8 +8,9 @@ import type {
   ChatMessage, ContentBlock, ToolCall, AgentMetrics, AgentResult,
   LLMProvider, ProviderTool, McpToolDef, AgentCallbacks,
 } from './types.js';
-import type { ToolLayer } from './tool-layers.js';
-import { buildToolsFromLayers, buildSystemPromptWithAliases, buildDiscoveryToolsWithAliases, buildSystemPrompt, buildDiscoveryTools, activateServerTools, toProviderTools, sanitizeServerName } from './tool-layers.js';
+import type { ToolLayer, SchemaTransformOptions } from './tool-layers.js';
+import { buildToolsFromLayers, buildSystemPromptWithAliases, buildDiscoveryToolsWithAliases, buildSystemPrompt, buildDiscoveryTools, activateServerTools, toProviderTools, sanitizeServerName, flattenPathMaps } from './tool-layers.js';
+import { unflattenParams } from '@webmcp-auto-ui/core';
 
 // Re-export buildSystemPrompt for backward compat
 export { buildSystemPrompt } from './tool-layers.js';
@@ -101,6 +102,8 @@ export interface AgentLoopOptions {
   compressHistory?: boolean;
   /** Max length for tool result truncation (default: 10000) */
   maxResultLength?: number;
+  /** Schema transform options — sanitize strips complex keywords, flatten simplifies nested objects */
+  schemaOptions?: SchemaTransformOptions;
 }
 
 export async function runAgentLoop(
@@ -122,6 +125,7 @@ export async function runAgentLoop(
     truncateResults = true,
     compressHistory = true,
     maxResultLength = MAX_RESULT_LEN,
+    schemaOptions,
   } = options;
 
   // Buffer for recall — stores full tool results keyed by tool_use_id
@@ -348,8 +352,15 @@ export async function runAgentLoop(
               if (!webmcpServer) {
                 result = `Error: no WebMCP server "${serverName}" found.`;
               } else {
-                // Fix flat params from small LLMs (Gemma): {name:"text", content:"..."} → {name:"text", params:{content:"..."}}
+                // Unflatten params if schema was flattened
                 let toolInput = block.input as Record<string, unknown>;
+                if (schemaOptions?.flatten) {
+                  const pathMap = flattenPathMaps.get(block.name);
+                  if (pathMap) {
+                    toolInput = unflattenParams(toolInput, pathMap);
+                  }
+                }
+                // Fix flat params from small LLMs (Gemma): {name:"text", content:"..."} → {name:"text", params:{content:"..."}}
                 if (realToolName === 'widget_display' && toolInput.name && !toolInput.params) {
                   const { name, ...rest } = toolInput;
                   toolInput = { name, params: rest };

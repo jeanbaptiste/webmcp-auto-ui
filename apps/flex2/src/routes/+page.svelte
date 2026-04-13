@@ -33,7 +33,8 @@
   let maxContextTokens = $state(150_000);
   let maxTokens = $state(4096);
   let cacheEnabled = $state(true);
-  let schemaValidation = $state(true);
+  let schemaSanitize = $state(true);
+  let schemaFlatten = $state(false);
   let temperature = $state(1.0);
   let topK = $state(64);
   let maxTools = $state(8);
@@ -239,6 +240,13 @@
   });
 
 
+  // Smart defaults: sanitize ON for Claude, flatten ON for Gemma
+  $effect(() => {
+    const isGemma = canvas.llm.startsWith('gemma');
+    schemaSanitize = !isGemma;
+    schemaFlatten = isGemma;
+  });
+
   // ── Layers & prompt ────────────────────────────────────────────────
   const layers = $derived.by((): ToolLayer[] => {
     const result: ToolLayer[] = [];
@@ -344,6 +352,7 @@
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         layers,
+        schemaOptions: { sanitize: schemaSanitize, flatten: schemaFlatten },
         callbacks: {
           onIterationStart: (i, max) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'iteration', detail: `Iteration ${i}/${max}` }];
@@ -569,7 +578,7 @@
   onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true}
   bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON
-  bind:schemaValidation
+  bind:schemaSanitize bind:schemaFlatten
   onconnect={() => addMcpServer(canvas.mcpUrl)}
   {connectedUrls} {loadingUrls}
   onaddserver={addMcpServer} onaddall={addAllServers} onremoveserver={removeMcpServer}

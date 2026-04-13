@@ -35,7 +35,8 @@
     topK?: number;
     showTokens?: boolean;
     showToolJSON?: boolean;
-    schemaValidation?: boolean;
+    schemaSanitize?: boolean;
+    schemaFlatten?: boolean;
     onconnect: () => void;
     connectedUrls?: string[];
     loadingUrls?: string[];
@@ -65,7 +66,8 @@
     topK = $bindable(64),
     showTokens = $bindable(true),
     showToolJSON = $bindable(false),
-    schemaValidation = $bindable(true),
+    schemaSanitize = $bindable(true),
+    schemaFlatten = $bindable(false),
     onconnect,
     connectedUrls = [],
     loadingUrls = [],
@@ -196,15 +198,22 @@
       </button>
     </section>
 
-    <!-- Validation -->
+    <!-- Schema transforms -->
     <section class="flex flex-col gap-2">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Validation</div>
+      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Schema LLM</div>
       <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
-        <input type="checkbox" bind:checked={schemaValidation} class="accent-teal w-3.5 h-3.5" />
-        Schema validation
+        <input type="checkbox" bind:checked={schemaSanitize} class="accent-teal w-3.5 h-3.5" />
+        Sanitize
       </label>
       <div class="text-[9px] font-mono text-text2/60 pl-5">
-        {schemaValidation ? 'Valide les params des widgets contre le schema JSON' : 'Pas de validation — les params sont passes tels quels'}
+        {schemaSanitize ? 'Strip oneOf/anyOf/allOf/$ref des schemas' : 'Schemas envoyes tels quels au LLM'}
+      </div>
+      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+        <input type="checkbox" bind:checked={schemaFlatten} class="accent-teal w-3.5 h-3.5" />
+        Flatten <span class="text-[8px] text-text2/40 font-mono">(experimental)</span>
+      </label>
+      <div class="text-[9px] font-mono text-text2/60 pl-5">
+        {schemaFlatten ? 'Aplatit les objets imbriques en key__subkey' : 'Schemas avec imbrication native'}
       </div>
     </section>
 

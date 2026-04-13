@@ -140,6 +140,83 @@ function sanitizeSchemaObject(obj: JsonSchemaObject, seen: WeakSet<object>): Jso
 }
 
 // ---------------------------------------------------------------------------
+// flattenSchema — flatten nested object properties for small LLMs
+// ---------------------------------------------------------------------------
+
+/**
+ * Flatten nested object schemas into flat key__subkey properties.
+ * Returns { schema, pathMap } where pathMap maps flat keys to nested paths.
+ * Only flattens properties of type "object" with their own properties.
+ */
+export function flattenSchema(schema: JsonSchema): { schema: JsonSchema; pathMap: Record<string, string[]> } {
+  if (typeof schema === 'boolean') return { schema, pathMap: {} };
+  const obj = schema as JsonSchemaObject;
+  if (!obj.properties) return { schema, pathMap: {} };
+
+  const flatProps: Record<string, JsonSchema> = {};
+  const pathMap: Record<string, string[]> = {};
+  const required = new Set(obj.required ?? []);
+  const flatRequired: string[] = [];
+
+  for (const [key, prop] of Object.entries(obj.properties)) {
+    if (typeof prop !== 'boolean' && prop.type === 'object' && prop.properties) {
+      // Flatten nested object
+      const nestedRequired = new Set((prop as JsonSchemaObject).required ?? []);
+      for (const [subKey, subProp] of Object.entries(prop.properties!)) {
+        const flatKey = `${key}__${subKey}`;
+        flatProps[flatKey] = subProp;
+        pathMap[flatKey] = [key, subKey];
+        if (required.has(key) && nestedRequired.has(subKey)) {
+          flatRequired.push(flatKey);
+        }
+      }
+    } else {
+      // Keep as-is
+      flatProps[key] = prop;
+      pathMap[key] = [key];
+      if (required.has(key)) flatRequired.push(key);
+    }
+  }
+
+  const result: JsonSchemaObject = {
+    ...obj,
+    properties: flatProps,
+  };
+  if (flatRequired.length > 0) result.required = flatRequired;
+  else delete result.required;
+
+  return { schema: result, pathMap };
+}
+
+/**
+ * Unflatten params using a pathMap from flattenSchema.
+ * Converts { a__b: 1, a__c: 2, d: 3 } back to { a: { b: 1, c: 2 }, d: 3 }
+ */
+export function unflattenParams(
+  params: Record<string, unknown>,
+  pathMap: Record<string, string[]>
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [flatKey, value] of Object.entries(params)) {
+    const path = pathMap[flatKey] ?? flatKey.split('__');
+    if (path.length === 1) {
+      result[path[0]] = value;
+    } else {
+      // Build nested structure
+      let current = result;
+      for (let i = 0; i < path.length - 1; i++) {
+        if (!(path[i] in current) || typeof current[path[i]] !== 'object') {
+          current[path[i]] = {};
+        }
+        current = current[path[i]] as Record<string, unknown>;
+      }
+      current[path[path.length - 1]] = value;
+    }
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // createToolGroup — ergonomic helper for SPA route-based tool registration
 // ---------------------------------------------------------------------------
 
