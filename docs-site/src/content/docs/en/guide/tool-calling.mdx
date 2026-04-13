@@ -100,14 +100,7 @@ if (activateMatch) {
 
 ## MCP Dispatch
 
-```mermaid
-graph LR
-    A["tool_use block\n{name: server_mcp_tool}"] -->|parse| B["name match\n+ resolveAlias"]
-    B -->|MCP branch| C["McpClient\n.callTool()"]
-    C -->|HTTP/SSE| D["MCP Server\n(network)"]
-    D -->|result JSON| E["Compress\nif > 300 chars"]
-    E -->|tool_result| F["Messages\nfor agent"]
-```
+<img src="/diagrams/tool-calling-1.svg" alt="MCP dispatch flow from tool_use block to agent messages" />
 
 ### MCP Code
 
@@ -134,19 +127,7 @@ if (protocol === 'mcp') {
 
 ## WebMCP Dispatch
 
-```mermaid
-graph LR
-    A["tool_use block\n{name: server_webmcp_tool}"] -->|parse| B["name match\n+ resolveAlias"]
-    B -->|WebMCP branch| C{"Tool name?"}
-    C -->|recall| D["Check resultBuffer\n+ return full"]
-    C -->|widget_display| E["Validate schema\n+ sanitize URLs"]
-    C -->|canvas| F["Route to callbacks\n(onMove, onResize, etc)"]
-    C -->|other| G["WebMCP server\n.executeTool()"]
-    D -->|string| H["tool_result"]
-    E -->|{widget,data,id}| H
-    F -->|{ok:true}| H
-    G -->|result| H
-```
+<img src="/diagrams/tool-calling-2.svg" alt="WebMCP dispatch flow with recall, widget_display, canvas and executeTool branches" />
 
 ### WebMCP Code
 
@@ -219,19 +200,7 @@ if (protocol === 'webmcp') {
 
 `widget_display()` is the main tool for **UI rendering**:
 
-```mermaid
-graph LR
-    A["widget_display\n(name, params)"] -->|validate| B["Get widget schema\nfrom autoui"]
-    B -->|JSON Schema| C["validateJsonSchema\n(params)"]
-    C -->|valid| D["sanitizeImageUrls\n(params)"]
-    D -->|cleaned| E["Generate widget ID\nw_xxxxx"]
-    E -->|{widget,data,id}| F["onWidget callback"]
-    F -->|Canvas.addWidget| G["Store widget"]
-    G -->|$state reactivity| H["WidgetRenderer\nmounts component"]
-    
-    C -->|invalid| I["Return errors\n+ expected schema"]
-    I -->|agent retry| A
-```
+<img src="/diagrams/tool-calling-3.svg" alt="widget_display validation, sanitization and rendering pipeline" />
 
 ### Complete Example
 

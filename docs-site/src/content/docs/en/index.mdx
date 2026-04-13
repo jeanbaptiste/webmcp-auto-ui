@@ -9,16 +9,7 @@ WebMCP Auto-UI is an automatic user interface generation platform driven by AI a
 
 ## Overview
 
-```mermaid
-graph LR
-    A["🧠 Agent LLM\n(Claude, Gemma)"] -->|calls| B["🔧 Tool Calling"]
-    B -->|dispatch| C["📊 MCP Servers\n(data)"]
-    B -->|dispatch| D["🎨 WebMCP Servers\n(UI)"]
-    C -->|results| A
-    D -->|widgets| E["🖥️ Canvas\n(Svelte + Vanilla)"]
-    A -->|loop| B
-    F["💾 HyperSkills\n(serialization)"] -.->|load/save| E
-```
+<img src="/diagrams/index-1.svg" alt="Overview: LLM agent, tool calling, MCP/WebMCP servers and canvas" />
 
 ## Key Features
 

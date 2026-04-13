@@ -11,17 +11,7 @@ Ce tutoriel montre comment connecter un **serveur MCP externe** (Model Context P
 
 **MCP** (Model Context Protocol) est un protocole client-serveur qui permet à un LLM d'accéder à des outils distants :
 
-```mermaid
-graph LR
-    A["Agent<br/>runAgentLoop()"]
-    B["MCP Client<br/>McpClient"]
-    C["Serveur MCP<br/>(données distantes)"]
-    D["Outils exposés<br/>(API, DB)"]
-
-    A -->|Appelle outil| B
-    B -->|JSON-RPC via HTTP| C
-    C -->|Exécute| D
-```
+<img src="/diagrams/tut-connect-mcp-1.svg" alt="Agent vers MCP Client vers serveur MCP distant" />
 
 ## Étape 1 : Initialiser le client MCP
 

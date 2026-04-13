@@ -116,34 +116,38 @@ interface RemoteLLMProviderOptions {
 
 #### WasmProvider
 
-Provider Gemma 2 (in-browser, via WASM avec Web Workers).
+Provider Gemma 4 LiteRT (in-browser, via WASM sur le thread principal).
 
 ```ts
 import { WasmProvider } from '@webmcp-auto-ui/agent';
 
 const provider = new WasmProvider({
-  modelSize: '2b',  // '2b' ou '7b'
-  quantized: true,  // Quantized 4-bit (recommandé)
-  workerUrl: new URL('@webmcp-auto-ui/agent/gemma-worker', import.meta.url),
+  model: 'gemma-e2b',    // 'gemma-e2b' ou 'gemma-e4b'
+  contextSize: 32768,     // Taille du contexte (défaut: 32768)
+  onProgress: (progress, status, loadedBytes, totalBytes) => {
+    console.log(`${Math.round(progress * 100)}%`, loadedBytes, totalBytes);
+  },
+  onStatusChange: (status) => {
+    console.log(status);  // 'idle' | 'loading' | 'ready' | 'error'
+  },
 });
 
-// Attendre le chargement
-await provider.ready();
+// Initialiser le modèle
+await provider.initialize();
 ```
 
-**Événements de statut:**
+**Options:**
 
 ```ts
-interface WasmStatus {
-  type: 'initializing' | 'loading' | 'ready' | 'error';
-  progress?: number;       // 0-1
-  message?: string;
+interface WasmProviderOptions {
+  model: WasmModelId;       // 'gemma-e2b' | 'gemma-e4b'
+  contextSize?: number;     // Taille du contexte (défaut: 32768)
+  onProgress?: (progress: number, status: string, loaded?: number, total?: number) => void;
+  onStatusChange?: (status: 'idle' | 'loading' | 'ready' | 'error') => void;
 }
-
-provider.onStatus((status) => {
-  console.log(status.type, status.progress);
-});
 ```
+
+Le modèle tourne sur le thread principal via LiteRT (pas de Web Worker). Le format natif `<|tool_call|>` est supporté pour les appels d'outils.
 
 #### LocalLLMProvider
 
@@ -157,6 +161,30 @@ const provider = new LocalLLMProvider({
   model: 'mistral',
 });
 ```
+
+#### createProvider
+
+Factory qui instancie le bon provider selon une configuration declarative.
+
+```ts
+import { createProvider } from '@webmcp-auto-ui/agent';
+import type { LLMConfig } from '@webmcp-auto-ui/agent';
+
+const config: LLMConfig = { type: 'remote', proxyUrl: '/api/chat', model: 'sonnet' };
+const provider = createProvider(config);
+```
+
+#### Aliases de compatibilite
+
+Les anciens noms `AnthropicProvider` et `GemmaProvider` restent exportes comme aliases :
+
+```ts
+// Alias -> classe actuelle
+import { AnthropicProvider } from '@webmcp-auto-ui/agent';  // = RemoteLLMProvider
+import { GemmaProvider } from '@webmcp-auto-ui/agent';      // = WasmProvider
+```
+
+Ces aliases sont deprecies. Preferez `RemoteLLMProvider` et `WasmProvider`.
 
 ### Tool Layers
 
@@ -238,6 +266,80 @@ Les 4 couches:
 2. **Decompose** — tokenise le nom et teste toutes paires (action, resource)
 3. **Description keywords** — scanne la description pour recipe/template/workflow
 4. **Fallback** — pas de match
+
+### Recipes
+
+#### WEBMCP_RECIPES
+
+Tableau statique de toutes les recettes WebMCP compilees a partir des fichiers `.md` du repo.
+
+```ts
+import { WEBMCP_RECIPES } from '@webmcp-auto-ui/agent';
+
+// WEBMCP_RECIPES: Recipe[]
+console.log(WEBMCP_RECIPES.length);  // nombre de recettes disponibles
+```
+
+#### parseRecipe / parseRecipes
+
+Parsent le frontmatter et le body d'un fichier `.md` en objet `Recipe`.
+
+```ts
+import { parseRecipe, parseRecipes } from '@webmcp-auto-ui/agent';
+
+const recipe = parseRecipe(markdownString);
+// recipe: Recipe | null
+
+const recipes = parseRecipes(arrayOfMarkdownStrings);
+// recipes: Recipe[]
+```
+
+#### recipeRegistry
+
+Registre global des recettes. Permet d'enregistrer, filtrer et formater les recettes pour injection dans le prompt.
+
+```ts
+import {
+  recipeRegistry,
+  registerRecipes,
+  filterRecipesByServer,
+  formatRecipesForPrompt,
+  formatMcpRecipesForPrompt,
+} from '@webmcp-auto-ui/agent';
+
+// Enregistrer des recettes dans le registre global
+registerRecipes(recipes);
+
+// Filtrer par serveur
+const filtered = filterRecipesByServer(recipes, 'nasa');
+
+// Formater les recettes WebMCP pour injection dans le system prompt
+const promptBlock = formatRecipesForPrompt(recipes);
+
+// Formater les recettes MCP (list_recipes) pour injection dans le system prompt
+const mcpPromptBlock = formatMcpRecipesForPrompt(mcpRecipes);
+```
+
+### summarizeChat
+
+Resume une conversation agent pour inclusion dans les exports HyperSkills.
+
+```ts
+import { summarizeChat } from '@webmcp-auto-ui/agent';
+import type { SummarizeOptions, ChatSummaryResult } from '@webmcp-auto-ui/agent';
+
+const result: ChatSummaryResult = await summarizeChat({
+  messages: conversationHistory,
+  provider: remoteLLMProvider,
+  toolsUsed: ['widget_display', 'search_recipes'],
+  toolCallCount: 5,
+  mcpServers: ['nasa', 'hackernews'],
+  skillsReferenced: [],
+});
+
+// result.chatSummary: string — resume textuel
+// result.provenance: objet de traçabilite (servers, tools, LLM, etc.)
+```
 
 ### Type Definitions
 

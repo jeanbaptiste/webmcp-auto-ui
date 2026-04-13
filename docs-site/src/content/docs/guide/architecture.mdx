@@ -1,95 +1,118 @@
 ---
 title: Architecture du système
-description: Vue détaillée de la boucle agent, tool layers, component registry et canvas réactif
+description: Vue détaillée de la boucle agent, tool layers, widget registry et canvas réactif
 sidebar:
   order: 2
 ---
 
-WebMCP Auto-UI utilise une **architecture modulaire** basée sur quatre concepts fondamentaux : la **boucle agentic**, les **tool layers**, le **composant registry** et le **canvas réactif**.
+WebMCP Auto-UI utilise une **architecture modulaire** basée sur quatre concepts fondamentaux : la **boucle agentic**, les **tool layers**, le **widget registry** et le **canvas réactif**.
 
 ## Architecture globale
 
-```mermaid
-graph TB
-    subgraph "Frontend (Svelte 5)"
-        Canvas["Canvas Réactif\n(store + widgets)"]
-        Chat["Chat Panel\n(messages)"]
-        Settings["Settings\n(LLM, MCP)"]
-        Canvas -->|broadcast| Bus["FONC Message Bus"]
-        Chat -->|send| Bus
-    end
-    
-    subgraph "Agent (boucle agentic)"
-        Prompt["User Prompt\n(ou interaction)"]
-        LLM["LLM Provider\n(Claude/Gemma)"]
-        Prompt -->|entrée| LLM
-        LLM -->|tool_use| Dispatch["Tool Dispatcher"]
-        Dispatch -->|résultats| LLM
-        LLM -->|comprendre| SysPrompt["System Prompt\n(avec tool listing)"]
-    end
-    
-    subgraph "Tool Routing"
-        TL["Tool Layers\n(MCP + WebMCP)"]
-        MCP["MCP Servers\n(SSE/HTTP)"]
-        WebMCP["WebMCP Servers\n(local)"]
-        TL -->|route| MCP
-        TL -->|route| WebMCP
-        MCP -->|données| Dispatch
-        WebMCP -->|widgets| Dispatch
-    end
-    
-    Chat -->|prompt| Prompt
-    Dispatch -->|widget_display| Canvas
-    Dispatch -->|canvas tools| Bus
-    Canvas -->|onWidget callback| Dispatch
-```
+<img src="/diagrams/architecture-1.svg" alt="Architecture globale : Frontend Svelte 5, boucle agent et routage des outils" />
 
 ## Boucle agentic détaillée
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Chat as Chat Panel
-    participant Agent as Agent Loop
-    participant LLM as LLM Provider
-    participant Dispatcher as Tool Dispatcher
-    participant ToolLayer as Tool Layers
-    participant Canvas as Canvas / UI
-    
-    User->>Chat: Écrit un prompt
-    Chat->>Agent: runAgentLoop(prompt)
-    
-    loop Jusqu'à end_turn ou max_iterations
-        Agent->>LLM: POST /chat (messages, tools, system)
-        LLM-->>Agent: response (text + tool_use blocks)
-        
-        alt Pas de tool_use
-            Agent->>Chat: texte final
-            Agent->>Canvas: onDone(metrics)
-            Note over Agent: Terminé
-        else tool_use présent
-            Agent->>Dispatcher: Traiter chaque block
-            
-            par Dispatch parallèle
-                Dispatcher->>ToolLayer: Résoudre alias + activer serveur
-                ToolLayer->>ToolLayer: resolveCanonicalTools()
-                
-                Dispatcher->>ToolLayer: Appeler outil
-                alt MCP
-                    ToolLayer->>ToolLayer: client.callTool()
-                else WebMCP
-                    ToolLayer->>ToolLayer: server.executeTool()
-                end
-                
-                ToolLayer-->>Dispatcher: résultat
-            end
-            
-            Dispatcher->>Dispatcher: Compresser anciens tool_results
-            Dispatcher->>Agent: tool_result blocks
-            Agent->>Agent: compressHistory si contexte trop grand
-        end
-    end
+<img src="/diagrams/architecture-2.svg" alt="Sequence diagram de la boucle agentic detaillee" />
+
+## Providers LLM
+
+Le package `@webmcp-auto-ui/agent` expose trois providers interchangeables, tous conformes a l'interface `LLMProvider` :
+
+```typescript
+interface LLMProvider {
+  readonly name: string;
+  readonly model: string;
+  chat(
+    messages: ChatMessage[],
+    tools: ProviderTool[],
+    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string;
+                maxTokens?: number; temperature?: number; onToken?: (token: string) => void }
+  ): Promise<LLMResponse>;
+}
 ```
+
+### RemoteLLMProvider (Claude)
+
+Provider pour les modeles Anthropic (Claude) via un proxy HTTP. Utilise `proxyUrl` pour pointer vers l'endpoint `/api/chat` de l'app :
+
+```typescript
+import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
+
+const provider = new RemoteLLMProvider({
+  proxyUrl: '/api/chat',
+});
+
+// Changer de modele a la volee
+provider.setModel('haiku');   // Claude Haiku (rapide, economique)
+provider.setModel('sonnet');  // Claude Sonnet (equilibre)
+provider.setModel('opus');    // Claude Opus (raisonnement profond)
+```
+
+Les alias `'haiku'`, `'sonnet'`, `'opus'` sont resolus cote serveur vers les identifiants complets du modele.
+
+### WasmProvider (Gemma 4 LiteRT)
+
+Provider in-browser utilisant Gemma 4 via le runtime LiteRT. Le modele tourne entierement dans le navigateur, sans appel reseau :
+
+```typescript
+import { WasmProvider } from '@webmcp-auto-ui/agent';
+
+const provider = new WasmProvider({
+  model: 'gemma-e2b',       // Gemma 4 E2B (2B params)
+  contextSize: 32_768,
+  onProgress: (progress, status, loaded, total) => { /* ... */ },
+  onStatusChange: (status) => { /* 'idle' | 'loading' | 'ready' | 'error' */ },
+});
+
+await provider.initialize();
+```
+
+Deux variantes disponibles :
+
+| Model ID | Params | Usage |
+|----------|--------|-------|
+| `gemma-e2b` | 2B | Rapide, contexte reduit |
+| `gemma-e4b` | 4B | Plus capable, plus lent |
+
+Le `WasmProvider` supporte nativement le format `<\|tool_call\|>` de Gemma pour le tool calling sans intermediaire.
+
+### LocalLLMProvider (Ollama)
+
+Provider pour les modeles locaux via Ollama :
+
+```typescript
+import { LocalLLMProvider } from '@webmcp-auto-ui/agent';
+
+const provider = new LocalLLMProvider({
+  backend: 'ollama',
+  model: 'llama3.2',
+  baseUrl: 'http://localhost:11434',
+});
+```
+
+### Factory
+
+La fonction `createProvider` instancie le bon provider selon la configuration :
+
+```typescript
+import { createProvider } from '@webmcp-auto-ui/agent';
+
+const provider = createProvider({ type: 'remote', model: 'sonnet', proxyUrl: '/api/chat' });
+const gemma = createProvider({ type: 'wasm', model: 'gemma-e4b' });
+```
+
+### Composant `&lt;LLMSelector>`
+
+Le selecteur unifie les trois providers dans un seul composant UI :
+
+```typescript
+import { LLMSelector } from '@webmcp-auto-ui/ui';
+
+// Le composant expose les modeles : haiku, sonnet, opus, gemma-e2b, gemma-e4b
+```
+
+Le `&lt;GemmaLoader>` affiche la progression du telechargement et du chargement des poids Gemma 4 LiteRT dans le navigateur.
 
 ## Tool Layers (couches d'outils)
 
@@ -139,18 +162,7 @@ if (!activatedServers.has(serverKey)) {
 
 Pour les **MCP servers**, les outils sont matchés à des **rôles canoniques** :
 
-```mermaid
-graph LR
-    A["Tool MCP:\nfind_recipes_by_keyword"] -->|Couche 1| B["Match exact\nsearch_recipes?"]
-    A -->|Couche 2| C["Tokenize\n+ action×resource\nmatching"]
-    A -->|Couche 3| D["Description keywords\n(recipe, template, ...)"]
-    A -->|Couche 4| E["Fallback\nRaw tool names"]
-    
-    B -->|✓| F["search_recipes alias"]
-    C -->|✓ search+recipes| F
-    D -->|✓ contient recipe| F
-    E -->|pas de match| F
-```
+<img src="/diagrams/architecture-3.svg" alt="Resolution canonique des outils MCP en 4 couches de matching" />
 
 **Couche 1** : Nom exact (`search_recipes`, `list_recipes`, `get_recipe`)
 
@@ -184,7 +196,7 @@ const resolvedName = aliasMap.get(toolName) ?? toolName;
 // "myserver_mcp_search_recipes" → "myserver_mcp_find_recipes_by_keyword"
 ```
 
-## Component Registry (WebMCP)
+## Widget Registry (WebMCP)
 
 Un **WebMCP server** expose des **widgets** + **outils de rendu** :
 
@@ -256,14 +268,7 @@ const systemPrompt = buildSystemPromptWithAliases(layers).prompt;
 
 Le **canvas** est un **store réactif** avec gestion d'état centralisée :
 
-```mermaid
-graph LR
-    VanillaStore["canvasVanilla\n(framework-agnostic)"] -->|subscribe| SvelteRunes["canvas (Svelte 5)\n($state runes)"]
-    
-    SvelteRunes -->|get/set| UI["UI Components\n(WidgetRenderer, etc.)"]
-    
-    Callbacks["Agent callbacks\nonWidget, onClear, etc."] -->|update| VanillaStore
-```
+<img src="/diagrams/architecture-4.svg" alt="Canvas reactif : store vanilla, wrapper Svelte 5 et callbacks agent" />
 
 ### Réactivité
 
@@ -313,21 +318,14 @@ const fullResult = await client.callTool('recall', { id: 'id_xyz' });
 
 ## Flux widget_display
 
-```mermaid
-graph LR
-    A["Agent appelle\nwidget_display"] -->|params| B["WebMCP\nexecuteTool"]
-    B -->|valide schema| C["Sanitize\nimage URLs"]
-    C -->|callback| D["onWidget\ncallback"]
-    D -->|id généré| E["Canvas\nreçoit widget"]
-    E -->|render| F["WidgetRenderer"]
-    F -->|mount| G["DOM\n(Svelte/Vanilla)"]
-```
+<img src="/diagrams/architecture-5.svg" alt="Flux widget_display de la validation au montage DOM" />
 
 ## Résumé architectural
 
 | Composant | Responsabilité |
 |-----------|-----------------|
 | **Agent Loop** | Boucle LLM → tools → LLM |
+| **LLM Providers** | Claude (remote), Gemma 4 LiteRT (WASM), Ollama (local) |
 | **Tool Layers** | Structuration MCP + WebMCP |
 | **Dispatcher** | Routing + activation lazy |
 | **Tool Resolver** | Matching canonique (4 couches) |

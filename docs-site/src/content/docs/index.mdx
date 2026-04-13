@@ -9,16 +9,7 @@ WebMCP Auto-UI est une plateforme de génération automatique d'interfaces utili
 
 ## Vue d'ensemble
 
-```mermaid
-graph LR
-    A["🧠 Agent LLM\n(Claude, Gemma)"] -->|appelle| B["🔧 Tool Calling"]
-    B -->|dispatch| C["📊 MCP Servers\n(données)"]
-    B -->|dispatch| D["🎨 WebMCP Servers\n(UI)"]
-    C -->|résultats| A
-    D -->|widgets| E["🖥️ Canvas\n(Svelte + Vanilla)"]
-    A -->|boucle| B
-    F["💾 HyperSkills\n(sérialisation)"] -.->|charge/sauve| E
-```
+<img src="/diagrams/index-1.svg" alt="Vue d'ensemble : agent LLM, tool calling, MCP/WebMCP servers et canvas" />
 
 ## Caractéristiques principales
 
@@ -70,14 +61,14 @@ Les canvas sont exportés en tant que **skills** JSON, compressés en URLs court
 |---------|-----------------|
 | `@webmcp-auto-ui/core` | Types WebMCP, polyfill, MCP client, validation |
 | `@webmcp-auto-ui/agent` | Boucle agent, providers LLM, tool layers, recipes |
-| `@webmcp-auto-ui/ui` | Composants Svelte (30+ widgets), canvas store |
+| `@webmcp-auto-ui/ui` | Composants Svelte (30+ widgets), theme, message bus |
 | `@webmcp-auto-ui/sdk` | HyperSkills, skills registry, canvas store |
 
 ## Stack technique
 
 - **Framework frontend** : Svelte 5 (runes)
 - **Styling** : UnoCSS (dark/light themes)
-- **LLM** : Anthropic Claude (API) + Google Gemma 2 (WASM)
+- **LLM** : Anthropic Claude (API) + Google Gemma 4 (LiteRT)
 - **Worker** : Web Worker pour Gemma (sans blocage UI)
 - **Schéma** : JSON Schema (validation côté agent)
 - **Communication** : postMessage bridge (cross-document WebMCP)

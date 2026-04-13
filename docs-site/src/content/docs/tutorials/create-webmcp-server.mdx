@@ -9,15 +9,7 @@ Ce tutoriel explique comment exposer vos propres widgets via le protocole WebMCP
 
 ## Vue d'ensemble
 
-```mermaid
-flowchart LR
-    A["Composant\n(Svelte, vanilla)"] --> B["Recette .md\n(frontmatter + body)"]
-    B --> C["createWebMcpServer()"]
-    C --> D[".registerWidget()"]
-    D --> E[".layer()"]
-    E --> F["runAgentLoop()\nlayers: [...]"]
-    F --> G["LLM"]
-```
+<img src="/diagrams/tut-webmcp-server-1.svg" alt="Pipeline complet : composant, recette, serveur WebMCP, agent loop, LLM" />
 
 Le pipeline complet part d'un composant UI, passe par une recette declarative, puis est enregistre dans un serveur WebMCP qui expose les outils au LLM.
 
@@ -304,25 +296,7 @@ Ce prefixage evite les collisions quand plusieurs serveurs (MCP + WebMCP) coexis
 
 ### Architecture multi-serveurs
 
-```mermaid
-flowchart TB
-    LLM["LLM (Claude)"]
-
-    subgraph MCP ["MCP (donnees distantes)"]
-        MCP1["tricoteuses_mcp_*\nquery_sql, search_recipes"]
-        MCP2["datagouv_mcp_*\nfetch_dataset"]
-    end
-
-    subgraph WebMCP ["WebMCP (affichage local)"]
-        W1["autoui_webmcp_*\n26 widgets natifs"]
-        W2["monserveur_webmcp_*\nkanban, gantt"]
-    end
-
-    LLM --> MCP1
-    LLM --> MCP2
-    LLM --> W1
-    LLM --> W2
-```
+<img src="/diagrams/tut-webmcp-server-2.svg" alt="Architecture multi-serveurs MCP et WebMCP" />
 
 ---
 
@@ -338,33 +312,11 @@ User: "Montre-moi un kanban de mon sprint"
 
 Le LLM va suivre cette sequence :
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant LLM
-    participant S as monserveur (WebMCP)
-
-    U->>LLM: "Montre-moi un kanban de mon sprint"
-    LLM->>S: monserveur_webmcp_search_recipes({query: "kanban"})
-    S-->>LLM: [{name: "kanban", description: "Tableau Kanban..."}]
-    LLM->>S: monserveur_webmcp_get_recipe({name: "kanban"})
-    S-->>LLM: {schema: {...}, recipe: "## Quand utiliser..."}
-    Note over LLM: Construit les parametres en suivant le schema
-    LLM->>S: monserveur_webmcp_widget_display({name: "kanban", params: {columns: [...]}})
-    S-->>LLM: {widget: "kanban", data: {...}, id: "w_k8m2p1"}
-    Note over LLM,S: Le renderer affiche KanbanBoard sur le canvas
-```
+<img src="/diagrams/tut-webmcp-server-3.svg" alt="Sequence de decouverte et rendu d'un widget kanban" />
 
 ### Le dispatch widget_display
 
-```mermaid
-flowchart LR
-    A["LLM appelle\nwidget_display('kanban', {...})"] --> B["Serveur WebMCP\nvalidation JSON Schema"]
-    B -->|valide| C["Retourne\n{widget, data, id}"]
-    B -->|invalide| D["Retourne\n{error, details, expected_schema}"]
-    D --> E["LLM corrige\net reessaie"]
-    C --> F["WidgetRenderer\nKanbanBoard.svelte"]
-```
+<img src="/diagrams/tut-webmcp-server-4.svg" alt="Dispatch widget_display avec validation et rendu" />
 
 ### Verifier le rendu
 

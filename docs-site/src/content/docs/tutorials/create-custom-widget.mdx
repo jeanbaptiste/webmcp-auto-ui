@@ -303,19 +303,7 @@ export { myServer };
 
 ## Architecture interne
 
-```mermaid
-graph TD
-    A["Composant Svelte custom<br/>CustomProgressBar.svelte"]
-    B["Registry<br/>CUSTOM_WIDGETS"]
-    C["BlockRenderer<br/>@webmcp-auto-ui/ui"]
-    D["Canvas store<br/>canvas.addWidget()"]
-    E["DOM rendu<br/>✓ Interactif"]
-
-    A -->|Enregistré dans| B
-    B -->|Consulté par| C
-    D -->|Crée bloc| C
-    C -->|Monté dans| E
-```
+<img src="/diagrams/tut-custom-widget-1.svg" alt="Architecture interne : composant Svelte, registry, BlockRenderer, canvas et DOM" />
 
 ## Checklist de création
 

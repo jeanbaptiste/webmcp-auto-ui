@@ -14,10 +14,14 @@ Magasin d'état applicatif réactif pour gérer les widgets, le mode, la connexi
 ### Accès au Store
 
 ```ts
-import { canvas } from '@webmcp-auto-ui/sdk';
-// OU (en Svelte)
+// Svelte 5 (runes, reactivity via $state/$derived)
 import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+
+// Framework-agnostique (vanilla JS, React, Vue, etc.)
+import { canvas } from '@webmcp-auto-ui/sdk/canvas-vanilla';
 ```
+
+Le chemin `@webmcp-auto-ui/sdk/canvas` exporte le store Svelte 5 avec runes (`$state`/`$derived`). Le chemin `@webmcp-auto-ui/sdk/canvas-vanilla` exporte une version sans dépendance Svelte, utilisable dans n'importe quel environnement JavaScript.
 
 ### State Getters/Setters
 
@@ -110,7 +114,9 @@ let empty = $derived(canvas.isEmpty);
 **2. Framework-agnostique (subscribe):**
 
 ```ts
-// canvas.ts - pattern useSyncExternalStore
+// canvas-vanilla.ts - pattern useSyncExternalStore
+import { canvas } from '@webmcp-auto-ui/sdk/canvas-vanilla';
+
 const unsubscribe = canvas.subscribe(() => {
   const snapshot = canvas.getSnapshot();
   console.log(snapshot.blocks);
@@ -266,6 +272,7 @@ import {
   listSkills,
   clearSkills,
   loadSkills,
+  loadDemoSkills,
   onSkillsChange,
 } from '@webmcp-auto-ui/sdk';
 
@@ -300,6 +307,9 @@ const all = listSkills();
 // Batch
 await loadSkills(skillObjects);
 clearSkills();
+
+// Demo skills — charge un jeu de skills prédéfinis pour le développement
+await loadDemoSkills();
 
 // Reactivity
 onSkillsChange((skills) => {

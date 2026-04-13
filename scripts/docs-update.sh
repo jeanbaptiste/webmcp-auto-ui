@@ -437,6 +437,7 @@ Rules:
 - GitHub org is 'jeanbaptiste' (NOT 'hyperskills'). URLs: github.com/jeanbaptiste/webmcp-auto-ui, degit jeanbaptiste/webmcp-auto-ui/...
 - No emojis
 - Escape < in MDX (use &lt; or backticks)
+- NEVER use inline \`\`\`mermaid blocks. Always reference pre-rendered SVGs with <img src=\"/diagrams/...svg\" alt=\"...\" />
 - Return ONLY the file content, no explanation before or after"
 
     local stderr_file="/tmp/docs-update-stderr-$$-$index"
@@ -484,6 +485,7 @@ Rules:
 - npm not pnpm, proxyUrl not apiKey, model aliases not full names
 - GitHub org is 'jeanbaptiste' (NOT 'hyperskills'). URLs: github.com/jeanbaptiste/webmcp-auto-ui
 - Relative links only, no emojis, escape < in MDX
+- NEVER use inline \`\`\`mermaid blocks. Always reference pre-rendered SVGs with <img src=\"/diagrams/...svg\" alt=\"...\" />
 - Return ONLY the file content, no explanation"
 
     local stderr_file="/tmp/docs-update-stderr-$$-$index"
@@ -602,6 +604,7 @@ Rules:
 - npm not pnpm, proxyUrl not apiKey, model aliases not full names
 - GitHub org is 'jeanbaptiste' (NOT 'hyperskills'). URLs: github.com/jeanbaptiste/webmcp-auto-ui
 - Relative links, no emojis, escape < in MDX
+- NEVER use inline \`\`\`mermaid blocks. Always reference pre-rendered SVGs with <img src=\"/diagrams/...svg\" alt=\"...\" />
 - Return ONLY the file content, no explanation"
 
   log "Calling Claude ($MODEL_WRITE)..."

@@ -25,24 +25,7 @@ The script knows the correct paths and configurations for each app.
 
 ## Applications and Their Paths
 
-```mermaid
-graph TB
-    Repo["Local Repo\n(monorepo)"] -->|./scripts/deploy.sh| Script["Deploy script"]
-    
-    Script -->|npm build| Build["Build artifacts"]
-    
-    Build -->|Flex2\n(Node.js)| FD["flex2/build/\nindex.js"]
-    FD -->|deploy to| FP["/opt/webmcp-demos/flex2/\nindex.js"]
-    
-    Build -->|Viewer2\n(Node.js)| VD["viewer2/build/"]
-    VD -->|deploy to| VP["/opt/webmcp-demos/viewer2/"]
-    
-    Build -->|Home\n(static)| HD["dist/"]
-    HD -->|deploy to| HP["/opt/webmcp-demos/home/"]
-    
-    Build -->|Multi-Svelte\n(static)| MD["build/"]
-    MD -->|deploy to| MP["/opt/webmcp-demos/multi-svelte/"]
-```
+<img src="/diagrams/deploy-1.svg" alt="Deployment pipeline: local repo to server via deploy.sh" />
 
 ### Detailed Table
 

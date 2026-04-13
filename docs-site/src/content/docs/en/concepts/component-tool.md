@@ -5,6 +5,10 @@ sidebar:
   order: 2
 ---
 
+:::caution[Deprecated page]
+This page describes the old `component()` / `componentRegistry` API removed in Phase 8. See [Architecture](/guide/architecture/) for the current API based on WebMCP servers and `widget_display`.
+:::
+
 Three separate tools expose 56 components (31 renderable, 25 non-renderable) to the LLM. In smart mode, these are the only visible UI tools.
 
 ## Smart vs explicit mode

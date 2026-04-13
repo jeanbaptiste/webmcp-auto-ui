@@ -27,19 +27,36 @@ recipes/
       +page.svelte        -- Explorateur de recettes
       api/chat/+server.ts -- Proxy Anthropic
     lib/
-      explorer.ts         -- Logique de filtrage et d'affichage
+      RecipeList.svelte    -- Catalogue filtrable (local + MCP)
+      RecipeDetail.svelte  -- Detail d'une recette
+      RecipePreview.svelte -- Preview + chat input
+      explorer.ts          -- Logique de filtrage et d'affichage
 ```
 
 Packages utilises :
-- `@webmcp-auto-ui/agent` : `WEBMCP_RECIPES`, `filterRecipesByServer`, `parseRecipe`
-- `@webmcp-auto-ui/core` : `McpClient` pour les tests live
-- `@webmcp-auto-ui/ui` : `BlockRenderer`, composants
+- `@webmcp-auto-ui/agent` : `WEBMCP_RECIPES`, `recipeRegistry`, `parseRecipe`, `autoui`, `RemoteLLMProvider`, `WasmProvider`, `runAgentLoop`, `buildSystemPrompt`, `fromMcpTools`, `trimConversationHistory`, `TokenTracker`
+- `@webmcp-auto-ui/core` : `McpMultiClient` pour la connexion multi-serveurs
+- `@webmcp-auto-ui/sdk` : `MCP_DEMO_SERVERS`, `canvas` (store)
+- `@webmcp-auto-ui/ui` : `McpStatus`, `LLMSelector`, `GemmaLoader`, `RemoteMCPserversDemo`, `AgentConsole`, `THEME_MAP`
 
-## Utilisation
+## Lancement
 
 ```bash
+# Dev (port 3009)
 npm -w apps/recipes run dev
 ```
+
+En production, l'app tourne sur le port **3009** via `node index.js` (adapter-node). Le service systemd est `webmcp-recipes`, deploye dans `/opt/webmcp-demos/recipes/`.
+
+```bash
+# Build
+npm -w apps/recipes run build
+
+# Deploy
+./scripts/deploy.sh recipes
+```
+
+## Utilisation
 
 1. Parcourir les recettes dans le catalogue
 2. Cliquer sur une recette pour voir son detail (frontmatter, composants, conditions)
