@@ -3,7 +3,8 @@
 import type { McpToolDef, ProviderTool } from './types.js';
 import type { McpRecipe } from './recipes/types.js';
 import type { WebMcpToolDef } from '@webmcp-auto-ui/core';
-import { sanitizeSchema, flattenSchema } from '@webmcp-auto-ui/core';
+import { sanitizeSchema, sanitizeSchemaWithReport, flattenSchema } from '@webmcp-auto-ui/core';
+import type { SchemaPatch } from '@webmcp-auto-ui/core';
 import { DiscoveryCache, type ServerCache } from './discovery-cache.js';
 
 /** Sanitize a server name for use in tool name prefixes.
@@ -47,6 +48,8 @@ export interface SchemaTransformOptions {
   sanitize?: boolean;
   /** Flatten nested object properties using key__subkey convention (default: false) */
   flatten?: boolean;
+  /** Called when a schema is auto-patched for strict mode */
+  onSchemaPatch?: (toolName: string, patches: SchemaPatch[]) => void;
 }
 
 /** Path maps for flattened schemas — keyed by prefixed tool name */
@@ -186,9 +189,19 @@ function isStrictCompatible(schema: Record<string, unknown>): boolean {
 /** Convert McpToolDef[] to ProviderTool[] */
 export function toProviderTools(tools: McpToolDef[], schemaOptions?: SchemaTransformOptions): ProviderTool[] {
   return tools.map(t => {
-    let schema = (t.inputSchema ?? { type: 'object', properties: {} }) as import('@webmcp-auto-ui/core').JsonSchema;
-    if (schemaOptions?.sanitize !== false) schema = sanitizeSchema(schema);
+    let schema = (t.inputSchema ?? { type: 'object', properties: {}, additionalProperties: false }) as import('@webmcp-auto-ui/core').JsonSchema;
+    if (schemaOptions?.sanitize !== false) {
+      const report = sanitizeSchemaWithReport(schema);
+      schema = report.schema;
+      if (report.patches.length > 0) {
+        schemaOptions?.onSchemaPatch?.(t.name, report.patches);
+      }
+    }
     const schemaObj = schema as Record<string, unknown>;
+    // Ensure root schema has additionalProperties for strict mode
+    if (schemaObj.type === 'object' && !('additionalProperties' in schemaObj)) {
+      schemaObj.additionalProperties = false;
+    }
     return {
       name: t.name,
       description: t.description ?? t.name,
@@ -202,7 +215,13 @@ export function toProviderTools(tools: McpToolDef[], schemaOptions?: SchemaTrans
 function webmcpToProviderTools(tools: WebMcpToolDef[], schemaOptions?: SchemaTransformOptions): ProviderTool[] {
   return tools.map(t => {
     let schema = (t.inputSchema ?? { type: 'object', properties: {} }) as import('@webmcp-auto-ui/core').JsonSchema;
-    if (schemaOptions?.sanitize !== false) schema = sanitizeSchema(schema);
+    if (schemaOptions?.sanitize !== false) {
+      const report = sanitizeSchemaWithReport(schema);
+      schema = report.schema;
+      if (report.patches.length > 0) {
+        schemaOptions?.onSchemaPatch?.(t.name, report.patches);
+      }
+    }
     const schemaObj = schema as Record<string, unknown>;
     return {
       name: t.name,

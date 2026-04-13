@@ -75,6 +75,86 @@ export function signalCompletion(completionEventName: string, detail?: unknown):
 // Item 19 — sanitizeSchema (for AI SDKs)
 // ---------------------------------------------------------------------------
 
+export interface SchemaPatch {
+  path: string;          // e.g. "root", "properties.params", "properties.data.items"
+  type: 'additionalProperties'; // what was patched
+  value: false;
+}
+
+/**
+ * Sanitize schema AND report patches applied for strict tool use.
+ * Use this when you need visibility into what was changed.
+ */
+export function sanitizeSchemaWithReport(schema: JsonSchema): { schema: JsonSchema; patches: SchemaPatch[] } {
+  if (typeof schema === 'boolean') return { schema, patches: [] };
+  const patches: SchemaPatch[] = [];
+  const result = sanitizeSchemaObjectWithReport({ ...schema } as JsonSchemaObject, new WeakSet(), 'root', patches);
+  return { schema: result, patches };
+}
+
+function sanitizeSchemaObjectWithReport(obj: JsonSchemaObject, seen: WeakSet<object>, path: string, patches: SchemaPatch[]): JsonSchemaObject {
+  if (seen.has(obj)) return obj;
+  seen.add(obj);
+
+  const result = { ...obj };
+
+  // Remove composition keywords that AI SDKs can't handle
+  delete result.oneOf;
+  delete result.anyOf;
+  delete result.allOf;
+  delete result.not;
+
+  // Remove conditional keywords
+  delete result.if;
+  delete result.then;
+  delete result.else;
+
+  // Remove $ref (needs dereferencing first)
+  delete result.$ref;
+
+  // Recursively sanitize nested schemas
+  if (result.properties) {
+    const sanitizedProps: Record<string, JsonSchema> = {};
+    for (const [key, value] of Object.entries(result.properties)) {
+      sanitizedProps[key] = typeof value === 'boolean'
+        ? value
+        : sanitizeSchemaObjectWithReport({ ...value } as JsonSchemaObject, seen, `${path}.properties.${key}`, patches);
+    }
+    result.properties = sanitizedProps;
+  }
+
+  if (result.items) {
+    if (Array.isArray(result.items)) {
+      result.items = result.items.map((item, i) =>
+        typeof item === 'boolean'
+          ? item
+          : sanitizeSchemaObjectWithReport({ ...item } as JsonSchemaObject, seen, `${path}.items[${i}]`, patches)
+      );
+    } else if (typeof result.items !== 'boolean') {
+      result.items = sanitizeSchemaObjectWithReport({ ...result.items } as JsonSchemaObject, seen, `${path}.items`, patches);
+    }
+  }
+
+  // Strict tool use: ensure additionalProperties is set on any object type
+  if ((result.type === 'object' || result.properties) && !('additionalProperties' in result)) {
+    result.additionalProperties = false;
+    patches.push({ path, type: 'additionalProperties', value: false });
+  }
+
+  if (result.additionalProperties && typeof result.additionalProperties === 'object') {
+    result.additionalProperties = sanitizeSchemaObjectWithReport(
+      { ...result.additionalProperties } as JsonSchemaObject,
+      seen,
+      `${path}.additionalProperties`,
+      patches
+    );
+  }
+
+  return result;
+}
+
+
+
 /**
  * Strip JSON Schema keywords that cause errors in AI SDKs
  * (e.g., Vercel AI SDK rejects oneOf/anyOf on non-STRING types).
@@ -129,8 +209,9 @@ function sanitizeSchemaObject(obj: JsonSchemaObject, seen: WeakSet<object>): Jso
     }
   }
 
-  // Strict tool use: ensure additionalProperties is set on object types
-  if (result.type === 'object' && result.properties && !('additionalProperties' in result)) {
+  // Strict tool use: ensure additionalProperties is set on any object type
+  // Anthropic requires this on ALL objects, even without properties
+  if ((result.type === 'object' || result.properties) && !('additionalProperties' in result)) {
     result.additionalProperties = false;
   }
 

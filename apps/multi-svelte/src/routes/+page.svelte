@@ -346,7 +346,17 @@
         layers,
         discoveryCache,
         contextRAG: contextRAG ?? undefined,
-        schemaOptions: { sanitize: schemaSanitize, flatten: schemaFlatten },
+        schemaOptions: {
+          sanitize: schemaSanitize,
+          flatten: schemaFlatten,
+          onSchemaPatch: (toolName, patches) => {
+            agentLogs = [...agentLogs, {
+              ts: Date.now(),
+              type: 'warning',
+              detail: `[strict] ${toolName}: patched ${patches.map(p => p.path).join(', ')}`
+            }];
+          },
+        },
         callbacks: {
           onIterationStart: (i, max) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'iteration', detail: `Iteration ${i}/${max}` }];

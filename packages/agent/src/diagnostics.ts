@@ -3,6 +3,8 @@
 import type { ToolLayer } from './tool-layers.js';
 import type { ProviderTool } from './types.js';
 import { sanitizeServerName } from './tool-layers.js';
+import { sanitizeSchemaWithReport } from '@webmcp-auto-ui/core';
+import type { JsonSchema } from '@webmcp-auto-ui/core';
 
 export interface Diagnostic {
   severity: 'error' | 'warning';
@@ -95,6 +97,19 @@ export function runDiagnostics(
         title: `Outil inconnu dans le prompt`,
         detail: `Le system prompt reference "${fullName}" mais cet outil n'existe pas dans les outils enregistres.`,
         quickFix: `Supprimez ou corrigez la reference "${fullName}" dans le system prompt.`,
+      });
+    }
+  }
+
+  // 5. Strict mode — schemas that were auto-patched
+  for (const tool of tools) {
+    const { patches } = sanitizeSchemaWithReport(tool.input_schema as JsonSchema);
+    if (patches.length > 0) {
+      diagnostics.push({
+        severity: 'warning',
+        title: `Schema patché: ${tool.name}`,
+        detail: `${patches.length} correction(s) pour strict mode: ${patches.map(p => p.path).join(', ')}. additionalProperties: false ajouté automatiquement.`,
+        codeFix: `Ajouter "additionalProperties": false dans le schema du serveur MCP pour ${tool.name}.`,
       });
     }
   }

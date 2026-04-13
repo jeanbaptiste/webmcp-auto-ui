@@ -76,10 +76,12 @@ export {
   dispatchAndWait,
   signalCompletion,
   sanitizeSchema,
+  sanitizeSchemaWithReport,
   flattenSchema,
   unflattenParams,
   createToolGroup,
 } from './utils.js';
+export type { SchemaPatch } from './utils.js';
 
 // WebMCP helpers (result builders)
 export {
