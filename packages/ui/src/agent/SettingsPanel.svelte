@@ -7,6 +7,9 @@
     maxTokens?: number;
     maxContextTokens?: number;
     maxTools?: number;
+    maxResultLength?: number;
+    compressHistory?: boolean;
+    compressPreview?: number;
     cacheEnabled?: boolean;
     temperature?: number;
     topK?: number;
@@ -21,6 +24,9 @@
     maxTokens = $bindable(4096),
     maxContextTokens = $bindable(150_000),
     maxTools = $bindable(8),
+    maxResultLength = $bindable(10000),
+    compressHistory = $bindable(false),
+    compressPreview = $bindable(200),
     cacheEnabled = $bindable(true),
     temperature = $bindable(0.7),
     topK = $bindable(10),
@@ -186,6 +192,34 @@
              class="w-full accent-accent" />
     </div>
     {/if}
+
+    <!-- Max result length -->
+    <div>
+      <div class="flex justify-between items-baseline mb-1">
+        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Max result (chars)</span>
+        <span class="font-mono text-xs text-text1">{formatNumber(maxResultLength)}</span>
+      </div>
+      <input type="range" bind:value={maxResultLength}
+             min={500} max={20000} step={500}
+             class="w-full accent-accent" />
+    </div>
+
+    <!-- Compress history -->
+    <div>
+      <label class="flex items-center gap-2 cursor-pointer select-none mb-1">
+        <input type="checkbox" bind:checked={compressHistory} class="accent-accent w-3.5 h-3.5" />
+        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Compresser l'historique</span>
+      </label>
+      {#if compressHistory}
+      <div class="flex justify-between items-baseline mb-1">
+        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Preview (chars)</span>
+        <span class="font-mono text-xs text-text1">{compressPreview}</span>
+      </div>
+      <input type="range" bind:value={compressPreview}
+             min={100} max={1000} step={50}
+             class="w-full accent-accent" />
+      {/if}
+    </div>
   </section>
 
   <!-- Cache -->

@@ -42,6 +42,7 @@
   let maxResultLength = $state(10000);
   let truncateResults = $state(false);
   let compressHistory = $state(false);
+  let compressPreview = $state(200);
   let systemPrompt = $state('');
   let localUrl = $state('http://localhost:11434');
   let localModel = $state('');
@@ -366,7 +367,7 @@
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
         maxIterations: 15, maxTokens, maxTools, maxResultLength, temperature, topK, cacheEnabled,
-        truncateResults, compressHistory,
+        truncateResults, compressHistory: compressHistory ? compressPreview : false,
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         layers,
@@ -601,7 +602,7 @@
   onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true}
   bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools bind:maxResultLength
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON
-  bind:schemaSanitize bind:schemaFlatten
+  bind:schemaSanitize bind:schemaFlatten bind:compressHistory bind:compressPreview
   bind:localUrl bind:localModel
   onconnect={() => addMcpServer(canvas.mcpUrl)}
   {connectedUrls} {loadingUrls}

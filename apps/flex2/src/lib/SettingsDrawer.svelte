@@ -30,6 +30,9 @@
     maxTokens?: number;
     maxContextTokens?: number;
     maxTools?: number;
+    maxResultLength?: number;
+    compressHistory?: boolean;
+    compressPreview?: number;
     cacheEnabled?: boolean;
     temperature?: number;
     topK?: number;
@@ -64,6 +67,9 @@
     maxTokens = $bindable(4096),
     maxContextTokens = $bindable(150_000),
     maxTools = $bindable(8),
+    maxResultLength = $bindable(10000),
+    compressHistory = $bindable(false),
+    compressPreview = $bindable(200),
     cacheEnabled = $bindable(true),
     temperature = $bindable(1.0),
     topK = $bindable(64),
@@ -181,6 +187,9 @@
         bind:maxTokens
         bind:maxContextTokens
         bind:maxTools
+        bind:maxResultLength
+        bind:compressHistory
+        bind:compressPreview
         bind:cacheEnabled
         bind:temperature
         bind:topK

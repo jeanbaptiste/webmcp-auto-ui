@@ -40,14 +40,15 @@ function isDiscoveryTool(prefixedName: string): boolean {
  * When a resultBuffer is provided, includes a recall('id') hint so the LLM
  * can retrieve the full result on demand.
  */
-function compressOldToolResults(messages: ChatMessage[], resultBuffer?: Map<string, string>): void {
+function compressOldToolResults(messages: ChatMessage[], previewSize: number, resultBuffer?: Map<string, string>): void {
+  const threshold = Math.round(previewSize * 1.5);
   for (let i = 0; i < messages.length - 2; i++) {
     const msg = messages[i];
     if (typeof msg.content !== 'string' && Array.isArray(msg.content)) {
       for (let j = 0; j < msg.content.length; j++) {
         const block = msg.content[j];
-        if (block.type === 'tool_result' && typeof block.content === 'string' && block.content.length > 300) {
-          const preview = block.content.slice(0, 200);
+        if (block.type === 'tool_result' && typeof block.content === 'string' && block.content.length > threshold) {
+          const preview = block.content.slice(0, previewSize);
           const totalLen = block.content.length;
           const id = block.tool_use_id;
           if (resultBuffer && resultBuffer.has(id)) {
@@ -98,8 +99,8 @@ export interface AgentLoopOptions {
   signal?: AbortSignal;
   /** Truncate tool results to maxResultLength chars (default: true) */
   truncateResults?: boolean;
-  /** Compress old tool_result blocks to save context (default: true) */
-  compressHistory?: boolean;
+  /** Compress old tool_result blocks to save context. true = default 200 chars preview, number = custom preview size, false = disabled */
+  compressHistory?: boolean | number;
   /** Max length for tool result truncation (default: 10000) */
   maxResultLength?: number;
   /** Schema transform options — sanitize strips complex keywords, flatten simplifies nested objects */
@@ -431,7 +432,10 @@ export async function runAgentLoop(
     }
 
     // Compress old tool results to save context window
-    if (compressHistory) compressOldToolResults(messages, resultBuffer);
+    if (compressHistory) {
+      const previewSize = typeof compressHistory === 'number' ? compressHistory : 200;
+      compressOldToolResults(messages, previewSize, resultBuffer);
+    }
   }
 
   callbacks.onDone?.(metrics);

@@ -61,6 +61,7 @@
   let maxResultLength = $state(10000);
   let truncateResults = $state(false);
   let compressHistory = $state(false);
+  let compressPreview = $state(200);
   let schemaSanitize = $state(true);
   let schemaFlatten = $state(false);
   let localUrl = $state('http://localhost:11434');
@@ -324,7 +325,7 @@
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
         maxIterations: 15, maxTokens, maxTools, maxResultLength, temperature, cacheEnabled,
-        truncateResults, compressHistory,
+        truncateResults, compressHistory: compressHistory ? compressPreview : false,
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         layers,
