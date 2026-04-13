@@ -8,9 +8,14 @@ import { sanitizeSchema, flattenSchema } from '@webmcp-auto-ui/core';
 /** Sanitize a server name for use in tool name prefixes.
  *  Tool names must match ^[a-zA-Z0-9_-]{1,128}$ per the Anthropic API. */
 export function sanitizeServerName(name: string): string {
-  let clean = name.replace(/\s*(MCP|mcp)\s*(Server|server)?\s*$/i, '').replace(/[_-]+(mcp|MCP)$/i, '').trim();
+  // Strip all trailing variants: "MCP Server", "MCP-Server", "-mcp-server", "-mcp", "_mcp" etc.
+  let clean = name.replace(/[\s_-]*(mcp[\s_-]*server|mcp)\s*$/i, '').trim();
   if (!clean) clean = name;
-  return clean.toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '') || 'mcp';
+  return clean.toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '_')  // invalid chars → underscore
+    .replace(/[_-]{2,}/g, '_')       // collapse any separator runs (including -_ or _-)
+    .replace(/^[_-]+|[_-]+$/g, '')   // strip leading/trailing separators
+    || 'mcp';
 }
 
 /** MCP data layer — tools and recipes from a connected MCP server */
