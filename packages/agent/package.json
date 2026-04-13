@@ -22,6 +22,7 @@
     "access": "public"
   },
   "devDependencies": {
+    "@huggingface/transformers": "^4.0.1",
     "@webmcp-auto-ui/core": "file:../core",
     "onnxruntime-web": "^1.24.3",
     "typescript": "^5.0.0"
