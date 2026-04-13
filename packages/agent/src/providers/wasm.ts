@@ -270,13 +270,33 @@ export class WasmProvider implements LLMProvider {
           tokenCount++;
           options?.onToken?.(partialResult);
 
-          // P2: once we have a complete tool call (<|tool_call>...<tool_call|>),
-          // if the response keeps growing beyond limit, cancel early.
-          // This prevents 60s+ generations where Gemma dumps all data into params.
+          // Early detect and strip fake tool_response in streaming
+          if (fullText.includes('<|tool_response>') && fullText.includes('<tool_call|>')) {
+            const lastCallEnd = fullText.lastIndexOf('<tool_call|>');
+            const responseStart = fullText.indexOf('<|tool_response>', lastCallEnd);
+            if (responseStart !== -1) {
+              // Gemma is hallucinating a response — cancel immediately
+              this.inference?.cancelProcessing();
+              // Truncate to last valid tool call
+              fullText = fullText.slice(0, lastCallEnd + '<tool_call|>'.length);
+              return;
+            }
+          }
+
+          // Cancel immediately after complete tool call — don't let Gemma hallucinate
           if (!hasCompleteToolCall && fullText.includes('<tool_call|>')) {
             hasCompleteToolCall = true;
+            // Check if there's a new tool_call opening after the last closing
+            const lastEnd = fullText.lastIndexOf('<tool_call|>');
+            const afterEnd = fullText.slice(lastEnd + '<tool_call|>'.length);
+            if (!afterEnd.includes('<|tool_call>')) {
+              // No new tool call — cancel immediately
+              this.inference?.cancelProcessing();
+              return;
+            }
           }
-          if (hasCompleteToolCall && fullText.length > TOOL_CALL_MAX_CHARS) {
+          // Safety: if text grows way too long, force cancel
+          if (fullText.length > TOOL_CALL_MAX_CHARS * 2) {
             this.inference?.cancelProcessing();
             return;
           }
@@ -302,16 +322,37 @@ export class WasmProvider implements LLMProvider {
       }
     }
 
-    // Clean up hallucinated content after the last valid tool call end tag.
-    // Gemma often hallucinates `<|tool_response>t...` after `<tool_call|>`, polluting context.
-    const lastEndTag = fullText.lastIndexOf('<tool_call|>');
-    if (lastEndTag !== -1) {
-      const afterEnd = fullText.slice(lastEndTag + '<tool_call|>'.length);
-      // If there's no new tool_call opening after the last closing tag, truncate
-      if (!afterEnd.includes('<|tool_call>')) {
-        fullText = fullText.slice(0, lastEndTag + '<tool_call|>'.length);
+    // Clean up hallucinated content after tool calls.
+    // Gemma often hallucinates fake <|tool_response> blocks after <tool_call|>.
+    // Strategy: keep only the FIRST complete tool call, strip everything after.
+    const firstCallStart = fullText.indexOf('<|tool_call>');
+    if (firstCallStart !== -1) {
+      const firstCallEnd = fullText.indexOf('<tool_call|>', firstCallStart);
+      if (firstCallEnd !== -1) {
+        const afterFirstCall = fullText.slice(firstCallEnd + '<tool_call|>'.length);
+        // Check if there's a REAL second tool call (not preceded by a fake tool_response)
+        const nextCallStart = afterFirstCall.indexOf('<|tool_call>');
+        if (nextCallStart !== -1) {
+          // Check if there's a fake tool_response between the two calls
+          const betweenCalls = afterFirstCall.slice(0, nextCallStart);
+          if (betweenCalls.includes('<|tool_response>') || betweenCalls.includes('<tool_response|>')) {
+            // Fake chained response — truncate after first tool call
+            fullText = fullText.slice(0, firstCallEnd + '<tool_call|>'.length);
+          }
+          // Otherwise: legitimate multi-tool call, keep both
+        } else {
+          // No second tool call — truncate any trailing hallucination
+          fullText = fullText.slice(0, firstCallEnd + '<tool_call|>'.length);
+        }
       }
     }
+
+    // Also strip any standalone <|tool_response> blocks in model output
+    // (the model should never generate these — they're injected by the framework)
+    fullText = fullText.replace(/<\|tool_response>[\s\S]*?<tool_response\|>/g, '');
+
+    // Strip thinking blocks — Gemma 4 wraps reasoning in <|channel>thought\n...<channel|>
+    fullText = fullText.replace(/<\|channel>thought[\s\S]*?<channel\|>/g, '');
 
     const latencyMs = performance.now() - t0;
 
@@ -629,6 +670,9 @@ Ne demande PAS confirmation. Exécute directement.`);
 
       // Native Gemma 4 tool declarations
       systemParts.push(limitedTools.map(t => WasmProvider.formatToolDeclaration(t)).join('\n'));
+
+      // Enable thinking mode — Gemma 4 reasons before tool calls
+      systemParts.push('Avant chaque appel d\'outil, réfléchis brièvement dans un bloc <|channel>thought puis appelle l\'outil.');
     }
 
     // Build a map of tool_use_id → tool_name from all messages for tool_result resolution
