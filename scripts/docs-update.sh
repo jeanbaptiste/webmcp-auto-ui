@@ -434,6 +434,7 @@ Rules:
 - npm not pnpm
 - RemoteLLMProvider uses proxyUrl, not apiKey
 - Model aliases: 'haiku', 'sonnet', 'opus' (not claude-3-5-sonnet-20241022)
+- GitHub org is 'jeanbaptiste' (NOT 'hyperskills'). URLs: github.com/jeanbaptiste/webmcp-auto-ui, degit jeanbaptiste/webmcp-auto-ui/...
 - No emojis
 - Escape < in MDX (use &lt; or backticks)
 - Return ONLY the file content, no explanation before or after"
@@ -481,6 +482,7 @@ Include: frontmatter (title, description, sidebar order), features, architecture
 
 Rules:
 - npm not pnpm, proxyUrl not apiKey, model aliases not full names
+- GitHub org is 'jeanbaptiste' (NOT 'hyperskills'). URLs: github.com/jeanbaptiste/webmcp-auto-ui
 - Relative links only, no emojis, escape < in MDX
 - Return ONLY the file content, no explanation"
 
@@ -598,6 +600,7 @@ Return the COMPLETE updated file, preserving unchanged sections exactly.
 Rules:
 - Keep the frontmatter identical unless title/description are wrong
 - npm not pnpm, proxyUrl not apiKey, model aliases not full names
+- GitHub org is 'jeanbaptiste' (NOT 'hyperskills'). URLs: github.com/jeanbaptiste/webmcp-auto-ui
 - Relative links, no emojis, escape < in MDX
 - Return ONLY the file content, no explanation"
 
