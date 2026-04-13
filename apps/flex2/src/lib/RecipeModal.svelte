@@ -13,11 +13,6 @@
     body?: string;
   }
 
-  /** True when the recipe is an MCP recipe (no body/when/layout — only name+description) */
-  const isMcpRecipe = $derived(
-    recipe != null && !recipe.body && !recipe.when && !recipe.layout
-  );
-
   interface Props {
     open: boolean;
     recipe: RecipeData | null;
@@ -25,6 +20,11 @@
   }
 
   let { open = $bindable(false), recipe, onclose }: Props = $props();
+
+  /** True when the recipe is an MCP recipe (no body/when/layout — only name+description) */
+  const isMcpRecipe = $derived(
+    recipe != null && !recipe.body && !recipe.when && !recipe.layout
+  );
 
   function close() { open = false; onclose(); }
 

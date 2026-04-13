@@ -9,7 +9,7 @@
  * Reactivity: subscribe(fn) / getSnapshot() pattern (useSyncExternalStore compatible).
  */
 
-import { encode, decode } from 'hyperskills';
+import { encode, decode } from '../hyperskills.js';
 
 export type WidgetType =
   | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'

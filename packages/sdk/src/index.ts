@@ -36,10 +36,10 @@ export interface HyperSkillVersion {
 
 // HyperSkill encoding — powered by the `hyperskills` NPM package.
 // Raw functions re-exported for direct access:
-export { encode, decode, hash, diff, getHsParam } from 'hyperskills';
+export { encode, decode, hash, diff, getHsParam } from './hyperskills.js';
 
 // Typed convenience wrappers — prefer these in apps:
-import { encode, decode, hash, diff } from 'hyperskills';
+import { encode, decode, hash, diff } from './hyperskills.js';
 
 export async function encodeHyperSkill(skill: HyperSkill, sourceUrl?: string): Promise<string> {
   const base = sourceUrl ?? (typeof window !== 'undefined' ? window.location.href.split('?')[0] : 'https://example.com');

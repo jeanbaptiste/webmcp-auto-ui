@@ -61,7 +61,7 @@
     <div class="flex flex-col gap-1 mb-3">
       {#each layers as layer, i}
         <div class="text-[10px] font-mono text-text1 px-2 py-1 bg-surface2/50 rounded">
-          [{i}] {layer.source}
+          [{i}] {layer.protocol}
           {#if 'serverName' in layer && layer.serverName}
             — {layer.serverName}
           {/if}

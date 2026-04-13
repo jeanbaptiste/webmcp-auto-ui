@@ -1,7 +1,9 @@
-<script lang="ts">
+<script lang="ts" module>
   declare const __BUILD_TIME__: string;
   declare const __GIT_HASH__: string;
+</script>
 
+<script lang="ts">
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
   import { McpConnector, LLMSelector, SettingsPanel, RemoteMCPserversDemo } from '@webmcp-auto-ui/ui';

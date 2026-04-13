@@ -293,7 +293,7 @@
           skill.provenance = result.provenance;
         } catch { /* don't block export */ }
       }
-      const url = await encodeHyperSkill(skill as HyperSkill, window.location.origin + base);
+      const url = await encodeHyperSkill(skill as unknown as HyperSkill, window.location.origin + base);
       await navigator.clipboard.writeText(url);
       exportedUrl = url;
       // Build block summary
@@ -339,7 +339,7 @@
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
-        schemaValidation, maxIterations: 15, maxTokens, maxTools, temperature, topK, cacheEnabled,
+        maxIterations: 15, maxTokens, maxTools, temperature, topK, cacheEnabled,
         truncateResults: false, compressHistory: false,
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
@@ -574,7 +574,7 @@
   {connectedUrls} {loadingUrls}
   onaddserver={addMcpServer} onaddall={addAllServers} onremoveserver={removeMcpServer}
   {mcpRecipes}
-  webmcpRecipes={layers.find(l => l.protocol === 'webmcp')?.recipes ?? []}
+  webmcpRecipes={(layers.find(l => l.protocol === 'webmcp') as any)?.recipes ?? []}
 />
 
 <!-- EXPORT MODAL -->

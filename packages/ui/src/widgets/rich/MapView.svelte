@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
 
   export interface LatLng    { lat: number; lng: number; }
   export interface MapMarker { lat: number; lng: number; label?: string; color?: string; }
@@ -77,11 +77,11 @@
 
     syncMarkers(spec.markers ?? []);
     leafletLoaded = true;
+  });
 
-    return () => {
-      map?.remove();
-      map = undefined;
-    };
+  onDestroy(() => {
+    map?.remove();
+    map = undefined;
   });
 
   $effect(() => {

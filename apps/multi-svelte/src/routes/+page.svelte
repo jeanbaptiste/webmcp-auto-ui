@@ -13,9 +13,10 @@
     McpStatus, GemmaLoader, AgentProgress, EphemeralBubble,
     TokenBubble, LLMSelector, bus, layoutAdapter,
     FloatingLayout, FlexLayout, WidgetRenderer,
-    LinkIndicators, linkGroupColor,
+    LinkIndicators, linkGroupColor, RemoteMCPserversDemo,
   } from '@webmcp-auto-ui/ui';
   import type { ManagedWindow } from '@webmcp-auto-ui/ui';
+  import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
   import { Settings, Terminal, LayoutGrid, X, ChevronLeft, ChevronRight } from 'lucide-svelte';
   import ServerSelector from '$lib/ServerSelector.svelte';
   import { ALL_PACKS, buildLayers, getActiveServers } from '$lib/agent-setup';
@@ -172,7 +173,6 @@
   }
 
   async function addAllServers() {
-    const { MCP_DEMO_SERVERS } = await import('@webmcp-auto-ui/sdk');
     for (const server of MCP_DEMO_SERVERS) {
       await addMcpServer(server.url);
     }
@@ -294,7 +294,7 @@
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
-        schemaValidation: true, maxIterations: 15, maxTokens, maxTools, temperature, cacheEnabled,
+        maxIterations: 15, maxTokens, maxTools, temperature, cacheEnabled,
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         layers,
@@ -395,12 +395,22 @@
       <!-- LLM Selector -->
       <div class="px-3 py-3 border-b border-border">
         <span class="text-[10px] uppercase tracking-wider text-text2 mb-2 block">Model</span>
-        <LLMSelector />
+        <LLMSelector
+          value={canvas.llm}
+          onchange={(v) => { canvas.setLlm(v as any); }}
+          models={[
+            { value: 'haiku', label: 'claude-haiku-4-5', group: 'remote' },
+            { value: 'sonnet', label: 'claude-sonnet-4-6', group: 'remote' },
+            { value: 'opus', label: 'claude-opus-4-6', group: 'remote' },
+            { value: 'gemma-e2b', label: 'Gemma E2B (WASM)', group: 'wasm' },
+            { value: 'gemma-e4b', label: 'Gemma E4B (WASM)', group: 'wasm' },
+          ]}
+        />
       </div>
 
-      <!-- MCP Connection -->
+      <!-- MCP Connection (URL manuelle) -->
       <div class="px-3 py-3 border-b border-border">
-        <span class="text-[10px] uppercase tracking-wider text-text2 mb-2 block">MCP Server</span>
+        <span class="text-[10px] uppercase tracking-wider text-text2 mb-2 block">Serveur MCP (URL manuelle)</span>
         <div class="flex flex-col gap-1.5">
           <input type="text" bind:value={mcpUrl} placeholder="wss://server.example/sse"
             class="w-full bg-surface2 border border-border2 rounded px-2 py-1.5 text-xs font-mono text-text1
@@ -415,12 +425,6 @@
             class="w-full px-2 py-1.5 rounded bg-accent/10 border border-accent/30 text-accent font-mono text-xs
                    hover:bg-accent/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
             {loadingUrls.includes(mcpUrl) ? 'Connecting...' : 'Connect'}
-          </button>
-          <button onclick={addAllServers}
-            disabled={loadingUrls.length > 0}
-            class="w-full px-2 py-1.5 rounded bg-teal/10 border border-teal/30 text-teal font-mono text-xs
-                   hover:bg-teal/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-            Connect all MCP demos
           </button>
         </div>
         {#if connectedUrls.length > 0}
@@ -439,6 +443,18 @@
         {/if}
       </div>
 
+      <!-- Serveurs MCP démo -->
+      <div class="px-3 py-3 border-b border-border">
+        <RemoteMCPserversDemo
+          servers={MCP_DEMO_SERVERS}
+          connectedUrls={connectedUrls}
+          loading={loadingUrls}
+          onconnect={addMcpServer}
+          onconnectall={addAllServers}
+          ondisconnect={removeMcpServer}
+        />
+      </div>
+
       <!-- Server Selector -->
       <div class="px-3 py-3 border-b border-border">
         <ServerSelector servers={serverOptions} onchange={togglePack} />
@@ -449,7 +465,7 @@
         <span class="text-[10px] uppercase tracking-wider text-text2 mb-1">Settings</span>
         <label class="flex items-center justify-between text-xs font-mono text-text2">
           <span>Max tokens</span>
-          <input type="number" bind:value={maxTokens} min={256} max={8192} step={256}
+          <input type="number" bind:value={maxTokens} min={256} max={16384} step={256}
             class="w-16 bg-surface2 border border-border2 rounded px-1 py-0.5 text-xs text-text1 text-right outline-none" />
         </label>
         <label class="flex items-center justify-between text-xs font-mono text-text2">
@@ -474,6 +490,14 @@
         <textarea bind:value={systemPrompt} rows={3} placeholder="Custom instructions..."
           class="w-full bg-surface2 border border-border2 rounded px-2 py-1.5 text-xs font-mono text-text1
                  outline-none placeholder:text-text2/50 focus:border-accent/60 transition-colors resize-y" />
+        {#if effectivePrompt}
+          <details class="mt-2">
+            <summary class="text-[10px] uppercase tracking-wider text-text2 cursor-pointer hover:text-text1 transition-colors">
+              Prompt effectif ({effectivePrompt.length} chars)
+            </summary>
+            <pre class="mt-1 max-h-32 overflow-auto text-[10px] font-mono text-text2 bg-surface2 border border-border2 rounded p-2 whitespace-pre-wrap break-words">{effectivePrompt}</pre>
+          </details>
+        {/if}
       </div>
     </aside>
   {/if}
@@ -574,8 +598,7 @@
                   {/if}
                 </div>
               {/if}
-              <div class="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize"
-                   onmousedown={(e) => ctx.onresizestart(e)}></div>
+              <!-- resize handled by FloatingLayout -->
             </div>
           {/snippet}
         </FloatingLayout>
