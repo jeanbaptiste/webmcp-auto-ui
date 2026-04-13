@@ -1,151 +1,286 @@
 ---
 title: "component()"
-description: Tool unifie exposant 56 composants au LLM, mode smart vs explicit
+description: Tool unifie exposant les composants au LLM, widget_display, et le pont agent-UI
 sidebar:
   order: 2
 ---
 
-:::caution[Page obsolète]
-Cette page décrit l'ancienne API `component()` / `componentRegistry` supprimée en Phase 8. Voir [Architecture](/guide/architecture/) pour l'API actuelle basée sur les serveurs WebMCP et `widget_display`.
+Imaginez un telecommande universelle : au lieu d'avoir une telecommande par appareil (TV, sono, lumieres), vous avez un seul bouton "affiche ca". Vous dites ce que vous voulez voir et avec quels parametres, et la telecommande se debrouille. C'est exactement le role de `widget_display` : un **outil unique** qui permet a l'agent de rendre n'importe lequel des 24+ widgets natifs.
+
+## Qu'est-ce que l'outil component / widget_display ?
+
+`widget_display` est l'outil WebMCP central qui permet a l'agent IA d'**afficher un widget sur le canvas**. L'agent envoie un nom de widget et ses parametres, et le systeme :
+1. Valide les parametres contre le schema JSON du widget
+2. Assainit les URLs d'images (supprime les URLs hallucinées)
+3. Rend le widget sur le canvas
+4. Retourne un identifiant unique pour les modifications ulterieures
+
+```ts
+// L'agent appelle :
+widget_display({
+  name: "stat-card",
+  params: { label: "Uptime", value: "99.9", unit: "%", variant: "success" }
+})
+
+// Le systeme retourne :
+{ widget: "stat-card", data: { label: "Uptime", value: "99.9", unit: "%", variant: "success" }, id: "w_a3f2" }
+```
+
+:::note[Evolution historique]
+L'outil s'appelait `component()` dans les versions anterieures (avant la Phase 8). Il a ete renomme en `widget_display` lors de l'adoption du serveur WebMCP `autoui`. L'ancienne API `component()` / `componentRegistry` a ete supprimee. Le concept reste le meme : un outil unique pour rendre n'importe quel widget.
 :::
 
-Trois outils separes exposent 56 composants (31 renderable, 25 non-renderable) au LLM. En mode smart, ce sont les seuls outils UI visibles.
+## Pourquoi un outil unique ?
 
-## Mode smart vs explicit
+L'alternative serait d'exposer un outil **par widget** : `render_stat`, `render_chart`, `render_table`... soit 31 outils. Comparez :
 
-| | Smart (defaut) | Explicit |
-|--|---------------|----------|
-| **Outils UI** | 3 : `list_components()`, `get_component()`, `component()` | 31 `render_*` + `component()` |
-| **Discovery** | `list_components()` + `get_component(nom)` | Le LLM voit tous les tools |
-| **Tokens schema** | ~200 tokens | ~3000 tokens |
-| **Recommandation** | Cloud (Claude) | WASM (Gemma) ou debug |
+| Approche | Outils visibles | Tokens de schema | Decouverte |
+|----------|----------------|-----------------|------------|
+| 1 outil par widget | 31 `render_*` | ~3000 tokens | Le LLM voit tout d'emblee |
+| Outil unique `widget_display` | 1 outil | ~200 tokens | Le LLM decouvre via les recettes |
 
-## Trois outils
+L'outil unique consomme **15x moins de tokens** de schema. Avec un LLM distant comme Claude, c'est une economie significative a chaque requete.
 
-### list_components() -- Discovery globale
+## Les 6 outils du serveur autoui
 
-```
-list_components()
-```
+Le serveur `autoui` expose 6 outils au total. Les 4 premiers forment le systeme de decouverte et de rendu, les 2 derniers sont des outils utilitaires :
 
-Retourne la liste des 56 composants avec nom, description, et flag `renderable`, plus les recettes disponibles.
-
-### get_component(nom) -- Schema detaille
+### search_recipes() -- Recherche
 
 ```
-get_component("stat-card")
+autoui_webmcp_search_recipes({ query: "kpi" })
 ```
 
-Retourne le schema JSON detaille, la description et la renderability d'un composant specifique. Appeler `list_components()` d'abord pour voir les noms disponibles.
+Retourne les widgets et recettes dont le nom ou la description contient le terme recherche.
 
-### component(nom, params) -- Rendu
+### list_recipes() -- Liste complete
 
 ```
-component("stat-card", { label: "Revenue", value: "$142K" })
+autoui_webmcp_list_recipes()
 ```
 
-Rend le composant sur le canvas via le callback `onWidget`. Appeler `get_component(nom)` d'abord pour connaitre les parametres attendus.
+Retourne la liste de tous les widgets enregistres avec nom, description et groupe.
 
-## Noms de composants
+### get_recipe() -- Schema detaille
 
-Les noms utilisent des tirets : `stat-card`, `data-table`, `chart-rich`. Les anciens noms `render_*` sont acceptes en backward compat.
+```
+autoui_webmcp_get_recipe({ name: "stat-card" })
+```
 
-### Actions canvas
+Retourne le **schema JSON complet** du widget, sa description, et sa **recette d'usage** (un guide en Markdown). C'est la que l'agent apprend les parametres attendus.
 
-| Nom court | Equivalent legacy |
-|-----------|------------------|
-| `clear` | `clear_canvas` |
-| `update` | `update_block` |
-| `move` | `move_block` |
-| `resize` | `resize_block` |
-| `style` | `style_block` |
+### widget_display() -- Rendu
 
-## Composants renderable (31)
+```
+autoui_webmcp_widget_display({ name: "stat-card", params: { label: "Uptime", value: "99.9%" } })
+```
 
-Tous les block types utilises par `BlockRenderer` :
+**L'outil principal.** Valide les parametres, assainit les URLs, et rend le widget sur le canvas. Retourne `{ widget, data, id }`.
 
-| Composant | Description |
-|-----------|-------------|
-| `stat` | Metrique unique avec trend |
-| `kv` | Paires cle-valeur |
-| `list` | Liste a puces |
-| `chart` | Bar chart simple |
-| `alert` | Banniere d'alerte |
-| `code` | Bloc de code |
-| `text` | Paragraphe texte |
-| `actions` | Boutons d'action |
-| `tags` | Collection de tags |
-| `stat-card` | Stat enrichie avec couleur |
-| `data-table` | Table triable |
-| `timeline` | Chronologie |
-| `profile` | Fiche profil |
-| `trombinoscope` | Grille de personnes |
-| `json-viewer` | Arbre JSON interactif |
-| `hemicycle` | Hemicycle parlementaire |
-| `chart-rich` | Chart multi-type |
-| `cards` | Grille de cards |
-| `grid-data` | Grille spreadsheet |
-| `sankey` | Diagramme de flux |
-| `map` | Carte Leaflet |
-| `d3` | Widget D3 (presets) |
-| `log` | Viewer de logs |
-| `gallery` | Galerie d'images |
-| `carousel` | Carousel de slides |
-| `clear` | Vider le canvas |
-| `update` | Mettre a jour un bloc |
-| `move` | Deplacer un bloc |
-| `resize` | Redimensionner un bloc |
-| `style` | Styler un bloc |
+### canvas() -- Manipulation
 
-## Composants non-renderable (25)
+```
+autoui_webmcp_canvas({ action: "update", id: "w_a3f2", params: { data: { value: "99.8%" } } })
+```
 
-Composants Svelte (primitives, base UI, layouts, agent UI, theme). Retournent leur schema et un hint d'usage via `get_component("nom")`.
+5 actions pour modifier les widgets existants : `clear`, `update`, `move`, `resize`, `style`.
 
-## API
+### recall() -- Relecture
+
+```
+autoui_webmcp_recall({ id: "toolu_xxx" })
+```
+
+Relit le resultat complet d'un appel d'outil precedent (utile quand le resultat a ete tronque a 10 000 caracteres par la boucle agent).
+
+## Le flux complet : de la decouverte au rendu
+
+```mermaid
+sequenceDiagram
+    participant LLM as Agent LLM
+    participant SR as search_recipes
+    participant GR as get_recipe
+    participant WD as widget_display
+    participant C as Canvas
+
+    Note over LLM: L'agent a des donnees a afficher
+    LLM->>SR: search_recipes("table")
+    SR-->>LLM: [{name: "data-table", desc: "Tableau triable"}, {name: "grid-data", desc: "Grille spreadsheet"}]
+
+    LLM->>GR: get_recipe("data-table")
+    GR-->>LLM: {schema: {columns: [...], rows: [...]}, recipe: "## Quand utiliser..."}
+
+    Note over LLM: L'agent connait maintenant le schema exact
+    LLM->>WD: widget_display({name: "data-table", params: {columns: [{key: "nom", label: "Nom"}], rows: [{nom: "Alice"}]}})
+    WD-->>LLM: {widget: "data-table", id: "w_b7c1"}
+    WD->>C: Rend le tableau sur le canvas
+
+    Note over LLM: Plus tard, mise a jour du widget
+    LLM->>WD: canvas({action: "update", id: "w_b7c1", params: {data: {rows: [{nom: "Alice"}, {nom: "Bob"}]}}})
+```
+
+## Le pont bidirectionnel agent-UI
+
+Le systeme cree un **pont bidirectionnel** entre l'agent et l'interface :
+
+```mermaid
+graph LR
+    subgraph "Agent → UI"
+        A1["widget_display()"] -->|"cree"| W["Widget sur le canvas"]
+        A2["canvas(update)"] -->|"modifie"| W
+    end
+
+    subgraph "UI → Agent"
+        W -->|"auto-enregistre"| T["Outils WebMCP par bloc"]
+        T -->|"block_id_get"| A3["Agent lit les donnees"]
+        I["Interaction utilisateur"] -->|"evenement"| A4["Agent reagit"]
+    end
+```
+
+### Direction agent → UI
+
+L'agent cree et modifie les widgets :
+
+1. `widget_display()` cree un nouveau widget
+2. `canvas(update)` met a jour les donnees d'un widget existant
+3. `canvas(move/resize/style)` change la position et le style
+4. `canvas(clear)` vide tout le canvas
+
+### Direction UI → agent
+
+Chaque widget rendu s'auto-enregistre comme source d'outils WebMCP via `navigator.modelContext` :
 
 ```ts
-import { autoui, NATIVE_WIDGET_NAMES } from '@webmcp-auto-ui/agent';
-```
+// Quand un widget "stat-card" avec id "w_a3f2" est monte :
+navigator.modelContext.registerTool('block_w_a3f2_get', {
+  description: 'Read current data of stat-card widget',
+  execute: () => currentData,
+});
 
-### Enregistrer un composant custom
+navigator.modelContext.registerTool('block_w_a3f2_update', {
+  description: 'Update stat-card widget data',
+  execute: (newData) => { /* met a jour le widget */ },
+});
 
-```ts
-componentRegistry.set('my-widget', {
-  name: 'my-widget',
-  toolName: 'my-widget',
-  description: 'Widget custom.',
-  inputSchema: { type: 'object', properties: { title: { type: 'string' } } },
-  renderable: false,
+navigator.modelContext.registerTool('block_w_a3f2_remove', {
+  description: 'Remove this widget from the canvas',
+  execute: () => { /* retire le widget */ },
 });
 ```
 
-## Serveur autoui
+Les interactions utilisateur (clic sur un bouton, selection dans un tableau) remontent aussi a l'agent sous forme d'evenements.
 
-Le serveur `autoui` pre-enregistre tous les widgets natifs. Utiliser `autoui.layer()` pour obtenir une WebMcpLayer :
+## Validation et securite
+
+### Validation JSON Schema
+
+Chaque appel a `widget_display` est valide contre le schema du widget cible. Si les parametres ne correspondent pas, le serveur retourne une erreur avec le schema attendu :
 
 ```ts
-import { autoui } from '@webmcp-auto-ui/agent';
+// L'agent envoie des parametres invalides :
+widget_display({ name: "stat", params: { valeur: "42" } })
 
-const layer = autoui.layer();
-// { protocol: 'webmcp', serverName: 'autoui', tools: [...] }
+// Le serveur retourne :
+{
+  error: "Validation failed",
+  details: [{ path: "/label", message: "required property missing" }],
+  expected_schema: { type: "object", required: ["label", "value"], ... }
+}
 ```
 
-### Groupes
+L'agent corrige alors son appel automatiquement (le prompt systeme inclut des regles de gestion d'erreurs).
 
-| Groupe | Composants |
-|--------|-----------|
-| `simple` | stat, kv, list, chart, alert, code, text, actions, tags |
-| `rich` | table, timeline, profile, trombinoscope, json, hemicycle, chart-rich, cards, sankey, log, stat-card, grid |
-| `media` | gallery, carousel, map |
-| `advanced` | d3, js-sandbox |
-| `canvas` | clear, update, move, resize, style |
+### Assainissement des URLs d'images
 
-## Flux complet
+Les LLMs ont tendance a inventer des URLs d'images. Le serveur `autoui` **supprime automatiquement** les URLs invalides dans les champs d'image (`src`, `avatar`, `image`, `thumbnail`...) :
+
+```ts
+// L'agent hallucine une URL :
+widget_display({ name: "profile", params: {
+  name: "Alice",
+  avatar: { src: "portrait-alice.jpg" }   // URL relative, invalide
+} })
+
+// Le serveur supprime l'avatar invalide avant le rendu
+// Le widget ProfileCard affiche les initiales "A" a la place
+```
+
+Seules les URLs commencant par `http://`, `https://`, `data:` ou `/` sont conservees.
+
+## Noms de widgets et retrocompatibilite
+
+Les noms de widgets utilisent des tirets : `stat-card`, `data-table`, `chart-rich`. Les anciens noms avec prefixe `render_*` sont acceptes pour la retrocompatibilite :
+
+| Nom actuel | Ancien nom (legacy) |
+|-----------|---------------------|
+| `stat-card` | `render_stat_card` |
+| `data-table` | `render_data_table` |
+| `chart-rich` | `render_chart_rich` |
+
+## Relations avec les autres concepts
+
+```mermaid
+graph TD
+    TL["ToolLayers"] -->|"WebMcpLayer"| AU["Serveur autoui"]
+    AU -->|"expose"| WD["widget_display()"]
+    AU -->|"expose"| CV["canvas()"]
+    AU -->|"expose"| RC["recall()"]
+    AU -->|"expose"| SR["search/list/get_recipe()"]
+
+    SR -->|"decouverte"| R["Recettes widget"]
+    R -->|"guide"| WD
+    WD -->|"rend"| W["Widgets UI"]
+    W -->|"sur le"| C["Canvas"]
+    CV -->|"modifie"| W
+```
+
+- **ToolLayers** : le serveur autoui produit une `WebMcpLayer` qui porte tous ces outils
+- **Recettes** : les recettes widget (inline dans autoui) et les recettes WebMCP (fichiers `.md`) guident le choix des widgets
+- **Widgets** : le catalogue des 24+ composants visuels rendus par `widget_display`
+- **MCP** : les outils MCP fournissent les donnees que `widget_display` affiche
+
+## Patterns avances
+
+### Composition multi-widgets
+
+L'agent peut enchainer plusieurs `widget_display` pour composer un dashboard complet :
 
 ```
-1. App ajoute autoui.layer() aux layers
-2. buildToolsFromLayers() genere les ProviderTool[]
-3. LLM recoit les outils de decouverte (search_recipes, list_recipes, etc.)
-4. LLM appelle widget_display("stat-card", {label, value}) -> rendu
-5. onWidget callback -> canvas affiche le widget
+// L'agent suit une recette "dashboard-kpi"
+widget_display({ name: "stat-card", params: { label: "Revenue", value: "$142K" } })  → w_1
+widget_display({ name: "stat-card", params: { label: "Users", value: "3.2K" } })     → w_2
+widget_display({ name: "chart-rich", params: { type: "line", ... } })                → w_3
+widget_display({ name: "data-table", params: { columns: [...], rows: [...] } })      → w_4
 ```
+
+### Mise a jour reactive
+
+L'agent peut modifier un widget sans le recréer :
+
+```
+// Premiere creation
+widget_display({ name: "stat", params: { label: "Prix", value: "$100" } }) → w_5
+
+// Plus tard, mise a jour
+canvas({ action: "update", id: "w_5", params: { data: { value: "$105" } } })
+```
+
+### Gestion d'erreurs en cascade
+
+Le prompt systeme inclut des regles strictes de gestion d'erreurs :
+
+1. Si un appel echoue : analyser le message d'erreur et le schema attendu
+2. Corriger l'appel en respectant strictement le schema
+3. Retenter au moins une fois avant de changer de strategie
+4. Apres deux echecs identiques : chercher une autre recette
+
+## Resume : les 6 outils en un tableau
+
+| Outil | Role | Quand l'utiliser |
+|-------|------|-----------------|
+| `search_recipes` | Chercher des widgets/recettes | Au debut, pour trouver le bon widget |
+| `list_recipes` | Lister tous les widgets | Si la recherche ne donne rien |
+| `get_recipe` | Obtenir le schema complet | Avant le premier appel a widget_display |
+| `widget_display` | Rendre un widget | Pour afficher des donnees |
+| `canvas` | Modifier un widget existant | Pour mettre a jour, deplacer, styler |
+| `recall` | Relire un resultat tronque | Quand un resultat MCP depasse 10K chars |

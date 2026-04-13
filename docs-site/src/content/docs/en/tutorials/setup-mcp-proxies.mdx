@@ -5,43 +5,64 @@ sidebar:
   order: 7
 ---
 
-This tutorial explains how to install and configure the MCP proxies that allow webmcp-auto-ui apps to access public MCP servers (NASA, iNaturalist, Wikipedia, etc.) from the browser.
+MCP servers communicate via stdio (stdin/stdout), but browsers need HTTP endpoints. This tutorial shows you how to deploy the proxies that bridge the gap, locally with Docker or in production with systemd and nginx.
 
-## Introduction
+## Goal
 
-MCP servers are npm packages or Python scripts that communicate via stdio (stdin/stdout). Browsers cannot communicate over stdio -- they need HTTP endpoints.
+Deploy MCP proxies to make public MCP servers (NASA, HackerNews, Wikipedia, etc.) accessible from the browser.
 
-The `mcp-stdio-bridge.py` bridge solves this problem: it wraps each MCP server into an HTTP endpoint that accepts JSON-RPC 2.0 requests, forwards them to the MCP process via stdio, and returns the response.
+## Prerequisites
+
+- Docker and Docker Compose installed (for the quick method)
+- Or: an Ubuntu/Debian VM with `python3`, `node`, `npm`, `nginx` (for production)
+- Understanding of what an MCP server is (see [Connect an MCP server](./connect-mcp-server))
+
+## What you will build
+
+MCP servers accessible via HTTP, with CORS configured, recipes injected, and systemd monitoring.
+
+```mermaid
+graph LR
+    Browser[Browser] -->|HTTPS| Nginx[nginx reverse proxy]
+    Nginx -->|HTTP localhost:900x| Bridge["mcp-stdio-bridge.py"]
+    Bridge -->|stdin/stdout| MCP["MCP Server (npx/python3)"]
+```
 
 ---
 
 ## Architecture
 
-```
-Browser (McpClient)
-    |
-    v  (HTTPS)
-nginx reverse proxy  (CORS + routing)
-    |
-    v  (HTTP, localhost:900x)
-mcp-stdio-bridge.py  (HTTP → stdio)
-    |
-    v  (stdin/stdout, JSON-RPC 2.0)
-MCP server subprocess  (npx / python3)
-```
-
-Each bridge:
+Each bridge is a Python process that:
 - Spawns the MCP server as a child process communicating via stdio
 - Accepts `POST /mcp` with a JSON-RPC 2.0 body
 - Forwards to the subprocess via stdin, reads the response from stdout
 - Manages the subprocess lifecycle (lazy start, restart on crash)
 - Optionally injects recipe tools from a JSON file
 
+```mermaid
+graph TB
+    subgraph "Per MCP server"
+        HTTP["POST /mcp (JSON-RPC 2.0)"] --> Bridge["mcp-stdio-bridge.py"]
+        Bridge --> Stdin["stdin"]
+        Stdin --> Process["MCP server subprocess"]
+        Process --> Stdout["stdout"]
+        Stdout --> Bridge
+        Bridge --> Response["HTTP Response"]
+    end
+
+    subgraph nginx
+        CORS["CORS Headers"] --> Proxy["proxy_pass localhost:900x"]
+    end
+
+    Client[McpClient] --> nginx
+    nginx --> HTTP
+```
+
 ---
 
-## Quick method (Docker)
+## Quick method: Docker
 
-For local development, Docker Compose starts all servers in a single command:
+For local development, Docker Compose starts all servers in one command:
 
 ```bash
 cd mcp-proxies
@@ -56,55 +77,91 @@ To start a single server:
 docker compose up -d hackernews
 ```
 
+**Checkpoint**: test with curl:
+
+```bash
+curl -s -X POST http://localhost:9006/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {},
+      "clientInfo": { "name": "test", "version": "1.0" }
+    }
+  }'
+```
+
+A valid response contains `"result"` with the server capabilities.
+
+:::tip[Quick development]
+Use Docker for development. Only switch to the VM method for production deployment.
+:::
+
 ---
 
-## VM method (systemd + nginx)
+## Production method: systemd + nginx
 
-For production deployment on an Ubuntu/Debian VM:
+For production on an Ubuntu/Debian VM:
 
 ```bash
 cd mcp-proxies
 sudo ./setup.sh
 ```
 
-The script is idempotent (it can be re-run safely). It performs the following operations:
+The script is **idempotent** (safe to re-run). It performs:
 
-1. Checks prerequisites (`python3`, `node`, `npm`, `nginx`)
+1. Prerequisite checks (`python3`, `node`, `npm`, `nginx`)
 2. Creates a dedicated `mcpbridge` system user
 3. Copies bridge scripts to `/opt/mcp-bridge/`
 4. Generates systemd unit files for each server
-5. Generates the nginx location block
+5. Generates nginx location blocks
 6. Starts or restarts all services
 7. Tests each endpoint with curl
 
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant Setup as setup.sh
+    participant System as systemd
+    participant Nginx as nginx
+
+    Admin->>Setup: sudo ./setup.sh
+    Setup->>Setup: Check prerequisites
+    Setup->>Setup: Create mcpbridge user
+    Setup->>Setup: Copy scripts to /opt/mcp-bridge/
+    Setup->>System: Generate + enable systemd units
+    Setup->>Nginx: Generate locations + reload
+    Setup->>Setup: curl test each endpoint
+    Setup-->>Admin: Startup report
+```
+
 ### NASA API key
 
-The NASA proxy requires a `NASA_API_KEY` environment variable. Set it before running setup:
+The NASA proxy requires a `NASA_API_KEY` environment variable:
 
 ```bash
 export NASA_API_KEY="your-key-here"
 sudo -E ./setup.sh
 ```
 
-Or create the `/opt/mcp-bridge/.env` file on the VM:
-
-```
-NASA_API_KEY=your-key-here
-```
+:::caution[Don't forget -E]
+The `-E` flag preserves environment variables in the sudo context. Without it, `NASA_API_KEY` won't be passed to the script.
+:::
 
 ---
 
 ## Adding a new MCP server
 
-To add an MCP server to the proxy system:
-
-1. Create a subdirectory in `mcp-proxies/servers/`:
+### 1. Create the directory
 
 ```bash
 mkdir mcp-proxies/servers/my-server
 ```
 
-2. Add the configuration files:
+### 2. Add configuration files
 
 ```
 mcp-proxies/servers/my-server/
@@ -114,19 +171,31 @@ mcp-proxies/servers/my-server/
   examples.md     # Prompt examples
 ```
 
-3. Re-run the setup to register the new service:
+### 3. Create recipes (optional but recommended)
+
+```json
+[
+  {
+    "name": "search-guide",
+    "description": "How to search in my-server",
+    "content": "## Search\\n\\nUse search({query: 'keyword'})..."
+  }
+]
+```
+
+### 4. Re-run setup
 
 ```bash
 sudo ./setup.sh
 ```
 
-Or, to manually add the systemd service, create the unit file and reload systemd.
+**Checkpoint**: the new service appears in `systemctl status mcp-bridge-my-server`.
 
 ---
 
 ## Testing a server
 
-Send an `initialize` request to verify a server is responding correctly:
+Send an `initialize` request:
 
 ```bash
 curl -s -X POST http://localhost:9001/mcp \
@@ -143,33 +212,37 @@ curl -s -X POST http://localhost:9001/mcp \
   }'
 ```
 
-A valid response contains `"result"` with the server capabilities. Replace port `9001` with the target server port (see the table below).
+Then list tools:
+
+```bash
+curl -s -X POST http://localhost:9001/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/list",
+    "params": {}
+  }'
+```
 
 ---
 
 ## Connecting from a webmcp-auto-ui app
 
-Once the proxy is running, connect from your app using `McpClient`:
-
 ```typescript
 import { McpClient } from '@webmcp-auto-ui/core';
 
-const client = new McpClient({
-  serverUrl: 'http://localhost:9001/mcp',
-});
+// Local development
+const client = new McpClient('http://localhost:9001/mcp');
+
+// Production
+const client = new McpClient('https://demos.hyperskills.net/mcp-metmuseum/mcp');
+
 await client.initialize();
 const tools = await client.listTools();
 ```
 
-In production, use the public proxy URL:
-
-```typescript
-const client = new McpClient({
-  serverUrl: 'https://demos.hyperskills.net/mcp-metmuseum/mcp',
-});
-```
-
-To manage multiple MCP servers simultaneously, use `McpMultiClient`:
+For multiple servers:
 
 ```typescript
 import { McpMultiClient } from '@webmcp-auto-ui/core';
@@ -183,7 +256,9 @@ await multi.addServer('https://demos.hyperskills.net/mcp-wikipedia/mcp');
 
 ## Recipe system
 
-Each server can optionally include a `recipes.json` file in `servers/{name}/` that injects recipe tools (`list_recipes`, `get_recipe`, `search_recipes`) into the MCP server's tool list. The bridge loads these at startup via the `--recipes` flag.
+Each server can optionally include a `recipes.json` file that injects recipe tools (`list_recipes`, `get_recipe`, `search_recipes`) into the MCP server's tool list. The bridge loads these at startup via the `--recipes` flag.
+
+Recipes let the LLM discover how to use the server autonomously, even if the original MCP server has no built-in discovery mechanism.
 
 ---
 
@@ -201,7 +276,9 @@ Each server can optionally include a `recipes.json` file in `servers/{name}/` th
 
 Production URLs are prefixed with `https://demos.hyperskills.net`.
 
-The `datagouv` server is a special case: it does not use a stdio bridge but a simple nginx reverse proxy to a remote MCP server that is already accessible over HTTP.
+:::note[Special case: datagouv]
+The `datagouv` server does not use a stdio bridge but a simple nginx reverse proxy to a remote MCP server already accessible over HTTP.
+:::
 
 ---
 
@@ -210,7 +287,7 @@ The `datagouv` server is a special case: it does not use a stdio bridge but a si
 ```
 mcp-proxies/
   bridge/
-    mcp-stdio-bridge.py      # The generic stdio-to-HTTP bridge
+    mcp-stdio-bridge.py      # Generic stdio-to-HTTP bridge
     inaturalist-mcp.py        # Custom Python MCP server for iNaturalist
   nginx/
     mcp-locations.conf        # nginx location blocks (CORS + proxy_pass)
@@ -227,6 +304,24 @@ mcp-proxies/
 ```
 
 ---
+
+## Troubleshooting
+
+| Problem | Likely cause | Solution |
+|---------|-------------|----------|
+| "Connection refused" | Bridge not started | `systemctl status mcp-bridge-<name>` |
+| "CORS error" | Missing CORS headers in nginx | Check `mcp-locations.conf` |
+| Timeout on first call | MCP server takes time to start | Bridge does lazy start, first call is slow |
+| "Invalid JSON-RPC" | Wrong request format | Check JSON-RPC 2.0 body format |
+| Server crash loop | Missing npm dependency | `journalctl -u mcp-bridge-<name>` for logs |
+
+---
+
+## Going further
+
+- **Create a custom MCP server**: write your own MCP server in Node.js or Python
+- **Monitoring**: add systemd healthchecks and alerts
+- **Security**: add token authentication to endpoints
 
 ## See also
 

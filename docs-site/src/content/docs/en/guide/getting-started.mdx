@@ -5,19 +5,29 @@ sidebar:
   order: 1
 ---
 
-Get started with WebMCP Auto-UI in 5 minutes.
+This guide walks you from installation to your first working agent. By the end, you will have an interactive canvas where an AI agent generates widgets in real time from your prompts.
+
+## Who This Guide Is For
+
+- **Frontend developers** looking to integrate an AI agent into a Svelte interface
+- **Explorers** curious to see MCP in action on the client side
+- **Contributors** who want to understand the monorepo structure before diving into code
 
 ## Prerequisites
 
-- **Node.js** 18.x or higher
-- **npm** (the monorepo uses `package-lock.json`)
-- **Claude API key** (optional — Gemma in-browser is available)
+| Tool | Minimum Version | Why |
+|------|----------------|-----|
+| **Node.js** | 18.x | Server runtime (SvelteKit) and build tooling |
+| **npm** | 9.x | Monorepo management (workspaces) |
+| **Modern browser** | Chrome/Edge recommended | WebAssembly for Gemma, Web Workers |
 
-## Installation
+:::note[API key is optional]
+An Anthropic key (`ANTHROPIC_API_KEY`) is only needed for Claude. The Gemma 4 agent runs entirely in the browser -- no key, no remote server.
+:::
 
-### Quick start (boilerplate)
+## Quick Path: Boilerplate
 
-The fastest way to get started is with the **boilerplate** app, which includes three pre-configured Tricoteuses widgets:
+The fastest way to get started is with the **boilerplate** -- a ready-to-use SvelteKit app with three pre-configured Tricoteuses widgets:
 
 ```bash
 npx degit jeanbaptiste/webmcp-auto-ui/apps/boilerplate my-app
@@ -26,194 +36,316 @@ npm install
 npm run dev
 ```
 
-### Full monorepo (contributors)
+Here is what each command does:
+
+1. `npx degit` downloads the `apps/boilerplate` folder without git history (fast, lightweight).
+2. `npm install` installs dependencies, including all four `@webmcp-auto-ui/*` packages.
+3. `npm run dev` starts the SvelteKit server on `http://localhost:5173`.
+
+The app launches with a canvas, a chat panel, and three working widgets. Type a prompt in the chat to see the agent in action.
+
+:::tip[When to choose the boilerplate]
+Choose the boilerplate if you want to **use** WebMCP Auto-UI in a project. Choose the full monorepo if you want to **contribute** to the project or modify the packages themselves.
+:::
+
+## Full Monorepo (for Contributors)
+
+### Step 1: Clone the Repository
 
 ```bash
 git clone https://github.com/jeanbaptiste/webmcp-auto-ui.git
 cd webmcp-auto-ui
+```
+
+The repository is about 50 MB (excluding `node_modules`). It contains four packages and eight demo apps.
+
+### Step 2: Install Dependencies
+
+```bash
 npm install
 ```
 
-### Configure environment variables
+npm automatically detects the workspaces defined in `package.json` and installs all dependencies in a single pass. Local packages (`@webmcp-auto-ui/*`) are linked via symlinks -- no manual `npm link` required.
 
-Create a `.env.local` file at the root:
+### Step 3: Configure Environment
+
+Create a `.env.local` file at the root of the app you want to run (for example `apps/flex2/.env.local`):
 
 ```bash
-# Claude API (optional, required for remote agents)
+# Claude API (optional, only required for remote agents)
 ANTHROPIC_API_KEY=sk-ant-...
 
-# URL of remote MCP servers (format: protocol://host:port)
+# Remote MCP servers (optional, format: protocol://host:port)
 MCP_SERVERS=http://localhost:3001,http://localhost:3002
 ```
 
-### Start in development
+:::caution[Security]
+Never commit `.env` files. They are already in `.gitignore`. On the production server, `.env` files are created manually once and never deployed.
+:::
+
+### Step 4: Start Development
 
 ```bash
 npm run dev
 ```
 
-The app starts on `http://localhost:5173`. You will see:
+This command launches all apps in parallel via `concurrently`. Each app listens on a different port:
 
-- **Canvas**: Widget drawing area
-- **Chat panel**: Agent interface
-- **Settings**: LLM model selector (Claude/Gemma)
+| App | Port | Description |
+|-----|------|-------------|
+| home | 5173 | Homepage (static) |
+| flex2 | 5174 | Main app (SvelteKit) |
+| viewer2 | 5175 | HyperSkills viewer |
+| showcase2 | 5176 | Widget gallery |
+| todo2 | 5177 | Todo demo |
 
-## Your First Simple Agent
+To launch a single app:
 
-### Step 1: Choose a model
+```bash
+npm run dev:flex2    # Just flex2
+npm run dev:home     # Just home
+```
 
-1. Click **Settings**
-2. Select **Claude (Haiku)** or **Gemma (in-browser)**
-3. If Claude: verify that `ANTHROPIC_API_KEY` is set
+## Your First Agent: Step by Step
 
-### Step 2: Write a prompt
+### 1. Choose a Model
 
-In the **Chat panel**, enter:
+Open `http://localhost:5174` (flex2). In the right panel, click **Settings** and select a model:
+
+| Model | Speed | Quality | Requirement |
+|-------|-------|---------|-------------|
+| Claude Haiku | Fast | Good | API key |
+| Claude Sonnet | Medium | Very good | API key |
+| Claude Opus | Slow | Excellent | API key |
+| Gemma 4 E2B | Medium | Fair | None (in-browser) |
+| Gemma 4 E4B | Slow | Good | None (in-browser) |
+
+If you choose Gemma, the browser downloads model weights (~2-6 GB). The `<GemmaLoader>` component shows real-time progress.
+
+### 2. Write a Prompt
+
+In the **chat panel**, type:
 
 ```
 Display a stat with label "Visitors" and value "1,234"
 ```
 
-### Step 3: Watch the agent
+### 3. Watch the Agent
 
-1. Agent receives the prompt
-2. Identifies it needs a `stat` widget
-3. Calls `widget_display('stat', { label: 'Visitors', value: '1,234' })`
-4. Canvas displays the widget
+The agent follows a predictable flow:
 
-## Development Architecture
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as LLM Agent
+    participant D as Dispatcher
+    participant W as WebMCP (autoui)
+    participant C as Canvas
 
-### Monorepo structure
+    U->>A: "Display a stat..."
+    A->>D: tool_use: search_recipes("stat")
+    D->>W: search_recipes
+    W-->>D: [{name: "stat-card", ...}]
+    D-->>A: tool_result
+    A->>D: tool_use: get_recipe("stat-card")
+    D->>W: get_recipe
+    W-->>D: {schema, description, examples}
+    D-->>A: tool_result
+    A->>D: tool_use: widget_display("stat-card", {label, value})
+    D->>W: widget_display
+    W-->>D: {widget: "stat-card", id: "w_abc"}
+    D-->>A: tool_result
+    A-->>C: Widget mounted on canvas
+```
+
+1. The agent searches for a matching recipe (`search_recipes`).
+2. It loads the full recipe to learn the schema (`get_recipe`).
+3. It calls `widget_display` with validated parameters.
+4. The canvas displays the widget.
+
+### 4. Go Further
+
+Try more complex prompts:
+
+```
+Show 3 stats: visitors (1,234), conversions (3.2%), and revenue ($45,678).
+Then add a bar chart with monthly sales.
+```
+
+The agent will chain multiple tool calls in a single loop.
+
+## Monorepo Structure
 
 ```
 webmcp-auto-ui/
 ├── packages/
-│   ├── core/            # WebMCP types, polyfill, MCP client
-│   ├── agent/           # Agent loop, LLM providers, tool layers
-│   ├── ui/              # Svelte widgets (30+), UI components
-│   └── sdk/             # HyperSkills, canvas store
+│   ├── core/          # WebMCP types, polyfill, MCP client, validation
+│   ├── agent/         # Agent loop, LLM providers, tool layers, Nano-RAG
+│   ├── ui/            # 30+ Svelte widgets, agent components, theme, bus
+│   └── sdk/           # HyperSkills, skills registry, canvas store
 ├── apps/
-│   ├── boilerplate/     # Entry point for new devs (SvelteKit + 3 Tricoteuses widgets)
-│   ├── flex2/           # Main SvelteKit app
-│   ├── showcase2/       # Showcase demo
-│   ├── todo2/           # Todo demo
-│   ├── viewer2/         # HyperSkills viewer
-│   ├── home/            # Homepage (static)
-│   ├── mobile/          # Mobile app
-│   ├── multi-svelte/    # Multi-widget Svelte
-│   └── recipes/         # Recipes demo
-└── scripts/
-    └── deploy.sh        # Deployment script
+│   ├── boilerplate/   # Entry point for new devs (SvelteKit + Tricoteuses)
+│   ├── flex2/         # Main SvelteKit app (composer)
+│   ├── showcase2/     # Widget gallery
+│   ├── todo2/         # Todo demo
+│   ├── viewer2/       # HyperSkills viewer
+│   ├── home/          # Homepage (static)
+│   ├── mobile/        # Mobile app
+│   ├── multi-svelte/  # Multi-widget Svelte
+│   └── recipes/       # Recipe explorer
+├── scripts/
+│   └── deploy.sh      # Centralized deployment script
+├── docs-site/         # Documentation site (Astro Starlight)
+└── tests/
+    └── e2e/           # Playwright tests
 ```
 
-### Recommended imports
+### Package Dependencies
+
+```mermaid
+graph TD
+    CORE["@webmcp-auto-ui/core<br/>Types, MCP client, validation"]
+    SDK["@webmcp-auto-ui/sdk<br/>HyperSkills, canvas store"]
+    AGENT["@webmcp-auto-ui/agent<br/>Agent loop, LLM providers"]
+    UI["@webmcp-auto-ui/ui<br/>30+ widgets, agent components"]
+
+    CORE --> SDK
+    CORE --> AGENT
+    CORE --> UI
+    SDK --> UI
+    AGENT --> UI
+```
+
+`core` is the foundation: it depends on nothing else. `agent` and `sdk` depend on `core`. `ui` depends on all three.
+
+## Recommended Imports
 
 ```typescript
 // Agent loop
 import { runAgentLoop } from '@webmcp-auto-ui/agent';
 
 // LLM Providers
-import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
-import { WasmProvider } from '@webmcp-auto-ui/agent';
+import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';  // Claude via proxy
+import { WasmProvider } from '@webmcp-auto-ui/agent';       // Gemma 4 in-browser
+import { LocalLLMProvider } from '@webmcp-auto-ui/agent';   // Ollama local
 
 // Tool layers
-import { buildDiscoveryTools, activateServerTools, resolveCanonicalTools } from '@webmcp-auto-ui/agent';
+import { buildDiscoveryTools, activateServerTools } from '@webmcp-auto-ui/agent';
+import { resolveCanonicalTools, buildSystemPromptWithAliases } from '@webmcp-auto-ui/agent';
 
 // Widgets
-import { WidgetRenderer } from '@webmcp-auto-ui/ui';
+import { WidgetRenderer, BlockRenderer } from '@webmcp-auto-ui/ui';
 
-// Canvas store
+// Canvas store (Svelte 5 only)
 import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 
 // MCP Client
-import { McpClient } from '@webmcp-auto-ui/core';
+import { McpClient, McpMultiClient } from '@webmcp-auto-ui/core';
+
+// HyperSkills
+import { encodeHyperSkill, decodeHyperSkill } from '@webmcp-auto-ui/sdk';
 ```
 
-## Common Examples
+## Practical Examples
 
-### Create a Claude provider
+### Create a Claude Provider
 
-`RemoteLLMProvider` connects through a SvelteKit proxy endpoint, keeping your API key server-side:
+`RemoteLLMProvider` connects to Claude through a SvelteKit proxy endpoint. Your API key stays server-side -- never exposed to the browser.
 
 ```typescript
 import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
 
 const provider = new RemoteLLMProvider({
   proxyUrl: '/api/chat',
-  model: 'sonnet', // resolves to claude-sonnet-4-6
+  model: 'sonnet',  // Resolved server-side to claude-sonnet-4-6
 });
 ```
 
-Available model aliases: `'haiku'` (claude-haiku-4-5-20251001), `'sonnet'` (claude-sonnet-4-6), `'opus'` (claude-opus-4-6).
+Available aliases:
 
-### Create a Gemma provider
+| Alias | Full Model | Use Case |
+|-------|-----------|----------|
+| `'haiku'` | `claude-haiku-4-5-20251001` | Fast, cost-effective |
+| `'sonnet'` | `claude-sonnet-4-6` | Balanced quality/speed |
+| `'opus'` | `claude-opus-4-6` | Deep reasoning |
+
+### Create a Gemma Provider (In-Browser)
+
+`WasmProvider` runs Gemma 4 directly in the browser via LiteRT. No API key, no remote server:
 
 ```typescript
 import { WasmProvider } from '@webmcp-auto-ui/agent';
 
 const provider = new WasmProvider({
-  modelId: 'gemma-e4b', // 4B variant
-  autoDownload: true,
-});
-
-// Wait for loading
-provider.onStatusChange((status) => {
-  console.log('Gemma status:', status);
-});
-```
-
-### Run an agent
-
-```typescript
-import { runAgentLoop } from '@webmcp-auto-ui/agent';
-
-const result = await runAgentLoop('Display a sales chart', {
-  provider,
-  layers: [
-    // ... tool layers
-  ],
-  maxIterations: 5,
-  callbacks: {
-    onToolCall: (call) => console.log('Tool called:', call.name),
-    onWidget: (type, data) => console.log('Widget:', type),
+  model: 'gemma-e4b',      // 4B variant (more capable)
+  contextSize: 32_768,
+  onProgress: (progress, status, loaded, total) => {
+    console.log(`Loading: ${Math.round(progress * 100)}%`);
+  },
+  onStatusChange: (status) => {
+    // 'idle' → 'loading' → 'ready' (or 'error')
+    console.log('Gemma:', status);
   },
 });
 
-console.log('Agent finished:', result.text);
+await provider.initialize();
 ```
 
-### Display a widget
+### Run a Full Agent
+
+```typescript
+import { runAgentLoop } from '@webmcp-auto-ui/agent';
+import { autoui } from '@webmcp-auto-ui/agent';
+
+const result = await runAgentLoop('Show a chart of monthly sales', {
+  provider,           // RemoteLLMProvider or WasmProvider
+  layers: [
+    { protocol: 'webmcp', serverName: 'autoui', tools: autoui.listTools() },
+    // Add more MCP layers as needed
+  ],
+  maxIterations: 5,   // Safety guard: max 5 loops
+  callbacks: {
+    onToolCall: (call) => console.log('Tool called:', call.name, `(${call.elapsed}ms)`),
+    onWidget: (type, data) => {
+      console.log('Widget generated:', type);
+      // Add to canvas here
+      return { id: `w_${Date.now()}` };
+    },
+    onText: (text) => console.log('Agent says:', text),
+  },
+});
+
+console.log('Result:', result.text);
+console.log('Tools called:', result.metrics.toolCalls);
+```
+
+This example shows the complete flow: the provider sends the prompt to the LLM, the agent loop iterates by calling tools, and callbacks receive events in real time.
+
+### Display a Widget in Svelte
 
 ```svelte
 <script>
   import { WidgetRenderer } from '@webmcp-auto-ui/ui';
-  
+  import { autoui } from '@webmcp-auto-ui/agent';
+
   const widgetData = {
     label: 'Visitors',
     value: '1,234',
     trend: 'up',
+    variant: 'success',
   };
 </script>
 
-<WidgetRenderer 
-  type="stat-card" 
+<WidgetRenderer
+  type="stat-card"
   data={widgetData}
   servers={[autoui]}
 />
 ```
 
-## Connect to an MCP Server
+`WidgetRenderer` detects the type, loads the matching Svelte component, and passes the data as props. The `servers` attribute references WebMCP servers for schema validation.
 
-### Start a local MCP server
-
-```bash
-# Example: weather MCP server
-npx @example/weather-mcp
-```
-
-Must listen on `http://localhost:3000` and expose an `/sse` endpoint (Server-Sent Events).
-
-### Connect from the app
+### Connect to an MCP Server
 
 ```typescript
 import { McpClient } from '@webmcp-auto-ui/core';
@@ -224,48 +356,59 @@ const client = new McpClient({
 
 await client.initialize();
 
-// List tools
+// List tools exposed by the server
 const tools = await client.listTools();
-console.log('MCP tools:', tools);
+console.log('MCP tools:', tools.map(t => t.name));
+
+// Call a tool
+const result = await client.callTool('get_forecast', { location: 'Paris' });
+console.log('Result:', result);
 ```
 
-## Local Deployment
+The MCP client communicates via SSE (Server-Sent Events) with the remote server. Initialization negotiates capabilities and retrieves the tool list.
 
-To test on a local server before production:
+## Local Deployment (Preview)
+
+To test a production build locally:
 
 ```bash
-# Build for production
-npm run build
-
-# Start the server
-npm run preview
+npm run build    # Build all apps
+npm run preview  # Start the preview server
 ```
 
-Accessible on `http://localhost:4173`.
+Accessible on `http://localhost:4173`. This is the same code that will be deployed to production.
 
 ## Troubleshooting
 
-### Agent does not call tools
+### Agent Does Not Call Tools
 
-- Verify that `layers` are configured correctly
-- Verify that `buildDiscoveryTools()` returns expected tools
-- Check LLM provider logs
+1. **Check layers**: the `layers` array passed to `runAgentLoop` must contain at least one layer with tools.
+2. **Check the system prompt**: `buildSystemPromptWithAliases(layers)` must return a prompt that lists available tools.
+3. **Check logs**: enable `onToolCall` in callbacks to trace every call.
+4. **Check the model**: some models (small Gemma variants) struggle with the tool calling format.
 
-### Gemma does not load
+### Gemma Does Not Load
 
-- Verify internet connection (downloads ~6GB of WASM)
-- Verify browser (Chrome/Edge recommended)
-- Check dev console (`F12`)
+- **Internet connection**: the first launch downloads weights (~2-6 GB depending on variant).
+- **Browser**: Chrome or Edge recommended. Firefox supports WebAssembly but may be slower.
+- **Memory**: Gemma 4B requires ~8 GB of available RAM in the browser.
+- **Console**: open `F12` and check errors in the Console tab.
 
-### Widget does not display
+### Widgets Do Not Display
 
-- Verify that the type exists in `NATIVE_MAP` of `WidgetRenderer`
-- Verify data structure vs widget's `inputSchema`
-- Check validation errors
+- **Unknown type**: verify that the type passed to `WidgetRenderer` exists in the native map (`NATIVE_WIDGET_NAMES`).
+- **Invalid schema**: data is validated against the widget's JSON Schema. If validation fails, the widget is not mounted.
+- **Silent errors**: open the browser console to see validation errors.
+
+### Build Fails
+
+- **Build order**: packages must be compiled before apps (`core` -> `sdk` -> `ui` -> `agent`). The `npm run build` script handles this order.
+- **Stale cache**: delete `node_modules/.cache` and re-run `npm run build`.
+- **Types**: run `npm run check` to surface TypeScript errors.
 
 ## Next Steps
 
-- **[Architecture](./architecture)**: Understand the agent loop
-- **[Tool Calling](./tool-calling)**: Dispatch tools
-- **[Deployment](./deploy)**: Host in production
-- **[Create a Custom Widget](../tutorials/create-custom-widget)**: Step-by-step tutorial with Tricoteuses widgets
+- **[Architecture](./architecture)**: Understand the agent loop, tool layers, and reactive canvas
+- **[Tool Calling](./tool-calling)**: The complete journey of a tool call
+- **[Deployment](./deploy)**: Host in production with `deploy.sh`
+- **[Contributing](./contributing)**: Patterns, pitfalls, and contribution workflow

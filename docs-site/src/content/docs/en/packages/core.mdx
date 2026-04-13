@@ -1,19 +1,123 @@
 ---
 title: "@webmcp-auto-ui/core"
-description: "Foundations: MCP Client, WebMCP server, JSON schema validation, utilities."
+description: "Foundations: MCP Client, WebMCP server, W3C polyfill, JSON schema validation, utilities."
 sidebar:
   order: 4
 ---
 
-The `@webmcp-auto-ui/core` package provides the foundations: MCP client (streamable HTTP), WebMCP server, JSON schema validation, and communication utilities.
+The `@webmcp-auto-ui/core` package is the technical foundation of the entire WebMCP Auto-UI platform. It provides four key capabilities: a **W3C WebMCP polyfill** (conforming to the Draft CG Report 2026-03-27), a **Streamable HTTP MCP client**, a **WebMCP server** for exposing widgets and tools, and a **JSON Schema validator** with zero external dependencies.
+
+Zero dependencies. Framework-agnostic. Works on both server and client.
+
+## Internal Architecture
+
+```mermaid
+graph TD
+    subgraph "@webmcp-auto-ui/core"
+        P[W3C Polyfill] --> T[MCP/WebMCP Types]
+        C[McpClient] --> T
+        MC[McpMultiClient] --> C
+        S[WebMcpServer] --> T
+        S --> FM[parseFrontmatter]
+        S --> MW[mountWidget]
+        V[validateJsonSchema] --> T
+        U[Utilities] --> T
+        E[PostMessage Bridge] --> T
+    end
+
+    APP[Application] --> C
+    APP --> S
+    APP --> V
+    AGENT["@webmcp-auto-ui/agent"] --> C
+    AGENT --> S
+    AGENT --> V
+```
+
+## Installation
+
+The package is part of the monorepo. In an app within the project:
+
+```ts
+import { McpClient, createWebMcpServer, validateJsonSchema } from '@webmcp-auto-ui/core';
+```
+
+In an app's `package.json`:
+
+```json
+{
+  "devDependencies": {
+    "@webmcp-auto-ui/core": "file:../../packages/core"
+  }
+}
+```
+
+---
+
+## W3C WebMCP Polyfill
+
+The polyfill implements all 17 mandatory features of the W3C WebMCP Draft CG Report (2026-03-27). It installs `navigator.modelContext` in browsers that don't natively support it, making MCP tools accessible through a standardized API.
+
+### The "MCP polyfill" concept
+
+The idea is straightforward: browsers don't yet implement the Model Context Protocol natively. The polyfill intercepts calls to `navigator.modelContext` and routes them to a JavaScript implementation that handles tool registration, schema validation, and communication with LLM agents.
+
+### initializeWebMCPPolyfill
+
+Installs the polyfill on `navigator.modelContext`.
+
+```ts
+import { initializeWebMCPPolyfill, cleanupWebMCPPolyfill, hasNativeWebMCP } from '@webmcp-auto-ui/core';
+
+// Check if the browser supports WebMCP natively
+if (!hasNativeWebMCP()) {
+  initializeWebMCPPolyfill({
+    defaultConfirmationTier: 'auto',
+  });
+}
+
+// Later, cleanly remove the polyfill
+cleanupWebMCPPolyfill();
+```
+
+The polyfill restores the original `navigator.modelContext` descriptors on cleanup (save/restore pattern).
+
+### Registering tools via the polyfill
+
+Once installed, tools register through the standard API:
+
+```ts
+await navigator.modelContext.registerTool({
+  name: 'search_recipes',
+  description: 'Search for recipes',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Search keyword' }
+    },
+    required: ['query']
+  }
+}, async (params) => {
+  return { content: [{ type: 'text', text: 'Results...' }] };
+});
+```
+
+### executeToolInternal
+
+Executes a tool registered in the polyfill (used internally by the agent loop).
+
+```ts
+import { executeToolInternal } from '@webmcp-auto-ui/core';
+
+const result = await executeToolInternal('search_recipes', { query: 'pasta' });
+```
+
+---
 
 ## MCP Client
 
-JSON-RPC client for the Model Context Protocol over streamable HTTP.
+JSON-RPC client for the Model Context Protocol over Streamable HTTP. Handles sessions, reconnection, and timeouts automatically.
 
 ### McpClient
-
-Class for communicating with an MCP server.
 
 ```ts
 import { McpClient } from '@webmcp-auto-ui/core';
@@ -23,74 +127,86 @@ const client = new McpClient('http://localhost:3000/mcp', {
   clientVersion: '1.0.0',
   timeout: 30000,
 });
-
-// Initialize
-await client.initialize();
-
-// List tools
-const tools = await client.listTools();
-// McpTool[] with name, description, inputSchema
-
-// Call a tool
-const result = await client.callTool('search_recipes', {
-  query: 'desserts',
-});
-// McpToolResult { content: [...], isError? }
 ```
 
-**Options:**
+The constructor accepts the MCP server URL and an options object:
 
 ```ts
 interface McpClientOptions {
-  clientName?: string;              // Default: 'webmcp-client'
-  clientVersion?: string;           // Default: '1.0.0'
+  clientName?: string;              // Default: 'webmcp-auto-ui'
+  clientVersion?: string;           // Default: '0.1.0'
   timeout?: number;                 // Default: 30000 ms
-  headers?: Record<string, string>; // Custom headers
-  autoReconnect?: boolean;          // Auto-reconnect
-  maxReconnectAttempts?: number;    // Default: 3
+  headers?: Record<string, string>; // Additional HTTP headers
+  autoReconnect?: boolean;          // Automatic reconnection (default: true)
+  maxReconnectAttempts?: number;    // Max attempts (default: 3)
 }
 ```
 
-**Methods:**
+### Connection lifecycle
 
 ```ts
-client.initialize(): Promise<McpInitializeResult>
-client.listTools(): Promise<McpTool[]>
-client.callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult>
-client.close(): Promise<void>
+// 1. Connect and JSON-RPC handshake
+const initResult = await client.connect();
+// McpInitializeResult { protocolVersion, capabilities, serverInfo }
+
+// 2. Discover available tools
+const tools = await client.listTools();
+// McpTool[] — each tool has name, description, and inputSchema
+
+// 3. Call a tool
+const result = await client.callTool('search_recipes', { query: 'desserts' });
+// McpToolResult { content: [...], isError? }
+
+// 4. Clean shutdown
+await client.close();
 ```
+
+:::tip
+The client manages sessions automatically via the `Mcp-Session-Id` header. If the connection drops and `autoReconnect` is enabled, it retries up to `maxReconnectAttempts` times.
+:::
 
 ### McpMultiClient
 
-Manage multiple MCP servers in parallel.
+When your application needs to interact with multiple MCP servers simultaneously — for example a recipe server and a database server — `McpMultiClient` simplifies management.
 
 ```ts
 import { McpMultiClient } from '@webmcp-auto-ui/core';
 
 const multi = new McpMultiClient();
 
+// Connect to multiple servers
 await multi.connect('recipes', 'http://localhost:3000/mcp');
 await multi.connect('database', 'http://localhost:3001/mcp');
 
 // List connected servers
 const servers = multi.listServers();
+// ConnectedServer[] { url, name, tools, ... }
 
 // Call a tool on a specific server
-const result = await multi.callTool('recipes', 'search_recipes', {
-  query: 'pasta'
-});
+const result = await multi.callTool('recipes', 'search_recipes', { query: 'pasta' });
 
-// Close all servers
+// Close all connections
 await multi.closeAll();
 ```
 
+```ts
+interface ConnectedServer {
+  url: string;
+  name: string;
+  tools: McpTool[];
+  client: McpClient;
+}
+```
+
+---
+
 ## WebMCP Server
 
-Create a WebMCP server to expose widgets and tools.
+The WebMCP server is the local counterpart of a remote MCP server. While MCP provides **data** (via HTTP server), WebMCP provides **widgets** (client-side, in the browser). This symmetry allows the agent to combine remote data and local display in a unified loop.
 
 ### createWebMcpServer
 
-Build a WebMCP server with widgets and tools.
+Creates a WebMCP server capable of registering widgets and tools.
 
 ```ts
 import { createWebMcpServer } from '@webmcp-auto-ui/core';
@@ -100,61 +216,90 @@ const server = createWebMcpServer('my-widgets', {
 });
 ```
 
-**Register a widget:**
+The server returns a `WebMcpServer` object:
 
 ```ts
-// Via Markdown recipe with YAML frontmatter
+interface WebMcpServer {
+  readonly name: string;
+  readonly description: string;
+
+  registerWidget(recipeMarkdown: string, renderer: WidgetRenderer): void;
+  addTool(tool: WebMcpToolDef): void;
+  layer(): { protocol: 'webmcp'; serverName: string; description: string; tools: WebMcpToolDef[] };
+  getWidget(name: string): WidgetEntry | undefined;
+  listWidgets(): WidgetEntry[];
+}
+```
+
+### Registering a widget
+
+Widgets are declared via a **recipe** — a Markdown file with YAML frontmatter. The frontmatter defines the name, description, and JSON Schema for parameters. The Markdown body contains documentation injected into the agent's prompt.
+
+```ts
 server.registerWidget(`
 ---
 widget: my-chart
-description: Custom chart
+description: Custom chart with title and data
 schema:
   type: object
   properties:
     title:
       type: string
+      description: Chart title
     data:
       type: array
+      description: Data to display
 required:
   - data
 ---
 
-## How to use
+## When to use
 
-Displays a chart with the provided data.
+Use this widget to display data as a chart.
+The 'title' field is optional, 'data' is required.
 `, renderer);
 ```
 
-**Vanilla renderer (function):**
+### Renderers
+
+The server supports two types of renderers:
+
+**Vanilla renderer (JavaScript function)** — for framework-free widgets:
 
 ```ts
 const renderer = (container: HTMLElement, data: Record<string, unknown>) => {
-  container.innerHTML = `<h1>${data.title}</h1>`;
+  const title = data.title as string || 'Untitled';
+  container.innerHTML = `
+    <div style="padding: 16px; border-radius: 8px; background: var(--color-surface);">
+      <h2>${title}</h2>
+      <div class="chart-body">...</div>
+    </div>
+  `;
+
   // Optionally return a cleanup function
-  return () => {
-    // Cleanup if needed
-  };
+  return () => { container.innerHTML = ''; };
 };
 ```
 
-**Framework renderer (Svelte, React, etc.):**
+**Framework renderer (Svelte, React, etc.)** — pass the component directly:
 
 ```ts
-// Pass the component directly (non-vanilla)
-import MyComponent from './MyComponent.svelte';
-server.registerWidget(recipeMd, MyComponent);
+import MyChart from './MyChart.svelte';
+server.registerWidget(recipeMd, MyChart);
 ```
 
-**Add a custom tool:**
+The server automatically detects whether the renderer is a function (vanilla) or a framework component, setting the `vanilla` flag in `WidgetEntry` accordingly.
+
+### Adding a custom tool
 
 ```ts
 server.addTool({
   name: 'compute',
-  description: 'Perform a computation',
+  description: 'Perform a mathematical computation',
   inputSchema: {
     type: 'object',
     properties: {
-      operation: { type: 'string', enum: ['add', 'multiply'] },
+      operation: { type: 'string', enum: ['add', 'subtract', 'multiply', 'divide'] },
       a: { type: 'number' },
       b: { type: 'number' },
     },
@@ -162,84 +307,77 @@ server.addTool({
   },
   execute: async (params) => {
     const { operation, a, b } = params as { operation: string; a: number; b: number };
-    const result = operation === 'add' ? a + b : a * b;
-    return { result };
+    const ops: Record<string, (x: number, y: number) => number> = {
+      add: (x, y) => x + y, subtract: (x, y) => x - y,
+      multiply: (x, y) => x * y, divide: (x, y) => x / y,
+    };
+    return { result: ops[operation](a, b) };
   },
 });
 ```
 
-**List widgets:**
+### Exporting as a layer
 
-```ts
-const widgets = server.listWidgets();
-// WidgetEntry[] { name, description, inputSchema, recipe, renderer }
-
-const widget = server.getWidget('my-chart');
-if (widget) {
-  console.log(widget.description);
-  console.log(widget.inputSchema);
-}
-```
-
-**Export as a layer:**
+The `layer()` method converts the server into a `ToolLayer` for the agent loop:
 
 ```ts
 const layer = server.layer();
 // { protocol: 'webmcp', serverName: 'my-widgets', description: '...', tools: [...] }
 ```
 
-### parseFrontmatter
+### Listing and retrieving widgets
 
-Parse the YAML frontmatter from a Markdown recipe.
+```ts
+const widgets = server.listWidgets();
+// WidgetEntry[] — each entry has name, description, inputSchema, recipe, renderer
+
+const widget = server.getWidget('my-chart');
+if (widget) {
+  console.log(widget.vanilla); // true if renderer is a plain function
+}
+```
+
+---
+
+## parseFrontmatter
+
+Parses the YAML frontmatter from a recipe Markdown file. Internal implementation with no YAML dependency — supports scalars, nested objects (indentation), arrays (`- item`), and inline values.
 
 ```ts
 import { parseFrontmatter } from '@webmcp-auto-ui/core';
 
-const markdown = `---
-widget: stat
-description: Key statistic
-schema:
-  type: object
-  properties:
-    label:
-      type: string
-    value:
-      type: string
----
-
-## When to use
-...
-`;
-
-const { frontmatter, body } = parseFrontmatter(markdown);
+const { frontmatter, body } = parseFrontmatter(markdownString);
 // frontmatter: { widget: 'stat', description: '...', schema: {...} }
-// body: '## When to use...'
+// body: remaining Markdown content
 ```
 
-### mountWidget
+:::note
+If the Markdown doesn't start with `---`, the function returns an empty frontmatter and the full body. No error is thrown.
+:::
 
-Mount a vanilla widget into a DOM container.
+---
+
+## mountWidget
+
+Mounts a vanilla widget into a DOM container. Resolves the widget by name across the provided servers, then calls its renderer.
 
 ```ts
 import { mountWidget } from '@webmcp-auto-ui/core';
 
-const container = document.getElementById('widget');
-const cleanup = mountWidget(container, 'stat', {
-  label: 'Revenue',
-  value: '$42k'
-}, [server]);
+const container = document.getElementById('widget-container');
+const cleanup = mountWidget(container, 'stat', { label: 'Revenue', value: '$42k' }, [server]);
 
-// Later...
+// Later, unmount cleanly
 cleanup?.();
 ```
 
-## JSON Schema Validation
+---
 
-Validate data against a JSON Schema.
+## JSON Schema Validation
 
 ### validateJsonSchema
 
-Strictly validate an input against a schema.
+Strict validation of data against a JSON Schema. Supports primitive types, nested objects, arrays, `minimum`/`maximum`/`minLength`/`maxLength`/`enum` constraints, and `required` fields.
 
 ```ts
 import { validateJsonSchema } from '@webmcp-auto-ui/core';
@@ -247,22 +385,24 @@ import { validateJsonSchema } from '@webmcp-auto-ui/core';
 const schema = {
   type: 'object',
   properties: {
-    name: { type: 'string' },
+    name: { type: 'string', minLength: 1 },
     age: { type: 'number', minimum: 0 },
+    role: { type: 'string', enum: ['admin', 'user', 'guest'] },
   },
   required: ['name'],
 };
 
-const data = { name: 'Alice', age: 30 };
-const result = validateJsonSchema(data, schema);
+const ok = validateJsonSchema({ name: 'Alice', age: 30 }, schema);
+// { valid: true, errors: [] }
 
-if (!result.valid) {
-  console.error(result.errors);
-  // ValidationError[] { path, message, expected, actual }
-}
+const err = validateJsonSchema({ age: -5 }, schema);
+// { valid: false, errors: [
+//   { path: '$.name', message: 'required property missing' },
+//   { path: '$.age', message: 'value below minimum' }
+// ] }
 ```
 
-**Interface:**
+**Return types:**
 
 ```ts
 interface ValidationResult {
@@ -271,29 +411,27 @@ interface ValidationResult {
 }
 
 interface ValidationError {
-  path: string;           // e.g., '$.properties.age'
+  path: string;       // JSON Pointer path (e.g., '$.properties.age')
   message: string;
-  expected?: string;      // e.g., 'number'
-  actual?: string;        // e.g., 'string'
+  expected?: string;
+  actual?: string;
 }
 ```
+
+:::tip
+This validation is used internally by the WebMCP server to validate tool parameters before execution, and by the agent loop to verify LLM-generated tool call arguments.
+:::
+
+---
 
 ## Utilities
 
 ### sanitizeSchema
 
-Clean a JSON schema to make it compatible with the Anthropic API.
+Cleans a JSON Schema for Anthropic API compatibility. Claude's API enforces strict constraints on schemas (no `$ref` without `$defs`, no `additionalProperties` in certain contexts, limited depth).
 
 ```ts
 import { sanitizeSchema } from '@webmcp-auto-ui/core';
-
-const rawSchema = {
-  type: 'object',
-  properties: {
-    // ...
-  },
-  // Some fields may not be compatible
-};
 
 const clean = sanitizeSchema(rawSchema);
 ```
@@ -303,34 +441,123 @@ Removes:
 - Invalid additional properties
 - Overly deep nested schemas
 
+The variant `sanitizeSchemaWithReport` also returns the list of applied modifications:
+
+```ts
+import { sanitizeSchemaWithReport } from '@webmcp-auto-ui/core';
+
+const { schema, patches } = sanitizeSchemaWithReport(rawSchema);
+// patches: SchemaPatch[] — each patch describes a modification
+```
+
+### flattenSchema / unflattenParams
+
+Flattens nested object schemas into flat schemas using `key__subkey` convention. Useful when the LLM struggles with deeply nested objects.
+
+```ts
+import { flattenSchema, unflattenParams } from '@webmcp-auto-ui/core';
+
+// Flatten the schema
+const flat = flattenSchema(nestedSchema);
+// { properties: { config__host: ..., config__port: ... } }
+
+// Unflatten params received from the LLM
+const nested = unflattenParams({ config__host: 'localhost', config__port: 3000 }, pathMap);
+// { config: { host: 'localhost', port: 3000 } }
+```
+
 ### createToolGroup
 
-Create a tool group with a shared namespace.
+Creates a tool group with a shared namespace prefix.
 
 ```ts
 import { createToolGroup } from '@webmcp-auto-ui/core';
 
 const group = createToolGroup('database', [
-  {
-    name: 'query',
-    description: 'Execute a SQL query',
-    inputSchema: { /* ... */ },
-  },
-  {
-    name: 'insert',
-    description: 'Insert a record',
-    inputSchema: { /* ... */ },
-  },
+  { name: 'query', description: 'Execute a SQL query', inputSchema: { /* ... */ } },
+  { name: 'insert', description: 'Insert a record', inputSchema: { /* ... */ } },
 ]);
-
-// group.tools:
-// - database_query
-// - database_insert
+// group.tools: database_query, database_insert
 ```
 
-## Core Types
+### textResult / jsonResult
 
-### JSON Schema
+Helpers for building MCP-compliant tool results:
+
+```ts
+import { textResult, jsonResult } from '@webmcp-auto-ui/core';
+
+const text = textResult('Operation successful');
+// { content: [{ type: 'text', text: 'Operation successful' }] }
+
+const json = jsonResult({ count: 42, items: ['a', 'b'] });
+// { content: [{ type: 'text', text: '{"count":42,"items":["a","b"]}' }] }
+```
+
+---
+
+## PostMessage Bridge
+
+The postMessage bridge enables tools to run in isolated contexts (iframes, Web Workers) while communicating with the main agent. This is how untrusted code can execute safely (sandbox widgets, third-party extensions).
+
+```mermaid
+sequenceDiagram
+    participant Agent as Agent (parent)
+    participant Bridge as PostMessage Bridge
+    participant Worker as Widget (iframe/worker)
+
+    Agent->>Bridge: callToolViaPostMessage('compute', args)
+    Bridge->>Worker: postMessage({type: 'webmcp:call-tool', ...})
+    Worker->>Worker: executeTool('compute', args)
+    Worker->>Bridge: postMessage({type: 'webmcp:tool-result', ...})
+    Bridge->>Agent: Promise resolves with result
+```
+
+### listenForAgentCalls
+
+Listens for incoming tool calls via postMessage. Typically used inside an iframe or worker.
+
+```ts
+import { listenForAgentCalls, signalCompletion } from '@webmcp-auto-ui/core';
+
+const stopListening = listenForAgentCalls(async (toolName, args) => {
+  const result = await executeTool(toolName, args);
+  signalCompletion(result);
+});
+
+stopListening();
+```
+
+### callToolViaPostMessage
+
+Calls a tool in a remote context. Returns a Promise that resolves when the result arrives via postMessage.
+
+```ts
+import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
+
+const result = await callToolViaPostMessage(targetWindow, 'compute', { a: 5, b: 3 });
+```
+
+### isWebMCPEvent
+
+Checks if a message event is a valid WebMCP message.
+
+```ts
+import { isWebMCPEvent } from '@webmcp-auto-ui/core';
+
+window.addEventListener('message', (e) => {
+  if (isWebMCPEvent(e.data)) {
+    console.log(e.data.type);
+    // 'webmcp:call-tool' | 'webmcp:tool-result' | 'webmcp:tool-error'
+  }
+});
+```
+
+---
+
+## Types
+
+### JSON Schema Types
 
 ```ts
 export type JsonSchemaType =
@@ -348,13 +575,12 @@ export interface JsonSchemaObject {
   minimum?: number;
   maximum?: number;
   enum?: unknown[];
-  // ... and more
 }
 
 export type JsonSchema = boolean | JsonSchemaObject;
 ```
 
-### MCP
+### MCP Types
 
 ```ts
 export interface McpTool {
@@ -384,7 +610,7 @@ export interface McpInitializeResult {
 }
 ```
 
-### WebMCP
+### WebMCP Types
 
 ```ts
 export interface WebMcpToolDef {
@@ -401,115 +627,153 @@ export interface WidgetEntry {
   recipe: string;
   renderer: WidgetRenderer;
   group?: string;
-  vanilla: boolean;
+  vanilla: boolean;  // true when the renderer is a plain function
 }
 
 export type WidgetRenderer =
   | ((container: HTMLElement, data: Record<string, unknown>) => void | (() => void))
-  | unknown;  // Framework component
+  | unknown;  // Framework component (Svelte, React, etc.)
 ```
 
-## PostMessage Bridge
+---
 
-Communicate with tools via postMessage (iframe/worker).
+## Tutorial: Building a WebMCP Server from Scratch
 
-### listenForAgentCalls
+This tutorial walks through creating a WebMCP server with two widgets and a custom tool, then integrating it with the agent loop.
 
-Listen for tool calls from a client via postMessage.
-
-```ts
-import { listenForAgentCalls, signalCompletion } from '@webmcp-auto-ui/core';
-
-const stopListening = listenForAgentCalls(async (toolName, args) => {
-  // Execute the tool
-  const result = await executeTool(toolName, args);
-  // Signal the result
-  signalCompletion(result);
-});
-
-// Later...
-stopListening();
-```
-
-### callToolViaPostMessage
-
-Call a tool in a remote context (worker/iframe) via postMessage.
+### Step 1: Create the server
 
 ```ts
-import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
-
-const result = await callToolViaPostMessage(
-  targetWindow,
-  'compute',
-  { a: 5, b: 3 }
-);
-```
-
-### isWebMCPEvent
-
-Check whether an event is a valid WebMCP message.
-
-```ts
-import { isWebMCPEvent } from '@webmcp-auto-ui/core';
-
-window.addEventListener('message', (e) => {
-  if (isWebMCPEvent(e.data)) {
-    // It is a WebMCP event
-    console.log(e.data.type); // 'webmcp:call-tool', etc.
-  }
-});
-```
-
-## Full Example: Custom Server + Client
-
-```ts
-// === Server (backend) ===
 import { createWebMcpServer } from '@webmcp-auto-ui/core';
 
-const server = createWebMcpServer('my-api', {
-  description: 'API widgets',
+const server = createWebMcpServer('dashboard', {
+  description: 'Dashboard widgets',
 });
+```
 
-server.addTool({
-  name: 'fetch_data',
-  description: 'Fetch data',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      endpoint: { type: 'string' },
-    },
-    required: ['endpoint'],
-  },
-  execute: async (params) => {
-    const { endpoint } = params as { endpoint: string };
-    const response = await fetch(`/api/${endpoint}`);
-    return await response.json();
-  },
-});
+### Step 2: Register a stat widget
 
+```ts
 server.registerWidget(`
 ---
-widget: data-display
-description: Data display
+widget: metric
+description: Displays a key metric with label, value, and trend
 schema:
   type: object
   properties:
-    items:
-      type: array
+    label:
+      type: string
+    value:
+      type: string
+    trend:
+      type: string
+      enum: [up, down, stable]
+  required:
+    - label
+    - value
 ---
+
+## Usage
+
+Use this widget to display an important KPI.
+Examples: "Revenue: $42k (up)", "Users: 1.2k (stable)".
 `, (container, data) => {
-  const items = data.items as any[];
-  container.innerHTML = items.map(i => `<div>${i}</div>`).join('');
+  const trend = data.trend === 'up' ? '+' : data.trend === 'down' ? '-' : '=';
+  container.innerHTML = `
+    <div style="padding: 16px; border-radius: 8px; background: var(--color-surface);">
+      <div style="font-size: 0.875rem; color: var(--color-muted);">${data.label}</div>
+      <div style="font-size: 1.5rem; font-weight: bold;">${data.value} ${trend}</div>
+    </div>
+  `;
 });
+```
 
-// === Client (agent) ===
-import { runAgentLoop } from '@webmcp-auto-ui/agent';
+### Step 3: Add a data tool
 
-const result = await runAgentLoop('Show the users', {
-  provider: llmProvider,
-  layers: [server.layer()],
-  callbacks: {
-    onToolCall: (call) => console.log(`Tool: ${call.name}`),
+```ts
+server.addTool({
+  name: 'fetch_metrics',
+  description: 'Retrieve dashboard metrics',
+  inputSchema: {
+    type: 'object',
+    properties: { period: { type: 'string', enum: ['day', 'week', 'month'] } },
+    required: ['period'],
+  },
+  execute: async (params) => {
+    const { period } = params as { period: string };
+    return {
+      revenue: period === 'day' ? '$2.1k' : period === 'week' ? '$14.8k' : '$42k',
+      users: period === 'day' ? '89' : period === 'week' ? '523' : '1.2k',
+    };
   },
 });
 ```
+
+### Step 4: Connect to the agent loop
+
+```ts
+import { runAgentLoop, RemoteLLMProvider } from '@webmcp-auto-ui/agent';
+
+const provider = new RemoteLLMProvider({ proxyUrl: '/api/chat', model: 'sonnet' });
+
+const result = await runAgentLoop('Show me the monthly metrics', {
+  provider,
+  layers: [server.layer()],
+  callbacks: {
+    onWidget: (type, data) => {
+      console.log(`Widget ${type}:`, data);
+      return { id: `widget_${Date.now()}` };
+    },
+  },
+});
+```
+
+---
+
+## Integration with Other Packages
+
+```mermaid
+graph LR
+    CORE["@webmcp-auto-ui/core"] -->|McpClient, types| AGENT["@webmcp-auto-ui/agent"]
+    CORE -->|WebMcpServer.layer()| AGENT
+    CORE -->|validateJsonSchema| AGENT
+    AGENT -->|autoui server| UI["@webmcp-auto-ui/ui"]
+    UI -->|mountWidget| CORE
+    SDK["@webmcp-auto-ui/sdk"] -->|canvas store| UI
+```
+
+- **agent** depends on core for the MCP client, types, schema validation, and sanitization
+- **ui** uses `mountWidget` from core for vanilla widgets
+- **agent** uses `createWebMcpServer` from core to build the built-in `autoui` server
+
+---
+
+## Best Practices
+
+:::tip[Prefer layers]
+Rather than calling `client.callTool()` manually, export the server as a layer via `.layer()` and let the agent loop handle dispatch. The layer system automatically adds namespacing, discovery, and canonical aliasing.
+:::
+
+:::caution[Anthropic-compatible schemas]
+Claude's API imposes constraints on JSON Schemas (no `$ref`, no `oneOf`/`anyOf`/`allOf`). Use `sanitizeSchema()` before sending a schema to the LLM, or enable the `sanitize: true` option in the agent loop's `SchemaTransformOptions` (enabled by default).
+:::
+
+:::caution[Widget cleanup]
+Vanilla renderers that add event listeners or timers must return a cleanup function. Without it, widgets accumulate memory leaks on each re-render.
+:::
+
+---
+
+## FAQ
+
+**Is the W3C polyfill spec-compliant?**
+Yes, it implements all 17 mandatory features of the Draft CG Report 2026-03-27. The architecture is module-level (no class) for tree-shakability.
+
+**Can I use McpClient without the agent loop?**
+Absolutely. The client is framework-agnostic and can be used independently to query any Streamable HTTP MCP server.
+
+**Why doesn't parseFrontmatter use a YAML library?**
+To maintain the zero-dependency guarantee. The internal implementation covers recipe use cases (scalars, nested objects, simple arrays) without requiring a full YAML parser.
+
+**How does the postMessage bridge handle security?**
+WebMCP messages are typed and validated (`isWebMCPEvent`). The bridge only transmits protocol-conforming messages, rejecting everything else. Sandboxed iframes benefit from standard browser isolation.

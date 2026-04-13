@@ -1,43 +1,99 @@
 ---
 title: "@webmcp-auto-ui/ui"
-description: "Composants Svelte pour widgets, layouts, et contrôles agent UI."
+description: "Composants Svelte pour widgets, layouts, controles agent, bus de messages, et systeme de theme."
 sidebar:
   order: 2
 ---
 
-Le package `@webmcp-auto-ui/ui` fournit une bibliothèque complète de composants Svelte 5 pour afficher les widgets, gérer la UI et orchestrer l'agent LLM.
+Le package `@webmcp-auto-ui/ui` fournit une bibliotheque complete de composants Svelte 5 pour construire des applications agent. Il couvre quatre domaines : les **widgets** (plus de 25 types pour afficher des donnees), les **layouts** (grille, flottant, empile, flex), les **composants agent** (selecteur LLM, progression, chat, parametres), et l'**infrastructure** (theme, bus de messages, primitives UI).
+
+Tous les composants utilisent le design system du projet (tokens CSS, Tailwind preset) et supportent les themes light/dark.
+
+## Architecture interne
+
+```mermaid
+graph TD
+    subgraph "@webmcp-auto-ui/ui"
+        THEME[ThemeProvider] --> TOKENS[Tokens CSS]
+        WR[WidgetRenderer] --> SIMPLE[9 Widgets simples]
+        WR --> RICH[16 Widgets riches]
+        WR --> CUSTOM[Custom widgets<br/>via WebMCP server]
+        BR[BlockRenderer] --> WR
+
+        LAYOUTS[Layouts] --> TILING[TilingLayout]
+        LAYOUTS --> FLOATING[FloatingLayout]
+        LAYOUTS --> STACK[StackLayout]
+        LAYOUTS --> FLEX[FlexLayout]
+
+        AGENT_UI[Composants Agent] --> LLM[LLMSelector]
+        AGENT_UI --> GEMMA[GemmaLoader]
+        AGENT_UI --> MCP_S[McpStatus]
+        AGENT_UI --> PROG[AgentProgress]
+        AGENT_UI --> CHAT[ChatPanel]
+        AGENT_UI --> CONSOLE[AgentConsole]
+        AGENT_UI --> SETTINGS[SettingsPanel]
+
+        BUS[bus FONC] --> LINKS[LinkOverlay]
+        BUS --> LI[LinkIndicators]
+        ADAPTER[layoutAdapter] --> LAYOUTS
+    end
+
+    SDK["@webmcp-auto-ui/sdk"] -->|canvas store| AGENT_UI
+    AGENT["@webmcp-auto-ui/agent"] -->|autoui server| WR
+```
+
+## Installation
+
+```ts
+import { WidgetRenderer, LLMSelector, ThemeProvider, bus } from '@webmcp-auto-ui/ui';
+```
+
+Dans un `package.json` d'app :
+
+```json
+{
+  "devDependencies": {
+    "@webmcp-auto-ui/ui": "file:../../packages/ui",
+    "@webmcp-auto-ui/sdk": "file:../../packages/sdk"
+  }
+}
+```
+
+Peer dependencies : `svelte ^5.0.0`, `d3 ^7.9.0` (pour D3Widget), `leaflet >=1.9.0` (pour MapView).
+
+---
 
 ## Theme
 
 ### ThemeProvider
 
-Fournit le contexte de theme (dark/light) a tous les composants enfants.
+Enveloppe racine qui fournit le contexte de theme a tous les composants enfants. Gere le basculement dark/light et les overrides CSS.
 
 ```svelte
 <script lang="ts">
   import { ThemeProvider } from '@webmcp-auto-ui/ui';
 </script>
 
-<ThemeProvider defaultMode="dark">
-  <!-- Tous les composants enfants ont acces au theme -->
+<ThemeProvider defaultMode="dark" overrides={{ '--color-primary': '#4F46E5' }}>
+  <!-- Tous les composants enfants heritent du theme -->
   <slot />
 </ThemeProvider>
 ```
 
-**Props:**
+**Props :**
 
 ```ts
 interface Props {
-  defaultMode?: ThemeMode;                          // 'light' | 'dark' (defaut: 'light')
-  overrides?: Record<string, string>;               // CSS custom properties
-  theme?: ThemeJSON;                                // Theme JSON externe
+  defaultMode?: ThemeMode;                    // 'light' | 'dark' (defaut: 'light')
+  overrides?: Record<string, string>;         // CSS custom properties
+  theme?: ThemeJSON;                          // Theme JSON externe
   children: Snippet;
 }
 ```
 
 ### getTheme
 
-Fonction contexte Svelte qui retourne l'API de theme depuis n'importe quel composant enfant de `ThemeProvider`.
+Fonction contexte Svelte pour acceder a l'API de theme depuis n'importe quel composant enfant de `ThemeProvider`.
 
 ```svelte
 <script lang="ts">
@@ -46,17 +102,17 @@ Fonction contexte Svelte qui retourne l'API de theme depuis n'importe quel compo
   const theme = getTheme();
 </script>
 
-<span>Mode actuel : {theme.mode}</span>
-<button onclick={theme.toggle}>Basculer le theme</button>
+<span>Mode : {theme.mode}</span>
+<button onclick={theme.toggle}>Basculer</button>
 ```
 
-**API retournee:**
+**API retournee :**
 
 ```ts
 interface ThemeAPI {
-  readonly mode: ThemeMode;                         // 'light' | 'dark'
-  toggle: () => void;                               // Bascule dark/light
-  setMode: (m: ThemeMode) => void;                  // Definit le mode
+  readonly mode: ThemeMode;       // 'light' | 'dark'
+  toggle: () => void;             // Bascule dark ↔ light
+  setMode: (m: ThemeMode) => void;
 }
 ```
 
@@ -65,119 +121,497 @@ interface ThemeAPI {
 ```ts
 import { DARK_TOKENS, LIGHT_TOKENS, THEME_MAP } from '@webmcp-auto-ui/ui';
 import type { ThemeMode, ThemeOverrides, ThemeTokens } from '@webmcp-auto-ui/ui';
+
+// DARK_TOKENS / LIGHT_TOKENS : Record<string, string> avec les CSS variables par mode
+// THEME_MAP : { light: ThemeTokens, dark: ThemeTokens }
 ```
 
-- `DARK_TOKENS` / `LIGHT_TOKENS` — objets `Record<string, string>` avec les CSS custom properties par mode
-- `THEME_MAP` — `{ light: ThemeTokens, dark: ThemeTokens }` pour basculer programmatiquement
+---
 
-## Rendu de Widgets
+## Rendu de widgets
 
 ### WidgetRenderer
 
-Composant principal qui résout et affiche un widget (natif, custom serveur, ou fallback).
+Composant principal qui resout et affiche un widget. Il cherche le widget dans les serveurs WebMCP fournis (custom), puis dans le registre natif. Si le widget est inconnu, un fallback est affiche.
 
 ```svelte
 <script lang="ts">
   import { WidgetRenderer } from '@webmcp-auto-ui/ui';
   import { autoui } from '@webmcp-auto-ui/agent';
-
-  const servers = [autoui];
 </script>
 
 <WidgetRenderer
   id="block_1"
   type="stat"
-  data={{ label: 'Revenue', value: '$42k' }}
-  {servers}
+  data={{ label: 'Revenue', value: '$42k', trend: 'up' }}
+  servers={[autoui]}
   oninteract={(type, action, payload) => console.log(action, payload)}
 />
 ```
 
-**Props:**
+**Props :**
 
 ```ts
 interface Props {
-  id?: string;                                      // Widget ID (auto-genere)
-  type: string;                                     // Type de widget
-  data: Record<string, unknown>;                    // Donnees du widget
-  servers?: WebMcpServer[];                         // Serveurs WebMCP (pour custom widgets)
+  id?: string;                              // ID du widget (auto-genere si absent)
+  type: string;                             // Type de widget ('stat', 'chart', etc.)
+  data: Record<string, unknown>;            // Donnees du widget
+  servers?: WebMcpServer[];                 // Serveurs WebMCP (pour les widgets custom)
   oninteract?: (type: string, action: string, payload: unknown) => void;
 }
 ```
 
-**Actions d'interaction:**
+**Actions d'interaction supportees :**
 
-- `itemclick` — Clique sur un item de liste
-- `rowclick` — Clique sur une ligne tableau
-- `cardclick` — Clique sur une carte
-- `imageclick` — Clique sur une image (gallery)
-- `slidechange` — Changement de slide (carousel)
-- `cellclick` — Clique sur cellule (grid-data)
+| Action | Widget | Description |
+|--------|--------|-------------|
+| `itemclick` | list | Clic sur un item de liste |
+| `rowclick` | data-table | Clic sur une ligne du tableau |
+| `cardclick` | cards | Clic sur une carte |
+| `imageclick` | gallery | Clic sur une image |
+| `slidechange` | carousel | Changement de slide |
+| `cellclick` | grid-data | Clic sur une cellule |
 
-**Auto-enregistrement WebMCP:**
-
-Le widget s'enregistre automatiquement 3 tools sur `navigator.modelContext`:
+**Auto-enregistrement WebMCP :** chaque widget s'enregistre automatiquement sur `navigator.modelContext` avec 3 outils :
 - `widget_{id}_get()` — obtenir les donnees actuelles
 - `widget_{id}_update(...)` — mettre a jour les donnees
 - `widget_{id}_remove()` — supprimer le widget
 
-```ts
-// L'agent peut appeler ces tools sans configuration supplementaire
-onWidget: (type, data) => {
-  // L'agent peut ensuite appeler widget_<id>_update(newData)
-}
-```
-
 ### BlockRenderer
 
-Alias herite pour `WidgetRenderer`. Utiliser `WidgetRenderer` preferablement.
+Alias herite de `WidgetRenderer`. Conserve pour retrocompatibilite.
 
 ```svelte
-<BlockRenderer type="stat" data={{label: 'Sales', value: '100'}} />
+<BlockRenderer type="stat" data={{ label: 'Sales', value: '100' }} />
 ```
 
-## Composants Agent
+---
+
+## Widgets simples (9)
+
+Widgets legers pour l'affichage de donnees basiques.
+
+### StatBlock
+
+Statistique cle avec label, valeur, et tendance optionnelle. Affiche une carte compacte avec une fleche de tendance.
+
+```svelte
+<StatBlock data={{
+  label: 'Revenue',
+  value: '$42k',
+  trend: 'up'           // 'up' | 'down' | 'stable'
+}} />
+```
+
+### KVBlock
+
+Paires cle-valeur en grille.
+
+```svelte
+<KVBlock data={{
+  items: [
+    { key: 'Status', value: 'Active' },
+    { key: 'Region', value: 'Europe' },
+    { key: 'Users', value: '1,234' }
+  ]
+}} />
+```
+
+### ListBlock
+
+Liste d'items avec puces.
+
+```svelte
+<ListBlock data={{
+  items: ['Premier item', 'Deuxieme item', 'Troisieme item'],
+  title: 'Taches'
+}} />
+```
+
+### ChartBlock
+
+Graphique a barres simple (sans librairie externe).
+
+```svelte
+<ChartBlock data={{
+  bars: [['Jan', 10], ['Fev', 20], ['Mar', 15], ['Avr', 25]]
+}} />
+```
+
+### AlertBlock
+
+Alerte coloree avec icone et message. Niveaux : info, warning, error, success.
+
+```svelte
+<AlertBlock data={{
+  level: 'warning',
+  title: 'Attention',
+  message: 'Les donnees sont obsoletes depuis 24h.'
+}} />
+```
+
+### CodeBlock
+
+Bloc de code avec coloration syntaxique et bouton de copie.
+
+```svelte
+<CodeBlock data={{
+  code: 'const x = 42;\nconsole.log(x);',
+  language: 'javascript'
+}} />
+```
+
+### TextBlock
+
+Texte Markdown rendu en HTML.
+
+```svelte
+<TextBlock data={{
+  text: '# Titre\n\nParagraphe avec **gras** et *italique*.'
+}} />
+```
+
+### ActionsBlock
+
+Boutons d'action interactifs. L'agent peut proposer des choix a l'utilisateur.
+
+```svelte
+<ActionsBlock data={{
+  actions: [
+    { label: 'Approuver', value: 'approve', variant: 'primary' },
+    { label: 'Rejeter', value: 'reject', variant: 'danger' }
+  ]
+}} />
+```
+
+### TagsBlock
+
+Badges/tags colores.
+
+```svelte
+<TagsBlock data={{
+  tags: [
+    { label: 'Frontend', color: '#3B82F6' },
+    { label: 'Production', color: '#10B981' },
+    { label: 'Urgent', color: '#EF4444' }
+  ]
+}} />
+```
+
+---
+
+## Widgets riches (16)
+
+Widgets avances pour des visualisations complexes.
+
+### DataTable
+
+Tableau de donnees avec tri par colonne cliquable.
+
+```svelte
+<DataTable
+  spec={{
+    columns: [
+      { key: 'name', label: 'Nom' },
+      { key: 'age', label: 'Age' },
+      { key: 'role', label: 'Role' }
+    ],
+    rows: [
+      { name: 'Alice', age: 30, role: 'Dev' },
+      { name: 'Bob', age: 25, role: 'Design' }
+    ]
+  }}
+  onrowclick={(row) => console.log('Clic:', row)}
+/>
+```
+
+### StatCard
+
+Carte statistique enrichie avec icone, tendance, et description.
+
+```svelte
+<StatCard spec={{
+  title: 'Revenus',
+  value: '$42,000',
+  change: '+12%',
+  trend: 'up',
+  description: 'Par rapport au trimestre precedent'
+}} />
+```
+
+### Timeline
+
+Chronologie d'evenements avec statuts visuels.
+
+```svelte
+<Timeline spec={{
+  events: [
+    { title: 'Lancement', date: '2024-01', status: 'done' },
+    { title: 'Beta publique', date: '2024-03', status: 'active' },
+    { title: 'v1.0', date: '2024-06', status: 'pending' }
+  ]
+}} />
+```
+
+### ProfileCard
+
+Fiche profil avec avatar, champs personnalises et statistiques.
+
+```svelte
+<ProfileCard spec={{
+  name: 'Alice Martin',
+  subtitle: 'Lead Developer',
+  avatar: 'https://example.com/avatar.jpg',
+  fields: [
+    { label: 'Equipe', value: 'Backend' },
+    { label: 'Localisation', value: 'Paris' }
+  ],
+  stats: [
+    { label: 'Commits', value: '1,234' },
+    { label: 'PRs', value: '89' }
+  ]
+}} />
+```
+
+### Trombinoscope
+
+Grille de profils (equipe, classe, organisation).
+
+```svelte
+<Trombinoscope spec={{
+  people: [
+    { name: 'Alice', role: 'Dev', avatar: '...' },
+    { name: 'Bob', role: 'Design', avatar: '...' }
+  ]
+}} />
+```
+
+### JsonViewer
+
+Arbre JSON interactif et explorable avec ouverture/fermeture des noeuds.
+
+```svelte
+<JsonViewer spec={{
+  data: { users: [{ name: 'Alice' }, { name: 'Bob' }], count: 2 },
+  expanded: true
+}} />
+```
+
+### Hemicycle
+
+Representation d'un hemicycle parlementaire avec sieges colores par groupe.
+
+```svelte
+<Hemicycle spec={{
+  groups: [
+    { name: 'Majorite', seats: 289, color: '#3B82F6' },
+    { name: 'Opposition', seats: 248, color: '#EF4444' }
+  ]
+}} />
+```
+
+### Chart (Rich)
+
+Graphique multi-series. Supporte : bar, line, area, pie, donut.
+
+```svelte
+<Chart spec={{
+  type: 'bar',
+  labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+  data: [
+    { label: 'Ventes', values: [10, 20, 15, 25] },
+    { label: 'Couts', values: [8, 12, 10, 15] }
+  ]
+}} />
+```
+
+### Cards
+
+Grille de cartes avec titre, description, et tags.
+
+```svelte
+<Cards
+  spec={{
+    cards: [
+      { title: 'Projet A', description: 'En cours', tags: ['frontend'] },
+      { title: 'Projet B', description: 'Termine', tags: ['backend'] }
+    ]
+  }}
+  oncardclick={(card) => console.log(card)}
+/>
+```
+
+### GridData
+
+Grille de donnees avec cellules cliquables (similaire a un tableur).
+
+```svelte
+<GridData spec={{
+  headers: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'],
+  rows: [
+    { label: 'Alice', cells: [8, 7, 9, 8, 6] },
+    { label: 'Bob', cells: [6, 8, 7, 9, 7] }
+  ]
+}} />
+```
+
+### Sankey
+
+Diagramme Sankey pour visualiser des flux entre categories.
+
+```svelte
+<Sankey spec={{
+  nodes: ['Source A', 'Source B', 'Target X', 'Target Y'],
+  links: [
+    { source: 0, target: 2, value: 10 },
+    { source: 0, target: 3, value: 5 },
+    { source: 1, target: 3, value: 8 }
+  ]
+}} />
+```
+
+### MapView
+
+Carte Leaflet interactive avec marqueurs et popups.
+
+```svelte
+<MapView spec={{
+  center: { lat: 48.8566, lng: 2.3522 },
+  zoom: 12,
+  height: '400px',
+  markers: [
+    { lat: 48.8566, lng: 2.3522, label: 'Paris', popup: 'Capitale' },
+    { lat: 48.8606, lng: 2.3376, label: 'Louvre' }
+  ]
+}} />
+```
+
+:::note
+MapView necessite `leaflet` en peer dependency. Le CSS Leaflet est charge automatiquement.
+:::
+
+### D3Widget
+
+Visualisations D3.js avec presets : hex-heatmap, radial, treemap, force graph.
+
+```svelte
+<D3Widget spec={{
+  preset: 'treemap',
+  data: {
+    name: 'root',
+    children: [
+      { name: 'A', value: 100 },
+      { name: 'B', value: 200 },
+      { name: 'C', children: [
+        { name: 'C1', value: 50 },
+        { name: 'C2', value: 150 }
+      ]}
+    ]
+  }
+}} />
+```
+
+### JsSandbox
+
+Sandbox JavaScript isolee pour des visualisations custom. Execute du code dans une iframe securisee.
+
+```svelte
+<JsSandbox spec={{
+  code: "document.getElementById('root').textContent = 'Hello from sandbox!';",
+  html: '<div id="root"></div>',
+  css: 'body { font-family: sans-serif; padding: 16px; }',
+  height: '300px'
+}} />
+```
+
+### LogViewer
+
+Visionneuse de logs avec filtrage par niveau et coloration.
+
+```svelte
+<LogViewer spec={{
+  title: 'Application Logs',
+  entries: [
+    { timestamp: '2024-01-15T10:30:00Z', level: 'info', message: 'Server started', source: 'main' },
+    { timestamp: '2024-01-15T10:31:00Z', level: 'error', message: 'Connection failed', source: 'db' },
+    { timestamp: '2024-01-15T10:32:00Z', level: 'warn', message: 'Slow query detected', source: 'db' },
+  ],
+  maxHeight: '400px',
+}} />
+```
+
+### Gallery
+
+Galerie d'images responsive en grille.
+
+```svelte
+<Gallery
+  spec={{
+    title: 'Collection',
+    images: [
+      { src: 'https://example.com/a.jpg', alt: 'Image A', caption: 'Premiere' },
+      { src: 'https://example.com/b.jpg', alt: 'Image B', caption: 'Deuxieme' },
+    ],
+    columns: 3,
+    gap: '8px',
+  }}
+  onimageclick={(img, index) => console.log(img, index)}
+/>
+```
+
+### Carousel
+
+Carousel d'images/contenus avec navigation et autoplay.
+
+```svelte
+<Carousel
+  spec={{
+    title: 'Presentation',
+    slides: [
+      { src: 'https://example.com/slide1.jpg', title: 'Slide 1' },
+      { content: '<h2>Texte</h2><p>Contenu HTML</p>', title: 'Slide 2' },
+    ],
+    autoPlay: true,
+    interval: 5000,
+  }}
+  onslidechange={(slide, index) => console.log(slide, index)}
+/>
+```
+
+---
+
+## Composants agent
 
 ### LLMSelector
 
-Selecteur de modele LLM avec support remote (Claude) et WASM (Gemma).
+Selecteur de modele LLM avec support des modeles distants (Claude) et locaux (Gemma WASM).
 
 ```svelte
 <script lang="ts">
   import { LLMSelector } from '@webmcp-auto-ui/ui';
-  import { canvas } from '@webmcp-auto-ui/sdk';
-
-  function onSelect(model: string) {
-    canvas.llm = model;
-  }
+  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 </script>
 
-<LLMSelector value={canvas.llm} onchange={onSelect} />
+<LLMSelector value={canvas.llm} onchange={(model) => canvas.setLlm(model)} />
 ```
 
-**Props:**
+**Props :**
 
 ```ts
 interface Props {
-  value?: string;                                   // Modele selectionne
-  disabled?: boolean;                              // Desactiver
-  onchange?: (model: string) => void;             // Callback selection
+  value?: string;                     // Modele selectionne
+  disabled?: boolean;
+  onchange?: (model: string) => void;
 }
 ```
 
-**Modeles supportes:**
-- `haiku`, `sonnet`, `opus` — Anthropic Claude
-- `gemma-e2b`, `gemma-e4b` — Google Gemma (WASM)
+Modeles affiches : `haiku`, `sonnet`, `opus` (Anthropic Claude), `gemma-e2b`, `gemma-e4b` (Google Gemma WASM).
 
 ### GemmaLoader
 
-Indicateur de chargement pour Gemma WASM avec barre de progression, taille et temps ecoule.
+Indicateur de chargement pour le modele Gemma WASM. Affiche une barre de progression, la taille telechargee, et le temps ecoule.
 
 ```svelte
-<script lang="ts">
-  import { GemmaLoader } from '@webmcp-auto-ui/ui';
-</script>
-
 <GemmaLoader
   status="loading"
   progress={45}
@@ -189,39 +623,35 @@ Indicateur de chargement pour Gemma WASM avec barre de progression, taille et te
 />
 ```
 
-**Props:**
+**Props :**
 
 ```ts
 interface Props {
   status: 'idle' | 'loading' | 'ready' | 'error';
-  progress?: number;                               // Pourcentage 0-100
-  elapsed?: number;                                // Secondes ecoulees
-  loadedMB?: number;                               // Mo telecharges
-  totalMB?: number;                                // Mo total
-  modelName?: string;                              // Nom affiche
-  onunload?: () => void;                           // Callback decharger
+  progress?: number;         // 0-100
+  elapsed?: number;          // Secondes ecoulees
+  loadedMB?: number;         // Mo telecharges
+  totalMB?: number;          // Mo total
+  modelName?: string;
+  onunload?: () => void;     // Callback pour decharger le modele
 }
 ```
 
 ### McpStatus
 
-Indicateur de connexion MCP (statut + nombre d'outils).
+Indicateur de connexion MCP (pastille verte/rouge + nombre d'outils disponibles).
 
 ```svelte
-<script lang="ts">
-  import { McpStatus } from '@webmcp-auto-ui/ui';
-  import { canvas } from '@webmcp-auto-ui/sdk';
-</script>
-
 <McpStatus
   connected={canvas.mcpConnected}
   connecting={canvas.mcpConnecting}
   name={canvas.mcpName}
-  servers={multiClient.listServers().map(s => ({ url: s.url, name: s.name, toolCount: s.tools.length }))}
+  toolCount={canvas.mcpTools.length}
+  servers={[{ url: '...', name: 'recipes', toolCount: 5 }]}
 />
 ```
 
-**Props:**
+**Props :**
 
 ```ts
 interface Props {
@@ -236,57 +666,42 @@ interface Props {
 
 ### AgentProgress
 
-Barre de progression et metriques de l'agent (temps, tool calls, dernier outil).
+Barre de progression animee de l'agent avec metriques temps reel.
 
 ```svelte
-<script lang="ts">
-  import { AgentProgress } from '@webmcp-auto-ui/ui';
-</script>
-
 <AgentProgress
   active={canvas.generating}
-  elapsed={chatTimer}
-  toolCalls={chatToolCount}
-  lastTool={chatLastTool}
+  elapsed={12}
+  toolCalls={3}
+  lastTool="search_recipes"
 />
 ```
 
-**Props:**
+**Props :**
 
 ```ts
 interface Props {
-  active?: boolean;                                // Agent en cours
-  elapsed?: number;                                // Secondes ecoulees
-  toolCalls?: number;                              // Nombre de tool calls
-  lastTool?: string;                               // Dernier outil appele
+  active?: boolean;          // Agent en cours de generation
+  elapsed?: number;          // Secondes ecoulees
+  toolCalls?: number;        // Nombre de tool calls
+  lastTool?: string;         // Nom du dernier outil appele
 }
 ```
 
-Affiche une barre horizontale animee + informations detaillees.
-
 ### McpConnector
 
-Interface interactive de connexion MCP (URL input + bouton connexion).
+Interface de connexion MCP avec champ URL et bouton.
 
 ```svelte
-<script lang="ts">
-  import { McpConnector } from '@webmcp-auto-ui/ui';
-  import { canvas } from '@webmcp-auto-ui/sdk';
-
-  async function handleConnect(url: string) {
-    canvas.mcpUrl = url;
-    canvas.setMcpConnecting(true);
-  }
-</script>
-
 <McpConnector
   url={canvas.mcpUrl}
   connecting={canvas.mcpConnecting}
-  onconnect={handleConnect}
+  onconnect={(url) => { /* logique de connexion */ }}
+  oninput={(url) => canvas.setMcpUrl(url)}
 />
 ```
 
-**Props:**
+**Props :**
 
 ```ts
 interface Props {
@@ -297,70 +712,9 @@ interface Props {
 }
 ```
 
-### EphemeralBubble
-
-Bulles de message ephemeres affichees pendant la generation de l'agent. Disparaissent automatiquement apres un delai.
-
-```svelte
-<script lang="ts">
-  import { EphemeralBubble } from '@webmcp-auto-ui/ui';
-
-  let ephemeral = $state<{id: string; role: 'user' | 'assistant'; html: string}[]>([]);
-</script>
-
-<EphemeralBubble {ephemeral} />
-```
-
-**Props:**
-
-```ts
-interface Props {
-  ephemeral: {
-    id: string;
-    role: 'user' | 'assistant';
-    html: string;                                  // Contenu HTML rendu
-  }[];
-}
-```
-
-### TokenBubble
-
-Affiche les metriques de tokens en temps reel (requetes/min, tokens in/out, cache).
-
-```svelte
-<script lang="ts">
-  import { TokenBubble } from '@webmcp-auto-ui/ui';
-  import { TokenTracker } from '@webmcp-auto-ui/agent';
-
-  const tracker = new TokenTracker();
-  let metrics = $state(tracker.metrics);
-  tracker.subscribe(m => { metrics = m; });
-</script>
-
-<TokenBubble {metrics} visible={true} />
-```
-
-**Props:**
-
-```ts
-interface Props {
-  metrics: {
-    requestsPerMin: number;
-    inputTokensPerMin: number;
-    outputTokensPerMin: number;
-    totalRequests: number;
-    totalInputTokens: number;
-    totalOutputTokens: number;
-    totalCacheReadTokens: number;
-    isWasm: boolean;
-  };
-  visible?: boolean;                               // Defaut: true
-}
-```
-
 ### ChatPanel
 
-Panneau de chat complet avec feed de messages, indicateur de generation et input.
+Panneau de chat complet avec feed de messages, indicateur de generation, et champ de saisie.
 
 ```svelte
 <script lang="ts">
@@ -378,28 +732,28 @@ Panneau de chat complet avec feed de messages, indicateur de generation et input
   timer={0}
   toolCount={0}
   lastTool=""
-  onsend={(msg) => { /* envoyer le message */ }}
+  onsend={(msg) => { /* envoyer le message a l'agent */ }}
 />
 ```
 
-**Props:**
+**Props :**
 
 ```ts
 interface Props {
-  feed?: ChatFeedItem[];                           // Messages du chat
-  input?: string;                                  // Valeur input (bindable)
-  generating?: boolean;                            // Agent en cours
-  timer?: number;                                  // Temps ecoule
-  toolCount?: number;                              // Nb tool calls
-  lastTool?: string;                               // Dernier outil
-  placeholder?: string;                            // Placeholder input
-  showSrc?: boolean;                               // Afficher la source
-  onsend?: (msg: string) => void;                  // Callback envoi
+  feed?: ChatFeedItem[];       // Messages du chat
+  input?: string;              // Valeur du champ (bindable)
+  generating?: boolean;        // Agent en cours
+  timer?: number;              // Temps ecoule
+  toolCount?: number;
+  lastTool?: string;
+  placeholder?: string;
+  showSrc?: boolean;           // Afficher la source des messages
+  onsend?: (msg: string) => void;
   class?: string;
 }
 ```
 
-**Types exportes:**
+**Types du feed :**
 
 ```ts
 interface ChatBubble {
@@ -415,19 +769,19 @@ type ChatFeedItem = ChatBubble | ChatBlock;
 
 ### AgentConsole
 
-Console de logs de l'agent avec filtrage par type et bouton clear.
+Console de logs de l'agent avec filtrage par type et bouton de vidage.
 
 ```svelte
-<script lang="ts">
-  import { AgentConsole } from '@webmcp-auto-ui/ui';
-
-  let logs = $state<{ ts: number; type: string; detail: string }[]>([]);
-</script>
-
-<AgentConsole {logs} onclear={() => logs = []} />
+<AgentConsole
+  logs={[
+    { ts: Date.now(), type: 'tool', detail: 'search_recipes({query: "pasta"})' },
+    { ts: Date.now(), type: 'rag', detail: 'Ingested 5 chunks (1.2k chars)' },
+  ]}
+  onclear={() => { /* vider les logs */ }}
+/>
 ```
 
-**Props:**
+**Props :**
 
 ```ts
 interface Props {
@@ -439,13 +793,9 @@ interface Props {
 
 ### SettingsPanel
 
-Panneau de reglages agent (system prompt, max tokens, temperature, cache, etc.).
+Panneau de reglages agent avec tous les parametres bindables.
 
 ```svelte
-<script lang="ts">
-  import { SettingsPanel } from '@webmcp-auto-ui/ui';
-</script>
-
 <SettingsPanel
   bind:systemPrompt
   bind:maxTokens
@@ -457,34 +807,56 @@ Panneau de reglages agent (system prompt, max tokens, temperature, cache, etc.).
 />
 ```
 
-**Props:**
+**Props :**
 
 ```ts
 interface Props {
-  systemPrompt?: string;                           // Bindable
-  effectivePrompt?: string;                        // Prompt final (lecture seule)
-  maxTokens?: number;                              // Defaut: 4096, bindable
-  maxContextTokens?: number;                       // Defaut: 150000, bindable
-  maxTools?: number;                               // Defaut: 8, bindable
-  cacheEnabled?: boolean;                          // Defaut: true, bindable
-  temperature?: number;                            // Defaut: 0.7, bindable
-  topK?: number;                                   // Defaut: 10, bindable
+  systemPrompt?: string;           // Bindable
+  effectivePrompt?: string;        // Prompt final genere (lecture seule)
+  maxTokens?: number;              // Defaut: 4096
+  maxContextTokens?: number;       // Defaut: 150000
+  maxTools?: number;               // Defaut: 8
+  cacheEnabled?: boolean;          // Defaut: true
+  temperature?: number;            // Defaut: 0.7
+  topK?: number;                   // Defaut: 10
   modelType?: 'remote' | 'wasm';
   modelId?: string;
   class?: string;
 }
 ```
 
-### RemoteMCPserversDemo
+### EphemeralBubble
 
-Composant de connexion multi-serveurs MCP avec liste de serveurs demo pre-configures.
+Bulles de messages ephemeres affichees pendant la generation. Disparaissent automatiquement.
+
+```svelte
+<EphemeralBubble ephemeral={[
+  { id: '1', role: 'assistant', html: '<p>En reflexion...</p>' }
+]} />
+```
+
+### TokenBubble
+
+Metriques de tokens en temps reel (requetes/min, tokens in/out, cache).
 
 ```svelte
 <script lang="ts">
-  import { RemoteMCPserversDemo } from '@webmcp-auto-ui/ui';
-  import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
+  import { TokenBubble } from '@webmcp-auto-ui/ui';
+  import { TokenTracker } from '@webmcp-auto-ui/agent';
+
+  const tracker = new TokenTracker();
+  let metrics = $state(tracker.metrics);
+  tracker.subscribe(m => { metrics = m; });
 </script>
 
+<TokenBubble {metrics} visible={true} />
+```
+
+### RemoteMCPserversDemo
+
+Interface de connexion multi-serveurs MCP avec liste pre-configuree.
+
+```svelte
 <RemoteMCPserversDemo
   servers={MCP_DEMO_SERVERS}
   connectedUrls={['https://mcp.example.com/mcp']}
@@ -495,188 +867,121 @@ Composant de connexion multi-serveurs MCP avec liste de serveurs demo pre-config
 />
 ```
 
-**Props:**
+### DiagnosticModal / DiagnosticIcon
 
-```ts
-interface Props {
-  servers: { id: string; name: string; description: string; url: string; tags?: string[] }[];
-  connectedUrls?: string[];
-  loading?: string[];                              // URLs en cours de connexion
-  onconnect?: (url: string) => void;
-  onconnectall?: () => void;
-  ondisconnect?: (url: string) => void;
-}
+Composants pour afficher les resultats de `runDiagnostics` du package agent.
+
+```svelte
+<DiagnosticIcon diagnostics={diagnosticResults} />
+<DiagnosticModal diagnostics={diagnosticResults} open={showModal} />
 ```
+
+---
 
 ## Primitives
 
 ### Card
 
-Conteneur carte generique avec border et fond surface.
+Conteneur carte avec border et fond surface.
 
 ```svelte
-<Card>
-  <p>Contenu de la carte</p>
-</Card>
-```
-
-### List
-
-Liste generique avec items.
-
-```svelte
-<List>
-  <li>Item 1</li>
-  <li>Item 2</li>
-</List>
+<Card><p>Contenu</p></Card>
 ```
 
 ### Panel
 
-Conteneur avec barre de titre et border.
+Conteneur avec barre de titre, collapsible optionnellement.
 
 ```svelte
-<script lang="ts">
-  import { Panel } from '@webmcp-auto-ui/ui';
-</script>
-
-<Panel title="Statistiques">
-  <div>Contenu</div>
+<Panel title="Statistiques" collapsible={true}>
+  <div>Contenu du panneau</div>
 </Panel>
 ```
 
-**Props:**
-
-```ts
-interface Props {
-  title?: string;
-  collapsible?: boolean;
-  collapsed?: boolean;
-  onclose?: () => void;
-}
-```
+**Props :** `title?: string`, `collapsible?: boolean`, `collapsed?: boolean`, `onclose?: () => void`
 
 ### Window
 
-Fenetre avec barre de titre, optionnellement deplacable.
+Fenetre avec barre de titre, optionnellement deplaçable.
 
 ```svelte
-<script lang="ts">
-  import { Window } from '@webmcp-auto-ui/ui';
-</script>
-
 <Window title="Editeur" draggable={true}>
-  <p>Contenu de la fenetre</p>
+  <p>Contenu</p>
 </Window>
 ```
 
-**Props:**
-
-```ts
-interface Props {
-  title: string;
-  draggable?: boolean;                             // Defaut: false
-  class?: string;
-  onmove?: (dx: number, dy: number) => void;
-  children: Snippet;
-}
-```
+**Props :** `title: string`, `draggable?: boolean`, `onmove?: (dx, dy) => void`
 
 ### NativeSelect
 
-Select HTML natif avec le style du design system.
+Select HTML natif stylise avec le design system.
 
 ```svelte
-<script lang="ts">
-  import { NativeSelect } from '@webmcp-auto-ui/ui';
-
-  let value = $state('normal');
-</script>
-
 <NativeSelect bind:value class="w-24">
-  <option value="low">low</option>
-  <option value="normal">normal</option>
-  <option value="high">high</option>
+  <option value="low">Low</option>
+  <option value="normal">Normal</option>
 </NativeSelect>
 ```
 
-Etend `HTMLSelectAttributes` avec `class?: string` et `value?: string` (bindable).
-
 ### Tooltip
 
-Tooltip contextuel au survol.
+Tooltip au survol.
 
 ```svelte
-<script lang="ts">
-  import { Tooltip } from '@webmcp-auto-ui/ui';
-</script>
-
 <Tooltip content="Information supplementaire">
   <span>Survolez-moi</span>
 </Tooltip>
 ```
 
-**Props:**
+### Button / Badge
 
-```ts
-interface Props {
-  content: string;
-  class?: string;
-  children?: Snippet;
-}
+Composants de base avec variantes (pattern shadcn-svelte) :
+
+```svelte
+<Button variant="default" size="sm">Cliquer</Button>
+<Badge variant="outline">Tag</Badge>
 ```
 
 ### Dialog
 
-Ensemble de composants pour modales accessibles (pattern shadcn-svelte).
+Ensemble de composants pour modales accessibles :
 
 ```svelte
-<script lang="ts">
-  import {
-    Dialog, DialogTrigger, DialogContent,
-    DialogHeader, DialogTitle, DialogDescription, DialogFooter
-  } from '@webmcp-auto-ui/ui';
-</script>
-
 <Dialog>
-  <DialogTrigger>
-    <button>Ouvrir</button>
-  </DialogTrigger>
+  <DialogTrigger><button>Ouvrir</button></DialogTrigger>
   <DialogContent>
     <DialogHeader>
       <DialogTitle>Titre</DialogTitle>
-      <DialogDescription>Description du dialog.</DialogDescription>
+      <DialogDescription>Description</DialogDescription>
     </DialogHeader>
-    <p>Contenu principal</p>
-    <DialogFooter>
-      <button>Confirmer</button>
-    </DialogFooter>
+    <p>Contenu</p>
+    <DialogFooter><button>Confirmer</button></DialogFooter>
   </DialogContent>
 </Dialog>
 ```
 
-**Composants:**
-- `Dialog` — racine, props: `open?: boolean` (bindable), `onOpenChange?: (open: boolean) => void`
-- `DialogTrigger` — declencheur
-- `DialogContent` — conteneur du contenu
-- `DialogHeader` — en-tete
-- `DialogTitle` — titre
-- `DialogDescription` — description
-- `DialogFooter` — pied
+### SafeImage
 
-Tous acceptent `class?: string` et `children?: Snippet`.
+Image robuste avec validation d'URL et fallback. Valide les protocoles (http, https, data, /), affiche un placeholder si l'URL est invalide ou si l'image ne charge pas.
+
+```svelte
+<SafeImage
+  src="https://example.com/image.jpg"
+  alt="Description"
+  fallbackText="Image"
+  hideOnError={false}
+/>
+```
+
+---
 
 ## Layouts
 
 ### TilingLayout
 
-Layout en tuiles (grille) pour organiser les widgets cote a cote.
+Grille de tuiles responsive.
 
 ```svelte
-<script lang="ts">
-  import { TilingLayout } from '@webmcp-auto-ui/ui';
-</script>
-
 <TilingLayout gap="4" columns={3}>
   <div>Widget 1</div>
   <div>Widget 2</div>
@@ -684,34 +989,11 @@ Layout en tuiles (grille) pour organiser les widgets cote a cote.
 </TilingLayout>
 ```
 
-**Props:**
-
-```ts
-interface Props {
-  gap?: string;                                    // Espace entre items (defaut: '2')
-  columns?: number;                                // Nb colonnes (defaut: auto)
-  rows?: number;                                   // Nb lignes
-}
-```
-
-### GridLayout
-
-Layout grille CSS avec positionnement cellule.
-
-```svelte
-<script lang="ts">
-  import { GridLayout } from '@webmcp-auto-ui/ui';
-</script>
-
-<GridLayout rows={4} cols={4}>
-  <div style="grid-row: 1; grid-column: 1 / 3;">Widget A</div>
-  <div style="grid-row: 1 / 3; grid-column: 3 / 5;">Widget B</div>
-</GridLayout>
-```
+**Props :** `gap?: string`, `columns?: number`, `rows?: number`
 
 ### FloatingLayout
 
-Layout flottant avec fenetres deplacables et redimensionnables. Utilise un snippet `children` qui recoit un contexte avec des callbacks de drag/resize.
+Layout flottant avec fenetres deplaçables et redimensionnables par drag. Utilise un snippet `children` qui reçoit le contexte de chaque fenetre.
 
 ```svelte
 <script lang="ts">
@@ -724,35 +1006,26 @@ Layout flottant avec fenetres deplacables et redimensionnables. Utilise un snipp
 
 <FloatingLayout bind:this={fl} {windows} defaultWidth={380} defaultHeight={280}>
   {#snippet children(win, _lw, ctx)}
-    <div class="bg-surface rounded-lg border border-border">
+    <div class="bg-surface rounded-lg border">
+      <!-- Barre de titre (drag) -->
       <div onmousedown={(e) => ctx.ondragstart(e)}
            ondblclick={() => ctx.ontogglecollapse()}>
         {win.title}
       </div>
+      <!-- Contenu (collapsible) -->
       {#if !ctx.collapsed}
-        <div>Contenu du widget {win.id}</div>
+        <div>Widget {win.id}</div>
       {/if}
-      <div onmousedown={(e) => ctx.onresizestart(e)}></div>
+      <!-- Poignee de redimensionnement -->
+      <div onmousedown={(e) => ctx.onresizestart(e)} class="resize-handle"></div>
     </div>
   {/snippet}
 </FloatingLayout>
 ```
 
-**Props:**
+**Props :** `windows: ManagedWindow[]`, `gap?: number`, `defaultWidth?: number`, `defaultHeight?: number`, `onmove?`, `onresize?`
 
-```ts
-interface Props {
-  windows: ManagedWindow[];
-  gap?: number;                                    // Defaut: 4
-  defaultWidth?: number;                           // Defaut: 400
-  defaultHeight?: number;                          // Defaut: 300
-  onmove?: (id: string, x: number, y: number) => void;
-  onresize?: (id: string, w: number, h: number) => void;
-  children: Snippet<[ManagedWindow, LayoutWindow, SnippetCtx]>;
-}
-```
-
-**Contexte snippet (`SnippetCtx`):**
+**Contexte snippet :**
 
 ```ts
 interface SnippetCtx {
@@ -764,62 +1037,34 @@ interface SnippetCtx {
 }
 ```
 
-**Methodes exposees (via `bind:this`):**
+**Methodes exposees (via `bind:this`) :**
 
 ```ts
-fl.move(id: string, x: number, y: number): void
-fl.resize(id: string, w: number, h: number): void
-fl.toggleCollapse(id: string): void
-fl.fitToContent(id: string): void
+fl.move(id, x, y): void
+fl.resize(id, w, h): void
+fl.toggleCollapse(id): void
+fl.fitToContent(id): void
 ```
 
 ### FlexLayout
 
-Layout en grille responsive avec largeur adaptative (flexbox wrap).
+Layout flex responsive avec largeur adaptative.
 
 ```svelte
-<script lang="ts">
-  import { FlexLayout } from '@webmcp-auto-ui/ui';
-  import type { ManagedWindow } from '@webmcp-auto-ui/ui';
-
-  let windows = $state<ManagedWindow[]>([]);
-</script>
-
-<FlexLayout {windows} minWidth={260} maxWidth={600}>
+<FlexLayout {windows} minWidth={260} maxWidth={600} showSlider={true}>
   {#snippet children(win, _lw, ctx)}
-    <div>
-      <span>{win.title}</span>
-      <div>Contenu {win.id} (scale: {ctx.scale})</div>
-    </div>
+    <div>Widget {win.id} (scale: {ctx.scale})</div>
   {/snippet}
 </FlexLayout>
 ```
 
-**Props:**
-
-```ts
-interface Props {
-  windows: ManagedWindow[];
-  minWidth?: number;                               // Defaut: 280
-  maxWidth?: number;                               // Defaut: 800
-  gap?: number;                                    // Defaut: 8
-  showSlider?: boolean;                            // Slider de taille (defaut: true)
-  children: Snippet<[ManagedWindow, LayoutWindow, { scale: number }]>;
-}
-```
+**Props :** `windows`, `minWidth?: number`, `maxWidth?: number`, `gap?: number`, `showSlider?: boolean`
 
 ### StackLayout
 
-Layout empile (une fenetre a la fois ou defilement vertical).
+Layout empile : une fenetre a la fois ou defilement vertical.
 
 ```svelte
-<script lang="ts">
-  import { StackLayout } from '@webmcp-auto-ui/ui';
-  import type { ManagedWindow } from '@webmcp-auto-ui/ui';
-
-  let windows = $state<ManagedWindow[]>([]);
-</script>
-
 <StackLayout {windows} mode="scroll" gap={8}>
   {#snippet children(win, _lw)}
     <div>{win.title}: contenu</div>
@@ -827,104 +1072,20 @@ Layout empile (une fenetre a la fois ou defilement vertical).
 </StackLayout>
 ```
 
-**Props:**
+**Props :** `windows`, `mode?: 'single' | 'scroll'`, `gap?: number`, `padding?: number`
 
-```ts
-interface Props {
-  windows: ManagedWindow[];
-  mode?: 'single' | 'scroll';                     // Defaut: 'scroll'
-  gap?: number;                                    // Defaut: 8
-  padding?: number;                                // Defaut: 0
-  children: Snippet<[ManagedWindow, LayoutWindow]>;
-}
-```
+### GridLayout
 
-### LinkIndicators
-
-Indicateurs visuels de liens entre widgets, integres dans les barres de titre des fenetres. Lit l'etat des liens depuis le `bus` global.
+Grille CSS avec positionnement explicite des cellules.
 
 ```svelte
-<script lang="ts">
-  import { LinkIndicators } from '@webmcp-auto-ui/ui';
-</script>
-
-<LinkIndicators busId="widget_123" />
-```
-
-**Props:**
-
-```ts
-interface Props {
-  busId: string;                                   // ID du widget dans le bus
-}
-```
-
-### LinkOverlay
-
-Overlay SVG plein ecran qui dessine des fleches bezier entre les widgets lies. Se gere automatiquement via les evenements du bus.
-
-```svelte
-<script lang="ts">
-  import { LinkOverlay } from '@webmcp-auto-ui/ui';
-</script>
-
-<LinkOverlay />
-```
-
-Aucune prop. S'abonne automatiquement aux evenements `show-links` et `link` du bus.
-
-### linkGroupColor
-
-Utilitaire qui retourne une couleur HSL deterministe a partir d'un group ID. Utilise pour colorer les bordures des widgets lies.
-
-```ts
-import { linkGroupColor } from '@webmcp-auto-ui/ui';
-
-const color = linkGroupColor('group_abc'); // "hsl(210, 70%, 60%)"
-```
-
-### layoutAdapter
-
-Singleton qui connecte les callbacks de layout (move, resize, style) aux outils de l'agent (`move_block`, `resize_block`, `style_block`).
-
-```ts
-import { layoutAdapter } from '@webmcp-auto-ui/ui';
-
-// Enregistrer les callbacks (typiquement dans onMount)
-layoutAdapter.register({
-  move:   (id, x, y) => fl?.move(id, x, y),
-  resize: (id, w, h) => fl?.resize(id, w, h),
-  style:  (id, styles) => {
-    const el = document.querySelector(`[data-block-id="${id}"]`);
-    if (el) for (const [k, v] of Object.entries(styles))
-      el.style.setProperty(`--color-${k}`, v);
-  },
-});
-
-// Desenregistrer (dans onDestroy)
-layoutAdapter.unregister();
-```
-
-**API:**
-
-```ts
-layoutAdapter.register(cbs: {
-  move?: (id: string, x: number, y: number) => void;
-  resize?: (id: string, w: number, h: number) => void;
-  style?: (id: string, styles: Record<string, string>) => void;
-}): void
-
-layoutAdapter.unregister(): void
-layoutAdapter.move(id: string, x: number, y: number): void
-layoutAdapter.resize(id: string, w: number, h: number): void
-layoutAdapter.style(id: string, styles: Record<string, string>): void
+<GridLayout rows={4} cols={4}>
+  <div style="grid-row: 1; grid-column: 1 / 3;">Widget A</div>
+  <div style="grid-row: 1 / 3; grid-column: 3 / 5;">Widget B</div>
+</GridLayout>
 ```
 
 ### Types Window Manager
-
-```ts
-import type { ManagedWindow, LayoutWindow, FloatingWindowState } from '@webmcp-auto-ui/ui';
-```
 
 ```ts
 interface ManagedWindow {
@@ -954,418 +1115,259 @@ interface FloatingWindowState {
 }
 ```
 
-## Widgets Simples
-
-### StatBlock
-
-Affiche une statistique cle (label + valeur + tendance optionnelle).
-
-```svelte
-<StatBlock data={{
-  label: 'Revenue',
-  value: '$42k',
-  trend: 'up'
-}} />
-```
-
-### ChartBlock
-
-Graphique a barres simples.
-
-```svelte
-<ChartBlock data={{
-  bars: [['Jan', 10], ['Fev', 20], ['Mar', 15]]
-}} />
-```
-
-### DataTable
-
-Tableau de donnees avec tri par colonne et interactions.
-
-```svelte
-<DataTable
-  spec={{
-    columns: [
-      { key: 'name', label: 'Nom' },
-      { key: 'age', label: 'Age' }
-    ],
-    rows: [
-      { name: 'Alice', age: 30 },
-      { name: 'Bob', age: 25 }
-    ]
-  }}
-  onrowclick={(row) => console.log(row)}
-/>
-```
-
-### Timeline
-
-Chronologie d'evenements avec statuts (done, active, pending).
-
-```svelte
-<Timeline
-  spec={{
-    events: [
-      { title: 'Demarrage', date: '2024-01', status: 'done' },
-      { title: 'En cours', date: '2024-02', status: 'active' }
-    ]
-  }}
-/>
-```
-
-### ProfileCard
-
-Fiche profil avec avatar, champs et statistiques.
-
-```svelte
-<ProfileCard
-  spec={{
-    name: 'Alice Martin',
-    subtitle: 'Developpeuse',
-    fields: [
-      { label: 'Role', value: 'Lead Dev' },
-      { label: 'Team', value: 'Backend' }
-    ]
-  }}
-/>
-```
-
-### JsonViewer
-
-Arbre JSON interactif et explorable.
-
-```svelte
-<JsonViewer spec={{
-  data: { a: 1, b: { c: 2, d: [3, 4] } },
-  expanded: true
-}} />
-```
-
-### Cards
-
-Grille de cartes avec titre, description, tags.
-
-```svelte
-<Cards
-  spec={{
-    cards: [
-      { title: 'Projet A', description: 'En cours', tags: ['frontend'] },
-      { title: 'Projet B', description: 'Termine', tags: ['backend'] }
-    ]
-  }}
-  oncardclick={(card) => console.log(card)}
-/>
-```
-
-### Chart (Rich)
-
-Graphique multi-series (bar, line, area, pie, donut) avec Recharts.
-
-```svelte
-<Chart
-  spec={{
-    type: 'bar',
-    labels: ['Q1', 'Q2', 'Q3', 'Q4'],
-    data: [
-      { label: 'Ventes', values: [10, 20, 15, 25] },
-      { label: 'Couts', values: [8, 12, 10, 15] }
-    ]
-  }}
-/>
-```
-
-### MapView
-
-Carte Leaflet avec marqueurs.
-
-```svelte
-<MapView
-  spec={{
-    center: { lat: 48.8566, lng: 2.3522 },
-    zoom: 12,
-    height: '400px',
-    markers: [
-      { lat: 48.8566, lng: 2.3522, label: 'Paris' }
-    ]
-  }}
-/>
-```
-
-### D3Widget
-
-Visualisations D3.js (hex-heatmap, radial, treemap, force graph).
-
-```svelte
-<D3Widget
-  spec={{
-    preset: 'treemap',
-    data: { name: 'root', children: [...] }
-  }}
-/>
-```
-
-### JsSandbox
-
-Sandbox JavaScript pour visualisations custom.
-
-```svelte
-<JsSandbox
-  spec={{
-    code: "document.getElementById('root').innerHTML = '&lt;h1>Hello&lt;/h1>'",
-    html: '&lt;div id="root">&lt;/div>',
-    css: 'body { background: #f0f0f0; }',
-    height: '300px'
-  }}
-/>
-```
-
-### LogViewer
-
-Visionneuse de logs avec niveaux (debug, info, warn, error) et horodatage.
-
-```svelte
-<script lang="ts">
-  import { LogViewer } from '@webmcp-auto-ui/ui';
-</script>
-
-<LogViewer
-  spec={{
-    title: 'Application Logs',
-    entries: [
-      { timestamp: '2024-01-15T10:30:00Z', level: 'info', message: 'Server started', source: 'main' },
-      { timestamp: '2024-01-15T10:31:00Z', level: 'error', message: 'Connection failed', source: 'db' },
-    ],
-    maxHeight: '400px',
-  }}
-/>
-```
-
-**Props:**
-
-```ts
-interface Props {
-  spec: {
-    title?: string;
-    entries?: LogEntry[];
-    maxHeight?: string;
-  };
-  data?: unknown;                                  // Fallback LogEntry[]
-}
-
-interface LogEntry {
-  timestamp?: string;
-  level?: 'debug' | 'info' | 'warn' | 'error';
-  message: string;
-  source?: string;
-}
-```
-
-### Gallery
-
-Galerie d'images responsive en grille avec clique.
-
-```svelte
-<script lang="ts">
-  import { Gallery } from '@webmcp-auto-ui/ui';
-</script>
-
-<Gallery
-  spec={{
-    title: 'Collection',
-    images: [
-      { src: 'https://example.com/a.jpg', alt: 'Image A', caption: 'Premiere image' },
-      { src: 'https://example.com/b.jpg', alt: 'Image B', caption: 'Deuxieme image' },
-    ],
-    columns: 3,
-    gap: '8px',
-  }}
-  onimageclick={(img, index) => console.log(img, index)}
-/>
-```
-
-**Props:**
-
-```ts
-interface Props {
-  spec: {
-    title?: string;
-    images?: GalleryImage[];
-    columns?: number;
-    gap?: string;
-    emptyMessage?: string;
-  };
-  data?: unknown;                                  // Fallback GalleryImage[]
-  onimageclick?: (img: GalleryImage, index: number) => void;
-}
-
-interface GalleryImage {
-  src: string;
-  alt?: string;
-  caption?: string;
-  href?: string;
-}
-```
-
-### Carousel
-
-Carousel d'images/contenus avec navigation et autoplay optionnel.
-
-```svelte
-<script lang="ts">
-  import { Carousel } from '@webmcp-auto-ui/ui';
-</script>
-
-<Carousel
-  spec={{
-    title: 'Presentation',
-    slides: [
-      { src: 'https://example.com/slide1.jpg', title: 'Slide 1', subtitle: 'Intro' },
-      { content: '&lt;h2>Texte&lt;/h2>&lt;p>Contenu HTML&lt;/p>', title: 'Slide 2' },
-    ],
-    autoPlay: true,
-    interval: 5000,
-  }}
-  onslidechange={(slide, index) => console.log(slide, index)}
-/>
-```
-
-**Props:**
-
-```ts
-interface Props {
-  spec: {
-    title?: string;
-    slides?: CarouselSlide[];
-    autoPlay?: boolean;
-    interval?: number;                             // ms entre slides (defaut: 5000)
-  };
-  data?: unknown;                                  // Fallback CarouselSlide[]
-  onslidechange?: (slide: CarouselSlide, index: number) => void;
-}
-
-interface CarouselSlide {
-  src?: string;                                    // URL image
-  content?: string;                                // HTML alternatif
-  title?: string;
-  subtitle?: string;
-}
-```
-
-## SafeImage
-
-Composant image robuste avec validation d'URL et fallback.
-
-```svelte
-<script lang="ts">
-  import { SafeImage } from '@webmcp-auto-ui/ui';
-</script>
-
-<SafeImage
-  src="https://example.com/image.jpg"
-  alt="Description"
-  fallbackText="Image"
-  hideOnError={false}
-/>
-```
-
-**Props:**
-
-```ts
-interface Props {
-  src: string | undefined | null;
-  alt?: string;
-  fallbackText?: string;        // Texte par defaut
-  hideOnError?: boolean;        // Masquer si erreur
-}
-```
-
-Valide les URL (http://, https://, data:, /) et affiche un placeholder si invalide/cassee.
+---
 
 ## FONC Message Bus
 
-Systeme de messagerie inter-composants base sur le bus de messages.
-
-```svelte
-<script lang="ts">
-  import { bus } from '@webmcp-auto-ui/ui';
-  
-  // S'enregistrer sur le bus
-  const unregister = bus.register(
-    'my_component',
-    'widget',
-    ['update', 'interact', '*'],
-    (msg) => console.log(msg)
-  );
-
-  // Envoyer un message
-  bus.broadcast('my_component', 'update', { newValue: 42 });
-
-  // Nettoyer
-  onDestroy(() => unregister());
-</script>
-```
-
-**API bus:**
+Systeme de messagerie inter-composants pour la communication entre widgets sans couplage direct.
 
 ```ts
-bus.register(id, type, channels, handler): () => void
-bus.send(from, to, channel, payload): void
-bus.broadcast(from, channel, payload): void
-bus.subscribe(channels, handler): () => void
-bus.link(widgetIds, groupId?): string
-bus.unlink(widgetId, groupId): void
-bus.getLinks(widgetId): string[]
-bus.getGroup(groupId): string[]
-bus.hasLinks(widgetId): boolean
+import { bus } from '@webmcp-auto-ui/ui';
+import type { BusMessage } from '@webmcp-auto-ui/ui';
 ```
 
-## Exemples Complets
+### API du bus
 
-### Chat avec Agent
+```ts
+// Enregistrer un participant (widget, composant)
+const unregister = bus.register(
+  'widget_123',           // ID unique
+  'widget',               // Type de participant
+  ['update', 'interact'], // Channels ecoutes (ou ['*'] pour tout)
+  (msg: BusMessage) => {
+    console.log(`Message de ${msg.from}: ${msg.channel}`, msg.payload);
+  }
+);
+
+// Envoyer un message cible
+bus.send('widget_123', 'widget_456', 'update', { newValue: 42 });
+
+// Diffuser a tous les participants
+bus.broadcast('widget_123', 'refresh', { timestamp: Date.now() });
+
+// S'abonner sans s'enregistrer comme participant
+const unsub = bus.subscribe(['update', 'interact'], (msg) => { /* ... */ });
+
+// Lier des widgets (communication bidirectionnelle)
+const groupId = bus.link(['widget_1', 'widget_2', 'widget_3']);
+
+// Delier
+bus.unlink('widget_1', groupId);
+
+// Interroger les liens
+bus.getLinks('widget_1');      // string[] — groupes
+bus.getGroup(groupId);         // string[] — widgets du groupe
+bus.hasLinks('widget_1');      // boolean
+```
+
+Le bus est utilise par `LinkOverlay` et `LinkIndicators` pour dessiner les liens visuels entre widgets.
+
+### LinkOverlay
+
+Overlay SVG plein ecran qui dessine des fleches bezier entre les widgets lies.
+
+```svelte
+<LinkOverlay />
+```
+
+S'abonne automatiquement aux evenements `show-links` et `link` du bus.
+
+### LinkIndicators
+
+Indicateurs visuels dans les barres de titre des fenetres.
+
+```svelte
+<LinkIndicators busId="widget_123" />
+```
+
+### linkGroupColor
+
+Retourne une couleur HSL deterministe pour un group ID.
+
+```ts
+import { linkGroupColor } from '@webmcp-auto-ui/ui';
+const color = linkGroupColor('group_abc'); // "hsl(210, 70%, 60%)"
+```
+
+---
+
+## Layout Adapter
+
+Singleton qui connecte les layouts aux outils de l'agent (`canvas` tool avec actions `move`, `resize`, `style`).
+
+```ts
+import { layoutAdapter } from '@webmcp-auto-ui/ui';
+
+// Enregistrer les callbacks de layout (dans onMount)
+layoutAdapter.register({
+  move:   (id, x, y) => floatingLayout?.move(id, x, y),
+  resize: (id, w, h) => floatingLayout?.resize(id, w, h),
+  style:  (id, styles) => {
+    const el = document.querySelector(`[data-block-id="${id}"]`);
+    if (el instanceof HTMLElement) {
+      for (const [k, v] of Object.entries(styles)) {
+        el.style.setProperty(`--color-${k}`, v);
+      }
+    }
+  },
+});
+
+// Desenregistrer (dans onDestroy)
+layoutAdapter.unregister();
+```
+
+---
+
+## Tutoriel : construire un chat agent complet
+
+Ce tutoriel assemble les composants UI pour creer une interface de chat avec widgets, selection de modele, et progression agent.
+
+### Etape 1 : structure de base
 
 ```svelte
 <script lang="ts">
-  import { LLMSelector, AgentProgress, McpStatus } from '@webmcp-auto-ui/ui';
-  import { canvas } from '@webmcp-auto-ui/sdk';
-  import { runAgentLoop, RemoteLLMProvider } from '@webmcp-auto-ui/agent';
+  import { ThemeProvider, LLMSelector, McpStatus, AgentProgress,
+           ChatPanel, WidgetRenderer } from '@webmcp-auto-ui/ui';
+  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+  import { runAgentLoop, RemoteLLMProvider, autoui } from '@webmcp-auto-ui/agent';
+  import type { ChatFeedItem } from '@webmcp-auto-ui/ui';
 
-  let input = '';
-  let loading = false;
+  let feed = $state<ChatFeedItem[]>([]);
+  let input = $state('');
+  let timer = $state(0);
+  let toolCount = $state(0);
+  let lastTool = $state('');
 
   const provider = new RemoteLLMProvider({
     proxyUrl: '/api/chat',
-    model: 'sonnet',  // resout en claude-sonnet-4-6
+    model: 'sonnet',
   });
+</script>
+```
 
-  async function chat() {
-    loading = true;
+### Etape 2 : logique de chat
+
+```svelte
+<script lang="ts">
+  // ... (suite du script precedent)
+
+  async function send(msg: string) {
+    feed = [...feed, { role: 'user', html: `<p>${msg}</p>` }];
+    canvas.generating = true;
+    const start = Date.now();
+    const interval = setInterval(() => { timer = (Date.now() - start) / 1000; }, 100);
+
     try {
-      const result = await runAgentLoop(input, {
+      const result = await runAgentLoop(msg, {
         provider,
-        layers: [],
+        layers: [autoui.layer()],
+        maxIterations: 5,
         callbacks: {
-          onToken: (token) => {
-            // Streaming en temps reel
+          onToolCall: (call) => {
+            toolCount++;
+            lastTool = call.name;
+          },
+          onWidget: (type, data) => {
+            feed = [...feed, { type, data }];
+            return { id: `w_${Date.now()}` };
+          },
+          onText: (text) => {
+            feed = [...feed, { role: 'assistant', html: `<p>${text}</p>` }];
           },
         },
       });
-      canvas.addMsg('assistant', result.text);
     } finally {
-      loading = false;
+      canvas.generating = false;
+      clearInterval(interval);
     }
   }
 </script>
-
-<div class="p-4">
-  <LLMSelector bind:value={canvas.llm} />
-  <McpStatus
-    connected={canvas.mcpConnected}
-    name={canvas.mcpName}
-  />
-  <input bind:value={input} />
-  <button disabled={loading} onclick={chat}>Envoyer</button>
-  {#if loading}
-    <AgentProgress iteration={1} maxIterations={5} />
-  {/if}
-</div>
 ```
+
+### Etape 3 : assembler l'UI
+
+```svelte
+<ThemeProvider defaultMode="dark">
+  <div class="flex flex-col h-screen">
+    <!-- Barre superieure -->
+    <header class="p-4 border-b flex items-center gap-4">
+      <LLMSelector value={canvas.llm} onchange={(m) => canvas.setLlm(m)} />
+      <McpStatus connected={canvas.mcpConnected} name={canvas.mcpName} />
+      {#if canvas.generating}
+        <AgentProgress active elapsed={timer} toolCalls={toolCount} lastTool={lastTool} />
+      {/if}
+    </header>
+
+    <!-- Zone principale -->
+    <main class="flex-1 overflow-auto p-4">
+      <ChatPanel
+        {feed}
+        bind:input
+        generating={canvas.generating}
+        {timer}
+        {toolCount}
+        {lastTool}
+        onsend={send}
+      />
+    </main>
+  </div>
+</ThemeProvider>
+```
+
+---
+
+## Integration avec les autres packages
+
+```mermaid
+graph LR
+    UI["@webmcp-auto-ui/ui"] -->|WidgetRenderer| CORE["@webmcp-auto-ui/core"]
+    UI -->|canvas store| SDK["@webmcp-auto-ui/sdk"]
+    UI -->|autoui server| AGENT["@webmcp-auto-ui/agent"]
+    UI -->|TokenTracker| AGENT
+    AGENT -->|callbacks| UI
+    SDK -->|MCP_DEMO_SERVERS| UI
+```
+
+- **WidgetRenderer** utilise `mountWidget` de core pour les widgets vanilla
+- Les composants agent lisent l'etat du canvas store du SDK
+- Le `TokenBubble` s'abonne au `TokenTracker` de l'agent
+- Le `RemoteMCPserversDemo` utilise `MCP_DEMO_SERVERS` du SDK
+
+---
+
+## Bonnes pratiques
+
+:::tip[ThemeProvider obligatoire]
+Enveloppez toujours la racine de votre application dans `<ThemeProvider>`. Sans cela, les tokens CSS ne sont pas injectes et les composants n'ont pas de couleurs.
+:::
+
+:::tip[WidgetRenderer plutot que composants directs]
+Preferez `<WidgetRenderer type="stat" data={...} />` plutot qu'importer `StatBlock` directement. Le renderer gere la resolution (natif vs custom), le fallback, et l'auto-enregistrement WebMCP.
+:::
+
+:::caution[Peer dependencies]
+`MapView` necessite `leaflet`, `D3Widget` necessite `d3`. Si vous n'utilisez pas ces widgets, les peer dependencies ne sont pas requises — les widgets ne sont importes que quand ils sont utilises via le `WidgetRenderer`.
+:::
+
+:::caution[Performances du FloatingLayout]
+Avec plus de 20 fenetres, le FloatingLayout peut devenir lent a cause du recalcul des z-index et des positions. Preferez `FlexLayout` ou `StackLayout` pour les grandes collections.
+:::
+
+---
+
+## FAQ
+
+**Combien de widgets sont disponibles ?**
+25 widgets natifs (9 simples + 16 riches), plus la possibilite d'ajouter des widgets custom via un serveur WebMCP.
+
+**Puis-je utiliser les widgets sans l'agent ?**
+Oui. Chaque widget est un composant Svelte autonome importable directement. Le `WidgetRenderer` est pratique mais pas obligatoire.
+
+**Comment ajouter un widget custom ?**
+Creez un serveur WebMCP avec `createWebMcpServer()` (package core), enregistrez votre widget avec `registerWidget()`, et passez le serveur dans la prop `servers` du `WidgetRenderer`.
+
+**Le bus FONC est-il persistant ?**
+Non, le bus est en memoire. Les liens et les messages sont perdus au rechargement de la page. Pour persister des liens, stockez-les dans le canvas store.
+
+**Quel est le rapport entre les layouts ?**
+`TilingLayout` est une grille statique. `FlexLayout` est responsive avec un slider de taille. `FloatingLayout` permet le drag & drop libre. `StackLayout` empile verticalement. Choisissez selon le mode d'interaction souhaite.

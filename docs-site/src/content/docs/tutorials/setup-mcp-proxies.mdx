@@ -5,41 +5,62 @@ sidebar:
   order: 7
 ---
 
-Ce tutoriel explique comment installer et configurer les proxies MCP qui permettent aux apps webmcp-auto-ui d'acceder a des serveurs MCP publics (NASA, iNaturalist, Wikipedia, etc.) depuis le navigateur.
+Les serveurs MCP communiquent par stdio (stdin/stdout), mais les navigateurs ont besoin d'endpoints HTTP. Ce tutoriel vous montre comment deployer les proxies qui font le pont, en local avec Docker ou en production avec systemd et nginx.
 
-## Introduction
+## Objectif
 
-Les serveurs MCP sont des packages npm ou des scripts Python qui communiquent via stdio (stdin/stdout). Les navigateurs ne peuvent pas communiquer en stdio -- ils ont besoin d'endpoints HTTP.
+Deployer les proxies MCP pour rendre accessibles depuis le navigateur les serveurs MCP publics (NASA, HackerNews, Wikipedia, etc.).
 
-Le pont `mcp-stdio-bridge.py` resout ce probleme : il wrappe chaque serveur MCP en un endpoint HTTP qui accepte des requetes JSON-RPC 2.0, les transmet au processus MCP via stdio, et renvoie la reponse.
+## Prerequis
+
+- Docker et Docker Compose installes (pour la methode rapide)
+- Ou : une VM Ubuntu/Debian avec `python3`, `node`, `npm`, `nginx` (pour la production)
+- Comprendre ce qu'est un serveur MCP (voir [Connecter un serveur MCP](./connect-mcp-server))
+
+## Resultat final
+
+Des serveurs MCP accessibles par HTTP, avec CORS configure, recettes injectees, et monitoring systemd.
+
+```mermaid
+graph LR
+    Browser[Navigateur] -->|HTTPS| Nginx[nginx reverse proxy]
+    Nginx -->|HTTP localhost:900x| Bridge["mcp-stdio-bridge.py"]
+    Bridge -->|stdin/stdout| MCP["Serveur MCP (npx/python3)"]
+```
 
 ---
 
 ## Architecture
 
-```
-Browser (McpClient)
-    |
-    v  (HTTPS)
-nginx reverse proxy  (CORS + routing)
-    |
-    v  (HTTP, localhost:900x)
-mcp-stdio-bridge.py  (HTTP → stdio)
-    |
-    v  (stdin/stdout, JSON-RPC 2.0)
-MCP server subprocess  (npx / python3)
-```
-
-Chaque bridge :
+Chaque bridge est un processus Python qui :
 - Spawn le serveur MCP comme processus enfant communicant via stdio
 - Accepte `POST /mcp` avec un body JSON-RPC 2.0
 - Transmet au subprocess via stdin, lit la reponse sur stdout
 - Gere le cycle de vie du subprocess (demarrage paresseux, redemarrage sur crash)
 - Injecte optionnellement des outils "recettes" depuis un fichier JSON
 
+```mermaid
+graph TB
+    subgraph "Par serveur MCP"
+        HTTP["POST /mcp (JSON-RPC 2.0)"] --> Bridge["mcp-stdio-bridge.py"]
+        Bridge --> Stdin["stdin"]
+        Stdin --> Process["MCP server subprocess"]
+        Process --> Stdout["stdout"]
+        Stdout --> Bridge
+        Bridge --> Response["Reponse HTTP"]
+    end
+
+    subgraph nginx
+        CORS["Headers CORS"] --> Proxy["proxy_pass localhost:900x"]
+    end
+
+    Client[McpClient] --> nginx
+    nginx --> HTTP
+```
+
 ---
 
-## Methode rapide (Docker)
+## Methode rapide : Docker
 
 Pour le developpement local, Docker Compose demarre tous les serveurs en une commande :
 
@@ -56,9 +77,32 @@ Pour demarrer un seul serveur :
 docker compose up -d hackernews
 ```
 
+**Verification** : testez avec curl :
+
+```bash
+curl -s -X POST http://localhost:9006/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {},
+      "clientInfo": { "name": "test", "version": "1.0" }
+    }
+  }'
+```
+
+Une reponse valide contient `"result"` avec les capabilities du serveur.
+
+:::tip[Developpement rapide]
+En developpement, utilisez Docker. Ne passez a la methode VM que pour le deploiement en production.
+:::
+
 ---
 
-## Methode VM (systemd + nginx)
+## Methode production : systemd + nginx
 
 Pour un deploiement en production sur une VM Ubuntu/Debian :
 
@@ -67,15 +111,32 @@ cd mcp-proxies
 sudo ./setup.sh
 ```
 
-Le script est idempotent (il peut etre relance sans risque). Il effectue les operations suivantes :
+Le script est **idempotent** (il peut etre relance sans risque). Il effectue :
 
-1. Verifie les prerequis (`python3`, `node`, `npm`, `nginx`)
-2. Cree un utilisateur systeme dedie `mcpbridge`
-3. Copie les scripts bridge dans `/opt/mcp-bridge/`
-4. Genere les fichiers unit systemd pour chaque serveur
-5. Genere le bloc de locations nginx
-6. Demarre ou redemarre tous les services
-7. Teste chaque endpoint avec curl
+1. Verification des prerequis (`python3`, `node`, `npm`, `nginx`)
+2. Creation d'un utilisateur systeme dedie `mcpbridge`
+3. Copie des scripts bridge dans `/opt/mcp-bridge/`
+4. Generation des fichiers unit systemd pour chaque serveur
+5. Generation du bloc de locations nginx
+6. Demarrage ou redemarrage de tous les services
+7. Test de chaque endpoint avec curl
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant Setup as setup.sh
+    participant System as systemd
+    participant Nginx as nginx
+
+    Admin->>Setup: sudo ./setup.sh
+    Setup->>Setup: Verifie prerequis
+    Setup->>Setup: Cree user mcpbridge
+    Setup->>Setup: Copie scripts vers /opt/mcp-bridge/
+    Setup->>System: Genere + active units systemd
+    Setup->>Nginx: Genere locations + reload
+    Setup->>Setup: curl test chaque endpoint
+    Setup-->>Admin: Rapport de demarrage
+```
 
 ### Cle API NASA
 
@@ -86,11 +147,9 @@ export NASA_API_KEY="votre-cle-ici"
 sudo -E ./setup.sh
 ```
 
-Ou creez le fichier `/opt/mcp-bridge/.env` sur la VM :
-
-```
-NASA_API_KEY=votre-cle-ici
-```
+:::caution[Ne pas oublier -E]
+Le flag `-E` preserve les variables d'environnement dans le contexte sudo. Sans lui, `NASA_API_KEY` ne sera pas transmise au script.
+:::
 
 ---
 
@@ -98,35 +157,57 @@ NASA_API_KEY=votre-cle-ici
 
 Pour ajouter un serveur MCP au systeme de proxies :
 
-1. Creez un sous-repertoire dans `mcp-proxies/servers/` :
+### 1. Creer le repertoire
 
 ```bash
 mkdir mcp-proxies/servers/mon-serveur
 ```
 
-2. Ajoutez les fichiers de configuration :
+### 2. Ajouter les fichiers de configuration
 
 ```
 mcp-proxies/servers/mon-serveur/
-  recipes.json    # Outils "recettes" injectes dans le serveur (optionnel)
+  recipes.json    # Outils "recettes" injectes (optionnel)
   service.conf    # Configuration systemd (commande, port, env)
   README.md       # Documentation du serveur
   examples.md     # Exemples de prompts
 ```
 
-3. Relancez le setup pour enregistrer le nouveau service :
+Le fichier `service.conf` definit comment demarrer le serveur :
+
+```ini
+[Service]
+ExecStart=npx -y @modelcontextprotocol/server-mon-serveur
+Environment=PORT=9009
+```
+
+### 3. Creer les recettes (optionnel mais recommande)
+
+Le fichier `recipes.json` injecte des outils de decouverte dans le serveur :
+
+```json
+[
+  {
+    "name": "guide-recherche",
+    "description": "Comment chercher dans mon-serveur",
+    "content": "## Recherche\\n\\nUtiliser search({query: 'mot-cle'})..."
+  }
+]
+```
+
+### 4. Relancer le setup
 
 ```bash
 sudo ./setup.sh
 ```
 
-Ou, pour ajouter manuellement le service systemd, creez le fichier unit et rechargez systemd.
+**Verification** : le nouveau service apparait dans `systemctl status mcp-bridge-mon-serveur`.
 
 ---
 
 ## Tester un serveur
 
-Envoyez une requete `initialize` pour verifier qu'un serveur repond correctement :
+Envoyez une requete `initialize` pour verifier qu'un serveur repond :
 
 ```bash
 curl -s -X POST http://localhost:9001/mcp \
@@ -143,33 +224,38 @@ curl -s -X POST http://localhost:9001/mcp \
   }'
 ```
 
-Une reponse valide contient `"result"` avec les capabilities du serveur. Remplacez le port `9001` par celui du serveur cible (voir la table ci-dessous).
+Puis listez les outils :
+
+```bash
+curl -s -X POST http://localhost:9001/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/list",
+    "params": {}
+  }'
+```
 
 ---
 
 ## Connecter depuis une app webmcp-auto-ui
 
-Une fois le proxy en marche, connectez-vous depuis votre app avec `McpClient` :
+Une fois le proxy en marche, connectez-vous depuis votre app :
 
 ```typescript
 import { McpClient } from '@webmcp-auto-ui/core';
 
-const client = new McpClient({
-  serverUrl: 'http://localhost:9001/mcp',
-});
+// En developpement local
+const client = new McpClient('http://localhost:9001/mcp');
 await client.initialize();
 const tools = await client.listTools();
+
+// En production
+const client = new McpClient('https://demos.hyperskills.net/mcp-metmuseum/mcp');
 ```
 
-En production, utilisez l'URL publique du proxy :
-
-```typescript
-const client = new McpClient({
-  serverUrl: 'https://demos.hyperskills.net/mcp-metmuseum/mcp',
-});
-```
-
-Pour gerer plusieurs serveurs MCP simultanement, utilisez `McpMultiClient` :
+Pour gerer plusieurs serveurs simultanement :
 
 ```typescript
 import { McpMultiClient } from '@webmcp-auto-ui/core';
@@ -183,7 +269,9 @@ await multi.addServer('https://demos.hyperskills.net/mcp-wikipedia/mcp');
 
 ## Systeme de recettes
 
-Chaque serveur peut optionnellement inclure un fichier `recipes.json` dans `servers/{nom}/` qui injecte des outils de recettes (`list_recipes`, `get_recipe`, `search_recipes`) dans la liste d'outils du serveur MCP. Le bridge charge ces recettes au demarrage via le flag `--recipes`.
+Chaque serveur peut optionnellement inclure un fichier `recipes.json` qui injecte des outils de recettes (`list_recipes`, `get_recipe`, `search_recipes`) dans la liste d'outils du serveur MCP. Le bridge charge ces recettes au demarrage via le flag `--recipes`.
+
+Les recettes permettent au LLM de decouvrir comment utiliser le serveur de maniere autonome, meme si le serveur MCP d'origine n'a pas de mecanisme de decouverte integre.
 
 ---
 
@@ -201,7 +289,9 @@ Chaque serveur peut optionnellement inclure un fichier `recipes.json` dans `serv
 
 Les URLs de production sont prefixees par `https://demos.hyperskills.net`.
 
-Le serveur `datagouv` est un cas particulier : il n'utilise pas de bridge stdio mais un simple reverse proxy nginx vers un serveur MCP distant deja accessible en HTTP.
+:::note[Cas special : datagouv]
+Le serveur `datagouv` n'utilise pas de bridge stdio mais un simple reverse proxy nginx vers un serveur MCP distant deja accessible en HTTP.
+:::
 
 ---
 
@@ -228,8 +318,26 @@ mcp-proxies/
 
 ---
 
+## Troubleshooting
+
+| Probleme | Cause probable | Solution |
+|----------|---------------|----------|
+| "Connection refused" | Le bridge n'est pas demarre | `systemctl status mcp-bridge-<nom>` |
+| "CORS error" | Headers CORS manquants dans nginx | Verifiez `mcp-locations.conf` |
+| Timeout au premier appel | Le serveur MCP met du temps a demarrer | Le bridge fait un demarrage paresseux, le premier appel est lent |
+| "Invalid JSON-RPC" | Format de requete incorrect | Verifiez le body JSON-RPC 2.0 |
+| Serveur qui crash en boucle | Dependance npm manquante | `journalctl -u mcp-bridge-<nom>` pour voir les logs |
+
+---
+
+## Aller plus loin
+
+- **Creer un serveur MCP custom** : ecrivez votre propre serveur MCP en Node.js ou Python
+- **Monitoring** : ajoutez des healthchecks systemd et des alertes
+- **Securite** : ajoutez une authentification par token aux endpoints
+
 ## Voir aussi
 
 - [Demarrer avec le boilerplate](./boilerplate)
 - [Connecter un serveur MCP](./connect-mcp-server)
-- [Architecture](../guide/architecture)
+- [Architecture](/guide/architecture)

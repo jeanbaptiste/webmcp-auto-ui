@@ -5,43 +5,95 @@ sidebar:
   order: 2
 ---
 
-This tutorial shows how to use the **built-in widgets** (stat, chart, timeline, etc.) provided by WebMCP Auto-UI in your Svelte application.
+WebMCP Auto-UI ships with 26+ ready-to-use widget types. This tutorial shows you how to use them, customize them, and make them interact with each other. No need to create anything -- everything is already there.
 
-## Available widget types
+## Goal
 
-WebMCP Auto-UI provides two categories of widgets:
+Discover and use the native widgets to build rich interfaces without writing custom components.
+
+## Prerequisites
+
+- The boilerplate is installed (see [Getting started](./boilerplate))
+- Basic Svelte 5 knowledge (`$state`, `{#each}`)
+
+## What you will build
+
+An interactive dashboard using stat, chart-rich, data-table, timeline, and profile -- with dynamic updates and interaction handling.
+
+---
+
+## Widget catalog
 
 ### Simple widgets
-- `stat` -- Key statistic (KPI, counter)
-- `kv` -- Key-value pairs (properties, metadata)
-- `list` -- Ordered list of items
-- `chart` -- Bar chart
-- `alert` -- Notification/alert
-- `code` -- Code block with syntax highlighting
-- `text` -- Text paragraph
-- `actions` -- Action buttons
-- `tags` -- Badges/tags
+
+| Widget | Description | Typical use |
+|--------|-------------|-------------|
+| `stat` | Key statistic (KPI) | Number with trend |
+| `kv` | Key-value pairs | Metadata, properties |
+| `list` | Ordered list | Text items |
+| `chart` | Simple bar chart | Quick comparisons |
+| `alert` | Notification/alert | Important messages |
+| `code` | Code block with syntax highlighting | Code snippets |
+| `text` | Text paragraph | Written content |
+| `actions` | Action buttons | Calls to action |
+| `tags` | Badges/tags | Filters, categories |
 
 ### Rich widgets
-- `stat-card` -- Enhanced KPI with delta and colored variant
-- `data-table` -- Sortable table with columns
-- `timeline` -- Event chronology
-- `profile` -- Profile card with avatar and stats
-- `trombinoscope` -- Portrait grid
-- `json-viewer` -- Interactive JSON tree
-- `hemicycle` -- Parliamentary composition
-- `chart-rich` -- Multi-series (bar, line, area, pie)
-- `cards` -- Card grid
-- `grid-data` -- Grid with cell highlights
-- `sankey` -- Flow diagram
-- `map` -- Interactive Leaflet map
-- `log` -- Log stream
-- `gallery` -- Image gallery with lightbox
-- `carousel` -- Slide carousel
-- `d3` -- D3.js visualizations
-- `js-sandbox` -- Custom JavaScript sandbox
+
+| Widget | Description | Typical use |
+|--------|-------------|-------------|
+| `stat-card` | Enhanced KPI with delta and color | Financial dashboard |
+| `data-table` | Sortable table with columns | Data lists |
+| `timeline` | Event chronology | Project history |
+| `profile` | Profile card with avatar | Contact page |
+| `trombinoscope` | Portrait grid | Teams |
+| `json-viewer` | Interactive JSON tree | Debug, API |
+| `hemicycle` | Parliamentary composition | Politics |
+| `chart-rich` | Multi-series (bar, line, area, pie) | Comparative analysis |
+| `cards` | Card grid | Catalogs |
+| `grid-data` | Grid with cell highlights | Matrices |
+| `sankey` | Flow diagram | Financial flows |
+| `map` | Interactive Leaflet map | Geolocation |
+| `log` | Log stream | Monitoring |
+| `gallery` | Image gallery with lightbox | Portfolios |
+| `carousel` | Slide carousel | Presentations |
+| `d3` | D3.js visualizations | Advanced charts |
+| `js-sandbox` | Custom JavaScript sandbox | Interactive code |
+
+```mermaid
+graph TD
+    subgraph Simple
+        stat[stat]
+        kv[kv]
+        list[list]
+        chart[chart]
+        alert[alert]
+        code[code]
+        text[text]
+        actions[actions]
+        tags[tags]
+    end
+
+    subgraph Rich
+        statcard[stat-card]
+        datatable[data-table]
+        timeline[timeline]
+        profile[profile]
+        chartrich[chart-rich]
+        map[map]
+        gallery[gallery]
+        sankey[sankey]
+    end
+
+    BlockRenderer --> Simple
+    BlockRenderer --> Rich
+```
+
+---
 
 ## Step 1: Import BlockRenderer
+
+`BlockRenderer` is the entry point for displaying any widget. It automatically resolves the Svelte component matching the widget `type`:
 
 ```svelte
 <script lang="ts">
@@ -50,9 +102,16 @@ WebMCP Auto-UI provides two categories of widgets:
 </script>
 ```
 
-## Step 2: Create widgets
+`BlockRenderer` takes three main props:
+- `type`: the widget name (`'stat'`, `'data-table'`, etc.)
+- `data`: the data in the format expected by the widget
+- `id`: (optional) unique identifier for interactions
 
-Use the `canvas` store to add widgets:
+---
+
+## Step 2: Create widgets programmatically
+
+The `canvas` store provides methods to add widgets:
 
 ```svelte
 <script lang="ts">
@@ -98,9 +157,13 @@ Use the `canvas` store to add widgets:
 <button onclick={addTableWidget}>Add table</button>
 ```
 
+**Checkpoint**: click each button and verify the corresponding widget appears.
+
+---
+
 ## Step 3: Display widgets
 
-Use `BlockRenderer` to mount the canvas widgets:
+Loop through the canvas blocks and render them with `BlockRenderer`:
 
 ```svelte
 <div class="widgets-grid">
@@ -123,264 +186,168 @@ Use `BlockRenderer` to mount the canvas widgets:
 </style>
 ```
 
-## Common widget examples
+:::tip[Responsive by default]
+Use `grid-template-columns: repeat(auto-fit, minmax(300px, 1fr))` for a responsive grid that adapts to screen width.
+:::
 
-### KPI with trend
+---
+
+## Widget gallery with examples
+
+### Enhanced KPI (`stat-card`)
 
 ```svelte
 <script lang="ts">
-  function addKpi() {
-    canvas.addWidget('stat-card', {
-      label: 'Conversion rate',
-      value: '3.2',
-      unit: '%',
-      trend: 'up',
-      delta: '+0.5%',
-      variant: 'success',
-    });
-  }
+  canvas.addWidget('stat-card', {
+    label: 'Conversion rate',
+    value: '3.2',
+    unit: '%',
+    trend: 'up',
+    delta: '+0.5%',
+    variant: 'success',   // 'success' | 'warning' | 'danger' | 'info'
+  });
 </script>
 ```
 
-### Event timeline
+### Rich multi-series chart (`chart-rich`)
+
+5 chart types in a single widget:
 
 ```svelte
 <script lang="ts">
-  function addTimeline() {
-    canvas.addWidget('timeline', {
-      title: 'Project history',
-      events: [
-        {
-          title: 'Kickoff',
-          date: '2024-01-15',
-          status: 'done',
-          description: 'Project launched',
-        },
-        {
-          title: 'First release',
-          date: '2024-02-28',
-          status: 'done',
-          description: 'MVP delivered',
-        },
-        {
-          title: 'Optimizations',
-          date: '2024-04-01',
-          status: 'active',
-          description: 'Improvement phase in progress',
-        },
-        {
-          title: 'Public launch',
-          date: '2024-05-01',
-          status: 'pending',
-          description: 'Scheduled',
-        },
-      ],
-    });
-  }
+  canvas.addWidget('chart-rich', {
+    title: 'Quarterly performance',
+    type: 'bar',  // 'bar' | 'line' | 'area' | 'pie' | 'donut'
+    labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+    data: [
+      { label: 'Sales', values: [120, 190, 150, 180], color: '#3b82f6' },
+      { label: 'Profit', values: [80, 140, 110, 150], color: '#10b981' },
+    ],
+  });
 </script>
 ```
 
-### Profile card
+### Event timeline (`timeline`)
 
 ```svelte
 <script lang="ts">
-  function addProfile() {
-    canvas.addWidget('profile', {
-      name: 'Alice Dupont',
-      subtitle: 'Senior Developer',
-      fields: [
-        { label: 'Team', value: 'Backend' },
-        { label: 'Location', value: 'Paris, France' },
-        { label: 'Since', value: '2021' },
-      ],
-      stats: [
-        { label: 'Projects', value: '12' },
-        { label: 'Contributors', value: '45' },
-      ],
-    });
-  }
+  canvas.addWidget('timeline', {
+    title: 'Project history',
+    events: [
+      { title: 'Kickoff', date: '2024-01-15', status: 'done', description: 'Project launched' },
+      { title: 'First release', date: '2024-02-28', status: 'done', description: 'MVP delivered' },
+      { title: 'Optimizations', date: '2024-04-01', status: 'active', description: 'In progress' },
+      { title: 'Public launch', date: '2024-05-01', status: 'pending', description: 'Scheduled' },
+    ],
+  });
 </script>
 ```
 
-### Interactive table
+### Profile card (`profile`)
 
 ```svelte
 <script lang="ts">
-  function handleRowClick(row: Record<string, unknown>) {
-    console.log('Row clicked:', row);
-  }
-
-  function addTable() {
-    canvas.addWidget('data-table', {
-      title: 'Article list',
-      columns: [
-        { key: 'title', label: 'Title', align: 'left' },
-        { key: 'category', label: 'Category', align: 'center' },
-        { key: 'views', label: 'Views', align: 'right' },
-      ],
-      rows: [
-        { title: 'Introduction to Svelte', category: 'Tutorial', views: 1250 },
-        { title: 'WebMCP Best Practices', category: 'Guide', views: 890 },
-      ],
-    });
-  }
-</script>
-
-<div class="table-wrapper">
-  {#each canvas.blocks as block (block.id)}
-    {#if block.type === 'data-table'}
-      <BlockRenderer
-        id={block.id}
-        type={block.type}
-        data={block.data}
-        oninteract={(type, action, payload) => {
-          if (action === 'rowclick') handleRowClick(payload as Record<string, unknown>);
-        }}
-      />
-    {:else}
-      <BlockRenderer id={block.id} type={block.type} data={block.data} />
-    {/if}
-  {/each}
-</div>
-```
-
-### Rich multi-series chart
-
-```svelte
-<script lang="ts">
-  function addRichChart() {
-    canvas.addWidget('chart-rich', {
-      title: 'Quarterly performance',
-      type: 'bar',  // 'bar', 'line', 'area', 'pie', 'donut'
-      labels: ['Q1', 'Q2', 'Q3', 'Q4'],
-      data: [
-        {
-          label: 'Sales',
-          values: [120, 190, 150, 180],
-          color: '#3b82f6',
-        },
-        {
-          label: 'Profit',
-          values: [80, 140, 110, 150],
-          color: '#10b981',
-        },
-      ],
-    });
-  }
+  canvas.addWidget('profile', {
+    name: 'Alice Dupont',
+    subtitle: 'Senior Developer',
+    badge: { text: 'Online', variant: 'success' },
+    fields: [
+      { label: 'Team', value: 'Backend' },
+      { label: 'Location', value: 'Paris, France' },
+      { label: 'Since', value: '2021' },
+    ],
+    stats: [
+      { label: 'Projects', value: '12' },
+      { label: 'Contributors', value: '45' },
+    ],
+  });
 </script>
 ```
 
-### Image gallery
+### Interactive map (`map`)
 
 ```svelte
 <script lang="ts">
-  function addGallery() {
-    canvas.addWidget('gallery', {
-      title: 'Portfolio',
-      images: [
-        {
-          src: 'https://example.com/img1.jpg',
-          alt: 'Project 1',
-          caption: 'Management interface',
-        },
-        {
-          src: 'https://example.com/img2.jpg',
-          alt: 'Project 2',
-          caption: 'Analytics dashboard',
-        },
-      ],
-      columns: 2,
-    });
-  }
+  canvas.addWidget('map', {
+    title: 'Office locations',
+    center: { lat: 46.6, lng: 2.3 },
+    zoom: 6,
+    markers: [
+      { lat: 48.86, lng: 2.35, label: 'Paris (HQ)' },
+      { lat: 43.60, lng: 1.44, label: 'Toulouse' },
+      { lat: 45.76, lng: 4.84, label: 'Lyon' },
+    ],
+  });
 </script>
 ```
 
-### JSON Viewer
+### Code with syntax highlighting (`code`)
 
 ```svelte
 <script lang="ts">
-  function addJsonViewer() {
-    const complexData = {
-      user: {
-        id: 123,
-        name: 'Alice',
-        tags: ['admin', 'developer'],
-        meta: {
-          created: '2024-01-01',
-          visits: 456,
-        },
-      },
-    };
-
-    canvas.addWidget('json-viewer', {
-      title: 'Data structure',
-      data: complexData,
-      maxDepth: 3,
-      expanded: true,
-    });
-  }
-</script>
-```
-
-### Code snippet with syntax highlighting
-
-```svelte
-<script lang="ts">
-  function addCode() {
-    canvas.addWidget('code', {
-      lang: 'typescript',
-      content: `interface User {
+  canvas.addWidget('code', {
+    lang: 'typescript',
+    content: `interface User {
   id: number;
   name: string;
   email: string;
-}
-
-const user: User = {
-  id: 1,
-  name: 'Alice',
-  email: 'alice@example.com',
-};`,
-    });
-  }
+}`,
+  });
 </script>
 ```
 
-## Handling interactions
-
-Some widgets emit events when the user interacts with them:
+### JSON viewer (`json-viewer`)
 
 ```svelte
 <script lang="ts">
-  function handleWidgetInteraction(
-    type: string,
-    action: string,
-    payload: unknown
-  ) {
-    console.log(`Widget ${type} -> action: ${action}`, payload);
-
-    // Examples:
-    // type='data-table', action='rowclick', payload=row object
-    // type='timeline', action='eventclick', payload=event object
-    // type='cards', action='cardclick', payload=card object
-    // type='gallery', action='imageclick', payload={image, index}
-  }
+  canvas.addWidget('json-viewer', {
+    title: 'Data structure',
+    data: {
+      user: { id: 123, name: 'Alice', tags: ['admin', 'developer'] },
+    },
+    maxDepth: 3,
+    expanded: true,
+  });
 </script>
+```
 
+---
+
+## Handling interactions
+
+Some widgets emit events when the user interacts with them. Use the `oninteract` prop to capture them:
+
+```svelte
 <BlockRenderer
   id={block.id}
   type={block.type}
   data={block.data}
-  oninteract={handleWidgetInteraction}
+  oninteract={(type, action, payload) => {
+    console.log(`Widget ${type} -- action: ${action}`, payload);
+  }}
 />
 ```
 
+Events emitted by widgets:
+
+| Widget | Action | Payload |
+|--------|--------|---------|
+| `data-table` | `rowclick` | Row object |
+| `timeline` | `eventclick` | Event object |
+| `cards` | `cardclick` | Card object |
+| `gallery` | `imageclick` | `{image, index}` |
+| `tags` | `tagclick` | `{tag, index}` |
+| `actions` | `click` | `{action, index}` |
+
+---
+
 ## Dynamic updates
 
-To modify a widget after creation:
+Modify a widget after creation using canvas methods:
 
 ```svelte
 <script lang="ts">
-  function updateStat() {
+  function updateStat(blockId: string) {
     canvas.updateBlock(blockId, {
       value: '$15,000',
       trend: '+20%',
@@ -388,29 +355,35 @@ To modify a widget after creation:
     });
   }
 
-  function clearAllWidgets() {
-    canvas.clearBlocks();
-  }
-
-  function removeOneWidget(blockId: string) {
+  function removeWidget(blockId: string) {
     canvas.removeBlock(blockId);
   }
-</script>
 
-<button onclick={updateStat}>Update KPI</button>
-<button onclick={clearAllWidgets}>Clear all</button>
+  function clearAll() {
+    canvas.clearBlocks();
+  }
+</script>
 ```
+
+:::note[Automatic reactivity]
+Updates via `canvas.updateBlock()` automatically trigger re-rendering of the affected Svelte component.
+:::
+
+---
 
 ## Theme and customization
 
-Use `ThemeProvider` to customize appearance:
+Wrap your widgets in a `ThemeProvider` to apply a consistent theme:
 
 ```svelte
 <script lang="ts">
-  import { ThemeProvider, LIGHT_TOKENS } from '@webmcp-auto-ui/ui';
+  import { ThemeProvider } from '@webmcp-auto-ui/ui';
 </script>
 
-<ThemeProvider theme="light" tokens={LIGHT_TOKENS}>
+<ThemeProvider defaultMode="light" overrides={{
+  'color-accent': '#2d6a4f',
+  'color-bg': '#f4f1eb',
+}}>
   <div class="widgets-grid">
     {#each canvas.blocks as block (block.id)}
       <BlockRenderer id={block.id} type={block.type} data={block.data} />
@@ -419,17 +392,20 @@ Use `ThemeProvider` to customize appearance:
 </ThemeProvider>
 ```
 
-## Use case: Dynamic dashboard
+All native widgets respect theme tokens. Changing `color-accent` updates the accent color across all charts, progress bars, and buttons.
+
+---
+
+## Complete use case: Dynamic dashboard
 
 ```svelte
 <script lang="ts">
   import { BlockRenderer } from '@webmcp-auto-ui/ui';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+  import { onMount } from 'svelte';
 
   function buildDashboard(data: any) {
     canvas.clearBlocks();
-
-    // Main KPI
     canvas.addWidget('stat-card', {
       label: 'Monthly revenue',
       value: data.revenue.toLocaleString('en-US'),
@@ -437,16 +413,12 @@ Use `ThemeProvider` to customize appearance:
       trend: 'up',
       variant: 'success',
     });
-
-    // Trend chart
     canvas.addWidget('chart-rich', {
       title: 'Trend',
       type: 'line',
       labels: data.months,
       data: [{ label: 'Revenue', values: data.values }],
     });
-
-    // Transaction table
     canvas.addWidget('data-table', {
       title: 'Latest transactions',
       columns: [
@@ -458,8 +430,6 @@ Use `ThemeProvider` to customize appearance:
     });
   }
 
-  // Load on mount
-  import { onMount } from 'svelte';
   onMount(async () => {
     const data = await fetch('/api/dashboard').then(r => r.json());
     buildDashboard(data);
@@ -471,16 +441,43 @@ Use `ThemeProvider` to customize appearance:
     <BlockRenderer id={block.id} type={block.type} data={block.data} />
   {/each}
 </div>
-
-<style>
-  .dashboard {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 1.5rem;
-    padding: 2rem;
-  }
-</style>
 ```
+
+```mermaid
+sequenceDiagram
+    participant Page
+    participant API
+    participant Canvas
+    participant BR as BlockRenderer
+
+    Page->>API: GET /api/dashboard
+    API-->>Page: {revenue, months, values, transactions}
+    Page->>Canvas: clearBlocks()
+    Page->>Canvas: addWidget('stat-card', ...)
+    Page->>Canvas: addWidget('chart-rich', ...)
+    Page->>Canvas: addWidget('data-table', ...)
+    Canvas-->>BR: reactive blocks
+    BR-->>Page: widgets rendered
+```
+
+---
+
+## Troubleshooting
+
+| Problem | Likely cause | Solution |
+|---------|-------------|----------|
+| Widget shows as raw JSON | Unrecognized type | Check spelling (e.g., `data-table`, not `datatable`) |
+| Empty table | `rows` missing or empty | Ensure `rows` is an array of objects |
+| Invisible chart | `labels` or `data` missing | Both properties are required for `chart-rich` |
+| Theme not applied | No `ThemeProvider` | Wrap your widgets in a `<ThemeProvider>` |
+
+---
+
+## Going further
+
+- **Create your own widgets**: follow [Create a custom widget](./create-custom-widget)
+- **Advanced theming**: see [Build a themed demo](./themed-demo)
+- **Cross-widget interactions**: use the FONC bus or Svelte reactive filters to connect widgets
 
 ## See also
 

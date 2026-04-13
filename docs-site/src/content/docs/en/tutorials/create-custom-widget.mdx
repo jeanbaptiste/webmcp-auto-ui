@@ -5,22 +5,38 @@ sidebar:
   order: 1
 ---
 
-This tutorial shows how to create and register a custom widget in the WebMCP Auto-UI component system, then use it via `BlockRenderer`.
+Need a widget that does not exist in the native library? This tutorial walks you through every step: creating the Svelte component, writing the recipe, registering it in a WebMCP server, and integrating with the agent loop. By the end, the LLM will be able to use your widget just like any built-in one.
 
-## Overview
+## Goal
 
-A custom widget is composed of:
-1. **A Svelte component** that displays the data
-2. **A registration** in the canvas registry
-3. **A TypeScript type** for validation
+Create an interactive progress bar, register it as a WebMCP widget, and make it usable by the AI agent.
 
-The system supports two rendering modes:
-- **Svelte**: via `<BlockRenderer>` (recommended for web apps)
-- **Vanilla**: via `mountWidget()` for framework-free integration
+## Prerequisites
 
-## Step 1: Create the component
+- The boilerplate is installed and running (see [Getting started](./boilerplate))
+- Basic familiarity with Svelte 5 (`$props`, `$derived`, `$state`)
+- Understanding of JSON Schema (optional, covered in this tutorial)
 
-Create a simple Svelte component, for example `CustomProgressBar.svelte`:
+## What you will build
+
+A "progress-bar" widget that the LLM can call via `widget_display('progress-bar', {label: "Loading", current: 75, max: 100})`, with automatic parameter validation and interactions via the FONC bus.
+
+```mermaid
+graph TD
+    A[Svelte Component] -->|recipe .md| B[WebMCP Server]
+    B -->|layer| C[Agent Loop]
+    C -->|search_recipes| D[LLM discovers widget]
+    D -->|widget_display| E[Render on canvas]
+    E -->|FONC bus| F[User interactions]
+```
+
+---
+
+## Step 1: Create the Svelte component
+
+A widget is a standard Svelte 5 component. The only convention: it receives its data via a `data` prop (or directly via schema props).
+
+Create `src/lib/widgets/CustomProgressBar.svelte`:
 
 ```svelte
 <script lang="ts">
@@ -70,83 +86,159 @@ Create a simple Svelte component, for example `CustomProgressBar.svelte`:
 </style>
 ```
 
-## Step 2: Register the widget in the registry
+What happens in this component:
+- `interface Props` defines the data contract. This is also the source of the JSON Schema (auto-generated or written in the recipe)
+- `$derived` reactively computes the percentage
+- The CSS `transition` animates value changes
 
-Edit your app's registry file (e.g. `src/lib/widgets.ts`):
+:::tip[Naming convention]
+Name your files in PascalCase (`CustomProgressBar.svelte`) and the widget identifier in kebab-case (`progress-bar`). The mapping between the two is explicit in the recipe.
+:::
 
-```typescript
-import CustomProgressBar from './widgets/CustomProgressBar.svelte';
+**Checkpoint**: the file compiles without TypeScript errors.
 
-export const CUSTOM_WIDGETS: Record<string, Component> = {
-  'progress-bar': CustomProgressBar,
-};
+---
+
+## Step 2: Write the recipe
+
+The recipe is a Markdown file with a **YAML frontmatter** that defines the widget. This is what the LLM reads to know when and how to use your widget.
+
+Create `src/lib/recipes/progress-bar.md`:
+
+```markdown
+---
+widget: progress-bar
+description: Animated progress bar. Download, progress, completion, score, percentage.
+group: feedback
+schema:
+  type: object
+  required:
+    - label
+    - current
+    - max
+  properties:
+    label:
+      type: string
+      description: Label displayed above the bar
+    current:
+      type: number
+      description: Current progress value
+    max:
+      type: number
+      description: Maximum value (100%)
+    color:
+      type: string
+      description: CSS color for the bar (default blue)
+---
+
+## When to use
+
+To show progress, a score, a completion rate,
+or any bounded numeric value.
+
+## How
+
+Call widget_display('progress-bar', {label: "Download", current: 45, max: 100}).
+To customize the color: add color: "#10b981" (green).
+
+## Common mistakes
+
+- Forgetting max: it is required to calculate the percentage
+- current > max: the bar overflows, always ensure current <= max
 ```
 
-## Step 3: Use BlockRenderer
+The frontmatter contains three required fields:
 
-In your parent component, import `BlockRenderer` and pass the widget:
+| Field | Role |
+|-------|------|
+| `widget` | Unique widget identifier (used in `widget_display`) |
+| `description` | Short description for the LLM (appears in `search_recipes`) |
+| `schema` | JSON Schema of the parameters expected by the component |
+
+The `group` field is optional and is used to categorize widgets in `search_recipes`.
+
+The body (after the second `---`) contains free-form instructions for the LLM. Three recommended sections:
+- **When to use**: use cases
+- **How**: a concrete call example
+- **Common mistakes**: pitfalls to avoid
+
+:::caution[The description is crucial]
+The LLM chooses the widget based on the description. Include varied keywords to maximize match probability: "progress, score, completion, download, percentage".
+:::
+
+---
+
+## Step 3: Register the widget in a WebMCP server
+
+The WebMCP server exposes your widgets to the LLM. Create or modify `src/lib/widgets/register.ts`:
+
+```typescript
+import { createWebMcpServer } from '@webmcp-auto-ui/core';
+import CustomProgressBar from './CustomProgressBar.svelte';
+import progressBarRecipe from '../recipes/progress-bar.md?raw';
+
+const myServer = createWebMcpServer('my-app', {
+  description: 'Custom widgets for my application',
+});
+
+myServer.registerWidget(progressBarRecipe, CustomProgressBar);
+
+export { myServer };
+```
+
+`registerWidget` does three things internally:
+1. **Parses** the frontmatter to extract `widget`, `description`, and `schema`
+2. **Stores** the component as the renderer for this widget type
+3. **Automatically creates** the 4 built-in tools (on first call):
+   - `search_recipes` -- list available widgets
+   - `list_recipes` -- list all widgets with name and description
+   - `get_recipe` -- get schema + instructions for a widget
+   - `widget_display` -- display a widget on the canvas
+
+**Checkpoint**: calling `myServer.listWidgets()` returns `['progress-bar']`.
+
+---
+
+## Step 4: Connect to the agent loop
+
+Add your server's layer to the agent loop layers:
+
+```typescript
+import { autoui } from '@webmcp-auto-ui/agent';
+import { myServer } from '$lib/widgets/register';
+
+const layers = [
+  autoui.layer(),       // native widgets (stat, chart, table...)
+  myServer.layer(),     // your custom widgets
+];
+```
+
+And pass the server to `WidgetRenderer` for rendering:
 
 ```svelte
-<script lang="ts">
-  import { BlockRenderer } from '@webmcp-auto-ui/ui';
-  import { CUSTOM_WIDGETS } from './lib/widgets';
-  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-
-  // Add a widget to the canvas
-  function addProgress() {
-    canvas.addWidget('progress-bar', {
-      label: 'Download',
-      current: 45,
-      max: 100,
-      color: '#10b981',
-    });
-  }
-</script>
-
-<button onclick={addProgress}>Add progress bar</button>
-
-<div>
-  {#each canvas.blocks as block (block.id)}
-    <BlockRenderer 
-      id={block.id}
-      type={block.type}
-      data={block.data}
-      customWidgets={CUSTOM_WIDGETS}
-    />
-  {/each}
-</div>
+<WidgetRenderer
+  id={block.id}
+  type={block.type}
+  data={block.data}
+  servers={[myServer]}
+/>
 ```
 
-## Step 4: Type the widget
+Tool prefixing is automatic:
 
-Add the type to the `WidgetType` union definition:
+| Raw tool | Name exposed to the LLM |
+|----------|------------------------|
+| `search_recipes` | `my-app_webmcp_search_recipes` |
+| `get_recipe` | `my-app_webmcp_get_recipe` |
+| `widget_display` | `my-app_webmcp_widget_display` |
 
-```typescript
-// In your types.ts or types.d.ts
-declare global {
-  namespace WebMCP {
-    type WidgetType = 
-      | 'stat' | 'chart' | 'kv' | 'list'
-      | 'progress-bar';  // <-- your custom widget
-  }
-}
-```
+**Checkpoint**: in the chat, ask "Show me a progress bar at 75%". The LLM should discover the recipe and display your widget.
 
-Or in the SDK's `canvas.ts` if you are modifying the `WidgetType` type:
+---
 
-```typescript
-export type WidgetType =
-  | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
-  | 'stat-card' | 'data-table' | 'timeline' | 'profile' | 'trombinoscope' | 'json-viewer'
-  | 'hemicycle' | 'chart-rich' | 'cards' | 'grid-data' | 'sankey' | 'map' | 'log'
-  | 'gallery' | 'carousel' | 'd3' | 'js-sandbox'
-  | 'progress-bar'  // <-- custom type addition
-  | (string & {});  // fallback for plugin widgets
-```
+## Step 5: Add interactions (optional)
 
-## Step 5: Add interactions
-
-If your widget needs to communicate with the agent via the FONC bus, use callbacks:
+If your widget needs to communicate with the agent or other widgets, use the **FONC bus**:
 
 ```svelte
 <script lang="ts">
@@ -158,30 +250,29 @@ If your widget needs to communicate with the agent via the FONC bus, use callbac
       label: string;
       current: number;
       max: number;
-      onUpdate?: (value: number) => void;
     };
   }
 
   let { id, data }: Props = $props();
 
-  function handleClick() {
-    // Emit a bus event to the canvas
+  function handleComplete() {
     if (id) {
       bus.broadcast(id, 'progress-complete', { label: data.label });
     }
-    data.onUpdate?.(data.max);
   }
 </script>
 
 <div class="progress-bar">
   <progress value={data.current} max={data.max}></progress>
-  <button onclick={handleClick}>Done</button>
+  <button onclick={handleComplete}>Done</button>
 </div>
 ```
 
-## Step 6: Integrate with the WebMCP bus (optional)
+---
 
-To allow the agent to update the widget:
+## Step 6: Integrate with the WebMCP bus (advanced, optional)
+
+To let the agent update the widget after creation, register a WebMCP tool in the component:
 
 ```svelte
 <script lang="ts">
@@ -212,7 +303,27 @@ To allow the agent to update the widget:
 </script>
 ```
 
-## Full example: widget with persistent state
+---
+
+## Step 7: Type the widget (optional)
+
+For strict typing in your app, add the type to the `WidgetType` union:
+
+```typescript
+export type WidgetType =
+  | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
+  | 'stat-card' | 'data-table' | 'timeline' | 'profile' | 'trombinoscope' | 'json-viewer'
+  | 'hemicycle' | 'chart-rich' | 'cards' | 'grid-data' | 'sankey' | 'map' | 'log'
+  | 'gallery' | 'carousel' | 'd3' | 'js-sandbox'
+  | 'progress-bar'  // your custom widget
+  | (string & {});  // fallback for plugin widgets
+```
+
+---
+
+## Full example: checklist widget with persistent state
+
+A more complete widget combining reactive state, canvas persistence, and interactions:
 
 ```svelte
 <script lang="ts">
@@ -233,9 +344,7 @@ To allow the agent to update the widget:
 
   function toggleItem(index: number) {
     completed = completed === index ? -1 : index;
-    // Update the canvas
     canvas.updateBlock(id, { completed });
-    // Emit an interaction
     oninteract?.('checklist', 'toggle', { index, completed });
   }
 </script>
@@ -244,11 +353,7 @@ To allow the agent to update the widget:
   <h3>Checklist ({completed + 1}/{items.length})</h3>
   {#each items as item, i (i)}
     <label>
-      <input
-        type="checkbox"
-        checked={completed === i}
-        onchange={() => toggleItem(i)}
-      />
+      <input type="checkbox" checked={completed === i} onchange={() => toggleItem(i)} />
       <span class:done={completed === i}>{item}</span>
     </label>
   {/each}
@@ -261,61 +366,73 @@ To allow the agent to update the widget:
 </style>
 ```
 
-## Integration with the WebMCP system
-
-If you want to register your widget in a **custom WebMCP server** (for example an app that exposes its own widgets via MCP):
-
-```typescript
-import { createWebMcpServer } from '@webmcp-auto-ui/core';
-
-const myServer = createWebMcpServer('my-widgets', {
-  description: 'Custom widgets for my app',
-});
-
-// Register the widget with its recipe
-myServer.registerWidget(`---
-widget: progress-bar
-description: Interactive progress bar
-schema:
-  type: object
-  required:
-    - label
-    - current
-    - max
-  properties:
-    label:
-      type: string
-    current:
-      type: number
-    max:
-      type: number
-    color:
-      type: string
----
-
-## Usage
-
-Call widget_display('progress-bar', {label: "Download", current: 45, max: 100})
-`, undefined); // renderer = undefined -- will be resolved by BlockRenderer
-
-export { myServer };
+```mermaid
+graph TD
+    User[User checks item] -->|onchange| Toggle[toggleItem]
+    Toggle -->|updateBlock| Canvas[Canvas store]
+    Toggle -->|oninteract| Parent[Parent component]
+    Canvas -->|reactivity| Render[Svelte re-render]
 ```
 
-## Internal architecture
+---
 
-<img src="/webmcp-auto-ui/diagrams/tut-custom-widget-1.svg" alt="Internal architecture: Svelte component, registry, BlockRenderer, canvas and DOM" />
+## Automatic parameter validation
+
+The WebMCP server automatically validates the LLM's parameters against the JSON Schema **before** rendering. If the LLM sends invalid data, it receives the expected schema and can self-correct on the next turn.
+
+:::note[Image URL sanitization]
+The WebMCP server also automatically sanitizes image fields (`src`, `avatar`, `photo`, `thumbnail`) to remove URLs hallucinated by the LLM. Only valid prefixes are accepted: `http://`, `https://`, `data:`, `/`.
+:::
+
+---
+
+## Architecture overview
+
+```mermaid
+graph LR
+    Recipe[Recipe .md] -->|parse| Server[WebMCP Server]
+    Component[Component .svelte] -->|renderer| Server
+    Server -->|layer| Loop[Agent Loop]
+    Loop -->|tools| LLM[Claude]
+    LLM -->|widget_display| Server
+    Server -->|validate| Schema[JSON Schema]
+    Schema -->|OK| Renderer[BlockRenderer]
+    Renderer -->|mount| DOM
+```
+
+---
+
+## Troubleshooting
+
+| Problem | Likely cause | Solution |
+|---------|-------------|----------|
+| Widget not discovered by LLM | Description too vague in recipe | Add keywords to the frontmatter `description` |
+| "Validation failed" | LLM sends data not matching schema | Add `description` to each schema property |
+| Widget renders but is empty | Props don't match | Verify `interface Props` matches the schema |
+| "Unknown widget type" | Server not passed to WidgetRenderer | Add `servers={[myServer]}` to WidgetRenderer |
+
+---
 
 ## Creation checklist
 
-- [ ] Svelte component created with `data` props
-- [ ] Widget registered in the registry
-- [ ] `WidgetType` type updated
-- [ ] Imported in the parent with `BlockRenderer`
-- [ ] Tested with `canvas.addWidget('progress-bar', {...})`
-- [ ] (Optional) Registered in a custom WebMCP server
+- [ ] Svelte component created with `interface Props` and `data` prop
+- [ ] Recipe `.md` with frontmatter (`widget`, `description`, `schema`) + body
+- [ ] `createWebMcpServer()` + `registerWidget()`
+- [ ] Layer added to the agent loop layers
+- [ ] Server passed to `WidgetRenderer`
+- [ ] Tested: LLM discovers and uses the widget
+- [ ] (Optional) Interactions via FONC bus
+- [ ] (Optional) WebMCP tool for dynamic updates
+
+## Going further
+
+- **Auto-generate schemas**: run `npm run sync:schemas` to generate JSON Schema from your Svelte `interface Props`
+- **Vanilla renderer**: use `mountWidget()` from the core package for framework-free widget integration
+- **Custom tools**: add extra tools to your WebMCP server with `server.addTool()`
 
 ## See also
 
 - [Use existing widgets](./use-existing-widgets)
+- [Create a WebMCP server](./create-webmcp-server)
 - [Connect an MCP server](./connect-mcp-server)
-- [UI Package (WidgetRenderer)](../packages/ui)
+- [UI Package (WidgetRenderer)](/packages/ui)

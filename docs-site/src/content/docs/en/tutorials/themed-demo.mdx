@@ -5,19 +5,38 @@ sidebar:
   order: 6
 ---
 
-This tutorial shows how to build a themed dashboard from scratch using webmcp-auto-ui. The example is a "Nature Observatory" -- a wildlife tracking dashboard for a nature reserve.
+Themed dashboards are the showcase of webmcp-auto-ui: a color palette, interconnected widgets, and a shareable URL. This tutorial walks you through building a "Nature Observatory" -- a wildlife tracking dashboard for a nature reserve.
+
+## Goal
+
+Build a complete themed dashboard with 8 widgets, a light/dark theme, cross-component interactions, and a shareable HyperSkill URL export.
 
 ## Prerequisites
 
 - The monorepo is cloned and `npm install` has been run
 - Packages are built (`npm run build` at the root)
 - Basic familiarity with Svelte 5 and JSON
+- Having read [Use existing widgets](./use-existing-widgets)
+
+## What you will build
+
+A "Nature Observatory" dashboard with 8 widgets (stats, area chart, table, map, timeline, profile), a green/brown nature theme, interactive filtering, and a URL that anyone can open to see the dashboard.
+
+```mermaid
+graph TD
+    Theme[theme.json] --> Provider[ThemeProvider]
+    Skill[skill.json] --> Blocks[8 blocks]
+    Provider --> Page[SvelteKit Page]
+    Blocks --> Page
+    Page --> Dashboard[Rendered Dashboard]
+    Dashboard --> Export[HyperSkill URL]
+```
 
 ---
 
 ## Step 1: Create the theme
 
-Create a `theme.json` file at the root of your app (e.g. `apps/showcase/theme.json`):
+A theme is a set of **CSS tokens** that define the color palette. Create `apps/showcase/theme.json`:
 
 ```json
 {
@@ -48,7 +67,7 @@ Create a `theme.json` file at the root of your app (e.g. `apps/showcase/theme.js
 }
 ```
 
-This theme uses greens and browns:
+Palette breakdown:
 - **accent** (`#2d6a4f`): deep forest green for primary actions
 - **accent2** (`#bc4749`): warm red for alerts
 - **teal** (`#40916c`): light green for success states
@@ -56,11 +75,17 @@ This theme uses greens and browns:
 - **bg/surface**: off-white evoking parchment
 - **text**: dark brown instead of pure black
 
+The `dark` tokens override values in dark mode. Tokens not specified in `dark` inherit from the light version.
+
+:::tip[Choosing colors]
+Start with an accent color that evokes your theme (nature green, ocean blue, firefighter red), then derive other colors with saturation and brightness variations.
+:::
+
 ---
 
-## Step 2: Create a skill
+## Step 2: Create the skill
 
-A skill defines a set of instructions for the agent, including the blocks to produce with their data. Create `nature-observatory.skill.json`:
+A **skill** defines the blocks to display with their data. Create `apps/showcase/nature-observatory.skill.json`:
 
 ```json
 {
@@ -75,30 +100,15 @@ A skill defines a set of instructions for the agent, including the blocks to pro
   "blocks": [
     {
       "type": "stat",
-      "data": {
-        "label": "Species observed",
-        "value": "347",
-        "trend": "+12",
-        "trendDir": "up"
-      }
+      "data": { "label": "Species observed", "value": "347", "trend": "+12", "trendDir": "up" }
     },
     {
       "type": "stat",
-      "data": {
-        "label": "Observations this week",
-        "value": "1,204",
-        "trend": "+8.3%",
-        "trendDir": "up"
-      }
+      "data": { "label": "Observations this week", "value": "1,204", "trend": "+8.3%", "trendDir": "up" }
     },
     {
       "type": "stat",
-      "data": {
-        "label": "Endangered species alerts",
-        "value": "3",
-        "trend": "+1",
-        "trendDir": "up"
-      }
+      "data": { "label": "Endangered species alerts", "value": "3", "trend": "+1", "trendDir": "up" }
     },
     {
       "type": "chart-rich",
@@ -150,26 +160,40 @@ A skill defines a set of instructions for the agent, including the blocks to pro
           { "label": "Observations", "value": "18.4K" }
         ]
       }
+    },
+    {
+      "type": "map",
+      "data": {
+        "title": "Observation locations",
+        "center": { "lat": 35.6, "lng": -83.5 },
+        "zoom": 10,
+        "markers": [
+          { "lat": 35.65, "lng": -83.48, "label": "Red-tailed hawk" },
+          { "lat": 35.58, "lng": -83.52, "label": "River otter" },
+          { "lat": 35.62, "lng": -83.45, "label": "Bald eagle" },
+          { "lat": 35.55, "lng": -83.55, "label": "Black bear" }
+        ]
+      }
+    },
+    {
+      "type": "timeline",
+      "data": {
+        "title": "Observatory activity",
+        "events": [
+          { "date": "2026-04-05", "title": "Nesting confirmed", "description": "Hawk pair nesting on North Ridge", "status": "active" },
+          { "date": "2026-04-03", "title": "Bear spotted near trail", "description": "Black bear at Pine Hollow, caution advisory issued", "status": "done" },
+          { "date": "2026-03-28", "title": "Migration begins", "description": "First wave of migratory songbirds in wetland area", "status": "done" },
+          { "date": "2026-03-15", "title": "Sensor network updated", "description": "12 new camera traps in the southern sector", "status": "done" }
+        ]
+      }
     }
   ]
 }
 ```
 
-This skill uses 6 blocks: 3 stat for KPIs, an area chart for trends, a data table for recent observations, and a profile card for the reserve.
-
 ---
 
 ## Step 3: Set up the SvelteKit page
-
-Create a new route in your app.
-
-### 3a. Create the directory
-
-```bash
-mkdir -p apps/showcase/src/routes/nature
-```
-
-### 3b. Create the page
 
 Create `apps/showcase/src/routes/nature/+page.svelte`:
 
@@ -188,112 +212,38 @@ Create `apps/showcase/src/routes/nature/+page.svelte`:
     </header>
 
     <main class="max-w-6xl mx-auto space-y-6">
-      <!-- KPI: 3 stat blocks side by side -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         {#each skillJson.blocks.slice(0, 3) as block}
           <BlockRenderer type={block.type} data={block.data} />
         {/each}
       </div>
 
-      <!-- Chart -->
-      <BlockRenderer
-        type={skillJson.blocks[3].type}
-        data={skillJson.blocks[3].data}
-      />
+      <BlockRenderer type={skillJson.blocks[3].type} data={skillJson.blocks[3].data} />
+      <BlockRenderer type={skillJson.blocks[4].type} data={skillJson.blocks[4].data} />
 
-      <!-- Data table -->
-      <BlockRenderer
-        type={skillJson.blocks[4].type}
-        data={skillJson.blocks[4].data}
-      />
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <BlockRenderer type={skillJson.blocks[5].type} data={skillJson.blocks[5].data} />
+        <BlockRenderer type={skillJson.blocks[6].type} data={skillJson.blocks[6].data} />
+      </div>
 
-      <!-- Reserve profile card -->
-      <BlockRenderer
-        type={skillJson.blocks[5].type}
-        data={skillJson.blocks[5].data}
-      />
+      <BlockRenderer type={skillJson.blocks[7].type} data={skillJson.blocks[7].data} />
     </main>
   </div>
 </ThemeProvider>
 ```
 
-### 3c. Start the dev server
+Start the dev server and open `http://localhost:5177/nature`.
 
-```bash
-npm -w apps/showcase run dev
-```
-
-Open `http://localhost:5177/nature` in your browser. The complete dashboard is displayed with the nature theme applied.
+**Checkpoint**: the complete dashboard displays with the nature theme applied.
 
 ---
 
-## Step 4: Add additional components
+## Step 4: Cross-component interactions
 
-Add an observation map and an activity timeline. Complete the `blocks` array in the skill JSON:
-
-```json
-{
-  "type": "map",
-  "data": {
-    "title": "Observation locations",
-    "center": { "lat": 35.6, "lng": -83.5 },
-    "zoom": 10,
-    "markers": [
-      { "lat": 35.65, "lng": -83.48, "label": "Red-tailed hawk" },
-      { "lat": 35.58, "lng": -83.52, "label": "River otter" },
-      { "lat": 35.62, "lng": -83.45, "label": "Bald eagle" },
-      { "lat": 35.55, "lng": -83.55, "label": "Black bear" }
-    ]
-  }
-}
-```
-
-```json
-{
-  "type": "timeline",
-  "data": {
-    "title": "Observatory activity",
-    "events": [
-      { "date": "2026-04-05", "title": "Nesting confirmed", "description": "Hawk pair nesting on North Ridge", "status": "active" },
-      { "date": "2026-04-03", "title": "Bear spotted near trail", "description": "Black bear at Pine Hollow, caution advisory issued", "status": "done" },
-      { "date": "2026-03-28", "title": "Migration begins", "description": "First wave of migratory songbirds in wetland area", "status": "done" },
-      { "date": "2026-03-15", "title": "Sensor network updated", "description": "12 new camera traps in the southern sector", "status": "done" }
-    ]
-  }
-}
-```
-
-Then add them to the page layout:
-
-```svelte
-<!-- Map -->
-<BlockRenderer
-  type={skillJson.blocks[6].type}
-  data={skillJson.blocks[6].data}
-/>
-
-<!-- Timeline -->
-<BlockRenderer
-  type={skillJson.blocks[7].type}
-  data={skillJson.blocks[7].data}
-/>
-```
-
----
-
-## Step 5: Cross-component interactions
-
-Each block rendered via `BlockRenderer` exposes WebMCP tools when `navigator.modelContext` is available:
-- `block_<id>_get` -- read the current block data
-- `block_<id>_update` -- update the data
-- `block_<id>_remove` -- remove the block
-
-To link blocks together manually (without going through the agent), use Svelte reactive state:
+Use Svelte reactive state to link blocks without going through the agent:
 
 ```svelte
 <script lang="ts">
-  import { BlockRenderer } from '@webmcp-auto-ui/ui';
-
   let selectedSpecies = $state('all');
   let allRows = skillJson.blocks[4].data.rows;
 
@@ -307,7 +257,6 @@ To link blocks together manually (without going through the agent), use Svelte r
   );
 </script>
 
-<!-- Tags block for filtering -->
 <BlockRenderer
   type="tags"
   data={{
@@ -321,19 +270,21 @@ To link blocks together manually (without going through the agent), use Svelte r
   }}
 />
 
-<!-- Filtered table -->
 <BlockRenderer type="data-table" data={tableData} />
 ```
 
-This pattern allows building interactive dashboards where selecting a tag filters the table, clicking a map marker highlights a row, etc.
+```mermaid
+graph LR
+    Tags["Tags widget"] -->|selection| State["$state selectedSpecies"]
+    State -->|$derived| Filter["Filter on rows"]
+    Filter -->|tableData| Table["Data table widget"]
+```
 
 ---
 
-## Step 6: Export as a HyperSkill URL
+## Step 5: Export as a HyperSkill URL
 
-Once the dashboard is ready, export it as a portable URL that anyone can open.
-
-The SDK re-exports `encode` and `decode` from the [`hyperskills`](https://www.npmjs.com/package/hyperskills) package:
+Export your dashboard as a portable URL anyone can open -- no server, no installation needed:
 
 ```typescript
 import { encode } from '@webmcp-auto-ui/sdk';
@@ -350,39 +301,47 @@ const shareUrl = await encode(
   'https://demos.hyperskills.net/viewer',
   JSON.stringify(skill),
 );
-
-console.log(shareUrl);
-// Anyone can open this URL to see the full themed dashboard
 ```
 
-### How the URL works
+```mermaid
+sequenceDiagram
+    participant User as Recipient
+    participant Viewer
+    participant Theme as ThemeProvider
+    participant BR as BlockRenderer
 
+    User->>Viewer: Opens URL
+    Viewer->>Viewer: Decodes hs parameter
+    Viewer->>Viewer: Parses skill JSON
+    Viewer->>Theme: Applies theme tokens
+    Viewer->>BR: Renders each block
+    BR-->>User: Complete dashboard displayed!
 ```
-https://demos.hyperskills.net/viewer?hs=eyJ2ZXJzaW9uIjoiMS4wI...
 
-                                        ^^^^^^^^^^^^^^^^^^^^^^^^^
-                                        base64(JSON.stringify(skill))
-                                        or gz.base64(gzip(...)) if > 6 KB
-```
-
-When someone opens the URL:
-1. The Viewer reads the `hs` parameter
-2. Decodes the base64 (decompresses gzip if prefixed with `gz.`)
-3. Parses the skill JSON
-4. `ThemeProvider` applies the embedded theme tokens
-5. `BlockRenderer` renders each block
+:::tip[Serverless sharing]
+HyperSkill URLs are self-contained: all dashboard data is encoded in the URL. No database, no backend needed. The Viewer is a static app.
+:::
 
 ---
 
-## Step 7: Deploy
-
-Follow the [Deployment](/guide/deploy) tutorial to push your demo to production. For a quick deploy of the showcase app:
+## Step 6: Deploy
 
 ```bash
 ./scripts/deploy.sh showcase
 ```
 
-The script handles package builds, app build, old file cleanup, copying to the correct location, and integrity verification.
+The script handles package builds, app build, old file cleanup, copying to the right location, and integrity verification.
+
+---
+
+## Troubleshooting
+
+| Problem | Likely cause | Solution |
+|---------|-------------|----------|
+| Theme not applied | `ThemeProvider` missing or misconfigured | Verify `overrides={themeJson.tokens}` is present |
+| Dark mode doesn't work | `dark` tokens missing from theme.json | Add the `dark` section |
+| Map invisible | Leaflet library not loaded | Verify build includes Leaflet stylesheet |
+| HyperSkill URL too long | Too much data in skill | Data > 6 KB is automatically gzip-compressed |
 
 ---
 
@@ -396,7 +355,13 @@ What we built:
 5. A shareable HyperSkill URL
 6. A production deployment
 
-The same pattern works for any theme and any combination of the 26 available widget types. Change the colors in `theme.json`, swap the blocks, and you get a completely different dashboard.
+The same pattern works for any theme and any combination of the 26+ available widget types.
+
+## Going further
+
+- **Generative theme**: ask the agent to generate a theme from a description ("cyberpunk neon theme")
+- **Dynamic dashboard**: replace the static skill JSON with data fetched from an API
+- **Custom widgets**: add your own widgets for domain-specific visualizations
 
 ## See also
 

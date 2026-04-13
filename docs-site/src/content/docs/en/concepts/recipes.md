@@ -5,115 +5,86 @@ sidebar:
   order: 3
 ---
 
-The system has two types of recipes that guide the LLM in composing interfaces.
+Picture a chef in a well-equipped kitchen. They have the ingredients (MCP data) and the utensils (UI widgets). But without a **recipe**, they'd have to improvise every dish. Recipes tell them: "with these ingredients, use these utensils, in this order, to get this result." That's exactly what recipes do in webmcp-auto-ui.
 
-## Overview
+## What is a recipe?
 
-| Concept | Source | Role |
-|---------|--------|------|
-| **WebMCP Recipe** | Agent package (`.md` files) | Guides the LLM on how to present data with UI components |
-| **MCP Recipe** | MCP Server (`list_recipes`/`get_recipe`) | Describes what tools return and how to combine them |
+A recipe is a **composition guide** that tells the agent how to transform data into an interface. There are two complementary types:
 
-## Complete recipe flow
+| | WebMCP Recipe (UI) | MCP Recipe (server) |
+|--|---------------------|----------------------|
+| **Who provides it** | The `agent` package (`.md` files) | The remote MCP server |
+| **What it guides** | **How to display** data (which widgets, what layout) | **How to get** data (which tools, in what order) |
+| **Analogy** | The plating recipe | The cooking recipe |
 
-```
-MCP Connection                 buildSystemPrompt()              Agent loop (LLM)
-     |                              |                               |
-     |  1. list_recipes(server)     |                               |
-     |  -> {name, description}[]    |                               |
-     |                              |                               |
-     |  2. Load WEBMCP_RECIPES      |                               |
-     |     (local .md files)        |                               |
-     |                              |                               |
-     |          3. Prompt injection |                               |
-     |          ## mcp: DATA tools + "server recipes (N)"           |
-     |          ## webmcp: component() + "UI recipes (N)"           |
-     |          (short summaries only — no body)                     |
-     |                              |                               |
-     |                              |   4. list_components()        |
-     |                              |   <- components + recipes     |
-     |                              |                               |
-     |                              |   5. get_component("id")      |
-     |                              |   <- schema or recipe body    |
-     |                              |                               |
-     |                              |   6. component("recipe-id")   |
-     |                              |   <- body as composition guide|
-     |                              |                               |
-     |                              |   7. get_recipe("name")       |
-     |                              |   <- full MCP server recipe   |
-     |                              |                               |
-     |                              |   8. component("table",{...}) |
-     |                              |   -> onWidget -> Canvas       |
-```
+:::tip[Two axes, one result]
+The agent uses both together: an MCP recipe tells it **what to request** from the server, a WebMCP recipe tells it **how to present** the result. Like a chef following both a cooking recipe AND a plating guide.
+:::
 
-### Step 1: Connection and collection
+## Why recipes exist
 
-On MCP connection, the app calls `list_recipes` on each server. It receives a `{name, description}[]` array — short summaries, not the full body.
+Without recipes, the agent would have to:
+1. Guess which MCP tools to call and in what order
+2. Guess which widget fits which type of data
+3. Improvise the layout for every request
 
-```ts
-const recipesResult = await client.callTool('list_recipes', {});
-const mcpRecipes: McpRecipe[] = JSON.parse(recipesResult.content[0].text);
-// [{ name: 'profil-depute', description: 'Full profile with votes and mandates' }, ...]
-```
+With recipes, the agent follows a **guided path**: it finds a relevant recipe, reads it, and executes it. The result is more reliable, faster (fewer reasoning tokens), and more consistent.
 
-In parallel, built-in WebMCP recipes (`WEBMCP_RECIPES`) are loaded from `.md` files in the agent package.
+## The full flow: from question to dashboard
 
-### Step 2: Prompt construction (buildSystemPrompt)
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as Agent LLM
+    participant SR as search_recipes
+    participant GR as get_recipe
+    participant MCP as MCP Server
+    participant WD as widget_display
 
-The system prompt is structured in sections:
+    U->>A: "Build me a deputy dashboard"
 
-```
-## mcp (Tricoteuses)
-### DATA tools (12)
-- query_sql: Execute an SQL query...
-- search_deputes: Search for a deputy...
-### server recipes (2)
-- profil-depute: Full profile with votes and mandates
-- scrutin-detail: Detailed public vote analysis
+    Note over A: STEP 1 -- Recipe search
+    A->>SR: search_recipes("deputy")
+    SR-->>A: [{name: "parlementaire-profile"}, {name: "dashboard-kpi"}]
 
-## webmcp
-### component() — single UI tool
-Available components: stat-card, chart, table, ...
-### UI recipes (3)
-- Compose a KPI dashboard: numeric metrics [stat-card, chart, table, kv]
-- Parliamentary profile: deputy profile [profile, hemicycle, timeline]
+    Note over A: STEP 2 -- Read the recipe
+    A->>GR: get_recipe("parlementaire-profile")
+    GR-->>A: {schema: {...}, recipe: "1. Call search_deputes...\n2. Use profile + hemicycle..."}
+
+    Note over A: STEP 3 -- Execute DATA tools
+    A->>MCP: search_deputes({groupe: "ECO"})
+    MCP-->>A: [{nom: "Dupont", ...}, ...]
+
+    Note over A: STEP 4 -- UI display
+    A->>WD: widget_display({name: "profile", params: {name: "Dupont", ...}})
+    WD-->>A: {widget: "profile", id: "w_1"}
+    A->>WD: widget_display({name: "hemicycle", params: {groups: [...]}})
+    WD-->>A: {widget: "hemicycle", id: "w_2"}
+
+    A-->>U: Dashboard with profile + hemicycle
 ```
 
-The detailed recipe body is **NOT** in the prompt. Only `name`, `when` and `components_used` are injected. Cost: ~500 tokens for 5 recipes.
+### Token economy: lazy loading
 
-### Step 3: Tools sent to the LLM
-
-In smart mode (default), the LLM receives:
-- MCP tools (DATA) — `query_sql`, `search_deputes`, etc.
-- 3 UI tools: `list_components()`, `get_component()`, `component()`
-
-Neither `list_recipes` nor `get_recipe` are sent as tools to the LLM. The LLM discovers MCP recipes via the prompt, and their details via `get_recipe` (MCP server tool).
-
-### Step 4: Lazy loading (agent discovery)
-
-The full recipe body is loaded on demand, not at startup. The LLM decides when it needs the detail:
-
-**WebMCP recipes:**
+Recipe details are **never** injected into the initial prompt. Only names and descriptions are present. The LLM requests the full body only when needed:
 
 ```
-list_components()              -> list components + WebMCP recipes (id, when, components)
-get_component("recipe-id")    -> full body of a WebMCP recipe
-component("recipe-id")         -> returns the body as a composition guide
+Initial prompt (~500 tokens for 10 recipes):
+  "Available recipes:
+   - parlementaire-profile: deputy profile [profile, hemicycle, timeline]
+   - dashboard-kpi: numeric metrics [stat-card, chart, table]"
+
+-> The LLM calls get_recipe("parlementaire-profile")
+-> It receives the full body (~200 tokens) only when it needs it
 ```
 
-**MCP recipes (server):**
-
-```
-get_recipe("profil-depute")    -> full body of the server recipe
-```
-
-The LLM sees names and descriptions in the prompt, then requests the detail only when needed. This avoids bloating the initial context.
+Comparison: injecting 10 complete recipes into the prompt would cost ~2000 extra tokens. Lazy loading reduces this to ~500 fixed tokens + ~200 tokens per recipe actually used.
 
 ## WebMCP Recipes (UI)
 
-WebMCP recipes guide the LLM on component selection. They are `.md` files with YAML frontmatter, parsed at build time and injected into the prompt via the tool layers.
+WebMCP recipes guide the LLM on **widget selection** and **arrangement**. They are Markdown files with YAML frontmatter, distributed with the `@webmcp-auto-ui/agent` package.
 
-### Format
+### Recipe format
 
 ```markdown
 ---
@@ -129,15 +100,34 @@ layout:
 ---
 
 ## When to use
-MCP results contain numeric metrics...
+MCP results contain numeric metrics that need a synthetic
+presentation: totals, percentages, time series.
 
 ## How
 1. Identify the 3-5 main KPIs
-2. Display each KPI as a stat-card
-3. Add a chart for time series
+2. Display each KPI as a stat-card with proper formatting
+3. Add a chart if time series data exists
+4. Complete with a data-table for details
+
+## Common mistakes
+- Too many stat-cards: beyond 5, switch to kv or table
+- Unformatted numbers: "45230" instead of "45,230"
 ```
 
-### Recipe type
+### Frontmatter anatomy
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Unique recipe identifier |
+| `name` | `string` | Human-readable name for agent and user |
+| `components_used` | `string[]` | Widgets recommended by this recipe |
+| `when` | `string` | Trigger condition (free text) |
+| `servers` | `string[]` | Target MCP servers. Empty = universal |
+| `layout` | `object` | Layout suggestion (type, columns, arrangement) |
+
+The `body` (everything after the frontmatter) contains detailed instructions in Markdown.
+
+### TypeScript interface
 
 ```ts
 interface Recipe {
@@ -146,65 +136,94 @@ interface Recipe {
   description?: string;
   components_used?: string[];
   layout?: { type: string; columns?: number; arrangement?: string };
-  when: string;            // trigger condition (free text)
-  servers?: string[];      // target MCP servers (empty = universal)
-  body: string;            // markdown content
+  when: string;
+  servers?: string[];
+  body: string;
 }
 ```
 
-### API
+### The 10 built-in recipes
 
-```ts
-import {
-  WEBMCP_RECIPES,           // 8+ built-in recipes, auto-registered
-  parseRecipe,               // parse a raw .md -> Recipe
-  parseRecipes,              // parse a batch of .md -> Recipe[]
-  recipeRegistry,            // read-only singleton registry
-  registerRecipes,           // add to registry
-  filterRecipesByServer,     // filter by connected server name
-  formatRecipesForPrompt,    // format for prompt injection
-} from '@webmcp-auto-ui/agent';
-```
-
-### Built-in recipes
-
-| ID | When | Components |
+| ID | When | Recommended widgets |
 |----|------|-----------|
-| `composer-tableau-de-bord-kpi` | Numeric metrics | stat-card, chart, table, kv |
-| `afficher-oeuvres-art-collection-musee` | Image/art collections | gallery, cards, carousel |
-| `analyser-actualites-hacker-news` | News articles | cards, table, stat-card |
-| `cartographier-observations-biodiversite` | Geographic data | map, stat-card, table |
-| `explorer-dossiers-legislatifs` | Legislative records | timeline, kv, table |
-| `gallery-images` | Multiple images | gallery, carousel |
-| `parlementaire-profile` | Deputy/senator profile | profile, hemicycle, timeline |
-| `rechercher-textes-juridiques` | Legal texts | list, kv, code |
+| `composer-tableau-de-bord-kpi` | Numeric metrics, KPIs | stat-card, chart, table, kv |
+| `afficher-oeuvres-art-collection-musee` | Image or art collections | gallery, cards, carousel |
+| `analyser-actualites-hacker-news` | News articles, feeds | cards, table, stat-card |
+| `cartographier-observations-biodiversite` | Geographic data, observations | map, stat-card, table |
+| `explorer-dossiers-legislatifs` | Legislative records, bills | timeline, kv, table |
+| `gallery-images` | Multiple image collections | gallery, carousel |
+| `parlementaire-profile` | Deputy or senator profile | profile, hemicycle, timeline |
+| `rechercher-textes-juridiques` | Legal texts, statutory articles | list, kv, code |
 | `weather-viz` | Weather data | stat-card, chart |
 | `cross-server` | Multi-server data | table, chart, kv |
 
 ### Server filtering
 
+Recipes with a non-empty `servers` field only apply to the listed servers. Universal recipes (`servers: []`) are always available.
+
 ```ts
+import { filterRecipesByServer, WEBMCP_RECIPES } from '@webmcp-auto-ui/agent';
+
 const recipes = filterRecipesByServer(WEBMCP_RECIPES, ['tricoteuses']);
-// Returns recipes whose servers contain "tricoteuses" + universal ones (servers: [])
+// -> universal recipes + those targeting "tricoteuses"
 ```
 
-### Prompt injection
+### Writing a custom recipe
 
-Recipes are injected into the `## webmcp` section of the prompt:
+To add a recipe to your project:
 
+```ts
+import { parseRecipe, registerRecipes } from '@webmcp-auto-ui/agent';
+
+const myRecipe = parseRecipe(`---
+id: custom-weather-dashboard
+name: Custom weather dashboard
+components_used: [stat-card, chart-rich, map]
+when: data contains temperature, humidity, wind
+servers: []
+---
+
+## When to use
+Weather data with geographic coordinates.
+
+## How
+1. Display temperature, humidity, wind as stat-cards
+2. Line chart for 7-day forecast
+3. Map with markers for each station
+`);
+
+registerRecipes([myRecipe]);
 ```
-### UI recipes (3)
-- Compose a KPI dashboard: numeric metrics [stat-card, chart, table, kv]
-- Parliamentary profile: deputy profile [profile, hemicycle, timeline]
-```
 
-Compact format: <500 tokens for 5 recipes.
+### Full API
+
+```ts
+import {
+  WEBMCP_RECIPES,           // 10 built-in recipes, auto-registered
+  parseRecipe,               // parse a .md file -> Recipe
+  parseRecipes,              // parse a batch of .md files -> Recipe[]
+  recipeRegistry,            // singleton registry (read-only)
+  registerRecipes,           // add recipes to the registry
+  filterRecipesByServer,     // filter by connected server
+  formatRecipesForPrompt,    // format for prompt injection
+  formatMcpRecipesForPrompt, // format MCP server recipes
+} from '@webmcp-auto-ui/agent';
+```
 
 ## MCP Recipes (server)
 
-MCP recipes come from the connected server via `list_recipes` and `get_recipe` tools. They describe what tools return.
+MCP recipes come from the **remote server** and describe how to use its tools. They answer the question "how to get the data":
 
-### McpRecipe type
+```
+MCP Recipe "profil-depute":
+1. Call search_deputes(nom: "Dupont")
+2. Take the first result, extract the ID
+3. Call get_votes(depute_id: ID)
+4. Call get_mandats(depute_id: ID)
+5. Combine the results
+```
+
+### Interface
 
 ```ts
 interface McpRecipe {
@@ -213,59 +232,148 @@ interface McpRecipe {
 }
 ```
 
-### Usage
+### Collection and injection
 
 ```ts
+// 1. The client collects recipes on connection
 const recipesResult = await client.callTool('list_recipes', {});
 const mcpRecipes: McpRecipe[] = JSON.parse(recipesResult.content[0].text);
+// -> [{ name: 'profil-depute', description: 'Full profile with votes and mandates' }]
 
+// 2. They are added to the MCP layer
 const mcpLayer: McpLayer = {
   protocol: 'mcp',
   serverUrl: 'https://mcp.code4code.eu/mcp',
   serverName: 'Tricoteuses',
   tools: await client.listTools(),
-  recipes: mcpRecipes,
+  recipes: mcpRecipes,       // <- here
 };
 ```
 
-They appear in the prompt under:
+### Detail retrieval by the LLM
 
-```
-## mcp (Tricoteuses)
-### server recipes (2)
-- profil-depute: Full profile with votes and mandates
-- scrutin-detail: Detailed public vote analysis
-```
+The LLM sees summaries in the prompt. When it needs full instructions, it calls `get_recipe` (an MCP tool exposed by the server):
 
-### Detail via get_recipe
+```mermaid
+sequenceDiagram
+    participant LLM as Agent LLM
+    participant MCP as MCP Server
 
-The LLM sees summaries in the prompt. When it needs the detail, it calls `get_recipe` (MCP server tool):
-
-```
-LLM -> get_recipe({ name: "profil-depute" })
-    <- { body: "1. Call search_deputes(...)\n2. Call get_votes(...)\n..." }
+    Note over LLM: The prompt contains:<br/>"profil-depute: Full profile with votes and mandates"
+    LLM->>MCP: get_recipe({name: "profil-depute"})
+    MCP-->>LLM: {body: "1. Call search_deputes(...)\n2. Call get_votes(...)"}
+    Note over LLM: The agent now follows<br/>the instructions step by step
 ```
 
-The server decides the content of `body` — workflow, examples, recommended parameters.
+## Widget recipes (inline in autoui)
 
-## WebMCP vs MCP comparison
+In addition to WebMCP recipes (`.md` files) and MCP recipes (server), there are **widget recipes** defined inline in the `autoui` server. These are the most granular recipes: each native widget has its own recipe documenting its schema and usage.
 
-| | WebMCP Recipe (UI) | MCP Recipe (server) |
-|--|---------------------|----------------------|
-| **Source** | Agent package (.md files) | MCP Server (`list_recipes`) |
-| **Content** | How to present with component() | What tools return, how to combine them |
-| **Prompt section** | `## webmcp > UI recipes` | `## mcp > server recipes` |
-| **Type** | `Recipe` | `McpRecipe` |
-| **Carried by** | `WebMcpLayer` (autoui) | `McpLayer.recipes` |
-| **Lazy loading** | `get_component("id")` or `component("id")` | `get_recipe(name)` (MCP tool) |
-| **Guides what** | The **View** (how to display) | The **Model/Data** (what to request) |
-| **Body in prompt** | No (summaries only) | No (summaries only) |
+```
+search_recipes("stat")
+-> { name: "stat", description: "Key statistic (KPI, counter, total)" }
 
-### Two complementary axes
+get_recipe("stat")
+-> { schema: { type: "object", required: ["label", "value"], ... },
+    recipe: "## When to use\nTo display a single key figure..." }
+```
 
-WebMCP and MCP recipes serve different purposes:
+The LLM discovers available widgets via `search_recipes` and gets the exact schema via `get_recipe`.
 
-- **WebMCP** guides the "how to display": which components to use, in what layout, with what parameters. This is the **View** layer.
-- **MCP** guides the "what to request": which tools to call, in what order, with what parameters. This is the **Model/Data** layer.
+## Full comparison
 
-The agent uses both together: an MCP recipe tells it how to get the data, a WebMCP recipe tells it how to present it.
+| | WebMCP Recipe (UI) | MCP Recipe (server) | Widget Recipe (autoui) |
+|--|---------------------|----------------------|------------------------|
+| **Source** | `.md` files in the agent package | Remote MCP server (`list_recipes`) | autoui server (inline) |
+| **Scope** | Multi-widget composition | Multi-tool workflow | Single widget |
+| **Guides what** | Presentation (View) | Data retrieval (Model) | Widget schema |
+| **TypeScript type** | `Recipe` | `McpRecipe` | `WidgetEntry` |
+| **Carried by** | `WebMcpLayer` | `McpLayer.recipes` | `WebMcpLayer` (autoui) |
+| **Lazy loading** | `get_recipe("id")` | `get_recipe(name)` (MCP) | `get_recipe("widget-name")` |
+| **Body in prompt** | No (summaries) | No (summaries) | No (summaries) |
+
+### How the three levels connect
+
+```mermaid
+graph TD
+    subgraph "Level 1: MCP Recipe"
+        MR["profil-depute<br/>1. search_deputes()<br/>2. get_votes()<br/>3. get_mandats()"]
+    end
+
+    subgraph "Level 2: WebMCP Recipe"
+        WR["parlementaire-profile<br/>Use profile + hemicycle + timeline"]
+    end
+
+    subgraph "Level 3: Widget Recipes"
+        R1["profile<br/>schema: {name, fields, stats}"]
+        R2["hemicycle<br/>schema: {groups, totalSeats}"]
+        R3["timeline<br/>schema: {events}"]
+    end
+
+    MR -->|"what to request"| DATA["Raw data"]
+    DATA -->|"how to display"| WR
+    WR -->|"which widget"| R1
+    WR --> R2
+    WR --> R3
+```
+
+## How recipes relate to other concepts
+
+- **ToolLayers**: WebMCP recipes are carried by the `WebMcpLayer`, MCP recipes by `McpLayer` instances
+- **Widgets**: WebMCP recipes reference widgets by name (`stat-card`, `profile`...)
+- **widget_display**: the tool the LLM calls after reading the recipe
+- **MCP**: MCP recipes guide usage of the server's DATA tools
+
+## Advanced patterns
+
+### Cross-server recipes
+
+The `cross-server` recipe is designed for agents connected to multiple MCP servers:
+
+```markdown
+---
+id: cross-server
+name: Cross-server correlation
+when: user compares data from different servers
+servers: []
+---
+1. Identify relevant servers
+2. Query each server separately
+3. Cross-reference results by common key (region, date, etc.)
+4. Present as comparative table or chart overlay
+```
+
+### Interactive recipes (recipe-browser)
+
+The `recipe-browser` widget lets users explore available recipes through a visual interface. Clicking a recipe loads its detail and the agent can then execute it.
+
+### Dynamic registry
+
+The recipe registry (`recipeRegistry`) is a read-only singleton. To add recipes at runtime:
+
+```ts
+import { registerRecipes, parseRecipes, recipeRegistry } from '@webmcp-auto-ui/agent';
+
+// Load recipes from a file
+const newRecipes = parseRecipes([myMarkdown1, myMarkdown2]);
+registerRecipes(newRecipes);
+
+// The registry now contains built-in + new recipes
+console.log(recipeRegistry.size); // 12 (10 built-in + 2 new)
+```
+
+## Visual summary
+
+```mermaid
+graph LR
+    Q["User question"] --> S["search_recipes()<br/>Find the right recipe"]
+    S --> G["get_recipe()<br/>Read the instructions"]
+    G --> E["MCP tools<br/>Get the data"]
+    E --> W["widget_display()<br/>Display with widgets"]
+    W --> D["Final dashboard"]
+
+    style S fill:#e3f2fd
+    style G fill:#e8f5e9
+    style E fill:#fff3e0
+    style W fill:#fce4ec
+```

@@ -5,25 +5,42 @@ sidebar:
   order: 0
 ---
 
-Ce tutoriel guide pas a pas l'installation du boilerplate webmcp-auto-ui, la connexion a un serveur MCP, et la creation d'un premier widget custom.
+Vous allez voir, en 10 minutes vous aurez une application fonctionnelle qui connecte un serveur MCP, interroge Claude, et affiche des widgets generes automatiquement par l'IA. C'est le point de depart ideal pour tout projet webmcp-auto-ui.
 
-## Vue d'ensemble
+## Objectif
 
-Le boilerplate fournit une app SvelteKit 5 pre-cablee avec :
+Installer le boilerplate, connecter un serveur MCP distant, et obtenir votre premier widget genere par l'agent IA dans le navigateur.
 
-- **shadcn-svelte** pour le design system
-- **@webmcp-auto-ui/core** pour le client MCP et le serveur WebMCP
-- **@webmcp-auto-ui/agent** pour la boucle agent et le provider LLM
-- **@webmcp-auto-ui/sdk** pour le canvas store et l'encodage HyperSkill
-- **@webmcp-auto-ui/ui** pour les composants (LLMSelector, McpStatus, WidgetRenderer, etc.)
+## Prerequis
 
-L'app inclut 3 widgets custom (fiches deputes, scrutins, amendements) comme exemples d'integration.
+- **Node.js 18+** installe
+- Une **cle API Anthropic** (Claude) -- gratuite pour les premiers essais
+- Un terminal et un editeur de code
+- Aucune connaissance prealable de MCP n'est requise
+
+## Resultat final
+
+A la fin de ce tutoriel, vous aurez une app SvelteKit 5 complete avec :
+- Un chat connecte a Claude (Haiku, Sonnet ou Opus au choix)
+- Un serveur MCP distant connecte (donnees parlementaires francaises)
+- Des widgets qui s'affichent automatiquement sur un canvas
+- Un theme clair/sombre fonctionnel
+
+```mermaid
+graph LR
+    U[Utilisateur] -->|question| Chat
+    Chat -->|prompt| Claude[Claude API]
+    Claude -->|tool_call| MCP[Serveur MCP distant]
+    MCP -->|donnees| Claude
+    Claude -->|widget_display| Canvas[Canvas widgets]
+    Canvas -->|rendu| U
+```
 
 ---
 
 ## Etape 1 : Scaffolding
 
-Clonez le boilerplate avec degit :
+On commence par cloner le boilerplate avec `degit`, qui telecharge le repertoire sans l'historique git :
 
 ```bash
 npx degit jeanbaptiste/webmcp-auto-ui/apps/boilerplate my-app
@@ -31,11 +48,28 @@ cd my-app
 npm install
 ```
 
+Cela installe une app SvelteKit 5 pre-cablee avec les 4 packages du monorepo :
+
+| Package | Role |
+|---------|------|
+| `@webmcp-auto-ui/core` | Client MCP, serveur WebMCP, validation JSON Schema |
+| `@webmcp-auto-ui/agent` | Boucle agent, providers LLM, lazy loading |
+| `@webmcp-auto-ui/sdk` | Canvas store, encodage HyperSkill |
+| `@webmcp-auto-ui/ui` | Composants Svelte (LLMSelector, McpStatus, WidgetRenderer, etc.) |
+
+:::tip[Pourquoi degit ?]
+`degit` copie uniquement les fichiers, sans le `.git` du monorepo. Vous repartez avec un projet propre, pret a initialiser votre propre repo.
+:::
+
+**Verification** : apres `npm install`, verifiez que le repertoire `node_modules/@webmcp-auto-ui` contient les 4 sous-repertoires (`core`, `agent`, `sdk`, `ui`).
+
 ---
 
 ## Etape 2 : Configurer le proxy API
 
-Creez le fichier `src/routes/api/chat/+server.ts` (deja present dans le boilerplate) :
+Le navigateur ne peut pas appeler l'API Anthropic directement (les cles API ne doivent jamais etre exposees cote client). Le boilerplate inclut un proxy serveur SvelteKit qui relaie les requetes.
+
+Ouvrez le fichier `src/routes/api/chat/+server.ts` (deja present dans le boilerplate) :
 
 ```ts
 import { env } from '$env/dynamic/private';
@@ -50,19 +84,28 @@ export const POST: RequestHandler = async ({ request }) => {
 };
 ```
 
-Ajoutez votre cle API dans `.env` :
+Voici ce qui se passe :
+- Le proxy lit la cle API depuis les variables d'environnement serveur (jamais exposee au client)
+- `anthropicProxy` reformate le body et l'envoie a l'API Claude
+- Le header `X-Model` permet de changer de modele dynamiquement (`'haiku'`, `'sonnet'`, `'opus'`)
+
+Ajoutez votre cle API dans un fichier `.env` a la racine du projet :
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-Le proxy relaie les requetes vers l'API Claude. Le modele est selectionne dynamiquement via le header `X-Model` (alias : `'haiku'`, `'sonnet'`, `'opus'`).
+:::caution[Ne committez jamais votre .env]
+Le fichier `.env` est deja dans le `.gitignore` du boilerplate. Ne le retirez pas.
+:::
+
+**Verification** : le fichier `.env` existe et contient `ANTHROPIC_API_KEY=sk-ant-...` (votre vraie cle).
 
 ---
 
-## Etape 3 : Connecter un serveur MCP
+## Etape 3 : Comprendre la connexion MCP
 
-Le boilerplate utilise `McpMultiClient` pour gerer plusieurs serveurs MCP :
+Le boilerplate utilise `McpMultiClient` pour gerer une ou plusieurs connexions a des serveurs MCP distants. Un serveur MCP expose des **outils** (tools) que le LLM peut appeler pour recuperer des donnees.
 
 ```ts
 import { McpMultiClient } from '@webmcp-auto-ui/core';
@@ -71,19 +114,31 @@ const multiClient = new McpMultiClient();
 await multiClient.addServer('https://mcp.code4code.eu/mcp');
 ```
 
-Dans le composant principal, la connexion est deja cablee avec un champ URL et un bouton "Connecter". Au chargement de la page, l'app se connecte automatiquement a l'URL par defaut.
+`addServer` effectue trois operations :
+1. **Connexion** au serveur via HTTP Streamable (JSON-RPC 2.0)
+2. **Initialisation** du protocole MCP (echange de capabilities)
+3. **Recuperation** de la liste des outils disponibles
 
-Pour ajouter un serveur en dur :
+Dans le boilerplate, la connexion est deja cablee dans le composant principal : un champ URL + un bouton "Connecter". L'app se connecte automatiquement au chargement de la page.
 
-```ts
-await multiClient.addServer('https://votre-serveur-mcp.example/mcp');
+```mermaid
+sequenceDiagram
+    participant App as App (navigateur)
+    participant MCP as Serveur MCP
+    App->>MCP: POST /mcp {initialize}
+    MCP-->>App: {capabilities, serverInfo}
+    App->>MCP: POST /mcp {tools/list}
+    MCP-->>App: {tools: [...]}
+    Note over App: Outils disponibles !
 ```
+
+**Verification** : lancez `npm run dev`, ouvrez `http://localhost:5173`, et verifiez que l'indicateur MCP en haut de page passe au vert.
 
 ---
 
 ## Etape 4 : Comprendre le provider LLM
 
-Le boilerplate utilise `RemoteLLMProvider` pour communiquer avec Claude via le proxy :
+Le provider LLM est l'abstraction qui permet de communiquer avec differents modeles de langage. Le boilerplate utilise `RemoteLLMProvider` pour Claude :
 
 ```ts
 import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
@@ -91,22 +146,34 @@ import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
 const provider = new RemoteLLMProvider({ proxyUrl: '/api/chat' });
 ```
 
-Le modele est change dynamiquement via le composant `<LLMSelector>` qui expose les alias `'haiku'`, `'sonnet'` et `'opus'`.
+Le composant `<LLMSelector>` (dans la barre superieure) permet de changer de modele a chaud. Les alias disponibles sont :
+
+| Alias | Modele reel | Cas d'usage |
+|-------|-------------|-------------|
+| `haiku` | Claude Haiku | Rapide, economique, ideal pour les tests |
+| `sonnet` | Claude Sonnet | Equilibre performance/cout |
+| `opus` | Claude Opus | Maximum de qualite |
+
+:::tip[Commencez avec Haiku]
+Pendant le developpement, utilisez Haiku pour iterer rapidement. Passez a Sonnet ou Opus quand vous etes satisfait du workflow.
+:::
 
 ---
 
 ## Etape 5 : Lancer la boucle agent
 
-La boucle agent orchestre le LLM, les outils MCP et les widgets WebMCP :
+La boucle agent est le coeur du systeme. Elle orchestre les echanges entre le LLM, les outils MCP (donnees distantes) et les widgets WebMCP (affichage local).
+
+Voici le code complet, tel qu'il apparait dans le boilerplate :
 
 ```ts
 import { runAgentLoop, buildSystemPrompt, fromMcpTools, autoui } from '@webmcp-auto-ui/agent';
 import type { ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
 
-// Construire les layers (MCP distant + WebMCP local)
+// 1. Construire les layers (MCP distant + WebMCP local)
 const layers: ToolLayer[] = [];
 
-// Layer MCP (donnees distantes)
+// Layer MCP : chaque serveur connecte fournit ses outils
 for (const server of multiClient.listServers()) {
   const mcpLayer: McpLayer = {
     protocol: 'mcp',
@@ -116,13 +183,13 @@ for (const server of multiClient.listServers()) {
   layers.push(mcpLayer);
 }
 
-// Layer WebMCP (widgets natifs)
+// Layer WebMCP : widgets natifs (stat, chart, table, map...)
 layers.push(autoui.layer());
 
-// System prompt dynamique
+// 2. Generer le system prompt adapte aux serveurs connectes
 const systemPrompt = buildSystemPrompt(layers);
 
-// Lancer la boucle
+// 3. Lancer la boucle
 const result = await runAgentLoop(userMessage, {
   provider,
   systemPrompt,
@@ -131,7 +198,7 @@ const result = await runAgentLoop(userMessage, {
   maxTokens: 4096,
   callbacks: {
     onWidget: (type, data) => {
-      // Ajouter le widget au canvas
+      // Le LLM a demande d'afficher un widget
       const id = 'b_' + Date.now().toString(36);
       blocks = [...blocks, { id, type, data }];
       return { id };
@@ -142,11 +209,48 @@ const result = await runAgentLoop(userMessage, {
 });
 ```
 
+Le flux est le suivant :
+
+```mermaid
+sequenceDiagram
+    participant User as Utilisateur
+    participant AgentLoop as Agent Loop
+    participant LLM as Claude
+    participant MCP as Serveur MCP
+    participant UI as Canvas
+
+    User->>AgentLoop: "Montre-moi la fiche de Melenchon"
+    AgentLoop->>LLM: prompt + tools disponibles
+    LLM->>AgentLoop: tool_call: search_recipes
+    AgentLoop->>MCP: search_recipes
+    MCP-->>AgentLoop: recette "fiche-depute"
+    AgentLoop->>LLM: resultat + suite
+    LLM->>AgentLoop: tool_call: get_recipe
+    AgentLoop->>MCP: get_recipe
+    MCP-->>AgentLoop: schema + instructions
+    AgentLoop->>LLM: schema du widget
+    LLM->>AgentLoop: tool_call: query_sql
+    AgentLoop->>MCP: requete donnees
+    MCP-->>AgentLoop: donnees JSON
+    AgentLoop->>LLM: donnees
+    LLM->>AgentLoop: tool_call: widget_display
+    AgentLoop->>UI: affiche le widget
+    UI-->>User: Widget rendu !
+```
+
+Le `buildSystemPrompt` genere un prompt qui impose un workflow en 4 etapes au LLM :
+1. **Decouverte** : chercher les recettes disponibles
+2. **Lecture** : lire le schema et les instructions de la recette
+3. **Execution** : appeler les outils de donnees
+4. **Affichage** : appeler `widget_display` avec les bonnes donnees
+
+**Verification** : tapez "Montre-moi la fiche de Jean-Luc Melenchon" dans le chat. Vous devriez voir l'indicateur de progression, puis un widget s'afficher.
+
 ---
 
 ## Etape 6 : Afficher les widgets
 
-Le rendu des widgets se fait via `<WidgetRenderer>` :
+Le rendu des widgets se fait via `<WidgetRenderer>`. Ce composant resout automatiquement le composant Svelte correspondant au `type` du widget :
 
 ```svelte
 <script lang="ts">
@@ -165,15 +269,21 @@ Le rendu des widgets se fait via `<WidgetRenderer>` :
 </div>
 ```
 
-Le `WidgetRenderer` resout automatiquement le composant Svelte correspondant au `type` du widget, en cherchant dans :
-1. Les serveurs WebMCP custom (passes via `servers`)
-2. Les widgets natifs autoui (stat, chart, table, map, etc.)
+`WidgetRenderer` cherche le bon composant dans cet ordre :
+1. Les serveurs WebMCP custom (passes via la prop `servers`)
+2. Les widgets natifs `autoui` (stat, chart, table, map, profile, timeline, etc.)
+
+Si le type n'est reconnu par aucun serveur, un fallback JSON s'affiche pour le debug.
+
+:::note[WidgetRenderer vs BlockRenderer]
+`WidgetRenderer` est le composant recommande pour les apps qui utilisent des serveurs WebMCP multiples. `BlockRenderer` est un composant plus simple qui ne gere que les widgets natifs.
+:::
 
 ---
 
 ## Etape 7 : Ajouter les composants UI
 
-Le boilerplate integre les composants UI pre-faits :
+Le boilerplate integre plusieurs composants UI pre-faits qui simplifient la construction de l'interface :
 
 ```svelte
 <script lang="ts">
@@ -199,7 +309,7 @@ Le boilerplate integre les composants UI pre-faits :
   <LLMSelector />
 </header>
 
-<!-- Progression agent -->
+<!-- Progression agent (barre animee pendant la generation) -->
 <AgentProgress
   active={canvas.generating}
   elapsed={chatTimer}
@@ -208,11 +318,18 @@ Le boilerplate integre les composants UI pre-faits :
 />
 ```
 
+Chaque composant est autonome :
+- **`McpStatus`** affiche un point vert/rouge avec le nom du serveur et le nombre d'outils
+- **`LLMSelector`** expose un dropdown pour choisir le modele Claude
+- **`AgentProgress`** montre une barre de progression avec le temps ecoule, le nombre d'appels d'outils, et le dernier outil appele
+
 ---
 
 ## Etape 8 : Ajouter un widget custom
 
-Pour enregistrer vos propres widgets, creez un serveur WebMCP local :
+Le boilerplate inclut 3 widgets custom (fiches deputes, scrutins, amendements) comme exemples. Pour creer les votres, il suffit de :
+
+1. **Creer un serveur WebMCP local** :
 
 ```ts
 import { createWebMcpServer } from '@webmcp-auto-ui/core';
@@ -223,16 +340,17 @@ const monServeur = createWebMcpServer('mon-app', {
   description: 'Widgets custom de mon application',
 });
 
+// Enregistrer le widget avec sa recette (frontmatter + instructions)
 monServeur.registerWidget(monWidgetRecipe, MonWidget);
 ```
 
-Puis ajoutez le layer a la boucle agent :
+2. **Ajouter le layer a la boucle agent** :
 
 ```ts
 layers.push(monServeur.layer());
 ```
 
-Et passez le serveur au WidgetRenderer :
+3. **Passer le serveur au WidgetRenderer** :
 
 ```svelte
 <WidgetRenderer
@@ -243,7 +361,13 @@ Et passez le serveur au WidgetRenderer :
 />
 ```
 
-Pour les details sur la creation de widgets custom, voir le tutoriel [Creer un widget custom](./create-custom-widget).
+Le LLM decouvre automatiquement vos widgets via `search_recipes` et peut les utiliser dans ses reponses.
+
+**Verification** : demandez au chat quelque chose en rapport avec votre widget. Le LLM devrait decouvrir la recette et afficher votre composant.
+
+:::tip[Pour aller plus loin]
+Consultez le tutoriel [Creer un widget custom](./create-custom-widget) pour un guide complet avec recette, schema et interactions.
+:::
 
 ---
 
@@ -253,7 +377,12 @@ Pour les details sur la creation de widgets custom, voir le tutoriel [Creer un w
 npm run dev
 ```
 
-L'app est accessible sur `http://localhost:5173`. Tapez une question dans le chat pour declencher la boucle agent.
+L'app est accessible sur `http://localhost:5173`. L'app se connecte automatiquement au serveur MCP par defaut.
+
+**Verification finale** : tapez une question dans le chat et verifiez que :
+1. L'indicateur de progression s'active
+2. Des appels d'outils s'affichent dans la console
+3. Un ou plusieurs widgets apparaissent sur le canvas
 
 ---
 
@@ -264,6 +393,7 @@ my-app/
   src/
     routes/
       +page.svelte          # Page principale (chat + canvas)
+      +layout.svelte        # Layout racine (ThemeProvider)
       api/chat/+server.ts   # Proxy API Claude
     lib/
       widgets/
@@ -271,13 +401,31 @@ my-app/
         MonWidget.svelte    # Composant widget custom
       recipes/
         mon-widget.md       # Recette du widget (frontmatter + instructions)
-  .env                      # ANTHROPIC_API_KEY
+  .env                      # ANTHROPIC_API_KEY (jamais commite)
   package.json
   svelte.config.js
   vite.config.ts
 ```
 
 ---
+
+## Troubleshooting
+
+| Probleme | Cause probable | Solution |
+|----------|---------------|----------|
+| "Failed to fetch" dans le chat | Cle API manquante ou invalide | Verifiez `.env` et redemarrez le serveur de dev |
+| MCP reste rouge | URL incorrecte ou serveur MCP down | Verifiez l'URL, testez avec `curl -X POST <url>` |
+| Widgets ne s'affichent pas | Le LLM n'appelle pas `widget_display` | Verifiez que `autoui.layer()` est dans les layers |
+| "Module not found" au build | Packages pas installes | Relancez `npm install` |
+
+---
+
+## Aller plus loin
+
+- **Ajouter un second serveur MCP** : appelez `multiClient.addServer('https://autre-serveur/mcp')` pour combiner plusieurs sources de donnees
+- **Personnaliser le theme** : modifiez les tokens dans `ThemeProvider` (voir [Construire une demo themee](./themed-demo))
+- **Creer vos propres widgets** : suivez le tutoriel [Creer un widget custom](./create-custom-widget)
+- **Activer le Nano-RAG** : cochez la case "Nano-RAG" pour compresser le contexte avec des embeddings locaux
 
 ## Voir aussi
 

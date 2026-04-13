@@ -5,24 +5,45 @@ sidebar:
   order: 5
 ---
 
-This tutorial explains how to expose your own widgets via the WebMCP protocol, from component creation to integration in the agent loop.
+Want the LLM to use your own widgets autonomously? This tutorial shows you how to create a complete WebMCP server: component, recipe, registration, custom tools, and agent loop integration. By the end, your widgets will feel just as natural as the built-in ones.
 
-## Overview
+## Goal
 
-<img src="/webmcp-auto-ui/diagrams/tut-webmcp-server-1.svg" alt="Full pipeline: component, recipe, WebMCP server, agent loop, LLM" />
+Create a WebMCP server that exposes a Kanban widget, with automatic validation, custom tools, and full agent loop integration.
 
-The full pipeline starts from a UI component, goes through a declarative recipe, then is registered in a WebMCP server that exposes tools to the LLM.
+## Prerequisites
+
+- The boilerplate is installed (see [Getting started](./boilerplate))
+- Having read [Create a custom widget](./create-custom-widget) (recommended)
+- Basic understanding of JSON Schema
+
+## What you will build
+
+A WebMCP server `myserver` with a Kanban widget that the LLM discovers via `search_recipes`, reads via `get_recipe`, and displays via `widget_display` -- with automatic parameter validation and a custom `move_card` tool.
+
+```mermaid
+graph LR
+    Component[Svelte Component] --> Recipe[Recipe .md]
+    Recipe --> Server[WebMCP Server]
+    Server --> Layer[layer]
+    Layer --> Agent[Agent Loop]
+    Agent --> LLM[Claude]
+    LLM -->|search_recipes| Server
+    LLM -->|widget_display| Server
+    LLM -->|move_card| Server
+```
 
 ---
 
 ## Step 1: Create the component
 
-The component will be rendered on the canvas when the LLM calls `widget_display`. Two options depending on your approach.
+The component will be rendered on the canvas when the LLM calls `widget_display`. Two options are available.
 
-### Option A: Svelte 5
+### Option A: Svelte 5 (recommended)
+
+Create `src/lib/widgets/KanbanBoard.svelte`:
 
 ```svelte
-<!-- src/lib/widgets/KanbanBoard.svelte -->
 <script lang="ts">
   interface Props {
     title?: string;
@@ -46,7 +67,7 @@ The component will be rendered on the canvas when the LLM calls `widget_display`
 <div class="kanban">
   {#each columns as col}
     <div class="column">
-      <h4>{col.name}</h4>
+      <h4>{col.name} <span class="count">({col.cards.length})</span></h4>
       {#each col.cards as card}
         <div class="card">
           <strong>{card.title}</strong>
@@ -59,19 +80,19 @@ The component will be rendered on the canvas when the LLM calls `widget_display`
 </div>
 
 <style>
-  .kanban { display: flex; gap: 1rem; }
-  .column { flex: 1; background: #1a1a2e; border-radius: 8px; padding: 0.75rem; }
-  .card { background: #16213e; border-radius: 6px; padding: 0.5rem; margin-bottom: 0.5rem; }
-  .tag { font-size: 0.75rem; color: #888; }
+  .kanban { display: flex; gap: 1rem; overflow-x: auto; }
+  .column { flex: 1; min-width: 200px; background: var(--color-surface2, #1a1a2e); border-radius: 8px; padding: 0.75rem; }
+  .card { background: var(--color-surface, #16213e); border-radius: 6px; padding: 0.5rem; margin-bottom: 0.5rem; }
+  .tag { font-size: 0.75rem; color: var(--color-text2, #888); }
+  .count { font-weight: normal; color: var(--color-text2, #888); font-size: 0.85em; }
 </style>
 ```
 
 ### Option B: Vanilla renderer
 
-A vanilla renderer is a pure function that receives an `HTMLElement` and data, and optionally returns a cleanup function:
+A pure function that receives an `HTMLElement` and data:
 
 ```typescript
-// src/widgets/kanban.ts
 export function render(
   container: HTMLElement,
   data: Record<string, unknown>,
@@ -97,7 +118,6 @@ export function render(
   }
 
   container.appendChild(wrapper);
-
   return () => { container.innerHTML = ''; };
 }
 ```
@@ -106,12 +126,12 @@ export function render(
 
 ## Step 2: Write the recipe
 
-The recipe is a Markdown file with a YAML frontmatter. This is what the LLM will read to know how to use the widget.
+Create `src/lib/recipes/kanban.md`:
 
 ```markdown
 ---
 widget: kanban
-description: Kanban board with columns and cards. Project management, workflow, pipeline.
+description: Kanban board with columns and cards. Project management, workflow, pipeline, sprint board.
 group: project
 schema:
   type: object
@@ -120,6 +140,7 @@ schema:
   properties:
     title:
       type: string
+      description: Optional board title
     columns:
       type: array
       items:
@@ -130,6 +151,7 @@ schema:
         properties:
           name:
             type: string
+            description: Column name
           cards:
             type: array
             items:
@@ -160,42 +182,27 @@ Call widget_display('kanban', {columns: [{name: "To do", cards: [{title: "Task 1
 - Too many columns: beyond 5 columns, readability decreases
 ```
 
-The frontmatter contains three required fields:
-
-| Field         | Role                                                    |
-|---------------|---------------------------------------------------------|
-| `widget`      | Unique widget identifier (used in widget_display)          |
-| `description` | Short description for the LLM (search_recipes)             |
-| `schema`      | JSON Schema of the parameters expected by the component    |
-
-The `group` field is optional and is used for categorization in `search_recipes`.
-
-The body (after `---`) contains free-form instructions for the LLM: when to use the widget, how to build the parameters, and mistakes to avoid.
+:::caution[The description is your SEO for the LLM]
+The LLM chooses the widget based on the `description`. Include synonyms and varied use cases.
+:::
 
 ---
 
-## Step 3: Generate schemas automatically
+## Step 3: Generate schemas automatically (optional)
 
-If your component is in Svelte with an `interface Props`, you can generate the JSON Schema automatically from TypeScript types:
+If your component uses `interface Props`, auto-generate the JSON Schema:
 
 ```bash
 npm run sync:schemas
 ```
-
-This script parses the `interface Props` from Svelte components, converts them to JSON Schema, and injects the result into each recipe `.md` frontmatter. This avoids maintaining the schema manually.
-
-For vanilla renderers, the schema must be written manually in the recipe.
 
 ---
 
 ## Step 4: Create the server
 
 ```typescript
-// src/lib/my-server.ts
 import { createWebMcpServer } from '@webmcp-auto-ui/core';
 import KanbanBoard from './widgets/KanbanBoard.svelte';
-
-// The recipe can be imported as a raw string (Vite)
 import kanbanRecipe from './recipes/kanban.md?raw';
 
 const myserver = createWebMcpServer('myserver', {
@@ -203,7 +210,9 @@ const myserver = createWebMcpServer('myserver', {
 });
 ```
 
-`createWebMcpServer` creates an empty server with a name and description. The name will be used as a prefix in tools (`myserver_webmcp_*`).
+`createWebMcpServer` creates an empty server with a name and description:
+- The **name** is used as the prefix in tools (`myserver_webmcp_*`)
+- The **description** appears in the system prompt
 
 ---
 
@@ -214,20 +223,14 @@ myserver.registerWidget(kanbanRecipe, KanbanBoard);
 ```
 
 `registerWidget` does three things:
-1. Parses the frontmatter to extract `widget`, `description` and `schema`
-2. Stores the component as renderer
-3. Automatically creates the 4 built-in tools (on first call):
-   - `search_recipes` -- list available widgets
-   - `list_recipes` -- list all widgets with name and description
-   - `get_recipe` -- get the schema + instructions for a widget
-   - `widget_display` -- display a widget on the canvas
+1. **Parses** the frontmatter to extract `widget`, `description`, and `schema`
+2. **Stores** the component as renderer
+3. **Creates** the 4 built-in tools automatically:
+   - `search_recipes`, `list_recipes`, `get_recipe`, `widget_display`
 
 You can register multiple widgets on the same server:
 
 ```typescript
-import ganttRecipe from './recipes/gantt.md?raw';
-import GanttChart from './widgets/GanttChart.svelte';
-
 myserver.registerWidget(kanbanRecipe, KanbanBoard);
 myserver.registerWidget(ganttRecipe, GanttChart);
 ```
@@ -235,8 +238,6 @@ myserver.registerWidget(ganttRecipe, GanttChart);
 ---
 
 ## Step 6: Add custom tools (optional)
-
-You can add additional tools to the server. These tools will appear in the same namespace as the widgets:
 
 ```typescript
 myserver.addTool({
@@ -267,8 +268,6 @@ myserver.addTool({
 
 ## Step 7: Connect to the agent loop
 
-Call `.layer()` to get the tool layer, then pass it to `runAgentLoop`:
-
 ```typescript
 import { runAgentLoop, autoui } from '@webmcp-auto-ui/agent';
 
@@ -285,24 +284,48 @@ const result = await runAgentLoop(userMessage, {
 
 Tool prefixing is automatic:
 
-| Raw tool            | Name exposed to the LLM                  |
-|---------------------|-------------------------------------------|
-| `search_recipes`    | `myserver_webmcp_search_recipes`          |
-| `get_recipe`        | `myserver_webmcp_get_recipe`              |
-| `widget_display`    | `myserver_webmcp_widget_display`          |
-| `move_card`         | `myserver_webmcp_move_card`               |
+| Raw tool | Name exposed to the LLM |
+|----------|------------------------|
+| `search_recipes` | `myserver_webmcp_search_recipes` |
+| `widget_display` | `myserver_webmcp_widget_display` |
+| `move_card` | `myserver_webmcp_move_card` |
 
-This prefixing prevents collisions when multiple servers (MCP + WebMCP) coexist.
+Don't forget to pass the server to `WidgetRenderer`:
 
-### Multi-server architecture
+```svelte
+<WidgetRenderer
+  id={block.id}
+  type={block.type}
+  data={block.data}
+  servers={[myserver]}
+/>
+```
 
-<img src="/webmcp-auto-ui/diagrams/tut-webmcp-server-2.svg" alt="Multi-server MCP and WebMCP architecture" />
+```mermaid
+graph TB
+    subgraph Layers
+        AutoUI["autoui.layer()"]
+        Custom["myserver.layer()"]
+    end
+
+    subgraph "Tools exposed to LLM"
+        A1["autoui_webmcp_widget_display"]
+        A2["autoui_webmcp_search_recipes"]
+        C1["myserver_webmcp_widget_display"]
+        C2["myserver_webmcp_search_recipes"]
+        C3["myserver_webmcp_move_card"]
+    end
+
+    AutoUI --> A1
+    AutoUI --> A2
+    Custom --> C1
+    Custom --> C2
+    Custom --> C3
+```
 
 ---
 
 ## Step 8: Test
-
-### Verify discovery
 
 In the chat, ask something that triggers recipe search:
 
@@ -312,45 +335,47 @@ User: "Show me a kanban of my sprint"
 
 The LLM will follow this sequence:
 
-<img src="/webmcp-auto-ui/diagrams/tut-webmcp-server-3.svg" alt="Discovery and rendering sequence for a kanban widget" />
+```mermaid
+sequenceDiagram
+    participant LLM as Claude
+    participant Agent as Agent Loop
+    participant WS as WebMCP Server
 
-### The widget_display dispatch
+    LLM->>Agent: search_recipes("kanban sprint")
+    Agent->>WS: search_recipes
+    WS-->>Agent: [{name: "kanban", description: "..."}]
 
-<img src="/webmcp-auto-ui/diagrams/tut-webmcp-server-4.svg" alt="widget_display dispatch with validation and rendering" />
+    LLM->>Agent: get_recipe("kanban")
+    Agent->>WS: get_recipe
+    WS-->>Agent: {schema: {...}, instructions: "..."}
 
-### Verify rendering
+    LLM->>Agent: widget_display("kanban", {columns: [...]})
+    Agent->>WS: validate + render
+    WS-->>Agent: {id: "w_a3f2k1"}
+```
 
-The result of `widget_display` contains an `id` (e.g. `w_a3f2k1`). The UI uses this return to:
-1. Find the renderer (`KanbanBoard.svelte`) via `getWidget('kanban')`
-2. Pass `data` as props to the component
-3. Display the widget on the canvas
+**Checkpoint**: the kanban displays with columns and cards generated by the LLM.
 
 ---
 
 ## Parameter validation
 
-The WebMCP server automatically validates parameters against the JSON Schema before passing them to the renderer. The implementation uses `validateJsonSchema` from the `@webmcp-auto-ui/core` package:
+The WebMCP server validates parameters against the JSON Schema before rendering. If validation fails, the LLM receives the expected schema and can self-correct.
 
-```typescript
-// Excerpt from webmcp-server.ts -- widget_display execute
-const rawParams = (params.params ?? {}) as Record<string, unknown>;
-const validation = validateJsonSchema(rawParams, entry.inputSchema as JsonSchema);
-if (!validation.valid) {
-  return {
-    error: 'Validation failed',
-    details: validation.errors,
-    expected_schema: entry.inputSchema,
-  };
-}
-```
-
-If validation fails, the LLM receives the expected schema and can correct its call on the next turn.
+:::note[Image sanitization]
+The server automatically sanitizes image fields (`src`, `avatar`, `photo`, `thumbnail`) to remove hallucinated URLs. Only valid prefixes accepted: `http://`, `https://`, `data:`, `/`.
+:::
 
 ---
 
-## Image URL sanitization
+## Troubleshooting
 
-The WebMCP server automatically sanitizes image fields (src, avatar, photo, thumbnail, etc.) to remove URLs hallucinated by the LLM. Only valid prefixes are accepted: `http://`, `https://`, `data:`, `/`.
+| Problem | Likely cause | Solution |
+|---------|-------------|----------|
+| Widget not discovered | Recipe `description` doesn't match query | Enrich with synonyms |
+| "Validation failed" | LLM sends incompatible params | Add `description` to schema properties |
+| Widget renders as raw JSON | Server not passed to WidgetRenderer | Add `servers={[myserver]}` |
+| Custom tool not visible | Tool added after `layer()` | Call `addTool()` before `layer()` |
 
 ---
 
@@ -358,12 +383,18 @@ The WebMCP server automatically sanitizes image fields (src, avatar, photo, thum
 
 - [ ] Component created (Svelte or vanilla)
 - [ ] Recipe `.md` with frontmatter (`widget`, `description`, `schema`) + body
-- [ ] `npm run sync:schemas` executed (if Svelte)
 - [ ] `createWebMcpServer('name', {description})`
 - [ ] `server.registerWidget(recipe, component)`
 - [ ] `server.addTool({...})` if needed
 - [ ] `layers: [..., server.layer()]`
+- [ ] Server passed to WidgetRenderer via `servers={[...]}`
 - [ ] Test: search_recipes --> get_recipe --> widget_display
+
+## Going further
+
+- **Combine MCP and WebMCP**: your WebMCP server can coexist with remote MCP servers in the same layers
+- **Auto-generated schemas**: use `sync:schemas` to never write schemas manually
+- **Interactive component**: add the FONC bus for cross-widget interactions
 
 ## See also
 

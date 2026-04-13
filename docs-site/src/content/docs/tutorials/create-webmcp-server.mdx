@@ -5,24 +5,45 @@ sidebar:
   order: 5
 ---
 
-Ce tutoriel explique comment exposer vos propres widgets via le protocole WebMCP, de la creation du composant jusqu'a l'integration dans la boucle agent.
+Vous voulez que le LLM utilise vos propres widgets de maniere autonome ? Ce tutoriel vous montre comment creer un serveur WebMCP complet : composant, recette, enregistrement, outils custom, et integration dans la boucle agent. A la fin, vos widgets seront aussi naturels a utiliser que les widgets natifs.
 
-## Vue d'ensemble
+## Objectif
 
-<img src="/webmcp-auto-ui/diagrams/tut-webmcp-server-1.svg" alt="Pipeline complet : composant, recette, serveur WebMCP, agent loop, LLM" />
+Creer un serveur WebMCP qui expose un widget Kanban, avec validation automatique, outils custom, et integration complete dans la boucle agent.
 
-Le pipeline complet part d'un composant UI, passe par une recette declarative, puis est enregistre dans un serveur WebMCP qui expose les outils au LLM.
+## Prerequis
+
+- Le boilerplate est installe (voir [Demarrer avec le boilerplate](./boilerplate))
+- Avoir lu [Creer un widget custom](./create-custom-widget) (recommande)
+- Comprendre les bases du JSON Schema
+
+## Resultat final
+
+Un serveur WebMCP `monserveur` avec un widget Kanban que le LLM decouvre via `search_recipes`, lit via `get_recipe`, et affiche via `widget_display` -- avec validation automatique des parametres et un outil custom `move_card`.
+
+```mermaid
+graph LR
+    Component[Composant Svelte] --> Recipe[Recette .md]
+    Recipe --> Server[WebMCP Server]
+    Server --> Layer[layer]
+    Layer --> Agent[Agent Loop]
+    Agent --> LLM[Claude]
+    LLM -->|search_recipes| Server
+    LLM -->|widget_display| Server
+    LLM -->|move_card| Server
+```
 
 ---
 
 ## Etape 1 : Creer le composant
 
-Le composant sera rendu sur le canvas quand le LLM appelle `widget_display`. Deux options selon votre approche.
+Le composant sera rendu sur le canvas quand le LLM appelle `widget_display`. Deux options sont disponibles.
 
-### Option A : Svelte 5
+### Option A : Svelte 5 (recommande)
+
+Creez `src/lib/widgets/KanbanBoard.svelte` :
 
 ```svelte
-<!-- src/lib/widgets/KanbanBoard.svelte -->
 <script lang="ts">
   interface Props {
     title?: string;
@@ -46,7 +67,7 @@ Le composant sera rendu sur le canvas quand le LLM appelle `widget_display`. Deu
 <div class="kanban">
   {#each columns as col}
     <div class="column">
-      <h4>{col.name}</h4>
+      <h4>{col.name} <span class="count">({col.cards.length})</span></h4>
       {#each col.cards as card}
         <div class="card">
           <strong>{card.title}</strong>
@@ -59,16 +80,19 @@ Le composant sera rendu sur le canvas quand le LLM appelle `widget_display`. Deu
 </div>
 
 <style>
-  .kanban { display: flex; gap: 1rem; }
-  .column { flex: 1; background: #1a1a2e; border-radius: 8px; padding: 0.75rem; }
-  .card { background: #16213e; border-radius: 6px; padding: 0.5rem; margin-bottom: 0.5rem; }
-  .tag { font-size: 0.75rem; color: #888; }
+  .kanban { display: flex; gap: 1rem; overflow-x: auto; }
+  .column { flex: 1; min-width: 200px; background: var(--color-surface2, #1a1a2e); border-radius: 8px; padding: 0.75rem; }
+  .card { background: var(--color-surface, #16213e); border-radius: 6px; padding: 0.5rem; margin-bottom: 0.5rem; }
+  .tag { font-size: 0.75rem; color: var(--color-text2, #888); }
+  .count { font-weight: normal; color: var(--color-text2, #888); font-size: 0.85em; }
 </style>
 ```
 
-### Option B : Vanilla renderer
+Remarquez l'utilisation de variables CSS (`var(--color-surface2)`) pour respecter le theme actif.
 
-Un renderer vanilla est une fonction pure qui recoit un `HTMLElement` et des donnees, et retourne optionnellement une fonction de cleanup :
+### Option B : Renderer vanilla
+
+Un renderer vanilla est une fonction pure qui recoit un `HTMLElement` et des donnees :
 
 ```typescript
 // src/widgets/kanban.ts
@@ -97,21 +121,27 @@ export function render(
   }
 
   container.appendChild(wrapper);
-
+  // Retourner une fonction de cleanup (optionnel)
   return () => { container.innerHTML = ''; };
 }
 ```
+
+Le renderer vanilla utilise `mountWidget()` du package core pour etre monte dans un element DOM sans framework.
+
+**Verification** : le composant compile sans erreur.
 
 ---
 
 ## Etape 2 : Ecrire la recette
 
-La recette est un fichier Markdown avec un frontmatter YAML. C'est ce que le LLM lira pour savoir comment utiliser le widget.
+La recette est le document que le LLM lit pour comprendre votre widget. Elle contient un frontmatter YAML (schema) et un body Markdown (instructions).
+
+Creez `src/lib/recipes/kanban.md` :
 
 ```markdown
 ---
 widget: kanban
-description: Tableau Kanban avec colonnes et cartes. Gestion de projet, workflow, pipeline.
+description: Tableau Kanban avec colonnes et cartes. Gestion de projet, workflow, pipeline, sprint board.
 group: project
 schema:
   type: object
@@ -120,6 +150,7 @@ schema:
   properties:
     title:
       type: string
+      description: Titre optionnel du tableau
     columns:
       type: array
       items:
@@ -130,6 +161,7 @@ schema:
         properties:
           name:
             type: string
+            description: Nom de la colonne
           cards:
             type: array
             items:
@@ -162,27 +194,31 @@ Appeler widget_display('kanban', {columns: [{name: "A faire", cards: [{title: "T
 
 Le frontmatter contient trois champs obligatoires :
 
-| Champ         | Role                                                    |
-|---------------|---------------------------------------------------------|
-| `widget`      | Identifiant unique du widget (utilise dans widget_display) |
-| `description` | Description courte pour le LLM (search_recipes)           |
-| `schema`      | JSON Schema des parametres attendus par le composant       |
+| Champ | Role |
+|-------|------|
+| `widget` | Identifiant unique du widget (utilise dans `widget_display`) |
+| `description` | Description courte pour le LLM (apparait dans `search_recipes`) |
+| `schema` | JSON Schema des parametres attendus |
 
 Le champ `group` est optionnel et sert au classement dans `search_recipes`.
 
-Le body (apres `---`) contient les instructions libres pour le LLM : quand utiliser le widget, comment construire les parametres, et les erreurs a eviter.
+Le body contient les instructions libres pour le LLM : quand utiliser, comment appeler, erreurs a eviter. Plus c'est precis, mieux le LLM utilisera votre widget.
+
+:::caution[La description est votre SEO pour le LLM]
+Le LLM choisit le widget en se basant sur la `description`. Incluez des synonymes et des cas d'usage varies.
+:::
 
 ---
 
-## Etape 3 : Generer les schemas automatiquement
+## Etape 3 : Generer les schemas automatiquement (optionnel)
 
-Si votre composant est en Svelte avec une `interface Props`, vous pouvez generer le JSON Schema automatiquement a partir des types TypeScript :
+Si votre composant est en Svelte avec une `interface Props`, vous pouvez generer le JSON Schema automatiquement :
 
 ```bash
 npm run sync:schemas
 ```
 
-Ce script parse les `interface Props` des composants Svelte, les convertit en JSON Schema, et injecte le resultat dans le frontmatter de chaque recette `.md`. Cela evite de maintenir le schema manuellement.
+Ce script parse les `interface Props`, les convertit en JSON Schema, et injecte le resultat dans le frontmatter de chaque recette. Cela evite de maintenir le schema manuellement.
 
 Pour les renderers vanilla, le schema doit etre ecrit manuellement dans la recette.
 
@@ -194,8 +230,6 @@ Pour les renderers vanilla, le schema doit etre ecrit manuellement dans la recet
 // src/lib/mon-serveur.ts
 import { createWebMcpServer } from '@webmcp-auto-ui/core';
 import KanbanBoard from './widgets/KanbanBoard.svelte';
-
-// La recette peut etre importee en raw string (Vite)
 import kanbanRecipe from './recipes/kanban.md?raw';
 
 const monserveur = createWebMcpServer('monserveur', {
@@ -203,7 +237,11 @@ const monserveur = createWebMcpServer('monserveur', {
 });
 ```
 
-`createWebMcpServer` cree un serveur vide avec un nom et une description. Le nom sera utilise comme prefixe dans les outils (`monserveur_webmcp_*`).
+`createWebMcpServer` cree un serveur vide avec un nom et une description :
+- Le **nom** sera utilise comme prefixe dans les outils (`monserveur_webmcp_*`)
+- La **description** apparait dans le system prompt pour aider le LLM a choisir le bon serveur
+
+**Verification** : `monserveur.listWidgets()` retourne un tableau vide (aucun widget enregistre encore).
 
 ---
 
@@ -214,9 +252,9 @@ monserveur.registerWidget(kanbanRecipe, KanbanBoard);
 ```
 
 `registerWidget` fait trois choses :
-1. Parse le frontmatter pour extraire `widget`, `description` et `schema`
-2. Stocke le composant comme renderer
-3. Cree automatiquement les 4 outils built-in (au premier appel) :
+1. **Parse** le frontmatter pour extraire `widget`, `description` et `schema`
+2. **Stocke** le composant comme renderer
+3. **Cree automatiquement** les 4 outils built-in (au premier appel) :
    - `search_recipes` -- lister les widgets disponibles
    - `list_recipes` -- lister tous les widgets avec nom et description
    - `get_recipe` -- obtenir le schema + instructions d'un widget
@@ -225,18 +263,20 @@ monserveur.registerWidget(kanbanRecipe, KanbanBoard);
 Vous pouvez enregistrer plusieurs widgets sur le meme serveur :
 
 ```typescript
-import ganttRecipe from './recipes/gantt.md?raw';
 import GanttChart from './widgets/GanttChart.svelte';
+import ganttRecipe from './recipes/gantt.md?raw';
 
 monserveur.registerWidget(kanbanRecipe, KanbanBoard);
 monserveur.registerWidget(ganttRecipe, GanttChart);
 ```
 
+**Verification** : `monserveur.listWidgets()` retourne `['kanban']` (ou `['kanban', 'gantt']`).
+
 ---
 
 ## Etape 6 : Ajouter des outils custom (optionnel)
 
-Vous pouvez ajouter des outils supplementaires au serveur. Ces outils apparaitront dans le meme namespace que les widgets :
+Vous pouvez ajouter des outils supplementaires au serveur. Ils apparaitront dans le meme namespace que les widgets :
 
 ```typescript
 monserveur.addTool({
@@ -255,6 +295,7 @@ monserveur.addTool({
       cardTitle: string;
       targetColumn: string;
     };
+    // Logique metier ici
     return {
       ok: true,
       message: `Carte "${cardTitle}" deplacee vers "${targetColumn}"`,
@@ -262,6 +303,8 @@ monserveur.addTool({
   },
 });
 ```
+
+Le LLM verra cet outil comme `monserveur_webmcp_move_card` et pourra l'appeler apres avoir affiche le kanban.
 
 ---
 
@@ -285,18 +328,45 @@ const result = await runAgentLoop(userMessage, {
 
 Le prefixage des outils est automatique :
 
-| Outil brut          | Nom expose au LLM                        |
-|---------------------|-------------------------------------------|
-| `search_recipes`    | `monserveur_webmcp_search_recipes`        |
-| `get_recipe`        | `monserveur_webmcp_get_recipe`            |
-| `widget_display`    | `monserveur_webmcp_widget_display`        |
-| `move_card`         | `monserveur_webmcp_move_card`             |
+| Outil brut | Nom expose au LLM |
+|------------|-------------------|
+| `search_recipes` | `monserveur_webmcp_search_recipes` |
+| `get_recipe` | `monserveur_webmcp_get_recipe` |
+| `widget_display` | `monserveur_webmcp_widget_display` |
+| `move_card` | `monserveur_webmcp_move_card` |
 
-Ce prefixage evite les collisions quand plusieurs serveurs (MCP + WebMCP) coexistent.
+N'oubliez pas de passer le serveur au `WidgetRenderer` pour le rendu :
 
-### Architecture multi-serveurs
+```svelte
+<WidgetRenderer
+  id={block.id}
+  type={block.type}
+  data={block.data}
+  servers={[monserveur]}
+/>
+```
 
-<img src="/webmcp-auto-ui/diagrams/tut-webmcp-server-2.svg" alt="Architecture multi-serveurs MCP et WebMCP" />
+```mermaid
+graph TB
+    subgraph Layers
+        AutoUI["autoui.layer()"]
+        Custom["monserveur.layer()"]
+    end
+
+    subgraph "Outils exposes au LLM"
+        A1["autoui_webmcp_widget_display"]
+        A2["autoui_webmcp_search_recipes"]
+        C1["monserveur_webmcp_widget_display"]
+        C2["monserveur_webmcp_search_recipes"]
+        C3["monserveur_webmcp_move_card"]
+    end
+
+    AutoUI --> A1
+    AutoUI --> A2
+    Custom --> C1
+    Custom --> C2
+    Custom --> C3
+```
 
 ---
 
@@ -312,11 +382,27 @@ User: "Montre-moi un kanban de mon sprint"
 
 Le LLM va suivre cette sequence :
 
-<img src="/webmcp-auto-ui/diagrams/tut-webmcp-server-3.svg" alt="Sequence de decouverte et rendu d'un widget kanban" />
+```mermaid
+sequenceDiagram
+    participant LLM as Claude
+    participant Agent as Agent Loop
+    participant WS as WebMCP Server
 
-### Le dispatch widget_display
+    LLM->>Agent: search_recipes("kanban sprint")
+    Agent->>WS: search_recipes
+    WS-->>Agent: [{name: "kanban", description: "..."}]
+    Agent-->>LLM: recettes trouvees
 
-<img src="/webmcp-auto-ui/diagrams/tut-webmcp-server-4.svg" alt="Dispatch widget_display avec validation et rendu" />
+    LLM->>Agent: get_recipe("kanban")
+    Agent->>WS: get_recipe
+    WS-->>Agent: {schema: {...}, instructions: "..."}
+    Agent-->>LLM: schema + instructions
+
+    LLM->>Agent: widget_display("kanban", {columns: [...]})
+    Agent->>WS: validate + render
+    WS-->>Agent: {id: "w_a3f2k1"}
+    Agent-->>LLM: Widget affiche !
+```
 
 ### Verifier le rendu
 
@@ -325,14 +411,16 @@ Le resultat de `widget_display` contient un `id` (ex: `w_a3f2k1`). L'UI utilise 
 2. Passer `data` comme props au composant
 3. Afficher le widget sur le canvas
 
+**Verification** : le kanban s'affiche avec les colonnes et cartes generees par le LLM.
+
 ---
 
 ## Validation des parametres
 
-Le serveur WebMCP valide automatiquement les parametres contre le JSON Schema avant de les passer au renderer. L'implementation utilise `validateJsonSchema` du package `@webmcp-auto-ui/core` :
+Le serveur WebMCP valide automatiquement les parametres contre le JSON Schema avant de les passer au renderer :
 
 ```typescript
-// Extrait de webmcp-server.ts — execute de widget_display
+// Extrait de webmcp-server.ts -- execute de widget_display
 const rawParams = (params.params ?? {}) as Record<string, unknown>;
 const validation = validateJsonSchema(rawParams, entry.inputSchema as JsonSchema);
 if (!validation.valid) {
@@ -344,13 +432,22 @@ if (!validation.valid) {
 }
 ```
 
-Si la validation echoue, le LLM recoit le schema attendu et peut corriger son appel au tour suivant.
+Si la validation echoue, le LLM recoit le schema attendu et peut corriger son appel au tour suivant. Ce mecanisme d'auto-correction est transparent et fonctionne dans la majorite des cas.
+
+:::note[Sanitisation des images]
+Le serveur WebMCP sanitise automatiquement les champs d'image (src, avatar, photo, thumbnail) pour supprimer les URLs hallucinees par le LLM. Seuls les prefixes valides sont acceptes : `http://`, `https://`, `data:`, `/`.
+:::
 
 ---
 
-## Sanitisation des URLs d'images
+## Troubleshooting
 
-Le serveur WebMCP sanitise automatiquement les champs d'image (src, avatar, photo, thumbnail, etc.) pour supprimer les URLs hallucinees par le LLM. Seuls les prefixes valides sont acceptes : `http://`, `https://`, `data:`, `/`.
+| Probleme | Cause probable | Solution |
+|----------|---------------|----------|
+| Widget pas decouvert | La `description` dans la recette ne matche pas la requete | Enrichissez la description avec des synonymes |
+| "Validation failed" | Le LLM envoie des params incompatibles | Ajoutez des `description` a chaque propriete du schema |
+| Widget rendu comme JSON brut | Le serveur n'est pas passe au WidgetRenderer | Ajoutez `servers={[monserveur]}` |
+| Outil custom non visible | L'outil est ajoute apres `layer()` | Appelez `addTool()` avant `layer()` |
 
 ---
 
@@ -363,7 +460,14 @@ Le serveur WebMCP sanitise automatiquement les champs d'image (src, avatar, phot
 - [ ] `server.registerWidget(recette, composant)`
 - [ ] `server.addTool({...})` si besoin
 - [ ] `layers: [..., server.layer()]`
-- [ ] Tester : search_recipes --> get_recipe --> widget_display
+- [ ] Serveur passe au WidgetRenderer via `servers={[...]}`
+- [ ] Test : search_recipes --> get_recipe --> widget_display
+
+## Aller plus loin
+
+- **Combiner MCP et WebMCP** : votre serveur WebMCP peut coexister avec des serveurs MCP distants dans les memes layers
+- **Schema auto-genere** : utilisez `sync:schemas` pour ne jamais ecrire de schema manuellement
+- **Composant interactif** : ajoutez le bus FONC pour les interactions cross-widgets
 
 ## Voir aussi
 

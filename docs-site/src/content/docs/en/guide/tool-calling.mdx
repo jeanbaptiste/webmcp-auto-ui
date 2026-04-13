@@ -5,65 +5,104 @@ sidebar:
   order: 3
 ---
 
-**Tool calling** is the core of WebMCP Auto-UI. The LLM agent requests tools, and the dispatcher routes them to the correct server (MCP or WebMCP).
+**Tool calling** is the central mechanism of WebMCP Auto-UI. The LLM agent generates `tool_use` blocks, and the dispatcher routes them to the right server -- remote MCP or local WebMCP. This page traces the complete journey of a tool call, from the LLM to the result.
+
+## Flow Overview
+
+```mermaid
+sequenceDiagram
+    participant LLM as LLM Agent
+    participant DISP as Dispatcher
+    participant ALIAS as Alias Map
+    participant MCP as MCP Server (remote)
+    participant WMCP as WebMCP Server (local)
+    participant CANVAS as Canvas
+
+    LLM->>DISP: tool_use: weather_mcp_get_forecast
+    DISP->>ALIAS: Resolve alias
+    ALIAS-->>DISP: weather_mcp_get_weather_data
+    DISP->>DISP: Parse prefix:<br/>server=weather, proto=mcp, tool=get_weather_data
+    DISP->>MCP: callTool("get_weather_data", {location: "Paris"})
+    MCP-->>DISP: {temp: 18, wind: 12}
+    DISP-->>LLM: tool_result
+
+    LLM->>DISP: tool_use: autoui_webmcp_widget_display
+    DISP->>WMCP: executeTool("widget_display", {name: "stat", params: ...})
+    WMCP-->>DISP: {widget: "stat", id: "w_abc"}
+    DISP->>CANVAS: onWidget("stat", data)
+    DISP-->>LLM: tool_result
+```
 
 ## Anatomy of a Tool Call
 
-### 1. Agent generates a tool_use block
+### 1. Agent Generates a tool_use Block
+
+When the LLM decides to use a tool, it produces a structured block:
 
 ```typescript
-// LLM response
 {
   type: 'tool_use',
-  id: 'toolu_1234',
-  name: 'weather_mcp_get_forecast',
-  input: { location: 'Paris', days: 3 }
+  id: 'toolu_1234',                    // Unique call identifier
+  name: 'weather_mcp_get_forecast',    // Canonical name with prefix
+  input: { location: 'Paris', days: 3 } // Tool parameters
 }
 ```
 
-### 2. Dispatcher routes the call
+The name follows the `{serverName}_{protocol}_{toolName}` convention. This format tells the dispatcher immediately:
+- **Which server** to contact (`weather`)
+- **Which protocol** to use (`mcp` = remote, `webmcp` = local)
+- **Which tool** to call (`get_forecast`)
+
+### 2. Dispatcher Routes the Call
+
+The dispatcher is the routing core. For each `tool_use` block, it:
+
+1. Resolves aliases (canonical names to actual server names)
+2. Parses the prefix to identify server, protocol, and tool
+3. Routes to MCP or WebMCP
 
 ```typescript
-// In runAgentLoop, dispatcher.ts processes each block
 for (const block of toolBlocks) {
-  // Resolve alias
+  // Step 1: Resolve alias
   const resolvedName = aliasMap.get(block.name) ?? block.name;
-  
-  // Parse prefix: {serverName}_{protocol}_{toolName}
+
+  // Step 2: Parse prefix
   const match = resolvedName.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
   if (!match) {
-    // Error: invalid format
     result = `Error: unknown tool format`;
   } else {
     const [, serverName, protocol, realToolName] = match;
-    
-    // Routing
+
+    // Step 3: Routing
     if (protocol === 'mcp') {
-      // → MCP client.callTool()
+      // → Network call via MCP client
     } else if (protocol === 'webmcp') {
-      // → WebMCP server.executeTool()
+      // → Local execution via WebMCP server
     }
   }
 }
 ```
 
-### 3. Interceptor (pseudo-tools)
+:::note[Prefix format]
+The regex `^(.+?)_(mcp|webmcp)_(.+)$` uses a non-greedy match on the first group (`(.+?)`) to support server names containing underscores (e.g., `my_weather_mcp_get_forecast`).
+:::
 
-Before normal dispatch, two **pseudo-tools** are intercepted locally:
+### 3. Interceptor (Pseudo-Tools)
+
+Before normal dispatch, two **pseudo-tools** are intercepted locally. They do not trigger server activation:
 
 ```typescript
-// list_tools, search_tools — no server activation
-if (toolMatch && (toolMatch[3] === 'list_tools' || toolMatch[3] === 'search_tools')) {
-  const layer = layers.find(l => 
-    sanitizeServerName(l.serverName) === serverName && 
+if (toolMatch[3] === 'list_tools' || toolMatch[3] === 'search_tools') {
+  const layer = layers.find(l =>
+    sanitizeServerName(l.serverName) === serverName &&
     l.protocol === protocol
   );
-  
-  // Return the list without touching the server
+
   if (pseudoTool === 'list_tools') {
+    // Return the complete tool list for the server
     result = JSON.stringify(layer.tools);
   } else {
-    // search_tools
+    // Filter by keyword in name or description
     const query = String(block.input.query ?? '').toLowerCase();
     const matches = layer.tools.filter(t =>
       t.name.toLowerCase().includes(query) ||
@@ -74,138 +113,167 @@ if (toolMatch && (toolMatch[3] === 'list_tools' || toolMatch[3] === 'search_tool
 }
 ```
 
-### 4. Lazy server activation
+**Why intercept?** So the agent can explore available tools without triggering a network connection. The agent can call `list_tools()` as often as it wants with zero network cost.
 
-On **first call** to a server tool:
+### 4. Lazy Server Activation
+
+On the **first real call** to a server's tool:
 
 ```typescript
-const activateMatch = block.name.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
-if (activateMatch) {
-  const [, serverName, protocol] = activateMatch;
-  const serverKey = `${serverName}_${protocol}`;
-  
-  if (!activatedServers.has(serverKey)) {
-    activatedServers.add(serverKey);
-    const layer = layers.find(l => 
-      sanitizeServerName(l.serverName) === serverName && 
-      l.protocol === protocol
-    );
-    if (layer) {
-      // Add ALL server tools to activeTools
-      activeTools = activateServerTools(activeTools, layer);
-    }
+const serverKey = `${serverName}_${protocol}`;
+
+if (!activatedServers.has(serverKey)) {
+  activatedServers.add(serverKey);
+  const layer = layers.find(l =>
+    sanitizeServerName(l.serverName) === serverName &&
+    l.protocol === protocol
+  );
+  if (layer) {
+    // Add ALL server tools to active tools
+    activeTools = activateServerTools(activeTools, layer);
   }
 }
 ```
+
+After activation, the LLM receives the full tool list for the server on its next call. Activation is a one-shot operation: it happens once per session.
 
 ## MCP Dispatch
 
 <img src="/webmcp-auto-ui/diagrams/tool-calling-1.svg" alt="MCP dispatch flow from tool_use block to agent messages" />
 
-### MCP Code
+MCP dispatch goes through an SSE (Server-Sent Events) client connected to the remote server:
 
 ```typescript
 if (protocol === 'mcp') {
   if (!client) {
     result = `Error: no MCP client available for tool ${name}`;
   } else {
+    // Call the tool on the remote server
     const mcpResult = await client.callTool(realToolName, block.input);
+
+    // Extract text content from the MCP response
     const textContent = mcpResult.content?.find(
       (c) => c.type === 'text'
     ) as { text?: string } | undefined;
     const rawResult = textContent?.text ?? JSON.stringify(mcpResult);
-    
-    // Truncate if result > 10,000 chars (default MAX_RESULT_LEN)
-    result = truncateResults 
-      ? truncateResult(rawResult, maxResultLength) 
+
+    // Truncate if result exceeds limit (default: 10,000 chars)
+    result = truncateResults
+      ? truncateResult(rawResult, maxResultLength)
       : rawResult;
   }
 }
 ```
 
-**Network**: The MCP client establishes an SSE (Server-Sent Events) connection to the remote server and calls `tools/call`.
+Truncation prevents a large result (a 10,000-row table, for example) from filling the context window. The full result is stored in the `resultBuffer` and accessible via `recall()`.
+
+:::caution[Network latency]
+MCP calls involve a network round trip. If the server is slow or unreachable, the dispatcher waits indefinitely (unless an `AbortSignal` is provided via agent options).
+:::
 
 ## WebMCP Dispatch
 
 <img src="/webmcp-auto-ui/diagrams/tool-calling-2.svg" alt="WebMCP dispatch flow with recall, widget_display, canvas and executeTool branches" />
 
-### WebMCP Code
+WebMCP dispatch executes the tool locally in the browser:
 
 ```typescript
 if (protocol === 'webmcp') {
-  // ── Special: recall (re-read a compressed result) ──
+  // Special case: recall (re-read a compressed result)
   if (realToolName === 'recall' && resultBuffer.size > 0) {
     const recallId = (block.input as { id: string }).id;
-    result = resultBuffer.get(recallId) 
+    result = resultBuffer.get(recallId)
       ?? `No result found for id '${recallId}'.`;
   } else {
-    // ── Normal dispatch to WebMCP server ──
+    // Normal dispatch to WebMCP server
     const webmcpServer = webmcpServers.get(serverName);
     if (!webmcpServer) {
       result = `Error: no WebMCP server "${serverName}" found.`;
     } else {
       const toolResult = await webmcpServer.executeTool(
-        realToolName, 
+        realToolName,
         block.input
       );
-      result = typeof toolResult === 'string' 
-        ? toolResult 
+      result = typeof toolResult === 'string'
+        ? toolResult
         : JSON.stringify(toolResult);
-      
-      // ── Special: widget_display ──
-      if (realToolName === 'widget_display') {
-        const wr = toolResult as Record<string, unknown>;
-        if (wr.widget && wr.data && !wr.error) {
-          const widgetResult = callbacks.onWidget?.(
-            wr.widget as string, 
-            wr.data as Record<string, unknown>
-          );
-          if (widgetResult?.id) {
-            result = JSON.stringify({ ...wr, id: widgetResult.id });
-          }
-        }
-      }
-      
-      // ── Special: canvas (UI actions) ──
-      if (realToolName === 'canvas') {
-        const action = block.input.action as string;
-        const id = block.input.id as string;
-        const actionParams = block.input.params as Record<string, unknown>;
-        
-        switch (action) {
-          case 'clear': callbacks.onClear?.(); break;
-          case 'update': callbacks.onUpdate?.(id, actionParams ?? {}); break;
-          case 'move': callbacks.onMove?.(
-            id, 
-            (actionParams?.x ?? block.input.x) as number,
-            (actionParams?.y ?? block.input.y) as number
-          ); break;
-          case 'resize': callbacks.onResize?.(
-            id,
-            (actionParams?.width ?? block.input.width) as number,
-            (actionParams?.height ?? block.input.height) as number
-          ); break;
-          case 'style': callbacks.onStyle?.(
-            id,
-            (actionParams?.styles ?? block.input.styles) as Record<string, string>
-          ); break;
-        }
-      }
     }
   }
 }
 ```
 
-## Widget Display (special case)
+WebMCP dispatch handles three special cases beyond standard execution:
 
-`widget_display()` is the main tool for **UI rendering**:
+### Special Case: widget_display
+
+When the called tool is `widget_display`, the dispatcher detects the result and triggers the rendering callback:
+
+```typescript
+if (realToolName === 'widget_display') {
+  const wr = toolResult as Record<string, unknown>;
+  if (wr.widget && wr.data && !wr.error) {
+    const widgetResult = callbacks.onWidget?.(
+      wr.widget as string,
+      wr.data as Record<string, unknown>
+    );
+    if (widgetResult?.id) {
+      result = JSON.stringify({ ...wr, id: widgetResult.id });
+    }
+  }
+}
+```
+
+The `onWidget` callback is responsible for adding the widget to the canvas. The returned `id` lets the agent manipulate the widget in subsequent iterations (move, resize, update).
+
+### Special Case: canvas
+
+The `canvas` tool lets the agent manipulate existing widgets:
+
+```typescript
+if (realToolName === 'canvas') {
+  const action = block.input.action as string;
+  const id = block.input.id as string;
+  const actionParams = block.input.params as Record<string, unknown>;
+
+  switch (action) {
+    case 'clear':  callbacks.onClear?.(); break;
+    case 'update': callbacks.onUpdate?.(id, actionParams ?? {}); break;
+    case 'move':   callbacks.onMove?.(id, x, y); break;
+    case 'resize': callbacks.onResize?.(id, width, height); break;
+    case 'style':  callbacks.onStyle?.(id, styles); break;
+  }
+}
+```
+
+| Action | Description | Example Use |
+|--------|-------------|-------------|
+| `clear` | Empty the entire canvas | "Start from scratch" |
+| `update` | Modify a widget's data | Change a stat's value |
+| `move` | Reposition a widget (CSS transform) | Rearrange layout |
+| `resize` | Resize a widget | Enlarge a chart |
+| `style` | Apply CSS styles | Change background color |
+
+### Special Case: recall
+
+`recall` is a pseudo-tool that re-reads a compressed result. It is intercepted before normal dispatch:
+
+```typescript
+if (realToolName === 'recall' && resultBuffer.size > 0) {
+  const recallId = (block.input as { id: string }).id;
+  result = resultBuffer.get(recallId) ?? `No result found...`;
+}
+```
+
+## Widget Display in Detail
+
+`widget_display()` is the primary tool for UI rendering. Here is the complete journey of a call:
 
 <img src="/webmcp-auto-ui/diagrams/tool-calling-3.svg" alt="widget_display validation, sanitization and rendering pipeline" />
 
-### Complete Example
+### End-to-End Example
 
 ```typescript
-// Agent calls
+// 1. Agent calls widget_display
 {
   type: 'tool_use',
   id: 'toolu_5678',
@@ -215,130 +283,70 @@ if (protocol === 'webmcp') {
     params: {
       label: 'Conversion',
       value: '3.2%',
-      unit: '%',
       trend: 'up',
       variant: 'success'
     }
   }
 }
-
-// Dispatcher:
-// 1. Get schema for 'stat-card' widget
-// 2. Validate params vs schema
-// 3. Sanitize image URLs (none to remove here)
-// 4. Generate ID 'w_1a2b3c'
-// 5. Call onWidget('stat-card', {...params})
-// 6. Canvas adds widget: { id: 'w_1a2b3c', type: 'stat-card', data: {...} }
-// 7. WidgetRenderer mounts StatCard component with props
-// 8. UI displays the card
 ```
 
-## Canvas Tools (UI manipulation)
+The dispatcher executes these steps in sequence:
 
-The `canvas` tool allows the agent to **rearrange widgets**:
+1. **Resolution**: find the `stat-card` widget definition in the registry.
+2. **Validation**: check that `params` matches the JSON Schema (`label` and `value` required, `trend` must be one of `[up, down, stable]`).
+3. **Sanitization**: verify image URLs (if present) against an allowlist of domains.
+4. **ID generation**: create a unique identifier `w_1a2b3c`.
+5. **Callback**: call `onWidget('stat-card', {...params})` to add the widget to the canvas.
+6. **Canvas store**: the store adds `{ id: 'w_1a2b3c', type: 'stat-card', data: {...} }` to the block list.
+7. **Svelte rendering**: `WidgetRenderer` detects the new block and mounts the `StatCard` component with props.
+8. **Display**: the widget appears on the canvas.
 
-```typescript
-// Agent calls
-{
-  type: 'tool_use',
-  name: 'autoui_webmcp_canvas',
-  input: {
-    action: 'move',
-    id: 'w_1a2b3c',
-    params: { x: 100, y: 50 }
-  }
-}
-
-// Callbacks in agent
-callbacks.onMove?.('w_1a2b3c', 100, 50);
-// → Update CSS widget position
-```
-
-**Actions**:
-- `clear()` — empty canvas
-- `update(id, data)` — modify widget data
-- `move(id, x, y)` — reposition (CSS transform)
-- `resize(id, width, height)` — resize
-- `style(id, styles)` — apply CSS styles
-
-## Recall (re-read compressed results)
-
-After ~2 iterations, **old tool results** are compressed to save context:
-
-```typescript
-// Before compression
-{
-  type: 'tool_result',
-  tool_use_id: 'toolu_1234',
-  content: '{"data": [item1, item2, ... item1000], "total": 1000}'
-}
-
-// After compression (mutated in-place)
-{
-  type: 'tool_result',
-  tool_use_id: 'toolu_1234',
-  content: '{"data": [item1, item2, ... [recall(\'toolu_1234\') for complete result, 5000 chars]'
-}
-
-// Stored in resultBuffer
-resultBuffer.set('toolu_1234', '{"data": [item1, item2, ... item1000], "total": 1000}');
-```
-
-If the agent calls `recall('toolu_1234')`:
-
-```typescript
-// Dispatcher intercepts recall
-if (realToolName === 'recall' && resultBuffer.size > 0) {
-  const recallId = (block.input as { id: string }).id;
-  result = resultBuffer.get(recallId) ?? `No result found...`;
-}
-```
-
-**Advantage**: Agent can navigate multiple data layers without blocking context.
+:::tip[Auto-repair]
+If validation fails, the dispatcher returns the error **and** the expected schema. Modern LLMs (Claude, Gemma 4) can correct their parameters and retry automatically. The `autoRepairParams` module can also attempt automatic repair before returning the error.
+:::
 
 ## Error Handling
 
-### Schema validation error
+### Schema Validation Error
 
 ```typescript
-// Invalid widget params
+// Agent omits a required field
 {
-  type: 'tool_use',
   name: 'autoui_webmcp_widget_display',
   input: {
     name: 'stat',
-    params: { label: 'Sales' }  // ✗ missing value
+    params: { label: 'Sales' }  // Missing 'value' (required)
   }
 }
 
-// Response
+// Dispatcher returns error + schema
 {
   type: 'tool_result',
   content: JSON.stringify({
     error: 'Validation failed',
     details: [{ path: '/value', message: 'required' }],
-    expected_schema: { ... }
+    expected_schema: { type: 'object', required: ['label', 'value'], ... }
   })
 }
-
-// Agent receives error + schema → retries with correct fields
 ```
 
-### Tool not found
+The agent receives the expected schema and can retry with the correct fields. This error-correction pattern is natural for LLMs.
+
+### Tool Not Found
 
 ```typescript
-// MCP
+// MCP server not connected
 if (!client) {
   result = `Error: no MCP client available for tool ${name}`;
 }
 
-// WebMCP
+// WebMCP server not registered
 if (!webmcpServer) {
   result = `Error: no WebMCP server "${serverName}" found.`;
 }
 ```
 
-### Tool execution failure
+### Execution Failure
 
 ```typescript
 try {
@@ -346,42 +354,113 @@ try {
   result = ...;
 } catch (e) {
   call.error = e instanceof Error ? e.message : String(e);
-  toolResults.push({ 
-    type: 'tool_result', 
-    tool_use_id: block.id, 
-    content: `Error: ${call.error}` 
+  toolResults.push({
+    type: 'tool_result',
+    tool_use_id: block.id,
+    content: `Error: ${call.error}`
   });
 }
 ```
 
+Execution errors are caught and returned to the agent as normal `tool_result` messages. The agent can decide to retry, use a different tool, or report the failure to the user.
+
 ## Metrics and Monitoring
 
-Each tool call is tracked:
+Every tool call is tracked with metrics:
 
 ```typescript
 const call: ToolCall = {
-  id: block.id,
-  name: block.name,
-  args: block.input,
-  result: result,
-  error: undefined,
-  elapsed: Math.round(performance.now() - t1),
-  guided: wasDiscovering,  // true if preceded by discovery tool
+  id: block.id,          // Unique call ID
+  name: block.name,      // Canonical tool name
+  args: block.input,     // Parameters
+  result: result,        // Result (or error)
+  error: undefined,      // Error message if failed
+  elapsed: Math.round(performance.now() - t1),  // Duration in ms
+  guided: wasDiscovering, // true if preceded by a discovery tool
 };
 
 metrics.toolCalls++;
-callbacks.onToolCall?.(call);  // subscriber can log
+callbacks.onToolCall?.(call);
 ```
 
-**Useful for**: analytics, debugging, agent optimization.
+The `onToolCall` callback enables:
+- **Logging** every call for debugging
+- **Measuring** MCP server latency
+- **Counting** tools called per iteration
+- **Detecting** loops (same tool called repeatedly with same parameters)
+
+The `<AgentConsole>` component from `@webmcp-auto-ui/ui` displays these metrics in real time in the interface.
+
+## Result Compression
+
+After approximately 2 iterations, old `tool_result` messages are compressed to save context:
+
+```typescript
+// Before compression
+{
+  type: 'tool_result',
+  tool_use_id: 'toolu_1234',
+  content: '{"data": [item1, item2, ... item1000], "total": 1000}'
+  // 5000 characters
+}
+
+// After compression (mutated in place in the messages array)
+{
+  type: 'tool_result',
+  tool_use_id: 'toolu_1234',
+  content: '{"data": [item1, item2... [recall(\'toolu_1234\') for full result, 5000 chars]'
+  // 200 characters
+}
+
+// Full result stored in buffer
+resultBuffer.set('toolu_1234', '{"data": [item1, item2, ... item1000]}');
+```
+
+The agent can re-read the full result at any time by calling `recall('toolu_1234')`. This mechanism is transparent: the agent decides whether it needs the full result or if the preview is enough.
 
 ## Flow Summary
 
-1. **LLM generates** `tool_use` block
-2. **Dispatcher detects** format + resolves alias
-3. **Pseudo-tools** (list_tools, search_tools) → local response
-4. **Lazy activation**: if 1st call, add all server tools
-5. **Routing**: MCP → network, WebMCP → local
-6. **Post-processing**: compression, sanitize, callbacks
-7. **tool_result** returns to agent
-8. **Next iteration** of loop
+```mermaid
+flowchart TD
+    A[LLM generates tool_use] --> B{Valid format?}
+    B -->|No| ERR1[Error: unknown format]
+    B -->|Yes| C[Resolve alias]
+    C --> D{Pseudo-tool?}
+    D -->|Yes| E[Local response<br/>list/search_tools]
+    D -->|No| F{First call<br/>to this server?}
+    F -->|Yes| G[Activate all<br/>server tools]
+    F -->|No| H{Protocol?}
+    G --> H
+    H -->|MCP| I[Network call<br/>via SSE]
+    H -->|WebMCP| J{Special tool?}
+    J -->|recall| K[Read from<br/>resultBuffer]
+    J -->|widget_display| L[Validate + mount<br/>widget on canvas]
+    J -->|canvas| M[Manipulate<br/>existing widgets]
+    J -->|Standard| N[executeTool]
+    I --> O[Truncate if needed]
+    K --> O
+    L --> O
+    M --> O
+    N --> O
+    E --> O
+    O --> P[Compress old<br/>results]
+    P --> Q[Return tool_result<br/>to agent]
+```
+
+## FAQ
+
+### Why the `{server}_{proto}_{tool}` format instead of just the tool name?
+
+Because the same tool name can exist on multiple servers. For example, `list_items` could be defined on both a `database` and a `filesystem` server. The prefix disambiguates.
+
+### How many tools can an agent handle?
+
+In theory, as many as the context window allows. In practice, beyond 50 active tools, LLM choice quality degrades. The lazy loading mechanism limits tools to only the servers actually used.
+
+### What happens if an MCP server does not respond?
+
+The call waits until a timeout (configurable via `AbortSignal`). The agent receives an error and can decide what to do next (retry, use a different tool, inform the user).
+
+### How do I add a custom pseudo-tool?
+
+Pseudo-tools are managed in the dispatcher. To add one, you need to modify the interception logic in `loop.ts`. This is intentionally limited: pseudo-tools should be rare and well-defined.

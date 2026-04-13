@@ -1,151 +1,286 @@
 ---
 title: "component()"
-description: Unified tool exposing 56 components to the LLM, smart vs explicit mode
+description: Unified tool exposing components to the LLM, widget_display, and the agent-UI bridge
 sidebar:
   order: 2
 ---
 
-:::caution[Deprecated page]
-This page describes the old `component()` / `componentRegistry` API removed in Phase 8. See [Architecture](/guide/architecture/) for the current API based on WebMCP servers and `widget_display`.
+Think of a universal remote control: instead of having one remote per device (TV, speakers, lights), you have a single "show this" button. You say what you want to see and with what parameters, and the remote figures it out. That's exactly what `widget_display` does: a **single tool** that lets the agent render any of the 24+ native widgets.
+
+## What is the component / widget_display tool?
+
+`widget_display` is the central WebMCP tool that lets the AI agent **display a widget on the canvas**. The agent sends a widget name and its parameters, and the system:
+1. Validates parameters against the widget's JSON schema
+2. Sanitizes image URLs (strips hallucinated URLs)
+3. Renders the widget on the canvas
+4. Returns a unique identifier for later modifications
+
+```ts
+// The agent calls:
+widget_display({
+  name: "stat-card",
+  params: { label: "Uptime", value: "99.9", unit: "%", variant: "success" }
+})
+
+// The system returns:
+{ widget: "stat-card", data: { label: "Uptime", value: "99.9", unit: "%", variant: "success" }, id: "w_a3f2" }
+```
+
+:::note[Historical evolution]
+The tool was called `component()` in earlier versions (before Phase 8). It was renamed to `widget_display` when the WebMCP `autoui` server was adopted. The old `component()` / `componentRegistry` API has been removed. The concept remains the same: a single tool to render any widget.
 :::
 
-Three separate tools expose 56 components (31 renderable, 25 non-renderable) to the LLM. In smart mode, these are the only visible UI tools.
+## Why a single tool?
 
-## Smart vs explicit mode
+The alternative would be to expose one tool **per widget**: `render_stat`, `render_chart`, `render_table`... that's 31 tools. Compare:
 
-| | Smart (default) | Explicit |
-|--|---------------|----------|
-| **UI tools** | 3: `list_components()`, `get_component()`, `component()` | 31 `render_*` + `component()` |
-| **Discovery** | `list_components()` + `get_component(name)` | LLM sees all tools |
-| **Schema tokens** | ~200 tokens | ~3000 tokens |
-| **Recommended for** | Cloud (Claude) | WASM (Gemma) or debug |
+| Approach | Visible tools | Schema tokens | Discovery |
+|----------|--------------|--------------|-----------|
+| 1 tool per widget | 31 `render_*` | ~3000 tokens | LLM sees everything upfront |
+| Single `widget_display` | 1 tool | ~200 tokens | LLM discovers via recipes |
 
-## Three tools
+The single tool uses **15x fewer** schema tokens. With a remote LLM like Claude, that's a significant saving on every request.
 
-### list_components() -- Global discovery
+## The 6 tools of the autoui server
 
-```
-list_components()
-```
+The `autoui` server exposes 6 tools in total. The first 4 form the discovery and rendering system, the last 2 are utility tools:
 
-Returns the list of 56 components with name, description, and `renderable` flag, plus available recipes.
-
-### get_component(name) -- Detailed schema
+### search_recipes() -- Search
 
 ```
-get_component("stat-card")
+autoui_webmcp_search_recipes({ query: "kpi" })
 ```
 
-Returns the detailed JSON schema, description and renderability of a specific component. Call `list_components()` first to see available names.
+Returns widgets and recipes whose name or description contains the search term.
 
-### component(name, params) -- Rendering
+### list_recipes() -- Full list
 
 ```
-component("stat-card", { label: "Revenue", value: "$142K" })
+autoui_webmcp_list_recipes()
 ```
 
-Renders the component on the canvas via the `onWidget` callback. Call `get_component(name)` first for the expected parameters.
+Returns the list of all registered widgets with name, description and group.
 
-## Component names
+### get_recipe() -- Detailed schema
 
-Names use dashes: `stat-card`, `data-table`, `chart-rich`. Legacy `render_*` names are accepted for backward compatibility.
+```
+autoui_webmcp_get_recipe({ name: "stat-card" })
+```
 
-### Canvas actions
+Returns the widget's **full JSON schema**, its description, and its **usage recipe** (a Markdown guide). This is where the agent learns expected parameters.
 
-| Short name | Legacy equivalent |
-|-----------|------------------|
-| `clear` | `clear_canvas` |
-| `update` | `update_block` |
-| `move` | `move_block` |
-| `resize` | `resize_block` |
-| `style` | `style_block` |
+### widget_display() -- Rendering
 
-## Renderable components (31)
+```
+autoui_webmcp_widget_display({ name: "stat-card", params: { label: "Uptime", value: "99.9%" } })
+```
 
-All block types used by `BlockRenderer`:
+**The main tool.** Validates parameters, sanitizes URLs, and renders the widget on the canvas. Returns `{ widget, data, id }`.
 
-| Component | Description |
-|-----------|-------------|
-| `stat` | Single metric with trend |
-| `kv` | Key-value pairs |
-| `list` | Bulleted list |
-| `chart` | Simple bar chart |
-| `alert` | Alert banner |
-| `code` | Code block |
-| `text` | Text paragraph |
-| `actions` | Action buttons |
-| `tags` | Tag collection |
-| `stat-card` | Enhanced stat with color |
-| `data-table` | Sortable table |
-| `timeline` | Event timeline |
-| `profile` | Profile card |
-| `trombinoscope` | Portrait grid |
-| `json-viewer` | Interactive JSON tree |
-| `hemicycle` | Parliament hemicycle |
-| `chart-rich` | Multi-type chart |
-| `cards` | Card grid |
-| `grid-data` | Spreadsheet grid |
-| `sankey` | Flow diagram |
-| `map` | Leaflet map |
-| `d3` | D3 widget (presets) |
-| `log` | Log viewer |
-| `gallery` | Image gallery |
-| `carousel` | Slide carousel |
-| `clear` | Clear the canvas |
-| `update` | Update a block |
-| `move` | Move a block |
-| `resize` | Resize a block |
-| `style` | Style a block |
+### canvas() -- Manipulation
 
-## Non-renderable components (25)
+```
+autoui_webmcp_canvas({ action: "update", id: "w_a3f2", params: { data: { value: "99.8%" } } })
+```
 
-Svelte components (primitives, base UI, layouts, agent UI, theme). They return their schema and a usage hint via `get_component("name")`.
+5 actions to modify existing widgets: `clear`, `update`, `move`, `resize`, `style`.
 
-## API
+### recall() -- Result re-read
+
+```
+autoui_webmcp_recall({ id: "toolu_xxx" })
+```
+
+Re-reads the full result of a previous tool call (useful when the result was truncated to 10,000 characters by the agent loop).
+
+## The complete flow: from discovery to render
+
+```mermaid
+sequenceDiagram
+    participant LLM as Agent LLM
+    participant SR as search_recipes
+    participant GR as get_recipe
+    participant WD as widget_display
+    participant C as Canvas
+
+    Note over LLM: The agent has data to display
+    LLM->>SR: search_recipes("table")
+    SR-->>LLM: [{name: "data-table", desc: "Sortable table"}, {name: "grid-data", desc: "Spreadsheet grid"}]
+
+    LLM->>GR: get_recipe("data-table")
+    GR-->>LLM: {schema: {columns: [...], rows: [...]}, recipe: "## When to use..."}
+
+    Note over LLM: The agent now knows the exact schema
+    LLM->>WD: widget_display({name: "data-table", params: {columns: [{key: "name", label: "Name"}], rows: [{name: "Alice"}]}})
+    WD-->>LLM: {widget: "data-table", id: "w_b7c1"}
+    WD->>C: Renders the table on canvas
+
+    Note over LLM: Later, update the widget
+    LLM->>WD: canvas({action: "update", id: "w_b7c1", params: {data: {rows: [{name: "Alice"}, {name: "Bob"}]}}})
+```
+
+## The bidirectional agent-UI bridge
+
+The system creates a **bidirectional bridge** between the agent and the interface:
+
+```mermaid
+graph LR
+    subgraph "Agent -> UI"
+        A1["widget_display()"] -->|creates| W["Widget on canvas"]
+        A2["canvas(update)"] -->|modifies| W
+    end
+
+    subgraph "UI -> Agent"
+        W -->|auto-registers| T["Per-block WebMCP tools"]
+        T -->|block_id_get| A3["Agent reads data"]
+        I["User interaction"] -->|event| A4["Agent reacts"]
+    end
+```
+
+### Agent -> UI direction
+
+The agent creates and modifies widgets:
+
+1. `widget_display()` creates a new widget
+2. `canvas(update)` updates an existing widget's data
+3. `canvas(move/resize/style)` changes position and styling
+4. `canvas(clear)` clears the entire canvas
+
+### UI -> Agent direction
+
+Each rendered widget auto-registers as a WebMCP tool source via `navigator.modelContext`:
 
 ```ts
-import { autoui, NATIVE_WIDGET_NAMES } from '@webmcp-auto-ui/agent';
-```
+// When a "stat-card" widget with id "w_a3f2" is mounted:
+navigator.modelContext.registerTool('block_w_a3f2_get', {
+  description: 'Read current data of stat-card widget',
+  execute: () => currentData,
+});
 
-### Register a custom component
+navigator.modelContext.registerTool('block_w_a3f2_update', {
+  description: 'Update stat-card widget data',
+  execute: (newData) => { /* updates the widget */ },
+});
 
-```ts
-componentRegistry.set('my-widget', {
-  name: 'my-widget',
-  toolName: 'my-widget',
-  description: 'Custom widget.',
-  inputSchema: { type: 'object', properties: { title: { type: 'string' } } },
-  renderable: false,
+navigator.modelContext.registerTool('block_w_a3f2_remove', {
+  description: 'Remove this widget from the canvas',
+  execute: () => { /* removes the widget */ },
 });
 ```
 
-## autoui server
+User interactions (button clicks, table selections) also bubble up to the agent as events.
 
-The `autoui` server pre-registers all native widgets. Use `autoui.layer()` to get a WebMcpLayer:
+## Validation and security
+
+### JSON Schema validation
+
+Every `widget_display` call is validated against the target widget's schema. If parameters don't match, the server returns an error with the expected schema:
 
 ```ts
-import { autoui } from '@webmcp-auto-ui/agent';
+// The agent sends invalid parameters:
+widget_display({ name: "stat", params: { valeur: "42" } })
 
-const layer = autoui.layer();
-// { protocol: 'webmcp', serverName: 'autoui', tools: [...] }
+// The server returns:
+{
+  error: "Validation failed",
+  details: [{ path: "/label", message: "required property missing" }],
+  expected_schema: { type: "object", required: ["label", "value"], ... }
+}
 ```
 
-### Groups
+The agent then automatically corrects its call (the system prompt includes error handling rules).
 
-| Group | Components |
-|-------|-----------|
-| `simple` | stat, kv, list, chart, alert, code, text, actions, tags |
-| `rich` | table, timeline, profile, trombinoscope, json, hemicycle, chart-rich, cards, sankey, log, stat-card, grid |
-| `media` | gallery, carousel, map |
-| `advanced` | d3, js-sandbox |
-| `canvas` | clear, update, move, resize, style |
+### Image URL sanitization
 
-## Complete flow
+LLMs tend to fabricate image URLs. The `autoui` server **automatically strips** invalid URLs from image fields (`src`, `avatar`, `image`, `thumbnail`...):
+
+```ts
+// The agent hallucinates a URL:
+widget_display({ name: "profile", params: {
+  name: "Alice",
+  avatar: { src: "portrait-alice.jpg" }   // relative URL, invalid
+} })
+
+// The server strips the invalid avatar before rendering
+// The ProfileCard widget displays the initials "A" instead
+```
+
+Only URLs starting with `http://`, `https://`, `data:` or `/` are preserved.
+
+## Widget names and backward compatibility
+
+Widget names use dashes: `stat-card`, `data-table`, `chart-rich`. Legacy `render_*` prefixed names are still accepted for backward compatibility:
+
+| Current name | Legacy name |
+|-------------|-------------|
+| `stat-card` | `render_stat_card` |
+| `data-table` | `render_data_table` |
+| `chart-rich` | `render_chart_rich` |
+
+## How this relates to other concepts
+
+```mermaid
+graph TD
+    TL["ToolLayers"] -->|WebMcpLayer| AU["autoui server"]
+    AU -->|exposes| WD["widget_display()"]
+    AU -->|exposes| CV["canvas()"]
+    AU -->|exposes| RC["recall()"]
+    AU -->|exposes| SR["search/list/get_recipe()"]
+
+    SR -->|discovery| R["Widget recipes"]
+    R -->|guides| WD
+    WD -->|renders| W["UI Widgets"]
+    W -->|on the| C["Canvas"]
+    CV -->|modifies| W
+```
+
+- **ToolLayers**: the autoui server produces a `WebMcpLayer` carrying all these tools
+- **Recipes**: widget recipes (inline in autoui) and WebMCP recipes (`.md` files) guide widget selection
+- **Widgets**: the catalog of 24+ visual components rendered by `widget_display`
+- **MCP**: MCP tools provide the data that `widget_display` displays
+
+## Advanced patterns
+
+### Multi-widget composition
+
+The agent can chain multiple `widget_display` calls to compose a complete dashboard:
 
 ```
-1. App adds autoui.layer() to layers
-2. buildToolsFromLayers() generates ProviderTool[]
-3. LLM receives discovery tools (search_recipes, list_recipes, etc.)
-4. LLM calls widget_display("stat-card", {label, value}) -> render
-5. onWidget callback -> canvas displays the widget
+// The agent follows a "dashboard-kpi" recipe
+widget_display({ name: "stat-card", params: { label: "Revenue", value: "$142K" } })  -> w_1
+widget_display({ name: "stat-card", params: { label: "Users", value: "3.2K" } })     -> w_2
+widget_display({ name: "chart-rich", params: { type: "line", ... } })                -> w_3
+widget_display({ name: "data-table", params: { columns: [...], rows: [...] } })      -> w_4
 ```
+
+### Reactive updates
+
+The agent can modify a widget without recreating it:
+
+```
+// Initial creation
+widget_display({ name: "stat", params: { label: "Price", value: "$100" } }) -> w_5
+
+// Later, update
+canvas({ action: "update", id: "w_5", params: { data: { value: "$105" } } })
+```
+
+### Cascading error handling
+
+The system prompt includes strict error handling rules:
+
+1. If a call fails: analyze the error message and expected schema
+2. Correct the call in strict compliance with the schema
+3. Retry at least once before changing strategy
+4. After two identical failures: search for a different recipe
+
+## Summary: the 6 tools at a glance
+
+| Tool | Role | When to use |
+|------|------|-------------|
+| `search_recipes` | Search widgets/recipes | At the start, to find the right widget |
+| `list_recipes` | List all widgets | If search yields nothing |
+| `get_recipe` | Get full schema | Before the first widget_display call |
+| `widget_display` | Render a widget | To display data |
+| `canvas` | Modify an existing widget | To update, move, or style |
+| `recall` | Re-read a truncated result | When an MCP result exceeds 10K chars |

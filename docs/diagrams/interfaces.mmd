@@ -91,7 +91,7 @@ classDiagram
 
   class ContextRegistration {
     <<interface>>
-    +tool: ModelContextTool & { execute: ToolExecuteCallba...
+    +tool: ModelContextTool with execute
     +options?: ToolRegistrationOptions
   }
 
@@ -126,10 +126,7 @@ classDiagram
   class ToolContentResource {
     <<interface>>
     +type: 'resource'
-    +resource: {
-    uri: string;
-    mimeType?: string;
-    t...
+    +resource: ResourceRef
   }
 
   class ToolContentError {
@@ -208,9 +205,9 @@ classDiagram
 
   class McpCapabilities {
     <<interface>>
-    +tools?: { listChanged?: boolean }
-    +resources?: { listChanged?: boolean; subscribe?: boolean }
-    +prompts?: { listChanged?: boolean }
+    +tools?: CapabilityOptions
+    +resources?: ResourceCapabilityOptions
+    +prompts?: CapabilityOptions
     +logging?: Record#lt;string, unknown#gt;
   }
 
@@ -236,7 +233,7 @@ classDiagram
     +text?: string
     +data?: string
     +mimeType?: string
-    +resource?: { uri: string; mimeType?: string; text?: string...
+    +resource?: ResourceRef
   }
 
   class McpToolResult {
@@ -410,9 +407,7 @@ classDiagram
   class ChatSummaryResult {
     <<interface>>
     +chatSummary: string
-    +provenance: {
-    mcpServers?: string[];
-    toolsUsed?: st...
+    +provenance: ProvenanceInfo
   }
 
   class TokenMetrics {
@@ -462,8 +457,8 @@ classDiagram
     <<interface>>
     +content: ContentBlock[]
     +stopReason: string
-    +usage?: { input_tokens: number; output_tokens: number; ...
-    +stats?: { tokensPerSec: number; totalTokens: number; la...
+    +usage?: UsageInfo
+    +stats?: StatsInfo
   }
 
   class ToolCall {
@@ -520,9 +515,9 @@ classDiagram
     +name: string
     +description?: string
     +components_used?: string[]
-    +layout?: { type: string; columns?: number; arrangement?:...
+    +layout?: LayoutConfig
     +example_data?: Record#lt;string, unknown#gt;
-    +interactions?: { source: string; target: string; event: string...
+    +interactions?: InteractionConfig[]
     +when: string
     +servers?: string[]
     +body: string
@@ -581,9 +576,7 @@ classDiagram
     +hash?: string
     +previousHash?: string
     +chatSummary?: string
-    +provenance?: {
-    mcpServers?: string[];
-    toolsUsed?: st...
+    +provenance?: ProvenanceInfo
   }
 
   class HyperSkill {
