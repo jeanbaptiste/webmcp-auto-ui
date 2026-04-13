@@ -8,7 +8,7 @@
   import {
     RemoteLLMProvider, WasmProvider, LocalLLMProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, trimConversationHistory, summarizeChat, TokenTracker,
-    buildToolsFromLayers, runDiagnostics,
+    buildToolsFromLayers, runDiagnostics, buildDiscoveryCache,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
   import { autoui } from '@webmcp-auto-ui/agent';
@@ -291,6 +291,7 @@
   });
 
   const providerTools = $derived(buildToolsFromLayers(layers, { sanitize: schemaSanitize, flatten: schemaFlatten }));
+  const discoveryCache = $derived(buildDiscoveryCache(layers));
   const diagnostics = $derived(runDiagnostics(layers, providerTools, effectivePrompt ?? '', { sanitize: schemaSanitize, flatten: schemaFlatten }));
 
   // ── Helpers ────────────────────────────────────────────────────────
@@ -371,6 +372,7 @@
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         layers,
+        discoveryCache,
         schemaOptions: { sanitize: schemaSanitize, flatten: schemaFlatten },
         callbacks: {
           onIterationStart: (i, max) => {

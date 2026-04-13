@@ -4,6 +4,7 @@ import type { McpToolDef, ProviderTool } from './types.js';
 import type { McpRecipe } from './recipes/types.js';
 import type { WebMcpToolDef } from '@webmcp-auto-ui/core';
 import { sanitizeSchema, flattenSchema } from '@webmcp-auto-ui/core';
+import { DiscoveryCache, type ServerCache } from './discovery-cache.js';
 
 /** Sanitize a server name for use in tool name prefixes.
  *  Returns a clean underscore-separated identifier with no "mcp"/"server" noise.
@@ -511,4 +512,33 @@ export function activateServerTools(
   }
 
   return newTools;
+}
+
+/**
+ * Build a DiscoveryCache from tool layers.
+ * Pre-populates recipes and tool schemas for instant local lookups.
+ */
+export function buildDiscoveryCache(layers: ToolLayer[]): DiscoveryCache {
+  const cache = new DiscoveryCache();
+
+  for (const layer of layers) {
+    const prefix = sanitizeServerName(layer.serverName);
+    const serverCache: ServerCache = {
+      recipes: [],
+      tools: layer.tools.map(t => ({
+        name: t.name,
+        description: (t as any).description ?? t.name,
+        inputSchema: (t as any).inputSchema ?? (t as any).input_schema,
+      })),
+    };
+
+    // Add recipes if the layer has them
+    if ('recipes' in layer && Array.isArray((layer as any).recipes)) {
+      serverCache.recipes = (layer as any).recipes;
+    }
+
+    cache.register(prefix, serverCache);
+  }
+
+  return cache;
 }
