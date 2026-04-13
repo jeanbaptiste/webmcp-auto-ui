@@ -1,6 +1,6 @@
 <script lang="ts">
   interface Props {
-    logs: { ts: number; type: string; detail: string }[];
+    logs: { ts: number; type: string; detail: string; ctxSize?: number }[];
     onclear?: () => void;
     class?: string;
   }
@@ -62,6 +62,7 @@
              role={log.detail.length > 80 ? 'button' : undefined}
              tabindex={log.detail.length > 80 ? 0 : undefined}>
           <span class="ac-ts">{fmtTime(log.ts)}</span>
+          {#if log.ctxSize != null}<span class="ac-ctx">{log.ctxSize >= 1000 ? (log.ctxSize / 1000).toFixed(1) + 'K' : log.ctxSize}</span>{/if}
           <span class="ac-type" style="color:{typeColor[log.type] ?? 'var(--color-text2, #888)'}">{log.type}</span>
           {#if log.type === 'tool'}
             {@const prov = parseProvenance(log.detail)}
@@ -174,6 +175,15 @@
     flex-shrink: 0;
     color: var(--color-text2, #888);
     opacity: 0.5;
+  }
+
+  .ac-ctx {
+    flex-shrink: 0;
+    font-size: 7px;
+    color: #a78bfa;
+    opacity: 0.7;
+    min-width: 28px;
+    text-align: right;
   }
 
   .ac-type {

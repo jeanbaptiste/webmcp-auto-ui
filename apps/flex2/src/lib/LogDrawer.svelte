@@ -3,7 +3,7 @@
 
   interface Props {
     open: boolean;
-    logs: { ts: number; type: string; detail: string }[];
+    logs: { ts: number; type: string; detail: string; ctxSize?: number }[];
     onclear: () => void;
   }
 
