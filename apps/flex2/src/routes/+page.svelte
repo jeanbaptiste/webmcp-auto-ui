@@ -8,7 +8,7 @@
   import {
     RemoteLLMProvider, WasmProvider, LocalLLMProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, trimConversationHistory, summarizeChat, TokenTracker,
-    buildToolsFromLayers, runDiagnostics, buildDiscoveryCache,
+    buildToolsFromLayers, runDiagnostics, buildDiscoveryCache, ContextRAG,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
   import { autoui } from '@webmcp-auto-ui/agent';
@@ -49,6 +49,20 @@
   let composerMode = $state(true); // true = composer, false = consumer
   let layoutMode = $state<'float' | 'grid'>('float');
   let skills = $state<Skill[]>([]);
+
+  // ── Nano-RAG (experimental, off by default) ──────────────────────
+  let contextRAGEnabled = $state(false);
+  let contextRAG = $state<ContextRAG | null>(null);
+
+  $effect(() => {
+    if (contextRAGEnabled && !contextRAG) {
+      contextRAG = new ContextRAG({ topK: 5 });
+    }
+    if (!contextRAGEnabled && contextRAG) {
+      contextRAG.destroy();
+      contextRAG = null;
+    }
+  });
 
   // FlexGrid ref
   let flexGrid: { addBlock: (type: string, data: Record<string, unknown>, server?: string, component?: string) => { id: string }; clearBlocks: () => void; syncFromCanvas: () => void } | undefined;
@@ -373,6 +387,7 @@
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         layers,
         discoveryCache,
+        contextRAG: contextRAG ?? undefined,
         schemaOptions: { sanitize: schemaSanitize, flatten: schemaFlatten },
         callbacks: {
           onIterationStart: (i, max) => {

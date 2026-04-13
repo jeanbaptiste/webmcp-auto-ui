@@ -7,7 +7,7 @@
   import {
     RemoteLLMProvider, WasmProvider, LocalLLMProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, trimConversationHistory, TokenTracker,
-    buildToolsFromLayers, runDiagnostics, buildDiscoveryCache,
+    buildToolsFromLayers, runDiagnostics, buildDiscoveryCache, ContextRAG,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
   import {
@@ -70,6 +70,20 @@
   let layoutMode = $state<'float' | 'grid'>('float');
   let sidebarOpen = $state(true);
   let showLogs = $state(false);
+
+  // ── Nano-RAG (experimental, off by default) ──────────────────────
+  let contextRAGEnabled = $state(false);
+  let contextRAG = $state<ContextRAG | null>(null);
+
+  $effect(() => {
+    if (contextRAGEnabled && !contextRAG) {
+      contextRAG = new ContextRAG({ topK: 5 });
+    }
+    if (!contextRAGEnabled && contextRAG) {
+      contextRAG.destroy();
+      contextRAG = null;
+    }
+  });
 
   // ── Token tracking ────────────────────────────────────────────────
   const tokenTracker = new TokenTracker();
@@ -331,6 +345,7 @@
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
         layers,
         discoveryCache,
+        contextRAG: contextRAG ?? undefined,
         schemaOptions: { sanitize: schemaSanitize, flatten: schemaFlatten },
         callbacks: {
           onIterationStart: (i, max) => {

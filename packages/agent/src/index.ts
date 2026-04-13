@@ -55,6 +55,9 @@ export type { Diagnostic } from './diagnostics.js';
 export { autoRepairParams } from './auto-repair.js';
 export type { RepairResult } from './auto-repair.js';
 
+// Nano-RAG — context compaction
+export { ContextRAG, type ContextRAGOptions } from './nano-rag/mod.js';
+
 // Types
 export type {
   RemoteModelId, WasmModelId, LLMId, ModelId,

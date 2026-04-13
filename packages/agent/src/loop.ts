@@ -110,6 +110,8 @@ export interface AgentLoopOptions {
   schemaOptions?: SchemaTransformOptions;
   /** Pre-fetched discovery cache for instant recipe/tool lookups */
   discoveryCache?: DiscoveryCache;
+  /** Nano-RAG context compaction — ingest tool results, query before LLM calls */
+  contextRAG?: import('./nano-rag/context-rag.js').ContextRAG;
 }
 
 export async function runAgentLoop(
@@ -133,6 +135,7 @@ export async function runAgentLoop(
     maxResultLength = MAX_RESULT_LEN,
     schemaOptions,
     discoveryCache,
+    contextRAG,
   } = options;
 
   // Buffer for recall — stores full tool results keyed by tool_use_id
@@ -216,11 +219,30 @@ export async function runAgentLoop(
       });
     }
 
+    // Nano-RAG: inject relevant context before LLM call
+    let iterationSystemPrompt = systemPrompt;
+    if (contextRAG && contextRAG.size > 0) {
+      const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+      const queryText = typeof lastUserMsg?.content === 'string'
+        ? lastUserMsg.content
+        : (lastUserMsg?.content as any[])?.find((b: any) => b.type === 'text')?.text ?? '';
+      if (queryText) {
+        try {
+          const ragContext = await contextRAG.buildContext(queryText);
+          if (ragContext) {
+            iterationSystemPrompt = iterationSystemPrompt
+              ? `${iterationSystemPrompt}\n\n${ragContext}`
+              : ragContext;
+          }
+        } catch { /* RAG failure is non-fatal */ }
+      }
+    }
+
     callbacks.onLLMRequest?.(messages, iterationTools);
     const t0 = performance.now();
     let streamingText = '';
     const response = await provider.chat(messages, iterationTools, {
-      signal, cacheEnabled, system: systemPrompt, maxTokens, maxTools, temperature, topK,
+      signal, cacheEnabled, system: iterationSystemPrompt, maxTokens, maxTools, temperature, topK,
       onToken: callbacks.onToken ? (token) => {
         callbacks.onToken!(token);
         streamingText += token;
@@ -445,6 +467,13 @@ export async function runAgentLoop(
 
         // Store full result in buffer for later recall
         resultBuffer.set(block.id, result);
+
+        // Nano-RAG: ingest tool result for future context retrieval
+        if (contextRAG && result) {
+          const toolMatch2 = resolvedName.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
+          const realName = toolMatch2 ? toolMatch2[3] : block.name;
+          contextRAG.ingest(realName, block.id, typeof result === 'string' ? result : JSON.stringify(result)).catch(() => {});
+        }
 
         call.result = result;
         toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result });
