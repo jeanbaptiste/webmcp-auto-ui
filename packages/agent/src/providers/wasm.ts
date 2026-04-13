@@ -15,7 +15,7 @@ export interface WasmProviderOptions {
 }
 
 const LITERT_MODELS: Record<string, { repo: string; file: string; size: number }> = {
-  'gemma-e2b': { repo: 'litert-community/gemma-4-E2B-it-litert-lm', file: 'gemma-4-E2B-it-web.task', size: 1_500_000_000 },
+  'gemma-e2b': { repo: 'litert-community/gemma-4-E2B-it-litert-lm', file: 'gemma-4-E2B-it-web.task', size: 2_003_697_664 },
   'gemma-e4b': { repo: 'litert-community/gemma-4-E4B-it-litert-lm', file: 'gemma-4-E4B-it-web.task', size: 2_964_324_352 },
 };
 
@@ -479,6 +479,29 @@ export class WasmProvider implements LLMProvider {
     const litRegex = /(\w+)\s*:\s*(true|false|null)\s*(?:[,}]|$)/g;
     while ((m = litRegex.exec(raw)) !== null) {
       if (!(m[1] in pairs)) pairs[m[1]] = JSON.parse(m[2]);
+    }
+
+    // Extract inline object/array values (e.g. params:{items:[...]}, data:{a:1})
+    // Gemma often writes nested objects without <|"|> delimiters.
+    // We find key:{ or key:[ and then match balanced braces/brackets.
+    const objRe = /(\w+)\s*:\s*([{\[])/g;
+    while ((m = objRe.exec(raw)) !== null) {
+      if (m[1] in pairs) continue; // already captured by a higher-priority regex
+      const key = m[1];
+      const opener = m[2];
+      const closer = opener === '{' ? '}' : ']';
+      let depth = 1;
+      let i = m.index + m[0].length;
+      while (i < raw.length && depth > 0) {
+        const ch = raw[i];
+        if (ch === opener || ch === '{' || ch === '[') depth++;
+        else if (ch === closer || ch === '}' || ch === ']') depth--;
+        i++;
+      }
+      const fragment = raw.slice(m.index + m[0].length - 1, i); // includes opener and closer
+      // Replace <|"|> with " for JSON parsing
+      const jsonStr = fragment.replace(/<\|"\|>/g, '"');
+      try { pairs[key] = JSON.parse(jsonStr); } catch { /* unparseable — skip */ }
     }
 
     // Try to parse string values that look like JSON objects/arrays
