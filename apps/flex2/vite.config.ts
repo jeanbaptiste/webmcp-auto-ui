@@ -20,7 +20,7 @@ export default defineConfig({
     }
   },
   ssr: {
-    noExternal: ['hyperskills'],
+    noExternal: ['hyperskills', '@webmcp-auto-ui/core', '@webmcp-auto-ui/agent'],
   },
   server: {
     headers: {

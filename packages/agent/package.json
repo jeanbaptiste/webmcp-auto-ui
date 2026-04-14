@@ -4,6 +4,7 @@
   "description": "LLM agent loop + Anthropic/Gemma LiteRT providers + MCP wrapper",
   "license": "AGPL-3.0-or-later",
   "type": "module",
+  "sideEffects": true,
   "main": "./src/index.ts",
   "exports": {
     ".": {
