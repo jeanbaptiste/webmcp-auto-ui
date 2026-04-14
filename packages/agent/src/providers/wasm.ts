@@ -239,6 +239,15 @@ export class WasmProvider implements LLMProvider {
       // sizeInTokens not available — skip clipping
     }
 
+    // Count input tokens for usage reporting (TokenBubble Ctx ratio)
+    let inputTokenCount = 0;
+    try {
+      inputTokenCount = this.inference.sizeInTokens(prompt);
+    } catch {
+      // sizeInTokens not available — estimate from char count
+      inputTokenCount = Math.round(prompt.length / 4);
+    }
+
     // Generate
     const t0 = performance.now();
     let fullText = '';
@@ -501,6 +510,10 @@ export class WasmProvider implements LLMProvider {
         tokensPerSec: realTokenCount > 0 ? realTokenCount / (latencyMs / 1000) : 0,
         totalTokens: realTokenCount,
         latencyMs,
+      },
+      usage: {
+        input_tokens: inputTokenCount,
+        output_tokens: realTokenCount,
       },
     };
   }
