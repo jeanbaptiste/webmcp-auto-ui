@@ -98,6 +98,7 @@
   let tokenMetrics = $state(tokenTracker.metrics);
   let showTokens = $state(true);
   let showToolJSON = $state(false);
+  let lastLoggedToolCount = $state(0);
   tokenTracker.subscribe(m => { tokenMetrics = m; });
 
   let agentLogs = $state<{ ts: number; type: string; detail: string; ctxSize?: number }[]>([]);
@@ -413,7 +414,20 @@
               return sum + (m.content as any[]).reduce((s, b) => s + (b.text?.length ?? JSON.stringify(b).length ?? 0), 0);
             }, 0);
             const ctxTokens = Math.round(ctxChars / 4);
-            agentLogs = [...agentLogs, { ts: Date.now(), type: 'request', detail: `${messages.length} messages, ${tools.length} tools`, ctxSize: ctxTokens }];
+            const sanitizeLabel = schemaSanitize ? 'ON' : 'OFF';
+            const flattenLabel = schemaFlatten ? 'ON' : 'OFF';
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'request', detail: `${messages.length} messages, ${tools.length} tools (sanitize=${sanitizeLabel}, flatten=${flattenLabel})`, ctxSize: ctxTokens }];
+            // Log tool schemas on first call or when tool count changes (server activation)
+            if (tools.length !== lastLoggedToolCount) {
+              lastLoggedToolCount = tools.length;
+              for (const tool of tools) {
+                const props = (tool.input_schema as any)?.properties as Record<string, { type?: string }> | undefined;
+                const summary = props
+                  ? Object.entries(props).map(([k, v]) => `${k}: ${v.type ?? '?'}`).join(', ')
+                  : '(no schema)';
+                agentLogs = [...agentLogs, { ts: Date.now(), type: 'schema', detail: `${tool.name}: {${summary}}` }];
+              }
+            }
           },
           onLLMResponse: (response, latencyMs, tokens) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'response', detail: `${tokens?.input ?? '?'}in ${tokens?.output ?? '?'}out, ${Math.round(latencyMs)}ms, ${response.stopReason}`, ctxSize: tokens?.input }];
@@ -424,7 +438,7 @@
                 const widget = flexGrid?.addBlock(type, data, currentServerName, type);
                 return widget ? { id: widget.id } : undefined;
               },
-          onClear: () => flexGrid?.clearBlocks(),
+          onClear: () => { flexGrid?.clearBlocks(); conversationHistory = []; },
           onUpdate: (id, data) => bus.send('agent', id, 'data-update', data),
           onMove: (id, x, y) => layoutAdapter.move(id, x, y),
           onResize: (id, w, h) => layoutAdapter.resize(id, w, h),
@@ -484,6 +498,22 @@
       const hasBlocks = result?.toolCalls?.some(c => c.name === 'autoui_webmcp_widget_display' || c.name?.startsWith('render_'));
       setTimeout(() => { ephemeral = []; }, hasBlocks ? 3000 : 15000);
     }
+  }
+
+  function clearAll() {
+    flexGrid?.clearBlocks();
+    conversationHistory = [];
+    historyLog = [];
+    ephemeral = [];
+    agentLogs = [];
+    toolCallDetails = new Map();
+    allToolsUsed = [];
+    chatToolCount = 0;
+    chatLastTool = '';
+    chatTimer = 0;
+    tokenTracker.reset();
+    tokenMetrics = tokenTracker.metrics;
+    lastLoggedToolCount = 0;
   }
 
   function onKeydown(e: KeyboardEvent) {
@@ -604,6 +634,15 @@
             <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-teal"></span>
           {/if}
         </button>
+        {#if canvas.blocks.length > 0 || conversationHistory.length > 0}
+          <button
+            class="flex-shrink-0 h-8 px-2 flex items-center justify-center rounded-lg border border-border2 text-text2 hover:text-accent2 hover:border-accent2/40 transition-colors font-mono text-[10px]"
+            onclick={clearAll}
+            disabled={canvas.generating}
+            aria-label="Clear canvas and conversation">
+            Clear
+          </button>
+        {/if}
         <input type="text" bind:value={input} onkeydown={onKeydown}
           placeholder={canvas.mcpConnected ? `Demandez une interface sur ${canvas.mcpName}...` : 'Ouvrez le menu pour connecter un MCP...'}
           disabled={canvas.generating}
@@ -626,7 +665,7 @@
 <SettingsDrawer
   bind:open={settingsOpen}
   bind:composerMode bind:layoutMode bind:includeSummary
-  onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true}
+  onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true} onclear={clearAll}
   bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools bind:maxResultLength
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON
   bind:schemaSanitize bind:schemaFlatten bind:compressHistory bind:compressPreview

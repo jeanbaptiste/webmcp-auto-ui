@@ -25,6 +25,8 @@
     done: '#14b8a6',
     error: '#ef4444',
     prompt: '#6366f1',
+    schema: '#06b6d4',
+    warning: '#eab308',
   };
 
   function fmtTime(ts: number): string {

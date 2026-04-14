@@ -161,7 +161,7 @@ export async function runAgentLoop(
   const activatedServers = new Set<string>();
   const localAliasMap = new Map<string, string>();
 
-  const disc = buildDiscoveryToolsWithAliases(options.layers ?? []);
+  const disc = buildDiscoveryToolsWithAliases(options.layers ?? [], schemaOptions);
   let activeTools: ProviderTool[] = disc.tools;
   for (const [k, v] of disc.aliasMap) localAliasMap.set(k, v);
 
@@ -211,12 +211,20 @@ export async function runAgentLoop(
     }
 
     // After 5+ iterations without render, inject a nudge message (once)
+    // Merge into existing user message if the last message is already role=user (to avoid consecutive user messages)
     if (iterationsWithoutRender >= 5 && !hasRendered && !nudgedOnce) {
       nudgedOnce = true;
-      messages.push({
-        role: 'user',
-        content: 'STOP exploration. Use the data you already collected. Call widget_display() NOW to display results.',
-      });
+      const nudgeText = 'STOP exploration. Use the data you already collected. Call widget_display() NOW to display results.';
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg && lastMsg.role === 'user') {
+        if (typeof lastMsg.content === 'string') {
+          lastMsg.content = [{ type: 'text', text: lastMsg.content }, { type: 'text', text: nudgeText }];
+        } else if (Array.isArray(lastMsg.content)) {
+          (lastMsg.content as ContentBlock[]).push({ type: 'text', text: nudgeText });
+        }
+      } else {
+        messages.push({ role: 'user', content: nudgeText });
+      }
     }
 
     // Nano-RAG: inject relevant context before LLM call
@@ -371,7 +379,7 @@ export async function runAgentLoop(
               activatedServers.add(serverKey);
               const layer = (options.layers ?? []).find(l => sanitizeServerName(l.serverName) === serverName && l.protocol === protocol);
               if (layer) {
-                activeTools = activateServerTools(activeTools, layer);
+                activeTools = activateServerTools(activeTools, layer, schemaOptions);
               }
             }
           }
@@ -560,5 +568,30 @@ export function trimConversationHistory(history: ChatMessage[], maxTokens: numbe
     const removed = trimmed.splice(firstNonSystem, 2);
     total -= removed.reduce((s, m) => s + JSON.stringify(m).length, 0);
   }
+
+  // Remove orphaned tool_result messages at the start — these reference
+  // a tool_use in a message that was trimmed away, causing API errors.
+  while (trimmed.length > 0) {
+    const first = trimmed[0];
+    if (first.role === 'system') break; // preserve system messages at the front
+    const blocks = Array.isArray(first.content) ? first.content : [];
+    const hasToolResult = blocks.some((b: any) => b.type === 'tool_result');
+    if (hasToolResult) {
+      trimmed.shift();
+    } else {
+      break;
+    }
+  }
+
+  // Ensure the first non-system message is role=user (API requirement)
+  while (trimmed.length > 0) {
+    const firstNonSystem = trimmed.findIndex(m => m.role !== 'system');
+    if (firstNonSystem >= 0 && trimmed[firstNonSystem].role === 'assistant') {
+      trimmed.splice(firstNonSystem, 1);
+    } else {
+      break;
+    }
+  }
+
   return trimmed;
 }

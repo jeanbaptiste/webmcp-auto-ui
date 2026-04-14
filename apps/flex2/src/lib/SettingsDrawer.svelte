@@ -24,6 +24,7 @@
     onexport?: () => Promise<void>;
     exportState?: 'idle' | 'loading' | 'done';
     onhistory?: () => void;
+    onclear?: () => void;
     mcpToken?: string;
     systemPrompt?: string;
     effectivePrompt?: string;
@@ -62,6 +63,7 @@
     onexport,
     exportState = 'idle',
     onhistory,
+    onclear,
     mcpToken = $bindable(''),
     systemPrompt = $bindable(''),
     effectivePrompt = '',
@@ -240,6 +242,12 @@
               onclick={onhistory}>
         Historique
       </button>
+      {#if onclear}
+        <button class="font-mono text-xs h-7 px-3 rounded border border-accent2/30 text-accent2 hover:bg-accent2/10 transition-colors w-full text-left"
+                onclick={() => { onclear(); open = false; }}>
+          Clear (canvas + conversation)
+        </button>
+      {/if}
     </section>
 
     <!-- Schema transforms -->
