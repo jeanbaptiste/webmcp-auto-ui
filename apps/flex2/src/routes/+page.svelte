@@ -652,15 +652,6 @@
             <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-teal"></span>
           {/if}
         </button>
-        {#if canvas.blocks.length > 0 || conversationHistory.length > 0}
-          <button
-            class="flex-shrink-0 h-8 px-2 flex items-center justify-center rounded-lg border border-border2 text-text2 hover:text-accent2 hover:border-accent2/40 transition-colors font-mono text-[10px]"
-            onclick={clearAll}
-            disabled={canvas.generating}
-            aria-label="Clear canvas and conversation">
-            Clear
-          </button>
-        {/if}
         <input type="text" bind:value={input} onkeydown={onKeydown}
           placeholder={canvas.mcpConnected ? `Demandez une interface sur ${canvas.mcpName}...` : 'Ouvrez le menu pour connecter un MCP...'}
           disabled={canvas.generating}
