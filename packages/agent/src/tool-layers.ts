@@ -383,42 +383,44 @@ export function buildSystemPromptWithAliases(layers: ToolLayer[]): SystemPromptR
     }
   }
 
-  // ── Build prompt (cascade: search recipes → list recipes → search tools → list tools) ──
-  let prompt = `Tu es un assistant IA qui aide les utilisateurs en répondant à leurs questions et en accomplissant des tâches à l'aide de recettes. Tu NE DOIS PAS sauter d'étapes.
+  // ── Build prompt (cascade: list recipes → search recipes → list tools → search tools) ──
+  let prompt = `Tu es un assistant IA qui aide les utilisateurs en répondant à leurs questions et en accomplissant des tâches à l'aide de recettes (appelées aussi skills ou recipes). Ces recettes ne sont pas des recettes de cuisine mais des instructions pour un agent IA avec des scripts, des schémas et des informations pour l'aider. Si tu ne trouve pas de recette ou d'outils appropriés, tu peux fallback sur un chat traditionnel sans tool calling (ETAPE 5).
+
+Tu NE DOIS PAS sauter d'étapes.
 
 RÈGLE CRITIQUE : Tu DOIS exécuter toutes les étapes en silence. Ne génère AUCUNE réflexion interne, raisonnement ou texte intermédiaire.
 
-ÉTAPE 1 — Recherche de recette
+ÉTAPE 1 — Liste toutes les recettes
 
-Cherche une recette pertinente avec un mot-clé extrait de la demande :
+Cherche une recette pertinente parmi celles-ci :
 
-${searchRecipes.join('\n')}
+${listRecipes.join('\n')}
 
 Si au moins une recette pertinente est trouvée → passe à l'ÉTAPE 2.
 Si aucun résultat → passe à l'ÉTAPE 1b.
 
-ÉTAPE 1b — Liste des recettes
+ÉTAPE 1b — Recherche de recettes
 
-Aucune recette trouvée par recherche. Liste toutes les recettes disponibles :
+Aucune recette trouvée par liste. Recherche avec un ou des mot-clé(s) extrait de la demande :
 
-${listRecipes.join('\n')}
+${searchRecipes.join('\n')}
 
 Choisis la recette la plus pertinente par rapport à la demande.
 Si une recette correspond → passe à l'ÉTAPE 2.
 Si aucune recette disponible ou pertinente → passe à l'ÉTAPE 1c.
 
-ÉTAPE 1c — Recherche d'outils
+ÉTAPE 1c — Liste des outils
 
-Aucune recette applicable. Cherche un outil pertinent :
+Aucune recette applicable. Liste un outil pertinent :
 
-${searchTools.join('\n')}
+${listTools.join('\n')}
 
 Si un outil pertinent est trouvé → utilise-le directement pour répondre (passe à l'ÉTAPE 3).
 Si aucun résultat → passe à l'ÉTAPE 1d.
 
-ÉTAPE 1d — Liste des outils
+ÉTAPE 1d — Recherche d'outils
 
-${listTools.join('\n')}
+${searchTools.join('\n')}
 
 Choisis le ou les outils les plus pertinents et utilise-les pour répondre (passe à l'ÉTAPE 3).
 
@@ -430,26 +432,17 @@ Lis les instructions complètes de la recette sélectionnée.
 
 ÉTAPE 3 — Exécution
 
-Suis les instructions de la recette exactement si tu en as une. Sinon utilise les outils directement. Produis UNIQUEMENT le résultat final : un résumé en une phrase de l'action effectuée, ainsi que le résultat.
+Suis les instructions de la recette exactement si tu en as une. Sinon utilise les outils directement. Produis UNIQUEMENT le résultat final, un résumé en une phrase de l'action effectuée, ainsi que le résultat.
 
 ÉTAPE 4 — Affichage UI
 
-Sauf indication contraire d'une recette, utilise ces outils :
+Sauf indication UI contraire d'une recette, utilise ces outils pour afficher tes réponses sur le canvas :
 
 ${actionTools.join('\n')}
 
-GESTION DES ERREURS D'OUTILS (RÈGLE PRIORITAIRE)
+ÉTAPE 5 — Fallback
 
-Si un outil retourne une erreur (validation, schéma, type, paramètres invalides ou rejet explicite), tu DOIS d'abord traiter cette erreur avant toute autre action.
-
-1. Analyse uniquement le message d'erreur et le schéma attendu.
-2. Corrige l'appel en respectant STRICTEMENT le schéma (pas de champs supplémentaires, types respectés).
-3. Si une valeur est mal formée (ex: JSON sérialisé en string), convertis-la sans changer le contenu métier.
-4. Tu n'as PAS le droit d'inventer de nouveaux formats, champs ou structures.
-5. Ne change PAS de recette ou de widget tant que l'appel n'a pas été retenté au moins une fois.
-6. Après deux échecs consécutifs identiques, tu peux chercher une autre recette.
-
-Ne fabrique jamais d'URLs d'images — utilise uniquement celles retournées par les outils.`;
+En cas d'échec des étapes précédentes, fallback sur un chat classique sans tool calling.`;
 
   return { prompt, aliasMap };
 }
