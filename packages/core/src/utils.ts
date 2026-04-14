@@ -77,8 +77,10 @@ export function signalCompletion(completionEventName: string, detail?: unknown):
 
 export interface SchemaPatch {
   path: string;          // e.g. "root", "properties.params", "properties.data.items"
-  type: 'additionalProperties'; // what was patched
-  value: false;
+  type: 'additionalProperties' | 'removed'; // what was patched
+  keyword?: string;      // which keyword was removed (for type: 'removed')
+  detail?: string;       // human-readable detail
+  value?: false;         // for additionalProperties patches
 }
 
 /**
@@ -111,6 +113,72 @@ function sanitizeSchemaObjectWithReport(obj: JsonSchemaObject, seen: WeakSet<obj
 
   // Remove $ref (needs dereferencing first)
   delete result.$ref;
+
+  // Remove numerical constraints not supported by Anthropic API
+  if (result.minimum !== undefined) {
+    patches.push({ path, type: 'removed', keyword: 'minimum', detail: `Removed minimum=${result.minimum}` });
+    delete result.minimum;
+  }
+  if (result.maximum !== undefined) {
+    patches.push({ path, type: 'removed', keyword: 'maximum', detail: `Removed maximum=${result.maximum}` });
+    delete result.maximum;
+  }
+  if (result.exclusiveMinimum !== undefined) {
+    patches.push({ path, type: 'removed', keyword: 'exclusiveMinimum', detail: `Removed exclusiveMinimum=${result.exclusiveMinimum}` });
+    delete result.exclusiveMinimum;
+  }
+  if (result.exclusiveMaximum !== undefined) {
+    patches.push({ path, type: 'removed', keyword: 'exclusiveMaximum', detail: `Removed exclusiveMaximum=${result.exclusiveMaximum}` });
+    delete result.exclusiveMaximum;
+  }
+  if (result.multipleOf !== undefined) {
+    patches.push({ path, type: 'removed', keyword: 'multipleOf', detail: `Removed multipleOf=${result.multipleOf}` });
+    delete result.multipleOf;
+  }
+
+  // Remove string constraints not supported
+  if (result.minLength !== undefined) {
+    patches.push({ path, type: 'removed', keyword: 'minLength', detail: `Removed minLength=${result.minLength}` });
+    delete result.minLength;
+  }
+  if (result.maxLength !== undefined) {
+    patches.push({ path, type: 'removed', keyword: 'maxLength', detail: `Removed maxLength=${result.maxLength}` });
+    delete result.maxLength;
+  }
+
+  // Remove array constraints not supported (keep minItems only if 0 or 1)
+  if (result.minItems !== undefined && result.minItems > 1) {
+    patches.push({ path, type: 'removed', keyword: 'minItems', detail: `Removed minItems=${result.minItems} (only 0 and 1 supported)` });
+    delete result.minItems;
+  }
+  if (result.maxItems !== undefined) {
+    patches.push({ path, type: 'removed', keyword: 'maxItems', detail: `Removed maxItems=${result.maxItems}` });
+    delete result.maxItems;
+  }
+  if (result.uniqueItems !== undefined) {
+    patches.push({ path, type: 'removed', keyword: 'uniqueItems', detail: `Removed uniqueItems=${result.uniqueItems}` });
+    delete result.uniqueItems;
+  }
+
+  // Remove object constraints not supported
+  if (result.patternProperties !== undefined) {
+    patches.push({ path, type: 'removed', keyword: 'patternProperties', detail: 'Removed patternProperties' });
+    delete result.patternProperties;
+  }
+  if (result.minProperties !== undefined) {
+    patches.push({ path, type: 'removed', keyword: 'minProperties', detail: `Removed minProperties=${result.minProperties}` });
+    delete result.minProperties;
+  }
+  if (result.maxProperties !== undefined) {
+    patches.push({ path, type: 'removed', keyword: 'maxProperties', detail: `Removed maxProperties=${result.maxProperties}` });
+    delete result.maxProperties;
+  }
+
+  // Force additionalProperties to false for objects (non-false, non-object values)
+  if (result.additionalProperties !== undefined && result.additionalProperties !== false && typeof result.additionalProperties !== 'object') {
+    patches.push({ path, type: 'removed', keyword: 'additionalProperties', detail: `Forced additionalProperties from ${result.additionalProperties} to false` });
+    result.additionalProperties = false;
+  }
 
   // Recursively sanitize nested schemas
   if (result.properties) {
@@ -185,6 +253,34 @@ function sanitizeSchemaObject(obj: JsonSchemaObject, seen: WeakSet<object>): Jso
 
   // Remove $ref (needs dereferencing first)
   delete result.$ref;
+
+  // Remove numerical constraints not supported by Anthropic API
+  delete result.minimum;
+  delete result.maximum;
+  delete result.exclusiveMinimum;
+  delete result.exclusiveMaximum;
+  delete result.multipleOf;
+
+  // Remove string constraints not supported
+  delete result.minLength;
+  delete result.maxLength;
+
+  // Remove array constraints not supported (keep minItems only if 0 or 1)
+  if (result.minItems !== undefined && result.minItems > 1) {
+    delete result.minItems;
+  }
+  delete result.maxItems;
+  delete result.uniqueItems;
+
+  // Remove object constraints not supported
+  delete result.patternProperties;
+  delete result.minProperties;
+  delete result.maxProperties;
+
+  // Force additionalProperties to false for objects (non-false, non-object values)
+  if (result.additionalProperties !== undefined && result.additionalProperties !== false && typeof result.additionalProperties !== 'object') {
+    result.additionalProperties = false;
+  }
 
   // Recursively sanitize nested schemas
   if (result.properties) {

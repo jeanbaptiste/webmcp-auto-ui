@@ -53,7 +53,7 @@
   let chatTimer = $state(0);
   let chatToolCount = $state(0);
   let chatLastTool = $state('');
-  let maxContextTokens = $state(150_000);
+  let maxContextTokens = $state(120_000);
   let maxTokens = $state(4096);
   let cacheEnabled = $state(true);
   let temperature = $state(1.0);
@@ -271,14 +271,26 @@
   // Smart defaults: sanitize ON for Claude/local, flatten ON for Gemma/local
   $effect(() => {
     const isGemma = canvas.llm.startsWith('gemma');
+    const isE4B = canvas.llm === 'gemma-e4b';
     const isLocal = canvas.llm === 'local';
     schemaSanitize = isLocal ? true : !isGemma;
     schemaFlatten = isGemma || isLocal;
     truncateResults = isGemma || isLocal;
     compressHistory = isGemma || isLocal;
-    if (isGemma) maxResultLength = 2000;
-    else if (isLocal) maxResultLength = 3000;
-    else maxResultLength = 10000;
+    if (isGemma) {
+      maxResultLength = 2000;
+      temperature = 0.7;
+      maxContextTokens = isE4B ? 16384 : 8192;
+      cacheEnabled = false;
+    } else if (isLocal) {
+      maxResultLength = 3000;
+    } else {
+      // Claude defaults
+      maxResultLength = 10000;
+      temperature = 1.0;
+      maxContextTokens = 120_000;
+      cacheEnabled = true;
+    }
   });
 
   // ── Layers & prompt ───────────────────────────────────────────────
@@ -304,9 +316,9 @@
     return hasCustom ? `${systemPrompt}\n\n${b}` : b;
   });
 
-  const providerTools = $derived(buildToolsFromLayers(layers, { sanitize: schemaSanitize, flatten: schemaFlatten }));
+  const providerTools = $derived(buildToolsFromLayers(layers, { sanitize: schemaSanitize, flatten: schemaFlatten, strict: false }));
   const discoveryCache = $derived(buildDiscoveryCache(layers));
-  const diagnostics = $derived(runDiagnostics(layers, providerTools, effectivePrompt ?? '', { sanitize: schemaSanitize, flatten: schemaFlatten }));
+  const diagnostics = $derived(runDiagnostics(layers, providerTools, effectivePrompt ?? '', { sanitize: schemaSanitize, flatten: schemaFlatten, strict: false }));
   let diagModalOpen = $state(false);
 
   // ── Helpers ────────────────────────────────────────────────────────
@@ -349,6 +361,7 @@
         schemaOptions: {
           sanitize: schemaSanitize,
           flatten: schemaFlatten,
+          strict: false,
           onSchemaPatch: (toolName, patches) => {
             agentLogs = [...agentLogs, {
               ts: Date.now(),

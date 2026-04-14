@@ -236,14 +236,19 @@
     {/if}
   </section>
 
-  <!-- Cache -->
-  <label class="flex items-center gap-2.5 cursor-pointer select-none">
+  <!-- Cache (disabled for WASM/Gemma — prompt caching is Anthropic API only) -->
+  <label class="flex items-center gap-2.5 select-none" class:cursor-pointer={modelType !== 'wasm'} class:opacity-40={modelType === 'wasm'}>
     <input
       type="checkbox"
       bind:checked={cacheEnabled}
+      disabled={modelType === 'wasm'}
       class="accent-accent w-3.5 h-3.5"
     />
     <span class="text-xs font-mono text-text1">Prompt caching</span>
-    <span class="text-[10px] font-mono text-text2 ml-auto">économise ~80% tokens</span>
+    {#if modelType === 'wasm'}
+      <span class="text-[10px] font-mono text-text2/50 ml-auto">API Anthropic uniquement</span>
+    {:else}
+      <span class="text-[10px] font-mono text-text2 ml-auto">économise ~80% tokens</span>
+    {/if}
   </label>
 </div>

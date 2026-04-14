@@ -83,6 +83,8 @@
   let truncateResults = $state(false);
   let compressHistory = $state(false);
   let compressPreview = $state(500);
+  let cacheEnabled = $state(true);
+  let temperature = $state(1.0);
 
   // Smart defaults: adjust optimization options when LLM model changes
   $effect(() => {
@@ -92,9 +94,18 @@
     schemaFlatten = isGemma || isLocal;
     truncateResults = isGemma || isLocal;
     compressHistory = isGemma || isLocal;
-    if (isGemma) maxResultLength = 2000;
-    else if (isLocal) maxResultLength = 3000;
-    else maxResultLength = 10000;
+    if (isGemma) {
+      maxResultLength = 2000;
+      temperature = 0.7;
+      cacheEnabled = false;
+    } else if (isLocal) {
+      maxResultLength = 3000;
+    } else {
+      // Claude defaults
+      maxResultLength = 10000;
+      temperature = 1.0;
+      cacheEnabled = true;
+    }
   });
 
   // Nano-RAG (experimental, off by default)
@@ -154,10 +165,12 @@
         maxResultLength,
         truncateResults,
         compressHistory: compressHistory ? compressPreview : false,
+        temperature,
+        cacheEnabled,
         layers,
         discoveryCache,
         contextRAG: contextRAG ?? undefined,
-        schemaOptions: { sanitize: schemaSanitize, flatten: schemaFlatten },
+        schemaOptions: { sanitize: schemaSanitize, flatten: schemaFlatten, strict: false },
         initialMessages: conversationHistory,
         callbacks: {
           onWidget: (type, data) => {

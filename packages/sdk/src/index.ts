@@ -15,7 +15,7 @@ export interface HyperSkillMeta {
   previousHash?: string;
   chatSummary?: string;
   provenance?: {
-    mcpServers?: string[];
+    mcpServers?: (string | { name: string; url: string })[];
     toolsUsed?: string[];
     toolCallCount?: number;
     skillsReferenced?: string[];

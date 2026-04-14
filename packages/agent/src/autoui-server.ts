@@ -1013,13 +1013,13 @@ for (const recipe of RECIPES) {
 
 autoui.addTool({
   name: 'canvas',
-  description: 'Manipulate widgets on the canvas. Actions: clear, update, move, resize, style.',
+  description: 'Manipulate existing widgets on the canvas after they have been created by widget_display. Use this to update widget data, reposition, resize, restyle, or clear the entire canvas. Requires the widget ID returned by widget_display (except for the "clear" action which removes all widgets). Prefer "update" over creating a new widget when refreshing data — this avoids duplicate widgets and preserves layout. Do NOT use this to create new widgets — use widget_display instead.',
   inputSchema: {
     type: 'object',
     properties: {
-      action: { type: 'string', enum: ['clear', 'update', 'move', 'resize', 'style'] },
-      id: { type: 'string', description: 'Widget ID (not needed for clear)' },
-      params: { type: 'object', description: 'Action parameters: move={x,y}, resize={width,height}, style={styles}, update={data}' },
+      action: { type: 'string', enum: ['clear', 'update', 'move', 'resize', 'style'], description: 'The operation to perform. "clear" removes all widgets from the canvas (no id needed). "update" replaces the widget data (pass new params in params). "move" repositions a widget (params: {x, y}). "resize" changes dimensions (params: {width, height}). "style" applies CSS styles (params: {styles}).' },
+      id: { type: 'string', description: 'The widget ID returned by widget_display, e.g. "w_abc123". Required for all actions except "clear". If omitted for non-clear actions, the operation will fail.' },
+      params: { type: 'object', description: 'Action-specific parameters. For "update": the new widget data object (same structure as widget_display params). For "move": {x: number, y: number}. For "resize": {width: string, height: string} (CSS values). For "style": {styles: {color: "...", background: "...", ...}} (CSS properties). Not used for "clear".' },
     },
     required: ['action'],
   },
@@ -1043,11 +1043,11 @@ autoui.addTool({
 
 autoui.addTool({
   name: 'recall',
-  description: "Re-read the full result of a previous tool call. Use the identifier returned in the summary (e.g. recall('toolu_xxx')).",
+  description: 'Re-read the full, untruncated result of a previous tool call that was summarized or truncated in the conversation. When tool results are large (e.g. long API responses, big datasets), the agent loop stores the full result and returns a summary with an identifier. Use recall with that identifier to retrieve the complete data. This is essential when you need details that were omitted from the summary. Do NOT use this for tool calls whose results were already shown in full — it will return an error.',
   inputSchema: {
     type: 'object',
     properties: {
-      id: { type: 'string', description: "Tool call ID (e.g. 'toolu_xxx')" },
+      id: { type: 'string', description: 'The tool call identifier from the summary, e.g. "toolu_abc123". This ID is provided in the truncated result message when a tool response exceeds the display limit.' },
     },
     required: ['id'],
   },

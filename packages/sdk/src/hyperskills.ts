@@ -25,7 +25,22 @@ export const hash: (
 
 export const diff: (prev: unknown, next: unknown) => unknown = hs.diff;
 
-export const getHsParam: () => string | null = hs.getHsParam;
+/**
+ * Get the ?hs= param from a URL string or the current browser URL.
+ * When called with a URL argument, parses that URL.
+ * When called without arguments, reads window.location.search.
+ */
+export function getHsParam(url?: string): string | null {
+  if (url) {
+    try {
+      const parsed = new URL(url, typeof window !== 'undefined' ? window.location.href : 'https://example.com');
+      return parsed.searchParams.get('hs');
+    } catch {
+      return null;
+    }
+  }
+  return hs.getHsParam();
+}
 
 export const createVersion: (
   sourceUrl: string,

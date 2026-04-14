@@ -31,11 +31,12 @@
   let chatTimer = $state(0);
   let chatToolCount = $state(0);
   let chatLastTool = $state('');
-  let maxContextTokens = $state(150_000);
+  let maxContextTokens = $state(120_000);
   let maxTokens = $state(4096);
   let cacheEnabled = $state(true);
   let schemaSanitize = $state(true);
   let schemaFlatten = $state(false);
+  let schemaStrict = $state(false);
   let temperature = $state(1.0);
   let topK = $state(64);
   let maxTools = $state(8);
@@ -268,14 +269,29 @@
   // Smart defaults: sanitize ON for Claude/local, flatten ON for Gemma/local
   $effect(() => {
     const isGemma = canvas.llm.startsWith('gemma');
+    const isE4B = canvas.llm === 'gemma-e4b';
     const isLocal = canvas.llm === 'local';
     schemaSanitize = isLocal ? true : !isGemma;
     schemaFlatten = isGemma || isLocal;
     truncateResults = isGemma || isLocal;
     compressHistory = isGemma || isLocal;
-    if (isGemma) maxResultLength = 2000;
-    else if (isLocal) maxResultLength = 3000;
-    else maxResultLength = 10000;
+    schemaStrict = false;
+    if (isGemma) {
+      maxResultLength = 2000;
+      temperature = 0.7;
+      topK = 40;
+      maxContextTokens = isE4B ? 16384 : 8192;
+      cacheEnabled = false;
+    } else if (isLocal) {
+      maxResultLength = 3000;
+    } else {
+      // Claude defaults
+      maxResultLength = 10000;
+      temperature = 1.0;
+      topK = 64;
+      maxContextTokens = 120_000;
+      cacheEnabled = true;
+    }
   });
 
   // ── Layers & prompt ────────────────────────────────────────────────
@@ -305,9 +321,9 @@
     return hasCustom ? `${systemPrompt}\n\n${base}` : base;
   });
 
-  const providerTools = $derived(buildToolsFromLayers(layers, { sanitize: schemaSanitize, flatten: schemaFlatten }));
+  const providerTools = $derived(buildToolsFromLayers(layers, { sanitize: schemaSanitize, flatten: schemaFlatten, strict: schemaStrict }));
   const discoveryCache = $derived(buildDiscoveryCache(layers));
-  const diagnostics = $derived(runDiagnostics(layers, providerTools, effectivePrompt ?? '', { sanitize: schemaSanitize, flatten: schemaFlatten }));
+  const diagnostics = $derived(runDiagnostics(layers, providerTools, effectivePrompt ?? '', { sanitize: schemaSanitize, flatten: schemaFlatten, strict: schemaStrict }));
 
   // ── Helpers ────────────────────────────────────────────────────────
   function uid() { return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
@@ -329,7 +345,7 @@
           const result = await summarizeChat({
             messages: conversationHistory, provider: getProvider(),
             toolsUsed: allToolsUsed, toolCallCount: chatToolCount,
-            mcpServers: multiClient.listServers().map(s => s.name),
+            mcpServers: multiClient.listServers().map(s => ({ name: s.name, url: s.url })),
             skillsReferenced: skills.map(s => s.name),
           });
           skill.chatSummary = result.chatSummary;
@@ -392,6 +408,7 @@
         schemaOptions: {
           sanitize: schemaSanitize,
           flatten: schemaFlatten,
+          strict: schemaStrict,
           onSchemaPatch: (toolName, patches) => {
             agentLogs = [...agentLogs, {
               ts: Date.now(),
@@ -416,7 +433,8 @@
             const ctxTokens = Math.round(ctxChars / 4);
             const sanitizeLabel = schemaSanitize ? 'ON' : 'OFF';
             const flattenLabel = schemaFlatten ? 'ON' : 'OFF';
-            agentLogs = [...agentLogs, { ts: Date.now(), type: 'request', detail: `${messages.length} messages, ${tools.length} tools (sanitize=${sanitizeLabel}, flatten=${flattenLabel})`, ctxSize: ctxTokens }];
+            const strictLabel = schemaStrict ? 'ON' : 'OFF';
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'request', detail: `${messages.length} messages, ${tools.length} tools (sanitize=${sanitizeLabel}, flatten=${flattenLabel}, strict=${strictLabel})`, ctxSize: ctxTokens }];
             // Log tool schemas on first call or when tool count changes (server activation)
             if (tools.length !== lastLoggedToolCount) {
               lastLoggedToolCount = tools.length;
@@ -668,7 +686,7 @@
   onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true} onclear={clearAll}
   bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools bind:maxResultLength
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON
-  bind:schemaSanitize bind:schemaFlatten bind:compressHistory bind:compressPreview
+  bind:schemaSanitize bind:schemaFlatten bind:schemaStrict bind:compressHistory bind:compressPreview
   bind:contextRAGEnabled
   bind:localUrl bind:localModel
   onconnect={() => addMcpServer(canvas.mcpUrl)}

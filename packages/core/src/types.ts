@@ -43,6 +43,8 @@ export interface JsonSchemaObject {
   required?: string[];
   additionalProperties?: boolean | JsonSchema;
   patternProperties?: Record<string, JsonSchema>;
+  minProperties?: number;
+  maxProperties?: number;
 
   // array
   items?: JsonSchema | JsonSchema[];

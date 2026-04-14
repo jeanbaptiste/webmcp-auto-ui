@@ -216,8 +216,9 @@ export class WasmProvider implements LLMProvider {
     // Build Gemma chat prompt (Gemma 4 format with tool hints)
     let prompt = this.buildPrompt(messages, tools, options?.system, options?.maxTools);
 
-    // Aggressive clipping: Gemma struggles with long conversations — cap at 8 messages
-    const MAX_MESSAGES = 8;
+    // Aggressive clipping: Gemma struggles with long conversations — dynamic cap based on context size
+    const contextTokens = this.opts.contextSize ?? 4096;
+    const MAX_MESSAGES = contextTokens <= 4096 ? 8 : contextTokens <= 8192 ? 16 : 32;
     while (messages.length > MAX_MESSAGES) {
       messages = messages.slice(1);
     }
@@ -582,7 +583,7 @@ export class WasmProvider implements LLMProvider {
 
     const schema = tool.input_schema;
     if (schema?.properties) {
-      const props = schema.properties as Record<string, { description?: string; type?: string; enum?: string[] }>;
+      const props = schema.properties as Record<string, { description?: string; type?: string; enum?: string[]; format?: string; default?: unknown }>;
       decl += `,\n  parameters:{\n    properties:{\n`;
 
       const propEntries = Object.entries(props);
@@ -604,6 +605,8 @@ export class WasmProvider implements LLMProvider {
         }
         parts.push(`type:${q}${inferredType.toUpperCase()}${q}`);
         if (val.enum) parts.push(`enum:[${val.enum.map(e => `${q}${e}${q}`).join(',')}]`);
+        if (val.format) parts.push(`format:${q}${val.format}${q}`);
+        if (val.default !== undefined) parts.push(`default:${WasmProvider.gemmaValue(val.default)}`);
         decl += parts.join(',');
         decl += `}${i < propEntries.length - 1 ? ',' : ''}\n`;
       }

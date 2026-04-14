@@ -7,14 +7,14 @@ export interface SummarizeOptions {
   provider: LLMProvider;
   toolsUsed?: string[];
   toolCallCount?: number;
-  mcpServers?: string[];
+  mcpServers?: { name: string; url: string }[];
   skillsReferenced?: string[];
 }
 
 export interface ChatSummaryResult {
   chatSummary: string;
   provenance: {
-    mcpServers?: string[];
+    mcpServers?: { name: string; url: string }[];
     toolsUsed?: string[];
     toolCallCount?: number;
     skillsReferenced?: string[];

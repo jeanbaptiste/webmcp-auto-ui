@@ -48,6 +48,8 @@ export interface SchemaTransformOptions {
   sanitize?: boolean;
   /** Flatten nested object properties using key__subkey convention (default: false) */
   flatten?: boolean;
+  /** Enable strict tool use (grammar-constrained sampling). Default: false */
+  strict?: boolean;
   /** Called when a schema is auto-patched for strict mode */
   onSchemaPatch?: (toolName: string, patches: SchemaPatch[]) => void;
 }
@@ -206,7 +208,7 @@ export function toProviderTools(tools: McpToolDef[], schemaOptions?: SchemaTrans
       name: t.name,
       description: t.description ?? t.name,
       input_schema: schemaObj,
-      strict: isStrictCompatible(schemaObj) ? true : undefined,
+      strict: schemaOptions?.strict && isStrictCompatible(schemaObj) ? true : undefined,
     };
   });
 }
@@ -227,7 +229,7 @@ function webmcpToProviderTools(tools: WebMcpToolDef[], schemaOptions?: SchemaTra
       name: t.name,
       description: t.description,
       input_schema: schemaObj,
-      strict: isStrictCompatible(schemaObj) ? true : undefined,
+      strict: schemaOptions?.strict && isStrictCompatible(schemaObj) ? true : undefined,
     };
   });
 }
@@ -440,7 +442,7 @@ export interface DiscoveryToolsResult {
  * Build discovery-only tools with a local alias map (parallel-safe).
  * Prefer this over buildDiscoveryTools() when running multiple agent loops.
  */
-export function buildDiscoveryToolsWithAliases(layers: ToolLayer[]): DiscoveryToolsResult {
+export function buildDiscoveryToolsWithAliases(layers: ToolLayer[], schemaOptions?: SchemaTransformOptions): DiscoveryToolsResult {
   const tools: ProviderTool[] = [];
   const aliasMap = new Map<string, string>();
 
@@ -448,7 +450,7 @@ export function buildDiscoveryToolsWithAliases(layers: ToolLayer[]): DiscoveryTo
     const prefix = `${sanitizeServerName(layer.serverName)}_${layer.protocol}_`;
 
     if (layer.protocol === 'mcp') {
-      const allProviderTools = toProviderTools(layer.tools);
+      const allProviderTools = toProviderTools(layer.tools, schemaOptions);
       const matches = resolveCanonicalTools(layer.tools);
 
       for (const m of matches) {
@@ -469,17 +471,17 @@ export function buildDiscoveryToolsWithAliases(layers: ToolLayer[]): DiscoveryTo
       // Pseudo-tools for tool discovery on MCP servers
       tools.push({
         name: `${prefix}search_tools`,
-        description: `Search tools by keyword on ${layer.serverName}`,
-        input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Search keyword' } }, required: ['query'] },
+        description: `Search tools by keyword on the ${layer.serverName} server. Use this when you need to find a specific data-fetching or action tool but don't know its exact name. Pass a keyword related to the task (e.g. "weather", "search", "create") and get back matching tool names with descriptions and input schemas. This is more targeted than list_tools — prefer it when you have a clear idea of what you're looking for. Returns an array of {name, description, inputSchema} objects.`,
+        input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Keyword to search for in tool names and descriptions, e.g. "weather", "user", "search". Case-insensitive.' } }, required: ['query'] },
       });
       tools.push({
         name: `${prefix}list_tools`,
-        description: `List all available tools on ${layer.serverName}`,
+        description: `List ALL available tools on the ${layer.serverName} server with their names, descriptions, and input schemas. Use this when search_tools returned no results, or when you want to browse the full capabilities of the server. Returns the complete tool catalog — useful when the user's request doesn't map to an obvious keyword. Does not accept any parameters.`,
         input_schema: { type: 'object', properties: {} },
       });
     } else {
       // WebMCP: search_recipes, list_recipes, get_recipe, plus action tools (widget_display, canvas, recall)
-      for (const tool of webmcpToProviderTools(layer.tools)) {
+      for (const tool of webmcpToProviderTools(layer.tools, schemaOptions)) {
         if (tool.name === 'search_recipes' || tool.name === 'list_recipes' || tool.name === 'get_recipe' ||
             tool.name === 'widget_display' || tool.name === 'canvas' || tool.name === 'recall') {
           tools.push({ ...tool, name: `${prefix}${tool.name}` });
@@ -489,12 +491,12 @@ export function buildDiscoveryToolsWithAliases(layers: ToolLayer[]): DiscoveryTo
       // Pseudo-tools for tool discovery on WebMCP servers
       tools.push({
         name: `${prefix}search_tools`,
-        description: `Search tools by keyword on ${layer.serverName}`,
-        input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Search keyword' } }, required: ['query'] },
+        description: `Search tools by keyword on the ${layer.serverName} server. Use this when you need to find a specific data-fetching or action tool but don't know its exact name. Pass a keyword related to the task (e.g. "weather", "search", "create") and get back matching tool names with descriptions and input schemas. This is more targeted than list_tools — prefer it when you have a clear idea of what you're looking for. Returns an array of {name, description, inputSchema} objects.`,
+        input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Keyword to search for in tool names and descriptions, e.g. "weather", "user", "search". Case-insensitive.' } }, required: ['query'] },
       });
       tools.push({
         name: `${prefix}list_tools`,
-        description: `List all available tools on ${layer.serverName}`,
+        description: `List ALL available tools on the ${layer.serverName} server with their names, descriptions, and input schemas. Use this when search_tools returned no results, or when you want to browse the full capabilities of the server. Returns the complete tool catalog — useful when the user's request doesn't map to an obvious keyword. Does not accept any parameters.`,
         input_schema: { type: 'object', properties: {} },
       });
     }
@@ -529,14 +531,15 @@ export function buildDiscoveryTools(layers: ToolLayer[]): ProviderTool[] {
 export function activateServerTools(
   currentTools: ProviderTool[],
   layer: ToolLayer,
+  schemaOptions?: SchemaTransformOptions,
 ): ProviderTool[] {
   const prefix = `${sanitizeServerName(layer.serverName)}_${layer.protocol}_`;
   const existing = new Set(currentTools.map(t => t.name));
   const newTools = [...currentTools];
 
   const layerTools = layer.protocol === 'mcp'
-    ? toProviderTools(layer.tools)
-    : webmcpToProviderTools(layer.tools);
+    ? toProviderTools(layer.tools, schemaOptions)
+    : webmcpToProviderTools(layer.tools, schemaOptions);
 
   for (const tool of layerTools) {
     const prefixed = `${prefix}${tool.name}`;

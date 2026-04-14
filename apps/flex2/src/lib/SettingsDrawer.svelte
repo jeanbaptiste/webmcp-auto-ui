@@ -42,6 +42,7 @@
     showToolJSON?: boolean;
     schemaSanitize?: boolean;
     schemaFlatten?: boolean;
+    schemaStrict?: boolean;
     onconnect: () => void;
     connectedUrls?: string[];
     loadingUrls?: string[];
@@ -68,7 +69,7 @@
     systemPrompt = $bindable(''),
     effectivePrompt = '',
     maxTokens = $bindable(4096),
-    maxContextTokens = $bindable(150_000),
+    maxContextTokens = $bindable(120_000),
     maxTools = $bindable(8),
     maxResultLength = $bindable(10000),
     compressHistory = $bindable(false),
@@ -81,6 +82,7 @@
     showToolJSON = $bindable(false),
     schemaSanitize = $bindable(true),
     schemaFlatten = $bindable(false),
+    schemaStrict = $bindable(false),
     onconnect,
     connectedUrls = [],
     loadingUrls = [],
@@ -266,6 +268,14 @@
       </label>
       <div class="text-[9px] font-mono text-text2/60 pl-5">
         {schemaFlatten ? 'Aplatit les objets imbriques en key__subkey' : 'Schemas avec imbrication native'}
+      </div>
+      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+        <input type="checkbox" bind:checked={schemaStrict} class="accent-teal w-3.5 h-3.5" />
+        Strict tool use
+        <span class="text-[8px] text-text2/40 font-mono">grammaire contrainte</span>
+      </label>
+      <div class="text-[9px] font-mono text-text2/60 pl-5">
+        {schemaStrict ? 'Sampling contraint par grammaire JSON' : 'Sampling libre (sanitize + auto-repair suffisent)'}
       </div>
     </section>
 

@@ -367,13 +367,13 @@ export function createWebMcpServer(
     builtinTools = [
       {
         name: 'search_recipes',
-        description: 'List available widget recipes with their descriptions.',
+        description: 'Search available widget recipes by keyword and return matching names with descriptions. Use this as your FIRST step when the user asks to display data visually — it helps you find the right widget type before calling widget_display. Pass a keyword extracted from the user request (e.g. "chart", "table", "map", "profile"). Returns an array of {name, description, group} objects. If no results match, fall back to list_recipes to browse all available widgets.',
         inputSchema: {
           type: 'object',
           properties: {
             query: {
               type: 'string',
-              description: 'Optional search term to filter recipes',
+              description: 'Keyword to filter recipes by name or description, e.g. "chart", "table", "timeline", "map". Case-insensitive. Omit to return all recipes.',
             },
           },
           additionalProperties: false,
@@ -388,7 +388,7 @@ export function createWebMcpServer(
       },
       {
         name: 'list_recipes',
-        description: 'List all available widget recipes with their name and description.',
+        description: 'List ALL available widget recipes with their name, description, and group. Use this when search_recipes returned no results, or when the user wants to explore all display capabilities. Returns the complete catalog of widgets — useful for choosing the best visualization when the exact widget type is unclear. Does not accept any parameters.',
         inputSchema: {
           type: 'object',
           properties: {},
@@ -402,11 +402,11 @@ export function createWebMcpServer(
       },
       {
         name: 'get_recipe',
-        description: 'Get the full recipe for a widget: JSON schema + usage instructions.',
+        description: 'Retrieve the full recipe for a specific widget type, including its JSON schema and step-by-step usage instructions. Call this BEFORE calling widget_display to understand the exact parameter structure expected by the widget. Returns {name, description, schema, recipe} where schema is the JSON Schema for params validation and recipe contains markdown instructions. If the widget name is not found, returns an error with the list of available widget names.',
         inputSchema: {
           type: 'object',
           properties: {
-            name: { type: 'string', description: 'Widget name' },
+            name: { type: 'string', description: 'Exact widget type name as returned by search_recipes or list_recipes, e.g. "chart-rich", "data-table", "stat-card", "hemicycle". Must match exactly — no partial matches.' },
           },
           required: ['name'],
           additionalProperties: false,
@@ -428,14 +428,14 @@ export function createWebMcpServer(
       {
         name: 'widget_display',
         // Description is dynamic — rebuilt in layer()
-        description: 'Display a widget on the canvas. REQUIRED: {name: "widget_type", params: {…}}. Example: {name: "text", params: {content: "Hello world"}}',
+        description: 'Render a widget on the user\'s canvas with the specified type and parameters. Use this tool whenever you need to display data visually — charts, tables, statistics, timelines, maps, galleries, etc. The widget type must match one of the available widget names (use search_recipes or list_recipes first to discover available widgets, then get_recipe to learn the exact schema). Parameters are validated against the widget\'s JSON schema — invalid params will return a validation error with the expected schema. Returns the widget\'s unique ID for later updates via the canvas tool. Do NOT use this tool for plain text responses — use regular text output instead.',
         inputSchema: {
           type: 'object',
           properties: {
-            name: { type: 'string', description: 'Widget name (e.g. "text", "stat", "list", "chart", "data-table")' },
+            name: { type: 'string', description: 'The widget type name, e.g. "chart", "stat", "data-table", "timeline", "map", "hemicycle". Must exactly match a registered widget name. Use list_recipes() to see all available widget names.' },
             params: {
               type: 'object',
-              description: 'Widget parameters as JSON object (call get_recipe for the full schema). Example for text: {content: "Hello"}',
+              description: 'Widget-specific parameters as a JSON object. The structure depends on the widget type — use get_recipe(name) to see the exact JSON schema and examples. For instance, stat expects {label, value}, chart expects {bars}, data-table expects {columns, rows}. Invalid parameters will be rejected with a validation error showing the expected schema.',
               additionalProperties: true,
             },
           },
@@ -512,7 +512,7 @@ export function createWebMcpServer(
         // Rebuild widget_display description with current widget names
         const names = [...widgets.keys()];
         const displayTool = builtinTools.find(t => t.name === 'widget_display')!;
-        displayTool.description = `Display a widget on the canvas. REQUIRED: {name: "widget_type", params: {…}}. Example: {name: "text", params: {content: "Hello"}}. Available widgets: ${names.join(', ')}.`;
+        displayTool.description = `Render a widget on the user's canvas with the specified type and parameters. Use this tool whenever you need to display data visually — charts, tables, statistics, timelines, maps, galleries, etc. The widget type must match one of the available widget names (use search_recipes or get_recipe first to learn the exact schema). Returns the widget's unique ID for later updates via the canvas tool. Do NOT use this tool for plain text responses. Available widgets: ${names.join(', ')}.`;
 
         allTools.push(...builtinTools);
       }
