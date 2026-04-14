@@ -559,6 +559,10 @@ export function buildDiscoveryCache(layers: ToolLayer[]): DiscoveryCache {
   const cache = new DiscoveryCache();
 
   for (const layer of layers) {
+    // Skip WebMCP layers — their discovery tools (list_recipes, etc.) are local
+    // closures over the widgets Map and must be executed directly, not cached.
+    if (layer.protocol === 'webmcp') continue;
+
     const prefix = sanitizeServerName(layer.serverName);
     const serverCache: ServerCache = {
       recipes: [],
