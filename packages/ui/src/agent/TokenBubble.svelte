@@ -16,10 +16,19 @@
       totalCachedGB: number;
       isWasm: boolean;
     };
+    maxContextTokens?: number;
     visible?: boolean;
   }
 
-  let { metrics, visible = true }: Props = $props();
+  let { metrics, maxContextTokens, visible = true }: Props = $props();
+
+  const ctxRatio = $derived(
+    maxContextTokens && maxContextTokens > 0 && metrics.lastInputTokens > 0
+      ? metrics.lastInputTokens / maxContextTokens
+      : 0
+  );
+
+  const ctxWarn = $derived(ctxRatio > 0.8);
 
   // Rate limits (Anthropic tier)
   const LIMITS = { reqPerMin: 1000, inPerMin: 450_000, outPerMin: 90_000 };
@@ -65,6 +74,9 @@
     in:fly={{ y: -8, duration: 200, opacity: 0 }}
     out:fly={{ y: -8, duration: 150, opacity: 0 }}
   >
+    {#if maxContextTokens && maxContextTokens > 0 && metrics.lastInputTokens > 0}
+      <span class:warn={ctxWarn}>Ctx {fmt(metrics.lastInputTokens)}/{fmt(maxContextTokens)}</span>
+    {/if}
     {#if !metrics.isWasm && metrics.totalCacheReadTokens > 0}
       <span class="cached-active">Cached {fmt(metrics.totalCacheReadTokens)}</span>
     {/if}

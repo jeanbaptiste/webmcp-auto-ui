@@ -580,7 +580,7 @@
         <span class="text-text1">Auto-UI</span> <span class="text-accent">flex2</span>
       </span>
     </button>
-    <TokenBubble metrics={tokenMetrics} visible={showTokens && composerMode} />
+    <TokenBubble metrics={tokenMetrics} {maxContextTokens} visible={showTokens && composerMode} />
     <div class="flex-1"></div>
 
     {#if composerMode}
