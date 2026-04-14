@@ -51,6 +51,7 @@ export class TokenTracker {
   record(
     usage: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number },
     latencyMs?: number,
+    isWasm = false,
   ): void {
     const now = Date.now();
     const event: TokenEvent = {
@@ -71,7 +72,7 @@ export class TokenTracker {
     this._metrics.lastCacheReadTokens = event.cacheRead;
     this._metrics.lastLatencyMs = latencyMs ?? 0;
     this._metrics.totalCachedGB = this._metrics.totalCacheReadTokens * 4 / 1e9;
-    this._metrics.isWasm = false;
+    this._metrics.isWasm = isWasm;
 
     // Rolling per-minute rates
     const oneMinAgo = now - 60_000;
