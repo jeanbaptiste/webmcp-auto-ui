@@ -211,7 +211,10 @@ export function toProviderTools(tools: McpToolDef[], schemaOptions?: SchemaTrans
         schemaOptions?.onSchemaPatch?.(t.name, report.patches);
         if (trace) {
           for (const p of report.patches) {
-            trace.push('sanitize', t.name, `removed ${p.keyword ?? p.type} at ${p.path}`, 'warn');
+            const msg = p.type === 'additionalProperties'
+              ? `added additionalProperties:false at ${p.path}`
+              : `removed ${p.keyword} at ${p.path}`;
+            trace.push('sanitize', t.name, msg, 'warn');
           }
         }
       }
@@ -241,7 +244,10 @@ function webmcpToProviderTools(tools: WebMcpToolDef[], schemaOptions?: SchemaTra
         schemaOptions?.onSchemaPatch?.(t.name, report.patches);
         if (trace) {
           for (const p of report.patches) {
-            trace.push('sanitize', t.name, `removed ${p.keyword ?? p.type} at ${p.path}`, 'warn');
+            const msg = p.type === 'additionalProperties'
+              ? `added additionalProperties:false at ${p.path}`
+              : `removed ${p.keyword} at ${p.path}`;
+            trace.push('sanitize', t.name, msg, 'warn');
           }
         }
       }

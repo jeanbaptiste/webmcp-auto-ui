@@ -409,13 +409,6 @@
           sanitize: schemaSanitize,
           flatten: schemaFlatten,
           strict: schemaStrict,
-          onSchemaPatch: (toolName, patches) => {
-            agentLogs = [...agentLogs, {
-              ts: Date.now(),
-              type: 'warning',
-              detail: `[strict] ${toolName}: patched ${patches.map(p => p.path).join(', ')}`
-            }];
-          },
         },
         callbacks: {
           onIterationStart: (i, max) => {
