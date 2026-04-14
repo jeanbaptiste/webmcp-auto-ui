@@ -174,11 +174,9 @@ function sanitizeSchemaObjectWithReport(obj: JsonSchemaObject, seen: WeakSet<obj
     delete result.maxProperties;
   }
 
-  // Force additionalProperties to false for objects (non-false, non-object values)
-  if (result.additionalProperties !== undefined && result.additionalProperties !== false && typeof result.additionalProperties !== 'object') {
-    patches.push({ path, type: 'removed', keyword: 'additionalProperties', detail: `Forced additionalProperties from ${result.additionalProperties} to false` });
-    result.additionalProperties = false;
-  }
+  // Note: do NOT force additionalProperties to false when explicitly set to true —
+  // that's a deliberate choice (e.g. widget_display params accepts free-form keys).
+  // We only add additionalProperties: false when it's ABSENT (see below).
 
   // Recursively sanitize nested schemas
   if (result.properties) {
@@ -277,10 +275,9 @@ function sanitizeSchemaObject(obj: JsonSchemaObject, seen: WeakSet<object>): Jso
   delete result.minProperties;
   delete result.maxProperties;
 
-  // Force additionalProperties to false for objects (non-false, non-object values)
-  if (result.additionalProperties !== undefined && result.additionalProperties !== false && typeof result.additionalProperties !== 'object') {
-    result.additionalProperties = false;
-  }
+  // Note: do NOT force additionalProperties to false when explicitly set to true —
+  // that's a deliberate choice (e.g. widget_display params accepts free-form keys).
+  // We only add additionalProperties: false when it's ABSENT (see below).
 
   // Recursively sanitize nested schemas
   if (result.properties) {
