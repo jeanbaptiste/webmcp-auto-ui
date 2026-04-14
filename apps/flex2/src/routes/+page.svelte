@@ -442,7 +442,7 @@
           },
           onLLMResponse: (response, latencyMs, tokens) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'response', detail: `${tokens?.input ?? '?'}in ${tokens?.output ?? '?'}out, ${Math.round(latencyMs)}ms, ${response.stopReason}`, ctxSize: tokens?.input }];
-            if (response.usage) tokenTracker.record(response.usage, latencyMs, modelType === 'wasm');
+            if (response.usage) tokenTracker.record(response.usage, latencyMs, canvas.llm?.startsWith('gemma') ?? false);
             else if (response.stats) tokenTracker.recordEstimate(0, response.stats.totalTokens * 4, latencyMs);
           },
           onWidget: (type, data) => {
