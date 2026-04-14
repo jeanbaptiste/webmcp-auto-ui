@@ -380,10 +380,8 @@ export function createWebMcpServer(
         },
         execute: async (params: Record<string, unknown>) => {
           const query = (params.query as string | undefined)?.toLowerCase();
-          const results = [...widgets.values()]
-            .filter(w => !query || w.name.includes(query) || w.description.toLowerCase().includes(query))
-            .map(w => ({ name: w.name, description: w.description, group: w.group }));
-          return results;
+          const all = [...widgets.values()].map(w => ({ name: w.name, description: w.description, group: w.group }));
+          return all.filter(w => !query || w.name.includes(query) || w.description.toLowerCase().includes(query));
         },
       },
       {
@@ -395,9 +393,7 @@ export function createWebMcpServer(
           additionalProperties: false,
         },
         execute: async () => {
-          const results = [...widgets.values()]
-            .map(w => ({ name: w.name, description: w.description, group: w.group }));
-          return results;
+          return [...widgets.values()].map(w => ({ name: w.name, description: w.description, group: w.group }));
         },
       },
       {
@@ -414,15 +410,10 @@ export function createWebMcpServer(
         execute: async (params: Record<string, unknown>) => {
           const widgetName = params.name as string;
           const entry = widgets.get(widgetName);
-          if (!entry) {
-            return { error: `Widget "${widgetName}" not found. Available: ${[...widgets.keys()].join(', ')}` };
+          if (entry) {
+            return { name: entry.name, description: entry.description, schema: entry.inputSchema, recipe: entry.recipe };
           }
-          return {
-            name: entry.name,
-            description: entry.description,
-            schema: entry.inputSchema,
-            recipe: entry.recipe,
-          };
+          return { error: `Recipe "${widgetName}" not found`, available: [...widgets.keys()] };
         },
       },
       {
@@ -506,6 +497,10 @@ export function createWebMcpServer(
     },
 
     layer() {
+      if (!builtinTools && widgets.size > 0) {
+        ensureBuiltinTools();
+      }
+
       const allTools = [...customTools];
 
       if (builtinTools) {
