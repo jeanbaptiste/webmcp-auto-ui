@@ -6,6 +6,7 @@ import type { WebMcpToolDef } from '@webmcp-auto-ui/core';
 import { sanitizeSchema, sanitizeSchemaWithReport, flattenSchema } from '@webmcp-auto-ui/core';
 import type { SchemaPatch } from '@webmcp-auto-ui/core';
 import { DiscoveryCache, type ServerCache } from './discovery-cache.js';
+import type { PipelineTrace } from './pipeline-trace.js';
 
 /** Sanitize a server name for use in tool name prefixes.
  *  Returns a clean underscore-separated identifier with no "mcp"/"server" noise.
@@ -200,7 +201,7 @@ function isStrictCompatible(schema: Record<string, unknown>): boolean {
 }
 
 /** Convert McpToolDef[] to ProviderTool[] */
-export function toProviderTools(tools: McpToolDef[], schemaOptions?: SchemaTransformOptions): ProviderTool[] {
+export function toProviderTools(tools: McpToolDef[], schemaOptions?: SchemaTransformOptions, trace?: PipelineTrace): ProviderTool[] {
   return tools.map(t => {
     let schema = (t.inputSchema ?? { type: 'object', properties: {}, additionalProperties: false }) as import('@webmcp-auto-ui/core').JsonSchema;
     if (schemaOptions?.sanitize !== false) {
@@ -208,6 +209,11 @@ export function toProviderTools(tools: McpToolDef[], schemaOptions?: SchemaTrans
       schema = report.schema;
       if (report.patches.length > 0) {
         schemaOptions?.onSchemaPatch?.(t.name, report.patches);
+        if (trace) {
+          for (const p of report.patches) {
+            trace.push('sanitize', t.name, `removed ${p.keyword ?? p.type} at ${p.path}`, 'warn');
+          }
+        }
       }
     }
     const schemaObj = schema as Record<string, unknown>;
@@ -225,7 +231,7 @@ export function toProviderTools(tools: McpToolDef[], schemaOptions?: SchemaTrans
 }
 
 /** Convert WebMcpToolDef[] to ProviderTool[] (Fix 12: sanitize schemas) */
-function webmcpToProviderTools(tools: WebMcpToolDef[], schemaOptions?: SchemaTransformOptions): ProviderTool[] {
+function webmcpToProviderTools(tools: WebMcpToolDef[], schemaOptions?: SchemaTransformOptions, trace?: PipelineTrace): ProviderTool[] {
   return tools.map(t => {
     let schema = (t.inputSchema ?? { type: 'object', properties: {}, additionalProperties: false }) as import('@webmcp-auto-ui/core').JsonSchema;
     if (schemaOptions?.sanitize !== false) {
@@ -233,6 +239,11 @@ function webmcpToProviderTools(tools: WebMcpToolDef[], schemaOptions?: SchemaTra
       schema = report.schema;
       if (report.patches.length > 0) {
         schemaOptions?.onSchemaPatch?.(t.name, report.patches);
+        if (trace) {
+          for (const p of report.patches) {
+            trace.push('sanitize', t.name, `removed ${p.keyword ?? p.type} at ${p.path}`, 'warn');
+          }
+        }
       }
     }
     const schemaObj = schema as Record<string, unknown>;
@@ -249,18 +260,18 @@ function webmcpToProviderTools(tools: WebMcpToolDef[], schemaOptions?: SchemaTra
  *  ALL tools are prefixed: {serverName}_{protocol}_{toolName}
  *  Returns { tools, pathMaps } — use pathMaps instead of the deprecated flattenPathMaps singleton.
  */
-export function buildToolsFromLayers(layers: ToolLayer[], schemaOptions?: SchemaTransformOptions): BuildToolsResult {
+export function buildToolsFromLayers(layers: ToolLayer[], schemaOptions?: SchemaTransformOptions, trace?: PipelineTrace): BuildToolsResult {
   const tools: ProviderTool[] = [];
 
   for (const layer of layers) {
     const prefix = `${sanitizeServerName(layer.serverName)}_${layer.protocol}_`;
 
     if (layer.protocol === 'mcp') {
-      for (const tool of toProviderTools(layer.tools, schemaOptions)) {
+      for (const tool of toProviderTools(layer.tools, schemaOptions, trace)) {
         tools.push({ ...tool, name: `${prefix}${tool.name}` });
       }
     } else {
-      for (const tool of webmcpToProviderTools(layer.tools, schemaOptions)) {
+      for (const tool of webmcpToProviderTools(layer.tools, schemaOptions, trace)) {
         tools.push({ ...tool, name: `${prefix}${tool.name}` });
       }
     }
@@ -282,6 +293,13 @@ export function buildToolsFromLayers(layers: ToolLayer[], schemaOptions?: Schema
       if (Object.keys(pathMap).length > 0) {
         tool.input_schema = flatSchema as Record<string, unknown>;
         localPathMaps.set(tool.name, pathMap);
+      }
+      if (trace) {
+        const flattenedCount = Object.keys(pathMap).filter(k => pathMap[k].length > 1).length;
+        const totalProps = Object.keys((tool.input_schema as Record<string, unknown>).properties ?? {}).length;
+        if (flattenedCount === 0 && totalProps > 0) {
+          trace.push('flatten', tool.name, `0/${totalProps} properties flattened`, 'warn');
+        }
       }
     }
 
@@ -460,7 +478,7 @@ export interface DiscoveryToolsResult {
  * Build discovery-only tools with a local alias map (parallel-safe).
  * Prefer this over buildDiscoveryTools() when running multiple agent loops.
  */
-export function buildDiscoveryToolsWithAliases(layers: ToolLayer[], schemaOptions?: SchemaTransformOptions): DiscoveryToolsResult {
+export function buildDiscoveryToolsWithAliases(layers: ToolLayer[], schemaOptions?: SchemaTransformOptions, trace?: PipelineTrace): DiscoveryToolsResult {
   const tools: ProviderTool[] = [];
   const aliasMap = new Map<string, string>();
 
@@ -468,7 +486,7 @@ export function buildDiscoveryToolsWithAliases(layers: ToolLayer[], schemaOption
     const prefix = `${sanitizeServerName(layer.serverName)}_${layer.protocol}_`;
 
     if (layer.protocol === 'mcp') {
-      const allProviderTools = toProviderTools(layer.tools, schemaOptions);
+      const allProviderTools = toProviderTools(layer.tools, schemaOptions, trace);
       const matches = resolveCanonicalTools(layer.tools);
 
       for (const m of matches) {
@@ -499,7 +517,7 @@ export function buildDiscoveryToolsWithAliases(layers: ToolLayer[], schemaOption
       });
     } else {
       // WebMCP: search_recipes, list_recipes, get_recipe, plus action tools (widget_display, canvas, recall)
-      for (const tool of webmcpToProviderTools(layer.tools, schemaOptions)) {
+      for (const tool of webmcpToProviderTools(layer.tools, schemaOptions, trace)) {
         if (tool.name === 'search_recipes' || tool.name === 'list_recipes' || tool.name === 'get_recipe' ||
             tool.name === 'widget_display' || tool.name === 'canvas' || tool.name === 'recall') {
           tools.push({ ...tool, name: `${prefix}${tool.name}` });
@@ -550,14 +568,15 @@ export function activateServerTools(
   currentTools: ProviderTool[],
   layer: ToolLayer,
   schemaOptions?: SchemaTransformOptions,
+  trace?: PipelineTrace,
 ): ProviderTool[] {
   const prefix = `${sanitizeServerName(layer.serverName)}_${layer.protocol}_`;
   const existing = new Set(currentTools.map(t => t.name));
   const newTools = [...currentTools];
 
   const layerTools = layer.protocol === 'mcp'
-    ? toProviderTools(layer.tools, schemaOptions)
-    : webmcpToProviderTools(layer.tools, schemaOptions);
+    ? toProviderTools(layer.tools, schemaOptions, trace)
+    : webmcpToProviderTools(layer.tools, schemaOptions, trace);
 
   for (const tool of layerTools) {
     const prefixed = `${prefix}${tool.name}`;

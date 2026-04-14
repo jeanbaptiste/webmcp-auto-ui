@@ -14,6 +14,7 @@ import type { DiscoveryCache } from './discovery-cache.js';
 import { unflattenParams, validateJsonSchema } from '@webmcp-auto-ui/core';
 import type { JsonSchema } from '@webmcp-auto-ui/core';
 import { autoRepairParams } from './auto-repair.js';
+import { PipelineTrace } from './pipeline-trace.js';
 
 // Re-export buildSystemPrompt for backward compat
 export { buildSystemPrompt } from './tool-layers.js';
@@ -160,10 +161,18 @@ export async function runAgentLoop(
   // Use local alias maps (parallel-safe — no global singleton)
   const activatedServers = new Set<string>();
   const localAliasMap = new Map<string, string>();
+  const trace = new PipelineTrace();
 
-  const disc = buildDiscoveryToolsWithAliases(options.layers ?? [], schemaOptions);
+  const disc = buildDiscoveryToolsWithAliases(options.layers ?? [], schemaOptions, trace);
   let activeTools: ProviderTool[] = disc.tools;
   for (const [k, v] of disc.aliasMap) localAliasMap.set(k, v);
+
+  // Log any trace warnings from initial tool build
+  const initTraceSummary = trace.summary();
+  if (initTraceSummary) {
+    callbacks.onText?.(`[pipeline-trace] init\n${initTraceSummary}`);
+    trace.clear();
+  }
 
   let baseSystemPrompt: string;
   if (options.systemPrompt) {
@@ -379,12 +388,13 @@ export async function runAgentLoop(
               activatedServers.add(serverKey);
               const layer = (options.layers ?? []).find(l => sanitizeServerName(l.serverName) === serverName && l.protocol === protocol);
               if (layer) {
-                activeTools = activateServerTools(activeTools, layer, schemaOptions);
+                activeTools = activateServerTools(activeTools, layer, schemaOptions, trace);
               }
             }
           }
         }
         if (!toolMatch) {
+          trace.push('dispatch', name, `unknown tool format, expected {source}_{protocol}_{tool}`, 'error');
           result = `Error: unknown tool format "${name}". Expected {source}_{protocol}_{tool}.`;
         } else {
           const [, serverName, protocol, realToolName] = toolMatch;
@@ -397,11 +407,15 @@ export async function runAgentLoop(
             if (repair.fixes.length > 0) {
               toolInput = repair.params;
               callbacks.onText?.(`[auto-repair] ${repair.fixes.join(', ')}`);
+              for (const fix of repair.fixes) {
+                trace.push('repair', name, fix, 'warn');
+              }
             }
             // Validate after repair
             const validation = validateJsonSchema(toolInput, toolDef.input_schema as JsonSchema);
             if (!validation.valid) {
               const errors = validation.errors?.map((e: { message?: string }) => e.message ?? String(e)).join(', ') ?? 'unknown';
+              trace.push('validate', name, errors, 'error');
               result = `Validation error: ${errors}. Expected schema: ${JSON.stringify(toolDef.input_schema)}`;
               // Push error as tool_result and skip to next block
               toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result });
@@ -511,6 +525,13 @@ export async function runAgentLoop(
     }
 
     messages.push({ role: 'user', content: toolResults });
+
+    // Flush pipeline trace warnings to agent console
+    const traceSummary = trace.summary();
+    if (traceSummary) {
+      callbacks.onText?.(`[pipeline-trace]\n${traceSummary}`);
+      trace.clear();
+    }
 
     // Track iterations without render — widget_display means a render happened
     const renderedThisIteration = toolBlocks.some(b => {

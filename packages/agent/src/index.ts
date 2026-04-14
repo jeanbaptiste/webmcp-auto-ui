@@ -55,6 +55,9 @@ export type { Diagnostic } from './diagnostics.js';
 export { autoRepairParams } from './auto-repair.js';
 export type { RepairResult } from './auto-repair.js';
 
+// Pipeline trace
+export { PipelineTrace, type TraceEntry } from './pipeline-trace.js';
+
 // Nano-RAG — context compaction
 export { ContextRAG, type ContextRAGOptions } from './nano-rag/mod.js';
 

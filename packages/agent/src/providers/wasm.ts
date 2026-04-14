@@ -4,6 +4,7 @@
  * Uses dynamic import() to avoid bundling MediaPipe when only Claude is used.
  */
 import type { LLMProvider, LLMResponse, ChatMessage, AnthropicTool, WasmModelId, ContentBlock } from '../types.js';
+import type { PipelineTrace } from '../pipeline-trace.js';
 
 export type WasmStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -22,6 +23,9 @@ const LITERT_MODELS: Record<string, { repo: string; file: string; size: number }
 export class WasmProvider implements LLMProvider {
   readonly name = 'wasm';
   readonly model: string;
+
+  /** Optional pipeline trace — set externally to trace parsing strategy fallbacks */
+  trace?: PipelineTrace;
 
   private inference: any = null;  // LlmInference
   private status: WasmStatus = 'idle';
@@ -389,7 +393,10 @@ export class WasmProvider implements LLMProvider {
       // Strategy 2: If no pairs found, try simple replacement + JSON.parse
       if (Object.keys(toolArgs).length === 0) {
         const argsStr = rawArgs.replace(/<\|"\|>/g, '"');
-        try { toolArgs = JSON.parse(argsStr); } catch {
+        try {
+          toolArgs = JSON.parse(argsStr);
+          this.trace?.push('parse', toolName, 'fell back to quote replacement strategy', 'warn');
+        } catch {
           // Strategy 3: regex key:value extraction on replaced string
           try {
             const obj: Record<string, unknown> = {};
@@ -402,7 +409,10 @@ export class WasmProvider implements LLMProvider {
               else if (arrVal !== undefined) { try { obj[k] = JSON.parse(arrVal); } catch { obj[k] = arrVal; } }
               else if (litVal !== undefined) obj[k] = JSON.parse(litVal);
             }
-            if (Object.keys(obj).length > 0) toolArgs = obj;
+            if (Object.keys(obj).length > 0) {
+              toolArgs = obj;
+              this.trace?.push('parse', toolName, 'fell back to regex key:value strategy', 'warn');
+            }
           } catch {}
         }
       }
