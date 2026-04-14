@@ -144,6 +144,6 @@ The Viewer is deployed in the `build/` subdirectory, not at the root. The `deplo
 ## Links
 
 - [Live demo](https://demos.hyperskills.net/viewer2/)
-- [SDK package](/en/packages/sdk/) -- `decodeHyperSkill`, `encodeHyperSkill`
-- [Flex](/en/apps/flex2/) -- for editing with the AI agent
-- [Recipes](/en/apps/recipes/) -- for testing recipes
+- [SDK package](/webmcp-auto-ui/en/packages/sdk/) -- `decodeHyperSkill`, `encodeHyperSkill`
+- [Flex](/webmcp-auto-ui/en/apps/flex2/) -- for editing with the AI agent
+- [Recipes](/webmcp-auto-ui/en/apps/recipes/) -- for testing recipes

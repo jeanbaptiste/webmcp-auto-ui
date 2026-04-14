@@ -144,6 +144,6 @@ Le Viewer est deploye dans le sous-dossier `build/`, pas a la racine. Le script 
 ## Liens
 
 - [Demo live](https://demos.hyperskills.net/viewer2/)
-- [Package SDK](/packages/sdk/) -- `decodeHyperSkill`, `encodeHyperSkill`
-- [Flex](/apps/flex2/) -- pour editer avec l'agent IA
-- [Recipes](/apps/recipes/) -- pour tester les recettes
+- [Package SDK](/webmcp-auto-ui/packages/sdk/) -- `decodeHyperSkill`, `encodeHyperSkill`
+- [Flex](/webmcp-auto-ui/apps/flex2/) -- pour editer avec l'agent IA
+- [Recipes](/webmcp-auto-ui/apps/recipes/) -- pour tester les recettes

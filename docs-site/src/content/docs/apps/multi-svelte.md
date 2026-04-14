@@ -209,6 +209,6 @@ La sidebar est directement dans `+page.svelte`. Ajouter des sections en suivant 
 ## Liens
 
 - [Demo live](https://demos.hyperskills.net/multi-svelte/)
-- [Package agent](/packages/agent/)
-- [Package UI](/packages/ui/) -- FloatingLayout, FlexLayout, LinkIndicators
-- [Flex](/apps/flex2/) -- version avec export HyperSkill
+- [Package agent](/webmcp-auto-ui/packages/agent/)
+- [Package UI](/webmcp-auto-ui/packages/ui/) -- FloatingLayout, FlexLayout, LinkIndicators
+- [Flex](/webmcp-auto-ui/apps/flex2/) -- version avec export HyperSkill

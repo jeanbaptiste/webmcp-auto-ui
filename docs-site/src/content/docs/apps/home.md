@@ -131,5 +131,5 @@ PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/home run build
 ## Liens
 
 - [Demo live](https://demos.hyperskills.net)
-- [Flex](/apps/flex2/) -- app principale
-- [Package UI](/packages/ui/) -- `getTheme`
+- [Flex](/webmcp-auto-ui/apps/flex2/) -- app principale
+- [Package UI](/webmcp-auto-ui/packages/ui/) -- `getTheme`

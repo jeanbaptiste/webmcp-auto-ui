@@ -196,6 +196,6 @@ Le layout 3 colonnes est defini en CSS dans `<style>` du `+page.svelte`. Les bre
 ## Liens
 
 - [Demo live](https://demos.hyperskills.net/recipes/)
-- [Package agent](/packages/agent/) -- `WEBMCP_RECIPES`, `recipeRegistry`
-- [Flex](/apps/flex2/) -- utilisation des recettes en contexte
-- [Viewer](/apps/viewer2/) -- pour consulter les skills generees
+- [Package agent](/webmcp-auto-ui/packages/agent/) -- `WEBMCP_RECIPES`, `recipeRegistry`
+- [Flex](/webmcp-auto-ui/apps/flex2/) -- utilisation des recettes en contexte
+- [Viewer](/webmcp-auto-ui/apps/viewer2/) -- pour consulter les skills generees

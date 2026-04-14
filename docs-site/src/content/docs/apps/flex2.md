@@ -187,7 +187,7 @@ Pour modifier Flex :
 ## Liens
 
 - [Demo live](https://demos.hyperskills.net/flex2/)
-- [Package agent](/packages/agent/)
-- [Package core](/packages/core/)
-- [Package SDK](/packages/sdk/)
-- [Package UI](/packages/ui/)
+- [Package agent](/webmcp-auto-ui/packages/agent/)
+- [Package core](/webmcp-auto-ui/packages/core/)
+- [Package SDK](/webmcp-auto-ui/packages/sdk/)
+- [Package UI](/webmcp-auto-ui/packages/ui/)

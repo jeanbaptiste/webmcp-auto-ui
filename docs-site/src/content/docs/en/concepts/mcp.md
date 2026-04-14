@@ -209,7 +209,7 @@ const layers = [mcpLayer, uiLayer];
 ```
 
 :::note[Server recipes]
-MCP recipes come from the server and describe how to combine its tools. They are distinct from WebMCP recipes which guide display. See the [Recipes](/en/concepts/recipes/) page for the full comparison.
+MCP recipes come from the server and describe how to combine its tools. They are distinct from WebMCP recipes which guide display. See the [Recipes](/webmcp-auto-ui/en/concepts/recipes/) page for the full comparison.
 :::
 
 ## What the LLM sees in the prompt

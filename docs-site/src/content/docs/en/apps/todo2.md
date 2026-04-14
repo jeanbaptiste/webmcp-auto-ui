@@ -167,7 +167,7 @@ The app stores everything in memory. To persist:
 
 ### Connecting to an agent
 
-To drive tools via an LLM agent (instead of the browser), see the [Boilerplate](/en/apps/boilerplate/) architecture which integrates `runAgentLoop`.
+To drive tools via an LLM agent (instead of the browser), see the [Boilerplate](/webmcp-auto-ui/en/apps/boilerplate/) architecture which integrates `runAgentLoop`.
 
 ## Deployment
 
@@ -182,6 +182,6 @@ To drive tools via an LLM agent (instead of the browser), see the [Boilerplate](
 ## Links
 
 - [Live demo](https://demos.hyperskills.net/todo2/)
-- [Core package](/en/packages/core/) -- `jsonResult`
-- [UI package](/en/packages/ui/) -- used components
-- [Boilerplate](/en/apps/boilerplate/) -- version with AI agent
+- [Core package](/webmcp-auto-ui/en/packages/core/) -- `jsonResult`
+- [UI package](/webmcp-auto-ui/en/packages/ui/) -- used components
+- [Boilerplate](/webmcp-auto-ui/en/apps/boilerplate/) -- version with AI agent

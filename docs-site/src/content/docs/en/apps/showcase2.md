@@ -185,5 +185,5 @@ Add an object to `SIMPLE_BLOCKS` or `RICH_BLOCKS` in `demo-data.ts` with the `ty
 ## Links
 
 - [Live demo](https://demos.hyperskills.net/showcase2/)
-- [UI package](/en/packages/ui/) -- all widgets
-- [Flex](/en/apps/flex2/) -- full agent usage
+- [UI package](/webmcp-auto-ui/en/packages/ui/) -- all widgets
+- [Flex](/webmcp-auto-ui/en/apps/flex2/) -- full agent usage

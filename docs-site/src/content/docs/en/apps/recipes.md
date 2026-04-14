@@ -196,6 +196,6 @@ The 3-column layout is defined in CSS within `+page.svelte`'s `<style>`. Breakpo
 ## Links
 
 - [Live demo](https://demos.hyperskills.net/recipes/)
-- [Agent package](/en/packages/agent/) -- `WEBMCP_RECIPES`, `recipeRegistry`
-- [Flex](/en/apps/flex2/) -- using recipes in context
-- [Viewer](/en/apps/viewer2/) -- for viewing generated skills
+- [Agent package](/webmcp-auto-ui/en/packages/agent/) -- `WEBMCP_RECIPES`, `recipeRegistry`
+- [Flex](/webmcp-auto-ui/en/apps/flex2/) -- using recipes in context
+- [Viewer](/webmcp-auto-ui/en/apps/viewer2/) -- for viewing generated skills

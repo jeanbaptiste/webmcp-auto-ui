@@ -185,5 +185,5 @@ Ajouter un objet dans `SIMPLE_BLOCKS` ou `RICH_BLOCKS` de `demo-data.ts` avec le
 ## Liens
 
 - [Demo live](https://demos.hyperskills.net/showcase2/)
-- [Package UI](/packages/ui/) -- tous les widgets
-- [Flex](/apps/flex2/) -- utilisation complete avec agent
+- [Package UI](/webmcp-auto-ui/packages/ui/) -- tous les widgets
+- [Flex](/webmcp-auto-ui/apps/flex2/) -- utilisation complete avec agent

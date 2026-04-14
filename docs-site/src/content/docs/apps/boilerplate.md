@@ -205,6 +205,6 @@ Le schema JSON dans le frontmatter est critique : c'est ce que le LLM voit pour 
 ## Liens
 
 - [Demo live](https://demos.hyperskills.net/boilerplate/)
-- [Package core](/packages/core/) -- `createWebMcpServer`
-- [Package agent](/packages/agent/) -- `runAgentLoop`
-- [Flex (app complete)](/apps/flex2/) -- pour voir toutes les fonctionnalites avancees
+- [Package core](/webmcp-auto-ui/packages/core/) -- `createWebMcpServer`
+- [Package agent](/webmcp-auto-ui/packages/agent/) -- `runAgentLoop`
+- [Flex (app complete)](/webmcp-auto-ui/apps/flex2/) -- pour voir toutes les fonctionnalites avancees
