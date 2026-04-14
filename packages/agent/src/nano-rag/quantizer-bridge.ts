@@ -113,3 +113,7 @@ export async function loadQuantizer(): Promise<QuantizerInstance> {
 
 	return instance;
 }
+
+export function resetQuantizer(): void {
+	instance = null;
+}

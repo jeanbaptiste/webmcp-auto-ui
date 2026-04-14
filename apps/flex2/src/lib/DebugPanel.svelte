@@ -32,7 +32,7 @@
   );
 
   /** Total tools actually sent to the LLM (MCP + UI + component/recall/use_skill) */
-  const toolCount = $derived(buildToolsFromLayers(layers).length);
+  const toolCount = $derived(buildToolsFromLayers(layers).tools.length);
 
   const recipeCount = $derived(
     layers.reduce((sum, l) => sum + ('recipes' in l && l.recipes ? l.recipes.length : 0), 0)

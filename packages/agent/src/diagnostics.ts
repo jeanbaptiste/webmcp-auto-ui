@@ -23,6 +23,8 @@ export function runDiagnostics(
   tools: ProviderTool[],
   systemPrompt: string,
   schemaOptions?: { sanitize?: boolean; flatten?: boolean },
+  /** Original (pre-sanitize) tools — used for check #5 to detect patchable schemas */
+  rawTools?: ProviderTool[],
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
@@ -102,7 +104,9 @@ export function runDiagnostics(
   }
 
   // 5. Strict mode — schemas that were auto-patched
-  for (const tool of tools) {
+  // Must run on raw (pre-sanitize) schemas; sanitized tools will never show patches.
+  const checkTools = rawTools ?? tools;
+  for (const tool of checkTools) {
     const { patches } = sanitizeSchemaWithReport(tool.input_schema as JsonSchema);
     if (patches.length > 0) {
       diagnostics.push({

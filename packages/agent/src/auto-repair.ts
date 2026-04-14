@@ -82,8 +82,8 @@ export function autoRepairParams(
         params[req] = propSchema.default;
         fixes.push(`${req}: missing required → default ${JSON.stringify(propSchema.default)}`);
       }
-      // If enum with single value, use it
-      if (propSchema.enum && (propSchema.enum as unknown[]).length === 1) {
+      // If enum with single value, use it (only if not already filled by default above)
+      else if (propSchema.enum && (propSchema.enum as unknown[]).length === 1) {
         params[req] = (propSchema.enum as unknown[])[0];
         fixes.push(`${req}: missing required → single enum ${JSON.stringify(params[req])}`);
       }

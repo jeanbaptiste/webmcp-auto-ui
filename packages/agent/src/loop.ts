@@ -9,7 +9,7 @@ import type {
   LLMProvider, ProviderTool, McpToolDef, AgentCallbacks,
 } from './types.js';
 import type { ToolLayer, SchemaTransformOptions } from './tool-layers.js';
-import { buildToolsFromLayers, buildSystemPromptWithAliases, buildDiscoveryToolsWithAliases, buildSystemPrompt, buildDiscoveryTools, activateServerTools, toProviderTools, sanitizeServerName, flattenPathMaps } from './tool-layers.js';
+import { buildToolsFromLayers, buildSystemPromptWithAliases, buildDiscoveryToolsWithAliases, buildSystemPrompt, activateServerTools, toProviderTools, sanitizeServerName, flattenPathMaps } from './tool-layers.js';
 import type { DiscoveryCache } from './discovery-cache.js';
 import { unflattenParams, validateJsonSchema } from '@webmcp-auto-ui/core';
 import type { JsonSchema } from '@webmcp-auto-ui/core';
@@ -371,7 +371,7 @@ export async function runAgentLoop(
 
         // Parse tool name to extract server — activate on first contact
         {
-          const activateMatch = block.name.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
+          const activateMatch = resolvedName.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
           if (activateMatch) {
             const [, serverName, protocol] = activateMatch;
             const serverKey = `${serverName}_${protocol}`;
@@ -482,8 +482,7 @@ export async function runAgentLoop(
 
         // Nano-RAG: ingest tool result for future context retrieval
         if (contextRAG && result) {
-          const toolMatch2 = resolvedName.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
-          const realName = toolMatch2 ? toolMatch2[3] : block.name;
+          const realName = toolMatch ? toolMatch[3] : block.name;
           const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
           // Find the last user message for contextual embeddings
           const lastUserText = [...messages].reverse()

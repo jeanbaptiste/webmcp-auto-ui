@@ -321,7 +321,7 @@
     return hasCustom ? `${systemPrompt}\n\n${base}` : base;
   });
 
-  const providerTools = $derived(buildToolsFromLayers(layers, { sanitize: schemaSanitize, flatten: schemaFlatten, strict: schemaStrict }));
+  const providerTools = $derived(buildToolsFromLayers(layers, { sanitize: schemaSanitize, flatten: schemaFlatten, strict: schemaStrict }).tools);
   const discoveryCache = $derived(buildDiscoveryCache(layers));
   const diagnostics = $derived(runDiagnostics(layers, providerTools, effectivePrompt ?? '', { sanitize: schemaSanitize, flatten: schemaFlatten, strict: schemaStrict }));
 

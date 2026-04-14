@@ -54,8 +54,19 @@ export interface SchemaTransformOptions {
   onSchemaPatch?: (toolName: string, patches: SchemaPatch[]) => void;
 }
 
-/** Path maps for flattened schemas — keyed by prefixed tool name */
+/**
+ * @deprecated Use the `pathMaps` field returned by `buildToolsFromLayers()` instead.
+ * This singleton is NOT parallel-safe — concurrent agent loops will clobber each other.
+ * Kept for backward compatibility only; populated as a side-effect of `buildToolsFromLayers`.
+ */
 export const flattenPathMaps = new Map<string, Record<string, string[]>>();
+
+/** Result of buildToolsFromLayers — tools + per-call path maps (parallel-safe) */
+export interface BuildToolsResult {
+  tools: ProviderTool[];
+  /** Path maps for flattened schemas, keyed by prefixed tool name. Empty if flatten is off. */
+  pathMaps: Map<string, Record<string, string[]>>;
+}
 
 // ── Canonical tool resolution (4-layer matching) ─────────────────────
 //
@@ -216,7 +227,7 @@ export function toProviderTools(tools: McpToolDef[], schemaOptions?: SchemaTrans
 /** Convert WebMcpToolDef[] to ProviderTool[] (Fix 12: sanitize schemas) */
 function webmcpToProviderTools(tools: WebMcpToolDef[], schemaOptions?: SchemaTransformOptions): ProviderTool[] {
   return tools.map(t => {
-    let schema = (t.inputSchema ?? { type: 'object', properties: {} }) as import('@webmcp-auto-ui/core').JsonSchema;
+    let schema = (t.inputSchema ?? { type: 'object', properties: {}, additionalProperties: false }) as import('@webmcp-auto-ui/core').JsonSchema;
     if (schemaOptions?.sanitize !== false) {
       const report = sanitizeSchemaWithReport(schema);
       schema = report.schema;
@@ -236,8 +247,9 @@ function webmcpToProviderTools(tools: WebMcpToolDef[], schemaOptions?: SchemaTra
 
 /** Build ProviderTool[] from structured layers.
  *  ALL tools are prefixed: {serverName}_{protocol}_{toolName}
+ *  Returns { tools, pathMaps } — use pathMaps instead of the deprecated flattenPathMaps singleton.
  */
-export function buildToolsFromLayers(layers: ToolLayer[], schemaOptions?: SchemaTransformOptions): ProviderTool[] {
+export function buildToolsFromLayers(layers: ToolLayer[], schemaOptions?: SchemaTransformOptions): BuildToolsResult {
   const tools: ProviderTool[] = [];
 
   for (const layer of layers) {
@@ -260,21 +272,27 @@ export function buildToolsFromLayers(layers: ToolLayer[], schemaOptions?: Schema
     seen.set(tool.name, tool);
   }
 
+  const localPathMaps = new Map<string, Record<string, string[]>>();
+
   // Apply flatten if requested
   if (schemaOptions?.flatten) {
-    flattenPathMaps.clear();
     const result = Array.from(seen.values());
     for (const tool of result) {
       const { schema: flatSchema, pathMap } = flattenSchema(tool.input_schema as import('@webmcp-auto-ui/core').JsonSchema);
       if (Object.keys(pathMap).length > 0) {
         tool.input_schema = flatSchema as Record<string, unknown>;
-        flattenPathMaps.set(tool.name, pathMap);
+        localPathMaps.set(tool.name, pathMap);
       }
     }
-    return result;
+
+    // Populate deprecated singleton for backward compat
+    flattenPathMaps.clear();
+    for (const [k, v] of localPathMaps) flattenPathMaps.set(k, v);
+
+    return { tools: result, pathMaps: localPathMaps };
   }
 
-  return Array.from(seen.values());
+  return { tools: Array.from(seen.values()), pathMaps: localPathMaps };
 }
 
 /** Result of buildSystemPromptWithAliases — prompt text + per-call alias map */

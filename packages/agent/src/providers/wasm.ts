@@ -222,7 +222,7 @@ export class WasmProvider implements LLMProvider {
     while (messages.length > MAX_MESSAGES) {
       messages = messages.slice(1);
     }
-    prompt = this.buildPrompt(messages, tools, options?.system);
+    prompt = this.buildPrompt(messages, tools, options?.system, options?.maxTools);
 
     // Token-based clipping: if prompt is still too large, drop oldest messages
     const maxPromptTokens = (this.opts.contextSize ?? 4096) - 512;
@@ -536,8 +536,10 @@ export class WasmProvider implements LLMProvider {
       let i = m.index + m[0].length;
       while (i < raw.length && depth > 0) {
         const ch = raw[i];
-        if (ch === opener || ch === '{' || ch === '[') depth++;
-        else if (ch === closer || ch === '}' || ch === ']') depth--;
+        if (ch === opener) depth++;
+        else if (ch !== opener && (ch === '{' || ch === '[')) depth++;
+        else if (ch === closer) depth--;
+        else if (ch !== closer && (ch === '}' || ch === ']')) depth--;
         i++;
       }
       const fragment = raw.slice(m.index + m[0].length - 1, i); // includes opener and closer

@@ -57,6 +57,7 @@
   let maxTokens = $state(4096);
   let cacheEnabled = $state(true);
   let temperature = $state(1.0);
+  let topK = $state(64);
   let maxTools = $state(8);
   let maxResultLength = $state(10000);
   let truncateResults = $state(false);
@@ -280,6 +281,7 @@
     if (isGemma) {
       maxResultLength = 2000;
       temperature = 0.7;
+      topK = 40;
       maxContextTokens = isE4B ? 16384 : 8192;
       cacheEnabled = false;
     } else if (isLocal) {
@@ -288,6 +290,7 @@
       // Claude defaults
       maxResultLength = 10000;
       temperature = 1.0;
+      topK = 64;
       maxContextTokens = 120_000;
       cacheEnabled = true;
     }
@@ -297,13 +300,17 @@
   const layers = $derived.by((): ToolLayer[] => {
     const result: ToolLayer[] = [];
     if (canvas.mcpConnected) {
-      const mcpLayer: McpLayer = {
-        protocol: 'mcp',
-        serverName: canvas.mcpName ?? 'mcp',
-        tools: fromMcpTools(canvas.mcpTools as Parameters<typeof fromMcpTools>[0]),
-        recipes: mcpRecipes.length > 0 ? mcpRecipes : undefined,
-      };
-      result.push(mcpLayer);
+      let recipesAttached = false;
+      for (const server of multiClient.listServers()) {
+        const mcpLayer: McpLayer = {
+          protocol: 'mcp',
+          serverName: server.name,
+          tools: fromMcpTools(server.tools as Parameters<typeof fromMcpTools>[0]),
+          recipes: !recipesAttached && mcpRecipes.length > 0 ? mcpRecipes : undefined,
+        };
+        if (mcpLayer.recipes) recipesAttached = true;
+        result.push(mcpLayer);
+      }
     }
     // Add all enabled widget pack layers
     result.push(...buildLayers(enabledPacks));
@@ -316,7 +323,7 @@
     return hasCustom ? `${systemPrompt}\n\n${b}` : b;
   });
 
-  const providerTools = $derived(buildToolsFromLayers(layers, { sanitize: schemaSanitize, flatten: schemaFlatten, strict: false }));
+  const providerTools = $derived(buildToolsFromLayers(layers, { sanitize: schemaSanitize, flatten: schemaFlatten, strict: false }).tools);
   const discoveryCache = $derived(buildDiscoveryCache(layers));
   const diagnostics = $derived(runDiagnostics(layers, providerTools, effectivePrompt ?? '', { sanitize: schemaSanitize, flatten: schemaFlatten, strict: false }));
   let diagModalOpen = $state(false);
@@ -351,7 +358,7 @@
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
-        maxIterations: 15, maxTokens, maxTools, maxResultLength, temperature, cacheEnabled,
+        maxIterations: 15, maxTokens, maxTools, maxResultLength, temperature, topK, cacheEnabled,
         truncateResults, compressHistory: compressHistory ? compressPreview : false,
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
