@@ -170,7 +170,7 @@ export async function runAgentLoop(
   // Log any trace warnings from initial tool build
   const initTraceSummary = trace.summary();
   if (initTraceSummary) {
-    callbacks.onText?.(`[pipeline-trace] init\n${initTraceSummary}`);
+    callbacks.onTrace?.(`[pipeline-trace] init\n${initTraceSummary}`);
     trace.clear();
   }
 
@@ -247,7 +247,7 @@ export async function runAgentLoop(
         try {
           const ragResults = await contextRAG.query(queryText);
           if (ragResults.length > 0) {
-            callbacks.onText?.(`[nano-rag] query "${queryText.slice(0, 40)}${queryText.length > 40 ? '…' : ''}" → ${ragResults.length} results (${ragResults.map(r => r.score.toFixed(2)).join(', ')})`);
+            callbacks.onTrace?.(`[nano-rag] query "${queryText.slice(0, 40)}${queryText.length > 40 ? '…' : ''}" → ${ragResults.length} results (${ragResults.map(r => r.score.toFixed(2)).join(', ')})`);
           }
           const ragContext = await contextRAG.buildContext(queryText);
           if (ragContext) {
@@ -406,7 +406,7 @@ export async function runAgentLoop(
             const repair = autoRepairParams(toolInput, toolDef.input_schema, realToolName);
             if (repair.fixes.length > 0) {
               toolInput = repair.params;
-              callbacks.onText?.(`[auto-repair] ${repair.fixes.join(', ')}`);
+              callbacks.onTrace?.(`[auto-repair] ${repair.fixes.join(', ')}`);
               for (const fix of repair.fixes) {
                 trace.push('repair', name, fix, 'warn');
               }
@@ -506,7 +506,7 @@ export async function runAgentLoop(
             : (lastUserText as any[])?.find((b: any) => b.type === 'text')?.text ?? '';
           contextRAG.ingest(realName, block.id, resultStr, userQuery).then((chunkCount) => {
             if (chunkCount > 0) {
-              callbacks.onText?.(`[nano-rag] ingested ${chunkCount} chunks from ${realName} (${resultStr.length} chars)`);
+              callbacks.onTrace?.(`[nano-rag] ingested ${chunkCount} chunks from ${realName} (${resultStr.length} chars)`);
             }
           }).catch(() => {});
         }
@@ -529,7 +529,7 @@ export async function runAgentLoop(
     // Flush pipeline trace warnings to agent console
     const traceSummary = trace.summary();
     if (traceSummary) {
-      callbacks.onText?.(`[pipeline-trace]\n${traceSummary}`);
+      callbacks.onTrace?.(`[pipeline-trace]\n${traceSummary}`);
       trace.clear();
     }
 

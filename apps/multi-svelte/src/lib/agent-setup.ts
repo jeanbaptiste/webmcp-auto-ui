@@ -1,17 +1,11 @@
 import type { WebMcpServer } from '@webmcp-auto-ui/core';
 import type { ToolLayer } from '@webmcp-auto-ui/agent';
 import { autoui } from '@webmcp-auto-ui/agent';
-import { d3server } from './servers/d3/server.js';
-import { threejsServer } from './servers/threejs/server.js';
-import { mermaidServer } from './servers/mermaid/server.js';
-import { plotlyServer } from './servers/plotly/server.js';
-import { leafletServer } from './servers/leaflet/server.js';
-import { mapboxServer } from './servers/mapbox/server.js';
-import { canvas2dServer } from './servers/canvas2d/server.js';
-import { chartjsServer } from './servers/chartjs/server.js';
-import { cytoscapeServer } from './servers/cytoscape/server.js';
-import { roughServer } from './servers/rough/server.js';
-import { pixijsServer } from './servers/pixijs/server.js';
+import {
+  d3server, threejsServer, mermaidServer, plotlyServer,
+  leafletServer, mapboxServer, canvas2dServer, chartjsServer,
+  cytoscapeServer, roughServer, pixijsServer,
+} from '@webmcp-auto-ui/servers';
 
 export interface ServerPack {
   id: string;

@@ -98,6 +98,8 @@ export interface AgentCallbacks {
   onClear?: () => void;
   onText?: (text: string) => void;
   onToken?: (token: string) => void;
+  /** Called for pipeline trace / auto-repair / nano-rag diagnostics (not streamed to UI) */
+  onTrace?: (message: string) => void;
   onDone?: (metrics: AgentMetrics) => void;
   // Canvas mutation tools
   onUpdate?: (id: string, data: Record<string, unknown>) => void;

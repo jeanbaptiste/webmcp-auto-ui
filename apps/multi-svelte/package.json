@@ -18,6 +18,7 @@
     "@webmcp-auto-ui/ui": "file:../../packages/ui"
   },
   "devDependencies": {
+    "@webmcp-auto-ui/servers": "file:../../packages/servers",
     "@huggingface/transformers": "^4.0.1",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "autoprefixer": "^10.4.0",

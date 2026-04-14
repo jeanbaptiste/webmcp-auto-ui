@@ -3,6 +3,7 @@
   import { FloatingLayout, FlexLayout, WidgetRenderer, layoutAdapter, LinkIndicators, linkGroupColor, bus } from '@webmcp-auto-ui/ui';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import type { ManagedWindow } from '@webmcp-auto-ui/ui';
+  import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import ProvenanceBadge from './ProvenanceBadge.svelte';
 
   /** Compute the left-border accent color for a linked widget (or 'transparent'). */
@@ -17,8 +18,8 @@
     return `border-left:3px solid ${linkGroupColor(gid)};`;
   }
 
-  interface Props { class?: string; layoutMode?: 'float' | 'grid'; oninteract?: (widgetId: string, widgetType: string, action: string, payload: unknown) => void; }
-  let { class: cls = '', layoutMode = 'float', oninteract }: Props = $props();
+  interface Props { class?: string; layoutMode?: 'float' | 'grid'; servers?: WebMcpServer[]; oninteract?: (widgetId: string, widgetType: string, action: string, payload: unknown) => void; }
+  let { class: cls = '', layoutMode = 'float', servers, oninteract }: Props = $props();
 
   let windows = $state<ManagedWindow[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -109,7 +110,7 @@
           </div>
           <div class="flex-1 overflow-auto min-h-0">
             {#if block}
-              <WidgetRenderer type={block.type} data={block.data} id={block.id}
+              <WidgetRenderer type={block.type} data={block.data} id={block.id} {servers}
                 oninteract={(type, action, payload) => oninteract?.(block.id, type, action, payload)} />
             {/if}
           </div>
@@ -141,7 +142,7 @@
           {#if !ctx.collapsed}
             <div class="flex-1 overflow-auto min-h-0">
               {#if block}
-                <WidgetRenderer type={block.type} data={block.data} id={block.id}
+                <WidgetRenderer type={block.type} data={block.data} id={block.id} {servers}
                 oninteract={(type, action, payload) => oninteract?.(block.id, type, action, payload)} />
               {/if}
             </div>

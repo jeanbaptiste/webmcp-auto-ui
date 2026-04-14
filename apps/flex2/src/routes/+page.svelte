@@ -12,6 +12,12 @@
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
   import { autoui } from '@webmcp-auto-ui/agent';
+  import type { WebMcpServer } from '@webmcp-auto-ui/core';
+  import {
+    canvas2dServer, chartjsServer, cytoscapeServer, d3server,
+    leafletServer, mapboxServer, mermaidServer, pixijsServer,
+    plotlyServer, roughServer, threejsServer,
+  } from '@webmcp-auto-ui/servers';
   import { McpStatus, GemmaLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
   import { Menu, Terminal, LayoutGrid } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
@@ -22,6 +28,9 @@
 
   // ── State ─────────────────────────────────────────────────────────────
   let input = $state('');
+  let inputHistory = $state<string[]>([]);
+  let historyIndex = $state(-1);
+  let savedInput = $state('');
   let mcpToken = $state('');
   let conversationHistory = $state<ChatMessage[]>([]);
   let historyLog = $state<{id:string; role:string; content:string; ts:Date}[]>([]);
@@ -50,6 +59,25 @@
   let composerMode = $state(true); // true = composer, false = consumer
   let layoutMode = $state<'float' | 'grid'>('float');
   let skills = $state<Skill[]>([]);
+
+  // ── WebMCP servers (additional visualization packs) ─────────────
+  const SERVER_REGISTRY: { id: string; label: string; server: WebMcpServer }[] = [
+    { id: 'canvas2d', label: 'Canvas 2D', server: canvas2dServer },
+    { id: 'chartjs', label: 'Chart.js', server: chartjsServer },
+    { id: 'cytoscape', label: 'Cytoscape', server: cytoscapeServer },
+    { id: 'd3', label: 'D3.js', server: d3server },
+    { id: 'leaflet', label: 'Leaflet', server: leafletServer },
+    { id: 'mapbox', label: 'Mapbox GL', server: mapboxServer },
+    { id: 'mermaid', label: 'Mermaid', server: mermaidServer },
+    { id: 'pixijs', label: 'PixiJS', server: pixijsServer },
+    { id: 'plotly', label: 'Plotly', server: plotlyServer },
+    { id: 'rough', label: 'Rough.js', server: roughServer },
+    { id: 'threejs', label: 'Three.js', server: threejsServer },
+  ];
+  let enabledServers = $state(new Set<string>());
+  let activeServers = $derived<WebMcpServer[]>(
+    SERVER_REGISTRY.filter(s => enabledServers.has(s.id)).map(s => s.server)
+  );
 
   // ── Nano-RAG (experimental, off by default) ──────────────────────
   let contextRAGEnabled = $state(false);
@@ -99,6 +127,7 @@
   let tokenMetrics = $state(tokenTracker.metrics);
   let showTokens = $state(true);
   let showToolJSON = $state(false);
+  let showPipelineTrace = $state(false);
   let lastLoggedToolCount = $state(0);
   tokenTracker.subscribe(m => { tokenMetrics = m; });
 
@@ -311,6 +340,12 @@
       }
     }
     result.push(autoui.layer());
+    // Add enabled WebMCP server layers
+    for (const entry of SERVER_REGISTRY) {
+      if (enabledServers.has(entry.id)) {
+        result.push(entry.server.layer());
+      }
+    }
     return result;
   });
 
@@ -372,6 +407,10 @@
   // ── Agent ──────────────────────────────────────────────────────────
   async function sendMessage(msg: string) {
     if (!msg.trim() || canvas.generating) return;
+    // Push to input history (limit 50)
+    inputHistory = [...inputHistory.slice(-(49)), msg.trim()];
+    historyIndex = -1;
+    savedInput = '';
     input = '';
     ephemeral = [];
     allToolsUsed = [];
@@ -454,6 +493,11 @@
           onMove: (id, x, y) => layoutAdapter.move(id, x, y),
           onResize: (id, w, h) => layoutAdapter.resize(id, w, h),
           onStyle: (id, styles) => layoutAdapter.style(id, styles),
+          onTrace: (message) => {
+            if (showPipelineTrace) {
+              agentLogs = [...agentLogs, { ts: Date.now(), type: 'trace', detail: message }];
+            }
+          },
           onToken: () => {},
           onText: (text) => {
             if (text) {
@@ -528,7 +572,29 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); return; }
+    if (e.key === 'ArrowUp' && inputHistory.length > 0) {
+      e.preventDefault();
+      if (historyIndex === -1) {
+        savedInput = input;
+        historyIndex = inputHistory.length - 1;
+      } else if (historyIndex > 0) {
+        historyIndex--;
+      }
+      input = inputHistory[historyIndex];
+      return;
+    }
+    if (e.key === 'ArrowDown' && historyIndex !== -1) {
+      e.preventDefault();
+      historyIndex++;
+      if (historyIndex >= inputHistory.length) {
+        historyIndex = -1;
+        input = savedInput;
+      } else {
+        input = inputHistory[historyIndex];
+      }
+      return;
+    }
   }
 
   function toggleTheme() {
@@ -612,7 +678,7 @@
 
   <!-- CANVAS + EPHEMERAL -->
   <div class="flex-1 relative overflow-hidden">
-    <FlexGrid bind:this={flexGrid} class="w-full h-full" {layoutMode} oninteract={handleWidgetInteraction} />
+    <FlexGrid bind:this={flexGrid} class="w-full h-full" {layoutMode} servers={activeServers} oninteract={handleWidgetInteraction} />
 
     {#if composerMode}
       <div class="absolute bottom-3 left-[50px] right-[50px] flex flex-col gap-2 pointer-events-none z-20">
@@ -669,7 +735,7 @@
   bind:composerMode bind:layoutMode bind:includeSummary
   onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true} onclear={clearAll}
   bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools bind:maxResultLength
-  bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON
+  bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:showPipelineTrace
   bind:schemaSanitize bind:schemaFlatten bind:schemaStrict bind:compressHistory bind:compressPreview
   bind:contextRAGEnabled
   bind:localUrl bind:localModel
@@ -679,6 +745,8 @@
   {mcpRecipes}
   webmcpRecipes={(layers.find(l => l.protocol === 'webmcp') as any)?.recipes ?? []}
   {diagnostics}
+  serverRegistry={SERVER_REGISTRY.map(s => ({ id: s.id, label: s.label, widgetCount: s.server.listWidgets().length }))}
+  bind:enabledServers
 />
 
 <!-- EXPORT MODAL -->

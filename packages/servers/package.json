@@ -1,0 +1,26 @@
+{
+  "name": "@webmcp-auto-ui/servers",
+  "version": "2.5.5",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*/server.ts"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.0",
+    "cytoscape": "^3.30.0",
+    "cytoscape-cola": "^2.5.1",
+    "cytoscape-cose-bilkent": "^4.1.0",
+    "cytoscape-dagre": "^2.5.0",
+    "cytoscape-fcose": "^2.2.0",
+    "d3": "^7.9.0",
+    "leaflet": "^1.9.4",
+    "mapbox-gl": "^3.5.0",
+    "mermaid": "^11.4.0",
+    "pixi.js": "^8.4.0",
+    "plotly.js-dist-min": "^2.35.0",
+    "roughjs": "^4.6.0",
+    "three": "^0.168.0"
+  }
+}

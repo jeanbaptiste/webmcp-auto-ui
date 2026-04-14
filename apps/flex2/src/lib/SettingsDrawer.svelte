@@ -40,6 +40,7 @@
     topK?: number;
     showTokens?: boolean;
     showToolJSON?: boolean;
+    showPipelineTrace?: boolean;
     schemaSanitize?: boolean;
     schemaFlatten?: boolean;
     schemaStrict?: boolean;
@@ -54,6 +55,8 @@
     localUrl?: string;
     localModel?: string;
     diagnostics?: Array<{ severity: 'error' | 'warning'; title: string; detail: string; quickFix?: string; codeFix?: string }>;
+    serverRegistry?: Array<{ id: string; label: string; widgetCount: number }>;
+    enabledServers?: Set<string>;
   }
 
   let {
@@ -80,6 +83,7 @@
     topK = $bindable(64),
     showTokens = $bindable(true),
     showToolJSON = $bindable(false),
+    showPipelineTrace = $bindable(false),
     schemaSanitize = $bindable(true),
     schemaFlatten = $bindable(false),
     schemaStrict = $bindable(false),
@@ -94,11 +98,21 @@
     localUrl = $bindable('http://localhost:11434'),
     localModel = $bindable(''),
     diagnostics = [],
+    serverRegistry = [],
+    enabledServers = $bindable(new Set<string>()),
   }: Props = $props();
 
   let selectedRecipe = $state<McpRecipe | WebmcpRecipe | null>(null);
   let recipeModalOpen = $state(false);
   let diagModalOpen = $state(false);
+  let serversCollapsed = $state(true);
+
+  function toggleServer(id: string) {
+    const next = new Set(enabledServers);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    enabledServers = next;
+  }
 
   function openRecipe(recipe: McpRecipe | WebmcpRecipe) {
     selectedRecipe = recipe;
@@ -148,6 +162,35 @@
         ondisconnect={(url) => onremoveserver?.(url)}
       />
     </section>
+
+    <!-- WebMCP servers -->
+    {#if serverRegistry.length > 0}
+      <section class="flex flex-col gap-2">
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="flex items-center gap-1 cursor-pointer select-none"
+             onclick={() => serversCollapsed = !serversCollapsed}>
+          <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Serveurs WebMCP</span>
+          <span class="text-[9px] text-text2/60 font-mono">({enabledServers.size}/{serverRegistry.length})</span>
+          <span class="text-[10px] text-text2 ml-auto transition-transform {serversCollapsed ? '' : 'rotate-90'}">{@html '&#x25B6;'}</span>
+        </div>
+        {#if !serversCollapsed}
+          <div class="flex flex-col gap-1">
+            {#each serverRegistry as srv (srv.id)}
+              <label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface2/50 cursor-pointer transition-colors group">
+                <input
+                  type="checkbox"
+                  checked={enabledServers.has(srv.id)}
+                  onchange={() => toggleServer(srv.id)}
+                  class="w-3.5 h-3.5 rounded border-border2 accent-accent cursor-pointer"
+                />
+                <span class="text-xs font-mono text-text1 group-hover:text-accent transition-colors truncate flex-1">{srv.label}</span>
+                <span class="text-[9px] font-mono text-text2/50">{srv.widgetCount}w</span>
+              </label>
+            {/each}
+          </div>
+        {/if}
+      </section>
+    {/if}
 
     <!-- LLM -->
     <section class="flex flex-col gap-2">
@@ -289,6 +332,10 @@
       <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
         <input type="checkbox" bind:checked={showToolJSON} class="accent-accent w-3.5 h-3.5" />
         Agent logs (panneau bas)
+      </label>
+      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+        <input type="checkbox" bind:checked={showPipelineTrace} class="accent-accent w-3.5 h-3.5" />
+        Pipeline trace (logs)
       </label>
     </section>
 
