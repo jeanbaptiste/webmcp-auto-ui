@@ -81,6 +81,7 @@
   .flex-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(var(--min-w), 1fr));
+    grid-auto-rows: 280px;
     gap: var(--gap);
     padding: var(--gap);
   }

@@ -211,7 +211,7 @@
 </script>
 
 {#if isVanillaRenderer}
-  <div bind:this={vanillaContainer}></div>
+  <div bind:this={vanillaContainer} class="w-full h-full overflow-hidden"></div>
 {:else if customRenderer}
   <svelte:component this={customRenderer as Component<any>} {data} {id} />
 {:else if nativeEntry}

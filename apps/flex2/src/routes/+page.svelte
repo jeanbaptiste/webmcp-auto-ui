@@ -484,8 +484,11 @@
             if (response.usage) tokenTracker.record(response.usage, latencyMs, canvas.llm?.startsWith('gemma') ?? false);
             else if (response.stats) tokenTracker.recordEstimate(0, response.stats.totalTokens * 4, latencyMs);
           },
-          onWidget: (type, data) => {
-                const widget = flexGrid?.addBlock(type, data, currentServerName, type);
+          onWidget: (type, data, serverName) => {
+                // Use serverName from the agent loop (WebMCP server that produced the widget),
+                // fall back to currentServerName (external MCP) if not set.
+                const provServer = serverName || currentServerName || undefined;
+                const widget = flexGrid?.addBlock(type, data, provServer, type);
                 return widget ? { id: widget.id } : undefined;
               },
           onClear: () => { flexGrid?.clearBlocks(); conversationHistory = []; },

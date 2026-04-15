@@ -93,8 +93,9 @@ export interface AgentCallbacks {
   onLLMRequest?: (messages: ChatMessage[], tools: ProviderTool[]) => void;
   onLLMResponse?: (response: LLMResponse, latencyMs: number, tokens?: { input: number; output: number }) => void;
   onToolCall?: (call: ToolCall) => void;
-  /** Called when a widget_display renders a widget. Return { id } so the LLM knows the block id. */
-  onWidget?: (type: string, data: Record<string, unknown>) => { id: string } | void;
+  /** Called when a widget_display renders a widget. Return { id } so the LLM knows the block id.
+   * @param serverName - the WebMCP server that produced the widget (e.g. "chartjs", "d3") */
+  onWidget?: (type: string, data: Record<string, unknown>, serverName?: string) => { id: string } | void;
   onClear?: () => void;
   onText?: (text: string) => void;
   onToken?: (token: string) => void;

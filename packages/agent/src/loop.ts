@@ -463,7 +463,7 @@ export async function runAgentLoop(
                 if (realToolName === 'widget_display' && typeof toolResult === 'object' && toolResult !== null) {
                   const wr = toolResult as Record<string, unknown>;
                   if (wr.widget && wr.data && !wr.error) {
-                    const widgetResult = callbacks.onWidget?.(wr.widget as string, wr.data as Record<string, unknown>);
+                    const widgetResult = callbacks.onWidget?.(wr.widget as string, wr.data as Record<string, unknown>, serverName);
                     if (widgetResult?.id) {
                       result = JSON.stringify({ ...wr, id: widgetResult.id });
                     }

@@ -46,6 +46,9 @@ export { default as Carousel } from './widgets/rich/Carousel.svelte';
 // Safe image (URL validation + error fallback)
 export { default as SafeImage } from './widgets/SafeImage.svelte';
 
+// Widget export utility
+export { exportWidget } from './widgets/export-widget.js';
+
 // Dispatcher
 export { default as BlockRenderer } from './widgets/BlockRenderer.svelte';
 export { default as WidgetRenderer } from './widgets/WidgetRenderer.svelte';

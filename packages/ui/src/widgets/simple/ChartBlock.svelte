@@ -9,7 +9,7 @@
   {#if data.title}<div class="text-[10px] font-mono text-text2 mb-4 uppercase tracking-widest">{data.title}</div>{/if}
   <div class="flex items-end gap-1.5 h-32">
     {#each bars as [, val]}
-      <div class="flex-1 rounded-t bg-accent/80 hover:bg-accent transition-all"
+      <div class="flex-1 rounded-t bg-accent opacity-80 hover:opacity-100 transition-all"
         style="height: max(2px, {Math.round(val / max * 100)}%)"></div>
     {/each}
   </div>

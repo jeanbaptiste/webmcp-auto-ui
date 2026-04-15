@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { FloatingLayout, FlexLayout, WidgetRenderer, layoutAdapter, LinkIndicators, linkGroupColor, bus } from '@webmcp-auto-ui/ui';
+  import { FloatingLayout, FlexLayout, WidgetRenderer, layoutAdapter, LinkIndicators, linkGroupColor, bus, exportWidget } from '@webmcp-auto-ui/ui';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import type { ManagedWindow } from '@webmcp-auto-ui/ui';
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
@@ -98,24 +98,32 @@
       {#snippet children(win, _lw, _ctx)}
         {@const block = canvas.blocks.find(b => b.id === win.id)}
         {@const prov = provenance[win.id]}
-        <div class="relative flex flex-col h-full bg-surface rounded-lg border border-border overflow-hidden"
-             data-block-id={win.id}>
-          <div class="flex items-center gap-2 px-3 py-1.5 bg-surface2/50 border-b border-border shrink-0 select-none"
-               style={linkBorderStyle(win.id)}>
-            <span class="text-[10px] font-mono text-text2 flex-1 truncate">{win.title}</span>
-            <LinkIndicators busId={win.id} />
-            <!-- svelte-ignore a11y_consider_explicit_label -->
-            <button class="w-4 h-4 text-text2 hover:text-accent2 text-sm leading-none transition-colors flex-shrink-0"
-                    onclick={(e) => { e.stopPropagation(); closeBlock(win.id); }}>x</button>
+        {#if true}
+          {@const widgetContainerRef = { el: null as HTMLElement | null }}
+          <div class="relative flex flex-col h-full bg-surface rounded-lg border border-border overflow-hidden"
+               data-block-id={win.id}>
+            <div class="flex items-center gap-2 px-3 py-1.5 bg-surface2/50 border-b border-border shrink-0 select-none"
+                 style={linkBorderStyle(win.id)}>
+              <span class="text-[10px] font-mono text-text2 flex-1 truncate">{win.title}</span>
+              <LinkIndicators busId={win.id} />
+              <!-- svelte-ignore a11y_consider_explicit_label -->
+              <button class="w-4 h-4 text-text2 hover:text-accent text-sm leading-none transition-colors flex-shrink-0"
+                      onclick={(e) => { e.stopPropagation(); if (block) exportWidget(block.type, block.data, widgetContainerRef.el ?? undefined); }}
+                      title="Exporter">&#x2913;</button>
+              <!-- svelte-ignore a11y_consider_explicit_label -->
+              <button class="w-4 h-4 text-text2 hover:text-accent2 text-sm leading-none transition-colors flex-shrink-0"
+                      onclick={(e) => { e.stopPropagation(); closeBlock(win.id); }}>x</button>
+            </div>
+            <div class="flex-1 overflow-auto min-h-0"
+                 bind:this={widgetContainerRef.el}>
+              {#if block}
+                <WidgetRenderer type={block.type} data={block.data} id={block.id} {servers}
+                  oninteract={(type, action, payload) => oninteract?.(block.id, type, action, payload)} />
+              {/if}
+            </div>
+            <ProvenanceBadge serverName={prov?.server} componentName={prov?.component} />
           </div>
-          <div class="flex-1 overflow-auto min-h-0">
-            {#if block}
-              <WidgetRenderer type={block.type} data={block.data} id={block.id} {servers}
-                oninteract={(type, action, payload) => oninteract?.(block.id, type, action, payload)} />
-            {/if}
-          </div>
-          <ProvenanceBadge serverName={prov?.server} componentName={prov?.component} />
-        </div>
+        {/if}
       {/snippet}
     </FlexLayout>
   {:else}
@@ -123,32 +131,40 @@
       {#snippet children(win, _lw, ctx)}
         {@const block = canvas.blocks.find(b => b.id === win.id)}
         {@const prov = provenance[win.id]}
-        <div class="relative flex flex-col h-full bg-surface rounded-lg border border-border overflow-hidden"
-             data-block-id={win.id}>
-          <div class="flex items-center gap-2 px-3 py-1.5 bg-surface2/50 border-b border-border shrink-0 cursor-move select-none"
-               style={linkBorderStyle(win.id)}
-               onmousedown={(e) => ctx.ondragstart(e)}
-               ondblclick={() => ctx.ontogglecollapse()}>
-            <span class="text-[10px] font-mono text-text2 flex-1 truncate">{win.title}</span>
-            <LinkIndicators busId={win.id} />
-            <!-- svelte-ignore a11y_consider_explicit_label -->
-            <button class="w-4 h-4 text-text2 hover:text-accent text-sm leading-none transition-colors flex-shrink-0"
-                    onclick={(e) => { e.stopPropagation(); ctx.onfittocontent(); }}
-                    title="Ajuster a la taille du contenu">&#x2922;</button>
-            <!-- svelte-ignore a11y_consider_explicit_label -->
-            <button class="w-4 h-4 text-text2 hover:text-accent2 text-sm leading-none transition-colors flex-shrink-0"
-                    onclick={(e) => { e.stopPropagation(); closeBlock(win.id); }}>x</button>
-          </div>
-          {#if !ctx.collapsed}
-            <div class="flex-1 overflow-auto min-h-0">
-              {#if block}
-                <WidgetRenderer type={block.type} data={block.data} id={block.id} {servers}
-                oninteract={(type, action, payload) => oninteract?.(block.id, type, action, payload)} />
-              {/if}
+        {#if true}
+          {@const widgetContainerRef = { el: null as HTMLElement | null }}
+          <div class="relative flex flex-col h-full bg-surface rounded-lg border border-border overflow-hidden"
+               data-block-id={win.id}>
+            <div class="flex items-center gap-2 px-3 py-1.5 bg-surface2/50 border-b border-border shrink-0 cursor-move select-none"
+                 style={linkBorderStyle(win.id)}
+                 onmousedown={(e) => ctx.ondragstart(e)}
+                 ondblclick={() => ctx.ontogglecollapse()}>
+              <span class="text-[10px] font-mono text-text2 flex-1 truncate">{win.title}</span>
+              <LinkIndicators busId={win.id} />
+              <!-- svelte-ignore a11y_consider_explicit_label -->
+              <button class="w-4 h-4 text-text2 hover:text-accent text-sm leading-none transition-colors flex-shrink-0"
+                      onclick={(e) => { e.stopPropagation(); ctx.onfittocontent(); }}
+                      title="Ajuster a la taille du contenu">&#x2922;</button>
+              <!-- svelte-ignore a11y_consider_explicit_label -->
+              <button class="w-4 h-4 text-text2 hover:text-accent text-sm leading-none transition-colors flex-shrink-0"
+                      onclick={(e) => { e.stopPropagation(); if (block) exportWidget(block.type, block.data, widgetContainerRef.el ?? undefined); }}
+                      title="Exporter">&#x2913;</button>
+              <!-- svelte-ignore a11y_consider_explicit_label -->
+              <button class="w-4 h-4 text-text2 hover:text-accent2 text-sm leading-none transition-colors flex-shrink-0"
+                      onclick={(e) => { e.stopPropagation(); closeBlock(win.id); }}>x</button>
             </div>
-          {/if}
-          <ProvenanceBadge serverName={prov?.server} componentName={prov?.component} />
-        </div>
+            {#if !ctx.collapsed}
+              <div class="flex-1 overflow-auto min-h-0"
+                   bind:this={widgetContainerRef.el}>
+                {#if block}
+                  <WidgetRenderer type={block.type} data={block.data} id={block.id} {servers}
+                  oninteract={(type, action, payload) => oninteract?.(block.id, type, action, payload)} />
+                {/if}
+              </div>
+            {/if}
+            <ProvenanceBadge serverName={prov?.server} componentName={prov?.component} />
+          </div>
+        {/if}
       {/snippet}
     </FloatingLayout>
   {/if}
