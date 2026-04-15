@@ -62,6 +62,7 @@
 
   // ── WebMCP servers (additional visualization packs) ─────────────
   const SERVER_REGISTRY: { id: string; label: string; server: WebMcpServer }[] = [
+    { id: 'autoui', label: 'Auto-UI (natif)', server: autoui },
     { id: 'canvas2d', label: 'Canvas 2D', server: canvas2dServer },
     { id: 'chartjs', label: 'Chart.js', server: chartjsServer },
     { id: 'cytoscape', label: 'Cytoscape', server: cytoscapeServer },
@@ -74,7 +75,7 @@
     { id: 'rough', label: 'Rough.js', server: roughServer },
     { id: 'threejs', label: 'Three.js', server: threejsServer },
   ];
-  let enabledServers = $state(new Set<string>());
+  let enabledServers = $state(new Set<string>(['autoui']));
   let activeServers = $derived<WebMcpServer[]>(
     SERVER_REGISTRY.filter(s => enabledServers.has(s.id)).map(s => s.server)
   );
@@ -174,7 +175,6 @@
 
   async function addMcpServer(url: string) {
     if (!url.trim()) return;
-    settingsOpen = false;
     loadingUrls = [...loadingUrls, url];
     canvas.setMcpConnecting(true);
     try {
@@ -339,8 +339,7 @@
         result.push(mcpLayer);
       }
     }
-    result.push(autoui.layer());
-    // Add enabled WebMCP server layers
+    // Add enabled WebMCP server layers (includes autoui when checked)
     for (const entry of SERVER_REGISTRY) {
       if (enabledServers.has(entry.id)) {
         result.push(entry.server.layer());

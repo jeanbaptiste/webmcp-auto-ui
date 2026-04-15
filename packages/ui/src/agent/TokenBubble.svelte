@@ -80,6 +80,7 @@
     {#if !metrics.isWasm && metrics.totalCacheReadTokens > 0}
       <span class="cached-active">Cached {fmt(metrics.totalCacheReadTokens)}</span>
     {/if}
+    <span class="sep">|</span>
     {#if metrics.isWasm}
       <span>Req {metrics.requestsPerMin}/min</span>
       <span>Out {fmt(metrics.outputTokensPerMin)}/min</span>
