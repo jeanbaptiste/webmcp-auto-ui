@@ -8,11 +8,12 @@ set -euo pipefail
 #   ./scripts/batch.sh                    # full pipeline
 #   ./scripts/batch.sh --no-deploy        # skip deploy
 #   ./scripts/batch.sh --no-bump          # skip version bump
+#   ./scripts/batch.sh --no-tag           # skip npm publish tag
 #   ./scripts/batch.sh --no-docs          # skip docs update
 #   ./scripts/batch.sh --message "msg"    # custom commit message
 #   ./scripts/batch.sh --dry-run          # show what would be done
 #
-# Combines: commit → deploy → push → bump → push
+# Combines: commit → deploy → push → bump → push → tag (triggers npm publish via CI)
 # ─────────────────────────────────────────────────────────────────────────────
 
 LOCAL_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,6 +37,7 @@ info() { echo -e "  ${CYAN}→${NC} $*"; }
 DRY_RUN=0
 NO_DEPLOY=0
 NO_BUMP=0
+NO_TAG=0
 NO_DOCS=0
 COMMIT_MSG=""
 
@@ -44,6 +46,7 @@ while [ $# -gt 0 ]; do
     --dry-run)    DRY_RUN=1 ;;
     --no-deploy)  NO_DEPLOY=1 ;;
     --no-bump)    NO_BUMP=1 ;;
+    --no-tag)     NO_TAG=1 ;;
     --no-docs)    NO_DOCS=1 ;;
     --message)
       shift
@@ -331,6 +334,45 @@ else
   fi
 
   step_end "bump"
+  echo ""
+fi
+
+# ── Step 6: Tag (triggers npm publish via CI) ──────────────────────────────
+
+if [ "$NO_TAG" = "1" ] || [ "$NO_BUMP" = "1" ]; then
+  echo -e "${BOLD}Step 6 — Tag npm publish${NC}"
+  skip "npm publish tag"
+  echo ""
+else
+  echo -e "${BOLD}Step 6 — Tag npm publish${NC}"
+  step_start "tag"
+
+  FINAL=$(current_version)
+  TAG="v${FINAL}"
+
+  if [ "$DRY_RUN" = "1" ]; then
+    skip "would create and push tag $TAG"
+  else
+    if git tag "$TAG" 2>/dev/null; then
+      info "created tag $TAG"
+      if git push origin "$TAG" 2>/dev/null; then
+        ok "pushed tag $TAG — npm publish workflow triggered"
+      else
+        echo -e "  ${YELLOW}⚠${NC} SSH push failed — trying HTTPS via gh..."
+        REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null || true)
+        if [ -n "$REPO" ]; then
+          git push "https://github.com/${REPO}.git" "$TAG"
+          ok "pushed tag $TAG via HTTPS"
+        else
+          fail "tag push failed"
+        fi
+      fi
+    else
+      echo -e "  ${YELLOW}⚠${NC} tag $TAG already exists — skipping"
+    fi
+  fi
+
+  step_end "tag"
   echo ""
 fi
 

@@ -14,6 +14,14 @@ export default defineConfig({
         },
         {
           tag: 'script',
+          attrs: {
+            'data-goatcounter': 'https://goat.cybernego.com/count',
+            async: true,
+            src: '//goat.cybernego.com/count.js',
+          },
+        },
+        {
+          tag: 'script',
           attrs: { type: 'module' },
           content: `
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
