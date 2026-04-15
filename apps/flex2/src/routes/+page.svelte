@@ -61,19 +61,19 @@
   let skills = $state<Skill[]>([]);
 
   // ── WebMCP servers (additional visualization packs) ─────────────
-  const SERVER_REGISTRY: { id: string; label: string; server: WebMcpServer }[] = [
-    { id: 'autoui', label: 'Auto-UI (natif)', server: autoui },
-    { id: 'canvas2d', label: 'Canvas 2D', server: canvas2dServer },
-    { id: 'chartjs', label: 'Chart.js', server: chartjsServer },
-    { id: 'cytoscape', label: 'Cytoscape', server: cytoscapeServer },
-    { id: 'd3', label: 'D3.js', server: d3server },
-    { id: 'leaflet', label: 'Leaflet', server: leafletServer },
-    { id: 'mapbox', label: 'Mapbox GL', server: mapboxServer },
-    { id: 'mermaid', label: 'Mermaid', server: mermaidServer },
-    { id: 'pixijs', label: 'PixiJS', server: pixijsServer },
-    { id: 'plotly', label: 'Plotly', server: plotlyServer },
-    { id: 'rough', label: 'Rough.js', server: roughServer },
-    { id: 'threejs', label: 'Three.js', server: threejsServer },
+  const SERVER_REGISTRY: { id: string; label: string; description: string; server: WebMcpServer }[] = [
+    { id: 'autoui', label: 'Auto-UI (natif)', description: 'Widgets natifs WebMCP (stat, table, galerie, timeline...)', server: autoui },
+    { id: 'canvas2d', label: 'Canvas 2D', description: 'Dessins et animations Canvas 2D', server: canvas2dServer },
+    { id: 'chartjs', label: 'Chart.js', description: 'Graphiques interactifs Chart.js (bar, line, pie, radar...)', server: chartjsServer },
+    { id: 'cytoscape', label: 'Cytoscape', description: 'Graphes et reseaux (nodes, edges, layouts)', server: cytoscapeServer },
+    { id: 'd3', label: 'D3.js', description: 'Visualisations D3.js avancees (treemap, force, chord...)', server: d3server },
+    { id: 'leaflet', label: 'Leaflet', description: 'Cartes interactives Leaflet (markers, GeoJSON, heatmap)', server: leafletServer },
+    { id: 'mapbox', label: 'Mapbox GL', description: 'Cartes 3D Mapbox GL (terrain, buildings, satellite)', server: mapboxServer },
+    { id: 'mermaid', label: 'Mermaid', description: 'Diagrammes Mermaid (flowchart, sequence, gantt...)', server: mermaidServer },
+    { id: 'pixijs', label: 'PixiJS', description: 'Rendus PixiJS haute performance (sprites, particles)', server: pixijsServer },
+    { id: 'plotly', label: 'Plotly', description: 'Graphiques scientifiques Plotly (scatter, 3D, contour...)', server: plotlyServer },
+    { id: 'rough', label: 'Rough.js', description: 'Dessins style croquis (hand-drawn look)', server: roughServer },
+    { id: 'threejs', label: 'Three.js', description: 'Scenes 3D Three.js (mesh, lights, animations)', server: threejsServer },
   ];
   let enabledServers = $state(new Set<string>(['autoui']));
   let activeServers = $derived<WebMcpServer[]>(
@@ -373,6 +373,7 @@
     if (exportState === 'loading') return;
     exportState = 'loading';
     try {
+      canvas.setEnabledServers([...enabledServers]);
       const skill = canvas.buildSkillJSON() as Record<string, unknown>;
       if (includeSummary && conversationHistory.length > 0) {
         try {
@@ -615,6 +616,10 @@
     if (param) {
       canvas.loadFromParam(param).then((ok) => {
         if (!ok) return;
+        // Restore enabled servers from skill data
+        if (canvas.enabledServerIds.length > 0) {
+          enabledServers = new Set(canvas.enabledServerIds);
+        }
         // Sync FlexGrid windows from canvas blocks already loaded into the store
         flexGrid?.syncFromCanvas();
         if (canvas.mcpUrl) addMcpServer(canvas.mcpUrl);
@@ -747,7 +752,7 @@
   {mcpRecipes}
   webmcpRecipes={(layers.find(l => l.protocol === 'webmcp') as any)?.recipes ?? []}
   {diagnostics}
-  serverRegistry={SERVER_REGISTRY.map(s => ({ id: s.id, label: s.label, widgetCount: s.server.listWidgets().length }))}
+  serverRegistry={SERVER_REGISTRY.map(s => ({ id: s.id, label: s.label, description: s.description, widgetCount: s.server.listWidgets().length }))}
   bind:enabledServers
 />
 

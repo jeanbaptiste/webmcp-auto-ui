@@ -22,13 +22,12 @@ export function registerRecipes(recipes: Recipe[]): void {
 /**
  * Filter recipes that match at least one of the given server names.
  * Uses substring matching: recipe server "tricoteuses" matches connected server
- * "Tricoteuses - Moulineuse" or "tricoteuses-mcp".
+ * "Tricoteuses" or "tricoteuses-mcp".
  */
 // Known aliases: servers that are the same but have different names
 const SERVER_ALIASES: Record<string, string[]> = {
-  'tricoteuses': ['moulineuse', 'code4code', 'mcp.code4code.eu'],
-  'moulineuse': ['tricoteuses', 'code4code', 'mcp.code4code.eu'],
-  'code4code': ['tricoteuses', 'moulineuse', 'mcp.code4code.eu'],
+  'tricoteuses': ['code4code', 'mcp.code4code.eu'],
+  'code4code': ['tricoteuses', 'mcp.code4code.eu'],
 };
 
 export function filterRecipesByServer(recipes: Recipe[], serverNames: string[]): Recipe[] {
@@ -39,7 +38,7 @@ export function filterRecipesByServer(recipes: Recipe[], serverNames: string[]):
     const lower = name.toLowerCase();
     expanded.add(lower);
     for (const alias of SERVER_ALIASES[lower] ?? []) expanded.add(alias);
-    // Also add parts of compound names ("Tricoteuses - Moulineuse" → tricoteuses, moulineuse)
+    // Also add parts of compound names ("Tricoteuses - code4code" → tricoteuses, code4code)
     for (const part of lower.split(/[\s,\-–]+/)) {
       if (part.length > 2) {
         expanded.add(part);
@@ -80,7 +79,7 @@ export function formatMcpRecipesForPrompt(recipes: McpRecipe[]): string {
   return recipes.map(r => {
     const id = r.name ?? '';
     const desc = r.description ?? '';
-    // If name is missing or looks like a prefix ("moulineuse: undefined"), use description as display
+    // If name is missing or looks like a prefix ("tricoteuses: undefined"), use description as display
     if (!id || id.includes('undefined')) {
       return `- ${desc}`;
     }

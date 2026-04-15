@@ -60,6 +60,7 @@ export interface CanvasSnapshot {
   statusText: string;
   statusColor: string;
   themeOverrides: Record<string, string>;
+  enabledServerIds: string[];
   blockCount: number;
   isEmpty: boolean;
 }
@@ -93,6 +94,7 @@ function createCanvasVanilla() {
   let _statusText = '● aucun MCP connecté';
   let _statusColor = 'text-zinc-600';
   let _themeOverrides: Record<string, string> = {};
+  let _enabledServerIds: string[] = ['autoui'];
 
   // ── Widget actions ─────────────────────────────────────────────────────
   function addWidget(type: WidgetType, data: Record<string, unknown> = {}): Widget {
@@ -196,6 +198,12 @@ function createCanvasVanilla() {
     notify();
   }
 
+  // ── Enabled servers ───────────────────────────────────────────────────
+  function setEnabledServers(ids: string[]) {
+    _enabledServerIds = ids;
+    notify();
+  }
+
   // ── HyperSkill ─────────────────────────────────────────────────────────
   function buildSkillJSON() {
     const skill: Record<string, unknown> = {
@@ -207,6 +215,7 @@ function createCanvasVanilla() {
       blocks: _blocks.map((b) => ({ type: b.type, data: b.data })),
     };
     if (Object.keys(_themeOverrides).length > 0) skill.theme = _themeOverrides;
+    if (_enabledServerIds.length > 0) skill.servers = _enabledServerIds;
     return skill;
   }
 
@@ -221,11 +230,13 @@ function createCanvasVanilla() {
     function applySkill(skill: {
       mcp?: string; llm?: LLMId;
       theme?: Record<string, string>;
+      servers?: string[];
       blocks?: { type: WidgetType; data: Record<string, unknown> }[];
     }) {
       if (skill.mcp) _mcpUrl = skill.mcp;
       if (skill.llm) _llm = skill.llm;
       if (skill.theme) _themeOverrides = skill.theme;
+      if (skill.servers) _enabledServerIds = skill.servers;
       if (skill.blocks) {
         _blocks = skill.blocks.map((b) => ({ id: uuid(), type: b.type, data: b.data }));
       }
@@ -283,6 +294,7 @@ function createCanvasVanilla() {
       statusText: _statusText,
       statusColor: _statusColor,
       themeOverrides: _themeOverrides,
+      enabledServerIds: _enabledServerIds,
       blockCount: _blocks.length,
       isEmpty: _blocks.length === 0,
     };
@@ -340,6 +352,10 @@ function createCanvasVanilla() {
     // Theme
     get themeOverrides() { return _themeOverrides; },
     setThemeOverrides,
+
+    // Enabled servers
+    get enabledServerIds() { return _enabledServerIds; },
+    setEnabledServers,
 
     // HyperSkill
     buildSkillJSON, buildHyperskillParam, loadFromParam, loadFromUrl,

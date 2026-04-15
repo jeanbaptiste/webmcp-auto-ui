@@ -1,6 +1,7 @@
 <script lang="ts" module>
   declare const __BUILD_TIME__: string;
   declare const __GIT_HASH__: string;
+  declare const __APP_VERSION__: string;
 </script>
 
 <script lang="ts">
@@ -12,6 +13,7 @@
   const buildStamp = typeof __BUILD_TIME__ === 'string'
     ? __BUILD_TIME__.replace('T', ' ').replace('Z', '').slice(0, 23) : '';
   const gitHash = typeof __GIT_HASH__ === 'string' ? __GIT_HASH__ : '';
+  const appVersion = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '?';
 
   interface McpRecipe { name: string; description?: string; }
   interface WebmcpRecipe { name: string; description?: string; when?: string; components_used?: string[]; servers?: string[]; layout?: { type: string; columns?: number; arrangement?: string }; body?: string; }
@@ -55,7 +57,7 @@
     localUrl?: string;
     localModel?: string;
     diagnostics?: Array<{ severity: 'error' | 'warning'; title: string; detail: string; quickFix?: string; codeFix?: string }>;
-    serverRegistry?: Array<{ id: string; label: string; widgetCount: number }>;
+    serverRegistry?: Array<{ id: string; label: string; description: string; widgetCount: number }>;
     enabledServers?: Set<string>;
   }
 
@@ -183,7 +185,12 @@
                   onchange={() => toggleServer(srv.id)}
                   class="w-3.5 h-3.5 rounded border-border2 accent-accent cursor-pointer"
                 />
-                <span class="text-xs font-mono text-text1 group-hover:text-accent transition-colors truncate flex-1">{srv.label}</span>
+                <span class="flex flex-col flex-1 min-w-0">
+                  <span class="text-xs font-mono text-text1 group-hover:text-accent transition-colors truncate">{srv.label}</span>
+                  {#if srv.description}
+                    <span class="text-[8px] font-mono text-text2/40 block truncate">{srv.description}</span>
+                  {/if}
+                </span>
                 <span class="text-[9px] font-mono text-text2/50">{srv.widgetCount}w</span>
               </label>
             {/each}
@@ -380,7 +387,7 @@
 
   <!-- Build footer -->
   <div class="px-5 py-3 border-t border-border flex-shrink-0 flex items-center justify-between">
-    <span class="font-mono text-[8px] text-text2/40">v1.0.0 · {gitHash} · {buildStamp}</span>
+    <span class="font-mono text-[8px] text-text2/40">v{appVersion} · {gitHash} · {buildStamp}</span>
     <a href="https://github.com/jeanbaptiste/webmcp-auto-ui/tree/main/apps/flex2"
        target="_blank" rel="noopener"
        class="font-mono text-[8px] text-text2/40 hover:text-text2 transition-colors">GitHub</a>

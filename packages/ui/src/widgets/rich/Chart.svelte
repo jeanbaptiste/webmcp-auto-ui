@@ -3,7 +3,11 @@
   export interface ChartSpec { title?: string; type?: 'bar'|'line'|'area'|'pie'|'donut'; labels?: string[]; data?: ChartDataset[]; legend?: boolean; xAxis?: {label?:string}; yAxis?: {label?:string}; }
   interface Props { spec: Partial<ChartSpec>; }
   let { spec }: Props = $props();
-  const PAL=['#7c6dfa','#3ecfb2','#f0a050','#fa6d7c','#3b82f6','#a855f7','#14b8a6','#f97316'];
+  const PAL=[
+    '#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6',
+    '#06b6d4','#f97316','#ec4899','#14b8a6','#a855f7',
+    '#eab308','#3b82f6','#22c55e','#e11d48','#0ea5e9',
+  ];
   const fmt=new Intl.NumberFormat('fr-FR');
   const datasets=$derived<ChartDataset[]>(Array.isArray(spec.data)?spec.data:[]);
   const labels=$derived<string[]>(Array.isArray(spec.labels)?spec.labels:[]);
@@ -14,6 +18,9 @@
   const xLabels=$derived(labels.length>0?labels:(datasets[0]?.values??[]).map((_:number,i:number)=>String(i+1)));
   const showLegend=$derived(spec.legend!==false&&datasets.length>1);
   function col(ds:ChartDataset,i:number){return ds.color??PAL[i%PAL.length];}
+  /** For single-series bar charts, color each bar distinctly by x-index */
+  const isCategoricalBar=$derived(type==='bar'&&datasets.length===1);
+  function barCol(ds:ChartDataset,di:number,xi:number){return isCategoricalBar?PAL[xi%PAL.length]:col(ds,di);}
   // Pie
   const pieTotal=$derived.by<number>(()=>{const ds=datasets[0];if(!ds)return 1;return ds.values.reduce((a,b)=>a+b,0)||1;});
   interface Slice{label:string;value:number;color:string;startAngle:number;endAngle:number;pct:number}
@@ -71,7 +78,7 @@
                 {@const v=ds.values[xi]??0}
                 {@const pct=Math.round(v/maxVal*100)}
                 <div class="flex-1 rounded-t transition-all hover:opacity-80 cursor-default"
-                  style="height:{pct}%;background:{col(ds,di)};"
+                  style="height:{pct}%;background:{barCol(ds,di,xi)};"
                   title="{ds.label??''} {lbl}: {fmt.format(v)}">
                 </div>
               {/each}
@@ -97,7 +104,16 @@
         </div>
       {/if}
     </div>
-    {#if showLegend}
+    {#if isCategoricalBar && xLabels.length>1}
+      <div class="flex gap-3 flex-wrap mt-2">
+        {#each xLabels as lbl,xi}
+          <div class="flex items-center gap-1 text-xs">
+            <div class="w-2.5 h-2.5 rounded-sm flex-shrink-0" style="background:{PAL[xi%PAL.length]};"></div>
+            <span class="text-text2">{lbl}</span>
+          </div>
+        {/each}
+      </div>
+    {:else if showLegend}
       <div class="flex gap-3 flex-wrap mt-2">
         {#each datasets as ds,i}
           <div class="flex items-center gap-1 text-xs">

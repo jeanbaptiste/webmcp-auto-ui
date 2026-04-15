@@ -93,7 +93,9 @@
 </script>
 
 <div class="w-full h-full {cls}">
-  {#if layoutMode === 'grid'}
+  <!-- Both layouts are always mounted to preserve WidgetRenderer instances (and their
+       resolved customWidgetEntry for external server widgets) across mode switches. -->
+  <div class="w-full h-full" class:hidden={layoutMode !== 'grid'}>
     <FlexLayout {windows} minWidth={260} maxWidth={600}>
       {#snippet children(win, _lw, _ctx)}
         {@const block = canvas.blocks.find(b => b.id === win.id)}
@@ -126,7 +128,8 @@
         {/if}
       {/snippet}
     </FlexLayout>
-  {:else}
+  </div>
+  <div class="w-full h-full" class:hidden={layoutMode !== 'float'}>
     <FloatingLayout bind:this={fl} {windows} defaultWidth={380} defaultHeight={280}>
       {#snippet children(win, _lw, ctx)}
         {@const block = canvas.blocks.find(b => b.id === win.id)}
@@ -167,5 +170,5 @@
         {/if}
       {/snippet}
     </FloatingLayout>
-  {/if}
+  </div>
 </div>

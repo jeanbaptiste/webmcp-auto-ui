@@ -28,6 +28,7 @@ function createCanvas() {
   let statusText = $state(canvasVanilla.statusText);
   let statusColor = $state(canvasVanilla.statusColor);
   let themeOverrides = $state<Record<string, string>>(canvasVanilla.themeOverrides);
+  let enabledServerIds = $state<string[]>(canvasVanilla.enabledServerIds);
 
   // ── Derived ─────────────────────────────────────────────────────────────
   const blockCount = $derived(blocks.length);
@@ -49,6 +50,7 @@ function createCanvas() {
     statusText = s.statusText;
     statusColor = s.statusColor;
     themeOverrides = s.themeOverrides;
+    enabledServerIds = canvasVanilla.enabledServerIds;
   });
 
   // ── Return public API ───────────────────────────────────────────────────
@@ -105,6 +107,10 @@ function createCanvas() {
     // Theme
     get themeOverrides() { return themeOverrides; },
     setThemeOverrides: canvasVanilla.setThemeOverrides.bind(canvasVanilla),
+
+    // Enabled servers
+    get enabledServerIds() { return enabledServerIds; },
+    setEnabledServers: canvasVanilla.setEnabledServers.bind(canvasVanilla),
 
     // HyperSkill
     buildSkillJSON: canvasVanilla.buildSkillJSON.bind(canvasVanilla),
