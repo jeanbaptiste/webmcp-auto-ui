@@ -32,6 +32,7 @@
 
   function onLlmChange(llm: string) {
     canvas.setLlm(llm as Parameters<typeof canvas.setLlm>[0]);
+    agentStore.applySmartDefaults();
     untrack(() => agentStore.initGemma());
   }
 

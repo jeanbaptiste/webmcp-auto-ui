@@ -61,8 +61,8 @@ let compressPreview = $state(500);
 let cacheEnabled = $state(true);
 let temperature = $state(1.0);
 
-// Smart defaults: adjust optimization options when LLM model changes
-$effect(() => {
+// Smart defaults: called imperatively when LLM changes (not $effect — module-level)
+function applySmartDefaults() {
   const isGemma = canvas.llm.startsWith('gemma');
   const isLocal = canvas.llm === 'local';
   schemaSanitize = isLocal ? true : !isGemma;
@@ -81,21 +81,23 @@ $effect(() => {
     temperature = 1.0;
     cacheEnabled = true;
   }
-});
+}
 
 // Nano-RAG (experimental, off by default)
 let contextRAGEnabled = $state(false);
 let contextRAG = $state<ContextRAG | null>(null);
 
-$effect(() => {
-  if (contextRAGEnabled && !contextRAG) {
+// ContextRAG lifecycle: called imperatively when toggle changes (not $effect — module-level)
+function setContextRAGEnabled(v: boolean) {
+  contextRAGEnabled = v;
+  if (v && !contextRAG) {
     contextRAG = new ContextRAG({ topK: 5 });
   }
-  if (!contextRAGEnabled && contextRAG) {
+  if (!v && contextRAG) {
     contextRAG.destroy();
     contextRAG = null;
   }
-});
+}
 
 // Token tracking
 const tokenTracker = new TokenTracker();
@@ -177,7 +179,10 @@ export const agentStore = {
   get gemmaTotalMB() { return gemmaTotalMB; },
   get multiClient() { return multiClient; },
   get contextRAGEnabled() { return contextRAGEnabled; },
-  set contextRAGEnabled(v: boolean) { contextRAGEnabled = v; },
+  set contextRAGEnabled(v: boolean) { setContextRAGEnabled(v); },
+
+  /** Apply smart defaults for the current LLM */
+  applySmartDefaults,
   get schemaSanitize() { return schemaSanitize; },
   set schemaSanitize(v: boolean) { schemaSanitize = v; },
   get schemaFlatten() { return schemaFlatten; },
