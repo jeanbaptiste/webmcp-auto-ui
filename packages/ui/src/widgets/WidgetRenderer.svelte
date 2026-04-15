@@ -168,6 +168,10 @@
     const mc = getMC();
     if (!mc) return;
 
+    // Unregister first in case widget was re-mounted with same busId
+    const toolNames = [`widget_${busId}_get`, `widget_${busId}_update`, `widget_${busId}_remove`];
+    toolNames.forEach(n => { try { mc.unregisterTool(n); } catch { /* ok */ } });
+
     mc.registerTool({
       name: `widget_${busId}_get`,
       description: `Get current data of ${type} widget (id: ${busId}).`,
