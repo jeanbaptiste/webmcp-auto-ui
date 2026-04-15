@@ -1,6 +1,6 @@
 {
   "name": "@webmcp-auto-ui/ui",
-  "version": "2.5.5",
+  "version": "2.5.6",
   "description": "Svelte 5 UI components — primitives, widgets, window manager",
   "license": "AGPL-3.0-or-later",
   "type": "module",
