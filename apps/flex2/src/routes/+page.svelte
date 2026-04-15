@@ -350,7 +350,7 @@
 
   const effectivePrompt = $derived.by(() => {
     const base = buildSystemPrompt(layers);
-    // Si l'utilisateur a customisé le prompt dans les settings, le préfixer
+    // If the user customised the prompt in settings, prepend it
     const hasCustom = systemPrompt && systemPrompt.trim().length > 0;
     return hasCustom ? `${systemPrompt}\n\n${base}` : base;
   });

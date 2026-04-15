@@ -18,9 +18,9 @@
 
   // ── State ───────────────────────────────────────────────────────────────
   let todos = $state<Todo[]>([
-    { id: '1', text: 'Activer WebMCP dans chrome://flags', done: false, priority: 'high', createdAt: Date.now() - 3600000 },
-    { id: '2', text: 'Tester les outils dans l\'extension', done: false, priority: 'normal', createdAt: Date.now() - 1800000 },
-    { id: '3', text: 'Lire la doc WebMCP W3C', done: true, priority: 'low', createdAt: Date.now() - 7200000 },
+    { id: '1', text: 'Enable WebMCP in chrome://flags', done: false, priority: 'high', createdAt: Date.now() - 3600000 },
+    { id: '2', text: 'Test the tools in the extension', done: false, priority: 'normal', createdAt: Date.now() - 1800000 },
+    { id: '3', text: 'Read the WebMCP W3C spec', done: true, priority: 'low', createdAt: Date.now() - 7200000 },
   ]);
   let input = $state('');
   let filter = $state<'all' | 'active' | 'done'>('all');

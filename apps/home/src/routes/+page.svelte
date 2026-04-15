@@ -11,51 +11,51 @@
   const demos = [
     {
       title: 'Flex',
-      desc: 'WebMCP multi-serveurs, widgets, recettes, lazy loading, debug panel.',
+      desc: 'WebMCP multi-server, widgets, recipes, lazy loading, debug panel.',
       url: `${base}/flex2`,
       accent: '#8b5cf6',
     },
     {
       title: 'Viewer',
-      desc: 'Lecteur HyperSkills read-only. Décode et affiche les widgets, bouton Modifier vers Flex.',
+      desc: 'Read-only HyperSkills viewer. Decodes and renders widgets, with an Edit button to open in Flex.',
       url: `${base}/viewer2`,
       accent: '#f59e0b',
     },
     {
       title: 'Showcase',
-      desc: 'Démo dynamique de tous les composants UI avec 3 thèmes (corporate, pastel, cyberpunk).',
+      desc: 'Dynamic showcase of all UI components with 3 themes (corporate, pastel, cyberpunk).',
       url: `${base}/showcase2`,
       accent: '#10b981',
     },
     {
       title: 'Todo-WebMCP',
-      desc: 'Template minimal de référence pour démarrer une app webmcp-auto-ui.',
+      desc: 'Minimal reference template to bootstrap a webmcp-auto-ui app.',
       url: `${base}/todo2`,
       accent: '#14b8a6',
     },
     {
       title: 'Recipes',
-      desc: 'Explorateur de recettes MCP et WebMCP. Connecte des serveurs, consulte les recettes, teste-les en live.',
+      desc: 'MCP and WebMCP recipe explorer. Connect servers, browse recipes, and test them live.',
       url: `${base}/recipes`,
       accent: '#ec4899',
     },
     {
       title: 'Boilerplate',
-      desc: 'Template d\'intégration Svelte + 3 widgets Tricoteuses custom. Point de départ pour votre projet.',
+      desc: 'Svelte integration template + 3 custom Tricoteuses widgets. Starting point for your project.',
       url: `${base}/boilerplate`,
       accent: '#e11d48',
     },
   ];
 
   const mcpServers = [
-    { name: 'Tricoteuses', desc: 'Parlement français' },
-    { name: 'Hacker News', desc: 'Stories & commentaires' },
-    { name: 'Met Museum', desc: 'Collections d\'art' },
-    { name: 'Open-Meteo', desc: 'Données météo' },
-    { name: 'Wikipedia', desc: 'Articles & recherche' },
-    { name: 'iNaturalist', desc: 'Biodiversité' },
-    { name: 'data.gouv.fr', desc: 'Open data FR' },
-    { name: 'NASA', desc: 'Données spatiales' },
+    { name: 'Tricoteuses', desc: 'French Parliament' },
+    { name: 'Hacker News', desc: 'Stories & comments' },
+    { name: 'Met Museum', desc: 'Art collections' },
+    { name: 'Open-Meteo', desc: 'Weather data' },
+    { name: 'Wikipedia', desc: 'Articles & search' },
+    { name: 'iNaturalist', desc: 'Biodiversity' },
+    { name: 'data.gouv.fr', desc: 'French open data' },
+    { name: 'NASA', desc: 'Space data' },
   ];
 </script>
 
@@ -98,7 +98,7 @@
     </div>
 
     <div class="mt-10 border border-border rounded-xl p-5">
-      <div class="text-[10px] font-mono text-text2 uppercase tracking-wider mb-3">Serveurs MCP disponibles</div>
+      <div class="text-[10px] font-mono text-text2 uppercase tracking-wider mb-3">Available MCP servers</div>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
         {#each mcpServers as srv}
           <div class="text-xs font-mono text-text1 bg-surface2 rounded-lg px-3 py-2">

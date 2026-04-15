@@ -278,7 +278,7 @@ export const agentStore = {
 
     try {
       const result = await runAgentLoop(
-        `Explore le serveur MCP "${canvas.mcpName}" et crée une page de démonstration avec au moins 6 composants UI variés utilisant les vraies données. Utilise des stat, chart, data-table, list, kv, timeline, cards etc.`,
+        `Explore the MCP server "${canvas.mcpName}" and create a demo page with at least 6 varied UI components using real data. Use stat, chart, data-table, list, kv, timeline, cards, etc.`,
         {
           client: multiClient as Parameters<typeof runAgentLoop>[1]['client'],
           provider: getProvider(),

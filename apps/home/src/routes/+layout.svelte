@@ -27,11 +27,11 @@
       description: 'List all available HyperSkills apps with their URLs and descriptions.',
       inputSchema: { type: 'object', properties: {} },
       execute: () => jsonResult([
-        { name: 'Flex', url: `${base}/flex2`, description: 'WebMCP multi-serveurs, widgets, recettes, lazy loading, debug panel' },
-        { name: 'Viewer', url: `${base}/viewer2`, description: 'Lecteur HyperSkills read-only — décode et affiche les widgets' },
-        { name: 'Showcase', url: `${base}/showcase2`, description: 'Démo dynamique de tous les composants UI avec 3 thèmes' },
-        { name: 'Todo', url: `${base}/todo2`, description: 'Template minimal de référence pour démarrer une app webmcp-auto-ui' },
-        { name: 'Recipes', url: `${base}/recipes`, description: 'Explorateur de recettes MCP et WebMCP' },
+        { name: 'Flex', url: `${base}/flex2`, description: 'WebMCP multi-server, widgets, recipes, lazy loading, debug panel' },
+        { name: 'Viewer', url: `${base}/viewer2`, description: 'Read-only HyperSkills viewer — decodes and renders widgets' },
+        { name: 'Showcase', url: `${base}/showcase2`, description: 'Dynamic showcase of all UI components with 3 themes' },
+        { name: 'Todo', url: `${base}/todo2`, description: 'Minimal reference template to bootstrap a webmcp-auto-ui app' },
+        { name: 'Recipes', url: `${base}/recipes`, description: 'MCP and WebMCP recipe explorer' },
       ]),
       annotations: { readOnlyHint: true },
     }, (tool, opts) => (navigator as unknown as { modelContext: { registerTool: (t: unknown, o: unknown) => void } }).modelContext?.registerTool(tool, opts));
