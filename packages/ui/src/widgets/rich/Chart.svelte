@@ -20,6 +20,7 @@
   function col(ds:ChartDataset,i:number){return ds.color??PAL[i%PAL.length];}
   /** For single-series bar charts, color each bar distinctly by x-index */
   const isCategoricalBar=$derived(type==='bar'&&datasets.length===1);
+  const isCategoricalLine=$derived((type==='line'||type==='area')&&datasets.length===1);
   function barCol(ds:ChartDataset,di:number,xi:number){return isCategoricalBar?PAL[xi%PAL.length]:col(ds,di);}
   // Pie
   const pieTotal=$derived.by<number>(()=>{const ds=datasets[0];if(!ds)return 1;return ds.values.reduce((a,b)=>a+b,0)||1;});
@@ -97,6 +98,11 @@
               <polygon points="{pad},{H-pad} {pts.join(' ')} {pad+((ds.values.length-1)*((W-pad*2)/(ds.values.length-1||1)))},{H-pad}" fill={col(ds,di)} opacity="0.15"/>
             {/if}
             <polyline points={pts.join(' ')} fill="none" stroke={col(ds,di)} stroke-width="2" stroke-linejoin="round"/>
+            {#each ds.values as v, i}
+              {@const cx = pad + i * ((W - pad * 2) / (ds.values.length - 1 || 1))}
+              {@const cy = H - pad - (v / maxVal) * (H - pad * 2)}
+              <circle cx={cx} cy={cy} r="4" fill={isCategoricalLine ? PAL[i % PAL.length] : col(ds, di)} stroke="var(--color-surface, white)" stroke-width="1.5" />
+            {/each}
           {/each}
         </svg>
         <div class="flex gap-1">
@@ -104,7 +110,16 @@
         </div>
       {/if}
     </div>
-    {#if isCategoricalBar && xLabels.length>1}
+    {#if isCategoricalLine && xLabels.length>1}
+      <div class="flex gap-3 flex-wrap mt-2">
+        {#each xLabels as lbl, xi}
+          <div class="flex items-center gap-1 text-xs">
+            <div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:{PAL[xi%PAL.length]};"></div>
+            <span class="text-text2">{lbl}</span>
+          </div>
+        {/each}
+      </div>
+    {:else if isCategoricalBar && xLabels.length>1}
       <div class="flex gap-3 flex-wrap mt-2">
         {#each xLabels as lbl,xi}
           <div class="flex items-center gap-1 text-xs">
