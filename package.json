@@ -13,7 +13,6 @@
     "apps/todo2",
     "apps/showcase2",
     "apps/recipes",
-    "apps/multi-svelte",
     "apps/boilerplate",
     "docs-site"
   ],

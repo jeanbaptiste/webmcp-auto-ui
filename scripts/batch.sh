@@ -87,7 +87,6 @@ BUMP_FILES=(
   "$LOCAL_ROOT/apps/boilerplate/package.json"
   "$LOCAL_ROOT/apps/flex2/package.json"
   "$LOCAL_ROOT/apps/home/package.json"
-  "$LOCAL_ROOT/apps/multi-svelte/package.json"
   "$LOCAL_ROOT/apps/recipes/package.json"
   "$LOCAL_ROOT/apps/showcase2/package.json"
   "$LOCAL_ROOT/apps/todo2/package.json"

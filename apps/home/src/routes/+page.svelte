@@ -40,12 +40,6 @@
       accent: '#ec4899',
     },
     {
-      title: 'Multi-WebMCP-UI',
-      desc: 'Intégration multi-framework : Svelte 5 + SvelteKit, serveur MCP, agent IA, widgets natifs.',
-      url: `${base}/multi-svelte`,
-      accent: '#ff3e00',
-    },
-    {
       title: 'Boilerplate',
       desc: 'Template d\'intégration Svelte + 3 widgets Tricoteuses custom. Point de départ pour votre projet.',
       url: `${base}/boilerplate`,

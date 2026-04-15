@@ -87,9 +87,9 @@ function extractBlockTypes() {
 }
 
 function extractAppPorts() {
-  const ports = { home: 5173, composer: 5174, todo: 5175, viewer: 5176, showcase: 5177, mobile: 5178 };
+  const ports = { home: 5173, composer: 5174, todo: 5175, viewer: 5176, showcase: 5177 };
   // Try to read from vite configs
-  const apps = ['home', 'composer', 'todo', 'viewer', 'showcase', 'mobile'];
+  const apps = ['home', 'composer', 'todo', 'viewer', 'showcase'];
   for (const app of apps) {
     try {
       const viteConfig = fs.readFileSync(path.join(ROOT, `apps/${app}/vite.config.ts`), 'utf8');

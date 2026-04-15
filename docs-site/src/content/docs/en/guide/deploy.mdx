@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-WebMCP Auto-UI deployment relies on a **centralized script** (`scripts/deploy.sh`) that manages all eight monorepo apps with their specific paths and configurations. This guide covers the complete procedure, from local build to production verification.
+WebMCP Auto-UI deployment relies on a **centralized script** (`scripts/deploy.sh`) that manages all seven monorepo apps with their specific paths and configurations. This guide covers the complete procedure, from local build to production verification.
 
 ## Golden Rule
 
@@ -30,7 +30,6 @@ graph LR
         NGINX -->|proxy| RECIPES[recipes :3009]
         NGINX -->|proxy| SHOWCASE[showcase2 :3010]
         NGINX -->|proxy| BOILER[boilerplate :3011]
-        NGINX -->|proxy| MULTI[multi-svelte :3012]
         NGINX -->|static| HOME[home/]
         NGINX -->|static| TODO[todo2/]
     end
@@ -40,7 +39,7 @@ graph LR
 |---------|-------|
 | **Server** | `demo.hyperskills.net` (via SSH alias `ssh bot`) |
 | **Base path** | `/opt/webmcp-demos/` |
-| **Node.js apps** | flex2 (:3007), viewer2, recipes, showcase2, boilerplate, multi-svelte |
+| **Node.js apps** | flex2 (:3007), viewer2, recipes, showcase2, boilerplate |
 | **Static apps** | home, todo2 (served by nginx) |
 | **Reverse proxy** | nginx on ports 80/443 |
 
@@ -57,7 +56,6 @@ Each app has a specific deployment path. The `deploy.sh` script knows these path
 | **showcase2** | Node.js (SvelteKit) | `apps/showcase2/build/` | `/opt/webmcp-demos/showcase2/` | `node index.js` | Widget gallery |
 | **recipes** | Node.js (SvelteKit) | `apps/recipes/build/` | `/opt/webmcp-demos/recipes/` | `node index.js` | Recipe explorer |
 | **boilerplate** | Node.js (SvelteKit) | `apps/boilerplate/build/` | `/opt/webmcp-demos/boilerplate/` | `node index.js` | Starter template |
-| **multi-svelte** | Node.js (SvelteKit) | `apps/multi-svelte/build/` | `/opt/webmcp-demos/multi-svelte/` | `node index.js` | Multi-tab app |
 | **home** | Static (SvelteKit) | `apps/home/build/` | `/opt/webmcp-demos/home/` | N/A (nginx) | Homepage |
 | **todo2** | Static (SvelteKit) | `apps/todo2/build/` | `/opt/webmcp-demos/todo2/` | N/A (nginx) | Todo demo |
 

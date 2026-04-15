@@ -10,17 +10,17 @@ test.describe('Home page', () => {
     await expect(page).toHaveTitle(/Auto-UI/i);
   });
 
-  test('shows all 5 demo cards', async ({ page }) => {
+  test('shows all 4 demo cards', async ({ page }) => {
     await page.goto(`${BASE}/`);
     await page.waitForSelector('a[href*="/composer"]');
     const cards = await page.locator('a[href*="demos.hyperskills.net"]').count();
-    expect(cards).toBeGreaterThanOrEqual(5);
+    expect(cards).toBeGreaterThanOrEqual(4);
   });
 
   test('card links point to correct domains', async ({ page }) => {
     await page.goto(`${BASE}/`);
     await page.waitForSelector('a[href*="/composer"]');
-    for (const path of ['/composer', '/viewer', '/showcase', '/mobile', '/todo']) {
+    for (const path of ['/composer', '/viewer', '/showcase', '/todo']) {
       const link = page.locator(`a[href*="${path}"]`).first();
       await expect(link).toBeVisible();
       const href = await link.getAttribute('href');
@@ -232,96 +232,6 @@ test.describe('Showcase', () => {
   });
 });
 
-// ─── MOBILE ─────────────────────────────────────────────────────────────────
-
-test.describe('Mobile', () => {
-  test('loads successfully', async ({ page }) => {
-    await page.goto(`${BASE}/mobile/`);
-    await expect(page.locator('text=Auto')).toBeVisible({ timeout: 10000 });
-  });
-
-  test('has hamburger menu', async ({ page }) => {
-    await page.goto(`${BASE}/mobile/`);
-    const hamburger = page.locator('button[aria-label="Menu"]');
-    await expect(hamburger).toBeVisible();
-  });
-
-  test('drawer opens and has MCP section', async ({ page }) => {
-    await page.goto(`${BASE}/mobile/`);
-    await page.click('button[aria-label="Menu"]');
-    await page.waitForTimeout(500);
-    await expect(page.locator('text=Serveur MCP')).toBeVisible();
-  });
-
-  test('drawer has LLM selector with Gemma options', async ({ page }) => {
-    await page.goto(`${BASE}/mobile/`);
-    await page.click('button[aria-label="Menu"]');
-    await page.waitForTimeout(500);
-    const select = page.locator('select');
-    const options = await select.locator('option').allTextContents();
-    expect(options.some(o => o.includes('Gemma E2B'))).toBe(true);
-    expect(options.some(o => o.includes('Gemma E4B'))).toBe(true);
-  });
-
-  test('no Bearer token input', async ({ page }) => {
-    await page.goto(`${BASE}/mobile/`);
-    await page.click('button[aria-label="Menu"]');
-    await page.waitForTimeout(500);
-    const content = await page.textContent('.drawer');
-    expect(content).not.toContain('Bearer token');
-  });
-
-  test('no API key input', async ({ page }) => {
-    await page.goto(`${BASE}/mobile/`);
-    await page.click('button[aria-label="Menu"]');
-    await page.waitForTimeout(500);
-    const content = await page.textContent('.drawer');
-    expect(content).not.toContain('Clé API');
-  });
-
-  test('drawer has recipes section', async ({ page }) => {
-    await page.goto(`${BASE}/mobile/`);
-    await page.click('button[aria-label="Menu"]');
-    await page.waitForTimeout(500);
-    await expect(page.locator('text=Recettes')).toBeVisible();
-  });
-
-  test('share button visible', async ({ page }) => {
-    await page.goto(`${BASE}/mobile/`);
-    await page.click('button[aria-label="Menu"]');
-    await page.waitForTimeout(500);
-    await expect(page.locator('text=partager')).toBeVisible();
-  });
-
-  test('theme toggle button exists', async ({ page }) => {
-    await page.goto(`${BASE}/mobile/`);
-    const toggle = page.locator('button[aria-label="Toggle theme"]');
-    await expect(toggle).toBeVisible();
-  });
-
-  test('chat API responds', async ({ request }) => {
-    const res = await request.post(`${BASE}/mobile/api/chat`, {
-      data: { messages: [{ role: 'user', content: 'ok' }], model: 'claude-haiku-4-5-20251001', max_tokens: 5 },
-    });
-    expect(res.status()).toBe(200);
-  });
-
-  test('MCP connect works', async ({ page }) => {
-    await page.goto(`${BASE}/mobile/`);
-    await page.click('button[aria-label="Menu"]');
-    await page.waitForTimeout(500);
-    const input = page.locator('input[placeholder*="mcp"]');
-    await input.fill('https://mcp.code4code.eu/mcp');
-    const connectBtn = page.locator('button', { hasText: /Connecter/i });
-    await connectBtn.click();
-    // Wait for connection attempt
-    await page.waitForTimeout(5000);
-    // Should show connected status or connection message in feed
-    const body = await page.textContent('body');
-    expect(body?.includes('connecté') || body?.includes('connexion') || body?.includes('MCP')).toBe(true);
-  });
-});
-
 // ─── TODO ───────────────────────────────────────────────────────────────────
 
 test.describe('Todo', () => {
@@ -355,7 +265,7 @@ test.describe('Todo', () => {
 
 test.describe('Cross-cutting', () => {
   test('all pages return 200', async ({ request }) => {
-    for (const path of ['/', '/composer/', '/viewer/', '/showcase/', '/mobile/', '/todo/']) {
+    for (const path of ['/', '/composer/', '/viewer/', '/showcase/', '/todo/']) {
       const res = await request.get(`${BASE}${path}`);
       expect(res.status(), `${path} should be 200`).toBe(200);
     }

@@ -5,7 +5,6 @@
     "packages/sdk/",
     "packages/ui/",
     "apps/flex2/",
-    "apps/multi-svelte/",
     "apps/boilerplate/",
     "apps/recipes/",
     "scripts/deploy.sh",
@@ -27,10 +26,6 @@
     {
       "file": "packages/agent.mdx",
       "reason": "packages/agent/ changed"
-    },
-    {
-      "file": "apps/multi-svelte.md",
-      "reason": "apps/flex2/ changed; apps/multi-svelte/ changed"
     },
     {
       "file": "apps/boilerplate.md",
