@@ -55,7 +55,7 @@ Etape 2 : pour chaque ID, `get_object({objectID: id})` → `{primaryImage, title
 ```
 component("gallery", {
   images: objects.map(obj => ({
-    src: obj.primaryImage,
+    src: obj.primaryImageSmall,
     alt: obj.title + " — " + obj.artistDisplayName,
     caption: obj.objectDate
   }))

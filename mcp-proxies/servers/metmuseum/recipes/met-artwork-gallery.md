@@ -12,7 +12,7 @@ data_type: images
 
 Quand l'utilisateur demande a voir des oeuvres d'art sous forme de galerie d'images : "montre-moi des tableaux impressionnistes", "gallery of Egyptian art", "show me Monet paintings".
 
-La galerie affiche les images haute resolution (`primaryImage`) avec le titre et l'artiste. Ce recipe convient pour les requetes visuelles ou l'utilisateur veut parcourir des oeuvres.
+La galerie affiche les images web (`primaryImageSmall`) avec le titre et l'artiste. Ce recipe convient pour les requetes visuelles ou l'utilisateur veut parcourir des oeuvres.
 
 ## Pipeline
 
@@ -45,19 +45,19 @@ La galerie affiche les images haute resolution (`primaryImage`) avec le titre et
    }
    ```
 
-4. **Filtrage** -- ignorer les objets dont `primaryImage` est vide (pas d'image disponible)
+4. **Filtrage** -- ignorer les objets dont `primaryImageSmall` est vide (pas d'image disponible)
 
 5. **Affichage** -- construire la galerie avec les objets restants
    ```
    autoui_webmcp_widget_display({name: "gallery", params: {
      images: [
        {
-         src: "<primaryImage de l'objet>",
+         src: "<primaryImageSmall de l'objet>",
          alt: "Water Lilies -- Claude Monet, 1906",
          caption: "Water Lilies -- Claude Monet, 1906"
        },
        {
-         src: "<primaryImage de l'objet>",
+         src: "<primaryImageSmall de l'objet>",
          alt: "A Woman with a Dog -- Pierre-Auguste Renoir, 1876",
          caption: "A Woman with a Dog -- Pierre-Auguste Renoir, 1876"
        }
@@ -93,12 +93,12 @@ Args: { "objectID": 437880 }
 autoui_webmcp_widget_display({name: "gallery", params: {
   images: [
     {
-      src: "<primaryImage retourne par get-museum-object>",
+      src: "<primaryImageSmall retourne par get-museum-object>",
       alt: "Young Woman with a Water Pitcher -- Johannes Vermeer",
       caption: "Young Woman with a Water Pitcher -- Johannes Vermeer, ca. 1662"
     },
     {
-      src: "<primaryImage retourne par get-museum-object>",
+      src: "<primaryImageSmall retourne par get-museum-object>",
       alt: "Allegory of the Catholic Faith -- Johannes Vermeer",
       caption: "Allegory of the Catholic Faith -- Johannes Vermeer, ca. 1670-72"
     }
@@ -110,5 +110,5 @@ autoui_webmcp_widget_display({name: "gallery", params: {
 
 - **Utiliser les objectIDs comme images** -- `search-museum-objects` retourne uniquement des IDs numeriques, pas des URLs d'images. Il faut obligatoirement appeler `get-museum-object` pour chaque ID afin d'obtenir `primaryImage`.
 - **Fetcher tous les IDs** -- la recherche peut retourner des milliers d'IDs. Se limiter aux 10-15 premiers.
-- **Ignorer les objets sans image** -- certains objets n'ont pas de `primaryImage` (champ vide). Les inclure dans la galerie produit des images cassees.
-- **Inventer des URLs d'images** -- ne jamais construire ou deviner une URL. Utiliser uniquement la valeur exacte de `primaryImage` ou `primaryImageSmall` retournee par `get-museum-object`.
+- **Ignorer les objets sans image** -- certains objets n'ont pas de `primaryImageSmall` (champ vide). Les inclure dans la galerie produit des images cassees.
+- **Inventer des URLs d'images** -- ne jamais construire ou deviner une URL. Utiliser uniquement la valeur exacte de `primaryImageSmall` retournee par `get-museum-object`.

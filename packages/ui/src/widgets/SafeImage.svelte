@@ -71,5 +71,6 @@
     {loading}
     onerror={onError}
     onload={onLoad}
+    referrerpolicy="no-referrer"
   />
 {/if}

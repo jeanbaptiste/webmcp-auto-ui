@@ -46,9 +46,9 @@ Le serveur Met Museum donne acces a la collection du Metropolitan Museum of Art 
    ```
    component("gallery", {
      images: objects
-       .filter(o => o.primaryImage)
+       .filter(o => o.primaryImageSmall)
        .map(o => ({
-         src: o.primaryImage,
+         src: o.primaryImageSmall,
          alt: o.title + " — " + o.artistDisplayName,
          caption: o.objectDate + " | " + o.medium
        }))
@@ -94,7 +94,7 @@ objectIDs.slice(0, 8).forEach(id => get_object({objectID: id}))
 
 // 3. Rendu
 component("stat-card", {label: "Oeuvres de Van Gogh", value: "8", icon: "palette"})
-component("gallery", {images: vanGoghWorks.map(w => ({src: w.primaryImage, alt: w.title, caption: w.objectDate}))})
+component("gallery", {images: vanGoghWorks.map(w => ({src: w.primaryImageSmall, alt: w.title, caption: w.objectDate}))})
 component("cards", {items: vanGoghWorks.map(w => ({title: w.title, subtitle: w.objectDate, image: w.primaryImageSmall, body: w.medium}))})
 ```
 
@@ -104,7 +104,7 @@ component("cards", {items: vanGoghWorks.map(w => ({title: w.title, subtitle: w.o
 search_objects({query: "egypt pharaoh", departmentId: 10, hasImages: true})
 
 // 2. Rendu avec metadonnees culturelles
-component("gallery", {images: egyptWorks.map(w => ({src: w.primaryImage, alt: w.title}))})
+component("gallery", {images: egyptWorks.map(w => ({src: w.primaryImageSmall, alt: w.title}))})
 component("table", {columns: ["Titre", "Periode", "Culture", "Medium"], rows: egyptDetails})
 component("kv", {pairs: [["Departement", "Egyptian Art"], ["Source", "Met Museum — Open Access"]]})
 ```
@@ -113,6 +113,6 @@ component("kv", {pairs: [["Departement", "Egyptian Art"], ["Source", "Met Museum
 
 - **Trop d'appels `get_object`** : la recherche retourne parfois des centaines d'IDs — limiter a 5-10 appels detail pour la performance
 - **Oeuvres sans image** : beaucoup d'objets Met n'ont pas de `primaryImage` — toujours filtrer avec `hasImages: true` dans la recherche ou verifier le champ
-- **Images basse resolution** : utiliser `primaryImage` (haute resolution) pour la galerie, `primaryImageSmall` pour les cards/thumbnails
+- **Images haute resolution cassees** : utiliser `primaryImageSmall` (web-large) pour la galerie et les cards — les URLs `primaryImage` (original) retournent souvent des 404
 - **Oublier la licence** : les oeuvres en domaine public (`isPublicDomain: true`) peuvent etre affichees librement, les autres ont un champ `rights` a respecter
 - **Artiste inconnu** : beaucoup d'oeuvres anciennes n'ont pas d'`artistDisplayName` — afficher "Artiste inconnu" ou la culture/periode a la place
