@@ -109,7 +109,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="ac-modal" onclick={(e) => e.stopPropagation()}>
       <div class="ac-modal-header">
-        <span class="ac-title">Détail</span>
+        <span class="ac-title">Detail</span>
         <button class="ac-clear" onclick={() => modalContent = null}>✕</button>
       </div>
       <pre class="ac-modal-content">{modalContent}</pre>

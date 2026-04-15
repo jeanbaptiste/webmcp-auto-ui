@@ -1,6 +1,6 @@
 ---
 widget: data-table
-description: Tableau de données triable avec colonnes configurables
+description: Sortable data table with configurable columns
 group: rich
 schema:
   type: object
@@ -33,14 +33,14 @@ schema:
         type: object
 ---
 
-## Quand utiliser
-Pour afficher des données tabulaires avec plusieurs colonnes — résultats de requêtes, listes d'enregistrements, inventaires. Préférer `kv` pour une seule entité, `list` pour une seule colonne.
+## When to use
+Display tabular data with multiple columns — query results, record lists, inventories. Prefer `kv` for a single entity, `list` for a single column.
 
-## Comment
-1. Récupérer les données via MCP (ex: résultat SQL, liste d'objets)
-2. Optionnel : définir `columns` pour contrôler l'ordre et les labels des colonnes
-3. Appeler `autoui_webmcp_widget_display('data-table', { title: 'Utilisateurs', columns: [{ key: 'name', label: 'Nom' }, { key: 'email', label: 'Email' }], rows: [{ name: 'Alice', email: 'alice@ex.com' }] })`
+## How to use
+1. Fetch data via MCP (e.g. SQL result, list of objects)
+2. Optional: define `columns` to control column order and labels
+3. Call `autoui_webmcp_widget_display('data-table', { title: 'Users', columns: [{ key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }], rows: [{ name: 'Alice', email: 'alice@ex.com' }] })`
 
-## Erreurs courantes
-- Oublier que `rows` est un tableau d'objets (pas un tableau de tableaux)
-- Définir des `columns.key` qui ne correspondent pas aux clés des objets dans `rows`
+## Common mistakes
+- Forgetting that `rows` is an array of objects (not an array of arrays)
+- Defining `columns.key` values that do not match the keys in the `rows` objects

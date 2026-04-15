@@ -1,6 +1,6 @@
 ---
 widget: tags
-description: Groupe de tags/badges
+description: Group of tags/badges
 group: simple
 schema:
   type: object
@@ -22,9 +22,9 @@ schema:
             type: boolean
 ---
 
-## Quand utiliser
-Pour afficher des catégories, des labels, des filtres ou des badges. Utile pour montrer les tags associés à un élément ou proposer des filtres visuels.
+## When to use
+Display categories, labels, filters, or badges. Useful for showing tags associated with an item or presenting visual filters.
 
-## Comment
-1. Récupérer les tags ou catégories depuis MCP
-2. Appeler `autoui_webmcp_widget_display('tags', { label: 'Catégories', tags: [{ text: 'Finance', active: true }, { text: 'Tech' }] })`
+## How to use
+1. Fetch the tags or categories from MCP
+2. Call `autoui_webmcp_widget_display('tags', { label: 'Categories', tags: [{ text: 'Finance', active: true }, { text: 'Tech' }] })`

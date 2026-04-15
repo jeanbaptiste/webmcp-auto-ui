@@ -92,7 +92,7 @@ function createCanvasVanilla() {
   let _mcpTools: McpToolInfo[] = [];
   let _messages: ChatMsg[] = [];
   let _generating = false;
-  let _statusText = '● aucun MCP connecté';
+  let _statusText = '● no MCP connected';
   let _statusColor = 'text-zinc-600';
   let _themeOverrides: Record<string, string> = {};
   let _enabledServerIds: string[] = ['autoui'];
@@ -179,7 +179,7 @@ function createCanvasVanilla() {
       _statusText = `● ${name} · ${tools?.length ?? 0} tools`;
       _statusColor = 'text-teal-400';
     } else {
-      _statusText = '● aucun MCP connecté';
+      _statusText = '● no MCP connected';
       _statusColor = 'text-zinc-600';
     }
     notify();

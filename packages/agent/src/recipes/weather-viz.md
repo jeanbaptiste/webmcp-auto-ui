@@ -1,50 +1,50 @@
 ---
-id: visualiser-previsions-meteo-avec-graphiques-et-kpi
-name: Visualiser des previsions meteo avec graphiques temporels et indicateurs cles
+id: visualize-weather-forecasts-with-charts-and-kpis
+name: Visualize weather forecasts with time series charts and key indicators
 components_used: [stat-card, chart-rich, map, kv]
-when: les donnees MCP contiennent des mesures meteorologiques (temperature, humidite, vent, precipitations) ou des previsions horaires/journalieres
+when: MCP data contains weather measurements (temperature, humidity, wind, precipitation) or hourly/daily forecasts
 servers: [openmeteo]
 layout:
   type: grid
   columns: 2
-  arrangement: stat-cards en haut, chart en bas sur toute la largeur
+  arrangement: stat-cards at the top, chart spanning full width at the bottom
 ---
 
-## Quand utiliser
+## When to use
 
-Les resultats MCP contiennent des donnees meteorologiques structurees. Typiquement :
-- **Open-Meteo** : previsions horaires (`hourly.temperature_2m`, `hourly.precipitation`), previsions journalieres (`daily.temperature_2m_max/min`), conditions actuelles (`current.temperature_2m`, `current.wind_speed_10m`)
-- Toute source retournant des series temporelles de mesures climatiques
+MCP results contain structured weather data. Typically:
+- **Open-Meteo**: hourly forecasts (`hourly.temperature_2m`, `hourly.precipitation`), daily forecasts (`daily.temperature_2m_max/min`), current conditions (`current.temperature_2m`, `current.wind_speed_10m`)
+- Any source returning time series of climate measurements
 
-La recette s'applique meme pour une seule ville : les stat-cards montrent les conditions actuelles, le graphique montre l'evolution.
+This recipe applies even for a single city: stat-cards show current conditions, the chart shows the trend over time.
 
-## Comment
+## How to use
 
-1. **Appeler l'outil meteo** avec les coordonnees ou le nom de la ville :
-   - Open-Meteo : `get_forecast({latitude: 48.85, longitude: 2.35, hourly: "temperature_2m,precipitation", daily: "temperature_2m_max,temperature_2m_min"})`
-2. **Extraire les KPIs actuels** et les afficher en stat-cards :
-   - Temperature actuelle : `component("stat-card", {label: "Temperature", value: "18.5°C", icon: "thermometer"})`
-   - Vent : `component("stat-card", {label: "Vent", value: "12.3 km/h", icon: "wind"})`
-   - Humidite : `component("stat-card", {label: "Humidite", value: "72%", icon: "droplets"})`
-   - Precipitations : `component("stat-card", {label: "Pluie (24h)", value: "2.1 mm", icon: "cloud-rain"})`
-3. **Construire le graphique temporel** a partir des series horaires ou journalieres :
+1. **Call the weather tool** with coordinates or city name:
+   - Open-Meteo: `get_forecast({latitude: 48.85, longitude: 2.35, hourly: "temperature_2m,precipitation", daily: "temperature_2m_max,temperature_2m_min"})`
+2. **Extract current KPIs** and display them as stat-cards:
+   - Current temperature: `component("stat-card", {label: "Temperature", value: "18.5°C", icon: "thermometer"})`
+   - Wind: `component("stat-card", {label: "Wind", value: "12.3 km/h", icon: "wind"})`
+   - Humidity: `component("stat-card", {label: "Humidity", value: "72%", icon: "droplets"})`
+   - Precipitation: `component("stat-card", {label: "Rain (24h)", value: "2.1 mm", icon: "cloud-rain"})`
+3. **Build the time series chart** from hourly or daily series:
    - `component("chart-rich", {type: "line", labels: hourly.time, datasets: [{label: "Temperature °C", data: hourly.temperature_2m}]})`
-   - Pour les precipitations, preferer un type "bar" superpose
-4. **Ajouter la carte** si des coordonnees sont disponibles :
+   - For precipitation, prefer an overlaid "bar" type
+4. **Add the map** if coordinates are available:
    - `component("map", {center: [lat, lon], zoom: 10, markers: [{lat, lon, label: "Paris"}]})`
-5. **Completer avec les details** en kv :
-   - `component("kv", {pairs: [["Lever du soleil", "06:42"], ["Coucher", "20:15"], ["Indice UV", "5 (modere)"]]})`
+5. **Complete with details** in kv:
+   - `component("kv", {pairs: [["Sunrise", "06:42"], ["Sunset", "20:15"], ["UV Index", "5 (moderate)"]]})`
 
-## Exemples
+## Examples
 
-### Previsions 7 jours pour Paris
+### 7-day forecast for Paris
 ```
-// Appel MCP
+// MCP call
 get_forecast({latitude: 48.8566, longitude: 2.3522, daily: "temperature_2m_max,temperature_2m_min,precipitation_sum"})
 
-// Rendu
-component("stat-card", {label: "Aujourd'hui", value: "22°C / 14°C", icon: "thermometer"})
-component("stat-card", {label: "Pluie prevue", value: "0 mm", icon: "sun"})
+// Render
+component("stat-card", {label: "Today", value: "22°C / 14°C", icon: "thermometer"})
+component("stat-card", {label: "Expected rain", value: "0 mm", icon: "sun"})
 component("chart-rich", {
   type: "line",
   labels: daily.time,  // ["2026-04-09", "2026-04-10", ...]
@@ -55,21 +55,21 @@ component("chart-rich", {
 })
 ```
 
-### Previsions horaires avec precipitations
+### Hourly forecast with precipitation
 ```
 component("chart-rich", {
   type: "line",
   labels: hourly.time.slice(0, 24),
   datasets: [
     {label: "Temperature °C", data: hourly.temperature_2m.slice(0, 24), yAxisID: "y"},
-    {label: "Pluie mm", data: hourly.precipitation.slice(0, 24), yAxisID: "y1", type: "bar"}
+    {label: "Rain mm", data: hourly.precipitation.slice(0, 24), yAxisID: "y1", type: "bar"}
   ]
 })
 ```
 
-## Erreurs courantes
+## Common mistakes
 
-- **Afficher les donnees brutes JSON** au lieu de les visualiser avec des composants
-- **Ne pas convertir les unites** : Open-Meteo retourne en unites SI par defaut (m/s pour le vent → convertir en km/h si l'utilisateur est francophone)
-- **Oublier les stat-cards** pour les KPIs principaux : un graphique seul ne donne pas les chiffres cles immediatement
-- **Trop de points sur le graphique** : pour des previsions horaires sur 7 jours (168 points), preferer un resample journalier ou limiter a 48h en mode horaire
+- **Displaying raw JSON data** instead of visualizing it with components
+- **Not converting units**: Open-Meteo returns SI units by default (m/s for wind → convert to km/h if appropriate for the user)
+- **Forgetting stat-cards** for the main KPIs: a chart alone does not surface key figures immediately
+- **Too many points on the chart**: for hourly forecasts over 7 days (168 points), prefer daily resampling or limit to 48h in hourly mode

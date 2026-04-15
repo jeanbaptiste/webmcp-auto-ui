@@ -1,6 +1,6 @@
 ---
 widget: alert
-description: Alerte ou notification système
+description: System alert or notification
 group: simple
 schema:
   type: object
@@ -19,9 +19,9 @@ schema:
         - error
 ---
 
-## Quand utiliser
-Pour signaler une information importante, un avertissement ou une erreur à l'utilisateur. Utile après une action qui nécessite attention (ex: seuil dépassé, opération échouée).
+## When to use
+Signal important information, a warning, or an error to the user. Useful after an action that requires attention (e.g. threshold exceeded, operation failed).
 
-## Comment
-1. Déterminer le niveau d'alerte selon le contexte ('info', 'warn', 'error')
-2. Appeler `autoui_webmcp_widget_display('alert', { title: 'Quota dépassé', message: 'Le stockage utilisé dépasse 90%', level: 'warn' })`
+## How to use
+1. Determine the alert level based on context ('info', 'warn', 'error')
+2. Call `autoui_webmcp_widget_display('alert', { title: 'Quota exceeded', message: 'Storage usage is above 90%', level: 'warn' })`

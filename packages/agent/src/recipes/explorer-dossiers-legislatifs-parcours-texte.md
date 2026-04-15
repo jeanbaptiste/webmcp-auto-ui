@@ -1,42 +1,42 @@
 ---
-id: explorer-dossiers-legislatifs-parcours-texte
-name: Explorer les dossiers legislatifs et le parcours d'un texte entre Assemblee et Senat
+id: explore-legislative-files-text-journey
+name: Explore legislative files and the journey of a text between the Assembly and the Senate
 components_used: [timeline, table, kv, stat-card]
-when: l'utilisateur demande le parcours d'un projet ou proposition de loi, la navette parlementaire, les lectures successives, ou le suivi d'un dossier legislatif
+when: the user asks about the journey of a bill or legislative proposal, the parliamentary shuttle, successive readings, or the tracking of a legislative file
 servers: [tricoteuses]
 layout:
   type: grid
   columns: 2
-  arrangement: timeline pleine largeur en haut, stats + table en dessous
+  arrangement: full-width timeline at top, stats + table below
 ---
 
-## Quand utiliser
+## When to use
 
-L'utilisateur s'interesse au parcours d'un texte de loi a travers les institutions :
-- "Ou en est le projet de loi sur l'immigration ?"
-- "Montre-moi la navette parlementaire de la reforme des retraites"
-- "Combien de lectures a subi ce texte ?"
-- "Quels amendements ont ete adoptes en commission ?"
+The user is interested in the journey of a bill through the institutions:
+- "Where does the immigration bill currently stand?"
+- "Show me the parliamentary shuttle for the pension reform"
+- "How many readings did this text go through?"
+- "Which amendments were adopted in committee?"
 
-Le serveur Tricoteuses contient les dossiers legislatifs avec leurs etapes : depot, renvoi en commission, discussion en seance, vote, navette, promulgation.
+The Tricoteuses server contains legislative files with their stages: filing, referral to committee, floor debate, vote, shuttle, promulgation.
 
-## Comment
+## How to use
 
-1. **Rechercher le dossier legislatif** :
+1. **Search for the legislative file**:
    ```
    query_sql({sql: "SELECT * FROM assemblee.dossiers WHERE titre ILIKE '%immigration%' ORDER BY date_depot DESC LIMIT 5"})
    ```
-   Ou via les recettes Tricoteuses :
+   Or via Tricoteuses recipes:
    ```
    search_recipes({query: "dossier legislatif parcours"})
    ```
 
-2. **Recuperer les etapes du parcours** :
+2. **Retrieve the journey stages**:
    ```
    query_sql({sql: "SELECT etape, chambre, date, resultat FROM assemblee.dossier_etapes WHERE dossier_id = $id ORDER BY date"})
    ```
 
-3. **Afficher la timeline du parcours** :
+3. **Display the journey timeline**:
    ```
    component("timeline", {
      events: etapes.map(e => ({
@@ -48,68 +48,68 @@ Le serveur Tricoteuses contient les dossiers legislatifs avec leurs etapes : dep
    })
    ```
 
-4. **Statistiques du dossier** en stat-cards :
+4. **File statistics** in stat-cards:
    ```
-   component("stat-card", {label: "Lectures", value: "3", icon: "book-open"})
-   component("stat-card", {label: "Amendements deposes", value: "1 247", icon: "file-text"})
-   component("stat-card", {label: "Amendements adoptes", value: "312", icon: "check"})
-   component("stat-card", {label: "Duree totale", value: "14 mois", icon: "clock"})
+   component("stat-card", {label: "Readings", value: "3", icon: "book-open"})
+   component("stat-card", {label: "Amendments filed", value: "1 247", icon: "file-text"})
+   component("stat-card", {label: "Amendments adopted", value: "312", icon: "check"})
+   component("stat-card", {label: "Total duration", value: "14 months", icon: "clock"})
    ```
 
-5. **Details des amendements par etape** en table :
+5. **Amendment details by stage** in a table:
    ```
    component("table", {
-     columns: ["Etape", "Chambre", "Amendements deposes", "Adoptes", "Rejetes"],
+     columns: ["Stage", "Chamber", "Amendments filed", "Adopted", "Rejected"],
      rows: etapeStats
    })
    ```
 
-6. **Metadonnees du dossier** en kv :
+6. **File metadata** in kv:
    ```
    component("kv", {pairs: [
-     ["Titre", dossier.titre],
+     ["Title", dossier.titre],
      ["Nature", "Projet de loi"],
-     ["Auteur", "Gouvernement"],
-     ["Date de depot", dossier.date_depot],
-     ["Etat actuel", dossier.etat],
+     ["Author", "Gouvernement"],
+     ["Filing date", dossier.date_depot],
+     ["Current status", dossier.etat],
      ["Source", "Tricoteuses"]
    ]})
    ```
 
-## Exemples
+## Examples
 
-### Parcours complet d'un texte
+### Complete text journey
 ```
-// 1. Recuperer le dossier
+// 1. Retrieve the file
 query_sql({sql: "SELECT id, titre, date_depot, etat FROM assemblee.dossiers WHERE titre ILIKE '%retraites%2023%' LIMIT 1"})
 
-// 2. Etapes
+// 2. Stages
 query_sql({sql: "SELECT * FROM assemblee.dossier_etapes WHERE dossier_id = $id ORDER BY date"})
 
-// 3. Amendements par etape
+// 3. Amendments by stage
 query_sql({sql: "SELECT etape, COUNT(*) as total, COUNT(*) FILTER (WHERE sort='Adopte') as adoptes FROM assemblee.amendements WHERE dossier_id = $id GROUP BY etape"})
 
-// 4. Rendu
-component("kv", {pairs: [["Dossier", titre], ["Etat", etat]]})
+// 4. Render
+component("kv", {pairs: [["File", titre], ["Status", etat]]})
 component("timeline", {events: etapes})
-component("stat-card", {label: "Total amendements", value: totalAmendements})
-component("stat-card", {label: "Adoptes", value: totalAdoptes})
-component("table", {columns: ["Etape", "Deposes", "Adoptes", "Taux"], rows: etapeStats})
+component("stat-card", {label: "Total amendments", value: totalAmendements})
+component("stat-card", {label: "Adopted", value: totalAdoptes})
+component("table", {columns: ["Stage", "Filed", "Adopted", "Rate"], rows: etapeStats})
 ```
 
-### Comparaison entre chambres
+### Comparison between chambers
 ```
-// Amendements par chambre
+// Amendments by chamber
 query_sql({sql: "SELECT chambre, COUNT(*) as deposes, COUNT(*) FILTER (WHERE sort='Adopte') as adoptes FROM assemblee.amendements WHERE dossier_id = $id GROUP BY chambre"})
 
-component("stat-card", {label: "Assemblee — Adoptes", value: an_adoptes + "/" + an_deposes})
-component("stat-card", {label: "Senat — Adoptes", value: senat_adoptes + "/" + senat_deposes})
-component("chart", {type: "bar", labels: ["Assemblee", "Senat"], datasets: [{label: "Deposes", data: [an_deposes, senat_deposes]}, {label: "Adoptes", data: [an_adoptes, senat_adoptes]}]})
+component("stat-card", {label: "Assembly — Adopted", value: an_adoptes + "/" + an_deposes})
+component("stat-card", {label: "Senate — Adopted", value: senat_adoptes + "/" + senat_deposes})
+component("chart", {type: "bar", labels: ["Assemblee", "Senat"], datasets: [{label: "Filed", data: [an_deposes, senat_deposes]}, {label: "Adopted", data: [an_adoptes, senat_adoptes]}]})
 ```
 
-## Erreurs courantes
+## Common mistakes
 
-- **Confondre projet et proposition de loi** : un projet vient du gouvernement, une proposition vient d'un parlementaire — verifier le champ `nature`
-- **Ne pas suivre la navette** : un texte peut faire plusieurs allers-retours entre Assemblee et Senat — afficher TOUTES les etapes
-- **Oublier la CMP** : la Commission Mixte Paritaire est une etape cruciale entre les deux chambres, ne pas l'omettre dans la timeline
-- **Timeline non chronologique** : toujours trier les etapes par date croissante
+- **Confusing bill types**: a "projet de loi" comes from the government, a "proposition de loi" comes from a parliamentary member — check the `nature` field
+- **Not following the shuttle**: a text can make several back-and-forth trips between the Assembly and the Senate — display ALL stages
+- **Forgetting the CMP**: the Commission Mixte Paritaire (Joint Committee) is a crucial stage between the two chambers — do not omit it from the timeline
+- **Non-chronological timeline**: always sort stages by ascending date

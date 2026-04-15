@@ -6,7 +6,7 @@
   const trendArrow = $derived(data.trendDir === 'up' ? '↑' : data.trendDir === 'down' ? '↓' : '→');
 </script>
 <div class="p-4 md:p-5">
-  <div class="text-[11px] font-mono text-text2 mb-1 uppercase tracking-widest">{data.label ?? 'Métrique'}</div>
+  <div class="text-[11px] font-mono text-text2 mb-1 uppercase tracking-widest">{data.label ?? 'Metric'}</div>
   <div class="text-3xl md:text-4xl font-bold text-text1 leading-none">{data.value ?? '—'}</div>
   {#if data.trend}
     <div class="text-xs font-mono mt-2 {trendColor}">{trendArrow} {data.trend}</div>

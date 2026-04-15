@@ -622,7 +622,7 @@ export class WasmProvider implements LLMProvider {
         let inferredType = val.type;
         if (!inferredType) {
           const descLower = (val.description ?? '').toLowerCase();
-          if (descLower.includes('objet') || descLower.includes('object') || descLower.includes('paramètre') || key === 'params') {
+          if (descLower.includes('objet') || descLower.includes('object') || descLower.includes('parameter') || descLower.includes('paramètre') || key === 'params') {
             inferredType = 'object';
           } else {
             inferredType = 'string';
@@ -692,15 +692,15 @@ export class WasmProvider implements LLMProvider {
         : tools;
 
       // Minimal instruction — Gemma 4 is trained on native tool format
-      systemParts.push(`Tu es un assistant UI connecté à des serveurs MCP.
-Utilise les outils disponibles pour répondre. Après chaque appel DATA, rends visuellement avec component().
-Ne demande PAS confirmation. Exécute directement.`);
+      systemParts.push(`You are a UI assistant connected to MCP servers.
+Use the available tools to respond. After each DATA call, render visually with component().
+Do NOT ask for confirmation. Execute directly.`);
 
       // Native Gemma 4 tool declarations
       systemParts.push(limitedTools.map(t => WasmProvider.formatToolDeclaration(t)).join('\n'));
 
       // Enable thinking mode — Gemma 4 reasons before tool calls
-      systemParts.push('Avant chaque appel d\'outil, réfléchis brièvement dans un bloc <|channel>thought puis appelle l\'outil.');
+      systemParts.push('Before each tool call, think briefly in a <|channel>thought block then call the tool.');
     }
 
     // Build a map of tool_use_id → tool_name from all messages for tool_result resolution

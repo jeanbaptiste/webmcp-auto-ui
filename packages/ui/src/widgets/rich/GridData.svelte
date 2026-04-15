@@ -13,7 +13,7 @@
 </script>
 <div class="bg-surface border border-border rounded-lg p-3 md:p-4 font-sans">
   {#if spec.title}<h3 class="text-sm font-semibold text-text1 mb-3">{spec.title}</h3>{/if}
-  {#if !columns.length&&!rows.length}<p class="text-text2 text-sm">Aucune donnée</p>
+  {#if !columns.length&&!rows.length}<p class="text-text2 text-sm">No data</p>
   {:else}
     <div class="overflow-auto rounded border border-border">
       <table class="w-full border-collapse text-xs font-mono">

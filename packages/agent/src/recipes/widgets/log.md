@@ -1,6 +1,6 @@
 ---
 widget: log
-description: Journal d'événements avec niveaux et timestamps
+description: Event log with levels and timestamps
 group: rich
 schema:
   type: object
@@ -31,9 +31,9 @@ schema:
             type: string
 ---
 
-## Quand utiliser
-Pour afficher un journal d'événements — logs applicatifs, audit trail, historique d'opérations. Chaque entrée peut être colorée par niveau (debug/info/warn/error).
+## When to use
+Display an event log — application logs, audit trail, operation history. Each entry can be color-coded by level (debug/info/warn/error).
 
-## Comment
-1. Récupérer les logs via MCP
-2. Appeler `autoui_webmcp_widget_display('log', { title: 'Logs serveur', entries: [{ timestamp: '14:32:01', level: 'error', message: 'Connection refused', source: 'db' }, { timestamp: '14:32:05', level: 'info', message: 'Retry successful', source: 'db' }] })`
+## How to use
+1. Fetch logs via MCP
+2. Call `autoui_webmcp_widget_display('log', { title: 'Server Logs', entries: [{ timestamp: '14:32:01', level: 'error', message: 'Connection refused', source: 'db' }, { timestamp: '14:32:05', level: 'info', message: 'Retry successful', source: 'db' }] })`

@@ -40,11 +40,11 @@ export async function summarizeChat(options: SummarizeOptions): Promise<ChatSumm
     .join('\n')
     .slice(0, 3000); // cap input to keep costs low
 
-  const prompt = `Résume cette conversation en 2-3 phrases courtes.
-Garde uniquement l'intention de l'utilisateur et les décisions techniques prises.
-Anonymise TOUT : remplace les noms de personnes, d'entreprises, de lieux, de domaines et d'URLs par des termes génériques (ex: "un utilisateur", "une entreprise", "une ville", "un serveur MCP").
-Ne mentionne jamais de données personnelles.
-Réponds UNIQUEMENT avec le résumé, sans préambule.
+  const prompt = `Summarize this conversation in 2-3 short sentences.
+Keep only the user's intent and technical decisions made.
+Anonymize EVERYTHING: replace names of people, companies, places, domains, and URLs with generic terms (e.g. "a user", "a company", "a city", "an MCP server").
+Never mention personal data.
+Reply ONLY with the summary, no preamble.
 
 Conversation:
 ${chatText}`;
@@ -63,7 +63,7 @@ ${chatText}`;
       .map((b) => (b as { type: 'text'; text: string }).text)
       .join(' ');
   } catch {
-    chatSummary = '(synthèse non disponible)';
+    chatSummary = '(summary unavailable)';
   }
 
   return {

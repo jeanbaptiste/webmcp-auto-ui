@@ -111,9 +111,9 @@ export function runDiagnostics(
     if (patches.length > 0) {
       diagnostics.push({
         severity: 'warning',
-        title: `Schema patché: ${tool.name}`,
-        detail: `${patches.length} correction(s) pour strict mode: ${patches.map(p => p.path).join(', ')}. additionalProperties: false ajouté automatiquement.`,
-        codeFix: `Ajouter "additionalProperties": false dans le schema du serveur MCP pour ${tool.name}.`,
+        title: `Schema patched: ${tool.name}`,
+        detail: `${patches.length} correction(s) for strict mode: ${patches.map(p => p.path).join(', ')}. additionalProperties: false added automatically.`,
+        codeFix: `Add "additionalProperties": false to the MCP server schema for ${tool.name}.`,
       });
     }
   }

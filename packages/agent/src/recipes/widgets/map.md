@@ -1,6 +1,6 @@
 ---
 widget: map
-description: Carte interactive avec marqueurs
+description: Interactive map with markers
 group: advanced
 schema:
   type: object
@@ -36,14 +36,14 @@ schema:
             type: string
 ---
 
-## Quand utiliser
-Pour afficher des données géolocalisées — adresses, points d'intérêt, itinéraires, zones de couverture. Idéal quand l'utilisateur demande "où se trouve..." ou "montre sur une carte".
+## When to use
+Display geolocated data — addresses, points of interest, itineraries, coverage areas. Ideal when the user asks "where is..." or "show on a map".
 
-## Comment
-1. Récupérer les coordonnées via MCP (lat/lng)
-2. Définir le centre et le zoom selon l'étendue des données
-3. Appeler `autoui_webmcp_widget_display('map', { title: 'Nos bureaux', center: { lat: 48.8566, lng: 2.3522 }, zoom: 12, markers: [{ lat: 48.8566, lng: 2.3522, label: 'Siège Paris' }] })`
+## How to use
+1. Retrieve coordinates via MCP (lat/lng)
+2. Set the center and zoom based on the extent of the data
+3. Call `autoui_webmcp_widget_display('map', { title: 'Our offices', center: { lat: 48.8566, lng: 2.3522 }, zoom: 12, markers: [{ lat: 48.8566, lng: 2.3522, label: 'Paris HQ' }] })`
 
-## Erreurs courantes
-- Inverser lat et lng (latitude = Nord/Sud, longitude = Est/Ouest)
-- Oublier de centrer la carte sur les marqueurs affichés
+## Common mistakes
+- Swapping lat and lng (latitude = North/South, longitude = East/West)
+- Forgetting to center the map on the displayed markers

@@ -12,7 +12,7 @@
 </script>
 <div class="bg-surface border border-border rounded-lg p-3 md:p-4 font-sans">
   {#if spec.title}<h3 class="text-sm font-semibold text-text1 mb-3">{spec.title}</h3>{/if}
-  {#if cards.length===0}<p class="text-text2 text-sm">{spec.emptyMessage??'Aucun élément'}</p>
+  {#if cards.length===0}<p class="text-text2 text-sm">{spec.emptyMessage??'No items'}</p>
   {:else}
     <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax({spec.minCardWidth??'180px'}, 1fr)); gap: {spec.gap??'1rem'};">
       {#each cards as card}

@@ -69,7 +69,7 @@
         disabled={!url.trim() || connecting}
         class="text-xs font-mono px-2 h-7 rounded border border-border2 bg-surface2 hover:border-accent/50 hover:text-accent text-text2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
       >
-        {connecting ? 'connexion…' : 'connect'}
+        {connecting ? 'connecting…' : 'connect'}
       </button>
     {:else}
       <button
@@ -79,7 +79,7 @@
         disconnect
       </button>
     {/if}
-    <McpStatus {connecting} {connected} name={serverName || 'non connecté'} />
+    <McpStatus {connecting} {connected} name={serverName || 'not connected'} />
   </div>
 
   {#if !compact}

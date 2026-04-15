@@ -1,8 +1,8 @@
 ---
-id: afficher-galerie-images-depuis-urls-mcp
-name: Afficher une galerie d'images a partir d'URLs retournees par un serveur MCP
+id: display-image-gallery-from-mcp-urls
+name: Display an image gallery from URLs returned by an MCP server
 components_used: [gallery, carousel, cards]
-when: les donnees MCP contiennent des champs URL pointant vers des images (jpg, png, webp, svg) comme hdurl, primaryImage, image_url, photos[].url, ou tout champ similaire
+when: MCP data contains URL fields pointing to images (jpg, png, webp, svg) such as hdurl, primaryImage, image_url, photos[].url, or any similar field
 servers: [nasa, metmuseum, inaturalist]
 layout:
   type: grid
@@ -11,32 +11,32 @@ interactions:
   - source: gallery, target: lightbox, event: click, action: zoom
 ---
 
-## Quand utiliser
+## When to use
 
-Les resultats d'un appel MCP contiennent des URLs d'images reelles. Cela inclut :
-- **NASA** : champ `hdurl` ou `url` dans les reponses APOD, Earth, Mars Rover Photos
-- **Met Museum** : champ `primaryImage` ou `primaryImageSmall` apres `get_object`
-- **iNaturalist** : champ `photos[].url` dans les observations
+The results of an MCP call contain real image URLs. This includes:
+- **NASA**: `hdurl` or `url` field in APOD, Earth, and Mars Rover Photos responses
+- **Met Museum**: `primaryImage` or `primaryImageSmall` field after `get_object`
+- **iNaturalist**: `photos[].url` field in observations
 
-La recette s'applique des qu'au moins 2 images sont disponibles dans les donnees. Pour une seule image, preferer un composant `card` avec l'image en en-tete.
+This recipe applies whenever at least 2 images are available in the data. For a single image, prefer a `card` component with the image as a header.
 
-## Comment
+## How to use
 
-1. **Appeler l'outil DATA** du serveur MCP pour recuperer les donnees contenant les images
-2. **Extraire les URLs reelles** depuis les resultats — ne JAMAIS inventer d'URLs placeholder
-3. **Verifier que les URLs sont valides** : elles doivent pointer vers des domaines connus (apod.nasa.gov, images.metmuseum.org, inaturalist-open-data.s3.amazonaws.com, etc.)
-4. **Choisir le composant** :
-   - 2-5 images : `component("gallery", {images: [{src, alt, caption?}]})`
-   - 6+ images : `component("carousel", {images: [{src, alt}]})` pour eviter une page trop longue
-   - Images avec metadonnees riches : `component("cards", {items: [{title, image, subtitle, body}]})`
-5. **Toujours fournir un `alt` descriptif** pour chaque image (titre de l'oeuvre, nom de l'espece, titre APOD)
-6. **Ajouter un titre contextuel** avant la galerie avec `component("text", {content: "..."})`
+1. **Call the DATA tool** from the MCP server to retrieve the data containing the images
+2. **Extract the real URLs** from the results — NEVER invent placeholder URLs
+3. **Verify that the URLs are valid**: they must point to known domains (apod.nasa.gov, images.metmuseum.org, inaturalist-open-data.s3.amazonaws.com, etc.)
+4. **Choose the component**:
+   - 2-5 images: `component("gallery", {images: [{src, alt, caption?}]})`
+   - 6+ images: `component("carousel", {images: [{src, alt}]})` to avoid an overly long page
+   - Images with rich metadata: `component("cards", {items: [{title, image, subtitle, body}]})`
+5. **Always provide a descriptive `alt`** for each image (artwork title, species name, APOD title)
+6. **Add a contextual title** before the gallery with `component("text", {content: "..."})`
 
-## Exemples
+## Examples
 
 ### NASA APOD (Astronomy Picture of the Day)
-Outil : `nasa_apod` ou `nasa_apod_range`
-Reponse type : `{hdurl: "https://apod.nasa.gov/apod/image/2401/...", title: "Horsehead Nebula", explanation: "..."}`
+Tool: `nasa_apod` or `nasa_apod_range`
+Typical response: `{hdurl: "https://apod.nasa.gov/apod/image/2401/...", title: "Horsehead Nebula", explanation: "..."}`
 
 ```
 component("gallery", {
@@ -48,9 +48,9 @@ component("gallery", {
 })
 ```
 
-### Met Museum — Recherche d'oeuvres
-Etape 1 : `search_objects({query: "impressionism sunflower"})` → liste d'IDs
-Etape 2 : pour chaque ID, `get_object({objectID: id})` → `{primaryImage, title, artistDisplayName}`
+### Met Museum — Artwork search
+Step 1: `search_objects({query: "impressionism sunflower"})` → list of IDs
+Step 2: for each ID, `get_object({objectID: id})` → `{primaryImage, title, artistDisplayName}`
 
 ```
 component("gallery", {
@@ -62,9 +62,9 @@ component("gallery", {
 })
 ```
 
-### iNaturalist — Observations avec photos
-Outil : `search_observations({taxon_name: "Parus major", lat: 48.85, lng: 2.35, radius: 10})`
-Reponse type : `{photos: [{url: "..."}], species_guess: "Mesange charbonniere", place_guess: "Paris"}`
+### iNaturalist — Observations with photos
+Tool: `search_observations({taxon_name: "Parus major", lat: 48.85, lng: 2.35, radius: 10})`
+Typical response: `{photos: [{url: "..."}], species_guess: "Mesange charbonniere", place_guess: "Paris"}`
 
 ```
 component("gallery", {
@@ -78,9 +78,9 @@ component("gallery", {
 })
 ```
 
-## Erreurs courantes
+## Common mistakes
 
-- **Inventer des URLs placeholder** (`https://example.com/image.jpg`, `via.placeholder.com`, `placehold.co`, `dummyimage.com`, `?text=...`) — strictement INTERDIT. Si aucune image réelle n'est retournée par l'API, ne PAS afficher de galerie.
-- **Oublier de verifier** que le champ image existe dans les donnees retournees (certains objets Met Museum n'ont pas de `primaryImage`)
-- **Utiliser `text` pour afficher des URLs** au lieu de `gallery` — les images doivent etre rendues visuellement
-- **Ne pas adapter la taille** : iNaturalist retourne des thumbnails "square" par defaut, remplacer par "medium" ou "large" dans l'URL
+- **Inventing placeholder URLs** (`https://example.com/image.jpg`, `via.placeholder.com`, `placehold.co`, `dummyimage.com`, `?text=...`) — strictly FORBIDDEN. If no real image is returned by the API, do NOT display a gallery.
+- **Forgetting to check** that the image field exists in the returned data (some Met Museum objects have no `primaryImage`)
+- **Using `text` to display URLs** instead of `gallery` — images must be rendered visually
+- **Not adapting the size**: iNaturalist returns "square" thumbnails by default — replace with "medium" or "large" in the URL

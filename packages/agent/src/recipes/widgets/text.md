@@ -1,6 +1,6 @@
 ---
 widget: text
-description: Paragraphe de texte libre
+description: Free-form text paragraph
 group: simple
 schema:
   type: object
@@ -11,9 +11,9 @@ schema:
       type: string
 ---
 
-## Quand utiliser
-Pour afficher un paragraphe de texte explicatif, un résumé ou une description longue. Préférer `stat` pour un chiffre, `kv` pour des paires structurées.
+## When to use
+Display an explanatory paragraph, a summary, or a long description. Prefer `stat` for a single figure, `kv` for structured pairs.
 
-## Comment
-1. Rédiger ou récupérer le texte à afficher
-2. Appeler `autoui_webmcp_widget_display('text', { content: 'Voici le résumé de l\'analyse...' })`
+## How to use
+1. Write or fetch the text to display
+2. Call `autoui_webmcp_widget_display('text', { content: 'Here is the summary of the analysis...' })`

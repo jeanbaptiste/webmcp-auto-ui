@@ -1,6 +1,6 @@
 ---
 widget: timeline
-description: Chronologie d'événements avec statut
+description: Event timeline with status
 group: rich
 schema:
   type: object
@@ -30,9 +30,9 @@ schema:
               - pending
 ---
 
-## Quand utiliser
-Pour afficher une séquence d'événements chronologiques — historique, étapes d'un processus, journal d'activité. Chaque événement peut avoir un statut (done/active/pending).
+## When to use
+Display a sequence of chronological events — history, process steps, activity log. Each event can have a status (done/active/pending).
 
-## Comment
-1. Récupérer les événements via MCP, les trier chronologiquement
-2. Appeler `autoui_webmcp_widget_display('timeline', { title: 'Historique commande', events: [{ date: '2024-01-15', title: 'Commande passée', status: 'done' }, { date: '2024-01-16', title: 'Expédition', status: 'active' }] })`
+## How to use
+1. Fetch events via MCP, sort them chronologically
+2. Call `autoui_webmcp_widget_display('timeline', { title: 'Order History', events: [{ date: '2024-01-15', title: 'Order placed', status: 'done' }, { date: '2024-01-16', title: 'Shipped', status: 'active' }] })`

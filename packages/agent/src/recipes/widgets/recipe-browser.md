@@ -1,6 +1,6 @@
 ---
 widget: recipe-browser
-description: Affiche les recettes disponibles sous forme de cartes interactives et permet de consulter le detail de chaque recette
+description: Displays available recipes as interactive cards and allows viewing the detail of each recipe
 group: rich
 schema:
   type: object
@@ -35,28 +35,28 @@ schema:
     - cards
 ---
 
-## Quand utiliser
-Quand l'utilisateur veut voir les recettes disponibles, explorer les possibilités du serveur, ou comprendre comment utiliser un widget spécifique.
+## When to use
+When the user wants to see available recipes, explore what the server can do, or understand how to use a specific widget.
 
-## Comment
+## How to use
 
-### Étape 1 — Lister les recettes
-Appelle `search_recipes()` sur chaque serveur connecté (MCP et WebMCP) pour obtenir la liste des recettes.
+### Step 1 — List recipes
+Call `search_recipes()` on each connected server (MCP and WebMCP) to get the list of recipes.
 
-### Étape 2 — Afficher en cartes interactives
-Utilise `widget_display('cards', ...)` avec le paramètre `interactive: true` pour rendre les cartes cliquables :
+### Step 2 — Display as interactive cards
+Use `widget_display('cards', ...)` with the `interactive: true` parameter to make cards clickable:
 
 ```json
 {
   "name": "cards",
   "params": {
-    "title": "Recettes disponibles",
+    "title": "Available recipes",
     "cards": [
       {
-        "title": "Nom de la recette",
-        "description": "Description courte",
-        "tags": ["serveur_source"],
-        "meta": { "recipe_name": "nom_technique", "server": "nom_serveur" }
+        "title": "Recipe name",
+        "description": "Short description",
+        "tags": ["source_server"],
+        "meta": { "recipe_name": "technical_name", "server": "server_name" }
       }
     ],
     "interactive": true
@@ -64,39 +64,39 @@ Utilise `widget_display('cards', ...)` avec le paramètre `interactive: true` po
 }
 ```
 
-Le champ `meta` est important : il sera renvoyé dans l'événement d'interaction quand l'utilisateur clique sur la carte.
+The `meta` field is important: it will be returned in the interaction event when the user clicks on a card.
 
-### Étape 3 — Réagir au clic
-Quand l'utilisateur clique sur une carte, tu recevras un message d'interaction contenant les données de `meta`. Utilise `meta.recipe_name` et `meta.server` pour :
+### Step 3 — React to a click
+When the user clicks on a card, you will receive an interaction message containing the `meta` data. Use `meta.recipe_name` and `meta.server` to:
 
-1. Appeler `get_recipe(meta.recipe_name)` sur le bon serveur
-2. Afficher le contenu de la recette dans un widget `code` avec `language: 'markdown'` :
+1. Call `get_recipe(meta.recipe_name)` on the right server
+2. Display the recipe content in a `code` widget with `language: 'markdown'`:
 
 ```json
 {
   "name": "code",
   "params": {
-    "title": "Recette : Nom",
+    "title": "Recipe: Name",
     "language": "markdown",
-    "code": "contenu complet de la recette..."
+    "code": "full recipe content..."
   }
 }
 ```
 
-3. **Lier les deux widgets** : le widget cartes (liste) et le widget code (détail) sont liés. Quand l'utilisateur clique sur une autre carte, mets à jour le widget détail au lieu d'en créer un nouveau via `canvas('update', ...)`.
+3. **Link the two widgets**: the cards widget (list) and the code widget (detail) are linked. When the user clicks on another card, update the detail widget instead of creating a new one via `canvas('update', ...)`.
 
-## Erreurs courantes
-- Ne pas oublier `interactive: true` dans les cartes — sans ça, les clics ne remontent pas
-- Ne pas créer un nouveau widget détail à chaque clic — réutiliser l'existant via `canvas('update', ...)`
-- Les recettes MCP et WebMCP ont des noms de serveur différents — utiliser le bon préfixe pour `get_recipe()`
+## Common mistakes
+- Do not forget `interactive: true` in the cards — without it, clicks are not forwarded
+- Do not create a new detail widget on each click — reuse the existing one via `canvas('update', ...)`
+- MCP and WebMCP recipes have different server names — use the correct prefix for `get_recipe()`
 
-## Exemple complet
+## Full example
 
-Utilisateur : « Montre-moi les recettes disponibles »
+User: "Show me the available recipes"
 
-1. `autoui_webmcp_search_recipes()` → 26 recettes widgets
-2. `tricoteuses_mcp_search_recipes()` → 10 recettes données
-3. `widget_display('cards', { title: "36 recettes", cards: [...], interactive: true })`
-4. *L'utilisateur clique sur « Composition de l'assemblée »*
-5. `autoui_webmcp_get_recipe('hemicycle')` → contenu markdown
-6. `widget_display('code', { title: "Recette : Composition de l'assemblée", language: "markdown", code: "..." })`
+1. `autoui_webmcp_search_recipes()` → 26 widget recipes
+2. `tricoteuses_mcp_search_recipes()` → 10 data recipes
+3. `widget_display('cards', { title: "36 recipes", cards: [...], interactive: true })`
+4. *User clicks on "Assembly composition"*
+5. `autoui_webmcp_get_recipe('hemicycle')` → markdown content
+6. `widget_display('code', { title: "Recipe: Assembly composition", language: "markdown", code: "..." })`

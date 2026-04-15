@@ -650,7 +650,7 @@
   <!-- TOPBAR -->
   <header class="h-12 flex items-center gap-3 px-4 border-b border-border bg-surface flex-shrink-0">
     <button class="flex items-center gap-2 text-text2 hover:text-text1 transition-colors flex-shrink-0"
-            onclick={() => settingsOpen = true} aria-label="Parametres">
+            onclick={() => settingsOpen = true} aria-label="Settings">
       <Menu size={18} />
       <span class="font-mono text-sm font-bold">
         <span class="text-text1">Auto-UI</span> <span class="text-accent">flex2</span>
@@ -729,7 +729,7 @@
           {/if}
         </button>
         <input type="text" bind:value={input} onkeydown={onKeydown}
-          placeholder={canvas.mcpConnected ? `Demandez une interface sur ${canvas.mcpName}...` : 'Ouvrez le menu pour connecter un MCP...'}
+          placeholder={canvas.mcpConnected ? `Ask for a UI about ${canvas.mcpName}...` : 'Open the menu to connect an MCP server...'}
           disabled={canvas.generating}
           class="flex-1 bg-surface2 border border-border2 rounded-xl px-5 py-3 text-sm font-mono text-text1
                  outline-none placeholder:text-text2/50 focus:border-accent/60 transition-colors

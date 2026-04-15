@@ -1,6 +1,6 @@
 ---
 widget: trombinoscope
-description: Grille de personnes avec badges
+description: People grid with badges
 group: rich
 schema:
   type: object
@@ -28,12 +28,12 @@ schema:
       type: number
 ---
 
-## Quand utiliser
-Pour afficher une grille de personnes — équipe, membres d'un groupe, participants. Chaque personne peut avoir un badge et une couleur distinctive.
+## When to use
+Display a grid of people — team, group members, participants. Each person can have a badge and a distinctive color.
 
-## Comment
-1. Récupérer la liste des personnes via MCP
-2. Appeler `autoui_webmcp_widget_display('trombinoscope', { title: 'Équipe Dev', people: [{ name: 'Alice', subtitle: 'Lead', badge: 'PM', color: '#4CAF50' }], columns: 3 })`
+## How to use
+1. Retrieve the list of people via MCP
+2. Call `autoui_webmcp_widget_display('trombinoscope', { title: 'Dev Team', people: [{ name: 'Alice', subtitle: 'Lead', badge: 'PM', color: '#4CAF50' }], columns: 3 })`
 
-## Erreurs courantes
-- Ne JAMAIS inventer d'URLs d'images pour le champ `avatar`. Utiliser UNIQUEMENT les URLs retournées par les outils MCP. Si aucune URL n'est disponible, ne pas inclure de champ avatar — le widget affichera les initiales automatiquement.
+## Common mistakes
+- NEVER fabricate image URLs for the `avatar` field. Use ONLY the URLs returned by MCP tools. If no URL is available, do not include an avatar field — the widget will display initials automatically.

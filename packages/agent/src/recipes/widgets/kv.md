@@ -1,6 +1,6 @@
 ---
 widget: kv
-description: Paires clé-valeur (propriétés, métadonnées)
+description: Key-value pairs (properties, metadata)
 group: simple
 schema:
   type: object
@@ -19,13 +19,13 @@ schema:
         maxItems: 2
 ---
 
-## Quand utiliser
-Pour afficher des propriétés ou métadonnées sous forme de paires clé-valeur. Idéal pour les fiches détaillées, les configurations, les résumés structurés.
+## When to use
+Display properties or metadata as key-value pairs. Ideal for detail cards, configurations, and structured summaries.
 
-## Comment
-1. Récupérer les données via MCP (ex: détails d'un enregistrement, propriétés d'un objet)
-2. Formater en tableau de paires : `[['Nom', 'Alice'], ['Email', 'alice@example.com']]`
-3. Appeler `autoui_webmcp_widget_display('kv', { title: 'Détails utilisateur', rows: [['Nom', 'Alice'], ['Email', 'alice@example.com']] })`
+## How to use
+1. Fetch the data via MCP (e.g. record details, object properties)
+2. Format as an array of pairs: `[['Name', 'Alice'], ['Email', 'alice@example.com']]`
+3. Call `autoui_webmcp_widget_display('kv', { title: 'User details', rows: [['Name', 'Alice'], ['Email', 'alice@example.com']] })`
 
-## Erreurs courantes
-- Passer un objet `{key: value}` au lieu d'un tableau de paires `[[key, value]]`
+## Common mistakes
+- Passing an object `{key: value}` instead of an array of pairs `[[key, value]]`

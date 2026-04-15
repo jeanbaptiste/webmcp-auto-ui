@@ -1,6 +1,6 @@
 ---
 widget: cards
-description: Grille de cartes avec titre, description et tags
+description: Card grid with title, description, and tags
 group: rich
 schema:
   type: object
@@ -28,14 +28,14 @@ schema:
               type: string
 ---
 
-## Quand utiliser
-Pour afficher une collection d'éléments riches — produits, articles, projets, événements. Chaque carte combine titre, description et tags. Préférer `list` pour des éléments simples sans structure.
+## When to use
+Display a collection of rich items — products, articles, projects, events. Each card combines a title, description, and tags. Prefer `list` for simple items without structure.
 
-## Comment
-1. Récupérer la collection via MCP
-2. Appeler `autoui_webmcp_widget_display('cards', { title: 'Projets actifs', cards: [{ title: 'Refonte UI', description: 'Migration vers Svelte 5', subtitle: 'Q2 2024', tags: ['frontend', 'priorité haute'] }] })`
+## How to use
+1. Retrieve the collection via MCP
+2. Call `autoui_webmcp_widget_display('cards', { title: 'Active projects', cards: [{ title: 'UI Redesign', description: 'Migration to Svelte 5', subtitle: 'Q2 2024', tags: ['frontend', 'high priority'] }] })`
 
-## Erreurs courantes
-- Ne JAMAIS inventer d'URLs d'images pour le champ `image`. Utiliser UNIQUEMENT les URLs retournées par les outils MCP. Si aucune URL n'est disponible, ne pas inclure de champ image — le widget s'affiche correctement sans.
-- STRICTEMENT INTERDIT : URLs placeholder (`via.placeholder.com`, `placehold.co`, `dummyimage.com`, `?text=...`). Omettre le champ `image` plutôt que de mettre un placeholder.
-- Toujours fournir un `title` pour chaque carte
+## Common mistakes
+- NEVER fabricate image URLs for the `image` field. Use ONLY the URLs returned by MCP tools. If no URL is available, do not include an image field — the widget renders correctly without it.
+- STRICTLY FORBIDDEN: placeholder URLs (`via.placeholder.com`, `placehold.co`, `dummyimage.com`, `?text=...`). Omit the `image` field rather than using a placeholder.
+- Always provide a `title` for each card

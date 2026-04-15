@@ -1,6 +1,6 @@
 ---
 widget: gallery
-description: Galerie d'images en grille
+description: Image gallery in grid layout
 group: media
 schema:
   type: object
@@ -26,14 +26,14 @@ schema:
       type: number
 ---
 
-## Quand utiliser
-Pour afficher une collection d'images en grille — galerie photo, résultats de recherche d'images, portfolio. Préférer `carousel` pour un défilement séquentiel.
+## When to use
+Display a collection of images in a grid — photo gallery, image search results, portfolio. Prefer `carousel` for sequential browsing.
 
-## Comment
-1. Récupérer les URLs d'images via MCP (ne jamais inventer d'URLs)
-2. Appeler `autoui_webmcp_widget_display('gallery', { title: 'Photos du site', images: [{ src: 'https://...', alt: 'Vue principale', caption: 'Façade nord' }], columns: 3 })`
+## How to use
+1. Retrieve image URLs via MCP (never fabricate URLs)
+2. Call `autoui_webmcp_widget_display('gallery', { title: 'Site photos', images: [{ src: 'https://...', alt: 'Main view', caption: 'North facade' }], columns: 3 })`
 
-## Erreurs courantes
-- Ne JAMAIS fabriquer d'URLs d'images — utiliser uniquement celles retournées par les outils MCP
-- STRICTEMENT INTERDIT : URLs placeholder (`via.placeholder.com`, `placehold.co`, `dummyimage.com`, `?text=...`, `example.com/image.jpg`). Si aucune image réelle n'est disponible, ne PAS afficher de galerie — utiliser un widget `text` ou `cards` sans image à la place
-- Toujours fournir un `alt` pour l'accessibilité
+## Common mistakes
+- NEVER fabricate image URLs — only use those returned by MCP tools
+- STRICTLY FORBIDDEN: placeholder URLs (`via.placeholder.com`, `placehold.co`, `dummyimage.com`, `?text=...`, `example.com/image.jpg`). If no real image is available, do NOT display a gallery — use a `text` or `cards` widget without an image instead
+- Always provide an `alt` for accessibility

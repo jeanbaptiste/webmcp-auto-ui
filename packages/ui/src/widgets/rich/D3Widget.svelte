@@ -29,7 +29,7 @@
   function renderHexHeatmap(d3: typeof import('d3'), el: HTMLDivElement, d: D3Spec) {
     const values = (d.data as { values?: number[][] })?.values;
     if (!values || values.length === 0) {
-      el.innerHTML = '<p class="text-xs text-text2 p-2">Aucune donnée (values manquant)</p>';
+      el.innerHTML = '<p class="text-xs text-text2 p-2">No data (values missing)</p>';
       return;
     }
     const cfg = d.config ?? {};
@@ -90,7 +90,7 @@
   function renderRadial(d3: typeof import('d3'), el: HTMLDivElement, d: D3Spec) {
     const segments = (d.data as { segments?: { label: string; value: number; color?: string }[] })?.segments;
     if (!segments || segments.length === 0) {
-      el.innerHTML = '<p class="text-xs text-text2 p-2">Aucune donnée (segments manquant)</p>';
+      el.innerHTML = '<p class="text-xs text-text2 p-2">No data (segments missing)</p>';
       return;
     }
     const cfg = d.config ?? {};
@@ -155,7 +155,7 @@
     type TreeNode = { name: string; value?: number; children?: TreeNode[] };
     const rawData = d.data as { children?: TreeNode[] };
     if (!rawData?.children || rawData.children.length === 0) {
-      el.innerHTML = '<p class="text-xs text-text2 p-2">Aucune donnée (children manquant)</p>';
+      el.innerHTML = '<p class="text-xs text-text2 p-2">No data (children missing)</p>';
       return;
     }
     const cfg = d.config ?? {};
@@ -219,7 +219,7 @@
     type FLink = { source: string; target: string; value?: number };
     const rawData = d.data as { nodes?: FNode[]; links?: FLink[] };
     if (!rawData?.nodes || rawData.nodes.length === 0) {
-      el.innerHTML = '<p class="text-xs text-text2 p-2">Aucune donnée (nodes manquant)</p>';
+      el.innerHTML = '<p class="text-xs text-text2 p-2">No data (nodes missing)</p>';
       return;
     }
     const nodes: FNode[] = rawData.nodes.map((n) => ({ ...n }));
@@ -314,7 +314,7 @@
     if (!container) return;
     container.innerHTML = '';
     if (!spec?.preset) {
-      container.innerHTML = '<p class="text-xs text-text2 p-2">Aucun preset spécifié.</p>';
+      container.innerHTML = '<p class="text-xs text-text2 p-2">No preset specified.</p>';
       return;
     }
     switch (spec.preset) {

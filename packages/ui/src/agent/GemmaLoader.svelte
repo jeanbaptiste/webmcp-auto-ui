@@ -108,9 +108,9 @@
           <div class="flex items-center justify-between">
             <span class="text-teal font-medium">
               {#if fromCache}
-                ⚡ {modelName} (depuis le cache) · {elapsed}s
+                ⚡ {modelName} (from cache) · {elapsed}s
               {:else}
-                ✓ {modelName} prêt
+                ✓ {modelName} ready
                 {#if totalMB && totalMB > 0} · {fmt(totalMB)}{/if}
                 {#if elapsed > 0} · {elapsed}s{/if}
               {/if}
@@ -119,7 +119,7 @@
               <button
                 class="text-text2 hover:text-accent2 transition-colors ml-2"
                 onclick={onunload}
-              >Décharger</button>
+              >Unload</button>
             {/if}
           </div>
         </div>
@@ -128,7 +128,7 @@
     {:else if status === 'error'}
       <div class="bg-surface/90 backdrop-blur-md border border-accent2 rounded-xl shadow-2xl p-4 font-mono text-xs">
         <div class="flex items-center justify-between">
-          <span class="text-accent2 font-medium">✕ {modelName} — échec</span>
+          <span class="text-accent2 font-medium">✕ {modelName} — failed</span>
         </div>
         {#if error}
           <p class="text-accent2/80 mt-1.5 break-words">{error}</p>

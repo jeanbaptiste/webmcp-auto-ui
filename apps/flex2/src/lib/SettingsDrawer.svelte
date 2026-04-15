@@ -132,7 +132,7 @@
 <aside class="settings-drawer {open ? 'open' : ''}">
 
   <div class="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
-    <span class="font-mono text-sm font-bold text-text1">Parametres</span>
+    <span class="font-mono text-sm font-bold text-text1">Settings</span>
     <button class="text-text2 hover:text-text1 text-lg leading-none transition-colors"
             onclick={() => open = false}>x</button>
   </div>
@@ -141,14 +141,14 @@
 
     <!-- MCP custom URL -->
     <section class="flex flex-col gap-2">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Serveur MCP (URL manuelle)</div>
+      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">MCP server (manual URL)</div>
       <McpConnector
         url={canvas.mcpUrl}
         onurlchange={(v) => canvas.setMcpUrl(v)}
         bind:token={mcpToken}
         connecting={canvas.mcpConnecting}
         connected={canvas.mcpConnected}
-        serverName={connectedUrls.length > 1 ? `multi-serveurs (${connectedUrls.length})` : canvas.mcpName ?? ''}
+        serverName={connectedUrls.length > 1 ? `multi-server (${connectedUrls.length})` : canvas.mcpName ?? ''}
         onconnect={onconnect}
       />
     </section>
@@ -171,7 +171,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="flex items-center gap-1 cursor-pointer select-none"
              onclick={() => serversCollapsed = !serversCollapsed}>
-          <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Serveurs WebMCP</span>
+          <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">WebMCP servers</span>
           <span class="text-[9px] text-text2/60 font-mono">({enabledServers.size}/{serverRegistry.length})</span>
           <span class="text-[10px] text-text2 ml-auto transition-transform {serversCollapsed ? '' : 'rotate-90'}">{@html '&#x25B6;'}</span>
         </div>
@@ -201,7 +201,7 @@
 
     <!-- LLM -->
     <section class="flex flex-col gap-2">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Modele LLM</div>
+      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">LLM model</div>
       <LLMSelector
         value={canvas.llm}
         onchange={(v) => canvas.setLlm(v as 'haiku'|'sonnet'|'gemma-e2b'|'gemma-e4b')}
@@ -212,7 +212,7 @@
     <!-- Local LLM -->
     {#if canvas.llm === 'local'}
     <section class="flex flex-col gap-2">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">LLM local</div>
+      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Local LLM</div>
       <input
         type="text"
         bind:value={localUrl}
@@ -260,12 +260,12 @@
       <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Mode</div>
       <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
         <input type="checkbox" bind:checked={composerMode} class="accent-accent w-3.5 h-3.5" />
-        Mode compositeur
+        Composer mode
       </label>
       {#if composerMode}
         <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
           <input type="checkbox" checked={layoutMode === 'grid'} onchange={() => layoutMode = layoutMode === 'float' ? 'grid' : 'float'} class="accent-accent w-3.5 h-3.5" />
-          Layout grille
+          Grid layout
         </label>
       {/if}
     </section>
@@ -275,7 +275,7 @@
       <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Export</div>
       <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
         <input type="checkbox" bind:checked={includeSummary} class="accent-accent w-3.5 h-3.5" />
-        Inclure synthese
+        Include summary
       </label>
       <button class="font-mono text-xs h-7 px-3 rounded border transition-colors w-full text-left flex items-center gap-2
                      {exportState === 'done' ? 'border-teal/40 text-teal' : 'border-border2 text-text2 hover:text-text1'}"
@@ -283,16 +283,16 @@
               disabled={exportState === 'loading'}>
         {#if exportState === 'loading'}
           <span class="inline-block w-3 h-3 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></span>
-          Preparation...
+          Preparing...
         {:else if exportState === 'done'}
-          Copie &#x2713;
+          Copied &#x2713;
         {:else}
-          Exporter Hyper-recette
+          Export Hyper-recipe
         {/if}
       </button>
       <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-text2 hover:text-text1 transition-colors w-full text-left"
               onclick={onhistory}>
-        Historique
+        History
       </button>
       {#if onclear}
         <button class="font-mono text-xs h-7 px-3 rounded border border-accent2/30 text-accent2 hover:bg-accent2/10 transition-colors w-full text-left"
@@ -310,35 +310,35 @@
         Sanitize
       </label>
       <div class="text-[9px] font-mono text-text2/60 pl-5">
-        {schemaSanitize ? 'Strip oneOf/anyOf/allOf/$ref des schemas' : 'Schemas envoyes tels quels au LLM'}
+        {schemaSanitize ? 'Strip oneOf/anyOf/allOf/$ref from schemas' : 'Schemas sent as-is to the LLM'}
       </div>
       <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
         <input type="checkbox" bind:checked={schemaFlatten} class="accent-teal w-3.5 h-3.5" />
         Flatten <span class="text-[8px] text-text2/40 font-mono">(experimental)</span>
       </label>
       <div class="text-[9px] font-mono text-text2/60 pl-5">
-        {schemaFlatten ? 'Aplatit les objets imbriques en key__subkey' : 'Schemas avec imbrication native'}
+        {schemaFlatten ? 'Flattens nested objects to key__subkey' : 'Schemas with native nesting'}
       </div>
       <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
         <input type="checkbox" bind:checked={schemaStrict} class="accent-teal w-3.5 h-3.5" />
         Strict tool use
-        <span class="text-[8px] text-text2/40 font-mono">grammaire contrainte</span>
+        <span class="text-[8px] text-text2/40 font-mono">constrained grammar</span>
       </label>
       <div class="text-[9px] font-mono text-text2/60 pl-5">
-        {schemaStrict ? 'Sampling contraint par grammaire JSON' : 'Sampling libre (sanitize + auto-repair suffisent)'}
+        {schemaStrict ? 'Grammar-constrained JSON sampling' : 'Free sampling (sanitize + auto-repair is enough)'}
       </div>
     </section>
 
     <!-- Display -->
     <section class="flex flex-col gap-2">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Affichage</div>
+      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Display</div>
       <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
         <input type="checkbox" bind:checked={showTokens} class="accent-accent w-3.5 h-3.5" />
         Token usage
       </label>
       <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
         <input type="checkbox" bind:checked={showToolJSON} class="accent-accent w-3.5 h-3.5" />
-        Agent logs (panneau bas)
+        Agent logs (bottom panel)
       </label>
       <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
         <input type="checkbox" bind:checked={showPipelineTrace} class="accent-accent w-3.5 h-3.5" />
@@ -349,7 +349,7 @@
     <!-- Recipes -->
     {#if mcpRecipes.length > 0 || webmcpRecipes.length > 0}
       <section class="flex flex-col gap-2">
-        <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Recettes</div>
+        <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Recipes</div>
 
         {#if mcpRecipes.length > 0}
           <div class="text-[9px] font-mono text-text2 mt-1">MCP ({mcpRecipes.length})</div>

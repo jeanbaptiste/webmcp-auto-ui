@@ -1,38 +1,38 @@
 ---
-id: cartographier-observations-biodiversite
-name: Cartographier les observations de biodiversite sur une zone geographique
+id: map-biodiversity-observations
+name: Map biodiversity observations on a geographic area
 components_used: [map, gallery, table, stat-card]
-when: l'utilisateur demande une carte des observations naturalistes, la biodiversite d'une zone, les especes presentes dans un lieu, ou les observations iNaturalist d'une region
+when: the user asks for a map of naturalist observations, the biodiversity of an area, the species present in a location, or iNaturalist observations in a region
 servers: [inaturalist]
 layout:
   type: grid
   columns: 2
-  arrangement: carte pleine largeur en haut, galerie + stats en dessous
+  arrangement: full-width map at top, gallery + stats below
 ---
 
-## Quand utiliser
+## When to use
 
-L'utilisateur pose une question sur la biodiversite d'un lieu ou demande une carte des observations :
-- "Quelles especes d'oiseaux observe-t-on a Paris ?"
-- "Montre-moi une carte des observations de papillons dans les Alpes"
-- "Quelle est la biodiversite autour du lac d'Annecy ?"
-- "Les especes menacees observees en Ile-de-France"
+The user asks a question about the biodiversity of a location or requests a map of observations:
+- "What bird species are observed in Paris?"
+- "Show me a map of butterfly observations in the Alps"
+- "What is the biodiversity around Lake Annecy?"
+- "Endangered species observed in Ile-de-France"
 
-Le serveur iNaturalist fournit des observations georeferencees avec photos, taxons, dates et observateurs.
+The iNaturalist server provides georeferenced observations with photos, taxa, dates, and observers.
 
-## Comment
+## How to use
 
-1. **Rechercher les observations** dans la zone cible :
+1. **Search for observations** in the target area:
    ```
    search_observations({lat: 48.85, lng: 2.35, radius: 10, taxon_name: "Aves", per_page: 50})
    ```
-   Parametres utiles :
-   - `lat`, `lng`, `radius` : centre et rayon de la zone en km
-   - `taxon_name` : filtre taxonomique ("Aves", "Lepidoptera", "Mammalia", etc.)
-   - `quality_grade` : "research" pour les observations verifiees
-   - `per_page` : nombre de resultats (max 200)
+   Useful parameters:
+   - `lat`, `lng`, `radius`: center and radius of the area in km
+   - `taxon_name`: taxonomic filter ("Aves", "Lepidoptera", "Mammalia", etc.)
+   - `quality_grade`: "research" for verified observations
+   - `per_page`: number of results (max 200)
 
-2. **Afficher la carte** avec les marqueurs d'observation :
+2. **Display the map** with observation markers:
    ```
    component("map", {
      center: [48.85, 2.35],
@@ -46,15 +46,15 @@ Le serveur iNaturalist fournit des observations georeferencees avec photos, taxo
    })
    ```
 
-3. **Statistiques de la zone** en stat-cards :
+3. **Area statistics** in stat-cards:
    ```
    component("stat-card", {label: "Observations", value: total_results, icon: "eye"})
-   component("stat-card", {label: "Especes uniques", value: uniqueSpecies.length, icon: "leaf"})
-   component("stat-card", {label: "Observateurs", value: uniqueObservers.length, icon: "users"})
-   component("stat-card", {label: "Grade recherche", value: researchGradeCount, icon: "check-circle"})
+   component("stat-card", {label: "Unique species", value: uniqueSpecies.length, icon: "leaf"})
+   component("stat-card", {label: "Observers", value: uniqueObservers.length, icon: "users"})
+   component("stat-card", {label: "Research grade", value: researchGradeCount, icon: "check-circle"})
    ```
 
-4. **Galerie des especes avec photos** :
+4. **Species gallery with photos**:
    ```
    component("gallery", {
      images: observations
@@ -67,45 +67,45 @@ Le serveur iNaturalist fournit des observations georeferencees avec photos, taxo
    })
    ```
 
-5. **Tableau recapitulatif** des especes :
+5. **Summary table** of species:
    ```
    component("table", {
-     columns: ["Espece", "Nom scientifique", "Observations", "Derniere obs."],
+     columns: ["Species", "Scientific name", "Observations", "Last obs."],
      rows: speciesSummary
    })
    ```
 
-## Exemples
+## Examples
 
-### Oiseaux de Paris
+### Birds of Paris
 ```
-// 1. Recherche
+// 1. Search
 search_observations({lat: 48.8566, lng: 2.3522, radius: 10, taxon_name: "Aves", quality_grade: "research", per_page: 100})
 
-// 2. Rendu
+// 2. Render
 component("map", {center: [48.8566, 2.3522], zoom: 12, markers: birdMarkers})
-component("stat-card", {label: "Especes d'oiseaux", value: "47", icon: "bird"})
-component("stat-card", {label: "Observations verifiees", value: "312", icon: "check"})
+component("stat-card", {label: "Bird species", value: "47", icon: "bird"})
+component("stat-card", {label: "Verified observations", value: "312", icon: "check"})
 component("gallery", {images: birdPhotos})
-component("table", {columns: ["Espece", "Observations", "Derniere"], rows: birdSummary})
+component("table", {columns: ["Species", "Observations", "Last"], rows: birdSummary})
 ```
 
-### Papillons des Alpes
+### Butterflies in the Alps
 ```
-// 1. Zone large autour de Chamonix
+// 1. Wide area around Chamonix
 search_observations({lat: 45.9237, lng: 6.8694, radius: 30, taxon_name: "Lepidoptera", per_page: 100})
 
-// 2. Rendu avec clustering sur la carte
+// 2. Render with clustering on the map
 component("map", {center: [45.9237, 6.8694], zoom: 10, markers: butterflyMarkers, cluster: true})
-component("stat-card", {label: "Especes de papillons", value: uniqueSpecies.length})
+component("stat-card", {label: "Butterfly species", value: uniqueSpecies.length})
 component("gallery", {images: butterflyPhotos})
-component("table", {columns: ["Espece", "Altitude", "Mois", "Observateur"], rows: enrichedData})
+component("table", {columns: ["Species", "Altitude", "Month", "Observer"], rows: enrichedData})
 ```
 
-## Erreurs courantes
+## Common mistakes
 
-- **Rayon trop large** : un rayon de 100 km retourne trop de resultats et noie l'information — preferer 5-20 km et augmenter si peu de resultats
-- **Thumbnails iNaturalist** : les URLs par defaut sont en format "square" (75x75) — remplacer "square" par "medium" (200px) ou "large" (500px)
-- **Pas de filtre taxonomique** : sans filtre, iNaturalist retourne plantes + animaux + champignons ensemble — toujours filtrer par groupe si l'utilisateur en mentionne un
-- **Oublier le grade de qualite** : les observations "casual" peuvent etre mal identifiees — preferer `quality_grade: "research"` pour des donnees fiables
-- **Carte sans zoom adapte** : ajuster le zoom en fonction du rayon de recherche (5 km → zoom 13, 20 km → zoom 11, 50 km → zoom 9)
+- **Radius too large**: a 100 km radius returns too many results and buries the information — prefer 5-20 km and increase if few results are found
+- **iNaturalist thumbnails**: default URLs are in "square" format (75x75) — replace "square" with "medium" (200px) or "large" (500px)
+- **No taxonomic filter**: without a filter, iNaturalist returns plants + animals + fungi together — always filter by group if the user mentions one
+- **Forgetting the quality grade**: "casual" observations may be misidentified — prefer `quality_grade: "research"` for reliable data
+- **Map with wrong zoom level**: adjust zoom based on the search radius (5 km → zoom 13, 20 km → zoom 11, 50 km → zoom 9)

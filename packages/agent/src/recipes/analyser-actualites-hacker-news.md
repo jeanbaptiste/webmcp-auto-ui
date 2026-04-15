@@ -1,59 +1,59 @@
 ---
 id: analyser-actualites-hacker-news
-name: Analyser les actualites et tendances Hacker News en tableau et graphiques
+name: Analyze Hacker News news and trends with tables and charts
 components_used: [table, chart, stat-card, cards]
-when: l'utilisateur demande les actualites tech, les tendances Hacker News, les top stories, ou une analyse des discussions et commentaires HN
+when: the user asks for tech news, Hacker News trends, top stories, or an analysis of HN discussions and comments
 servers: [hackernews]
 layout:
   type: grid
   columns: 2
-  arrangement: stats en ligne, table pleine largeur, chart en bas
+  arrangement: stats in a row, full-width table, chart at the bottom
 ---
 
-## Quand utiliser
+## When to use
 
-L'utilisateur s'interesse aux actualites technologiques ou aux tendances de la communaute Hacker News :
-- "Quelles sont les top stories Hacker News ?"
-- "Montre-moi les posts les plus commentes aujourd'hui"
-- "Les tendances tech de la semaine sur HN"
-- "Analyse les Ask HN recents"
-- "Quels sujets dominent Hacker News en ce moment ?"
+The user is interested in technology news or Hacker News community trends:
+- "What are the top Hacker News stories?"
+- "Show me the most commented posts today"
+- "This week's tech trends on HN"
+- "Analyze recent Ask HN posts"
+- "What topics are dominating Hacker News right now?"
 
-Le serveur Hacker News donne acces aux stories, commentaires, classements et metadonnees de posts.
+The Hacker News server provides access to stories, comments, rankings, and post metadata.
 
-## Comment
+## How to use
 
-1. **Recuperer les top stories** :
+1. **Fetch the top stories**:
    ```
    get_top_stories({limit: 30})
    ```
-   Retourne les IDs des stories les plus populaires.
+   Returns the IDs of the most popular stories.
 
-2. **Recuperer les details** de chaque story :
+2. **Fetch the details** of each story:
    ```
    get_item({id: storyId})
    ```
-   Retourne : `title`, `url`, `score`, `by` (auteur), `descendants` (nb commentaires), `time`, `type`.
+   Returns: `title`, `url`, `score`, `by` (author), `descendants` (comment count), `time`, `type`.
 
-3. **Afficher les KPIs** en stat-cards :
+3. **Display KPIs** in stat-cards:
    ```
    component("stat-card", {label: "Top Stories", value: "30", icon: "newspaper"})
-   component("stat-card", {label: "Score moyen", value: Math.round(avgScore), icon: "trending-up"})
-   component("stat-card", {label: "Commentaires moyen", value: Math.round(avgComments), icon: "message-circle"})
-   component("stat-card", {label: "Score max", value: maxScore + " pts", icon: "award"})
+   component("stat-card", {label: "Average score", value: Math.round(avgScore), icon: "trending-up"})
+   component("stat-card", {label: "Average comments", value: Math.round(avgComments), icon: "message-circle"})
+   component("stat-card", {label: "Max score", value: maxScore + " pts", icon: "award"})
    ```
 
-4. **Tableau des stories** trie par score :
+4. **Stories table** sorted by score:
    ```
    component("table", {
-     columns: ["#", "Titre", "Score", "Commentaires", "Auteur"],
+     columns: ["#", "Title", "Score", "Comments", "Author"],
      rows: stories.sort((a, b) => b.score - a.score).map((s, i) => [
        i + 1, s.title, s.score, s.descendants, s.by
      ])
    })
    ```
 
-5. **Graphique de distribution** des scores :
+5. **Score distribution chart**:
    ```
    component("chart", {
      type: "bar",
@@ -62,66 +62,66 @@ Le serveur Hacker News donne acces aux stories, commentaires, classements et met
    })
    ```
 
-6. **Cards pour les stories vedettes** (top 5) :
+6. **Cards for featured stories** (top 5):
    ```
    component("cards", {
      items: top5.map(s => ({
        title: s.title,
        subtitle: s.by + " — " + s.score + " points",
-       body: s.descendants + " commentaires | " + new Date(s.time * 1000).toLocaleDateString(),
+       body: s.descendants + " comments | " + new Date(s.time * 1000).toLocaleDateString(),
        url: s.url
      }))
    })
    ```
 
-## Exemples
+## Examples
 
-### Top 10 stories du moment
+### Top 10 stories right now
 ```
-// 1. Recuperer
+// 1. Fetch
 get_top_stories({limit: 10})
-// Pour chaque ID: get_item({id})
+// For each ID: get_item({id})
 
-// 2. Rendu
-component("stat-card", {label: "Score total", value: totalScore, icon: "zap"})
-component("stat-card", {label: "Commentaires total", value: totalComments, icon: "message-circle"})
+// 2. Render
+component("stat-card", {label: "Total score", value: totalScore, icon: "zap"})
+component("stat-card", {label: "Total comments", value: totalComments, icon: "message-circle"})
 component("table", {
-  columns: ["Rang", "Titre", "Score", "Commentaires", "Auteur", "Age"],
+  columns: ["Rank", "Title", "Score", "Comments", "Author", "Age"],
   rows: rankedStories
 })
 component("cards", {items: top3Stories})
 ```
 
-### Analyse Ask HN
+### Ask HN analysis
 ```
-// 1. Rechercher les Ask HN recents
+// 1. Fetch recent Ask HN posts
 get_ask_stories({limit: 20})
 
-// 2. Rendu
-component("stat-card", {label: "Ask HN recents", value: "20", icon: "help-circle"})
-component("stat-card", {label: "Reponses moyennes", value: avgReplies, icon: "message-circle"})
-component("table", {columns: ["Titre", "Reponses", "Score", "Auteur"], rows: askStories})
-component("chart", {type: "bar", labels: titles, datasets: [{label: "Reponses", data: replyCounts}]})
+// 2. Render
+component("stat-card", {label: "Recent Ask HN", value: "20", icon: "help-circle"})
+component("stat-card", {label: "Average replies", value: avgReplies, icon: "message-circle"})
+component("table", {columns: ["Title", "Replies", "Score", "Author"], rows: askStories})
+component("chart", {type: "bar", labels: titles, datasets: [{label: "Replies", data: replyCounts}]})
 ```
 
-### Tendances par domaine
+### Trends by domain
 ```
-// 1. Recuperer top stories et extraire les domaines des URLs
+// 1. Fetch top stories and extract domains from URLs
 get_top_stories({limit: 50})
 
-// 2. Grouper par domaine
+// 2. Group by domain
 const domains = groupBy(stories, s => new URL(s.url).hostname)
 
-// 3. Rendu
-component("stat-card", {label: "Domaines uniques", value: Object.keys(domains).length, icon: "globe"})
+// 3. Render
+component("stat-card", {label: "Unique domains", value: Object.keys(domains).length, icon: "globe"})
 component("chart", {type: "bar", labels: topDomains.map(d => d.name), datasets: [{label: "Stories", data: topDomains.map(d => d.count)}]})
-component("table", {columns: ["Domaine", "Stories", "Score total"], rows: domainStats})
+component("table", {columns: ["Domain", "Stories", "Total score"], rows: domainStats})
 ```
 
-## Erreurs courantes
+## Common mistakes
 
-- **Trop d'appels `get_item`** : chaque story necessite un appel individuel — limiter a 20-30 pour eviter la lenteur
-- **Timestamps non convertis** : HN retourne des timestamps Unix — convertir en dates lisibles
-- **Titres tronques dans les graphiques** : les titres HN sont longs — tronquer a 30-40 caracteres pour les labels de graphiques
-- **Oublier les stories sans URL** : les "Ask HN", "Show HN" et "Tell HN" n'ont pas toujours d'URL externe — gerer ce cas
-- **Ne pas distinguer les types** : HN a des stories, jobs, polls — filtrer par type si l'utilisateur demande un type specifique
+- **Too many `get_item` calls**: each story requires an individual call — limit to 20-30 to avoid slowness
+- **Unconverted timestamps**: HN returns Unix timestamps — convert them to human-readable dates
+- **Truncated titles in charts**: HN titles are long — truncate to 30-40 characters for chart labels
+- **Forgetting stories without a URL**: "Ask HN", "Show HN", and "Tell HN" posts don't always have an external URL — handle this case
+- **Not distinguishing types**: HN has stories, jobs, and polls — filter by type if the user asks for a specific type

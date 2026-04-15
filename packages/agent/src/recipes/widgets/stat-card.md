@@ -1,6 +1,6 @@
 ---
 widget: stat-card
-description: Carte statistique enrichie avec tendance et variante
+description: Enhanced stat card with trend and variant
 group: rich
 schema:
   type: object
@@ -34,10 +34,10 @@ schema:
         - info
 ---
 
-## Quand utiliser
-Pour un KPI enrichi avec contexte — delta, valeur précédente, unité, variante colorée. Préférer `stat` pour un chiffre simple sans contexte additionnel.
+## When to use
+For an enriched KPI with context — delta, previous value, unit, colored variant. Prefer `stat` for a simple number with no additional context.
 
-## Comment
-1. Récupérer la métrique et sa valeur de comparaison via MCP
-2. Calculer le delta si nécessaire
-3. Appeler `autoui_webmcp_widget_display('stat-card', { label: 'Revenus', value: '142k', unit: '€', delta: '+12%', trend: 'up', previousValue: '127k', variant: 'success' })`
+## How to use
+1. Fetch the metric and its comparison value via MCP
+2. Calculate the delta if needed
+3. Call `autoui_webmcp_widget_display('stat-card', { label: 'Revenue', value: '142k', unit: '€', delta: '+12%', trend: 'up', previousValue: '127k', variant: 'success' })`

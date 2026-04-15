@@ -42,7 +42,7 @@
 
 <div class="flex flex-col gap-2">
   <span class="text-[9px] font-mono uppercase tracking-wider text-text2">
-    Serveurs MCP disponibles
+    Available MCP servers
   </span>
 
   <div class="flex flex-col gap-1">
@@ -75,7 +75,7 @@
             <button
               onclick={() => ondisconnect?.(server.url)}
               class="text-xs font-mono px-1.5 h-6 rounded text-teal group-hover:text-accent2 transition-colors"
-              title="Déconnecter"
+              title="Disconnect"
             >
               <span class="group-hover:hidden">&#10003;</span>
               <span class="hidden group-hover:inline text-accent2">&#215;</span>
@@ -85,7 +85,7 @@
               onclick={() => onconnect?.(server.url)}
               class="text-[10px] font-mono px-1.5 h-6 rounded border border-border2 bg-surface2 hover:border-accent/50 hover:text-accent text-text2 transition-colors"
             >
-              connecter
+              connect
             </button>
           {/if}
         </div>
@@ -100,7 +100,7 @@
       disabled={allConnected}
       class="text-xs font-mono px-2 h-7 rounded border border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
     >
-      Tout charger
+      Load all
     </button>
     {#if anyConnected}
       <button
@@ -111,7 +111,7 @@
         }}
         class="text-xs font-mono px-2 h-7 rounded border border-border2 bg-surface2 hover:border-accent2/50 hover:text-accent2 text-text2 transition-colors"
       >
-        Tout déconnecter
+        Disconnect all
       </button>
     {/if}
   </div>

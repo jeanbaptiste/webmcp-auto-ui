@@ -1,6 +1,6 @@
 ---
 widget: chart
-description: Graphique à barres simples
+description: Simple bar chart
 group: simple
 schema:
   type: object
@@ -20,13 +20,13 @@ schema:
         maxItems: 2
 ---
 
-## Quand utiliser
-Pour un graphique à barres rapide avec des données catégorielles simples. Préférer `chart-rich` pour les graphiques multi-séries, les lignes ou les camemberts.
+## When to use
+Use for a quick bar chart with simple categorical data. Prefer `chart-rich` for multi-series charts, line charts, or pie charts.
 
-## Comment
-1. Récupérer les données via MCP (ex: comptages par catégorie)
-2. Formater en tableau de paires `[label, valeur]`
-3. Appeler `autoui_webmcp_widget_display('chart', { title: 'Ventes par région', bars: [['Nord', 150], ['Sud', 230], ['Est', 180]] })`
+## How to use
+1. Fetch the data via MCP (e.g. counts by category)
+2. Format as an array of `[label, value]` pairs
+3. Call `autoui_webmcp_widget_display('chart', { title: 'Sales by region', bars: [['North', 150], ['South', 230], ['East', 180]] })`
 
-## Erreurs courantes
-- Inverser label et valeur dans les paires — le format est `[string, number]`, pas `[number, string]`
+## Common mistakes
+- Swapping label and value in pairs — the format is `[string, number]`, not `[number, string]`

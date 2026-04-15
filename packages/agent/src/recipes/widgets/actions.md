@@ -1,6 +1,6 @@
 ---
 widget: actions
-description: Rangée de boutons d'action
+description: Row of action buttons
 group: simple
 schema:
   type: object
@@ -20,9 +20,9 @@ schema:
             type: boolean
 ---
 
-## Quand utiliser
-Pour proposer des choix d'action à l'utilisateur — confirmation, navigation, ou sélection parmi plusieurs options.
+## When to use
+Offer action choices to the user — confirmation, navigation, or selection among multiple options.
 
-## Comment
-1. Identifier les actions pertinentes selon le contexte
-2. Appeler `autoui_webmcp_widget_display('actions', { buttons: [{ label: 'Confirmer', primary: true }, { label: 'Annuler' }] })`
+## How to use
+1. Identify the relevant actions based on context
+2. Call `autoui_webmcp_widget_display('actions', { buttons: [{ label: 'Confirm', primary: true }, { label: 'Cancel' }] })`

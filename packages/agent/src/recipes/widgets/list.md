@@ -1,6 +1,6 @@
 ---
 widget: list
-description: Liste ordonnée d'items
+description: Ordered list of items
 group: simple
 schema:
   type: object
@@ -15,10 +15,10 @@ schema:
         type: string
 ---
 
-## Quand utiliser
-Pour afficher une liste simple d'éléments textuels — résultats de recherche, étapes, noms, éléments d'inventaire. Préférer `data-table` si les items ont plusieurs champs.
+## When to use
+Display a simple list of text items — search results, steps, names, inventory items. Prefer `data-table` if items have multiple fields.
 
-## Comment
-1. Récupérer les données via MCP
-2. Extraire les éléments en tableau de strings
-3. Appeler `autoui_webmcp_widget_display('list', { title: 'Résultats', items: ['Item 1', 'Item 2', 'Item 3'] })`
+## How to use
+1. Fetch the data via MCP
+2. Extract items as an array of strings
+3. Call `autoui_webmcp_widget_display('list', { title: 'Results', items: ['Item 1', 'Item 2', 'Item 3'] })`

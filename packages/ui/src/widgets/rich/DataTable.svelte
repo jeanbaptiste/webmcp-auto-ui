@@ -20,7 +20,7 @@
 <div class="bg-surface border border-border rounded-lg p-3 md:p-4 font-sans">
   {#if spec.title}<h3 class="text-sm font-semibold text-text1 mb-3">{spec.title}</h3>{/if}
   {#if columns.length===0&&rows.length===0}
-    <p class="text-text2 text-sm">{spec.emptyMessage??'Aucune donnée'}</p>
+    <p class="text-text2 text-sm">{spec.emptyMessage??'No data'}</p>
   {:else}
     <div class="overflow-auto max-h-[480px] rounded border border-border">
       <table class="w-full border-collapse">

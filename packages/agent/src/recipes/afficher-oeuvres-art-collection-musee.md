@@ -1,48 +1,48 @@
 ---
 id: afficher-oeuvres-art-collection-musee
-name: Afficher les oeuvres d'art d'une collection de musee en galerie visuelle
+name: Display artworks from a museum collection in a visual gallery
 components_used: [gallery, cards, kv, stat-card]
-when: l'utilisateur demande des oeuvres d'art, des collections de musee, des tableaux, sculptures ou objets d'art du Metropolitan Museum of Art
+when: the user asks for artworks, museum collections, paintings, sculptures, or art objects from the Metropolitan Museum of Art
 servers: [metmuseum]
 layout:
   type: grid
   columns: 2
-  arrangement: stats en haut, galerie pleine largeur au centre, details en bas
+  arrangement: stats at top, full-width gallery in the center, details at the bottom
 ---
 
-## Quand utiliser
+## When to use
 
-L'utilisateur s'interesse a des oeuvres d'art ou des collections de musee :
-- "Montre-moi des tableaux impressionnistes du Met Museum"
-- "Les sculptures grecques du Metropolitan"
-- "Quelles oeuvres de Van Gogh sont au Met ?"
-- "Les oeuvres d'art egyptien du musee"
-- "Cherche des estampes japonaises"
+The user is interested in artworks or museum collections:
+- "Show me Impressionist paintings from the Met Museum"
+- "Greek sculptures at the Metropolitan"
+- "What Van Gogh works are at the Met?"
+- "Egyptian art objects from the museum"
+- "Search for Japanese woodblock prints"
 
-Le serveur Met Museum donne acces a la collection du Metropolitan Museum of Art de New York (plus de 470 000 oeuvres, dont beaucoup avec images en domaine public).
+The Met Museum server provides access to the Metropolitan Museum of Art collection in New York (more than 470,000 objects, many with public domain images).
 
-## Comment
+## How to use
 
-1. **Rechercher les oeuvres** par theme, artiste ou departement :
+1. **Search for artworks** by theme, artist, or department:
    ```
    search_objects({query: "impressionism sunflower", hasImages: true})
    ```
-   Retourne une liste d'`objectID`s.
+   Returns a list of `objectID`s.
 
-2. **Recuperer les details** de chaque oeuvre (limiter a 5-10 pour la performance) :
+2. **Fetch the details** of each artwork (limit to 5-10 for performance):
    ```
    get_object({objectID: 436524})
    ```
-   Retourne : `title`, `artistDisplayName`, `primaryImage`, `objectDate`, `medium`, `department`, `culture`, etc.
+   Returns: `title`, `artistDisplayName`, `primaryImage`, `objectDate`, `medium`, `department`, `culture`, etc.
 
-3. **Afficher les statistiques** de la recherche :
+3. **Display search statistics**:
    ```
-   component("stat-card", {label: "Resultats", value: total, icon: "image"})
-   component("stat-card", {label: "Avec image", value: withImage, icon: "camera"})
-   component("stat-card", {label: "Domaine public", value: publicDomain, icon: "unlock"})
+   component("stat-card", {label: "Results", value: total, icon: "image"})
+   component("stat-card", {label: "With image", value: withImage, icon: "camera"})
+   component("stat-card", {label: "Public domain", value: publicDomain, icon: "unlock"})
    ```
 
-4. **Galerie des oeuvres** avec images haute definition :
+4. **Artwork gallery** with high-resolution images:
    ```
    component("gallery", {
      images: objects
@@ -55,64 +55,64 @@ Le serveur Met Museum donne acces a la collection du Metropolitan Museum of Art 
    })
    ```
 
-5. **Fiches detaillees** en cards pour les oeuvres principales :
+5. **Detailed cards** for the main artworks:
    ```
    component("cards", {
      items: objects.map(o => ({
        title: o.title,
-       subtitle: o.artistDisplayName || "Artiste inconnu",
+       subtitle: o.artistDisplayName || "Unknown artist",
        image: o.primaryImageSmall,
        body: [o.objectDate, o.medium, o.department].filter(Boolean).join(" — ")
      }))
    })
    ```
 
-6. **Details d'une oeuvre specifique** en kv :
+6. **Details of a specific artwork** in kv:
    ```
    component("kv", {pairs: [
-     ["Titre", obj.title],
-     ["Artiste", obj.artistDisplayName],
+     ["Title", obj.title],
+     ["Artist", obj.artistDisplayName],
      ["Date", obj.objectDate],
      ["Medium", obj.medium],
      ["Dimensions", obj.dimensions],
-     ["Departement", obj.department],
+     ["Department", obj.department],
      ["Culture", obj.culture],
      ["Credit", obj.creditLine],
-     ["Domaine public", obj.isPublicDomain ? "Oui" : "Non"]
+     ["Public domain", obj.isPublicDomain ? "Yes" : "No"]
    ]})
    ```
 
-## Exemples
+## Examples
 
-### Tableaux de Van Gogh
+### Van Gogh paintings
 ```
-// 1. Recherche
+// 1. Search
 search_objects({query: "van gogh", hasImages: true})  // → [436532, 436529, ...]
 
-// 2. Details (premiers 8 resultats)
+// 2. Details (first 8 results)
 objectIDs.slice(0, 8).forEach(id => get_object({objectID: id}))
 
-// 3. Rendu
-component("stat-card", {label: "Oeuvres de Van Gogh", value: "8", icon: "palette"})
+// 3. Render
+component("stat-card", {label: "Van Gogh works", value: "8", icon: "palette"})
 component("gallery", {images: vanGoghWorks.map(w => ({src: w.primaryImageSmall, alt: w.title, caption: w.objectDate}))})
 component("cards", {items: vanGoghWorks.map(w => ({title: w.title, subtitle: w.objectDate, image: w.primaryImageSmall, body: w.medium}))})
 ```
 
-### Art egyptien
+### Egyptian art
 ```
-// 1. Recherche par departement
+// 1. Search by department
 search_objects({query: "egypt pharaoh", departmentId: 10, hasImages: true})
 
-// 2. Rendu avec metadonnees culturelles
+// 2. Render with cultural metadata
 component("gallery", {images: egyptWorks.map(w => ({src: w.primaryImageSmall, alt: w.title}))})
-component("table", {columns: ["Titre", "Periode", "Culture", "Medium"], rows: egyptDetails})
-component("kv", {pairs: [["Departement", "Egyptian Art"], ["Source", "Met Museum — Open Access"]]})
+component("table", {columns: ["Title", "Period", "Culture", "Medium"], rows: egyptDetails})
+component("kv", {pairs: [["Department", "Egyptian Art"], ["Source", "Met Museum — Open Access"]]})
 ```
 
-## Erreurs courantes
+## Common mistakes
 
-- **Trop d'appels `get_object`** : la recherche retourne parfois des centaines d'IDs — limiter a 5-10 appels detail pour la performance
-- **Oeuvres sans image** : beaucoup d'objets Met n'ont pas de `primaryImage` — toujours filtrer avec `hasImages: true` dans la recherche ou verifier le champ
-- **Images haute resolution cassees** : utiliser `primaryImageSmall` (web-large) pour la galerie et les cards — les URLs `primaryImage` (original) retournent souvent des 404
-- **Oublier la licence** : les oeuvres en domaine public (`isPublicDomain: true`) peuvent etre affichees librement, les autres ont un champ `rights` a respecter
-- **Artiste inconnu** : beaucoup d'oeuvres anciennes n'ont pas d'`artistDisplayName` — afficher "Artiste inconnu" ou la culture/periode a la place
+- **Too many `get_object` calls**: a search sometimes returns hundreds of IDs — limit to 5-10 detail calls for performance
+- **Artworks without images**: many Met objects have no `primaryImage` — always filter with `hasImages: true` in the search or check the field
+- **Broken high-resolution images**: use `primaryImageSmall` (web-large) for the gallery and cards — `primaryImage` (original) URLs often return 404s
+- **Forgetting the license**: works in the public domain (`isPublicDomain: true`) can be displayed freely; others have a `rights` field to respect
+- **Unknown artist**: many ancient works have no `artistDisplayName` — display "Unknown artist" or the culture/period instead

@@ -231,7 +231,7 @@
     </label>
     {#if contextRAGEnabled}
       <div class="text-[9px] font-mono text-text2/60 pl-5">
-        Compaction sémantique du contexte via embeddings vectoriels
+        Semantic context compaction via vector embeddings
       </div>
     {/if}
   </section>
@@ -246,9 +246,9 @@
     />
     <span class="text-xs font-mono text-text1">Prompt caching</span>
     {#if modelType === 'wasm'}
-      <span class="text-[10px] font-mono text-text2/50 ml-auto">API Anthropic uniquement</span>
+      <span class="text-[10px] font-mono text-text2/50 ml-auto">Anthropic API only</span>
     {:else}
-      <span class="text-[10px] font-mono text-text2 ml-auto">économise ~80% tokens</span>
+      <span class="text-[10px] font-mono text-text2 ml-auto">saves ~80% tokens</span>
     {/if}
   </label>
 </div>

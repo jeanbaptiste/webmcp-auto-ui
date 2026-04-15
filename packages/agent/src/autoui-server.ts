@@ -12,7 +12,7 @@ const RECIPES: string[] = [
   // ── stat ────────────────────────────────────────────────────────────────
   `---
 widget: stat
-description: Statistique cle (KPI, compteur, total). Label + valeur + tendance optionnelle.
+description: Key statistic (KPI, counter, total). Label + value + optional trend.
 schema:
   type: object
   required:
@@ -30,17 +30,17 @@ schema:
       enum: [up, down, neutral]
 ---
 
-## Quand utiliser
-Pour afficher un chiffre cle unique (KPI, total, compteur).
+## When to use
+Display a single key figure (KPI, total, counter).
 
-## Comment
-Appeler widget_display({name: "stat", params: {label: "Total", value: "42"}}).
+## How to use
+Call widget_display({name: "stat", params: {label: "Total", value: "42"}}).
 `,
 
   // ── kv ──────────────────────────────────────────────────────────────────
   `---
 widget: kv
-description: Paires cle-valeur (proprietes, metadonnees, details).
+description: Key-value pairs (properties, metadata, details).
 schema:
   type: object
   required:
@@ -58,17 +58,17 @@ schema:
         maxItems: 2
 ---
 
-## Quand utiliser
-Pour afficher des proprietes ou metadonnees sous forme de paires cle/valeur.
+## When to use
+Display properties or metadata as key/value pairs.
 
-## Comment
-Appeler widget_display({name: "kv", params: {rows: [["Nom", "Dupont"], ["Age", "42"]]}}).
+## How to use
+Call widget_display({name: "kv", params: {rows: [["Nom", "Dupont"], ["Age", "42"]]}}).
 `,
 
   // ── list ─────────────────────────────────────────────────────────────────
   `---
 widget: list
-description: Liste ordonnee d'items.
+description: Ordered list of items.
 schema:
   type: object
   required:
@@ -82,17 +82,17 @@ schema:
         type: string
 ---
 
-## Quand utiliser
-Pour afficher une liste simple d'elements textuels.
+## When to use
+Display a simple list of text items.
 
-## Comment
-Appeler widget_display({name: "list", params: {items: ["A", "B", "C"]}}).
+## How to use
+Call widget_display({name: "list", params: {items: ["A", "B", "C"]}}).
 `,
 
   // ── chart ────────────────────────────────────────────────────────────────
   `---
 widget: chart
-description: Graphique a barres simples. Labels + valeurs numeriques.
+description: Simple bar chart. Labels + numeric values.
 schema:
   type: object
   required:
@@ -106,17 +106,17 @@ schema:
         type: array
 ---
 
-## Quand utiliser
+## When to use
 Pour un graphique a barres simple avec des labels et valeurs numeriques.
 
-## Comment
-Appeler widget_display({name: "chart", params: {bars: [["Jan", 10], ["Fev", 20]]}}).
+## How to use
+Call widget_display({name: "chart", params: {bars: [["Jan", 10], ["Fev", 20]]}}).
 `,
 
   // ── alert ────────────────────────────────────────────────────────────────
   `---
 widget: alert
-description: Alerte ou notification systeme.
+description: System alert or notification.
 schema:
   type: object
   required:
@@ -131,17 +131,17 @@ schema:
       enum: [info, warn, error]
 ---
 
-## Quand utiliser
-Pour afficher une alerte, un avertissement ou une notification.
+## When to use
+Display an alert, warning, or notification.
 
-## Comment
-Appeler widget_display({name: "alert", params: {title: "Attention", message: "Disque plein", level: "warn"}}).
+## How to use
+Call widget_display({name: "alert", params: {title: "Attention", message: "Disque plein", level: "warn"}}).
 `,
 
   // ── code ─────────────────────────────────────────────────────────────────
   `---
 widget: code
-description: Bloc de code avec coloration syntaxique.
+description: Code block with syntax highlighting.
 schema:
   type: object
   required:
@@ -153,17 +153,17 @@ schema:
       type: string
 ---
 
-## Quand utiliser
-Pour afficher un extrait de code source avec coloration syntaxique.
+## When to use
+Display a source code snippet with syntax highlighting.
 
-## Comment
-Appeler widget_display({name: "code", params: {lang: "python", content: "print('hello')"}}).
+## How to use
+Call widget_display({name: "code", params: {lang: "python", content: "print('hello')"}}).
 `,
 
   // ── text ─────────────────────────────────────────────────────────────────
   `---
 widget: text
-description: Paragraphe de texte libre.
+description: Free-form text paragraph.
 schema:
   type: object
   required:
@@ -173,17 +173,17 @@ schema:
       type: string
 ---
 
-## Quand utiliser
-Pour afficher un bloc de texte libre.
+## When to use
+Display a free-form text block.
 
-## Comment
-Appeler widget_display({name: "text", params: {content: "Texte explicatif..."}}).
+## How to use
+Call widget_display({name: "text", params: {content: "Texte explicatif..."}}).
 `,
 
   // ── actions ──────────────────────────────────────────────────────────────
   `---
 widget: actions
-description: Rangee de boutons d'action.
+description: Row of action buttons.
 schema:
   type: object
   required:
@@ -202,17 +202,17 @@ schema:
             type: boolean
 ---
 
-## Quand utiliser
+## When to use
 Pour proposer des actions cliquables a l'utilisateur.
 
-## Comment
-Appeler widget_display({name: "actions", params: {buttons: [{label: "OK", primary: true}, {label: "Annuler"}]}}).
+## How to use
+Call widget_display({name: "actions", params: {buttons: [{label: "OK", primary: true}, {label: "Annuler"}]}}).
 `,
 
   // ── tags ─────────────────────────────────────────────────────────────────
   `---
 widget: tags
-description: Groupe de tags/badges.
+description: Group of tags/badges.
 schema:
   type: object
   required:
@@ -233,17 +233,17 @@ schema:
             type: boolean
 ---
 
-## Quand utiliser
-Pour afficher des tags, categories ou badges.
+## When to use
+Display tags, categories, or badges.
 
-## Comment
-Appeler widget_display({name: "tags", params: {tags: [{text: "JS", active: true}, {text: "TS"}]}}).
+## How to use
+Call widget_display({name: "tags", params: {tags: [{text: "JS", active: true}, {text: "TS"}]}}).
 `,
 
   // ── data-table ───────────────────────────────────────────────────────────
   `---
 widget: data-table
-description: Tableau de donnees triable avec colonnes configurables.
+description: Sortable data table with configurable columns.
 schema:
   type: object
   required:
@@ -272,17 +272,17 @@ schema:
         type: object
 ---
 
-## Quand utiliser
-Pour afficher des donnees structurees en tableau avec tri par colonne.
+## When to use
+Display structured data in a table with column sorting.
 
-## Comment
-Appeler widget_display({name: "data-table", params: {columns: [{key:"name",label:"Nom"}], rows: [{name:"Alice"}]}}).
+## How to use
+Call widget_display({name: "data-table", params: {columns: [{key:"name",label:"Nom"}], rows: [{name:"Alice"}]}}).
 `,
 
   // ── timeline ─────────────────────────────────────────────────────────────
   `---
 widget: timeline
-description: Chronologie d'evenements avec statuts.
+description: Event timeline with statuses.
 schema:
   type: object
   required:
@@ -308,17 +308,17 @@ schema:
             enum: [done, active, pending]
 ---
 
-## Quand utiliser
-Pour afficher une sequence d'evenements dans le temps.
+## When to use
+Display a sequence of events over time.
 
-## Comment
-Appeler widget_display({name: "timeline", params: {events: [{title: "Debut", date: "2024-01", status: "done"}]}}).
+## How to use
+Call widget_display({name: "timeline", params: {events: [{title: "Debut", date: "2024-01", status: "done"}]}}).
 `,
 
   // ── profile ──────────────────────────────────────────────────────────────
   `---
 widget: profile
-description: Fiche profil avec avatar, champs et statistiques.
+description: Profile card with avatar, fields, and statistics.
 schema:
   type: object
   required:
@@ -354,20 +354,20 @@ schema:
             type: string
 ---
 
-## Quand utiliser
-Pour afficher une fiche personne ou entite avec champs structures.
+## When to use
+Display a person or entity card with structured fields.
 
-## Comment
-Appeler widget_display({name: "profile", params: {name: "Alice", fields: [{label:"Role", value:"Dev"}]}}).
+## How to use
+Call widget_display({name: "profile", params: {name: "Alice", fields: [{label:"Role", value:"Dev"}]}}).
 
-## Erreurs courantes
-- Ne JAMAIS inventer d'URLs pour l'avatar — utiliser uniquement celles retournées par les outils MCP. Sans URL, le widget affiche les initiales automatiquement.
+## Common mistakes
+- NEVER invent avatar URLs — only use those returned by MCP tools. Without a URL, the widget displays initials automatically.
 `,
 
   // ── trombinoscope ────────────────────────────────────────────────────────
   `---
 widget: trombinoscope
-description: Grille de portraits (trombinoscope). Personnes avec nom, sous-titre, badge.
+description: Portrait grid (trombinoscope). People with name, subtitle, badge.
 schema:
   type: object
   required:
@@ -394,20 +394,20 @@ schema:
       type: number
 ---
 
-## Quand utiliser
-Pour afficher une grille de personnes (equipe, assemblee, etc.).
+## When to use
+Display a grid of people (team, assembly, etc.).
 
-## Comment
-Appeler widget_display({name: "trombinoscope", params: {people: [{name: "Alice", badge: "Lead"}]}}).
+## How to use
+Call widget_display({name: "trombinoscope", params: {people: [{name: "Alice", badge: "Lead"}]}}).
 
-## Erreurs courantes
-- Ne JAMAIS inventer d'URLs pour le champ avatar — utiliser uniquement celles retournées par les outils MCP. Sans URL, le widget affiche les initiales automatiquement.
+## Common mistakes
+- NEVER invent URLs for the avatar field — only use those returned by MCP tools. Without a URL, the widget displays initials automatically.
 `,
 
   // ── json-viewer ──────────────────────────────────────────────────────────
   `---
 widget: json-viewer
-description: Arbre JSON interactif explorable.
+description: Interactive explorable JSON tree.
 schema:
   type: object
   required:
@@ -422,17 +422,17 @@ schema:
       type: boolean
 ---
 
-## Quand utiliser
-Pour afficher une structure JSON complexe de maniere interactive.
+## When to use
+Display a complex JSON structure interactively.
 
-## Comment
-Appeler widget_display({name: "json-viewer", params: {data: {a: 1, b: {c: 2}}}}).
+## How to use
+Call widget_display({name: "json-viewer", params: {data: {a: 1, b: {c: 2}}}}).
 `,
 
   // ── hemicycle ────────────────────────────────────────────────────────────
   `---
 widget: hemicycle
-description: Hemicycle SVG (composition parlementaire par groupe).
+description: SVG hemicycle (parliamentary composition by group).
 schema:
   type: object
   required:
@@ -462,17 +462,17 @@ schema:
       type: number
 ---
 
-## Quand utiliser
+## When to use
 Pour visualiser la composition d'une assemblee parlementaire.
 
-## Comment
-Appeler widget_display({name: "hemicycle", params: {groups: [{id:"g1", label:"Parti A", seats:120, color:"#e63946"}]}}).
+## How to use
+Call widget_display({name: "hemicycle", params: {groups: [{id:"g1", label:"Parti A", seats:120, color:"#e63946"}]}}).
 `,
 
   // ── chart-rich ───────────────────────────────────────────────────────────
   `---
 widget: chart-rich
-description: Graphique riche (bar, line, area, pie, donut) avec plusieurs series.
+description: Rich chart (bar, line, area, pie, donut) with multiple series.
 schema:
   type: object
   required:
@@ -504,17 +504,17 @@ schema:
             type: string
 ---
 
-## Quand utiliser
+## When to use
 Pour des graphiques multi-series (barres, lignes, aires, camembert, donut).
 
-## Comment
-Appeler widget_display({name: "chart-rich", params: {type: "bar", labels: ["Q1","Q2"], data: [{label:"Ventes", values:[10,20]}]}}).
+## How to use
+Call widget_display({name: "chart-rich", params: {type: "bar", labels: ["Q1","Q2"], data: [{label:"Ventes", values:[10,20]}]}}).
 `,
 
   // ── cards ────────────────────────────────────────────────────────────────
   `---
 widget: cards
-description: Grille de cartes (resultats, dossiers, entites).
+description: Card grid (results, records, entities).
 schema:
   type: object
   required:
@@ -541,20 +541,20 @@ schema:
               type: string
 ---
 
-## Quand utiliser
-Pour afficher des resultats, dossiers ou entites en grille de cartes.
+## When to use
+Display results, records, or entities as a card grid.
 
-## Comment
-Appeler widget_display({name: "cards", params: {cards: [{title: "Projet A", description: "En cours"}]}}).
+## How to use
+Call widget_display({name: "cards", params: {cards: [{title: "Projet A", description: "En cours"}]}}).
 
-## Erreurs courantes
-- Ne JAMAIS inventer d'URLs d'images pour le champ image — utiliser uniquement celles retournées par les outils MCP. Si aucune URL n'est disponible, ne pas inclure de champ image.
+## Common mistakes
+- NEVER invent image URLs for the image field — only use those returned by MCP tools. If no URL is available, do not include an image field.
 `,
 
   // ── sankey ───────────────────────────────────────────────────────────────
   `---
 widget: sankey
-description: Diagramme de flux Sankey (votes, co-signatures, parcours).
+description: Sankey flow diagram (votes, co-signatures, paths).
 schema:
   type: object
   required:
@@ -594,17 +594,17 @@ schema:
             type: number
 ---
 
-## Quand utiliser
+## When to use
 Pour visualiser des flux entre categories (votes, parcours, transferts).
 
-## Comment
-Appeler widget_display({name: "sankey", params: {nodes: [{id:"a", label:"A"}], links: [{source:"a", target:"b", value:10}]}}).
+## How to use
+Call widget_display({name: "sankey", params: {nodes: [{id:"a", label:"A"}], links: [{source:"a", target:"b", value:10}]}}).
 `,
 
   // ── log ──────────────────────────────────────────────────────────────────
   `---
 widget: log
-description: Flux de logs avec niveau, timestamp et source.
+description: Log stream with level, timestamp, and source.
 schema:
   type: object
   required:
@@ -630,17 +630,17 @@ schema:
             type: string
 ---
 
-## Quand utiliser
-Pour afficher un flux de logs ou d'evenements systeme.
+## When to use
+Display a stream of logs or system events.
 
-## Comment
-Appeler widget_display({name: "log", params: {entries: [{message: "Started", level: "info", timestamp: "12:00"}]}}).
+## How to use
+Call widget_display({name: "log", params: {entries: [{message: "Started", level: "info", timestamp: "12:00"}]}}).
 `,
 
   // ── gallery ──────────────────────────────────────────────────────────────
   `---
 widget: gallery
-description: Galerie d'images avec lightbox.
+description: Image gallery with lightbox.
 schema:
   type: object
   required:
@@ -665,21 +665,21 @@ schema:
       type: number
 ---
 
-## Quand utiliser
-Pour afficher une collection d'images avec navigation lightbox.
+## When to use
+Display an image collection with lightbox navigation.
 
-## Comment
-Appeler widget_display({name: "gallery", params: {images: [{src: "https://...", alt: "Photo 1"}]}}).
+## How to use
+Call widget_display({name: "gallery", params: {images: [{src: "https://...", alt: "Photo 1"}]}}).
 
-## Erreurs courantes
-- Ne JAMAIS fabriquer d'URLs d'images — utiliser uniquement celles retournées par les outils MCP
-- Toujours fournir un alt pour l'accessibilité
+## Common mistakes
+- NEVER fabricate image URLs — only use those returned by MCP tools
+- Always provide an alt for accessibility
 `,
 
   // ── carousel ─────────────────────────────────────────────────────────────
   `---
 widget: carousel
-description: Carousel de slides (images, contenu) avec navigation et auto-play.
+description: Slide carousel (images, content) with navigation and auto-play.
 schema:
   type: object
   required:
@@ -706,20 +706,20 @@ schema:
       type: number
 ---
 
-## Quand utiliser
+## When to use
 Pour presenter du contenu en diaporama avec navigation.
 
-## Comment
-Appeler widget_display({name: "carousel", params: {slides: [{src: "https://...", title: "Slide 1"}]}}).
+## How to use
+Call widget_display({name: "carousel", params: {slides: [{src: "https://...", title: "Slide 1"}]}}).
 
-## Erreurs courantes
-- Ne JAMAIS fabriquer d'URLs d'images pour src — utiliser uniquement celles retournées par les outils MCP
+## Common mistakes
+- NEVER fabricate image URLs for src — only use those returned by MCP tools
 `,
 
   // ── map ──────────────────────────────────────────────────────────────────
   `---
 widget: map
-description: Carte Leaflet interactive avec marqueurs. Fond sombre CARTO.
+description: Interactive Leaflet map with markers. Dark CARTO basemap.
 schema:
   type: object
   properties:
@@ -760,17 +760,17 @@ schema:
             type: string
 ---
 
-## Quand utiliser
-Pour afficher une carte geographique avec des marqueurs.
+## When to use
+Display a geographic map with markers.
 
-## Comment
-Appeler widget_display({name: "map", params: {center: {lat: 48.8, lng: 2.3}, zoom: 12, markers: [{lat: 48.8, lng: 2.3, label: "Paris"}]}}).
+## How to use
+Call widget_display({name: "map", params: {center: {lat: 48.8, lng: 2.3}, zoom: 12, markers: [{lat: 48.8, lng: 2.3, label: "Paris"}]}}).
 `,
 
   // ── stat-card ────────────────────────────────────────────────────────────
   `---
 widget: stat-card
-description: KPI enrichi avec unite, delta et variante coloree (success/warning/error/info).
+description: Enriched KPI with unit, delta, and colored variant (success/warning/error/info).
 schema:
   type: object
   required:
@@ -797,17 +797,17 @@ schema:
       enum: [default, success, warning, error, info]
 ---
 
-## Quand utiliser
+## When to use
 Pour un KPI enrichi avec delta, unite et variante de couleur.
 
-## Comment
-Appeler widget_display({name: "stat-card", params: {label: "Uptime", value: "99.9", unit: "%", trend: "up", variant: "success"}}).
+## How to use
+Call widget_display({name: "stat-card", params: {label: "Uptime", value: "99.9", unit: "%", trend: "up", variant: "success"}}).
 `,
 
   // ── grid-data ────────────────────────────────────────────────────────────
   `---
 widget: grid-data
-description: Grille de donnees tabulaires avec highlights de cellules (heatmap, comparaison).
+description: Tabular data grid with cell highlights (heatmap, comparison).
 schema:
   type: object
   required:
@@ -851,17 +851,17 @@ schema:
             type: string
 ---
 
-## Quand utiliser
+## When to use
 Pour des grilles de donnees avec mise en valeur de cellules (heatmap, comparaison).
 
-## Comment
-Appeler widget_display({name: "grid-data", params: {columns: [{key:"a",label:"A"}], rows: [[1,2],[3,4]], highlights: [{row:0,col:1,color:"#ff0"}]}}).
+## How to use
+Call widget_display({name: "grid-data", params: {columns: [{key:"a",label:"A"}], rows: [[1,2],[3,4]], highlights: [{row:0,col:1,color:"#ff0"}]}}).
 `,
 
   // ── d3 ───────────────────────────────────────────────────────────────────
   `---
 widget: d3
-description: Visualisation D3.js (hex-heatmap, radial, treemap, force graph).
+description: D3.js visualization (hex-heatmap, radial, treemap, force graph).
 schema:
   type: object
   required:
@@ -879,17 +879,17 @@ schema:
       type: object
 ---
 
-## Quand utiliser
+## When to use
 Pour des visualisations avancees D3.js (heatmap hexagonale, radial, treemap, graphe de force).
 
-## Comment
-Appeler widget_display({name: "d3", params: {preset: "treemap", data: {name: "root", children: [...]}}}).
+## How to use
+Call widget_display({name: "d3", params: {preset: "treemap", data: {name: "root", children: [...]}}}).
 `,
 
   // ── js-sandbox ───────────────────────────────────────────────────────────
   `---
 widget: js-sandbox
-description: Sandbox JavaScript dans un iframe securise. Code arbitraire avec acces a DOM et fetch.
+description: JavaScript sandbox in a secure iframe. Arbitrary code with DOM and fetch access.
 schema:
   type: object
   required:
@@ -912,17 +912,17 @@ schema:
       description: Hauteur CSS de l'iframe (ex "400px", "50vh")
 ---
 
-## Quand utiliser
+## When to use
 Pour des visualisations custom, animations, ou prototypes interactifs en JS pur.
 
-## Comment
-Appeler widget_display({name: "js-sandbox", params: {code: "document.getElementById('root').innerHTML = '<h1>Hello</h1>'"}}).
+## How to use
+Call widget_display({name: "js-sandbox", params: {code: "document.getElementById('root').innerHTML = '<h1>Hello</h1>'"}}).
 `,
 
   // ── recipe-browser ──────────────────────────────────────────────────────
   `---
 widget: recipe-browser
-description: Affiche les recettes disponibles sous forme de cartes interactives et permet de consulter le detail de chaque recette.
+description: Displays available recipes as interactive cards and allows browsing each recipe's details.
 group: rich
 schema:
   type: object
@@ -957,7 +957,7 @@ schema:
       type: boolean
 ---
 
-## Quand utiliser
+## When to use
 Quand l'utilisateur veut voir les recettes disponibles, explorer les possibilites du serveur, ou comprendre comment utiliser un widget specifique.
 
 ## Comment
@@ -977,7 +977,7 @@ Quand l'utilisateur clique sur une carte, tu recevras un message d'interaction c
 2. Afficher le contenu dans un widget code avec lang: 'markdown'
 3. Lier les deux widgets : reutiliser le widget detail existant via canvas('update', ...) au lieu d'en creer un nouveau a chaque clic.
 
-## Erreurs courantes
+## Common mistakes
 - Ne pas oublier interactive: true dans les cartes — sans ca, les clics ne remontent pas
 - Ne pas creer un nouveau widget detail a chaque clic — reutiliser l'existant via canvas('update', ...)
 - Les recettes MCP et WebMCP ont des noms de serveur differents — utiliser le bon prefixe pour get_recipe()

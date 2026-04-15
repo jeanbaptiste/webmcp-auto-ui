@@ -56,7 +56,7 @@ function compressOldToolResults(messages: ChatMessage[], previewSize: number, re
           const totalLen = block.content.length;
           const id = block.tool_use_id;
           if (resultBuffer && resultBuffer.has(id)) {
-            (block as any).content = `${preview}... [recall('${id}') pour le résultat complet, ${totalLen} chars]`;
+            (block as any).content = `${preview}... [recall('${id}') for the full result, ${totalLen} chars]`;
           } else {
             (block as any).content = `${preview}... [compressed, ${totalLen} chars original]`;
           }
@@ -80,10 +80,10 @@ function truncateResult(result: string, maxLen: number = MAX_RESULT_LEN): string
       while (JSON.stringify(sliced).length > maxLen && sliced.length > 1) {
         sliced = sliced.slice(0, Math.ceil(sliced.length / 2));
       }
-      return JSON.stringify(sliced) + `\n... (tronqué, ${parsed.length} items total)`;
+      return JSON.stringify(sliced) + `\n... (truncated, ${parsed.length} items total)`;
     }
   } catch { /* not JSON */ }
-  return result.slice(0, maxLen) + '\n... (tronqué)';
+  return result.slice(0, maxLen) + '\n... (truncated)';
 }
 
 export interface AgentLoopOptions {
@@ -184,7 +184,7 @@ export async function runAgentLoop(
   }
 
   const systemPrompt = maxTokens
-    ? `${baseSystemPrompt}\n\nIMPORTANT : Limite tes réponses à ${maxTokens} tokens.`
+    ? `${baseSystemPrompt}\n\nIMPORTANT: Limit your responses to ${maxTokens} tokens.`
     : baseSystemPrompt;
 
   const messages: ChatMessage[] = [
@@ -297,7 +297,7 @@ export async function runAgentLoop(
       if (!hasRendered && !nudgedOnce && metrics.toolCalls > 0) {
         nudgedOnce = true;
         messages.push({ role: 'assistant', content: response.content });
-        messages.push({ role: 'user', content: 'Tu n\'as pas encore affiché de résultat visuel. Appelle widget_display() avec les données que tu as récoltées.' });
+        messages.push({ role: 'user', content: 'You have not displayed any visual result yet. Call widget_display() with the data you have collected.' });
         continue;
       }
       messages.push({ role: 'assistant', content: response.content });
@@ -442,7 +442,7 @@ export async function runAgentLoop(
             // Intercept recall BEFORE hitting executeTool — use the local resultBuffer directly
             if (realToolName === 'recall' && resultBuffer.size > 0) {
               const recallId = (toolInput as { id: string }).id;
-              result = resultBuffer.get(recallId) ?? `Aucun résultat trouvé pour l'id '${recallId}'.`;
+              result = resultBuffer.get(recallId) ?? `No result found for id '${recallId}'.`;
             } else {
               // Route to WebMCP server
               const webmcpServer = webmcpServers.get(serverName);

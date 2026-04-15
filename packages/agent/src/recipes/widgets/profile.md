@@ -1,6 +1,6 @@
 ---
 widget: profile
-description: Fiche profil avec champs et statistiques
+description: Profile card with fields and statistics
 group: rich
 schema:
   type: object
@@ -37,13 +37,13 @@ schema:
             type: string
 ---
 
-## Quand utiliser
-Pour afficher la fiche d'une personne ou d'une entité — employé, client, organisation. Combine identité, champs détaillés et statistiques résumées.
+## When to use
+Display a profile card for a person or entity — employee, client, organization. Combines identity, detailed fields, and summarized statistics.
 
-## Comment
-1. Récupérer les informations de la personne/entité via MCP
-2. Séparer les données en `fields` (détails textuels) et `stats` (chiffres clés)
-3. Appeler `autoui_webmcp_widget_display('profile', { name: 'Alice Martin', subtitle: 'Développeuse Senior', fields: [{ label: 'Email', value: 'alice@ex.com' }], stats: [{ label: 'Projets', value: '12' }] })`
+## How to use
+1. Retrieve the person/entity information via MCP
+2. Separate the data into `fields` (text details) and `stats` (key figures)
+3. Call `autoui_webmcp_widget_display('profile', { name: 'Alice Martin', subtitle: 'Senior Developer', fields: [{ label: 'Email', value: 'alice@ex.com' }], stats: [{ label: 'Projects', value: '12' }] })`
 
-## Erreurs courantes
-- Ne JAMAIS inventer d'URLs d'images pour l'avatar. Utiliser UNIQUEMENT les URLs retournées par les outils MCP. Si aucune URL n'est disponible, ne pas inclure de champ avatar — le widget affichera les initiales automatiquement.
+## Common mistakes
+- NEVER fabricate image URLs for the avatar. Use ONLY the URLs returned by MCP tools. If no URL is available, do not include an avatar field — the widget will display initials automatically.

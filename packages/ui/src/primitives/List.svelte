@@ -5,7 +5,7 @@
 </script>
 <div class="overflow-y-auto divide-y divide-border {cls}" style="max-height: {maxHeight};">
   {#if items.length === 0}
-    {#if empty}{@render empty()}{:else}<p class="py-4 text-center text-sm text-text2">Aucun élément</p>{/if}
+    {#if empty}{@render empty()}{:else}<p class="py-4 text-center text-sm text-text2">No items</p>{/if}
   {:else}
     {#each items as it, i (i)}{@render item(it, i)}{/each}
   {/if}

@@ -45,7 +45,7 @@
 </script>
 <div class="bg-surface border border-border rounded-lg p-3 md:p-4 font-sans">
   {#if spec.title}<h3 class="text-sm font-semibold text-text1 mb-3">{spec.title}</h3>{/if}
-  {#if !datasets.length}<p class="text-text2 text-sm">Aucune donnée</p>
+  {#if !datasets.length}<p class="text-text2 text-sm">No data</p>
   {:else if isPie}
     <div class="relative flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
       <svg viewBox="-1 -1 2 2" class="w-40 h-40 flex-shrink-0" xmlns="http://www.w3.org/2000/svg">

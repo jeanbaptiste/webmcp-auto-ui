@@ -12,9 +12,9 @@
 </script>
 <div class="bg-surface border border-border rounded-lg p-3 md:p-4 font-sans">
   {#if spec.title}<h3 class="text-sm font-semibold text-text1 mb-3">{spec.title}</h3>{/if}
-  {#if !nodes.length||!links.length}<p class="text-text2 text-sm">Aucune donnée de flux</p>
+  {#if !nodes.length||!links.length}<p class="text-text2 text-sm">No flow data</p>
   {:else}
-    <div class="text-xs text-text2 mb-2 font-mono">{nodes.length} nœuds · {links.length} flux</div>
+    <div class="text-xs text-text2 mb-2 font-mono">{nodes.length} nodes · {links.length} flows</div>
     <div class="flex flex-col gap-1.5">
       {#each sorted as link}
         {@const src=nodeMap.get(link.source)}

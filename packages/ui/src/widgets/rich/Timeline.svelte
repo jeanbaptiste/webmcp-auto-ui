@@ -8,7 +8,7 @@
 </script>
 <div class="bg-surface border border-border rounded-lg p-3 md:p-4 font-sans">
   {#if spec.title}<h3 class="text-sm font-semibold text-text1 mb-3">{spec.title}</h3>{/if}
-  {#if events.length===0}<p class="text-text2 text-sm">Aucun événement</p>
+  {#if events.length===0}<p class="text-text2 text-sm">No events</p>
   {:else}
     <div class="py-1">
       {#each events as event, i}

@@ -37,7 +37,7 @@
 </script>
 <div class="bg-surface border border-border rounded-lg p-3 md:p-4 font-sans">
   {#if spec.title}<h3 class="text-sm font-semibold text-text1 mb-3">{spec.title}</h3>{/if}
-  {#if !groups.length||!total}<p class="text-text2 text-sm">Aucune donnée</p>
+  {#if !groups.length||!total}<p class="text-text2 text-sm">No data</p>
   {:else}
     <div class="relative">
       <svg viewBox="0 0 {W} {H}" class="block w-full max-h-[220px]" xmlns="http://www.w3.org/2000/svg">
@@ -52,10 +52,10 @@
             onmouseenter={()=>{const g=groups.find(g=>g.id===s.gid);if(g)tooltip={label:g.label,seats:g.seats};}}
             onmouseleave={()=>tooltip=null}
             ondblclick={()=>{const g=groups.find(g=>g.id===s.gid);if(g)ongroupclick?.(g);}}>
-            {#if s.gid}<title>Double-cliquez pour interagir</title>{/if}
+            {#if s.gid}<title>Double-click to interact</title>{/if}
           </circle>
         {/each}
-        <text x={cx} y={cy+18} text-anchor="middle" font-size="11" fill="var(--color-text2)" font-family="system-ui">{total} sièges</text>
+        <text x={cx} y={cy+18} text-anchor="middle" font-size="11" fill="var(--color-text2)" font-family="system-ui">{total} seats</text>
       </svg>
       {#if tooltip}
         <div class="absolute top-0 right-0 bg-surface2 border border-border2 rounded px-2 py-1 text-xs text-text1 pointer-events-none">
@@ -67,7 +67,7 @@
       {#each legend as g}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="flex items-center gap-1.5 text-xs cursor-pointer hover:opacity-80" role="button" tabindex="0" title="Double-cliquez pour interagir" ondblclick={()=>ongroupclick?.(g)} onkeydown={(e)=>{if(e.key==="Enter")ongroupclick?.(g)}}>
+        <div class="flex items-center gap-1.5 text-xs cursor-pointer hover:opacity-80" role="button" tabindex="0" title="Double-click to interact" ondblclick={()=>ongroupclick?.(g)} onkeydown={(e)=>{if(e.key==="Enter")ongroupclick?.(g)}}>
           <div class="w-3 h-3 rounded-full flex-shrink-0" style="background:{g.color};"></div>
           <span class="text-text2">{g.label}</span>
           <span class="text-text2">{g.seats}</span>

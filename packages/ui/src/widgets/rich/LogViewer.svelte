@@ -9,7 +9,7 @@
 <div class="bg-bg border border-border rounded-lg font-mono">
   {#if spec.title}<div class="px-4 py-2 border-b border-border text-xs text-text2">{spec.title}</div>{/if}
   <div class="overflow-y-auto text-xs leading-5 p-3 flex flex-col gap-0.5" style="max-height:{spec.maxHeight??'320px'};">
-    {#if !entries.length}<span class="text-text2">Aucune entrée de log</span>
+    {#if !entries.length}<span class="text-text2">No log entries</span>
     {:else}
       {#each entries as e}
         <div class="flex gap-2 items-start hover:bg-surface2 px-1 rounded">

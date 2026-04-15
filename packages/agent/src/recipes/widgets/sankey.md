@@ -1,6 +1,6 @@
 ---
 widget: sankey
-description: Diagramme de Sankey (flux entre nœuds)
+description: Sankey diagram (flow between nodes)
 group: rich
 schema:
   type: object
@@ -41,14 +41,14 @@ schema:
             type: number
 ---
 
-## Quand utiliser
-Pour visualiser des flux ou transferts entre catégories — budget, conversions, migrations, flux de données. Les nœuds représentent les étapes et les liens les quantités transférées.
+## When to use
+Visualize flows or transfers between categories — budget, conversions, migrations, data flows. Nodes represent stages and links represent transferred quantities.
 
-## Comment
-1. Récupérer les données de flux via MCP
-2. Définir les nœuds (étapes) et les liens (flux entre étapes)
-3. Appeler `autoui_webmcp_widget_display('sankey', { title: 'Flux budgétaire', nodes: [{ id: 'rev', label: 'Revenus' }, { id: 'sal', label: 'Salaires' }], links: [{ source: 'rev', target: 'sal', value: 50000 }] })`
+## How to use
+1. Fetch flow data via MCP
+2. Define nodes (stages) and links (flows between stages)
+3. Call `autoui_webmcp_widget_display('sankey', { title: 'Budget Flow', nodes: [{ id: 'rev', label: 'Revenue' }, { id: 'sal', label: 'Salaries' }], links: [{ source: 'rev', target: 'sal', value: 50000 }] })`
 
-## Erreurs courantes
-- Les `source` et `target` dans les liens doivent correspondre à des `id` existants dans les nœuds
-- Ne pas créer de cycles (le flux doit être directionnel)
+## Common mistakes
+- The `source` and `target` in links must match existing `id` values in the nodes
+- Do not create cycles (flow must be directional)

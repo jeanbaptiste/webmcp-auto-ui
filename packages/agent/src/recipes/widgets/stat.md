@@ -1,6 +1,6 @@
 ---
 widget: stat
-description: Statistique clé (KPI, compteur, total)
+description: Key statistic (KPI, counter, total)
 group: simple
 schema:
   type: object
@@ -22,14 +22,14 @@ schema:
         - neutral
 ---
 
-## Quand utiliser
-Pour afficher un chiffre clé unique — KPI, compteur, total, score. Idéal quand l'utilisateur demande "combien de…" ou un résumé chiffré.
+## When to use
+Display a single key figure — KPI, counter, total, score. Ideal when the user asks "how many…" or requests a numerical summary.
 
-## Comment
-1. Récupérer la donnée via l'outil MCP approprié (ex: requête SQL, appel API)
-2. Appeler `autoui_webmcp_widget_display('stat', { label: 'Utilisateurs actifs', value: '1 247' })`
-3. Optionnel : ajouter `trend` (ex: '+12%') et `trendDir` ('up'/'down'/'neutral') pour indiquer l'évolution
+## How to use
+1. Fetch the data via the appropriate MCP tool (e.g. SQL query, API call)
+2. Call `autoui_webmcp_widget_display('stat', { label: 'Active users', value: '1,247' })`
+3. Optional: add `trend` (e.g. '+12%') and `trendDir` ('up'/'down'/'neutral') to show the trend
 
-## Erreurs courantes
-- Passer `value` comme nombre au lieu de string — toujours convertir en string
-- Oublier de formater le nombre (séparateurs de milliers, unités)
+## Common mistakes
+- Passing `value` as a number instead of a string — always convert to string
+- Forgetting to format the number (thousand separators, units)

@@ -1,6 +1,6 @@
 ---
 widget: hemicycle
-description: Hémicycle parlementaire avec groupes politiques
+description: Parliamentary hemicycle with political groups
 group: rich
 schema:
   type: object
@@ -31,13 +31,13 @@ schema:
       type: number
 ---
 
-## Quand utiliser
-Pour visualiser la composition d'une assemblée parlementaire ou tout ensemble réparti en groupes avec des proportions. Idéal pour les résultats électoraux et la répartition des sièges.
+## When to use
+Visualize the composition of a parliamentary assembly or any set distributed into groups with proportions. Ideal for election results and seat distribution.
 
-## Comment
-1. Récupérer les données de composition via MCP (groupes, nombre de sièges, couleurs)
-2. Appeler `autoui_webmcp_widget_display('hemicycle', { title: 'Assemblée nationale', groups: [{ id: 'lfi', label: 'LFI', seats: 75, color: '#cc2443' }, { id: 'ren', label: 'Renaissance', seats: 170, color: '#ffeb00' }], totalSeats: 577 })`
+## How to use
+1. Fetch composition data via MCP (groups, seat counts, colors)
+2. Call `autoui_webmcp_widget_display('hemicycle', { title: 'National Assembly', groups: [{ id: 'lfi', label: 'LFI', seats: 75, color: '#cc2443' }, { id: 'ren', label: 'Renaissance', seats: 170, color: '#ffeb00' }], totalSeats: 577 })`
 
-## Erreurs courantes
-- Oublier un des 4 champs required dans chaque objet du tableau `groups` (id, label, seats, color sont TOUS obligatoires)
-- Ne pas fournir de couleur hexadécimale valide
+## Common mistakes
+- Forgetting one of the 4 required fields in each `groups` object (id, label, seats, color are ALL required)
+- Not providing a valid hexadecimal color
