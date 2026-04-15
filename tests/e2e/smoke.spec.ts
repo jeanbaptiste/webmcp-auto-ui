@@ -238,15 +238,15 @@ test.describe('Todo', () => {
   test('loads successfully', async ({ page }) => {
     await page.goto(`${BASE}/todo/`);
     await page.waitForTimeout(2000);
-    await expect(page.locator('input[placeholder*="tâche"], input[placeholder*="Nouvelle"]')).toBeVisible();
+    await expect(page.locator('input[placeholder*="task"], input[placeholder*="New"]')).toBeVisible();
   });
 
   test('add todo works', async ({ page }) => {
     await page.goto(`${BASE}/todo/`);
     await page.waitForTimeout(2000);
-    const input = page.locator('input[placeholder*="tâche"], input[placeholder*="Nouvelle"]').first();
+    const input = page.locator('input[placeholder*="task"], input[placeholder*="New"]').first();
     await input.fill('E2E test task');
-    await page.click('button:has-text("Ajouter")');
+    await page.click('button:has-text("Add")');
     await page.waitForTimeout(500);
     await expect(page.locator('text=E2E test task')).toBeVisible();
   });
@@ -254,10 +254,10 @@ test.describe('Todo', () => {
   test('filter buttons visible', async ({ page }) => {
     await page.goto(`${BASE}/todo/`);
     await page.waitForTimeout(2000);
-    for (const label of ['Tous', 'Actifs']) {
+    for (const label of ['All', 'Active']) {
       await expect(page.locator(`button:has-text("${label}")`)).toBeVisible();
     }
-    await expect(page.getByRole('button', { name: 'Terminés', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
   });
 });
 

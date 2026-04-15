@@ -1,38 +1,38 @@
-# Patterns & pièges — Guide contributeur
+# Patterns & Pitfalls — Contributor Guide
 
-Ce document compile les bugs réels rencontrés en production et les patterns
-à suivre pour les éviter. Mis à jour au fil des incidents.
+This document compiles real bugs encountered in production and the patterns
+to follow to avoid them. Updated as incidents occur.
 
 ---
 
-## Svelte 5 — Réactivité
+## Svelte 5 — Reactivity
 
-### Règle 1 : un `$effect` ne doit pas lire ET écrire les mêmes states
+### Rule 1: a `$effect` must not read AND write the same states
 
-**Symptôme** : `effect_update_depth_exceeded` en console, la page entière se bloque
-(boutons sans effet, modals qui n'ouvrent pas).
+**Symptom**: `effect_update_depth_exceeded` in the console, the entire page freezes
+(buttons unresponsive, modals that won't open).
 
-**Cause** : Svelte 5 re-exécute un `$effect` chaque fois qu'une de ses
-dépendances réactives change. Si l'effet écrit une valeur qu'il lit aussi,
-il se re-déclenche lui-même → boucle infinie → arrêt au bout de 5 itérations.
+**Cause**: Svelte 5 re-runs a `$effect` every time one of its reactive
+dependencies changes. If the effect writes a value it also reads,
+it triggers itself again → infinite loop → halted after 5 iterations.
 
 ```svelte
-<!-- ❌ BOUCLE — lit gemmaStatus ET l'écrit -->
+<!-- ❌ LOOP — reads gemmaStatus AND writes it -->
 $effect(() => {
   const llm = canvas.llm;
-  if (gemmaStatus === 'ready') {   // lit gemmaStatus → tracké
-    gemmaStatus = 'idle';          // écrit gemmaStatus → re-run !
+  if (gemmaStatus === 'ready') {   // reads gemmaStatus → tracked
+    gemmaStatus = 'idle';          // writes gemmaStatus → re-run!
   }
-  canvas.addMsg('system', llm);   // écrit canvas.messages
+  canvas.addMsg('system', llm);   // writes canvas.messages
 });
 
-<!-- ✅ CORRECT — untrack() pour les lectures non-déclencheuses -->
+<!-- ✅ CORRECT — untrack() for non-triggering reads -->
 import { untrack } from 'svelte';
 
 $effect(() => {
-  const llm = canvas.llm;         // seule dépendance trackée
+  const llm = canvas.llm;         // only tracked dependency
   untrack(() => {
-    if (gemmaStatus === 'ready') { // lu mais pas tracké
+    if (gemmaStatus === 'ready') { // read but not tracked
       gemmaStatus = 'idle';
     }
     canvas.addMsg('system', llm);
@@ -40,138 +40,137 @@ $effect(() => {
 });
 ```
 
-**Règle** : dans un `$effect`, isoler la/les dépendances qui doivent déclencher
-le re-run, et wrapper tout le reste dans `untrack()`.
+**Rule**: in a `$effect`, isolate the dependency or dependencies that should trigger
+a re-run, and wrap everything else in `untrack()`.
 
 ---
 
-### Règle 2 : préférer `$derived` à `$effect` + `$state` pour les valeurs calculées
+### Rule 2: prefer `$derived` over `$effect` + `$state` for computed values
 
 ```svelte
-<!-- ❌ anti-pattern — $state écrit dans un $effect -->
+<!-- ❌ anti-pattern — $state written inside a $effect -->
 let paletteOpen = $state(true);
 $effect(() => { paletteOpen = canvas.mode === 'drag'; });
 
-<!-- ✅ si la valeur est read-only -->
+<!-- ✅ if the value is read-only -->
 const paletteOpen = $derived(canvas.mode === 'drag');
 
-<!-- ✅ si la valeur est aussi écrite manuellement (toggle utilisateur) -->
-<!-- garder $state + $effect, mais s'assurer que l'effet ne lit pas paletteOpen -->
+<!-- ✅ if the value is also written manually (user toggle) -->
+<!-- keep $state + $effect, but make sure the effect does not read paletteOpen -->
 let paletteOpen = $state(true);
-$effect(() => { paletteOpen = canvas.mode === 'drag'; }); // ok : ne lit pas paletteOpen
+$effect(() => { paletteOpen = canvas.mode === 'drag'; }); // ok: does not read paletteOpen
 ```
 
 ---
 
-### Règle 3 : éviter les `$effect` redondants avec `onMount`
+### Rule 3: avoid redundant `$effect` alongside `onMount`
 
 ```svelte
-<!-- ❌ double initialisation inutile -->
+<!-- ❌ unnecessary double initialisation -->
 let skills = $state([]);
-$effect(() => { skills = listSkills(); });   // court-circuité par onMount
+$effect(() => { skills = listSkills(); });   // short-circuited by onMount
 onMount(() => { skills = listSkills(); });
 
-<!-- ✅ une seule source de vérité -->
+<!-- ✅ single source of truth -->
 let skills = $state([]);
 onMount(() => { skills = listSkills(); });
 ```
 
-Si `listSkills()` ne lit aucun state réactif, le `$effect` ne se re-déclenchera
-jamais après le premier run — il est strictement équivalent à `onMount`, mais
-plus trompeur.
+If `listSkills()` reads no reactive state, the `$effect` will never re-run
+after the first execution — it is strictly equivalent to `onMount`, but
+more misleading.
 
 ---
 
-### Règle 4 : passer le modèle LLM explicitement au provider
+### Rule 4: pass the LLM model explicitly to the provider
 
 ```ts
-<!-- ❌ utilise toujours 'haiku' par défaut -->
+<!-- ❌ always uses 'haiku' by default -->
 return new AnthropicProvider({ proxyUrl: `${base}/api/chat` });
 
-<!-- ✅ transmet le choix utilisateur -->
+<!-- ✅ forwards the user's choice -->
 return new AnthropicProvider({
   proxyUrl: `${base}/api/chat`,
   model: canvas.llm,
 });
 ```
 
-`AnthropicProvider` a `model ?? 'haiku'` comme défaut. Si l'utilisateur
-sélectionne `sonnet`, il recevra quand même `haiku` sans message d'erreur.
+`AnthropicProvider` defaults to `model ?? 'haiku'`. If the user
+selects `sonnet`, they will still receive `haiku` with no error message.
 
 ---
 
 ## Agent loop — `loop.ts`
 
-### `onText` n'est appelé qu'à la dernière itération sans tools
+### `onText` is only called on the last iteration without tools
 
-Par défaut, `callbacks.onText` est appelé uniquement quand le LLM répond
-sans `tool_use`. Comme le system prompt force l'usage de `render_*` tools,
-ce callback n'est jamais atteint dans le flow normal.
+By default, `callbacks.onText` is called only when the LLM responds
+without `tool_use`. Because the system prompt forces the use of `render_*` tools,
+this callback is never reached in the normal flow.
 
-**Conséquence** : la bulle "thinking" reste figée sur `🔧 last_tool…` et
-ne se met jamais à jour avec le texte final.
+**Consequence**: the "thinking" bubble stays frozen on `🔧 last_tool…` and
+never updates with the final text.
 
-**Fix appliqué dans `loop.ts`** : appeler `onText` aussi quand il y a du
-texte intermédiaire avant les tool_use (reasoning du LLM) :
+**Fix applied in `loop.ts`**: call `onText` also when there is intermediate
+text before tool_use (LLM reasoning):
 
 ```ts
-// Texte intermédiaire avant tool_use — mise à jour live
+// Intermediate text before tool_use — live update
 if (lastText) callbacks.onText?.(lastText);
 ```
 
 ---
 
-## Deploy — Intégrité du build
+## Deploy — Build Integrity
 
-### Règle : vérifier le sha256 après chaque deploy node
+### Rule: verify sha256 after every node deploy
 
-Le deploy script (`deploy.sh`) intègre maintenant une vérification d'intégrité
-automatique après `scp`. En cas de mismatch, le deploy échoue avec une erreur
-explicite.
+The deploy script (`deploy.sh`) now includes an automatic integrity check
+after `scp`. On a mismatch, the deploy fails with an explicit error.
 
-**Pourquoi c'est nécessaire** : sans cette vérification, un deploy peut
-"réussir" (pas d'erreur scp, service `active`) mais servir l'ancien code si :
-- le build local était périmé
-- le scp a été interrompu silencieusement
-- le fichier cible était en read-only et scp a échoué sans bruit
+**Why this is necessary**: without this check, a deploy can
+"succeed" (no scp error, service `active`) but serve the old code if:
+- the local build was stale
+- the scp was silently interrupted
+- the target file was read-only and scp failed silently
 
-**Ce que ça ne remplace pas** : les tests fonctionnels (Playwright). Le sha256
-vérifie que le fichier est bien transféré, pas qu'il fait ce qu'on attend.
-
----
-
-### Règle : toujours rebuilder les apps avant de déployer
-
-Le deploy script (`deploy_node_root`, `deploy_node_build`) rebuild maintenant
-automatiquement les apps via `npm run build` avant de copier.
-
-**Historique** : avant ce fix, les packages (`@webmcp-auto-ui/*`) étaient
-recompilés par le script, mais les apps (flex, viewer) étaient
-deployées avec leur ancien `build/`. Tous les fixes Svelte appliqués dans
-`apps/*/src/` étaient donc perdus.
-
-```
-build packages ✓  →  packages/*/dist/ mis à jour
-build apps ✗     →  apps/*/build/ = ancien code
-scp apps/*/build/*  →  l'ancien code est déployé
-```
+**What this does not replace**: functional tests (Playwright). The sha256
+verifies that the file was transferred correctly, not that it behaves as expected.
 
 ---
 
-## Debug — Checklist quand "le fix n'est pas en prod"
+### Rule: always rebuild apps before deploying
 
-1. **Le build local est-il à jour ?**
+The deploy script (`deploy_node_root`, `deploy_node_build`) now automatically
+rebuilds apps via `npm run build` before copying.
+
+**History**: before this fix, packages (`@webmcp-auto-ui/*`) were
+recompiled by the script, but apps (flex, viewer) were
+deployed with their old `build/`. All Svelte fixes applied in
+`apps/*/src/` were therefore lost.
+
+```
+build packages ✓  →  packages/*/dist/ updated
+build apps ✗     →  apps/*/build/ = old code
+scp apps/*/build/*  →  old code is deployed
+```
+
+---
+
+## Debug — Checklist when "the fix is not in prod"
+
+1. **Is the local build up to date?**
    ```bash
-   ls -la apps/flex/build/index.js   # date de modification
+   ls -la apps/flex/build/index.js   # modification date
    ```
 
-2. **Le fichier déployé correspond-il au build local ?**
+2. **Does the deployed file match the local build?**
    ```bash
    sha256sum apps/flex/build/index.js
    ssh bot "sha256sum /opt/webmcp-demos/flex/index.js"
    ```
 
-3. **Y a-t-il des erreurs JS côté client ?**
+3. **Are there JS errors on the client side?**
    ```bash
    # Via Playwright (headless)
    node -e "
@@ -186,7 +185,7 @@ scp apps/*/build/*  →  l'ancien code est déployé
    })();"
    ```
 
-4. **Le service a-t-il redémarré avec le bon fichier ?**
+4. **Did the service restart with the correct file?**
    ```bash
    ssh bot "systemctl status webmcp-flex --no-pager | head -20"
    ```
@@ -195,38 +194,38 @@ scp apps/*/build/*  →  l'ancien code est déployé
 
 ## Tests — Playwright
 
-Les tests e2e sont dans `tests/e2e/smoke.spec.ts`. Ils testent les apps
-déployées sur `https://demos.hyperskills.net`.
+E2e tests are in `tests/e2e/smoke.spec.ts`. They test the apps
+deployed at `https://demos.hyperskills.net`.
 
 ```bash
-npx playwright test                    # tous les tests
-npx playwright test --grep "Composer"  # une suite
-npx playwright test --grep "export"    # un test précis
+npx playwright test                    # all tests
+npx playwright test --grep "Composer"  # one suite
+npx playwright test --grep "export"    # one specific test
 ```
 
-**Quand lancer les tests** :
-- Après chaque deploy important
-- Avant de marquer un bug comme résolu
-- Après un refactor qui touche plusieurs composants
+**When to run the tests**:
+- After every significant deploy
+- Before marking a bug as resolved
+- After a refactor that touches multiple components
 
-**Ce que les tests ne vérifient pas** :
-- Que le code déployé correspond au code local (→ sha256)
-- Les erreurs JS silencieuses côté client (→ ajouter `page.on('pageerror')`)
-- Les loops réactives Svelte qui n'affectent pas les sélecteurs CSS testés
+**What the tests do not verify**:
+- That the deployed code matches the local code (→ sha256)
+- Silent JS errors on the client side (→ add `page.on('pageerror')`)
+- Svelte reactive loops that don't affect the CSS selectors being tested
 
-**Attention à l'hydratation SvelteKit** : les composants SSR sont dans le DOM
-dès le chargement, mais les event handlers Svelte ne sont attachés qu'après
-hydratation JS. Un `page.click()` immédiat après `page.goto()` peut frapper
-un bouton non-hydraté.
+**Watch out for SvelteKit hydration**: SSR components are in the DOM
+from page load, but Svelte event handlers are only attached after
+JS hydration. An immediate `page.click()` after `page.goto()` may hit
+a non-hydrated button.
 
 ```ts
-// ❌ peut cliquer avant hydratation
+// ❌ may click before hydration
 await page.goto(url);
 await page.click('button:has-text("export")');
 
-// ✅ attendre un élément client-side (seulement visible après hydratation)
+// ✅ wait for a client-side element (only visible after hydration)
 await page.goto(url);
 await page.waitForSelector('select', { state: 'visible' });
-await page.waitForTimeout(500);   // tick d'hydratation
+await page.waitForTimeout(500);   // hydration tick
 await page.click('button:has-text("export")');
 ```

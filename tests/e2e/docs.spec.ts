@@ -7,7 +7,7 @@ const DOCS = 'https://jeanbaptiste.github.io/webmcp-auto-ui';
 test.describe('Docs — Getting Started FR', () => {
   test('page loads', async ({ page }) => {
     await page.goto(`${DOCS}/guide/getting-started/`);
-    await expect(page.locator('h1')).toContainText('démarrage');
+    await expect(page.locator('h1')).toContainText('getting started', { ignoreCase: true });
   });
 
   test('boilerplate degit command is present', async ({ page }) => {

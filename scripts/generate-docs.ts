@@ -202,71 +202,71 @@ async function callClaude(
 // Prompt templates
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `Tu es un rédacteur de documentation technique expert. Tu génères des fichiers .mdx pour Starlight (Astro).
+const SYSTEM_PROMPT = `You are an expert technical documentation writer. You generate .mdx files for Starlight (Astro).
 
-Règles :
-- Chaque fichier commence par un frontmatter YAML avec : title, description, sidebar (avec order)
-- Les diagrammes d'architecture utilisent des blocs \`\`\`mermaid
-- Les exemples de code sont concrets, extraits ou inspirés du code réel fourni
-- Le ton est technique mais accessible
-- Tu utilises le format de sortie multi-fichiers :
-  === FILE: chemin/relatif.mdx ===
-  <contenu du fichier>
+Rules:
+- Each file starts with YAML frontmatter containing: title, description, sidebar (with order)
+- Architecture diagrams use \`\`\`mermaid blocks
+- Code examples are concrete, extracted from or inspired by the real code provided
+- The tone is technical but accessible
+- You use the multi-file output format:
+  === FILE: relative/path.mdx ===
+  <file content>
   === END FILE ===
-- Ne génère RIEN en dehors de ce format (pas de commentaire avant/après)`;
+- Generate NOTHING outside this format (no comments before/after)`;
 
 function promptOverviewAndGuide(sources: string): string {
-  return `Voici le code source du projet WebMCP Auto-UI :
+  return `Here is the source code of the WebMCP Auto-UI project:
 
 ${sources}
 
-Génère les fichiers suivants en FRANÇAIS :
+Generate the following files in FRENCH:
 
-1. **index.mdx** — Page d'accueil : overview du projet WebMCP Auto-UI (système d'auto-génération d'UI par agents IA via MCP). Sidebar order: 0.
+1. **index.mdx** — Home page: overview of the WebMCP Auto-UI project (UI auto-generation system by AI agents via MCP). Sidebar order: 0.
 
-2. **guide/getting-started.mdx** — Quickstart pour un développeur : installation, configuration, premier lancement. Sidebar order: 1.
+2. **guide/getting-started.mdx** — Quickstart for a developer: installation, configuration, first launch. Sidebar order: 1.
 
-3. **guide/architecture.mdx** — Architecture complète du système : MCP, agent loop, tool layers, component registry, canvas. Inclure au moins 2 diagrammes Mermaid (un pour l'architecture globale, un pour le flow agent). Sidebar order: 2.
+3. **guide/architecture.mdx** — Complete system architecture: MCP, agent loop, tool layers, component registry, canvas. Include at least 2 Mermaid diagrams (one for the overall architecture, one for the agent flow). Sidebar order: 2.
 
-4. **guide/tool-calling.mdx** — Comment fonctionne le tool calling : tool layers, component tool, UI tools, skill executor. Sidebar order: 3.
+4. **guide/tool-calling.mdx** — How tool calling works: tool layers, component tool, UI tools, skill executor. Sidebar order: 3.
 
-5. **guide/deploy.mdx** — Comment déployer les apps (utilisation de scripts/deploy.sh, chemins par app, contraintes). Sidebar order: 4.
+5. **guide/deploy.mdx** — How to deploy apps (using scripts/deploy.sh, paths per app, constraints). Sidebar order: 4.
 
-Utilise le format === FILE: ... === pour chaque fichier.`;
+Use the === FILE: ... === format for each file.`;
 }
 
 function promptPackages(sources: string): string {
-  return `Voici le code source du projet WebMCP Auto-UI :
+  return `Here is the source code of the WebMCP Auto-UI project:
 
 ${sources}
 
-Génère les fichiers suivants en FRANÇAIS — documentation API de référence pour chaque package :
+Generate the following files in FRENCH — API reference documentation for each package:
 
-1. **packages/agent.mdx** — Package @webmcp-auto-ui/agent : agent loop (runAgentLoop), providers (Anthropic, Gemma WASM), tool layers, component tool, skill executor, token tracker. Liste tous les exports publics avec leur signature et une description. Sidebar order: 1.
+1. **packages/agent.mdx** — Package @webmcp-auto-ui/agent: agent loop (runAgentLoop), providers (Anthropic, Gemma WASM), tool layers, component tool, skill executor, token tracker. List all public exports with their signature and a description. Sidebar order: 1.
 
-2. **packages/ui.mdx** — Package @webmcp-auto-ui/ui : BlockRenderer, LLMSelector, GemmaLoader, McpStatus, AgentProgress. Montre comment utiliser chaque composant Svelte avec des exemples. Sidebar order: 2.
+2. **packages/ui.mdx** — Package @webmcp-auto-ui/ui: BlockRenderer, LLMSelector, GemmaLoader, McpStatus, AgentProgress. Show how to use each Svelte component with examples. Sidebar order: 2.
 
-3. **packages/sdk.mdx** — Package @webmcp-auto-ui/sdk : canvas store, HyperSkill encode/decode/hash/diff/getHsParam. Détaille l'API du store canvas et les fonctions utilitaires. Sidebar order: 3.
+3. **packages/sdk.mdx** — Package @webmcp-auto-ui/sdk: canvas store, HyperSkill encode/decode/hash/diff/getHsParam. Detail the canvas store API and utility functions. Sidebar order: 3.
 
-4. **packages/core.mdx** — Package @webmcp-auto-ui/core : McpClient, createToolGroup, types, events. Détaille l'API client MCP et les helpers. Sidebar order: 4.
+4. **packages/core.mdx** — Package @webmcp-auto-ui/core: McpClient, createToolGroup, types, events. Detail the MCP client API and helpers. Sidebar order: 4.
 
-Utilise le format === FILE: ... === pour chaque fichier.`;
+Use the === FILE: ... === format for each file.`;
 }
 
 function promptTutorials(sources: string): string {
-  return `Voici le code source du projet WebMCP Auto-UI :
+  return `Here is the source code of the WebMCP Auto-UI project:
 
 ${sources}
 
-Génère les fichiers suivants en FRANÇAIS — tutorials pas-à-pas :
+Generate the following files in FRENCH — step-by-step tutorials:
 
-1. **tutorials/create-custom-widget.mdx** — Tutorial : créer un widget custom pour le système de composants. Montre comment enregistrer un nouveau composant dans le registry, le rendre via BlockRenderer, et le connecter au canvas. Sidebar order: 1.
+1. **tutorials/create-custom-widget.mdx** — Tutorial: create a custom widget for the component system. Show how to register a new component in the registry, render it via BlockRenderer, and connect it to the canvas. Sidebar order: 1.
 
-2. **tutorials/use-existing-widgets.mdx** — Tutorial : utiliser les widgets existants (BlockRenderer avec les types de blocs simple et rich). Montre des exemples concrets d'utilisation dans une app Svelte. Sidebar order: 2.
+2. **tutorials/use-existing-widgets.mdx** — Tutorial: use existing widgets (BlockRenderer with simple and rich block types). Show concrete usage examples in a Svelte app. Sidebar order: 2.
 
-3. **tutorials/connect-mcp-server.mdx** — Tutorial : connecter un serveur MCP externe. Montre comment utiliser McpClient, configurer les tool groups, et intégrer avec l'agent loop. Sidebar order: 3.
+3. **tutorials/connect-mcp-server.mdx** — Tutorial: connect an external MCP server. Show how to use McpClient, configure tool groups, and integrate with the agent loop. Sidebar order: 3.
 
-Utilise le format === FILE: ... === pour chaque fichier.`;
+Use the === FILE: ... === format for each file.`;
 }
 
 function promptTranslate(frenchDocs: Record<string, string>): string {
@@ -274,19 +274,19 @@ function promptTranslate(frenchDocs: Record<string, string>): string {
     .map(([path, content]) => `=== FILE: ${path} ===\n${content}\n=== END FILE ===`)
     .join('\n\n');
 
-  return `Traduis ces fichiers de documentation technique du français vers l'anglais.
-Conserve exactement :
-- Le frontmatter YAML (traduis title et description)
-- La structure Markdown/MDX
-- Les blocs de code (ne traduis PAS le code, seulement les commentaires)
-- Les diagrammes Mermaid (traduis les labels)
-- Le format de sortie === FILE: ... ===
+  return `Translate these technical documentation files from French to English.
+Preserve exactly:
+- The YAML frontmatter (translate title and description)
+- The Markdown/MDX structure
+- Code blocks (do NOT translate the code, only the comments)
+- Mermaid diagrams (translate the labels)
+- The === FILE: ... === output format
 
-Voici les fichiers :
+Here are the files:
 
 ${docsList}
 
-Génère les fichiers traduits avec les mêmes chemins relatifs.`;
+Generate the translated files with the same relative paths.`;
 }
 
 // ---------------------------------------------------------------------------
