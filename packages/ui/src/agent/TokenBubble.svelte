@@ -82,12 +82,12 @@
     {/if}
     <span class="sep">|</span>
     {#if metrics.isWasm}
-      <span>Req {metrics.requestsPerMin}/min</span>
       <span>Out {fmt(metrics.outputTokensPerMin)}/min</span>
+      <span>Req {metrics.requestsPerMin}/min</span>
     {:else}
-      <span class:warn={metrics.requestsPerMin > LIMITS.reqPerMin * 0.8}>Req {metrics.requestsPerMin}/min</span> <span class="limit">({fmt(LIMITS.reqPerMin)} max)</span>
       <span class:warn={metrics.inputTokensPerMin > LIMITS.inPerMin * 0.8}>In {fmt(metrics.inputTokensPerMin)}/min</span> <span class="limit">({fmt(LIMITS.inPerMin)} max)</span>
       <span class:warn={metrics.outputTokensPerMin > LIMITS.outPerMin * 0.8}>Out {fmt(metrics.outputTokensPerMin)}/min</span> <span class="limit">({fmt(LIMITS.outPerMin)} max)</span>
+      <span class:warn={metrics.requestsPerMin > LIMITS.reqPerMin * 0.8}>Req {metrics.requestsPerMin}/min</span> <span class="limit">({fmt(LIMITS.reqPerMin)} max)</span>
     {/if}
   </div>
 {/if}
