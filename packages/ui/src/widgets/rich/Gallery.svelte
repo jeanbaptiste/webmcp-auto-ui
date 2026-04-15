@@ -37,6 +37,15 @@
   {#if spec.title}<h3 class="text-sm font-semibold text-text1 mb-3">{spec.title}</h3>{/if}
   {#if images.length === 0}
     <p class="text-text2 text-sm">{spec.emptyMessage ?? 'Aucune image'}</p>
+  {:else if images.length === 1}
+    {@const img = images[0]}
+    <button class="relative overflow-hidden rounded-lg border border-border hover:border-border2 transition-all cursor-pointer bg-transparent p-0 group w-full"
+      onclick={() => open(0)}>
+      <SafeImage src={img.src} alt={img.alt ?? ''} class="w-full max-h-[400px] object-contain rounded-lg" loading="eager" />
+      {#if img.caption || img.alt}
+        <div class="mt-2 text-center text-xs text-text2">{img.caption ?? img.alt}</div>
+      {/if}
+    </button>
   {:else}
     <div class="grid gap-2 responsive-gallery" style="--gallery-cols: repeat({spec.columns ?? 3}, minmax(0, 1fr));">
       {#each images as img, i}
