@@ -10,7 +10,8 @@
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <li class="text-sm text-text1 bg-surface2 rounded px-3 py-2 border-l-2 border-accent {onitemclick ? 'cursor-pointer hover:bg-surface2/80' : ''}"
-          onclick={() => onitemclick?.(item, i)}>{item}</li>
+          title={onitemclick?"Double-cliquez pour interagir":undefined}
+          ondblclick={() => onitemclick?.(item, i)}>{item}</li>
     {/each}
   </ul>
 </div>

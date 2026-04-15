@@ -20,7 +20,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <!-- svelte-ignore a11y_interactive_supports_focus -->
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-        <div class="bg-surface2 border border-border rounded-lg overflow-hidden hover:border-border2 transition-all {oncardclick?'cursor-pointer':''}" role={oncardclick?"button":undefined} tabindex={oncardclick?0:undefined} onclick={()=>oncardclick?.(card)}>
+        <div class="bg-surface2 border border-border rounded-lg overflow-hidden hover:border-border2 transition-all {oncardclick?'cursor-pointer':''}" role={oncardclick?"button":undefined} tabindex={oncardclick?0:undefined} title={oncardclick?"Double-cliquez pour interagir":undefined} ondblclick={()=>oncardclick?.(card)}>
           {#if card.image}<SafeImage src={card.image} alt={card.title} class="w-full h-32 object-cover" hideOnError />{/if}
           <div class="p-3">
             <div class="font-semibold text-sm text-text1 leading-tight">{card.title}</div>

@@ -16,6 +16,8 @@
 
   function open(i: number) {
     lightboxIdx = i;
+  }
+  function interact(i: number) {
     onimageclick?.(images[i], i);
   }
   function close() { lightboxIdx = null; }
@@ -39,7 +41,9 @@
     <div class="grid gap-2 responsive-gallery" style="--gallery-cols: repeat({spec.columns ?? 3}, minmax(0, 1fr));">
       {#each images as img, i}
         <button class="relative overflow-hidden rounded-lg border border-border hover:border-border2 transition-all cursor-pointer bg-transparent p-0 group"
-          onclick={() => open(i)}>
+          title={onimageclick?"Double-cliquez pour interagir":undefined}
+          onclick={() => open(i)}
+          ondblclick={() => interact(i)}>
           <SafeImage src={img.src} alt={img.alt ?? ''} class="w-full h-32 sm:h-40 object-cover transition-transform group-hover:scale-105" loading="lazy" />
           {#if img.caption}
             <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5">

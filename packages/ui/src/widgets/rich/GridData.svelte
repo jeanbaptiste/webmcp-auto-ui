@@ -30,9 +30,10 @@
           {#each rows as row, ri}
             <tr class="hover:bg-surface2">
               {#each (Array.isArray(row)?row:[]) as cell, ci}
-                <td class="px-3 text-text2 border-b border-r border-border cursor-pointer hover:bg-surface2"
+                <td class="px-3 text-text2 border-b border-r border-border {oncellclick?'cursor-pointer':''} hover:bg-surface2"
                   style="height:{cellH}px;{bg(ri,ci)?`background:${bg(ri,ci)};`:''}"
-                  onclick={()=>oncellclick?.(ri,ci,cell)}>{dv(cell)}</td>
+                  title={oncellclick?"Double-cliquez pour interagir":undefined}
+                  ondblclick={()=>oncellclick?.(ri,ci,cell)}>{dv(cell)}</td>
               {/each}
             </tr>
           {/each}

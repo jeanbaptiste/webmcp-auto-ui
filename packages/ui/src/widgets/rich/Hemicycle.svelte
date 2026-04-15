@@ -51,7 +51,9 @@
             class={s.gid?'cursor-pointer':''}
             onmouseenter={()=>{const g=groups.find(g=>g.id===s.gid);if(g)tooltip={label:g.label,seats:g.seats};}}
             onmouseleave={()=>tooltip=null}
-            onclick={()=>{const g=groups.find(g=>g.id===s.gid);if(g)ongroupclick?.(g);}}/>
+            ondblclick={()=>{const g=groups.find(g=>g.id===s.gid);if(g)ongroupclick?.(g);}}>
+            {#if s.gid}<title>Double-cliquez pour interagir</title>{/if}
+          </circle>
         {/each}
         <text x={cx} y={cy+18} text-anchor="middle" font-size="11" fill="var(--color-text2)" font-family="system-ui">{total} sièges</text>
       </svg>
@@ -65,7 +67,7 @@
       {#each legend as g}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="flex items-center gap-1.5 text-xs cursor-pointer hover:opacity-80" role="button" tabindex="0" onclick={()=>ongroupclick?.(g)} onkeydown={(e)=>{if(e.key==="Enter")ongroupclick?.(g)}}>
+        <div class="flex items-center gap-1.5 text-xs cursor-pointer hover:opacity-80" role="button" tabindex="0" title="Double-cliquez pour interagir" ondblclick={()=>ongroupclick?.(g)} onkeydown={(e)=>{if(e.key==="Enter")ongroupclick?.(g)}}>
           <div class="w-3 h-3 rounded-full flex-shrink-0" style="background:{g.color};"></div>
           <span class="text-text2">{g.label}</span>
           <span class="text-text2">{g.seats}</span>

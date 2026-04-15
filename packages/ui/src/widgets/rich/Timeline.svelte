@@ -18,7 +18,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <!-- svelte-ignore a11y_interactive_supports_focus -->
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-        <div class="flex gap-4 relative {!isLast?'pb-5':''} {oneventclick?'cursor-pointer':''}" role={oneventclick?"button":undefined} tabindex={oneventclick?0:undefined} onclick={()=>oneventclick?.(event)} onkeydown={(e)=>{if(e.key==='Enter')oneventclick?.(event)}}>
+        <div class="flex gap-4 relative {!isLast?'pb-5':''} {oneventclick?'cursor-pointer':''}" role={oneventclick?"button":undefined} tabindex={oneventclick?0:undefined} title={oneventclick?"Double-cliquez pour interagir":undefined} ondblclick={()=>oneventclick?.(event)} onkeydown={(e)=>{if(e.key==='Enter')oneventclick?.(event)}}>
           <div class="flex flex-col items-center flex-shrink-0">
             <div class="w-3 h-3 rounded-full flex-shrink-0 mt-0.5" style="background:{dotColor};{event.status==='active'?`box-shadow:0 0 0 3px ${dotColor}33;`:''}"></div>
             {#if !isLast}<div class="w-0.5 flex-1 bg-border mt-1"></div>{/if}

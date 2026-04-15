@@ -37,7 +37,8 @@
         <tbody>
           {#each displayed as row, i}
             <tr class="hover:bg-surface2 transition-colors {spec.striped!==false&&i%2===1?'bg-white/[0.02]':''} {onrowclick?'cursor-pointer':''}"
-              onclick={()=>onrowclick?.(row)}>
+              title={onrowclick?"Double-cliquez pour interagir":undefined}
+              ondblclick={()=>onrowclick?.(row)}>
               {#each columns as col}
                 {@const val=row[col.key]}
                 <td class="border-b border-border text-text1 overflow-hidden text-ellipsis whitespace-nowrap max-w-[280px] {compact?'px-2 py-1 text-xs':'px-3 py-2 text-sm'} {col.align==='center'?'text-center':col.align==='right'?'text-right':''}">
