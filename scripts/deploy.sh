@@ -92,6 +92,8 @@ deploy_node_root() {
   fi
   echo "  [$app] copying build..."
   scp -r "$LOCAL_ROOT/apps/$app/build/"* "$SSH_HOST:$REMOTE_BASE/$app/"
+  # Ensure package.json is present (required for ESM "type": "module")
+  scp "$LOCAL_ROOT/apps/$app/package.json" "$SSH_HOST:$REMOTE_BASE/$app/package.json"
   echo "  [$app] verifying deploy integrity..."
   local expected actual
   expected=$(sha256sum "$LOCAL_ROOT/apps/$app/build/index.js" | cut -d' ' -f1)
@@ -126,6 +128,8 @@ deploy_node_build() {
   ssh "$SSH_HOST" "mkdir -p $REMOTE_BASE/$app/build"
   echo "  [$app] copying build..."
   scp -r "$LOCAL_ROOT/apps/$app/build/"* "$SSH_HOST:$REMOTE_BASE/$app/build/"
+  # Ensure package.json is present (required for ESM "type": "module")
+  scp "$LOCAL_ROOT/apps/$app/package.json" "$SSH_HOST:$REMOTE_BASE/$app/package.json"
   echo "  [$app] verifying deploy integrity..."
   local expected actual
   expected=$(sha256sum "$LOCAL_ROOT/apps/$app/build/index.js" | cut -d' ' -f1)
