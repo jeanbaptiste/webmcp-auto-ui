@@ -80,7 +80,7 @@ component("gallery", {
 
 ## Erreurs courantes
 
-- **Inventer des URLs placeholder** (`https://example.com/image.jpg`) — strictement INTERDIT
+- **Inventer des URLs placeholder** (`https://example.com/image.jpg`, `via.placeholder.com`, `placehold.co`, `dummyimage.com`, `?text=...`) — strictement INTERDIT. Si aucune image réelle n'est retournée par l'API, ne PAS afficher de galerie.
 - **Oublier de verifier** que le champ image existe dans les donnees retournees (certains objets Met Museum n'ont pas de `primaryImage`)
 - **Utiliser `text` pour afficher des URLs** au lieu de `gallery` — les images doivent etre rendues visuellement
 - **Ne pas adapter la taille** : iNaturalist retourne des thumbnails "square" par defaut, remplacer par "medium" ou "large" dans l'URL

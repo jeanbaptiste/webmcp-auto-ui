@@ -35,4 +35,5 @@ Pour afficher une collection d'images en grille — galerie photo, résultats de
 
 ## Erreurs courantes
 - Ne JAMAIS fabriquer d'URLs d'images — utiliser uniquement celles retournées par les outils MCP
+- STRICTEMENT INTERDIT : URLs placeholder (`via.placeholder.com`, `placehold.co`, `dummyimage.com`, `?text=...`, `example.com/image.jpg`). Si aucune image réelle n'est disponible, ne PAS afficher de galerie — utiliser un widget `text` ou `cards` sans image à la place
 - Toujours fournir un `alt` pour l'accessibilité

@@ -36,5 +36,6 @@ Pour afficher une collection d'éléments riches — produits, articles, projets
 2. Appeler `autoui_webmcp_widget_display('cards', { title: 'Projets actifs', cards: [{ title: 'Refonte UI', description: 'Migration vers Svelte 5', subtitle: 'Q2 2024', tags: ['frontend', 'priorité haute'] }] })`
 
 ## Erreurs courantes
-- Ne JAMAIS inventer d'URLs d'images pour le champ `image`. Utiliser UNIQUEMENT les URLs retournées par les outils MCP (query_sql, search_recipes, etc.). Si aucune URL n'est disponible, ne pas inclure de champ image.
+- Ne JAMAIS inventer d'URLs d'images pour le champ `image`. Utiliser UNIQUEMENT les URLs retournées par les outils MCP. Si aucune URL n'est disponible, ne pas inclure de champ image — le widget s'affiche correctement sans.
+- STRICTEMENT INTERDIT : URLs placeholder (`via.placeholder.com`, `placehold.co`, `dummyimage.com`, `?text=...`). Omettre le champ `image` plutôt que de mettre un placeholder.
 - Toujours fournir un `title` pour chaque carte
