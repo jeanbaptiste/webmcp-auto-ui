@@ -84,18 +84,10 @@ deploy_node_root() {
   rm -rf "$LOCAL_ROOT/apps/$app/build"
   echo "  [$app] building app..."
   (cd "$LOCAL_ROOT/apps/$app" && npm run build > /dev/null 2>&1)
-  echo "  [$app] cleaning old files on server..."
-  ssh "$SSH_HOST" "cd $REMOTE_BASE/$app && rm -f index.js handler.js env.js shims.js && rm -rf client server build"
-  # Recreate subdirectory structure so scp can copy files into nested dirs
-  local subdirs
-  subdirs=$(cd "$LOCAL_ROOT/apps/$app/build" && find . -type d | sed 's|^\./||' | grep -v '^\.$' || true)
-  if [ -n "$subdirs" ]; then
-    ssh "$SSH_HOST" "cd $REMOTE_BASE/$app && echo '$subdirs' | xargs -I{} mkdir -p '{}'"
-  fi
-  echo "  [$app] copying build..."
-  scp -r "$LOCAL_ROOT/apps/$app/build/"* "$SSH_HOST:$REMOTE_BASE/$app/"
-  # Ensure package.json is present (required for ESM "type": "module")
-  scp "$LOCAL_ROOT/apps/$app/package.json" "$SSH_HOST:$REMOTE_BASE/$app/package.json"
+  echo "  [$app] syncing build (rsync)..."
+  # Copy package.json into build/ so rsync sends everything in one pass
+  cp "$LOCAL_ROOT/apps/$app/package.json" "$LOCAL_ROOT/apps/$app/build/package.json"
+  rsync -az --delete --exclude='.env' "$LOCAL_ROOT/apps/$app/build/" "$SSH_HOST:$REMOTE_BASE/$app/"
   echo "  [$app] verifying deploy integrity..."
   local expected actual
   expected=$(sha256sum "$LOCAL_ROOT/apps/$app/build/index.js" | cut -d' ' -f1)
@@ -127,13 +119,10 @@ deploy_node_build() {
   rm -rf "$LOCAL_ROOT/apps/$app/build"
   echo "  [$app] building app..."
   (cd "$LOCAL_ROOT/apps/$app" && npm run build > /dev/null 2>&1)
-  echo "  [$app] cleaning old build..."
-  ssh "$SSH_HOST" "rm -rf $REMOTE_BASE/$app/build"
+  echo "  [$app] syncing build (rsync)..."
   ssh "$SSH_HOST" "mkdir -p $REMOTE_BASE/$app/build"
-  echo "  [$app] copying build..."
-  scp -r "$LOCAL_ROOT/apps/$app/build/"* "$SSH_HOST:$REMOTE_BASE/$app/build/"
-  # Ensure package.json is present (required for ESM "type": "module")
-  scp "$LOCAL_ROOT/apps/$app/package.json" "$SSH_HOST:$REMOTE_BASE/$app/package.json"
+  cp "$LOCAL_ROOT/apps/$app/package.json" "$LOCAL_ROOT/apps/$app/build/package.json"
+  rsync -az --delete --exclude='.env' "$LOCAL_ROOT/apps/$app/build/" "$SSH_HOST:$REMOTE_BASE/$app/build/"
   echo "  [$app] verifying deploy integrity..."
   local expected actual
   expected=$(sha256sum "$LOCAL_ROOT/apps/$app/build/index.js" | cut -d' ' -f1)
@@ -163,10 +152,8 @@ deploy_static() {
   rm -rf "$LOCAL_ROOT/apps/$app/build"
   echo "  [$app] building with production env..."
   (cd "$LOCAL_ROOT/apps/$app" && eval "${env_prefix}npm run build" > /dev/null 2>&1)
-  echo "  [$app] cleaning old assets on server..."
-  ssh "$SSH_HOST" "rm -rf $REMOTE_BASE/$app/_app"
-  echo "  [$app] copying build..."
-  scp -r "$LOCAL_ROOT/apps/$app/build/"* "$SSH_HOST:$REMOTE_BASE/$app/"
+  echo "  [$app] syncing build (rsync)..."
+  rsync -az --delete --exclude='.env' "$LOCAL_ROOT/apps/$app/build/" "$SSH_HOST:$REMOTE_BASE/$app/"
   echo "  [$app] verifying deploy integrity..."
   local expected actual
   expected=$(sha256sum "$LOCAL_ROOT/apps/$app/build/index.html" | cut -d' ' -f1)
@@ -191,10 +178,8 @@ deploy_vite_static() {
   rm -rf "$LOCAL_ROOT/apps/$app/dist"
   echo "  [$app] building with vite..."
   (cd "$LOCAL_ROOT/apps/$app" && ${env_prefix}npm run build > /dev/null 2>&1)
-  echo "  [$app] cleaning old assets on server..."
-  ssh "$SSH_HOST" "rm -rf $REMOTE_BASE/$app/assets"
-  echo "  [$app] copying dist..."
-  scp -r "$LOCAL_ROOT/apps/$app/dist/"* "$SSH_HOST:$REMOTE_BASE/$app/"
+  echo "  [$app] syncing dist (rsync)..."
+  rsync -az --delete --exclude='.env' "$LOCAL_ROOT/apps/$app/dist/" "$SSH_HOST:$REMOTE_BASE/$app/"
   echo "  [$app] verifying deploy integrity..."
   local expected actual
   expected=$(sha256sum "$LOCAL_ROOT/apps/$app/dist/index.html" | cut -d' ' -f1)
@@ -220,11 +205,8 @@ deploy_astro_node() {
   rm -rf "$LOCAL_ROOT/apps/$app/dist"
   echo "  [$app] building astro..."
   (cd "$LOCAL_ROOT/apps/$app" && npm run build > /dev/null 2>&1)
-  echo "  [$app] cleaning old build on server..."
-  ssh "$SSH_HOST" "rm -rf $REMOTE_BASE/$app/server $REMOTE_BASE/$app/client"
-  ssh "$SSH_HOST" "mkdir -p $REMOTE_BASE/$app"
-  echo "  [$app] copying dist..."
-  scp -r "$LOCAL_ROOT/apps/$app/dist/"* "$SSH_HOST:$REMOTE_BASE/$app/"
+  echo "  [$app] syncing dist (rsync)..."
+  rsync -az --delete --exclude='.env' "$LOCAL_ROOT/apps/$app/dist/" "$SSH_HOST:$REMOTE_BASE/$app/"
   echo "  [$app] verifying deploy integrity..."
   local expected actual
   expected=$(sha256sum "$LOCAL_ROOT/apps/$app/dist/server/entry.mjs" | cut -d' ' -f1)
