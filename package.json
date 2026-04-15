@@ -1,7 +1,7 @@
 {
   "name": "webmcp-auto-ui",
   "private": true,
-  "version": "2.5.8",
+  "version": "2.5.9",
   "workspaces": [
     "packages/core",
     "packages/ui",
