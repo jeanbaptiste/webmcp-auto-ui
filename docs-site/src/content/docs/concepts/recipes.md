@@ -321,7 +321,7 @@ graph TD
 
 - **ToolLayers** : les recettes WebMCP sont portees par la `WebMcpLayer`, les recettes MCP par les `McpLayer`
 - **Widgets** : les recettes WebMCP referent les widgets par leur nom (`stat-card`, `profile`...)
-- **component() / widget_display** : l'outil que le LLM appelle apres avoir lu la recette
+- **widget_display** : l'outil que le LLM appelle apres avoir lu la recette
 - **MCP** : les recettes MCP guident l'utilisation des outils DATA du serveur
 
 ## Patterns avances

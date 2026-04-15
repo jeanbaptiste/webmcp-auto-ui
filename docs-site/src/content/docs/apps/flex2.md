@@ -1,6 +1,6 @@
 ---
 title: Flex
-description: Canvas IA avec ToolLayers, component() unique, LogDrawer, RecipeModal et mode composeur/consommateur
+description: Canvas IA avec ToolLayers, widget_display() unique, LogDrawer, RecipeModal et mode composeur/consommateur
 sidebar:
   order: 1
 ---

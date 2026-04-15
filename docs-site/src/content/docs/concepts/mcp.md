@@ -292,14 +292,14 @@ const result = await runAgentLoop('Liste les deputes ecologistes', {
 graph TD
     MCP["MCP<br/>(ce concept)"] --> TL["ToolLayers<br/>Structure les outils"]
     MCP --> R["Recettes MCP<br/>Guident les donnees"]
-    TL --> CT["component()<br/>Rend les widgets"]
+    TL --> CT["widget_display()<br/>Rend les widgets"]
     CT --> W["Widgets UI<br/>Affichage final"]
     R --> WR["Recettes WebMCP<br/>Guident l'affichage"]
 ```
 
 - **ToolLayers** : MCP produit des `McpLayer` qui entrent dans le systeme de couches
 - **Recettes** : les recettes MCP (serveur) et WebMCP (UI) sont deux systemes complementaires
-- **component()** / **widget_display** : le LLM appelle ces outils pour rendre les donnees MCP en widgets
+- **widget_display** : le LLM appelle cet outil pour rendre les donnees MCP en widgets
 
 ## Patterns avances
 

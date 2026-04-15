@@ -1,5 +1,5 @@
 ---
-title: "component()"
+title: "widget_display()"
 description: Tool unifie exposant les composants au LLM, widget_display, et le pont agent-UI
 sidebar:
   order: 2
@@ -7,7 +7,7 @@ sidebar:
 
 Imaginez un telecommande universelle : au lieu d'avoir une telecommande par appareil (TV, sono, lumieres), vous avez un seul bouton "affiche ca". Vous dites ce que vous voulez voir et avec quels parametres, et la telecommande se debrouille. C'est exactement le role de `widget_display` : un **outil unique** qui permet a l'agent de rendre n'importe lequel des 24+ widgets natifs.
 
-## Qu'est-ce que l'outil component / widget_display ?
+## Qu'est-ce que l'outil widget_display ?
 
 `widget_display` est l'outil WebMCP central qui permet a l'agent IA d'**afficher un widget sur le canvas**. L'agent envoie un nom de widget et ses parametres, et le systeme :
 1. Valide les parametres contre le schema JSON du widget

@@ -211,7 +211,7 @@
 </script>
 
 {#if isVanillaRenderer}
-  <div bind:this={vanillaContainer} class="w-full h-full overflow-auto"></div>
+  <div bind:this={vanillaContainer} class="vanilla-container w-full h-full overflow-auto p-2"></div>
 {:else if customRenderer}
   <svelte:component this={customRenderer as Component<any>} {data} {id} />
 {:else if nativeEntry}
@@ -219,3 +219,24 @@
 {:else}
   <div class="p-3 font-mono text-xs text-text2">[{type}]</div>
 {/if}
+
+<style>
+  .vanilla-container :global(svg) {
+    width: 100%;
+    height: auto;
+    max-height: 100%;
+    display: block;
+  }
+  .vanilla-container :global(canvas) {
+    width: 100%;
+    height: auto;
+    max-height: 100%;
+    display: block;
+  }
+  .vanilla-container :global(img) {
+    width: 100%;
+    height: auto;
+    max-height: 100%;
+    object-fit: contain;
+  }
+</style>

@@ -521,7 +521,7 @@ graph LR
 ```
 
 - **Recettes** : les recettes WebMCP indiquent a l'agent quel widget utiliser en fonction des donnees
-- **component() / widget_display** : l'outil qui instancie un widget sur le canvas
+- **widget_display** : l'outil qui instancie un widget sur le canvas
 - **ToolLayers** : les widgets sont exposes via la `WebMcpLayer` du serveur autoui
 - **Canvas** : la surface reactive ou les widgets sont rendus et mis a jour
 
