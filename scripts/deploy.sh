@@ -80,6 +80,8 @@ deploy_node_root() {
     return
   fi
   backup_app "$app"
+  echo "  [$app] cleaning local build dir..."
+  rm -rf "$LOCAL_ROOT/apps/$app/build"
   echo "  [$app] building app..."
   (cd "$LOCAL_ROOT/apps/$app" && npm run build > /dev/null 2>&1)
   echo "  [$app] cleaning old files on server..."
@@ -121,6 +123,8 @@ deploy_node_build() {
     return
   fi
   backup_app "$app"
+  echo "  [$app] cleaning local build dir..."
+  rm -rf "$LOCAL_ROOT/apps/$app/build"
   echo "  [$app] building app..."
   (cd "$LOCAL_ROOT/apps/$app" && npm run build > /dev/null 2>&1)
   echo "  [$app] cleaning old build..."
@@ -155,6 +159,8 @@ deploy_static() {
     return
   fi
   backup_app "$app"
+  echo "  [$app] cleaning local build dir..."
+  rm -rf "$LOCAL_ROOT/apps/$app/build"
   echo "  [$app] building with production env..."
   (cd "$LOCAL_ROOT/apps/$app" && eval "${env_prefix}npm run build" > /dev/null 2>&1)
   echo "  [$app] cleaning old assets on server..."
@@ -181,6 +187,8 @@ deploy_vite_static() {
     return
   fi
   backup_app "$app"
+  echo "  [$app] cleaning local dist dir..."
+  rm -rf "$LOCAL_ROOT/apps/$app/dist"
   echo "  [$app] building with vite..."
   (cd "$LOCAL_ROOT/apps/$app" && ${env_prefix}npm run build > /dev/null 2>&1)
   echo "  [$app] cleaning old assets on server..."
@@ -208,6 +216,8 @@ deploy_astro_node() {
     return
   fi
   backup_app "$app"
+  echo "  [$app] cleaning local dist dir..."
+  rm -rf "$LOCAL_ROOT/apps/$app/dist"
   echo "  [$app] building astro..."
   (cd "$LOCAL_ROOT/apps/$app" && npm run build > /dev/null 2>&1)
   echo "  [$app] cleaning old build on server..."
