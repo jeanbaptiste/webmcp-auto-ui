@@ -56,7 +56,8 @@ export class McpMultiClient {
     const initResult = await client.connect();
     const tools = await client.listTools();
 
-    const name = initResult.serverInfo.name;
+    const SERVER_NAME_MAP: Record<string, string> = { 'moulineuse': 'Tricoteuses' };
+    const name = SERVER_NAME_MAP[initResult.serverInfo.name] ?? initResult.serverInfo.name;
     this.servers.set(url, { client, name, tools });
 
     return { name, tools };

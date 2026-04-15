@@ -88,6 +88,7 @@ function createCanvasVanilla() {
   let _mcpConnected = false;
   let _mcpConnecting = false;
   let _mcpName = '';
+  const MCP_NAME_MAP: Record<string, string> = { 'moulineuse': 'Tricoteuses' };
   let _mcpTools: McpToolInfo[] = [];
   let _messages: ChatMsg[] = [];
   let _generating = false;
@@ -318,7 +319,7 @@ function createCanvasVanilla() {
     set mcpUrl(v: string) { _mcpUrl = v; notify(); },
     get mcpConnected() { return _mcpConnected; },
     get mcpConnecting() { return _mcpConnecting; },
-    get mcpName() { return _mcpName; },
+    get mcpName() { return MCP_NAME_MAP[_mcpName] ?? _mcpName; },
     get mcpTools() { return _mcpTools; },
     get messages() { return _messages; },
     get generating() { return _generating; },
