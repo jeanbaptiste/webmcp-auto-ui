@@ -191,10 +191,91 @@ function exportImageUrls(type: string, data: Record<string, unknown>): void {
   downloadFile(content, filename(type, 'json'), 'application/json');
 }
 
+// ── Export Format types ───────────────────────────────────────────────────────
+
+export interface ExportFormat {
+  id: string;       // 'csv', 'png', 'json', 'md', 'html'
+  label: string;    // 'CSV', 'PNG', 'JSON', 'Markdown', 'HTML'
+  icon: string;     // emoji or unicode
+}
+
+const CSV_FMT:  ExportFormat = { id: 'csv',  label: 'CSV',      icon: '📊' };
+const PNG_FMT:  ExportFormat = { id: 'png',  label: 'PNG',      icon: '📷' };
+const JSON_FMT: ExportFormat = { id: 'json', label: 'JSON',     icon: '📋' };
+const MD_FMT:   ExportFormat = { id: 'md',   label: 'Markdown', icon: '📝' };
+const HTML_FMT: ExportFormat = { id: 'html', label: 'HTML',     icon: '🌐' };
+
+/**
+ * Return the list of export formats available for a given widget type.
+ */
+export function getExportFormats(type: string, containerEl?: HTMLElement): ExportFormat[] {
+  switch (type) {
+    case 'data-table':
+    case 'grid-data':
+    case 'kv':
+    case 'list':
+      return [CSV_FMT, JSON_FMT];
+
+    case 'chart':
+    case 'chart-rich':
+    case 'sankey':
+    case 'd3':
+    case 'hemicycle':
+    case 'map':
+      return [PNG_FMT, JSON_FMT];
+
+    case 'text':
+    case 'code':
+    case 'log':
+      return [MD_FMT, JSON_FMT];
+
+    case 'js-sandbox':
+      return [HTML_FMT, JSON_FMT];
+
+    case 'gallery':
+    case 'carousel':
+      return [JSON_FMT];
+
+    default:
+      return [JSON_FMT];
+  }
+}
+
+/**
+ * Export a widget in a specific format chosen by the user.
+ */
+export function exportWidgetAs(
+  format: string,
+  type: string,
+  data: Record<string, unknown>,
+  containerEl?: HTMLElement
+): void {
+  switch (format) {
+    case 'csv':
+      exportCsv(type, data);
+      break;
+    case 'png':
+      if (containerEl) exportPng(type, containerEl);
+      else console.warn('[exportWidgetAs] containerEl required for PNG export');
+      break;
+    case 'md':
+      exportMarkdown(type, data);
+      break;
+    case 'html':
+      exportHtml(type, data, containerEl);
+      break;
+    case 'json':
+    default:
+      exportJson(type, data);
+      break;
+  }
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
  * Export a widget's data in the most appropriate format for its type.
+ * @deprecated Use getExportFormats() + exportWidgetAs() for format selection modal.
  *
  * @param type       Widget type identifier (e.g. "data-table", "chart", "text")
  * @param data       The widget's data object

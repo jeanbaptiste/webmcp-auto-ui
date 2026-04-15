@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { FloatingLayout, FlexLayout, WidgetRenderer, layoutAdapter, LinkIndicators, linkGroupColor, bus, exportWidget } from '@webmcp-auto-ui/ui';
+  import { FloatingLayout, FlexLayout, WidgetRenderer, layoutAdapter, LinkIndicators, linkGroupColor, bus, ExportModal } from '@webmcp-auto-ui/ui';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import type { ManagedWindow } from '@webmcp-auto-ui/ui';
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
@@ -27,6 +27,9 @@
 
   // Track provenance per block: blockId -> { server, component }
   let provenance = $state<Record<string, { server?: string; component?: string }>>({});
+
+  // Export modal state
+  let exportTarget = $state<{ type: string; data: Record<string, unknown>; containerEl?: HTMLElement } | null>(null);
 
   $effect(() => {
     if (!fl) return;
@@ -110,7 +113,7 @@
               <LinkIndicators busId={win.id} />
               <!-- svelte-ignore a11y_consider_explicit_label -->
               <button class="w-4 h-4 text-text2 hover:text-accent text-sm leading-none transition-colors flex-shrink-0"
-                      onclick={(e) => { e.stopPropagation(); if (block) exportWidget(block.type, block.data, widgetContainerRef.el ?? undefined); }}
+                      onclick={(e) => { e.stopPropagation(); if (block) exportTarget = { type: block.type, data: block.data, containerEl: widgetContainerRef.el ?? undefined }; }}
                       title="Exporter">&#x2913;</button>
               <!-- svelte-ignore a11y_consider_explicit_label -->
               <button class="w-4 h-4 text-text2 hover:text-accent2 text-sm leading-none transition-colors flex-shrink-0"
@@ -150,7 +153,7 @@
                       title="Ajuster a la taille du contenu">&#x2922;</button>
               <!-- svelte-ignore a11y_consider_explicit_label -->
               <button class="w-4 h-4 text-text2 hover:text-accent text-sm leading-none transition-colors flex-shrink-0"
-                      onclick={(e) => { e.stopPropagation(); if (block) exportWidget(block.type, block.data, widgetContainerRef.el ?? undefined); }}
+                      onclick={(e) => { e.stopPropagation(); if (block) exportTarget = { type: block.type, data: block.data, containerEl: widgetContainerRef.el ?? undefined }; }}
                       title="Exporter">&#x2913;</button>
               <!-- svelte-ignore a11y_consider_explicit_label -->
               <button class="w-4 h-4 text-text2 hover:text-accent2 text-sm leading-none transition-colors flex-shrink-0"
@@ -171,4 +174,11 @@
       {/snippet}
     </FloatingLayout>
   </div>
+  <ExportModal
+    open={exportTarget !== null}
+    type={exportTarget?.type ?? ''}
+    data={exportTarget?.data ?? {}}
+    containerEl={exportTarget?.containerEl}
+    onclose={() => exportTarget = null}
+  />
 </div>

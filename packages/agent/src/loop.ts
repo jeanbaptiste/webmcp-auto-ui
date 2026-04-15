@@ -476,7 +476,49 @@ export async function runAgentLoop(
                   const id = (block.input as Record<string, unknown>).id as string;
                   const actionParams = (block.input as Record<string, unknown>).params as Record<string, unknown> | undefined;
                   switch (action) {
-                    case 'clear': callbacks.onClear?.(); break;
+                    case 'clear':
+                      callbacks.onClear?.();
+                      // Strip old widget_display / render_* tool calls AND their
+                      // matching tool_result blocks from the messages array so the
+                      // LLM no longer sees them in context and cannot re-create
+                      // the cleared widgets.
+                      {
+                        const strippedIds = new Set<string>();
+                        // Pass 1: collect IDs of widget tool_use blocks
+                        for (const msg of messages) {
+                          if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue;
+                          for (const b of msg.content as ContentBlock[]) {
+                            if (b.type !== 'tool_use') continue;
+                            const tu = b as { type: 'tool_use'; id: string; name: string };
+                            if (tu.name.includes('widget_display') || tu.name.startsWith('render_')) {
+                              strippedIds.add(tu.id);
+                            }
+                          }
+                        }
+                        // Pass 2: strip tool_use and matching tool_result blocks
+                        if (strippedIds.size > 0) {
+                          for (const msg of messages) {
+                            if (!Array.isArray(msg.content)) continue;
+                            msg.content = (msg.content as ContentBlock[]).filter(b => {
+                              if (b.type === 'tool_use') {
+                                return !strippedIds.has((b as { type: 'tool_use'; id: string }).id);
+                              }
+                              if (b.type === 'tool_result') {
+                                return !strippedIds.has((b as { type: 'tool_result'; tool_use_id: string }).tool_use_id);
+                              }
+                              return true;
+                            });
+                          }
+                          // Remove messages with empty content arrays (orphaned after stripping)
+                          let i = messages.length;
+                          while (i-- > 0) {
+                            const c = messages[i].content;
+                            if (Array.isArray(c) && c.length === 0) messages.splice(i, 1);
+                          }
+                        }
+                        hasRendered = false;
+                      }
+                      break;
                     case 'update': callbacks.onUpdate?.(id, actionParams ?? {}); break;
                     case 'move': callbacks.onMove?.(id, (actionParams?.x ?? (block.input as any).x) as number, (actionParams?.y ?? (block.input as any).y) as number); break;
                     case 'resize': callbacks.onResize?.(id, (actionParams?.width ?? (block.input as any).width) as number, (actionParams?.height ?? (block.input as any).height) as number); break;

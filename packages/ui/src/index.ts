@@ -47,7 +47,9 @@ export { default as Carousel } from './widgets/rich/Carousel.svelte';
 export { default as SafeImage } from './widgets/SafeImage.svelte';
 
 // Widget export utility
-export { exportWidget } from './widgets/export-widget.js';
+export { exportWidget, getExportFormats, exportWidgetAs } from './widgets/export-widget.js';
+export type { ExportFormat } from './widgets/export-widget.js';
+export { default as ExportModal } from './widgets/ExportModal.svelte';
 
 // Dispatcher
 export { default as BlockRenderer } from './widgets/BlockRenderer.svelte';

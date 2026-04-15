@@ -407,6 +407,16 @@
   // ── Agent ──────────────────────────────────────────────────────────
   async function sendMessage(msg: string) {
     if (!msg.trim() || canvas.generating) return;
+
+    // Intercept "clear" command — handle locally without sending to LLM.
+    // If sent to the LLM, it calls canvas clear then re-creates the widgets
+    // from the conversation history still visible in its context.
+    if (msg.trim().toLowerCase() === 'clear') {
+      clearAll();
+      input = '';
+      return;
+    }
+
     // Push to input history (limit 50)
     inputHistory = [...inputHistory.slice(-(49)), msg.trim()];
     historyIndex = -1;
