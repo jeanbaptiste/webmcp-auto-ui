@@ -1,9 +1,9 @@
 /**
- * Shared Anthropic proxy handler — used by all apps' /api/chat/+server.ts
+ * Shared LLM proxy handler — used by all apps' /api/chat/+server.ts
  * Accepts the parsed body (with __apiKey already extracted), the resolved
  * API key, and the optional model override from X-Model header.
  */
-export async function anthropicProxy(
+export async function llmProxy(
   body: Record<string, unknown>,
   apiKey: string,
   model?: string | null,

@@ -21,7 +21,7 @@ LLM appelle component("stat-card", {label: "Users", value: 8204})
 
 ### Mode explicit
 
-En mode explicit, le LLM voit les 31 `render_*` tools individuels + `component()`. Plus verbeux mais utile pour les modeles WASM qui ont besoin d'exemples concrets.
+En mode explicit, le LLM voit les 31 tools de widgets individuels + `widget_display()`. Plus verbeux mais utile pour les modeles WASM qui ont besoin d'exemples concrets.
 
 ### BlockRenderer
 

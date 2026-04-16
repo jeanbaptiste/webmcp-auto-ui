@@ -145,7 +145,7 @@ Le chat supporte la conversation continue. Les messages precedents sont conserve
 
 | Variable | Description | Defaut |
 |----------|-------------|--------|
-| `ANTHROPIC_API_KEY` | Cle API du provider LLM distant (`.env`) | requis |
+| `LLM_API_KEY` | Cle API du provider LLM distant (`.env`) | requis |
 
 ## Code walkthrough
 

@@ -91,7 +91,7 @@ npm -w apps/flex run dev
 ```
 
 :::note
-In production, a `.env` file containing `ANTHROPIC_API_KEY` is required for the server-side proxy. Never commit this file.
+In production, a `.env` file containing `LLM_API_KEY` is required for the server-side proxy. Never commit this file.
 :::
 
 ## Features
@@ -136,7 +136,7 @@ Enabled via a checkbox in the toolbar. `ContextRAG` compacts the agent's context
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ANTHROPIC_API_KEY` | Remote LLM provider API key (server-side `.env`) | required |
+| `LLM_API_KEY` | Remote LLM provider API key (server-side `.env`) | required |
 | `maxContextTokens` | Max context window | 150,000 |
 | `maxTokens` | Max tokens per response | 4,096 |
 | `maxTools` | Max tools per request | 8 |
@@ -153,7 +153,7 @@ Enabled via a checkbox in the toolbar. `ContextRAG` compacts the agent's context
 The main component orchestrates everything: it declares reactive state (`$state`), builds layers from connected MCP servers and local packs (`$derived`), initializes LLM providers, and drives the agent loop via `runAgentLoop`. Agent callbacks feed the canvas, logs, ephemeral bubbles, and token tracker.
 
 ### `api/chat/+server.ts` (LLM proxy)
-A SvelteKit endpoint using `anthropicProxy` from the agent package to relay requests to the remote LLM provider API. The API key is read from the server-side environment or from the request body (for BYOK mode).
+A SvelteKit endpoint using `llmProxy` from the agent package to relay requests to the remote LLM provider API. The API key is read from the server-side environment or from the request body (for BYOK mode).
 
 ### `FlexGrid.svelte` (layout)
 Manages widget display in float (draggable windows) or grid mode. Each widget is rendered via `WidgetRenderer` and framed by a provenance badge.

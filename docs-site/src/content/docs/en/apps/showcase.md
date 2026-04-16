@@ -132,7 +132,7 @@ Toggleable via checkbox. Uses `ContextRAG` to compact the agent's context via em
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ANTHROPIC_API_KEY` | Remote LLM provider API key (server-side `.env`) | required |
+| `LLM_API_KEY` | Remote LLM provider API key (server-side `.env`) | required |
 
 ## Code walkthrough
 

@@ -141,13 +141,13 @@ Actions canvas via noms courts :
 | `resize` | `resize_block` |
 | `style` | `style_block` |
 
-Les noms utilisent des tirets (`stat-card`). Les noms `render_*` sont acceptes en backward compat.
+Les noms utilisent des tirets (`stat-card`).
 
 ### Tous les composants enregistres
 
 `list_components()` retourne **tous** les composants (56), pas seulement les widgets renderables :
 
-- **renderable: true** -- tous les block types `render_*` + actions canvas. Renderables via `executeComponent`.
+- **renderable: true** -- tous les block types (widgets) + actions canvas. Renderables via `widget_display`.
 - **renderable: false** -- composants Svelte (primitives, base UI, layouts, agent UI, theme). Retournent leur schema et un hint d'usage.
 
 ## Composer une recette (skill)

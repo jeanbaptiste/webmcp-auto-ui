@@ -132,7 +132,7 @@ Activable via une checkbox. Utilise `ContextRAG` pour compacter le contexte de l
 
 | Variable | Description | Defaut |
 |----------|-------------|--------|
-| `ANTHROPIC_API_KEY` | Cle API du provider LLM distant (`.env` server-side) | requis |
+| `LLM_API_KEY` | Cle API du provider LLM distant (`.env` server-side) | requis |
 
 ## Code walkthrough
 

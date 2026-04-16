@@ -121,7 +121,7 @@ Les options d'optimisation (sanitize, flatten, truncate, compress) s'ajustent au
 
 | Variable | Description | Defaut |
 |----------|-------------|--------|
-| `ANTHROPIC_API_KEY` | Cle API du provider LLM distant (`.env` server-side) | requis |
+| `LLM_API_KEY` | Cle API du provider LLM distant (`.env` server-side) | requis |
 | `mcpUrl` | URL du serveur MCP par defaut | `https://mcp.code4code.eu/mcp` |
 
 ## Code walkthrough
@@ -157,7 +157,7 @@ Le composant principal. Il gere :
 - Les serveurs WebMCP locaux activables/desactivables
 
 ### `src/routes/api/chat/+server.ts`
-Proxy server-side identique a celui de Flex : utilise `anthropicProxy` du package agent.
+Proxy server-side identique a celui de Flex : utilise `llmProxy` du package agent.
 
 ## Utilisation comme template
 

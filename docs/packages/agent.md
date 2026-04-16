@@ -9,7 +9,7 @@ Boucle agent LLM avec providers distants (toute API compatible OpenAI, e.g. Clau
 - **autoui** : serveur WebMCP pre-configure avec 26 widgets natifs + outils canvas/recall
 - **Lazy loading** : `buildDiscoveryTools()` au demarrage, `activateServerTools()` a la demande
 - **Tool naming** : `{serverName}_{protocol}_{toolName}` pour le routage automatique
-- 4 providers LLM : `RemoteLLMProvider`, `WasmProvider`, `LocalLLMProvider`, + legacy `AnthropicProvider`/`GemmaProvider`
+- 3 providers LLM : `RemoteLLMProvider`, `WasmProvider`, `LocalLLMProvider`
 - TokenTracker temps reel + summarizeChat pour la provenance HyperSkill
 
 ## autoui — serveur WebMCP built-in
@@ -42,7 +42,7 @@ import { NATIVE_WIDGET_NAMES } from '@webmcp-auto-ui/agent';
 
 ### RemoteLLMProvider (nouveau)
 
-Provider unifie pour toute API LLM cloud compatible OpenAI (e.g. Claude/Anthropic, Gemini/Google, ChatGPT/OpenAI, Mistral, Qwen). Remplace `AnthropicProvider` (qui reste disponible en alias).
+Provider unifie pour toute API LLM cloud compatible OpenAI (e.g. Claude/Anthropic, Gemini/Google, ChatGPT/OpenAI, Mistral, Qwen).
 
 ```ts
 import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
@@ -56,7 +56,7 @@ const provider = new RemoteLLMProvider({
 
 ### WasmProvider (nouveau)
 
-Provider unifie pour les modeles WASM in-browser. Remplace `GemmaProvider` (qui reste disponible en alias).
+Provider unifie pour les modeles WASM in-browser.
 
 ```ts
 import { WasmProvider } from '@webmcp-auto-ui/agent';
@@ -382,7 +382,7 @@ import {
 ```ts
 // Providers
 export { RemoteLLMProvider, WasmProvider, LocalLLMProvider, createProvider };
-export { AnthropicProvider, GemmaProvider };  // backward compat
+export { AnthropicProvider, GemmaProvider };  // aliases (backward compat)
 
 // autoui server
 export { autoui, NATIVE_WIDGET_NAMES };

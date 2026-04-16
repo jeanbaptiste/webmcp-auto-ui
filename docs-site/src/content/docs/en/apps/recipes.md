@@ -145,7 +145,7 @@ The chat supports continuous conversation. Previous messages are preserved in `c
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ANTHROPIC_API_KEY` | Remote LLM provider API key (`.env`) | required |
+| `LLM_API_KEY` | Remote LLM provider API key (`.env`) | required |
 
 ## Code walkthrough
 

@@ -86,16 +86,16 @@ more misleading.
 
 ```ts
 <!-- ❌ always uses 'haiku' by default -->
-return new AnthropicProvider({ proxyUrl: `${base}/api/chat` });
+return new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
 
 <!-- ✅ forwards the user's choice -->
-return new AnthropicProvider({
+return new RemoteLLMProvider({
   proxyUrl: `${base}/api/chat`,
   model: canvas.llm,
 });
 ```
 
-`AnthropicProvider` defaults to `model ?? 'haiku'`. If the user
+`RemoteLLMProvider` defaults to `model ?? 'haiku'`. If the user
 selects `sonnet`, they will still receive `haiku` with no error message.
 
 ---
@@ -105,7 +105,7 @@ selects `sonnet`, they will still receive `haiku` with no error message.
 ### `onText` is only called on the last iteration without tools
 
 By default, `callbacks.onText` is called only when the LLM responds
-without `tool_use`. Because the system prompt forces the use of `render_*` tools,
+without `tool_use`. Because the system prompt forces the use of `widget_display` tools,
 this callback is never reached in the normal flow.
 
 **Consequence**: the "thinking" bubble stays frozen on `🔧 last_tool…` and

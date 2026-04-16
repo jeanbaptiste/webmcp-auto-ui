@@ -74,32 +74,32 @@ Open `src/routes/api/chat/+server.ts` (already present in the boilerplate):
 ```ts
 import { env } from '$env/dynamic/private';
 import type { RequestHandler } from '@sveltejs/kit';
-import { anthropicProxy } from '@webmcp-auto-ui/agent/server';
+import { llmProxy } from '@webmcp-auto-ui/agent/server';
 
 export const POST: RequestHandler = async ({ request }) => {
   const body = await request.json() as Record<string, unknown>;
-  const apiKey = (body.__apiKey as string | undefined) || env.ANTHROPIC_API_KEY || '';
+  const apiKey = (body.__apiKey as string | undefined) || env.LLM_API_KEY || '';
   delete body.__apiKey;
-  return anthropicProxy(body, apiKey, request.headers.get('X-Model'));
+  return llmProxy(body, apiKey, request.headers.get('X-Model'));
 };
 ```
 
 Here is what happens:
 - The proxy reads the API key from server-side environment variables (never exposed to the client)
-- `anthropicProxy` reformats the body and sends it to the remote LLM API
+- `llmProxy` reformats the body and sends it to the remote LLM API
 - The `X-Model` header allows changing the model dynamically (`'haiku'`, `'sonnet'`, `'opus'`)
 
 Add your API key to a `.env` file at the project root:
 
 ```
-ANTHROPIC_API_KEY=sk-ant-...
+LLM_API_KEY=sk-ant-...
 ```
 
 :::caution[Never commit your .env]
 The `.env` file is already in the boilerplate's `.gitignore`. Do not remove it.
 :::
 
-**Checkpoint**: the `.env` file exists and contains `ANTHROPIC_API_KEY=sk-ant-...` (your actual key).
+**Checkpoint**: the `.env` file exists and contains `LLM_API_KEY=sk-ant-...` (your actual key).
 
 ---
 
@@ -398,7 +398,7 @@ my-app/
         MyWidget.svelte     # Custom widget component
       recipes/
         my-widget.md        # Widget recipe (frontmatter + instructions)
-  .env                      # ANTHROPIC_API_KEY (never committed)
+  .env                      # LLM_API_KEY (never committed)
   package.json
   svelte.config.js
   vite.config.ts

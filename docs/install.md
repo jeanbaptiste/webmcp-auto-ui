@@ -85,11 +85,11 @@ Les autres apps (flex, viewer, todo, showcase, recipes) sont assignees a des por
 
 | Variable           | Apps                    | Role                                          |
 |--------------------|-------------------------|-----------------------------------------------|
-| `ANTHROPIC_API_KEY`| flex, todo              | Proxy server-side pour l'API LLM distante (compatible OpenAI) |
+| `LLM_API_KEY`      | flex, todo              | Proxy server-side pour l'API LLM distante (compatible OpenAI) |
 | `PUBLIC_BASE_URL`  | home                    | Base URL pour les liens (default: localhost)   |
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
+export LLM_API_KEY="sk-..."
 ```
 
 ## Problemes courants

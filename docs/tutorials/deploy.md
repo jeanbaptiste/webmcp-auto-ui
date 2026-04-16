@@ -107,7 +107,7 @@ ssh bot "rm -rf /opt/webmcp-demos/flex/{client,server,index.js,handler.js}"
 
 ### 4. .env manquant apres deploy
 
-**Symptome** : Service crash "ANTHROPIC_API_KEY is not defined".
+**Symptome** : Service crash "LLM_API_KEY is not defined".
 
 **Cause** : Le .env a ete supprime pendant le nettoyage.
 
@@ -151,6 +151,6 @@ ssh bot "systemctl is-active webmcp-flex webmcp-viewer webmcp-recipes"
 
 | Variable | Apps | Localisation serveur |
 |----------|------|--------------------|
-| `ANTHROPIC_API_KEY` | flex, viewer, recipes | `/opt/webmcp-demos/{app}/.env` |
+| `LLM_API_KEY` | flex, viewer, recipes | `/opt/webmcp-demos/{app}/.env` |
 | `PUBLIC_BASE_URL` | home (build-time) | Variable shell avant `npm run build` |
 | `PORT` | flex(3004), viewer(3002), recipes(3006) | systemd `Environment=PORT=...` |

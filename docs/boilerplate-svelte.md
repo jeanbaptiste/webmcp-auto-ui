@@ -15,17 +15,17 @@ Creer `src/routes/api/chat/+server.ts` :
 ```ts
 import { env } from '$env/dynamic/private';
 import type { RequestHandler } from '@sveltejs/kit';
-import { anthropicProxy } from '@webmcp-auto-ui/agent/server';
+import { llmProxy } from '@webmcp-auto-ui/agent/server';
 
 export const POST: RequestHandler = async ({ request }) => {
   const body = await request.json() as Record<string, unknown>;
-  const apiKey = (body.__apiKey as string | undefined) || env.ANTHROPIC_API_KEY || '';
+  const apiKey = (body.__apiKey as string | undefined) || env.LLM_API_KEY || '';
   delete body.__apiKey;
-  return anthropicProxy(body, apiKey, request.headers.get('X-Model'));
+  return llmProxy(body, apiKey, request.headers.get('X-Model'));
 };
 ```
 
-Ajouter `ANTHROPIC_API_KEY` dans `.env`.
+Ajouter `LLM_API_KEY` dans `.env`.
 
 ## Canvas store
 
@@ -95,11 +95,11 @@ Tous les composants s'importent depuis `@webmcp-auto-ui/ui` :
 ## Agent loop
 
 ```ts
-import { AnthropicProvider, runAgentLoop, buildSystemPrompt, fromMcpTools } from '@webmcp-auto-ui/agent';
+import { RemoteLLMProvider, runAgentLoop, buildSystemPrompt, fromMcpTools } from '@webmcp-auto-ui/agent';
 import type { ChatMessage } from '@webmcp-auto-ui/agent';
 import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 
-const provider = new AnthropicProvider({ proxyUrl: '/api/chat' });
+const provider = new RemoteLLMProvider({ proxyUrl: '/api/chat' });
 
 // Construire les outils depuis les serveurs MCP connectes
 const mcpTools = fromMcpTools(await client.listTools());
@@ -154,14 +154,14 @@ const fullTools = await activateServerTools(serverName, client);
   import { onMount } from 'svelte';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { McpClient } from '@webmcp-auto-ui/core';
-  import { AnthropicProvider, runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
+  import { RemoteLLMProvider, runAgentLoop, fromMcpTools } from '@webmcp-auto-ui/agent';
   import { WidgetRenderer, McpStatus } from '@webmcp-auto-ui/ui';
 
   let input = $state('');
   let running = $state(false);
   let client: McpClient;
 
-  const provider = new AnthropicProvider({ proxyUrl: '/api/chat' });
+  const provider = new RemoteLLMProvider({ proxyUrl: '/api/chat' });
 
   onMount(async () => {
     client = new McpClient({ url: '/mcp/sse' });

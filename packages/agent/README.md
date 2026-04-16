@@ -4,11 +4,13 @@ LLM agent loop that connects MCP and WebMCP servers to a UI. Given a user messag
 
 ## Providers
 
-**AnthropicProvider** — proxies to a `+server.ts` endpoint that holds the API key. Supports `claude-haiku-4-5` and `claude-sonnet-4-6`. Prompt caching enabled by default. Retry on 503 with exponential backoff. Returns stats in `LLMResponse`: tok/s, totalTokens, latencyMs.
+**RemoteLLMProvider** — proxies to a `+server.ts` endpoint that holds the API key. Compatible with any OpenAI-compatible API backend (Anthropic, OpenAI, Google, Mistral, etc.). Prompt caching enabled by default. Retry on 503 with exponential backoff. Returns stats in `LLMResponse`: tok/s, totalTokens, latencyMs.
 
 **GemmaProvider (LiteRT)** — runs Gemma 4 models via `@mediapipe/tasks-genai` (LiteRT, formerly known as MediaPipe) directly on the **main thread**. Uses WebGPU when available. No API key required. Models are cached in **OPFS** (Origin Private File System) for instant reload after first download.
 
 > **v0.5.0 migration**: GemmaProvider was migrated from ONNX (`@huggingface/transformers`) to LiteRT (`@mediapipe/tasks-genai`). LiteRT is 2-4x faster on WebGPU and provides native Gemma 4 support. The provider now runs on the main thread because MediaPipe is incompatible with ES module workers.
+
+**LocalLLMProvider** — runs against a local Ollama instance (or any OpenAI-compatible local server: vLLM, LM Studio, llamafile). No API key required. Converts messages and tools to the OpenAI chat completions format automatically.
 
 **Gemma 4 prompt format** — uses `<|turn>...<turn|>` delimiters (instead of the Gemma 2/3 `<start_of_turn>...<end_of_turn>`).
 
@@ -46,10 +48,10 @@ npm install @webmcp-auto-ui/agent
 ## Usage
 
 ```ts
-import { autoui, runAgentLoop, AnthropicProvider } from '@webmcp-auto-ui/agent';
+import { autoui, runAgentLoop, RemoteLLMProvider } from '@webmcp-auto-ui/agent';
 
 const result = await runAgentLoop('Show me sales data', {
-  provider: new AnthropicProvider({ proxyUrl: '/api/chat' }),
+  provider: new RemoteLLMProvider({ proxyUrl: '/api/chat' }),
   layers: [mcpClient.layer(), autoui.layer()],
   maxIterations: 5,
   callbacks: {
@@ -63,8 +65,6 @@ const result = await runAgentLoop('Show me sales data', {
   },
 });
 ```
-
-> **Migration from Phase 7**: `onBlock` still works as a deprecated alias for `onWidget`. The `UILayer`, `SkillLayer`, `COMPONENT_TOOL`, `executeComponent`, and `componentRegistry` exports are removed — use `autoui.layer()` instead.
 
 ## TokenTracker
 
@@ -125,18 +125,19 @@ Requires `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Po
 
 ## API proxy (`+server.ts`)
 
-The `AnthropicProvider` sends requests to a local endpoint. The endpoint reads `ANTHROPIC_API_KEY` from the environment, or from `body.__apiKey` as a fallback (for cases where the key is provided at runtime).
+The `RemoteLLMProvider` sends requests to a local `+server.ts` endpoint that forwards them to the configured LLM API. The endpoint reads `LLM_API_KEY` from the environment, or from `body.__apiKey` as a fallback (for cases where the key is provided at runtime).
 
 ```ts
 // src/routes/api/chat/+server.ts
 import { env } from '$env/dynamic/private';
 export const POST: RequestHandler = async ({ request }) => {
   const body = await request.json();
-  const apiKey = body.__apiKey || env.ANTHROPIC_API_KEY;
+  const apiKey = body.__apiKey || env.LLM_API_KEY;
   delete body.__apiKey;
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  // Forward to your LLM provider (Anthropic, OpenAI, Mistral, etc.)
+  const res = await fetch(LLM_ENDPOINT, {
     method: 'POST',
-    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   return Response.json(await res.json());

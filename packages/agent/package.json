@@ -1,7 +1,7 @@
 {
   "name": "@webmcp-auto-ui/agent",
   "version": "2.5.13",
-  "description": "LLM agent loop + Anthropic/Gemma LiteRT providers + MCP wrapper",
+  "description": "LLM agent loop + remote/WASM/local providers + MCP wrapper",
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "sideEffects": true,
@@ -11,7 +11,7 @@
       "import": "./src/index.ts"
     },
     "./server": {
-      "import": "./src/server/anthropicProxy.ts"
+      "import": "./src/server/llmProxy.ts"
     }
   },
   "scripts": {

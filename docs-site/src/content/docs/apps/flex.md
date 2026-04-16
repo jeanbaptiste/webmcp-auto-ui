@@ -91,7 +91,7 @@ npm -w apps/flex run dev
 ```
 
 :::note
-En production, un fichier `.env` contenant `ANTHROPIC_API_KEY` est requis pour le proxy server-side. Ne jamais commiter ce fichier.
+En production, un fichier `.env` contenant `LLM_API_KEY` est requis pour le proxy server-side. Ne jamais commiter ce fichier.
 :::
 
 ## Fonctionnalites
@@ -136,7 +136,7 @@ Active via une checkbox dans la barre d'outils. `ContextRAG` compacte le context
 
 | Variable | Description | Defaut |
 |----------|-------------|--------|
-| `ANTHROPIC_API_KEY` | Cle API du provider LLM distant (server-side `.env`) | requis |
+| `LLM_API_KEY` | Cle API du provider LLM distant (server-side `.env`) | requis |
 | `maxContextTokens` | Fenetre de contexte max | 150 000 |
 | `maxTokens` | Tokens max par reponse | 4 096 |
 | `maxTools` | Nombre max d'outils par requete | 8 |
@@ -153,7 +153,7 @@ Active via une checkbox dans la barre d'outils. `ContextRAG` compacte le context
 Le composant principal orchestre tout : il declare l'etat reactif (`$state`), construit les layers a partir des serveurs MCP connectes et des packs locaux (`$derived`), initialise les providers LLM, et pilote la boucle agent via `runAgentLoop`. Les callbacks de l'agent alimentent le canvas, les logs, les bulles ephemerales et le token tracker.
 
 ### `api/chat/+server.ts` (proxy LLM)
-Un endpoint SvelteKit qui utilise `anthropicProxy` du package agent pour relayer les requetes vers l'API du provider LLM distant. La cle API est lue depuis l'environnement server-side ou depuis le body de la requete (pour le mode BYOK).
+Un endpoint SvelteKit qui utilise `llmProxy` du package agent pour relayer les requetes vers l'API du provider LLM distant. La cle API est lue depuis l'environnement server-side ou depuis le body de la requete (pour le mode BYOK).
 
 ### `FlexGrid.svelte` (layout)
 Gere l'affichage des widgets en mode float (fenetres deplacables) ou grid. Chaque widget est rendu via `WidgetRenderer` et encadre par un badge de provenance.
