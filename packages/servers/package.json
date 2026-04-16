@@ -1,6 +1,6 @@
 {
   "name": "@webmcp-auto-ui/servers",
-  "version": "2.5.13",
+  "version": "2.5.14",
   "private": true,
   "type": "module",
   "exports": {
