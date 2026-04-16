@@ -50,6 +50,28 @@ import { render as renderAnimatedFlow } from './widgets/animated-flow.js';
 import { render as renderTimelineGraph } from './widgets/timeline-graph.js';
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Sort elements so nodes come before edges — Cytoscape requires source/target
+ *  nodes to exist before edges referencing them are added. */
+function sortElements(data: Record<string, unknown>): Record<string, unknown> {
+  const elements = data.elements;
+  if (!Array.isArray(elements)) return data;
+  const sorted = [...elements].sort((a, b) => {
+    const aIsEdge = a?.data?.source !== undefined ? 1 : 0;
+    const bIsEdge = b?.data?.source !== undefined ? 1 : 0;
+    return aIsEdge - bIsEdge;
+  });
+  return { ...data, elements: sorted };
+}
+
+/** Wrap a renderer to sort elements before passing to Cytoscape. */
+function withSortedElements(renderer: (container: HTMLElement, data: Record<string, unknown>) => Promise<void | (() => void)>) {
+  return (container: HTMLElement, data: Record<string, unknown>) => renderer(container, sortElements(data));
+}
+
+// ---------------------------------------------------------------------------
 // Server
 // ---------------------------------------------------------------------------
 
@@ -58,26 +80,26 @@ const cytoscapeServer = createWebMcpServer('cytoscape', {
 });
 
 const widgets: Array<[string, unknown]> = [
-  [graphForceRecipe, renderGraphForce],
-  [graphForceCompoundRecipe, renderGraphForceCompound],
-  [graphForceFastRecipe, renderGraphForceFast],
-  [treeHierarchyRecipe, renderTreeHierarchy],
-  [dagFlowRecipe, renderDagFlow],
-  [dagLayeredRecipe, renderDagLayered],
-  [circleGraphRecipe, renderCircleGraph],
-  [concentricRingsRecipe, renderConcentricRings],
-  [gridMapRecipe, renderGridMap],
-  [fixedPositionsRecipe, renderFixedPositions],
-  [clusterCirclesRecipe, renderClusterCircles],
-  [spreadLayoutRecipe, renderSpreadLayout],
-  [constrainedLayoutRecipe, renderConstrainedLayout],
-  [physicsSimulationRecipe, renderPhysicsSimulation],
-  [compoundTreeRecipe, renderCompoundTree],
-  [pagerankGraphRecipe, renderPagerankGraph],
-  [shortestPathRecipe, renderShortestPath],
-  [centralityMapRecipe, renderCentralityMap],
-  [animatedFlowRecipe, renderAnimatedFlow],
-  [timelineGraphRecipe, renderTimelineGraph],
+  [graphForceRecipe, withSortedElements(renderGraphForce)],
+  [graphForceCompoundRecipe, withSortedElements(renderGraphForceCompound)],
+  [graphForceFastRecipe, withSortedElements(renderGraphForceFast)],
+  [treeHierarchyRecipe, withSortedElements(renderTreeHierarchy)],
+  [dagFlowRecipe, withSortedElements(renderDagFlow)],
+  [dagLayeredRecipe, withSortedElements(renderDagLayered)],
+  [circleGraphRecipe, withSortedElements(renderCircleGraph)],
+  [concentricRingsRecipe, withSortedElements(renderConcentricRings)],
+  [gridMapRecipe, withSortedElements(renderGridMap)],
+  [fixedPositionsRecipe, withSortedElements(renderFixedPositions)],
+  [clusterCirclesRecipe, withSortedElements(renderClusterCircles)],
+  [spreadLayoutRecipe, withSortedElements(renderSpreadLayout)],
+  [constrainedLayoutRecipe, withSortedElements(renderConstrainedLayout)],
+  [physicsSimulationRecipe, withSortedElements(renderPhysicsSimulation)],
+  [compoundTreeRecipe, withSortedElements(renderCompoundTree)],
+  [pagerankGraphRecipe, withSortedElements(renderPagerankGraph)],
+  [shortestPathRecipe, withSortedElements(renderShortestPath)],
+  [centralityMapRecipe, withSortedElements(renderCentralityMap)],
+  [animatedFlowRecipe, withSortedElements(renderAnimatedFlow)],
+  [timelineGraphRecipe, withSortedElements(renderTimelineGraph)],
 ];
 
 for (const [recipe, renderer] of widgets) {
