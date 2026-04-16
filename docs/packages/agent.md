@@ -1,6 +1,6 @@
 # @webmcp-auto-ui/agent
 
-Boucle agent LLM avec providers Anthropic, Gemma LiteRT et locaux (Ollama/Llamafile), ToolLayers structures, serveur `autoui` pre-configure, lazy loading, TokenTracker et summarizeChat.
+Boucle agent LLM avec providers distants (toute API compatible OpenAI, e.g. Claude, Gemini, ChatGPT), Gemma LiteRT (WASM) et locaux (Ollama/Llamafile), ToolLayers structures, serveur `autoui` pre-configure, lazy loading, TokenTracker et summarizeChat.
 
 ## Ce que fait le package
 
@@ -42,7 +42,7 @@ import { NATIVE_WIDGET_NAMES } from '@webmcp-auto-ui/agent';
 
 ### RemoteLLMProvider (nouveau)
 
-Provider unifie pour les API cloud (Anthropic et compatibles). Remplace `AnthropicProvider` (qui reste disponible en alias).
+Provider unifie pour toute API LLM cloud compatible OpenAI (e.g. Claude/Anthropic, Gemini/Google, ChatGPT/OpenAI, Mistral, Qwen). Remplace `AnthropicProvider` (qui reste disponible en alias).
 
 ```ts
 import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';

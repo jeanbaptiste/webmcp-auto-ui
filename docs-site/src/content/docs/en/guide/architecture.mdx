@@ -78,9 +78,9 @@ interface LLMProvider {
 
 This uniform interface lets you swap providers without modifying agent code. The choice of provider is a runtime decision, not an architectural one.
 
-### RemoteLLMProvider (Claude)
+### RemoteLLMProvider (Remote LLM)
 
-Provider for Anthropic models (Claude) via an HTTP proxy. The proxy is a SvelteKit endpoint (`/api/chat`) that adds the API key server-side:
+Provider for any OpenAI-compatible API (e.g. Claude/Anthropic, Gemini/Google, ChatGPT/OpenAI, Le Chat/Mistral, Qwen) via an HTTP proxy. The proxy is a SvelteKit endpoint (`/api/chat`) that adds the API key server-side:
 
 ```typescript
 import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
@@ -95,7 +95,7 @@ provider.setModel('sonnet');  // Balanced
 provider.setModel('opus');    // Deep reasoning
 ```
 
-**Why a proxy?** To keep the API key off the browser. The proxy adds `Authorization: Bearer sk-ant-...` before relaying the request to the Anthropic API.
+**Why a proxy?** To keep the API key off the browser. The proxy adds the appropriate authorization header before relaying the request to the LLM provider API.
 
 ### WasmProvider (Gemma 4 LiteRT)
 
@@ -440,7 +440,7 @@ The full flow of a `widget_display` call:
 | Component | Responsibility | Package |
 |-----------|---------------|---------|
 | **Agent Loop** | Iterative LLM -> tools -> LLM loop | `agent` |
-| **LLM Providers** | Claude (remote), Gemma 4 (WASM), Ollama (local) | `agent` |
+| **LLM Providers** | Remote (any OpenAI-compatible API), Gemma 4 (WASM), Ollama (local) | `agent` |
 | **Tool Layers** | MCP + WebMCP tool structuring and discovery | `agent` |
 | **Dispatcher** | Prefix-based routing + lazy activation | `agent` |
 | **Tool Resolver** | 4-layer canonical matching | `agent` |
@@ -466,7 +466,7 @@ Svelte 5 (runes) offers fine-grained reactivity without a virtual DOM. For a can
 ### Why three LLM providers?
 
 Each provider addresses a different use case:
-- **Claude**: maximum quality, requires an API key and internet connection.
+- **Remote** (e.g. Claude, Gemini, ChatGPT): maximum quality, requires an API key and internet connection.
 - **Gemma**: total privacy (everything runs in the browser), no API key needed.
 - **Ollama**: local models for offline development or custom models.
 

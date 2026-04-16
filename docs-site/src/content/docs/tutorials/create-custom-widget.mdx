@@ -436,7 +436,7 @@ graph LR
     Recipe[Recette .md] -->|parse| Server[WebMCP Server]
     Component[Composant .svelte] -->|renderer| Server
     Server -->|layer| Loop[Agent Loop]
-    Loop -->|tools| LLM[Claude]
+    Loop -->|tools| LLM[LLM]
     LLM -->|widget_display| Server
     Server -->|validate| Schema[JSON Schema]
     Schema -->|OK| Renderer[BlockRenderer]

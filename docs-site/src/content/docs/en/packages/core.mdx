@@ -428,7 +428,7 @@ This validation is used internally by the WebMCP server to validate tool paramet
 
 ### sanitizeSchema
 
-Cleans a JSON Schema for Anthropic API compatibility. Claude's API enforces strict constraints on schemas (no `$ref` without `$defs`, no `additionalProperties` in certain contexts, limited depth).
+Cleans a JSON Schema for LLM API compatibility. Some providers (notably Anthropic) enforce strict constraints on schemas (no `$ref` without `$defs`, no `additionalProperties` in certain contexts, limited depth).
 
 ```ts
 import { sanitizeSchema } from '@webmcp-auto-ui/core';
@@ -754,8 +754,8 @@ graph LR
 Rather than calling `client.callTool()` manually, export the server as a layer via `.layer()` and let the agent loop handle dispatch. The layer system automatically adds namespacing, discovery, and canonical aliasing.
 :::
 
-:::caution[Anthropic-compatible schemas]
-Claude's API imposes constraints on JSON Schemas (no `$ref`, no `oneOf`/`anyOf`/`allOf`). Use `sanitizeSchema()` before sending a schema to the LLM, or enable the `sanitize: true` option in the agent loop's `SchemaTransformOptions` (enabled by default).
+:::caution[LLM-compatible schemas]
+Some LLM providers impose constraints on JSON Schemas (no `$ref`, no `oneOf`/`anyOf`/`allOf`). Use `sanitizeSchema()` before sending a schema to the LLM, or enable the `sanitize: true` option in the agent loop's `SchemaTransformOptions` (enabled by default).
 :::
 
 :::caution[Widget cleanup]

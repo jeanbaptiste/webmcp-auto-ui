@@ -54,21 +54,20 @@ import { render as renderTimelineGraph } from './widgets/timeline-graph.js';
 // ---------------------------------------------------------------------------
 
 /** Sort elements so nodes come before edges — Cytoscape requires source/target
- *  nodes to exist before edges referencing them are added. */
-function sortElements(data: Record<string, unknown>): Record<string, unknown> {
-  const elements = data.elements;
-  if (!Array.isArray(elements)) return data;
-  const sorted = [...elements].sort((a, b) => {
-    const aIsEdge = a?.data?.source !== undefined ? 1 : 0;
-    const bIsEdge = b?.data?.source !== undefined ? 1 : 0;
-    return aIsEdge - bIsEdge;
-  });
-  return { ...data, elements: sorted };
-}
-
-/** Wrap a renderer to sort elements before passing to Cytoscape. */
+ *  nodes to exist before edges referencing them are added.
+ *  Note: deep-clone (for Svelte proxy stripping) is handled by mountWidget in core. */
 function withSortedElements(renderer: (container: HTMLElement, data: Record<string, unknown>) => Promise<void | (() => void)>) {
-  return (container: HTMLElement, data: Record<string, unknown>) => renderer(container, sortElements(data));
+  return (container: HTMLElement, data: Record<string, unknown>) => {
+    const elements = data.elements;
+    if (Array.isArray(elements)) {
+      elements.sort((a: any, b: any) => {
+        const aIsEdge = a?.data?.source !== undefined ? 1 : 0;
+        const bIsEdge = b?.data?.source !== undefined ? 1 : 0;
+        return aIsEdge - bIsEdge;
+      });
+    }
+    return renderer(container, data);
+  };
 }
 
 // ---------------------------------------------------------------------------

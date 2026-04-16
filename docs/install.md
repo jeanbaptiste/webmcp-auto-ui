@@ -6,7 +6,7 @@ WebMCP Auto-UI en local en moins de 5 minutes.
 
 - **Node.js 22+** (`node -v`)
 - **npm 10+** (`npm -v`)
-- Une **cle API Anthropic** (pour les features LLM)
+- Une **cle API LLM** (pour les features LLM distantes, e.g. Anthropic, Google, OpenAI, Mistral)
 
 ## Cloner et installer
 
@@ -29,10 +29,10 @@ webmcp-auto-ui/
     ui/         @webmcp-auto-ui/ui     -- 34+ Svelte 5 components + agent UI widgets
   apps/
     home/       Landing page + app launcher
-    flex2/      Flex -- canvas IA, ToolLayers, component(), LogDrawer, RecipeModal
-    viewer2/    Viewer -- lecteur HyperSkills read-only avec CRUD, DAG, paste URI
-    showcase2/  Showcase -- demo dynamique avec agent + MCP + 3 themes
-    todo2/      Todo -- todo WebMCP, template minimal
+    flex/      Flex -- canvas IA, ToolLayers, component(), LogDrawer, RecipeModal
+    viewer/    Viewer -- lecteur HyperSkills read-only avec CRUD, DAG, paste URI
+    showcase/  Showcase -- demo dynamique avec agent + MCP + 3 themes
+    todo/      Todo -- todo WebMCP, template minimal
     recipes/    Recipes -- explorateur de recettes, layout 3 colonnes, chat input, test live
 ```
 
@@ -66,10 +66,10 @@ Ou une app specifique :
 
 ```bash
 npm run dev:home
-npm -w apps/flex2 run dev
-npm -w apps/viewer2 run dev
-npm -w apps/todo2 run dev
-npm -w apps/showcase2 run dev
+npm -w apps/flex run dev
+npm -w apps/viewer run dev
+npm -w apps/todo run dev
+npm -w apps/showcase run dev
 npm -w apps/recipes run dev
 ```
 
@@ -79,13 +79,13 @@ npm -w apps/recipes run dev
 |-----------|------|------------------------|
 | home      | 5173 | http://localhost:5173   |
 
-Les autres apps (flex2, viewer2, todo2, showcase2, recipes) sont assignees a des ports par Vite au lancement.
+Les autres apps (flex, viewer, todo, showcase, recipes) sont assignees a des ports par Vite au lancement.
 
 ## Variables d'environnement
 
 | Variable           | Apps                    | Role                                          |
 |--------------------|-------------------------|-----------------------------------------------|
-| `ANTHROPIC_API_KEY`| flex2, todo2              | Proxy server-side pour l'API Anthropic Claude |
+| `ANTHROPIC_API_KEY`| flex, todo              | Proxy server-side pour l'API LLM distante (compatible OpenAI) |
 | `PUBLIC_BASE_URL`  | home                    | Base URL pour les liens (default: localhost)   |
 
 ```bash

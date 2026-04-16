@@ -5,7 +5,7 @@ sidebar:
   order: 1
 ---
 
-Le package `@webmcp-auto-ui/agent` est le cerveau de la plateforme. Il orchestre la boucle agent LLM (prompt → tool call → resultat → prompt), gere les providers (Claude distant, Gemma WASM in-browser, Ollama local), structure les outils en layers avec lazy loading, et fournit un serveur WebMCP integre (`autoui`) avec plus de 25 widgets natifs.
+Le package `@webmcp-auto-ui/agent` est le cerveau de la plateforme. Il orchestre la boucle agent LLM (prompt → tool call → resultat → prompt), gere les providers (LLM distant via toute API compatible OpenAI, Gemma WASM in-browser, Ollama local), structure les outils en layers avec lazy loading, et fournit un serveur WebMCP integre (`autoui`) avec plus de 25 widgets natifs.
 
 C'est le package le plus volumineux du monorepo, et celui qui relie tous les autres.
 
@@ -203,7 +203,7 @@ interface LLMProvider {
 
 ### RemoteLLMProvider
 
-Provider pour Anthropic Claude via un proxy HTTP. Le proxy (typiquement un `+server.ts` SvelteKit) ajoute la cle API et relaie la requete a l'API Anthropic.
+Provider pour toute API LLM distante compatible OpenAI (e.g. Claude/Anthropic, Gemini/Google, ChatGPT/OpenAI, Le Chat/Mistral, Qwen) via un proxy HTTP. Le proxy (typiquement un `+server.ts` SvelteKit) ajoute la cle API et relaie la requete au provider.
 
 ```ts
 import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
@@ -262,7 +262,7 @@ interface WasmProviderOptions {
 ```
 
 :::caution[Thread principal]
-Gemma tourne sur le thread principal. Pendant l'inference, l'UI peut etre momentanement bloquee. Pour les taches longues, utilisez le provider Claude distant.
+Gemma tourne sur le thread principal. Pendant l'inference, l'UI peut etre momentanement bloquee. Pour les taches longues, utilisez le provider LLM distant.
 :::
 
 ### LocalLLMProvider
@@ -429,7 +429,7 @@ Options pour transformer les schemas avant envoi au LLM :
 
 ```ts
 interface SchemaTransformOptions {
-  sanitize?: boolean;   // Nettoyer pour compatibilite Anthropic (defaut: true)
+  sanitize?: boolean;   // Nettoyer pour compatibilite API LLM (defaut: true)
   flatten?: boolean;    // Aplatir les objets imbriques (defaut: false)
   onSchemaPatch?: (toolName: string, patches: SchemaPatch[]) => void;
 }
@@ -741,7 +741,7 @@ interface Diagnostic {
 
 Detecte :
 - Bruit dans les prefixes de serveur ("mcp", "server" residuels)
-- Schemas invalides ou incompatibles avec Anthropic
+- Schemas invalides ou incompatibles avec les API LLM
 - Incoherences entre le prompt et les outils enregistres
 
 ---
@@ -773,13 +773,13 @@ Reparations supportees :
 
 ### toProviderTools
 
-Convertit les outils MCP en format Anthropic (utilise par la boucle agent) :
+Convertit les outils MCP en format provider LLM (utilise par la boucle agent) :
 
 ```ts
 import { toProviderTools } from '@webmcp-auto-ui/agent';
 
 const providerTools = toProviderTools(mcpTools);
-// ProviderTool[] — format attendu par l'API Anthropic
+// ProviderTool[] — format attendu par l'API du provider LLM
 ```
 
 ### fromMcpTools
@@ -883,7 +883,7 @@ Ce tutoriel construit un agent qui se connecte a un serveur MCP distant pour les
 import { runAgentLoop, RemoteLLMProvider, autoui } from '@webmcp-auto-ui/agent';
 import { McpClient } from '@webmcp-auto-ui/core';
 
-// Provider Claude Sonnet
+// Provider LLM distant (e.g. Claude Sonnet)
 const provider = new RemoteLLMProvider({
   proxyUrl: '/api/chat',
   model: 'sonnet',
@@ -962,7 +962,7 @@ Le cache (`cacheEnabled: true` par defaut) reduit les couts de 90% en evitant de
 :::
 
 :::caution[Schemas des outils]
-Certains serveurs MCP exposent des schemas avec `$ref`, `oneOf`, ou `anyOf` que l'API Anthropic ne supporte pas. La sanitization est active par defaut (`sanitize: true`), mais verifiez avec `runDiagnostics` si vous rencontrez des erreurs de schema.
+Certains serveurs MCP exposent des schemas avec `$ref`, `oneOf`, ou `anyOf` que certaines API LLM ne supportent pas. La sanitization est active par defaut (`sanitize: true`), mais verifiez avec `runDiagnostics` si vous rencontrez des erreurs de schema.
 :::
 
 ---
@@ -970,7 +970,7 @@ Certains serveurs MCP exposent des schemas avec `$ref`, `oneOf`, ou `anyOf` que 
 ## FAQ
 
 **Quelle est la difference entre RemoteLLMProvider et WasmProvider ?**
-Remote envoie les requetes a l'API Claude via un proxy HTTP. Wasm telecharge et execute le modele Gemma directement dans le navigateur, sans serveur. Remote est plus puissant mais payant ; Wasm est gratuit mais plus lent et moins capable.
+Remote envoie les requetes a une API LLM cloud (e.g. Claude, Gemini, ChatGPT) via un proxy HTTP. Wasm telecharge et execute le modele Gemma directement dans le navigateur, sans serveur. Remote est plus puissant mais payant ; Wasm est gratuit mais plus lent et moins capable.
 
 **Comment l'agent sait quel widget utiliser ?**
 Les recipes injectees dans le prompt systeme decrivent chaque widget (nom, description, schema des parametres, cas d'utilisation). L'agent choisit le widget le plus adapte a la donnee qu'il veut afficher.
@@ -979,7 +979,7 @@ Les recipes injectees dans le prompt systeme decrivent chaque widget (nom, descr
 Non. Il faut creer explicitement une instance `ContextRAG` et la passer a la boucle. Le nano-RAG est surtout utile pour les conversations longues avec de nombreux resultats d'outils volumineux.
 
 **Puis-je utiliser un modele Ollama avec les widgets ?**
-Oui, mais les modeles Ollama sont generalement moins performants que Claude pour les tool calls. Testez avec `runDiagnostics` pour verifier la compatibilite des schemas.
+Oui, mais les modeles Ollama sont generalement moins performants que les grands modeles distants (e.g. Claude, Gemini) pour les tool calls. Testez avec `runDiagnostics` pour verifier la compatibilite des schemas.
 
 **Comment fonctionne l'auto-repair ?**
 Quand le LLM genere des parametres invalides (objet aplati, JSON stringify, champs manquants), `autoRepairParams` tente des corrections mecaniques avant de renvoyer une erreur. Cela ameliore significativement le taux de reussite des tool calls, surtout avec les modeles locaux.

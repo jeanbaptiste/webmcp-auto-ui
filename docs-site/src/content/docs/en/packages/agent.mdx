@@ -5,7 +5,7 @@ sidebar:
   order: 1
 ---
 
-The `@webmcp-auto-ui/agent` package is the brain of the platform. It orchestrates the LLM agent loop (prompt, tool call, result, prompt), manages providers (remote Claude, in-browser Gemma WASM, local Ollama), structures tools into layers with lazy loading, and provides a built-in WebMCP server (`autoui`) with over 25 native widgets.
+The `@webmcp-auto-ui/agent` package is the brain of the platform. It orchestrates the LLM agent loop (prompt, tool call, result, prompt), manages providers (remote LLM via any OpenAI-compatible API, in-browser Gemma WASM, local Ollama), structures tools into layers with lazy loading, and provides a built-in WebMCP server (`autoui`) with over 25 native widgets.
 
 This is the largest package in the monorepo and the one that ties everything together.
 
@@ -203,7 +203,7 @@ interface LLMProvider {
 
 ### RemoteLLMProvider
 
-Provider for Anthropic Claude via an HTTP proxy. The proxy (typically a SvelteKit `+server.ts`) adds the API key and relays requests to the Anthropic API.
+Provider for any OpenAI-compatible remote LLM API (e.g. Claude/Anthropic, Gemini/Google, ChatGPT/OpenAI, Le Chat/Mistral, Qwen) via an HTTP proxy. The proxy (typically a SvelteKit `+server.ts`) adds the API key and relays requests to the provider.
 
 ```ts
 import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
@@ -244,7 +244,7 @@ await provider.initialize();
 ```
 
 :::caution[Main thread]
-Gemma runs on the main thread. During inference, the UI may momentarily freeze. For long tasks, use the remote Claude provider instead.
+Gemma runs on the main thread. During inference, the UI may momentarily freeze. For long tasks, use the remote LLM provider instead.
 :::
 
 ### LocalLLMProvider
@@ -782,7 +782,7 @@ Caching (`cacheEnabled: true` by default) reduces costs by 90% by avoiding re-se
 :::
 
 :::caution[Tool schemas]
-Some MCP servers expose schemas with `$ref`, `oneOf`, or `anyOf` that the Anthropic API doesn't support. Sanitization is enabled by default (`sanitize: true`), but check with `runDiagnostics` if you encounter schema errors.
+Some MCP servers expose schemas with `$ref`, `oneOf`, or `anyOf` that certain LLM APIs don't support. Sanitization is enabled by default (`sanitize: true`), but check with `runDiagnostics` if you encounter schema errors.
 :::
 
 ---
@@ -790,7 +790,7 @@ Some MCP servers expose schemas with `$ref`, `oneOf`, or `anyOf` that the Anthro
 ## FAQ
 
 **What's the difference between RemoteLLMProvider and WasmProvider?**
-Remote sends requests to the Claude API via an HTTP proxy. Wasm downloads and runs the Gemma model directly in the browser with no server. Remote is more powerful but paid; Wasm is free but slower and less capable.
+Remote sends requests to a cloud LLM API (e.g. Claude, Gemini, ChatGPT) via an HTTP proxy. Wasm downloads and runs the Gemma model directly in the browser with no server. Remote is more powerful but paid; Wasm is free but slower and less capable.
 
 **How does the agent know which widget to use?**
 Recipes injected into the system prompt describe each widget (name, description, parameter schema, use cases). The agent picks the best match for the data it wants to display.
@@ -799,7 +799,7 @@ Recipes injected into the system prompt describe each widget (name, description,
 No. You need to explicitly create a `ContextRAG` instance. Nano-RAG is most useful for long conversations with many large tool results.
 
 **Can I use an Ollama model with widgets?**
-Yes, but Ollama models are generally less effective than Claude for tool calls. Test with `runDiagnostics` to verify schema compatibility.
+Yes, but Ollama models are generally less effective than large remote models (e.g. Claude, Gemini) for tool calls. Test with `runDiagnostics` to verify schema compatibility.
 
 **How does auto-repair work?**
 When the LLM generates invalid parameters (flat object, stringified JSON, missing fields), `autoRepairParams` attempts mechanical fixes before returning an error. This significantly improves tool call success rates, especially with local models.

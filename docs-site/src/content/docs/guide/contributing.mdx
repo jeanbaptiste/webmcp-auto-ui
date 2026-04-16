@@ -19,13 +19,13 @@ graph TD
     end
 
     subgraph "Apps"
-        FLEX[flex2 — Composeur principal]
-        VIEWER[viewer2 — Visionneur HyperSkills]
-        SHOWCASE[showcase2 — Galerie widgets]
+        FLEX[flex — Composeur principal]
+        VIEWER[viewer — Visionneur HyperSkills]
+        SHOWCASE[showcase — Galerie widgets]
         RECIPES[recipes — Explorateur recettes]
         HOME[home — Page d'accueil]
         BOILER[boilerplate — Template starter]
-        TODO[todo2 — Demo todo]
+        TODO[todo — Demo todo]
     end
 
     CORE --> SDK
@@ -47,7 +47,7 @@ Avant d'ecrire du code dans une app (`apps/*`), verifier d'abord si la fonctionn
 | Validation JSON Schema | `validateJsonSchema` | `core` |
 | Montage widget vanilla | `mountWidget` | `core` |
 | Boucle agent | `runAgentLoop` | `agent` |
-| Provider Claude | `RemoteLLMProvider` | `agent` |
+| Provider LLM distant | `RemoteLLMProvider` | `agent` |
 | Provider Gemma | `WasmProvider` | `agent` |
 | Provider Ollama | `LocalLLMProvider` | `agent` |
 | Outils de decouverte | `buildDiscoveryTools`, `activateServerTools` | `agent` |
@@ -257,19 +257,19 @@ Quand un correctif semble applique localement mais pas visible en production, su
 
 1. **Le build local est-il a jour ?**
    ```bash
-   ls -la apps/flex2/build/index.js   # Verifier la date de modification
+   ls -la apps/flex/build/index.js   # Verifier la date de modification
    ```
 
 2. **Le fichier deploye correspond-il au build local ?**
    ```bash
-   sha256sum apps/flex2/build/index.js
-   ssh bot "sha256sum /opt/webmcp-demos/flex2/index.js"
+   sha256sum apps/flex/build/index.js
+   ssh bot "sha256sum /opt/webmcp-demos/flex/index.js"
    # Les deux hashes doivent etre identiques
    ```
 
 3. **Le service a-t-il redemarre avec le bon fichier ?**
    ```bash
-   ssh bot "systemctl status webmcp-flex2 --no-pager | head -20"
+   ssh bot "systemctl status webmcp-flex --no-pager | head -20"
    ```
 
 4. **Y a-t-il des erreurs JavaScript cote client ?**
@@ -316,7 +316,7 @@ Conventions de nommage :
 ### 2. Developper et tester
 
 ```bash
-npm run dev:flex2    # Developper sur l'app principale
+npm run dev:flex    # Developper sur l'app principale
 npm run test         # Lancer les tests unitaires
 npm run check        # Verifier les types TypeScript
 ```

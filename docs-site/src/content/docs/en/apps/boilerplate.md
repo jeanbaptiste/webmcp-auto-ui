@@ -43,7 +43,7 @@ graph TD
     end
 
     subgraph Backend
-        Proxy["api/chat/+server.ts<br/>Anthropic proxy"]
+        Proxy["api/chat/+server.ts<br/>LLM Proxy"]
     end
 
     Register --> FD
@@ -64,7 +64,7 @@ graph TD
 | Framework | SvelteKit + Svelte 5 |
 | Styles | TailwindCSS 3.4 |
 | Icons | lucide-svelte |
-| LLM provider | `RemoteLLMProvider` (Claude via proxy) |
+| LLM provider | `RemoteLLMProvider` (remote LLM via proxy) |
 | MCP | `McpMultiClient` (multi-server) |
 | Custom widgets | 3 Svelte components via `createWebMcpServer` |
 | RAG | `ContextRAG` (experimental) |
@@ -121,7 +121,7 @@ Optimization options (sanitize, flatten, truncate, compress) automatically adjus
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ANTHROPIC_API_KEY` | Anthropic API key (server-side `.env`) | required |
+| `ANTHROPIC_API_KEY` | Remote LLM provider API key (server-side `.env`) | required |
 | `mcpUrl` | Default MCP server URL | `https://mcp.code4code.eu/mcp` |
 
 ## Code walkthrough
@@ -207,4 +207,4 @@ The JSON schema in the frontmatter is critical -- it's what the LLM sees to unde
 - [Live demo](https://demos.hyperskills.net/boilerplate/)
 - [Core package](/webmcp-auto-ui/en/packages/core/) -- `createWebMcpServer`
 - [Agent package](/webmcp-auto-ui/en/packages/agent/) -- `runAgentLoop`
-- [Flex (full app)](/webmcp-auto-ui/en/apps/flex2/) -- for all advanced features
+- [Flex (full app)](/webmcp-auto-ui/en/apps/flex/) -- for all advanced features

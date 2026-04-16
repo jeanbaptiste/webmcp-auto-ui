@@ -22,7 +22,7 @@ This guide walks you from installation to your first working agent. By the end, 
 | **Modern browser** | Chrome/Edge recommended | WebAssembly for Gemma, Web Workers |
 
 :::note[API key is optional]
-An Anthropic key (`ANTHROPIC_API_KEY`) is only needed for Claude. The Gemma 4 agent runs entirely in the browser -- no key, no remote server.
+An API key (`ANTHROPIC_API_KEY`) is only needed for remote LLM providers (e.g. Claude, Gemini, ChatGPT). The Gemma 4 agent runs entirely in the browser -- no key, no remote server.
 :::
 
 ## Quick Path: Boilerplate
@@ -69,10 +69,10 @@ npm automatically detects the workspaces defined in `package.json` and installs 
 
 ### Step 3: Configure Environment
 
-Create a `.env.local` file at the root of the app you want to run (for example `apps/flex2/.env.local`):
+Create a `.env.local` file at the root of the app you want to run (for example `apps/flex/.env.local`):
 
 ```bash
-# Claude API (optional, only required for remote agents)
+# Remote LLM API (optional, only required for remote agents)
 ANTHROPIC_API_KEY=sk-ant-...
 
 # Remote MCP servers (optional, format: protocol://host:port)
@@ -94,15 +94,15 @@ This command launches all apps in parallel via `concurrently`. Each app listens 
 | App | Port | Description |
 |-----|------|-------------|
 | home | 5173 | Homepage (static) |
-| flex2 | 5174 | Main app (SvelteKit) |
-| viewer2 | 5175 | HyperSkills viewer |
-| showcase2 | 5176 | Widget gallery |
-| todo2 | 5177 | Todo demo |
+| flex | 5174 | Main app (SvelteKit) |
+| viewer | 5175 | HyperSkills viewer |
+| showcase | 5176 | Widget gallery |
+| todo | 5177 | Todo demo |
 
 To launch a single app:
 
 ```bash
-npm run dev:flex2    # Just flex2
+npm run dev:flex    # Just flex
 npm run dev:home     # Just home
 ```
 
@@ -110,7 +110,7 @@ npm run dev:home     # Just home
 
 ### 1. Choose a Model
 
-Open `http://localhost:5174` (flex2). In the right panel, click **Settings** and select a model:
+Open `http://localhost:5174` (flex). In the right panel, click **Settings** and select a model:
 
 | Model | Speed | Quality | Requirement |
 |-------|-------|---------|-------------|
@@ -185,10 +185,10 @@ webmcp-auto-ui/
 │   └── sdk/           # HyperSkills, skills registry, canvas store
 ├── apps/
 │   ├── boilerplate/   # Entry point for new devs (SvelteKit + Tricoteuses)
-│   ├── flex2/         # Main SvelteKit app (composer)
-│   ├── showcase2/     # Widget gallery
-│   ├── todo2/         # Todo demo
-│   ├── viewer2/       # HyperSkills viewer
+│   ├── flex/         # Main SvelteKit app (composer)
+│   ├── showcase/     # Widget gallery
+│   ├── todo/         # Todo demo
+│   ├── viewer/       # HyperSkills viewer
 │   ├── home/          # Homepage (static)
 │   └── recipes/       # Recipe explorer
 ├── scripts/
@@ -223,7 +223,7 @@ graph TD
 import { runAgentLoop } from '@webmcp-auto-ui/agent';
 
 // LLM Providers
-import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';  // Claude via proxy
+import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';  // Remote LLM via proxy
 import { WasmProvider } from '@webmcp-auto-ui/agent';       // Gemma 4 in-browser
 import { LocalLLMProvider } from '@webmcp-auto-ui/agent';   // Ollama local
 
@@ -246,9 +246,9 @@ import { encodeHyperSkill, decodeHyperSkill } from '@webmcp-auto-ui/sdk';
 
 ## Practical Examples
 
-### Create a Claude Provider
+### Create a Remote LLM Provider
 
-`RemoteLLMProvider` connects to Claude through a SvelteKit proxy endpoint. Your API key stays server-side -- never exposed to the browser.
+`RemoteLLMProvider` connects to any OpenAI-compatible API (e.g. Claude, Gemini, ChatGPT, Mistral) through a SvelteKit proxy endpoint. Your API key stays server-side -- never exposed to the browser.
 
 ```typescript
 import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';

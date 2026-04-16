@@ -57,7 +57,7 @@ Le projet supporte deux modes de rendu :
 
 | Mode | Technologie | Usage |
 |------|------------|-------|
-| **Svelte** | `<BlockRenderer>` / `<WidgetRenderer>` | Apps SvelteKit (flex2, viewer2) |
+| **Svelte** | `<BlockRenderer>` / `<WidgetRenderer>` | Apps SvelteKit (flex, viewer) |
 | **Vanilla** | `mountWidget()` | Apps sans framework, integration externe |
 
 ### BlockRenderer (Svelte)

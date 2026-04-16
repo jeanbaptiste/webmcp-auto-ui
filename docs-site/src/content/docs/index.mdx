@@ -31,7 +31,7 @@ L'agent recoit votre message, choisit les widgets adaptes, appelle les outils ne
 
 Le diagramme ci-dessus montre les trois couches fondamentales du systeme :
 
-1. **L'agent LLM** (Claude ou Gemma) recoit un prompt utilisateur et decide quels outils appeler.
+1. **L'agent LLM** (e.g. Claude, Gemini, ChatGPT via API distante, ou Gemma in-browser) recoit un prompt utilisateur et decide quels outils appeler.
 2. **Le dispatcher** achemine chaque appel vers le bon serveur -- MCP distant (donnees, API) ou WebMCP local (widgets, actions UI).
 3. **Le canvas reactif** affiche les widgets generes et permet a l'agent de les repositionner, redimensionner et mettre a jour.
 
@@ -52,7 +52,7 @@ L'agent ne remplace pas le developpeur. Il augmente sa productivite en generant 
 
 ## Caracteristiques principales
 
-- **Agents autonomes** : Boucle agentic native avec support pour Claude (API), Gemma 4 (LiteRT in-browser) et Ollama (local)
+- **Agents autonomes** : Boucle agentic native avec support pour les LLM distants (toute API compatible OpenAI, e.g. Claude, Gemini, ChatGPT, Mistral, Qwen), Gemma 4 (LiteRT in-browser WASM) et Ollama (local)
 - **Tool calling multi-protocoles** : Dispatch transparent vers MCP (protocole reseau) et WebMCP (local)
 - **30+ widgets natifs** : Stat, chart, timeline, carte, galerie, hemicycle parlementaire, Sankey, D3, sandbox JS...
 - **Lazy loading** : Charge les outils a la demande pour optimiser le contexte LLM
@@ -137,7 +137,7 @@ Le `core` et l'`agent` sont du TypeScript pur -- aucune dependance a Svelte. Ils
 
 - **Framework frontend** : Svelte 5 (runes) avec SvelteKit pour les apps serveur
 - **Styling** : UnoCSS avec themes dark/light et tokens semantiques
-- **LLM** : Anthropic Claude (API via proxy), Google Gemma 4 (LiteRT, in-browser), Ollama (local)
+- **LLM** : API distante (tout provider compatible OpenAI, e.g. Claude, Gemini, ChatGPT, Mistral, Qwen), Google Gemma 4 (LiteRT, in-browser WASM), Ollama (local)
 - **Schema** : JSON Schema pour la validation cote agent de chaque widget
 - **Communication** : postMessage bridge pour le WebMCP cross-document
 - **Tests** : Vitest (unitaires) + Playwright (e2e sur les apps deployees)

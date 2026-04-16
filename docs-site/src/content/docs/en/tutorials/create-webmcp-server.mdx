@@ -27,7 +27,7 @@ graph LR
     Recipe --> Server[WebMCP Server]
     Server --> Layer[layer]
     Layer --> Agent[Agent Loop]
-    Agent --> LLM[Claude]
+    Agent --> LLM[LLM]
     LLM -->|search_recipes| Server
     LLM -->|widget_display| Server
     LLM -->|move_card| Server
@@ -337,7 +337,7 @@ The LLM will follow this sequence:
 
 ```mermaid
 sequenceDiagram
-    participant LLM as Claude
+    participant LLM as LLM
     participant Agent as Agent Loop
     participant WS as WebMCP Server
 

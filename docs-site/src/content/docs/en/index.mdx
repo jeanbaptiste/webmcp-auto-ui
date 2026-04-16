@@ -31,7 +31,7 @@ The agent receives your message, picks the right widgets, calls the necessary to
 
 The diagram above shows the three fundamental layers of the system:
 
-1. **The LLM agent** (Claude or Gemma) receives a user prompt and decides which tools to call.
+1. **The LLM agent** (e.g. Claude, Gemini, ChatGPT via remote API, or Gemma in-browser) receives a user prompt and decides which tools to call.
 2. **The dispatcher** routes each call to the right server -- remote MCP (data, APIs) or local WebMCP (widgets, UI actions).
 3. **The reactive canvas** displays the generated widgets and lets the agent reposition, resize, and update them.
 
@@ -52,7 +52,7 @@ The agent does not replace the developer. It amplifies productivity by generatin
 
 ## Key Features
 
-- **Autonomous agents**: Native agentic loop supporting Claude (API), Gemma 4 (LiteRT in-browser), and Ollama (local)
+- **Autonomous agents**: Native agentic loop supporting remote LLMs (any OpenAI-compatible API, e.g. Claude, Gemini, ChatGPT, Mistral, Qwen), Gemma 4 (LiteRT in-browser WASM), and Ollama (local)
 - **Multi-protocol tool calling**: Transparent dispatch to MCP (network protocol) and WebMCP (local)
 - **30+ native widgets**: Stat, chart, timeline, map, gallery, hemicycle, Sankey, D3, JS sandbox...
 - **Lazy loading**: Load tools on demand to optimize LLM context
@@ -137,7 +137,7 @@ The monorepo is organized into four packages, each with a clear responsibility:
 
 - **Frontend framework**: Svelte 5 (runes) with SvelteKit for server apps
 - **Styling**: UnoCSS with dark/light themes and semantic tokens
-- **LLM**: Anthropic Claude (API via proxy), Google Gemma 4 (LiteRT, in-browser), Ollama (local)
+- **LLM**: Remote API (any OpenAI-compatible provider, e.g. Claude, Gemini, ChatGPT, Mistral, Qwen), Google Gemma 4 (LiteRT, in-browser WASM), Ollama (local)
 - **Schema**: JSON Schema for agent-side validation of every widget
 - **Communication**: postMessage bridge for cross-document WebMCP
 - **Testing**: Vitest (unit) + Playwright (e2e on deployed apps)

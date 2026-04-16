@@ -31,13 +31,13 @@ test.describe('Docs — Getting Started FR', () => {
     expect(content).not.toContain("model: 'claude-3-5-sonnet");
   });
 
-  test('lists current apps (flex2, showcase2)', async ({ page }) => {
+  test('lists current apps (flex, showcase)', async ({ page }) => {
     await page.goto(`${DOCS}/guide/getting-started/`);
     const content = await page.textContent('body');
-    expect(content).toContain('flex2/');
-    expect(content).toContain('showcase2/');
-    expect(content).toContain('todo2/');
-    expect(content).toContain('viewer2/');
+    expect(content).toContain('flex/');
+    expect(content).toContain('showcase/');
+    expect(content).toContain('todo/');
+    expect(content).toContain('viewer/');
   });
 
   test('has Tricoteuses tutorial link', async ({ page }) => {

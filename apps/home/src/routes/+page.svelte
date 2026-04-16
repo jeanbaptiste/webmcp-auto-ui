@@ -12,25 +12,25 @@
     {
       title: 'Flex',
       desc: 'WebMCP multi-server, widgets, recipes, lazy loading, debug panel.',
-      url: `${base}/flex2`,
+      url: `${base}/flex`,
       accent: '#8b5cf6',
     },
     {
       title: 'Viewer',
       desc: 'Read-only HyperSkills viewer. Decodes and renders widgets, with an Edit button to open in Flex.',
-      url: `${base}/viewer2`,
+      url: `${base}/viewer`,
       accent: '#f59e0b',
     },
     {
       title: 'Showcase',
       desc: 'Dynamic showcase of all UI components with 3 themes (corporate, pastel, cyberpunk).',
-      url: `${base}/showcase2`,
+      url: `${base}/showcase`,
       accent: '#10b981',
     },
     {
       title: 'Todo-WebMCP',
       desc: 'Minimal reference template to bootstrap a webmcp-auto-ui app.',
-      url: `${base}/todo2`,
+      url: `${base}/todo`,
       accent: '#14b8a6',
     },
     {

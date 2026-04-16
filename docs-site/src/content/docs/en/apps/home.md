@@ -17,7 +17,7 @@ Below, a vertical list of clickable cards presents each app with:
 - A vertical color stripe on the left (each app has its distinctive color)
 - The app title
 - A short description
-- The URL path (`/flex2`, `/viewer2`, etc.)
+- The URL path (`/flex`, `/viewer`, etc.)
 
 The apps listed are: Flex, Viewer, Showcase, Todo-WebMCP, Recipes, Multi-WebMCP-UI, and Boilerplate.
 
@@ -131,5 +131,5 @@ PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/home run build
 ## Links
 
 - [Live demo](https://demos.hyperskills.net)
-- [Flex](/webmcp-auto-ui/en/apps/flex2/) -- main app
+- [Flex](/webmcp-auto-ui/en/apps/flex/) -- main app
 - [UI package](/webmcp-auto-ui/en/packages/ui/) -- `getTheme`

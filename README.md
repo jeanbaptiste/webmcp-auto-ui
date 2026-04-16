@@ -2,13 +2,13 @@
 
 Dynamic UI composition by humans and LLMs connected to multiple MCP servers.
 
-An agent (Claude or Gemma WASM) reads available tools and recipes from MCP + WebMCP servers, fetches data, and assembles typed UI blocks (stat cards, tables, charts, timelines, etc.). Each block is exposed as a live WebMCP tool that agents can read and update. The system implements [HyperSkills](https://hyperskills.net/) for portable, versionable UI snapshots (`?hs=gzip.base64`).
+An LLM agent (e.g. Claude, Gemini, ChatGPT, Mistral, Qwen via remote API, Gemma via in-browser WASM, or any Ollama model locally) reads available tools and recipes from MCP + WebMCP servers, fetches data, and assembles typed UI blocks (stat cards, tables, charts, timelines, etc.). Each block is exposed as a live WebMCP tool that agents can read and update. The system implements [HyperSkills](https://hyperskills.net/) for portable, versionable UI snapshots (`?hs=gzip.base64`).
 
 ## Packages
 
 | Package | Description |
 |---------|-------------|
-| [`@webmcp-auto-ui/agent`](./packages/agent/README.md) | Agent loop, providers (Claude / Gemma 4 WASM), `autoui` WebMCP server, lazy tool loading, recipes |
+| [`@webmcp-auto-ui/agent`](./packages/agent/README.md) | Agent loop, providers (remote LLM / Gemma WASM / Ollama), `autoui` WebMCP server, lazy tool loading, recipes |
 | [`@webmcp-auto-ui/core`](./packages/core/README.md) | MCP client, McpMultiClient, `createWebMcpServer()`, frontmatter parser, utilities |
 | [`@webmcp-auto-ui/sdk`](./packages/sdk/README.md) | Canvas store (Svelte 5 + vanilla), Widget/WidgetType, HyperSkills encode/decode/hash/diff, Skills registry |
 | [`@webmcp-auto-ui/ui`](./packages/ui/README.md) | 31 Svelte 5 components (blocks, widgets, layouts), WidgetRenderer, AgentConsole, ThemeProvider |
@@ -18,11 +18,11 @@ An agent (Claude or Gemma WASM) reads available tools and recipes from MCP + Web
 | App | Port | Description |
 |-----|------|-------------|
 | `home` | static | Landing page with links to demos |
-| `flex2` | 3007 | Full UI composer: agent chat, multi-MCP, canvas drag/resize, smart/explicit mode, debug panel, provenance badges, composer/consumer mode |
-| `viewer2` | 3008 | HyperSkills reader: paste URI, CRUD blocks, DAG versions, export |
+| `flex` | 3007 | Full UI composer: agent chat, multi-MCP, canvas drag/resize, smart/explicit mode, debug panel, provenance badges, composer/consumer mode |
+| `viewer` | 3008 | HyperSkills reader: paste URI, CRUD blocks, DAG versions, export |
 | `recipes` | 3009 | MCP + WebMCP recipe explorer with live agent testing |
-| `showcase2` | 3010 | Dynamic demo: all components with 3 themes, or agent-driven generation from an MCP server |
-| `todo2` | static | Minimal WebMCP todo |
+| `showcase` | 3010 | Dynamic demo: all components with 3 themes, or agent-driven generation from an MCP server |
+| `todo` | static | Minimal WebMCP todo |
 | `boilerplate` | 3011 | Starter template with 3 Tricoteuses widgets, tutorial-ready |
 
 ## Architecture
@@ -49,11 +49,11 @@ Both expose tools to the agent via the same `layer()` interface. Tool names foll
 ```bash
 npm install
 
-# Copy .env.example to .env and add your ANTHROPIC_API_KEY
+# Copy .env.example to .env and add your LLM provider API key
 cp .env.example .env
 
 # Development
-npm run dev:flex2    # single app (recommended)
+npm run dev:flex     # single app (recommended)
 npm run dev          # all apps
 
 # Tests
@@ -61,7 +61,7 @@ npm test
 
 # Production deploy
 ./scripts/deploy.sh          # all apps
-./scripts/deploy.sh flex2    # single app
+./scripts/deploy.sh flex     # single app
 ```
 
 ## Documentation

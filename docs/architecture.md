@@ -15,10 +15,10 @@ webmcp-auto-ui/
  |
  +-- apps/
  |    +-- home/          Landing page, app launcher (port 5173)
- |    +-- flex2/         Flex -- canvas IA, ToolLayers, LogDrawer, RecipeModal
- |    +-- viewer2/       Viewer -- lecteur HyperSkills read-only avec CRUD, DAG, paste URI
- |    +-- showcase2/     Showcase -- demo dynamique avec agent + MCP + 3 themes
- |    +-- todo2/         Todo -- todo WebMCP, template minimal
+ |    +-- flex/         Flex -- canvas IA, ToolLayers, LogDrawer, RecipeModal
+ |    +-- viewer/       Viewer -- lecteur HyperSkills read-only avec CRUD, DAG, paste URI
+ |    +-- showcase/     Showcase -- demo dynamique avec agent + MCP + 3 themes
+ |    +-- todo/         Todo -- todo WebMCP, template minimal
  |    +-- recipes/       Recipes -- explorateur de recettes, layout 3 colonnes, chat input, test live
  |
  +-- docs/               Documentation
@@ -181,10 +181,10 @@ Agent Loop (runAgentLoop)
 | App | Chemin | Description |
 |-----|--------|------------|
 | **Home** | `apps/home/` | Landing page avec liens vers toutes les apps. Configurable via `PUBLIC_BASE_URL`. |
-| **Flex** | `apps/flex2/` | Canvas IA avec ToolLayers, debug panel, badges provenance, mode composeur/consommateur, LogDrawer (AgentConsole), RecipeModal, export HyperSkill gzip. |
-| **Viewer** | `apps/viewer2/` | Lecteur HyperSkills read-only avec CRUD, DAG de versions, paste URI. |
-| **Showcase** | `apps/showcase2/` | Demo dynamique avec agent + MCP + 3 themes. |
-| **Todo** | `apps/todo2/` | Todo WebMCP, template minimal avec architecture layers. |
+| **Flex** | `apps/flex/` | Canvas IA avec ToolLayers, debug panel, badges provenance, mode composeur/consommateur, LogDrawer (AgentConsole), RecipeModal, export HyperSkill gzip. |
+| **Viewer** | `apps/viewer/` | Lecteur HyperSkills read-only avec CRUD, DAG de versions, paste URI. |
+| **Showcase** | `apps/showcase/` | Demo dynamique avec agent + MCP + 3 themes. |
+| **Todo** | `apps/todo/` | Todo WebMCP, template minimal avec architecture layers. |
 | **Recipes** | `apps/recipes/` | Explorateur de recettes MCP + WebMCP, layout 3 colonnes, chat input, test live, sync recettes par serveur. |
 
 ## Stack technique
@@ -196,7 +196,7 @@ Agent Loop (runAgentLoop)
 | UI base | bits-ui (shadcn-svelte pattern), tailwind-variants |
 | Charting | D3.js v7 (Chart, Sankey, Hemicycle, D3Widget) |
 | Maps | Leaflet (MapView) |
-| LLM | Anthropic Claude API (via server proxy), Gemma 4 LiteRT (in-browser, OPFS), Ollama/Llamafile (local) |
+| LLM | Remote LLM API (any OpenAI-compatible provider, e.g. Claude, Gemini, ChatGPT, Mistral, Qwen), Gemma 4 LiteRT (in-browser WASM, OPFS), Ollama/Llamafile (local) |
 | Protocol | MCP Streamable HTTP (JSON-RPC 2.0), WebMCP (in-process) |
 | Build | TypeScript, svelte-package, Vite |
 

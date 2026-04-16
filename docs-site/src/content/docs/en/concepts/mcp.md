@@ -58,7 +58,7 @@ An agent can connect to **multiple** MCP servers simultaneously. Each server pro
 graph TD
     subgraph Agent
         L[Agent Loop]
-        LLM[LLM Claude/Gemma/Ollama]
+        LLM[LLM remote/WASM/local]
     end
 
     subgraph "Data layer MCP"

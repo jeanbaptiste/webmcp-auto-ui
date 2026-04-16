@@ -39,7 +39,7 @@ The alternative would be to expose one tool **per widget**: `render_stat`, `rend
 | 1 tool per widget | 31 `render_*` | ~3000 tokens | LLM sees everything upfront |
 | Single `widget_display` | 1 tool | ~200 tokens | LLM discovers via recipes |
 
-The single tool uses **15x fewer** schema tokens. With a remote LLM like Claude, that's a significant saving on every request.
+The single tool uses **15x fewer** schema tokens. With a remote LLM (e.g. Claude, Gemini, ChatGPT), that's a significant saving on every request.
 
 ## The 6 tools of the autoui server
 

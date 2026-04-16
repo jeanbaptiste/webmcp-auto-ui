@@ -262,7 +262,7 @@
     connectedUrls = connectedUrls.filter(u => u !== url);
     if (multiClient.serverCount === 0) {
       canvas.setMcpConnected(false, '', []);
-      mcpRecipes = []; // TODO: track recipes per-server like flex2 (mcpRecipesByServer Map)
+      mcpRecipes = []; // TODO: track recipes per-server like flex (mcpRecipesByServer Map)
     } else {
       const allTools = multiClient.listAllTools();
       canvas.setMcpConnected(true, multiClient.listServers().map(s => s.name).join(', '), allTools as Parameters<typeof canvas.setMcpConnected>[2]);

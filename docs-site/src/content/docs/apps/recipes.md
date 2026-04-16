@@ -46,7 +46,7 @@ graph TD
     end
 
     subgraph Backend
-        Proxy["api/chat/+server.ts<br/>Proxy Anthropic"]
+        Proxy["api/chat/+server.ts<br/>LLM Proxy"]
     end
 
     Page --> RecipeList & RecipeDetail & RecipePreview
@@ -145,7 +145,7 @@ Le chat supporte la conversation continue. Les messages precedents sont conserve
 
 | Variable | Description | Defaut |
 |----------|-------------|--------|
-| `ANTHROPIC_API_KEY` | Cle API Anthropic (`.env`) | requis |
+| `ANTHROPIC_API_KEY` | Cle API du provider LLM distant (`.env`) | requis |
 
 ## Code walkthrough
 
@@ -153,7 +153,7 @@ Le chat supporte la conversation continue. Les messages precedents sont conserve
 Fichier principal (~850 lignes). Gere :
 - L'etat de selection des recettes (locale vs MCP)
 - La connexion multi-MCP avec chargement automatique des recettes
-- Les providers LLM (Claude + Gemma) avec smart defaults
+- Les providers LLM (distant + Gemma) avec smart defaults
 - Les layers (MCP + autoui) et le prompt systeme
 - La boucle agent avec callbacks detailles (logs, widgets, texte, outils)
 - Le layout 3 colonnes avec resize
@@ -197,5 +197,5 @@ Le layout 3 colonnes est defini en CSS dans `<style>` du `+page.svelte`. Les bre
 
 - [Demo live](https://demos.hyperskills.net/recipes/)
 - [Package agent](/webmcp-auto-ui/packages/agent/) -- `WEBMCP_RECIPES`, `recipeRegistry`
-- [Flex](/webmcp-auto-ui/apps/flex2/) -- utilisation des recettes en contexte
-- [Viewer](/webmcp-auto-ui/apps/viewer2/) -- pour consulter les skills generees
+- [Flex](/webmcp-auto-ui/apps/flex/) -- utilisation des recettes en contexte
+- [Viewer](/webmcp-auto-ui/apps/viewer/) -- pour consulter les skills generees

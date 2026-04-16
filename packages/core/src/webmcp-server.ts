@@ -299,7 +299,10 @@ export function mountWidget(
   for (const server of servers) {
     const widget = server.getWidget(type);
     if (widget?.renderer && widget.vanilla) {
-      return (widget.renderer as (container: HTMLElement, data: Record<string, unknown>) => void | (() => void))(container, data);
+      // Deep-clone to strip Svelte 5 $state proxies — third-party libs (Chart.js,
+      // Cytoscape, Plotly, etc.) use Object.defineProperty which conflicts with proxies.
+      const plainData = JSON.parse(JSON.stringify(data));
+      return (widget.renderer as (container: HTMLElement, data: Record<string, unknown>) => void | (() => void))(container, plainData);
     }
   }
   container.textContent = `[${type}]`;

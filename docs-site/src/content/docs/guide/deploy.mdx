@@ -25,13 +25,13 @@ graph LR
     DEV[Machine locale<br/>build + deploy.sh] -->|SSH + SCP| SERVER[demo.hyperskills.net]
 
     subgraph SERVER["Serveur de production"]
-        NGINX[nginx<br/>:80/:443] -->|proxy| FLEX[flex2 :3007]
-        NGINX -->|proxy| VIEWER[viewer2 :3008]
+        NGINX[nginx<br/>:80/:443] -->|proxy| FLEX[flex :3007]
+        NGINX -->|proxy| VIEWER[viewer :3008]
         NGINX -->|proxy| RECIPES[recipes :3009]
-        NGINX -->|proxy| SHOWCASE[showcase2 :3010]
+        NGINX -->|proxy| SHOWCASE[showcase :3010]
         NGINX -->|proxy| BOILER[boilerplate :3011]
         NGINX -->|static| HOME[home/]
-        NGINX -->|static| TODO[todo2/]
+        NGINX -->|static| TODO[todo/]
     end
 ```
 
@@ -39,8 +39,8 @@ graph LR
 |---------|--------|
 | **Serveur** | `demo.hyperskills.net` (via SSH alias `ssh bot`) |
 | **Base** | `/opt/webmcp-demos/` |
-| **Apps Node.js** | flex2 (:3007), viewer2, recipes, showcase2, boilerplate |
-| **Apps statiques** | home, todo2 (servies par nginx) |
+| **Apps Node.js** | flex (:3007), viewer, recipes, showcase, boilerplate |
+| **Apps statiques** | home, todo (servies par nginx) |
 | **Reverse proxy** | nginx sur les ports 80/443 |
 
 ## Applications et chemins de deploiement
@@ -51,16 +51,16 @@ Chaque app a un chemin de deploiement specifique. Le script `deploy.sh` connait 
 
 | App | Type | Build dir (local) | Deploy dest (serveur) | ExecStart | Notes |
 |-----|------|-------------------|----------------------|-----------|-------|
-| **flex2** | Node.js (SvelteKit) | `apps/flex2/build/` | `/opt/webmcp-demos/flex2/` | `node index.js` | Composeur principal |
-| **viewer2** | Node.js (SvelteKit) | `apps/viewer2/build/` | `/opt/webmcp-demos/viewer2/` | `node index.js` | Visionneur HyperSkills |
-| **showcase2** | Node.js (SvelteKit) | `apps/showcase2/build/` | `/opt/webmcp-demos/showcase2/` | `node index.js` | Galerie de widgets |
+| **flex** | Node.js (SvelteKit) | `apps/flex/build/` | `/opt/webmcp-demos/flex/` | `node index.js` | Composeur principal |
+| **viewer** | Node.js (SvelteKit) | `apps/viewer/build/` | `/opt/webmcp-demos/viewer/` | `node index.js` | Visionneur HyperSkills |
+| **showcase** | Node.js (SvelteKit) | `apps/showcase/build/` | `/opt/webmcp-demos/showcase/` | `node index.js` | Galerie de widgets |
 | **recipes** | Node.js (SvelteKit) | `apps/recipes/build/` | `/opt/webmcp-demos/recipes/` | `node index.js` | Explorateur de recettes |
 | **boilerplate** | Node.js (SvelteKit) | `apps/boilerplate/build/` | `/opt/webmcp-demos/boilerplate/` | `node index.js` | Template de demarrage |
 | **home** | Static (SvelteKit) | `apps/home/build/` | `/opt/webmcp-demos/home/` | N/A (nginx) | Page d'accueil |
-| **todo2** | Static (SvelteKit) | `apps/todo2/build/` | `/opt/webmcp-demos/todo2/` | N/A (nginx) | Demo todo |
+| **todo** | Static (SvelteKit) | `apps/todo/build/` | `/opt/webmcp-demos/todo/` | N/A (nginx) | Demo todo |
 
 :::caution[Chemins differents]
-Les apps Node.js sont deployees a la **racine** de leur dossier (`/opt/webmcp-demos/flex2/index.js`), car systemd lance `node index.js` depuis ce dossier. Si vous deployez au mauvais endroit, le service demarre mais sert l'ancien code.
+Les apps Node.js sont deployees a la **racine** de leur dossier (`/opt/webmcp-demos/flex/index.js`), car systemd lance `node index.js` depuis ce dossier. Si vous deployez au mauvais endroit, le service demarre mais sert l'ancien code.
 :::
 
 ## Procedure de deploiement
@@ -74,10 +74,10 @@ Le script gere tout : build des packages, build des apps, nettoyage, transfert, 
 ./scripts/deploy.sh
 
 # Deployer une app specifique
-./scripts/deploy.sh flex2
+./scripts/deploy.sh flex
 
 # Deployer plusieurs apps
-./scripts/deploy.sh flex2 viewer2 home
+./scripts/deploy.sh flex viewer home
 
 # Voir ce qui serait deploye sans rien changer
 ./scripts/deploy.sh --dry-run
@@ -92,8 +92,8 @@ Le script gere tout : build des packages, build des apps, nettoyage, transfert, 
 ssh bot
 
 # Verifier les services Node.js
-systemctl status webmcp-flex2
-systemctl status webmcp-viewer2
+systemctl status webmcp-flex
+systemctl status webmcp-viewer
 
 # Verifier les apps statiques
 curl -s -o /dev/null -w "%{http_code}" http://localhost/home/
@@ -125,12 +125,12 @@ flowchart TD
 Apres chaque transfert, le script compare le hash SHA-256 du fichier local avec celui du fichier deploye :
 
 ```bash
-expected=$(sha256sum apps/flex2/build/index.js | cut -d' ' -f1)
-actual=$(ssh bot "sha256sum /opt/webmcp-demos/flex2/index.js | cut -d' ' -f1")
+expected=$(sha256sum apps/flex/build/index.js | cut -d' ' -f1)
+actual=$(ssh bot "sha256sum /opt/webmcp-demos/flex/index.js | cut -d' ' -f1")
 
 if [ "$expected" != "$actual" ]; then
   echo "INTEGRITY ERROR — sha256 mismatch, rolling back"
-  rollback_app "flex2"
+  rollback_app "flex"
 fi
 ```
 
@@ -143,8 +143,8 @@ Avant chaque deploiement, une copie complete de l'app existante est stockee dans
 ```bash
 # Rollback manuel si necessaire
 ssh bot
-cp -a /opt/webmcp-demos/.backups/flex2.prev /opt/webmcp-demos/flex2
-systemctl restart webmcp-flex2
+cp -a /opt/webmcp-demos/.backups/flex.prev /opt/webmcp-demos/flex
+systemctl restart webmcp-flex
 ```
 
 ## Variables d'environnement
@@ -163,7 +163,7 @@ L'app `home` necessite `PUBLIC_BASE_URL` au moment du build, pas a l'execution :
 
 ```bash
 # Le script deploy.sh gere automatiquement cette variable
-# pour les apps statiques (home, todo2)
+# pour les apps statiques (home, todo)
 PUBLIC_BASE_URL=https://demos.hyperskills.net npm run build
 ```
 
@@ -175,7 +175,7 @@ nginx sert de reverse proxy pour les apps Node.js et de serveur statique pour le
 
 ```nginx
 # Apps Node.js → proxy vers le port local
-location /flex2/ {
+location /flex/ {
   proxy_pass http://localhost:3007/;
   proxy_http_version 1.1;
   proxy_set_header Upgrade $http_upgrade;
@@ -203,17 +203,17 @@ location / {
 ssh bot
 
 # Suivre les logs en temps reel
-journalctl -u webmcp-flex2 -f
+journalctl -u webmcp-flex -f
 
 # Voir les 50 derniers logs
-journalctl -u webmcp-flex2 -n 50 --no-pager
+journalctl -u webmcp-flex -n 50 --no-pager
 ```
 
 ### Verification de sante
 
 ```bash
 # Tester toutes les apps
-for app in home flex2 viewer2 showcase2 recipes; do
+for app in home flex viewer showcase recipes; do
   code=$(curl -s -o /dev/null -w "%{http_code}" "https://demos.hyperskills.net/$app/")
   echo "$app: HTTP $code"
 done
@@ -237,9 +237,9 @@ free -h     # Memoire
 ```bash
 ssh bot
 # Nettoyer les anciens fichiers
-rm -rf /opt/webmcp-demos/flex2/client /opt/webmcp-demos/flex2/server
+rm -rf /opt/webmcp-demos/flex/client /opt/webmcp-demos/flex/server
 # Redeployer proprement
-./scripts/deploy.sh flex2
+./scripts/deploy.sh flex
 ```
 
 :::tip[Le script nettoie automatiquement]
@@ -271,9 +271,9 @@ grep -A 5 "location /home/" /etc/nginx/sites-available/default
 sudo systemctl reload nginx
 ```
 
-### API rate-limited (Anthropic)
+### API rate-limited (provider LLM)
 
-**Symptome** : erreurs 429 dans les logs de flex2.
+**Symptome** : erreurs 429 dans les logs de flex.
 
 **Solutions** :
 1. Attendre (le client gere le backoff exponentiel automatiquement)
@@ -286,12 +286,12 @@ sudo systemctl reload nginx
 ssh bot
 
 # Voir l'erreur detaillee
-journalctl -u webmcp-flex2 -n 30 --no-pager
+journalctl -u webmcp-flex -n 30 --no-pager
 
 # Causes courantes :
 # - Port deja utilise → lsof -i :3007
-# - .env manquant → ls -la /opt/webmcp-demos/flex2/.env
-# - Dependances npm manquantes → cd /opt/webmcp-demos/flex2 && npm install --production
+# - .env manquant → ls -la /opt/webmcp-demos/flex/.env
+# - Dependances npm manquantes → cd /opt/webmcp-demos/flex && npm install --production
 ```
 
 ## Maintenance courante
@@ -300,7 +300,7 @@ journalctl -u webmcp-flex2 -n 30 --no-pager
 
 ```bash
 ssh bot
-sudo systemctl restart webmcp-flex2 webmcp-viewer2 webmcp-recipes webmcp-showcase2 nginx
+sudo systemctl restart webmcp-flex webmcp-viewer webmcp-recipes webmcp-showcase nginx
 ```
 
 ### Nettoyer les anciens logs
@@ -327,7 +327,7 @@ Avant chaque deploiement, verifier :
 - [ ] Les tests passent (`npm run test`)
 - [ ] Le code est commite et pousse
 - [ ] Utiliser `./scripts/deploy.sh` (jamais `scp` ou `rsync`)
-- [ ] Apres deploiement : verifier les logs (`journalctl -u webmcp-flex2 -n 20`)
+- [ ] Apres deploiement : verifier les logs (`journalctl -u webmcp-flex -n 20`)
 - [ ] Apres deploiement : tester dans le navigateur
 - [ ] Si l'app `home` est deployee : verifier que `PUBLIC_BASE_URL` est correct
 
@@ -338,12 +338,12 @@ Si un deploiement casse quelque chose et que le rollback automatique n'a pas fon
 ```bash
 # Option 1 : Restaurer depuis le backup
 ssh bot
-cp -a /opt/webmcp-demos/.backups/flex2.prev /opt/webmcp-demos/flex2
-systemctl restart webmcp-flex2
+cp -a /opt/webmcp-demos/.backups/flex.prev /opt/webmcp-demos/flex
+systemctl restart webmcp-flex
 
 # Option 2 : Redeployer une version anterieure
 git checkout <commit_precedent>
-./scripts/deploy.sh flex2
+./scripts/deploy.sh flex
 ```
 
 :::caution[Vitesse de rollback]

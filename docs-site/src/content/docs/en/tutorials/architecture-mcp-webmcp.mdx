@@ -51,7 +51,7 @@ graph TB
         W3[search_recipes]
     end
 
-    LLM[Claude LLM] -->|HTTP| MCP
+    LLM[LLM Agent] -->|HTTP| MCP
     LLM -->|JS in-process| WebMCP
 ```
 
@@ -246,7 +246,7 @@ sequenceDiagram
     participant User
     participant App
     participant Loop as Agent Loop
-    participant LLM as Claude
+    participant LLM as LLM
     participant MCP as MCP Server
     participant WebMCP as WebMCP Server
 
@@ -381,14 +381,14 @@ graph TB
     end
 
     subgraph Cloud
-        Claude[Claude API]
+        LLMApi[Remote LLM API]
         MCP1[MCP Server 1]
         MCP2[MCP Server 2]
     end
 
     App -->|message| Agent
-    Agent -->|prompt + tools| Claude
-    Claude -->|tool_calls| Agent
+    Agent -->|prompt + tools| LLMApi
+    LLMApi -->|tool_calls| Agent
     Agent -->|mcp calls| MCP1
     Agent -->|mcp calls| MCP2
     Agent -->|webmcp calls| WebMCPs

@@ -58,7 +58,7 @@ Un agent peut se connecter a **plusieurs** serveurs MCP simultanement. Chaque se
 graph TD
     subgraph Agent
         L[Agent Loop]
-        LLM[LLM Claude/Gemma/Ollama]
+        LLM[LLM distant/WASM/local]
     end
 
     subgraph "Couche donnees MCP"

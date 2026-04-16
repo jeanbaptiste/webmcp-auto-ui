@@ -239,7 +239,7 @@ Le prompt custom est un **prefixe**, pas un remplacement. Cela permet d'ajouter
 des instructions supplementaires (persona, contraintes de langue, domaine
 metier) sans casser le workflow en 4 etapes.
 
-Exemple concret dans `apps/flex2/src/routes/+page.svelte` :
+Exemple concret dans `apps/flex/src/routes/+page.svelte` :
 
 ```ts
 import { buildSystemPrompt } from '@webmcp-auto-ui/agent';

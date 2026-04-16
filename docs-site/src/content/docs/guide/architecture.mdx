@@ -78,9 +78,9 @@ interface LLMProvider {
 
 Cette interface unique permet de passer d'un provider a l'autre sans modifier le code de l'agent. Le choix du provider est une decision d'execution, pas d'architecture.
 
-### RemoteLLMProvider (Claude)
+### RemoteLLMProvider (LLM distant)
 
-Provider pour les modeles Anthropic (Claude) via un proxy HTTP. Le proxy est un endpoint SvelteKit (`/api/chat`) qui ajoute la cle API cote serveur :
+Provider pour toute API compatible OpenAI (e.g. Claude/Anthropic, Gemini/Google, ChatGPT/OpenAI, Le Chat/Mistral, Qwen) via un proxy HTTP. Le proxy est un endpoint SvelteKit (`/api/chat`) qui ajoute la cle API cote serveur :
 
 ```typescript
 import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
@@ -95,7 +95,7 @@ provider.setModel('sonnet');  // Equilibre
 provider.setModel('opus');    // Raisonnement profond
 ```
 
-**Pourquoi un proxy ?** Pour ne jamais exposer la cle API au navigateur. Le proxy ajoute `Authorization: Bearer sk-ant-...` avant de relayer la requete vers l'API Anthropic.
+**Pourquoi un proxy ?** Pour ne jamais exposer la cle API au navigateur. Le proxy ajoute l'en-tete d'autorisation avant de relayer la requete vers l'API du provider LLM.
 
 ### WasmProvider (Gemma 4 LiteRT)
 
@@ -440,7 +440,7 @@ Le flux complet d'un appel `widget_display` :
 | Composant | Responsabilite | Package |
 |-----------|---------------|---------|
 | **Agent Loop** | Boucle iterative LLM → outils → LLM | `agent` |
-| **LLM Providers** | Claude (remote), Gemma 4 (WASM), Ollama (local) | `agent` |
+| **LLM Providers** | Remote (toute API compatible OpenAI), Gemma 4 (WASM), Ollama (local) | `agent` |
 | **Tool Layers** | Structuration et decouverte des outils MCP + WebMCP | `agent` |
 | **Dispatcher** | Routing par prefixe + activation lazy | `agent` |
 | **Tool Resolver** | Matching canonique en 4 couches | `agent` |
@@ -466,7 +466,7 @@ Svelte 5 (runes) offre une reactivite fine grain sans virtual DOM. Pour un canva
 ### Pourquoi trois providers LLM ?
 
 Chaque provider repond a un cas d'usage different :
-- **Claude** : qualite maximale, requiert une cle API et une connexion internet.
+- **Distant** (e.g. Claude, Gemini, ChatGPT) : qualite maximale, requiert une cle API et une connexion internet.
 - **Gemma** : confidentialite totale (tout tourne dans le navigateur), pas de cle API.
 - **Ollama** : modeles locaux pour le developpement hors ligne ou les modeles custom.
 

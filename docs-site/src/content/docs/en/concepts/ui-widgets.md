@@ -57,7 +57,7 @@ The project supports two rendering modes:
 
 | Mode | Technology | Usage |
 |------|-----------|-------|
-| **Svelte** | `<BlockRenderer>` / `<WidgetRenderer>` | SvelteKit apps (flex2, viewer2) |
+| **Svelte** | `<BlockRenderer>` / `<WidgetRenderer>` | SvelteKit apps (flex, viewer) |
 | **Vanilla** | `mountWidget()` | Framework-free apps, external integration |
 
 ### BlockRenderer (Svelte)

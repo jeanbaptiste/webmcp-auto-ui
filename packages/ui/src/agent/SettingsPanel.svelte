@@ -236,7 +236,7 @@
     {/if}
   </section>
 
-  <!-- Cache (disabled for WASM/Gemma — prompt caching is Anthropic API only) -->
+  <!-- Cache (disabled for WASM/Gemma — prompt caching is provider-dependent) -->
   <label class="flex items-center gap-2.5 select-none" class:cursor-pointer={modelType !== 'wasm'} class:opacity-40={modelType === 'wasm'}>
     <input
       type="checkbox"
@@ -246,7 +246,7 @@
     />
     <span class="text-xs font-mono text-text1">Prompt caching</span>
     {#if modelType === 'wasm'}
-      <span class="text-[10px] font-mono text-text2/50 ml-auto">Anthropic API only</span>
+      <span class="text-[10px] font-mono text-text2/50 ml-auto">remote API only</span>
     {:else}
       <span class="text-[10px] font-mono text-text2 ml-auto">saves ~80% tokens</span>
     {/if}

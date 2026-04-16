@@ -14,12 +14,12 @@
   let current = $state(0);
   let timer: ReturnType<typeof setInterval> | null = null;
 
-  function goTo(i: number) {
+  function goTo(i: number, userInitiated = false) {
     current = Math.max(0, Math.min(i, slides.length - 1));
-    onslidechange?.(slides[current], current);
+    if (userInitiated) onslidechange?.(slides[current], current);
     resetAuto();
   }
-  function prev() { goTo(current > 0 ? current - 1 : slides.length - 1); }
+  function prev() { goTo(current > 0 ? current - 1 : slides.length - 1, true); }
   function next() { goTo(current < slides.length - 1 ? current + 1 : 0); }
 
   function resetAuto() {
@@ -72,7 +72,7 @@
 
       {#if slides.length > 1}
         <button class="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 text-sm" onclick={prev}>&lsaquo;</button>
-        <button class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 text-sm" onclick={next}>&rsaquo;</button>
+        <button class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 text-sm" onclick={() => goTo(current < slides.length - 1 ? current + 1 : 0, true)}>&rsaquo;</button>
       {/if}
     </div>
 
@@ -80,7 +80,7 @@
       <div class="flex justify-center gap-1.5 mt-2">
         {#each slides as _, i}
           <button class="w-2 h-2 rounded-full transition-colors {i === current ? 'bg-accent' : 'bg-border2'}"
-            onclick={() => goTo(i)}></button>
+            onclick={() => goTo(i, true)}></button>
         {/each}
       </div>
     {/if}

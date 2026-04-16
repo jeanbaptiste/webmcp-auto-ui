@@ -39,7 +39,7 @@ L'alternative serait d'exposer un outil **par widget** : `render_stat`, `render_
 | 1 outil par widget | 31 `render_*` | ~3000 tokens | Le LLM voit tout d'emblee |
 | Outil unique `widget_display` | 1 outil | ~200 tokens | Le LLM decouvre via les recettes |
 
-L'outil unique consomme **15x moins de tokens** de schema. Avec un LLM distant comme Claude, c'est une economie significative a chaque requete.
+L'outil unique consomme **15x moins de tokens** de schema. Avec un LLM distant (e.g. Claude, Gemini, ChatGPT), c'est une economie significative a chaque requete.
 
 ## Les 6 outils du serveur autoui
 

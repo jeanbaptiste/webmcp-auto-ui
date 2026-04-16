@@ -5,7 +5,7 @@ sidebar:
   order: 0
 ---
 
-Vous allez voir, en 10 minutes vous aurez une application fonctionnelle qui connecte un serveur MCP, interroge Claude, et affiche des widgets generes automatiquement par l'IA. C'est le point de depart ideal pour tout projet webmcp-auto-ui.
+Vous allez voir, en 10 minutes vous aurez une application fonctionnelle qui connecte un serveur MCP, interroge un LLM distant, et affiche des widgets generes automatiquement par l'IA. C'est le point de depart ideal pour tout projet webmcp-auto-ui.
 
 ## Objectif
 
@@ -14,14 +14,14 @@ Installer le boilerplate, connecter un serveur MCP distant, et obtenir votre pre
 ## Prerequis
 
 - **Node.js 18+** installe
-- Une **cle API Anthropic** (Claude) -- gratuite pour les premiers essais
+- Une **cle API LLM** (e.g. Anthropic pour Claude, Google pour Gemini, OpenAI pour ChatGPT) -- niveaux gratuits disponibles pour les premiers essais
 - Un terminal et un editeur de code
 - Aucune connaissance prealable de MCP n'est requise
 
 ## Resultat final
 
 A la fin de ce tutoriel, vous aurez une app SvelteKit 5 complete avec :
-- Un chat connecte a Claude (Haiku, Sonnet ou Opus au choix)
+- Un chat connecte a un LLM distant (e.g. Claude, Gemini, ChatGPT)
 - Un serveur MCP distant connecte (donnees parlementaires francaises)
 - Des widgets qui s'affichent automatiquement sur un canvas
 - Un theme clair/sombre fonctionnel
@@ -29,10 +29,10 @@ A la fin de ce tutoriel, vous aurez une app SvelteKit 5 complete avec :
 ```mermaid
 graph LR
     U[Utilisateur] -->|question| Chat
-    Chat -->|prompt| Claude[Claude API]
-    Claude -->|tool_call| MCP[Serveur MCP distant]
-    MCP -->|donnees| Claude
-    Claude -->|widget_display| Canvas[Canvas widgets]
+    Chat -->|prompt| LLM[LLM distant]
+    LLM -->|tool_call| MCP[Serveur MCP distant]
+    MCP -->|donnees| LLM
+    LLM -->|widget_display| Canvas[Canvas widgets]
     Canvas -->|rendu| U
 ```
 
@@ -67,7 +67,7 @@ Cela installe une app SvelteKit 5 pre-cablee avec les 4 packages du monorepo :
 
 ## Etape 2 : Configurer le proxy API
 
-Le navigateur ne peut pas appeler l'API Anthropic directement (les cles API ne doivent jamais etre exposees cote client). Le boilerplate inclut un proxy serveur SvelteKit qui relaie les requetes.
+Le navigateur ne peut pas appeler l'API du provider LLM directement (les cles API ne doivent jamais etre exposees cote client). Le boilerplate inclut un proxy serveur SvelteKit qui relaie les requetes.
 
 Ouvrez le fichier `src/routes/api/chat/+server.ts` (deja present dans le boilerplate) :
 
@@ -86,7 +86,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 Voici ce qui se passe :
 - Le proxy lit la cle API depuis les variables d'environnement serveur (jamais exposee au client)
-- `anthropicProxy` reformate le body et l'envoie a l'API Claude
+- `anthropicProxy` reformate le body et l'envoie a l'API du LLM distant
 - Le header `X-Model` permet de changer de modele dynamiquement (`'haiku'`, `'sonnet'`, `'opus'`)
 
 Ajoutez votre cle API dans un fichier `.env` a la racine du projet :
@@ -138,7 +138,7 @@ sequenceDiagram
 
 ## Etape 4 : Comprendre le provider LLM
 
-Le provider LLM est l'abstraction qui permet de communiquer avec differents modeles de langage. Le boilerplate utilise `RemoteLLMProvider` pour Claude :
+Le provider LLM est l'abstraction qui permet de communiquer avec differents modeles de langage. Le boilerplate utilise `RemoteLLMProvider` pour les modeles distants (toute API compatible OpenAI) :
 
 ```ts
 import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
@@ -215,7 +215,7 @@ Le flux est le suivant :
 sequenceDiagram
     participant User as Utilisateur
     participant AgentLoop as Agent Loop
-    participant LLM as Claude
+    participant LLM as LLM distant
     participant MCP as Serveur MCP
     participant UI as Canvas
 
@@ -320,7 +320,7 @@ Le boilerplate integre plusieurs composants UI pre-faits qui simplifient la cons
 
 Chaque composant est autonome :
 - **`McpStatus`** affiche un point vert/rouge avec le nom du serveur et le nombre d'outils
-- **`LLMSelector`** expose un dropdown pour choisir le modele Claude
+- **`LLMSelector`** expose un dropdown pour choisir le modele LLM
 - **`AgentProgress`** montre une barre de progression avec le temps ecoule, le nombre d'appels d'outils, et le dernier outil appele
 
 ---
@@ -394,7 +394,7 @@ my-app/
     routes/
       +page.svelte          # Page principale (chat + canvas)
       +layout.svelte        # Layout racine (ThemeProvider)
-      api/chat/+server.ts   # Proxy API Claude
+      api/chat/+server.ts   # Proxy API LLM distant
     lib/
       widgets/
         register.ts         # Serveur WebMCP + enregistrement widgets

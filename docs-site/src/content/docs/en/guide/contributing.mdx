@@ -19,13 +19,13 @@ graph TD
     end
 
     subgraph "Apps"
-        FLEX[flex2 — Main composer]
-        VIEWER[viewer2 — HyperSkills viewer]
-        SHOWCASE[showcase2 — Widget gallery]
+        FLEX[flex — Main composer]
+        VIEWER[viewer — HyperSkills viewer]
+        SHOWCASE[showcase — Widget gallery]
         RECIPES[recipes — Recipe explorer]
         HOME[home — Homepage]
         BOILER[boilerplate — Starter template]
-        TODO[todo2 — Todo demo]
+        TODO[todo — Todo demo]
     end
 
     CORE --> SDK
@@ -47,7 +47,7 @@ Before writing code in an app (`apps/*`), check whether the functionality alread
 | JSON Schema validation | `validateJsonSchema` | `core` |
 | Vanilla widget mounting | `mountWidget` | `core` |
 | Agent loop | `runAgentLoop` | `agent` |
-| Claude provider | `RemoteLLMProvider` | `agent` |
+| Remote LLM provider | `RemoteLLMProvider` | `agent` |
 | Gemma provider | `WasmProvider` | `agent` |
 | Ollama provider | `LocalLLMProvider` | `agent` |
 | Discovery tools | `buildDiscoveryTools`, `activateServerTools` | `agent` |
@@ -257,19 +257,19 @@ When a fix appears applied locally but is not visible in production, follow this
 
 1. **Is the local build up to date?**
    ```bash
-   ls -la apps/flex2/build/index.js   # Check modification date
+   ls -la apps/flex/build/index.js   # Check modification date
    ```
 
 2. **Does the deployed file match the local build?**
    ```bash
-   sha256sum apps/flex2/build/index.js
-   ssh bot "sha256sum /opt/webmcp-demos/flex2/index.js"
+   sha256sum apps/flex/build/index.js
+   ssh bot "sha256sum /opt/webmcp-demos/flex/index.js"
    # Both hashes must match
    ```
 
 3. **Did the service restart with the correct file?**
    ```bash
-   ssh bot "systemctl status webmcp-flex2 --no-pager | head -20"
+   ssh bot "systemctl status webmcp-flex --no-pager | head -20"
    ```
 
 4. **Are there client-side JavaScript errors?**
@@ -316,7 +316,7 @@ Naming conventions:
 ### 2. Develop and Test
 
 ```bash
-npm run dev:flex2    # Develop on the main app
+npm run dev:flex    # Develop on the main app
 npm run test         # Run unit tests
 npm run check        # Check TypeScript types
 ```

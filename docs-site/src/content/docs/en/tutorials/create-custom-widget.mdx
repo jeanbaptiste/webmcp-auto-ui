@@ -393,7 +393,7 @@ graph LR
     Recipe[Recipe .md] -->|parse| Server[WebMCP Server]
     Component[Component .svelte] -->|renderer| Server
     Server -->|layer| Loop[Agent Loop]
-    Loop -->|tools| LLM[Claude]
+    Loop -->|tools| LLM[LLM]
     LLM -->|widget_display| Server
     Server -->|validate| Schema[JSON Schema]
     Schema -->|OK| Renderer[BlockRenderer]

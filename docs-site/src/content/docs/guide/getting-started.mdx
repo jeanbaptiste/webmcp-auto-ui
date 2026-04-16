@@ -22,7 +22,7 @@ Ce guide vous accompagne de l'installation a votre premier agent fonctionnel. A 
 | **Navigateur moderne** | Chrome/Edge recommande | WebAssembly pour Gemma, Web Workers |
 
 :::note[Cle API optionnelle]
-Une cle Anthropic (`ANTHROPIC_API_KEY`) n'est necessaire que pour utiliser Claude. L'agent Gemma 4 tourne entierement dans le navigateur, sans cle ni serveur distant.
+Une cle API (`ANTHROPIC_API_KEY`) n'est necessaire que pour les LLM distants (e.g. Claude, Gemini, ChatGPT). L'agent Gemma 4 tourne entierement dans le navigateur, sans cle ni serveur distant.
 :::
 
 ## Chemin rapide : Boilerplate
@@ -69,10 +69,10 @@ npm detecte automatiquement les workspaces definis dans `package.json` et instal
 
 ### Etape 3 : Configurer l'environnement
 
-Creez un fichier `.env.local` a la racine de l'app que vous voulez lancer (par exemple `apps/flex2/.env.local`) :
+Creez un fichier `.env.local` a la racine de l'app que vous voulez lancer (par exemple `apps/flex/.env.local`) :
 
 ```bash
-# API Claude (optionnel, requis uniquement pour les agents distants)
+# API LLM distante (optionnel, requis uniquement pour les agents distants)
 ANTHROPIC_API_KEY=sk-ant-...
 
 # Serveurs MCP distants (optionnel, format: protocol://host:port)
@@ -94,15 +94,15 @@ Cette commande lance toutes les apps en parallele via `concurrently`. Chaque app
 | App | Port | Description |
 |-----|------|-------------|
 | home | 5173 | Page d'accueil (statique) |
-| flex2 | 5174 | App principale (SvelteKit) |
-| viewer2 | 5175 | Visionneur HyperSkills |
-| showcase2 | 5176 | Galerie de widgets |
-| todo2 | 5177 | Demo todo |
+| flex | 5174 | App principale (SvelteKit) |
+| viewer | 5175 | Visionneur HyperSkills |
+| showcase | 5176 | Galerie de widgets |
+| todo | 5177 | Demo todo |
 
 Pour lancer une seule app :
 
 ```bash
-npm run dev:flex2    # Juste flex2
+npm run dev:flex    # Juste flex
 npm run dev:home     # Juste home
 ```
 
@@ -110,7 +110,7 @@ npm run dev:home     # Juste home
 
 ### 1. Choisir un modele
 
-Ouvrez `http://localhost:5174` (flex2). Dans le panneau de droite, cliquez sur **Settings** et selectionnez un modele :
+Ouvrez `http://localhost:5174` (flex). Dans le panneau de droite, cliquez sur **Settings** et selectionnez un modele :
 
 | Modele | Vitesse | Qualite | Prerequis |
 |--------|---------|---------|-----------|
@@ -185,10 +185,10 @@ webmcp-auto-ui/
 │   └── sdk/           # HyperSkills, registre de skills, canvas store
 ├── apps/
 │   ├── boilerplate/   # Point d'entree nouveaux devs (SvelteKit + Tricoteuses)
-│   ├── flex2/         # App SvelteKit principale (composeur)
-│   ├── showcase2/     # Galerie de widgets
-│   ├── todo2/         # Demo todo
-│   ├── viewer2/       # Visionneur HyperSkills
+│   ├── flex/         # App SvelteKit principale (composeur)
+│   ├── showcase/     # Galerie de widgets
+│   ├── todo/         # Demo todo
+│   ├── viewer/       # Visionneur HyperSkills
 │   ├── home/          # Page d'accueil (statique)
 │   └── recipes/       # Explorateur de recettes
 ├── scripts/
@@ -223,7 +223,7 @@ Le `core` est la fondation : il ne depend de rien d'autre. L'`agent` et le `sdk`
 import { runAgentLoop } from '@webmcp-auto-ui/agent';
 
 // Providers LLM
-import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';  // Claude via proxy
+import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';  // LLM distant via proxy
 import { WasmProvider } from '@webmcp-auto-ui/agent';       // Gemma 4 in-browser
 import { LocalLLMProvider } from '@webmcp-auto-ui/agent';   // Ollama local
 
@@ -246,9 +246,9 @@ import { encodeHyperSkill, decodeHyperSkill } from '@webmcp-auto-ui/sdk';
 
 ## Exemples concrets
 
-### Creer un provider Claude
+### Creer un provider LLM distant
 
-Le `RemoteLLMProvider` se connecte a Claude via un endpoint proxy SvelteKit. La cle API reste cote serveur -- jamais exposee au navigateur.
+Le `RemoteLLMProvider` se connecte a toute API compatible OpenAI (e.g. Claude, Gemini, ChatGPT, Mistral) via un endpoint proxy SvelteKit. La cle API reste cote serveur -- jamais exposee au navigateur.
 
 ```typescript
 import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';

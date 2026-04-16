@@ -61,10 +61,10 @@ rollback_app() {
 
 # ── Deploy path mapping ─────────────────────────────────────────────────────
 # Node apps: ExecStart determines where index.js must be
-#   flex2, viewer2, showcase2, recipes, boilerplate → node index.js → deploy to root
+#   flex, viewer, showcase, recipes, boilerplate → node index.js → deploy to root
 #
 # Static apps: served directly by nginx
-#   home, todo2 → deploy to root
+#   home, todo → deploy to root
 
 deploy_node_root() {
   local app=$1
@@ -140,7 +140,7 @@ deploy_node_build() {
 deploy_static() {
   local app=$1
   local env_prefix=""
-  if [ "$app" = "home" ] || [ "$app" = "todo2" ]; then
+  if [ "$app" = "home" ] || [ "$app" = "todo" ]; then
     env_prefix="PUBLIC_BASE_URL=https://demos.hyperskills.net "
   fi
   if [ "$DRY_RUN" = "1" ]; then
@@ -224,15 +224,15 @@ deploy_astro_node() {
 deploy_app() {
   local app=$1
   case "$app" in
-    flex2)               deploy_node_root "flex2" ;;
-    viewer2)             deploy_node_root "viewer2" ;;
+    flex)                deploy_node_root "flex" ;;
+    viewer)              deploy_node_root "viewer" ;;
     recipes)             deploy_node_root "recipes" ;;
     home)                deploy_static "home" ;;
-    todo2)               deploy_static "todo2" ;;
+    todo)                deploy_static "todo" ;;
     boilerplate)         deploy_node_root "boilerplate" ;;
-    showcase2)           deploy_node_root "showcase2" ;;
+    showcase)            deploy_node_root "showcase" ;;
     *)
-      echo "  [$app] ✗ unknown app (valid: home, flex2, viewer2, showcase2, todo2, recipes, boilerplate)"
+      echo "  [$app] ✗ unknown app (valid: home, flex, viewer, showcase, todo, recipes, boilerplate)"
       return 1
       ;;
   esac
@@ -244,7 +244,7 @@ echo "webmcp-auto-ui deploy"
 echo ""
 
 if [ $# -eq 0 ]; then
-  APPS="home flex2 viewer2 showcase2 todo2 recipes boilerplate"
+  APPS="home flex viewer showcase todo recipes boilerplate"
 else
   APPS="$*"
 fi
@@ -276,7 +276,7 @@ echo ""
 echo "Verifying..."
 for app in $APPS; do
   case "$app" in
-    flex2|viewer2|recipes|showcase2|boilerplate)
+    flex|viewer|recipes|showcase|boilerplate)
       status=$(ssh "$SSH_HOST" "systemctl is-active webmcp-$app 2>/dev/null" || echo "inactive")
       echo "  $app: $status"
       ;;
