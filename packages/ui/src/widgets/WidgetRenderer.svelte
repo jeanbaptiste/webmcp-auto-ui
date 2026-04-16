@@ -137,8 +137,11 @@
     customRenderer ? undefined : NATIVE_MAP[type],
   );
 
-  // Deep-clone data to strip Svelte 5 $state proxies — third-party libs
-  // (Chart.js, Cytoscape, etc.) use Object.defineProperty which conflicts.
+  // Deep-clone data to strip Svelte 5 $state proxies — only needed for vanilla
+  // renderers whose third-party libs (Cytoscape, Plotly, etc.) use
+  // Object.defineProperty which conflicts with Svelte 5 proxies.
+  // Native Svelte components handle proxied data fine and benefit from
+  // fine-grained reactivity, so they receive raw `data` directly.
   const plainData: Record<string, unknown> = $derived(JSON.parse(JSON.stringify(data)));
 
   // ── Vanilla renderer container + lifecycle ────────────
@@ -221,9 +224,9 @@
 {#if isVanillaRenderer}
   <div bind:this={vanillaContainer} class="vanilla-container w-full h-full overflow-auto p-2"></div>
 {:else if customRenderer}
-  <svelte:component this={customRenderer as Component<any>} data={plainData} {id} />
+  <svelte:component this={customRenderer as Component<any>} {data} {id} />
 {:else if nativeEntry}
-  <svelte:component this={nativeEntry.component} {...nativeEntry.props(plainData, emit)} />
+  <svelte:component this={nativeEntry.component} {...nativeEntry.props(data, emit)} />
 {:else}
   <div class="p-3 font-mono text-xs text-text2">[{type}]</div>
 {/if}

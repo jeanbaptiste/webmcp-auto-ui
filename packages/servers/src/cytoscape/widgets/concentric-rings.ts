@@ -7,10 +7,12 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     elements: data.elements as any[],
     layout: {
       name: 'concentric',
-      concentric: (node: any) => node.data('level') ?? node.degree(),
-      levelWidth: () => 2,
       minNodeSpacing: 50,
       ...data.layout as any,
+      // Functions MUST come after spread — JSON data from MCP can't contain
+      // functions and would overwrite these with null/string if spread last.
+      concentric: (node: any) => node.data('level') ?? node.degree(),
+      levelWidth: () => 2,
     },
     style: data.style as any[] || [
       { selector: 'node', style: { 'background-color': '#8b5cf6', 'label': 'data(label)', 'color': '#fff', 'text-valign': 'center', 'font-size': '10px' } },

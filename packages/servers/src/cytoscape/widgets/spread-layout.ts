@@ -5,7 +5,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const cy = cytoscape({
     container,
     elements: data.elements as any[],
-    layout: { name: 'cose', nodeRepulsion: () => 8000, idealEdgeLength: () => 100, ...data.layout as any },
+    layout: { name: 'cose', ...data.layout as any, nodeRepulsion: () => 8000, idealEdgeLength: () => 100 },
     style: data.style as any[] || [
       { selector: 'node', style: { 'background-color': '#8b5cf6', 'label': 'data(label)', 'color': '#fff', 'text-valign': 'center', 'font-size': '10px' } },
       { selector: 'edge', style: { 'width': 2, 'line-color': '#ccc', 'target-arrow-color': '#ccc', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier' } },

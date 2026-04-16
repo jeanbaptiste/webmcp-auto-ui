@@ -11,9 +11,10 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       animate: true,
       infinite: true,
       gravity: layoutOpts.gravity ?? 80,
+      ...layoutOpts,
+      // Functions MUST come after spread — JSON data from MCP would overwrite them
       nodeRepulsion: () => layoutOpts.nodeRepulsion ?? 4500,
       edgeElasticity: () => layoutOpts.edgeElasticity ?? 45,
-      ...layoutOpts,
     },
     style: data.style as any[] || [
       { selector: 'node', style: { 'background-color': '#8b5cf6', 'label': 'data(label)', 'color': '#fff', 'text-valign': 'center', 'font-size': '10px' } },
