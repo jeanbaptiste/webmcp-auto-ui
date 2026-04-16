@@ -11,9 +11,10 @@
     name: string;
     servers?: ConnectedServerInfo[];
     onserverclick?: (url: string) => void;
+    onclick?: () => void;
     class?: string;
   }
-  let { connecting, connected, name, servers = [], onserverclick, class: cls = '' }: Props = $props();
+  let { connecting, connected, name, servers = [], onserverclick, onclick, class: cls = '' }: Props = $props();
 
   let dropdownOpen = $state(false);
 
@@ -45,7 +46,7 @@
       class="text-[10px] text-teal font-mono cursor-pointer hover:underline select-none"
       onclick={toggleDropdown}
     >
-      multi-serveurs ({servers.length})
+      multi-server ({servers.length})
     </span>
 
     {#if dropdownOpen}
@@ -61,14 +62,26 @@
           >
             <span class="w-1.5 h-1.5 rounded-full bg-teal flex-shrink-0"></span>
             <span class="truncate flex-1">{server.name}</span>
-            <span class="text-text2 text-[10px] flex-shrink-0">{server.toolCount} outils</span>
+            <span class="text-text2 text-[10px] flex-shrink-0">{server.toolCount} tools</span>
           </button>
         {/each}
+        {#if onclick}
+          <button
+            class="w-full flex items-center gap-2 px-3 py-1.5 text-left font-mono text-xs text-accent hover:bg-surface2 transition-colors border-t border-border"
+            onclick={(e) => { e.stopPropagation(); dropdownOpen = false; onclick?.(); }}
+          >
+            Browse recipes
+          </button>
+        {/if}
       </div>
     {/if}
   {:else}
-    <span class="text-[10px] text-text2 font-mono">
-      {connecting ? 'connexion\u2026' : connected ? name : 'non connect\u00e9'}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <span
+      class="text-[10px] text-text2 font-mono {connected && onclick ? 'cursor-pointer hover:underline' : ''}"
+      onclick={() => { if (connected) onclick?.(); }}
+    >
+      {connecting ? 'connecting\u2026' : connected ? name : 'not connected'}
     </span>
   {/if}
 </div>

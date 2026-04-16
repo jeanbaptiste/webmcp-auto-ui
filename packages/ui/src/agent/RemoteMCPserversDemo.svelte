@@ -14,6 +14,10 @@
     onconnect?: (url: string) => void;
     onconnectall?: () => void;
     ondisconnect?: (url: string) => void;
+    recipeCountByServer?: Record<string, number>;
+    onrecipeclick?: (url: string) => void;
+    toolCountByServer?: Record<string, number>;
+    ontoolclick?: (url: string) => void;
   }
 
   let {
@@ -23,6 +27,10 @@
     onconnect,
     onconnectall,
     ondisconnect,
+    recipeCountByServer,
+    onrecipeclick,
+    toolCountByServer,
+    ontoolclick,
   }: Props = $props();
 
   const allConnected = $derived(
@@ -65,6 +73,25 @@
         <div class="flex-1 min-w-0 flex flex-col">
           <span class="font-mono text-xs font-medium text-text1">{server.name}</span>
           <span class="text-[10px] text-text2 truncate">{server.description}</span>
+          {#if connected && (recipeCountByServer?.[server.url] || toolCountByServer?.[server.url])}
+            <span class="flex items-center gap-1.5 mt-0.5">
+              {#if recipeCountByServer?.[server.url]}
+                <button class="text-[10px] font-mono text-accent hover:underline"
+                        onclick={(e) => { e.stopPropagation(); onrecipeclick?.(server.url); }}>
+                  {recipeCountByServer[server.url]} recipes
+                </button>
+              {/if}
+              {#if recipeCountByServer?.[server.url] && toolCountByServer?.[server.url]}
+                <span class="text-[10px] text-text2">·</span>
+              {/if}
+              {#if toolCountByServer?.[server.url]}
+                <button class="text-[10px] font-mono text-accent hover:underline"
+                        onclick={(e) => { e.stopPropagation(); ontoolclick?.(server.url); }}>
+                  {toolCountByServer[server.url]} tools
+                </button>
+              {/if}
+            </span>
+          {/if}
         </div>
 
         <!-- action -->

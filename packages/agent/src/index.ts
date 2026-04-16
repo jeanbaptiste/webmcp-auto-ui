@@ -38,6 +38,11 @@ export type { WebMcpServer, WebMcpToolDef, WidgetEntry } from '@webmcp-auto-ui/c
 // Recipes
 export { WEBMCP_RECIPES, parseRecipe, parseRecipes } from './recipes/index.js';
 export { recipeRegistry, registerRecipes, filterRecipesByServer, formatRecipesForPrompt, formatMcpRecipesForPrompt } from './recipe-registry.js';
+export { filterRecipes, sortRecipes, recipeToMarkdown, recipeToDownloadBlob } from './recipe-browser.js';
+
+// Tool browser
+export { groupToolsByServer, formatToolSchema } from './tool-browser.js';
+export type { BrowsableTool } from './tool-browser.js';
 
 // Summarize
 export { summarizeChat } from './summarize.js';

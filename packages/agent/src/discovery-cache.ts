@@ -41,6 +41,39 @@ export class DiscoveryCache {
     this.servers.clear();
   }
 
+  /** All registered server prefixes */
+  serverPrefixes(): string[] {
+    return [...this.servers.keys()];
+  }
+
+  /** All recipes across all servers, tagged with their server prefix */
+  allRecipes(): Array<CachedRecipe & { server: string }> {
+    const result: Array<CachedRecipe & { server: string }> = [];
+    for (const [prefix, cache] of this.servers) {
+      for (const r of cache.recipes) result.push({ ...r, server: prefix });
+    }
+    return result;
+  }
+
+  /** All tools across all servers, tagged with their server prefix */
+  allTools(): Array<{ name: string; description?: string; inputSchema?: Record<string, unknown>; server: string }> {
+    const result: Array<{ name: string; description?: string; inputSchema?: Record<string, unknown>; server: string }> = [];
+    for (const [prefix, cache] of this.servers) {
+      for (const t of cache.tools) result.push({ ...t, server: prefix });
+    }
+    return result;
+  }
+
+  /** Recipe count for a specific server */
+  recipeCount(serverPrefix: string): number {
+    return this.servers.get(serverPrefix)?.recipes.length ?? 0;
+  }
+
+  /** Tool count for a specific server */
+  toolCount(serverPrefix: string): number {
+    return this.servers.get(serverPrefix)?.tools.length ?? 0;
+  }
+
   /**
    * Try to resolve a discovery tool call from cache.
    * Returns the result string if handled, or null if not a discovery tool.
