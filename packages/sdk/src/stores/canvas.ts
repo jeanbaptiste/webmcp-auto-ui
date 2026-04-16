@@ -213,7 +213,7 @@ function createCanvasVanilla() {
       created: new Date().toISOString(),
       mcp: _mcpUrl,
       llm: _llm,
-      blocks: _blocks.map((b) => ({ type: b.type, data: b.data })),
+      blocks: _blocks.map((b) => ({ type: b.type, data: JSON.parse(JSON.stringify(b.data)) })),
     };
     if (Object.keys(_themeOverrides).length > 0) skill.theme = _themeOverrides;
     if (_enabledServerIds.length > 0) skill.servers = _enabledServerIds;

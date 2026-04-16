@@ -39,40 +39,42 @@
 
 <div class="relative w-full h-full overflow-y-auto" bind:this={el}>
 
-  {#if showSlider && !mobile}
-    <div class="sticky top-0 z-10 flex items-center justify-end px-3 py-1.5 gap-2">
-      <label class="flex items-center gap-2 font-mono text-[10px] text-text2 select-none">
-        <span>Size</span>
-        <input type="range" min="0" max="1" step="0.01"
-               bind:value={scale}
-               class="w-24 h-1 accent-[var(--color-accent,#6366f1)]" />
-        <span class="w-10 text-right tabular-nums">{currentMinW}px</span>
-      </label>
-    </div>
-  {/if}
+  {#if cw > 0}
+    {#if showSlider && !mobile}
+      <div class="sticky top-0 z-10 flex items-center justify-end px-3 py-1.5 gap-2">
+        <label class="flex items-center gap-2 font-mono text-[10px] text-text2 select-none">
+          <span>Size</span>
+          <input type="range" min="0" max="1" step="0.01"
+                 bind:value={scale}
+                 class="w-24 h-1 accent-[var(--color-accent,#6366f1)]" />
+          <span class="w-10 text-right tabular-nums">{currentMinW}px</span>
+        </label>
+      </div>
+    {/if}
 
-  {#if mobile}
-    <div class="flex flex-col gap-3 p-2">
-      {#each windows as win (win.id)}
-        {#if win.visible !== false}
-          {@const lw = { id: win.id, x: 0, y: 0, width: cw, height: 0, zIndex: 1, visible: true, folded: win.folded }}
-          <div>
-            {@render children(win, lw, { scale })}
-          </div>
-        {/if}
-      {/each}
-    </div>
-  {:else}
-    <div class="flex-grid" style="--min-w:{currentMinW}px;--gap:{gap}px;">
-      {#each windows as win (win.id)}
-        {#if win.visible !== false}
-          {@const lw = makeLw(win)}
-          <div class="flex-grid-item rounded-lg">
-            {@render children(win, lw, { scale })}
-          </div>
-        {/if}
-      {/each}
-    </div>
+    {#if mobile}
+      <div class="flex flex-col gap-3 p-2">
+        {#each windows as win (win.id)}
+          {#if win.visible !== false}
+            {@const lw = { id: win.id, x: 0, y: 0, width: cw, height: 0, zIndex: 1, visible: true, folded: win.folded }}
+            <div>
+              {@render children(win, lw, { scale })}
+            </div>
+          {/if}
+        {/each}
+      </div>
+    {:else}
+      <div class="flex-grid" style="--min-w:{currentMinW}px;--gap:{gap}px;">
+        {#each windows as win (win.id)}
+          {#if win.visible !== false}
+            {@const lw = makeLw(win)}
+            <div class="flex-grid-item rounded-lg">
+              {@render children(win, lw, { scale })}
+            </div>
+          {/if}
+        {/each}
+      </div>
+    {/if}
   {/if}
 
 </div>
