@@ -136,13 +136,26 @@ cd "$LOCAL_ROOT"
 MODIFIED=$(git diff --name-only 2>/dev/null || true)
 STAGED=$(git diff --cached --name-only 2>/dev/null || true)
 UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null || true)
+UNPUSHED=$(git log @{upstream}..HEAD --oneline 2>/dev/null || true)
 
-if [ -z "$MODIFIED" ] && [ -z "$STAGED" ] && [ -z "$UNTRACKED" ]; then
-  fail "nothing to commit — working tree is clean"
-  exit 0
+HAS_LOCAL_CHANGES=0
+HAS_UNPUSHED=0
+
+if [ -n "$MODIFIED" ] || [ -n "$STAGED" ] || [ -n "$UNTRACKED" ]; then
+  HAS_LOCAL_CHANGES=1
+  ok "uncommitted changes detected"
 fi
 
-ok "changes detected"
+if [ -n "$UNPUSHED" ]; then
+  HAS_UNPUSHED=1
+  UNPUSHED_COUNT=$(echo "$UNPUSHED" | wc -l | tr -d ' ')
+  ok "$UNPUSHED_COUNT unpushed commit(s)"
+fi
+
+if [ "$HAS_LOCAL_CHANGES" = "0" ] && [ "$HAS_UNPUSHED" = "0" ]; then
+  fail "nothing to do — working tree is clean and all commits are pushed"
+  exit 0
+fi
 
 # Check gh auth
 if command -v gh &>/dev/null && gh auth status &>/dev/null; then
@@ -159,41 +172,45 @@ echo ""
 echo -e "${BOLD}Step 1 — Commit${NC}"
 step_start "commit"
 
-# Stage modified/deleted tracked files
-if [ -n "$MODIFIED" ]; then
-  info "staging modified files..."
-  git add -u
-fi
-
-# Stage untracked files only if they're in apps/ or packages/
-if [ -n "$UNTRACKED" ]; then
-  RELEVANT_UNTRACKED=$(echo "$UNTRACKED" | grep -E '^(apps/|packages/)' || true)
-  if [ -n "$RELEVANT_UNTRACKED" ]; then
-    info "staging untracked files in apps/ and packages/..."
-    echo "$RELEVANT_UNTRACKED" | xargs git add
+if [ "$HAS_LOCAL_CHANGES" = "1" ]; then
+  # Stage modified/deleted tracked files
+  if [ -n "$MODIFIED" ]; then
+    info "staging modified files..."
+    git add -u
   fi
-fi
 
-# Determine commit message
-if [ -z "$COMMIT_MSG" ]; then
-  if [ -t 0 ]; then
-    # Interactive — prompt
-    echo -e "  ${CYAN}?${NC} Commit message (default: release: v${VERSION}):"
-    read -r -p "    > " COMMIT_MSG
+  # Stage untracked files only if they're in apps/ or packages/
+  if [ -n "$UNTRACKED" ]; then
+    RELEVANT_UNTRACKED=$(echo "$UNTRACKED" | grep -E '^(apps/|packages/)' || true)
+    if [ -n "$RELEVANT_UNTRACKED" ]; then
+      info "staging untracked files in apps/ and packages/..."
+      echo "$RELEVANT_UNTRACKED" | xargs git add
+    fi
   fi
+
+  # Determine commit message
   if [ -z "$COMMIT_MSG" ]; then
-    COMMIT_MSG="release: v${VERSION}"
+    if [ -t 0 ]; then
+      # Interactive — prompt
+      echo -e "  ${CYAN}?${NC} Commit message (default: release: v${VERSION}):"
+      read -r -p "    > " COMMIT_MSG
+    fi
+    if [ -z "$COMMIT_MSG" ]; then
+      COMMIT_MSG="release: v${VERSION}"
+    fi
   fi
-fi
 
-if [ "$DRY_RUN" = "1" ]; then
-  skip "would commit with message: \"$COMMIT_MSG\""
-  STAGED_COUNT=$(git diff --cached --name-only | wc -l | tr -d ' ')
-  info "$STAGED_COUNT files staged"
-  git reset HEAD -- . > /dev/null 2>&1 || true
+  if [ "$DRY_RUN" = "1" ]; then
+    skip "would commit with message: \"$COMMIT_MSG\""
+    STAGED_COUNT=$(git diff --cached --name-only | wc -l | tr -d ' ')
+    info "$STAGED_COUNT files staged"
+    git reset HEAD -- . > /dev/null 2>&1 || true
+  else
+    git commit -m "$COMMIT_MSG"
+    ok "committed: $COMMIT_MSG"
+  fi
 else
-  git commit -m "$COMMIT_MSG"
-  ok "committed: $COMMIT_MSG"
+  ok "nothing to commit — using existing unpushed commits"
 fi
 
 step_end "commit"
