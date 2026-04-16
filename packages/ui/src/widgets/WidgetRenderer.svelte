@@ -137,6 +137,10 @@
     customRenderer ? undefined : NATIVE_MAP[type],
   );
 
+  // Deep-clone data to strip Svelte 5 $state proxies — third-party libs
+  // (Chart.js, Cytoscape, etc.) use Object.defineProperty which conflicts.
+  const plainData: Record<string, unknown> = $derived(JSON.parse(JSON.stringify(data)));
+
   // ── Vanilla renderer container + lifecycle ────────────
   let vanillaContainer: HTMLElement | undefined = $state(undefined);
 
@@ -144,9 +148,9 @@
     if (!isVanillaRenderer || !vanillaContainer) return;
     // Clear previous content
     vanillaContainer.innerHTML = '';
-    // Call the vanilla renderer, capture optional cleanup
+    // Call the vanilla renderer with proxy-free data, capture optional cleanup
     const cleanup = (customRenderer as (container: HTMLElement, data: Record<string, unknown>) => void | (() => void))(
-      vanillaContainer, data,
+      vanillaContainer, plainData,
     );
     // Return teardown for $effect
     return () => {
@@ -217,9 +221,9 @@
 {#if isVanillaRenderer}
   <div bind:this={vanillaContainer} class="vanilla-container w-full h-full overflow-auto p-2"></div>
 {:else if customRenderer}
-  <svelte:component this={customRenderer as Component<any>} {data} {id} />
+  <svelte:component this={customRenderer as Component<any>} data={plainData} {id} />
 {:else if nativeEntry}
-  <svelte:component this={nativeEntry.component} {...nativeEntry.props(data, emit)} />
+  <svelte:component this={nativeEntry.component} {...nativeEntry.props(plainData, emit)} />
 {:else}
   <div class="p-3 font-mono text-xs text-text2">[{type}]</div>
 {/if}
