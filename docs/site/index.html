@@ -423,11 +423,11 @@ Les autres apps (flex, viewer, todo, showcase, recipes) sont assignees a des por
 
 | Variable           | Apps                    | Role                                          |
 |--------------------|-------------------------|-----------------------------------------------|
-| `ANTHROPIC_API_KEY`| flex, todo              | Proxy server-side pour l'API LLM distante (compatible OpenAI) |
+| `LLM_API_KEY`      | flex, todo              | Proxy server-side pour l'API LLM distante (compatible OpenAI) |
 | `PUBLIC_BASE_URL`  | home                    | Base URL pour les liens (default: localhost)   |
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
+export LLM_API_KEY="sk-..."
 ```
 
 ## Problemes courants
@@ -1604,7 +1604,7 @@ Boucle agent LLM avec providers distants (toute API compatible OpenAI, e.g. Clau
 - **autoui** : serveur WebMCP pre-configure avec 26 widgets natifs + outils canvas/recall
 - **Lazy loading** : `buildDiscoveryTools()` au demarrage, `activateServerTools()` a la demande
 - **Tool naming** : `{serverName}_{protocol}_{toolName}` pour le routage automatique
-- 4 providers LLM : `RemoteLLMProvider`, `WasmProvider`, `LocalLLMProvider`, + legacy `AnthropicProvider`/`GemmaProvider`
+- 3 providers LLM : `RemoteLLMProvider`, `WasmProvider`, `LocalLLMProvider`
 - TokenTracker temps reel + summarizeChat pour la provenance HyperSkill
 
 ## autoui — serveur WebMCP built-in
@@ -1637,7 +1637,7 @@ import { NATIVE_WIDGET_NAMES } from '@webmcp-auto-ui/agent';
 
 ### RemoteLLMProvider (nouveau)
 
-Provider unifie pour toute API LLM cloud compatible OpenAI (e.g. Claude/Anthropic, Gemini/Google, ChatGPT/OpenAI, Mistral, Qwen). Remplace `AnthropicProvider` (qui reste disponible en alias).
+Provider unifie pour toute API LLM cloud compatible OpenAI (e.g. Claude/Anthropic, Gemini/Google, ChatGPT/OpenAI, Mistral, Qwen).
 
 ```ts
 import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
@@ -1651,7 +1651,7 @@ const provider = new RemoteLLMProvider({
 
 ### WasmProvider (nouveau)
 
-Provider unifie pour les modeles WASM in-browser. Remplace `GemmaProvider` (qui reste disponible en alias).
+Provider unifie pour les modeles WASM in-browser.
 
 ```ts
 import { WasmProvider } from '@webmcp-auto-ui/agent';
@@ -1977,7 +1977,7 @@ import {
 ```ts
 // Providers
 export { RemoteLLMProvider, WasmProvider, LocalLLMProvider, createProvider };
-export { AnthropicProvider, GemmaProvider };  // backward compat
+export { AnthropicProvider, GemmaProvider };  // aliases (backward compat)
 
 // autoui server
 export { autoui, NATIVE_WIDGET_NAMES };
@@ -2131,7 +2131,7 @@ ssh bot "rm -rf /opt/webmcp-demos/flex/{client,server,index.js,handler.js}"
 
 ### 4. .env manquant apres deploy
 
-**Symptome** : Service crash "ANTHROPIC_API_KEY is not defined".
+**Symptome** : Service crash "LLM_API_KEY is not defined".
 
 **Cause** : Le .env a ete supprime pendant le nettoyage.
 
@@ -2175,7 +2175,7 @@ ssh bot "systemctl is-active webmcp-flex webmcp-viewer webmcp-recipes"
 
 | Variable | Apps | Localisation serveur |
 |----------|------|--------------------|
-| `ANTHROPIC_API_KEY` | flex, viewer, recipes | `/opt/webmcp-demos/{app}/.env` |
+| `LLM_API_KEY` | flex, viewer, recipes | `/opt/webmcp-demos/{app}/.env` |
 | `PUBLIC_BASE_URL` | home (build-time) | Variable shell avant `npm run build` |
 | `PORT` | flex(3004), viewer(3002), recipes(3006) | systemd `Environment=PORT=...` |
 
@@ -3509,13 +3509,13 @@ Actions canvas via noms courts :
 | `resize` | `resize_block` |
 | `style` | `style_block` |
 
-Les noms utilisent des tirets (`stat-card`). Les noms `render_*` sont acceptes en backward compat.
+Les noms utilisent des tirets (`stat-card`).
 
 ### Tous les composants enregistres
 
 `list_components()` retourne **tous** les composants (56), pas seulement les widgets renderables :
 
-- **renderable: true** -- tous les block types `render_*` + actions canvas. Renderables via `executeComponent`.
+- **renderable: true** -- tous les block types (widgets) + actions canvas. Renderables via `widget_display`.
 - **renderable: false** -- composants Svelte (primitives, base UI, layouts, agent UI, theme). Retournent leur schema et un hint d'usage.
 
 ## Composer une recette (skill)
@@ -3630,7 +3630,7 @@ LLM appelle component("stat-card", {label: "Users", value: 8204})
 
 ### Mode explicit
 
-En mode explicit, le LLM voit les 31 `render_*` tools individuels + `component()`. Plus verbeux mais utile pour les modeles WASM qui ont besoin d'exemples concrets.
+En mode explicit, le LLM voit les 31 tools de widgets individuels + `widget_display()`. Plus verbeux mais utile pour les modeles WASM qui ont besoin d'exemples concrets.
 
 ### BlockRenderer
 
