@@ -507,66 +507,22 @@ export class WasmProvider implements LLMProvider {
   }
 
   /**
-   * Parse Gemma native tool call args, handling internal quotes in values.
-   * Extracts key-value pairs using <|"|> delimiters before any replacement,
-   * so internal quotes like data."date" are preserved correctly.
-   * Example: {schema:<|"|>assemblee<|"|>,query:<|"|>SELECT data."date"<|"|>}
+   * Parse Gemma native tool call args by normalizing to JSON in one pass.
+   *   1. `<|"|>...<|"|>`      → `"..."`          (string delimiters)
+   *   2. Unquoted keys         → `"quoted":`      (valid JSON keys)
+   * Then `JSON.parse` handles nesting, arrays, numbers, booleans, null natively.
+   * Example: {schema:<|"|>senat<|"|>,params:{data:[{id:1}]}} → {schema:"senat",params:{data:[{id:1}]}}
    */
   private static parseGemmaArgs(raw: string): Record<string, unknown> {
-    const pairs: Record<string, unknown> = {};
-
-    // Extract string values delimited by <|"|>
-    const kvRegex = /(\w+)\s*:\s*<\|"\|>([\s\S]*?)<\|"\|>/g;
-    let m: RegExpExecArray | null;
-    while ((m = kvRegex.exec(raw)) !== null) {
-      pairs[m[1]] = m[2];
+    const jsonStr = raw
+      .replace(/<\|"\|>/g, '"')
+      .replace(/([{,])\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
+    try {
+      const parsed = JSON.parse(jsonStr);
+      return (typeof parsed === 'object' && parsed !== null) ? parsed : {};
+    } catch {
+      return {};
     }
-
-    // Extract numeric values (no delimiters)
-    const numRegex = /(\w+)\s*:\s*(\d+(?:\.\d+)?(?:e[+-]?\d+)?)\s*(?:[,}]|$)/g;
-    while ((m = numRegex.exec(raw)) !== null) {
-      if (!(m[1] in pairs)) pairs[m[1]] = Number(m[2]);
-    }
-
-    // Extract boolean/null literals
-    const litRegex = /(\w+)\s*:\s*(true|false|null)\s*(?:[,}]|$)/g;
-    while ((m = litRegex.exec(raw)) !== null) {
-      if (!(m[1] in pairs)) pairs[m[1]] = JSON.parse(m[2]);
-    }
-
-    // Extract inline object/array values (e.g. params:{items:[...]}, data:{a:1})
-    // Gemma often writes nested objects without <|"|> delimiters.
-    // We find key:{ or key:[ and then match balanced braces/brackets.
-    const objRe = /(\w+)\s*:\s*([{\[])/g;
-    while ((m = objRe.exec(raw)) !== null) {
-      if (m[1] in pairs) continue; // already captured by a higher-priority regex
-      const key = m[1];
-      const opener = m[2];
-      const closer = opener === '{' ? '}' : ']';
-      let depth = 1;
-      let i = m.index + m[0].length;
-      while (i < raw.length && depth > 0) {
-        const ch = raw[i];
-        if (ch === opener) depth++;
-        else if (ch !== opener && (ch === '{' || ch === '[')) depth++;
-        else if (ch === closer) depth--;
-        else if (ch !== closer && (ch === '}' || ch === ']')) depth--;
-        i++;
-      }
-      const fragment = raw.slice(m.index + m[0].length - 1, i); // includes opener and closer
-      // Replace <|"|> with " for JSON parsing
-      const jsonStr = fragment.replace(/<\|"\|>/g, '"');
-      try { pairs[key] = JSON.parse(jsonStr); } catch { /* unparseable — skip */ }
-    }
-
-    // Try to parse string values that look like JSON objects/arrays
-    for (const [k, v] of Object.entries(pairs)) {
-      if (typeof v === 'string' && (v.startsWith('{') || v.startsWith('['))) {
-        try { pairs[k] = JSON.parse(v); } catch { /* keep as string */ }
-      }
-    }
-
-    return pairs;
   }
 
   /**
