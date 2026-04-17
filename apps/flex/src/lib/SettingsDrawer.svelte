@@ -31,8 +31,6 @@
     effectivePrompt?: string;
     maxTokens?: number;
     maxContextTokens?: number;
-    maxTools?: number;
-    maxMessages?: number;
     maxResultLength?: number;
     compressHistory?: boolean;
     compressPreview?: number;
@@ -82,8 +80,6 @@
     effectivePrompt = '',
     maxTokens = $bindable(4096),
     maxContextTokens = $bindable(120_000),
-    maxTools = $bindable(8),
-    maxMessages = $bindable(8),
     maxResultLength = $bindable(10000),
     compressHistory = $bindable(false),
     compressPreview = $bindable(500),
@@ -254,8 +250,6 @@
         {effectivePrompt}
         bind:maxTokens
         bind:maxContextTokens
-        bind:maxTools
-        bind:maxMessages
         bind:maxResultLength
         bind:compressHistory
         bind:compressPreview

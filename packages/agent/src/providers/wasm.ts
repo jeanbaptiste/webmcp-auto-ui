@@ -176,7 +176,7 @@ export class WasmProvider implements LLMProvider {
   async chat(
     messages: ChatMessage[],
     tools: ProviderTool[],
-    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string; maxTools?: number; maxMessages?: number }
+    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string }
   ): Promise<LLMResponse> {
     if (this.status !== 'ready') await this.initialize();
     if (!this.inference) throw new Error('Model not initialized');
@@ -202,7 +202,7 @@ export class WasmProvider implements LLMProvider {
   private async _chat(
     messages: ChatMessage[],
     tools: ProviderTool[],
-    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string; maxTools?: number; maxMessages?: number }
+    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string }
   ): Promise<LLMResponse> {
     // Apply per-request options
     if (options?.maxTokens || options?.temperature || options?.topK) {
@@ -218,22 +218,22 @@ export class WasmProvider implements LLMProvider {
     }
 
     // Build Gemma chat prompt (Gemma 4 format with tool hints)
-    let prompt = this.buildPrompt(messages, tools, options?.system, options?.maxTools);
+    let prompt = this.buildPrompt(messages, tools, options?.system);
 
     // Aggressive clipping: Gemma struggles with long conversations — dynamic cap based on context size
     const contextTokens = this.opts.contextSize ?? 4096;
-    const MAX_MESSAGES = options?.maxMessages ?? Math.max(4, Math.floor(contextTokens / 512));
+    const MAX_MESSAGES = Math.max(4, Math.floor(contextTokens / 512));
     while (messages.length > MAX_MESSAGES) {
       messages = messages.slice(1);
     }
-    prompt = this.buildPrompt(messages, tools, options?.system, options?.maxTools);
+    prompt = this.buildPrompt(messages, tools, options?.system);
 
     // Token-based clipping: if prompt is still too large, drop oldest messages
     const maxPromptTokens = (this.opts.contextSize ?? 4096) - 512;
     try {
       while (this.inference.sizeInTokens(prompt) > maxPromptTokens && messages.length > 1) {
         messages = messages.slice(1);
-        prompt = this.buildPrompt(messages, tools, options?.system, options?.maxTools);
+        prompt = this.buildPrompt(messages, tools, options?.system);
       }
     } catch {
       // sizeInTokens not available — skip clipping
@@ -661,8 +661,8 @@ export class WasmProvider implements LLMProvider {
     return `<|tool_call>call:${name}{${entries.join(',')}}<tool_call|>`;
   }
 
-  private buildPrompt(messages: ChatMessage[], tools: ProviderTool[], systemPrompt?: string, maxTools?: number): string {
-    return buildGemmaPrompt({ systemPrompt, tools, messages, maxTools });
+  private buildPrompt(messages: ChatMessage[], tools: ProviderTool[], systemPrompt?: string): string {
+    return buildGemmaPrompt({ systemPrompt, tools, messages });
   }
 
   destroy() {
@@ -683,12 +683,10 @@ export class WasmProvider implements LLMProvider {
 export interface BuildGemmaPromptInput {
   /** Raw system prompt (will have `tool_name(args)` rewritten to `<|tool_call>` syntax). */
   systemPrompt?: string;
-  /** Provider tools (will be declared via `<|tool>declaration>` and limited to `maxTools`). */
+  /** Provider tools (will be declared via `<|tool>declaration>` and hardcapped at 15). */
   tools: ProviderTool[];
   /** Conversation turns. Defaults to `[]` (preview mode — no `<|turn>` user/model blocks). */
   messages?: ChatMessage[];
-  /** Hard cap on number of tool declarations (default 15 — Gemma small models struggle beyond this). */
-  maxTools?: number;
 }
 
 /**
@@ -703,7 +701,7 @@ export interface BuildGemmaPromptInput {
  * 1. Rewrites `tool_name(args)` patterns in the system prompt to
  *    `<|tool_call>call:name{args:<|"|>...<|"|>}<tool_call|>` so Gemma does not
  *    mimic paren syntax as plain text.
- * 2. Limits tools to `maxTools` (default 15 — 8 `render_*`/`clear_canvas`
+ * 2. Limits tools to a hardcoded cap of 15 (8 `render_*`/`clear_canvas`
  *    + the remaining budget for data tools).
  * 3. Emits `<|tool>declaration>` blocks for each retained tool.
  * 4. Wraps the system part in `<|turn>user\n...<turn|>` (Gemma 4 has no
@@ -713,7 +711,7 @@ export interface BuildGemmaPromptInput {
  * 6. Terminates with an open `<|turn>model\n` for generation.
  */
 export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
-  const { systemPrompt, tools, messages = [], maxTools } = input;
+  const { systemPrompt, tools, messages = [] } = input;
   const systemParts: string[] = [];
 
   // Inject system prompt from settings if provided.
@@ -737,7 +735,7 @@ export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
 
   if (tools.length > 0) {
     // Gemma small models struggle with too many tools — limit to most relevant
-    const MAX_TOOLS = maxTools ?? 15;
+    const MAX_TOOLS = 15;
     const limitedTools = tools.length > MAX_TOOLS
       ? [
           // Always include render_* tools (UI)

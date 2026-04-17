@@ -51,7 +51,7 @@ export interface LLMProvider {
   chat(
     messages: ChatMessage[],
     tools: ProviderTool[],
-    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; maxTools?: number; maxMessages?: number }
+    options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void }
   ): Promise<LLMResponse>;
 }
 

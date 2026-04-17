@@ -91,9 +91,6 @@ export interface AgentLoopOptions {
   layers?: ToolLayer[];
   maxIterations?: number;
   maxTokens?: number;
-  maxTools?: number;
-  /** WASM-only: cap on conversation messages sent to the model. Default: derived from contextSize. */
-  maxMessages?: number;
   temperature?: number;
   topK?: number;
   cacheEnabled?: boolean;
@@ -126,8 +123,6 @@ export async function runAgentLoop(
     provider,
     maxIterations = 5,
     maxTokens,
-    maxTools,
-    maxMessages,
     temperature,
     topK,
     cacheEnabled = true,
@@ -267,7 +262,7 @@ export async function runAgentLoop(
     const t0 = performance.now();
     let streamingText = '';
     const response = await provider.chat(messages, iterationTools, {
-      signal, cacheEnabled, system: iterationSystemPrompt, maxTokens, maxTools, maxMessages, temperature, topK,
+      signal, cacheEnabled, system: iterationSystemPrompt, maxTokens, temperature, topK,
       onToken: callbacks.onToken ? (token) => {
         callbacks.onToken!(token);
         streamingText += token;
