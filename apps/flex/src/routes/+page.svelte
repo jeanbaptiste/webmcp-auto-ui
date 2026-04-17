@@ -88,6 +88,7 @@
 
   // ── Nano-RAG (experimental, off by default) ──────────────────────
   let contextRAGEnabled = $state(false);
+  let ragResidueSize = $state(200);
   let contextRAG = $state<ContextRAG | null>(null);
 
   $effect(() => {
@@ -331,15 +332,18 @@
     schemaStrict = false;
     if (isGemma) {
       maxResultLength = 2000;
+      ragResidueSize = 500;
       temperature = 0.7;
       topK = 40;
       maxContextTokens = isE4B ? 16384 : 8192;
       cacheEnabled = false;
     } else if (isLocal) {
       maxResultLength = 3000;
+      ragResidueSize = 300;
     } else {
       // Claude defaults
       maxResultLength = 10000;
+      ragResidueSize = 200;
       temperature = 1.0;
       topK = 64;
       maxContextTokens = 120_000;
@@ -507,6 +511,7 @@
         layers,
         discoveryCache,
         contextRAG: contextRAG ?? undefined,
+        ragResidueSize,
         schemaOptions: {
           sanitize: schemaSanitize,
           flatten: schemaFlatten,
@@ -808,7 +813,7 @@
   bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools bind:maxResultLength
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:showPipelineTrace
   bind:schemaSanitize bind:schemaFlatten bind:schemaStrict bind:compressHistory bind:compressPreview
-  bind:contextRAGEnabled
+  bind:contextRAGEnabled bind:ragResidueSize
   bind:localUrl bind:localModel
   onconnect={() => addMcpServer(canvas.mcpUrl)}
   {connectedUrls} {loadingUrls}

@@ -36,6 +36,7 @@
     compressHistory?: boolean;
     compressPreview?: number;
     contextRAGEnabled?: boolean;
+    ragResidueSize?: number;
     cacheEnabled?: boolean;
     temperature?: number;
     topK?: number;
@@ -84,6 +85,7 @@
     compressHistory = $bindable(false),
     compressPreview = $bindable(500),
     contextRAGEnabled = $bindable(false),
+    ragResidueSize = $bindable(200),
     cacheEnabled = $bindable(true),
     temperature = $bindable(1.0),
     topK = $bindable(64),
@@ -253,6 +255,7 @@
         bind:compressHistory
         bind:compressPreview
         bind:contextRAGEnabled
+        bind:ragResidueSize
         bind:cacheEnabled
         bind:temperature
         bind:topK

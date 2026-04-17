@@ -111,6 +111,8 @@ export interface AgentLoopOptions {
   discoveryCache?: DiscoveryCache;
   /** Nano-RAG context compaction — ingest tool results, query before LLM calls */
   contextRAG?: import('./nano-rag/context-rag.js').ContextRAG;
+  /** Size of inline residue (chars) left in tool_result after nano-RAG ingestion. 0 = stub only. Default: 200 */
+  ragResidueSize?: number;
 }
 
 export async function runAgentLoop(
@@ -135,6 +137,7 @@ export async function runAgentLoop(
     schemaOptions,
     discoveryCache,
     contextRAG,
+    ragResidueSize = 200,
   } = options;
 
   // Buffer for recall — stores full tool results keyed by tool_use_id
@@ -534,25 +537,31 @@ export async function runAgentLoop(
         // Store full result in buffer for later recall
         resultBuffer.set(block.id, result);
 
-        // Nano-RAG: ingest tool result for future context retrieval
-        if (contextRAG && result) {
+        // Nano-RAG: ingest tool result and replace with compact stub
+        let compactedResult = result;
+        if (contextRAG && result && !isDiscoveryTool(block.name)) {
           const realName = toolMatch ? toolMatch[3] : block.name;
           const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
-          // Find the last user message for contextual embeddings
           const lastUserText = [...messages].reverse()
             .find(m => m.role === 'user')?.content;
           const userQuery = typeof lastUserText === 'string'
             ? lastUserText
             : (lastUserText as any[])?.find((b: any) => b.type === 'text')?.text ?? '';
-          contextRAG.ingest(realName, block.id, resultStr, userQuery).then((chunkCount) => {
+          try {
+            const chunkCount = await contextRAG.ingest(realName, block.id, resultStr, userQuery);
             if (chunkCount > 0) {
               callbacks.onTrace?.(`[nano-rag] ingested ${chunkCount} chunks from ${realName} (${resultStr.length} chars)`);
+              // Replace with compact stub — full data retrievable via RAG query
+              const residue = ragResidueSize > 0 ? resultStr.slice(0, ragResidueSize) : '';
+              compactedResult = residue
+                ? `${residue}… [${resultStr.length} chars ingested into RAG]`
+                : `[${resultStr.length} chars ingested into RAG — query context for details]`;
             }
-          }).catch(() => {});
+          } catch { /* RAG failure is non-fatal — keep full result */ }
         }
 
         call.result = result;
-        toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result });
+        toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: compactedResult });
       } catch (e) {
         call.error = e instanceof Error ? e.message : String(e);
         toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: `Error: ${call.error}` });
