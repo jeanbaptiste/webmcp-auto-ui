@@ -3,6 +3,10 @@
  * Determines the best export format based on widget type and triggers a file download.
  */
 
+import { toPng } from 'html-to-image';
+
+const TARGET_PNG_WIDTH = 2048;
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function timestamp(): string {
@@ -81,54 +85,27 @@ function exportCsv(type: string, data: Record<string, unknown>): void {
   downloadFile(lines.join('\r\n'), filename(type, 'csv'), 'text/csv;charset=utf-8');
 }
 
-// ── PNG via SVG ───────────────────────────────────────────────────────────────
+// ── PNG via html-to-image ─────────────────────────────────────────────────────
 
-function svgToPng(svgEl: SVGElement, name: string): void {
-  // Inline computed styles on the SVG to improve fidelity when rendered off-DOM
-  const svgData = new XMLSerializer().serializeToString(svgEl);
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d')!;
-  const img = new Image();
-  const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  img.onload = () => {
-    canvas.width = img.naturalWidth || svgEl.clientWidth || 800;
-    canvas.height = img.naturalHeight || svgEl.clientHeight || 600;
-    ctx.drawImage(img, 0, 0);
-    const pngUrl = canvas.toDataURL('image/png');
-    downloadFile(pngUrl, name);
-    URL.revokeObjectURL(url);
-  };
-  img.onerror = () => {
-    // Fallback: try canvas.toDataURL directly if available
-    URL.revokeObjectURL(url);
-  };
-  img.src = url;
-}
-
-function canvasToPng(canvasEl: HTMLCanvasElement, name: string): void {
-  const url = canvasEl.toDataURL('image/png');
-  downloadFile(url, name);
-}
-
-function exportPng(type: string, containerEl: HTMLElement): void {
+async function exportPng(type: string, containerEl: HTMLElement): Promise<void> {
   const name = filename(type, 'png');
+  const clientW = Math.max(containerEl.clientWidth, 1);
+  const clientH = Math.max(containerEl.clientHeight, 1);
+  const pixelRatio = TARGET_PNG_WIDTH / clientW;
 
-  // Prefer canvas (chart.js renders to <canvas>)
-  const canvasEl = containerEl.querySelector('canvas');
-  if (canvasEl) {
-    canvasToPng(canvasEl, name);
-    return;
+  try {
+    const dataUrl = await toPng(containerEl, {
+      pixelRatio,
+      cacheBust: true,
+      // Let the DOM speak for its own styles — no forced background
+      // so dark/light themes both render correctly.
+    });
+    downloadFile(dataUrl, name);
+  } catch (err) {
+    console.error('[exportWidget] PNG export failed for type', type, err);
+    alert(`Export PNG impossible : ${err instanceof Error ? err.message : String(err)}`);
   }
-
-  // Fall back to SVG
-  const svgEl = containerEl.querySelector('svg');
-  if (svgEl) {
-    svgToPng(svgEl as SVGElement, name);
-    return;
-  }
-
-  console.warn('[exportWidget] No <canvas> or <svg> found in container for type:', type);
+  // pixelRatio used as-is; final canvas size = clientW*pixelRatio × clientH*pixelRatio = 2048 × (2048 * clientH / clientW)
 }
 
 // ── Markdown ──────────────────────────────────────────────────────────────────
@@ -209,53 +186,39 @@ const HTML_FMT: ExportFormat = { id: 'html', label: 'HTML',     icon: '🌐' };
  * Return the list of export formats available for a given widget type.
  */
 export function getExportFormats(type: string, containerEl?: HTMLElement): ExportFormat[] {
+  const base: ExportFormat[] = [PNG_FMT, JSON_FMT];
   switch (type) {
     case 'data-table':
     case 'grid-data':
     case 'kv':
     case 'list':
-      return [CSV_FMT, JSON_FMT];
-
-    case 'chart':
-    case 'chart-rich':
-    case 'sankey':
-    case 'd3':
-    case 'hemicycle':
-    case 'map':
-      return [PNG_FMT, JSON_FMT];
-
+      return [CSV_FMT, ...base];
     case 'text':
     case 'code':
     case 'log':
-      return [MD_FMT, JSON_FMT];
-
+      return [MD_FMT, ...base];
     case 'js-sandbox':
-      return [HTML_FMT, JSON_FMT];
-
-    case 'gallery':
-    case 'carousel':
-      return [JSON_FMT];
-
+      return [HTML_FMT, ...base];
     default:
-      return [JSON_FMT];
+      return base;
   }
 }
 
 /**
  * Export a widget in a specific format chosen by the user.
  */
-export function exportWidgetAs(
+export async function exportWidgetAs(
   format: string,
   type: string,
   data: Record<string, unknown>,
   containerEl?: HTMLElement
-): void {
+): Promise<void> {
   switch (format) {
     case 'csv':
       exportCsv(type, data);
       break;
     case 'png':
-      if (containerEl) exportPng(type, containerEl);
+      if (containerEl) await exportPng(type, containerEl);
       else console.warn('[exportWidgetAs] containerEl required for PNG export');
       break;
     case 'md':
@@ -281,11 +244,11 @@ export function exportWidgetAs(
  * @param data       The widget's data object
  * @param containerEl Optional DOM container — required for PNG exports
  */
-export function exportWidget(
+export async function exportWidget(
   type: string,
   data: Record<string, unknown>,
   containerEl?: HTMLElement
-): void {
+): Promise<void> {
   switch (type) {
     // ── CSV ──
     case 'data-table':
@@ -303,7 +266,7 @@ export function exportWidget(
     case 'hemicycle':
     case 'map':
       if (containerEl) {
-        exportPng(type, containerEl);
+        await exportPng(type, containerEl);
       } else {
         console.warn('[exportWidget] containerEl required for PNG export of type:', type);
       }
