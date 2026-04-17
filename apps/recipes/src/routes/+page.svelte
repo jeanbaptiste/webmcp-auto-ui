@@ -111,7 +111,7 @@
     schemaSanitize = isLocal ? true : !isGemma;
     schemaFlatten = isGemma || isLocal;
     truncateResults = isGemma || isLocal;
-    compressHistory = isGemma || isLocal;
+    compressHistory = isLocal;
     if (isGemma) {
       maxResultLength = 2000;
       temperature = 0.7;

@@ -176,7 +176,7 @@ export class WasmProvider implements LLMProvider {
   async chat(
     messages: ChatMessage[],
     tools: ProviderTool[],
-    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string; maxTools?: number }
+    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string; maxTools?: number; maxMessages?: number }
   ): Promise<LLMResponse> {
     if (this.status !== 'ready') await this.initialize();
     if (!this.inference) throw new Error('Model not initialized');
@@ -202,7 +202,7 @@ export class WasmProvider implements LLMProvider {
   private async _chat(
     messages: ChatMessage[],
     tools: ProviderTool[],
-    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string; maxTools?: number }
+    options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string; maxTools?: number; maxMessages?: number }
   ): Promise<LLMResponse> {
     // Apply per-request options
     if (options?.maxTokens || options?.temperature || options?.topK) {
@@ -222,7 +222,7 @@ export class WasmProvider implements LLMProvider {
 
     // Aggressive clipping: Gemma struggles with long conversations — dynamic cap based on context size
     const contextTokens = this.opts.contextSize ?? 4096;
-    const MAX_MESSAGES = contextTokens <= 4096 ? 8 : contextTokens <= 8192 ? 16 : 32;
+    const MAX_MESSAGES = options?.maxMessages ?? Math.max(4, Math.floor(contextTokens / 512));
     while (messages.length > MAX_MESSAGES) {
       messages = messages.slice(1);
     }
@@ -660,9 +660,23 @@ export class WasmProvider implements LLMProvider {
   private buildPrompt(messages: ChatMessage[], tools: ProviderTool[], systemPrompt?: string, maxTools?: number): string {
     const systemParts: string[] = [];
 
-    // Inject system prompt from settings if provided
+    // Inject system prompt from settings if provided.
+    // Rewrite paren syntax "tool_name()" / "tool_name(args)" to Gemma 4 native call syntax.
+    // Without this, Gemma mimics the paren syntax as plain text (regression from commit 2724b9e).
     if (systemPrompt) {
-      systemParts.push(systemPrompt);
+      const gemmaPrompt = systemPrompt.replace(
+        /\b([a-zA-Z_][a-zA-Z0-9_]*)\(([^)]*)\)/g,
+        (_full, name, args) => {
+          const trimmed = args.trim();
+          if (!trimmed) return `<|tool_call>call:${name}{}<tool_call|>`;
+          const argBody = trimmed
+            .split(',')
+            .map((a: string) => `${a.trim()}:<|"|>...<|"|>`)
+            .join(',');
+          return `<|tool_call>call:${name}{${argBody}}<tool_call|>`;
+        }
+      );
+      systemParts.push(gemmaPrompt);
     }
 
     if (tools.length > 0) {

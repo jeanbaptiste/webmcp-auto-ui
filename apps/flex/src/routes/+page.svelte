@@ -51,6 +51,7 @@
   let temperature = $state(1.0);
   let topK = $state(64);
   let maxTools = $state(8);
+  let maxMessages = $state(8);
   let maxResultLength = $state(10000);
   let truncateResults = $state(false);
   let compressHistory = $state(false);
@@ -338,7 +339,7 @@
     schemaSanitize = isLocal ? true : !isGemma;
     schemaFlatten = isGemma || isLocal;
     truncateResults = isGemma || isLocal;
-    compressHistory = isGemma || isLocal;
+    compressHistory = isLocal;
     schemaStrict = false;
     if (isGemma) {
       maxResultLength = 2000;
@@ -359,6 +360,11 @@
       maxContextTokens = 120_000;
       cacheEnabled = true;
     }
+  });
+
+  // Sync maxMessages from contextSize (WASM clipping heuristic)
+  $effect(() => {
+    maxMessages = Math.max(4, Math.floor(maxContextTokens / 512));
   });
 
   // ── Layers & prompt ────────────────────────────────────────────────
@@ -524,7 +530,7 @@
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
-        maxIterations: 15, maxTokens, maxTools, maxResultLength, temperature, topK, cacheEnabled,
+        maxIterations: 15, maxTokens, maxTools, maxMessages, maxResultLength, temperature, topK, cacheEnabled,
         truncateResults, compressHistory: compressHistory ? compressPreview : false,
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
@@ -830,7 +836,7 @@
   bind:open={settingsOpen}
   bind:composerMode bind:layoutMode bind:includeSummary
   onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true} onclear={clearAll}
-  bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools bind:maxResultLength
+  bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools bind:maxMessages bind:maxResultLength
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:showPipelineTrace
   bind:schemaSanitize bind:schemaFlatten bind:schemaStrict {providerKind} bind:compressHistory bind:compressPreview
   bind:contextRAGEnabled bind:ragResidueSize
