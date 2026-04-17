@@ -47,6 +47,7 @@ docs/generated/
 CLAUDE.md
 PLAN.md
 ARCH-*.md
+.claude/
 
 # Deprecated apps
 apps/template/
