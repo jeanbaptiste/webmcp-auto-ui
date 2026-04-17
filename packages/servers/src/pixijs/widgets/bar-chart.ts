@@ -7,6 +7,12 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   await app.init({ width: W, height: H, backgroundAlpha: 0, antialias: true });
   container.appendChild(app.canvas);
 
+  const ro = new ResizeObserver(() => {
+    const newW = container.clientWidth || W;
+    app.renderer.resize(newW, H);
+  });
+  ro.observe(container);
+
   const { values = [], labels = [], title, colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'] } = data as any;
   const pad = { top: title ? 40 : 20, right: 20, bottom: 40, left: 50 };
   const iW = W - pad.left - pad.right;
@@ -20,7 +26,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   app.stage.addChild(axes);
 
   if (title) {
-    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff } });
+    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 3 } } });
     t.x = W / 2 - t.width / 2;
     t.y = 8;
     app.stage.addChild(t);
@@ -39,7 +45,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     bars.push({ g, x, targetH, hex, currentH: 0 });
 
     if (labels[i]) {
-      const t = new PIXI.Text({ text: labels[i], style: { fontSize: 10, fill: 0xaaaaaa } });
+      const t = new PIXI.Text({ text: labels[i], style: { fontSize: 10, fill: 0xaaaaaa, stroke: { color: 0x000000, width: 2 } } });
       t.x = x + barW / 2 - t.width / 2;
       t.y = H - pad.bottom + 6;
       app.stage.addChild(t);
@@ -59,5 +65,5 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     if (allDone) return;
   });
 
-  return () => { app.destroy(true); };
+  return () => { ro.disconnect(); app.destroy(true); };
 }

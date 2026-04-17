@@ -7,12 +7,18 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   await app.init({ width: W, height: H, backgroundAlpha: 0, antialias: true });
   container.appendChild(app.canvas);
 
+  const ro = new ResizeObserver(() => {
+    const newW = container.clientWidth || W;
+    app.renderer.resize(newW, H);
+  });
+  ro.observe(container);
+
   const { data: entries = [], color = '#22c55e', title } = data as any;
   const baseHex = parseInt(color.replace('#', ''), 16);
   const r0 = (baseHex >> 16) & 0xff, g0 = (baseHex >> 8) & 0xff, b0 = baseHex & 0xff;
 
   if (title) {
-    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff } });
+    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 3 } } });
     t.x = W / 2 - t.width / 2;
     t.y = 8;
     app.stage.addChild(t);
@@ -29,7 +35,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
 
   // Sort entries by date to get range
   const dates = entries.map((e) => e.date).sort();
-  if (dates.length === 0) return;
+  if (dates.length === 0) return () => { ro.disconnect(); app.destroy(true); };
 
   const start = new Date(dates[0]);
   const end = new Date(dates[dates.length - 1]);
@@ -38,7 +44,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   // Draw day labels
   for (let d = 0; d < 7; d++) {
     if (dayLabels[d]) {
-      const t = new PIXI.Text({ text: dayLabels[d], style: { fontSize: 9, fill: 0x888888 } });
+      const t = new PIXI.Text({ text: dayLabels[d], style: { fontSize: 9, fill: 0x888888, stroke: { color: 0x000000, width: 2 } } });
       t.x = pad.left - 16;
       t.y = pad.top + d * (cellSize + gap);
       app.stage.addChild(t);
@@ -84,5 +90,5 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     }
   });
 
-  return () => { app.destroy(true); };
+  return () => { ro.disconnect(); app.destroy(true); };
 }

@@ -10,40 +10,11 @@ export async function render(
   const d3 = await import('d3');
   const { root: rawRoot, title, colorScheme, orientation = 'horizontal' } = data as any;
 
-  const width = 600;
-  const height = 400;
-  const margin = { top: title ? 36 : 16, right: 80, bottom: 16, left: 80 };
-  const innerW = width - margin.left - margin.right;
-  const innerH = height - margin.top - margin.bottom;
+  container.style.position = 'relative';
 
   const colors = d3.scaleOrdinal(
     (d3 as any)[`scheme${colorScheme ?? 'Tableau10'}`] ?? d3.schemeTableau10,
   );
-
-  const hierarchy = d3.hierarchy(rawRoot);
-  const treeLayout = d3.tree().size(
-    orientation === 'horizontal' ? [innerH, innerW] : [innerW, innerH],
-  );
-  const root = treeLayout(hierarchy);
-
-  const svg = d3
-    .select(container)
-    .append('svg')
-    .attr('viewBox', `0 0 ${width} ${height}`)
-    .style('width', '100%')
-    .style('height', 'auto')
-    .style('font', '10px sans-serif');
-
-  if (title) {
-    svg
-      .append('text')
-      .attr('x', width / 2)
-      .attr('y', 20)
-      .attr('text-anchor', 'middle')
-      .style('font-size', '14px')
-      .style('font-weight', 'bold')
-      .text(title);
-  }
 
   const tooltip = d3
     .select(container)
@@ -57,82 +28,126 @@ export async function render(
     .style('font-size', '12px')
     .style('opacity', '0');
 
-  container.style.position = 'relative';
+  const draw = (width: number, height: number) => {
+    d3.select(container).selectAll('svg').remove();
 
-  const g = svg
-    .append('g')
-    .attr('transform', `translate(${margin.left},${margin.top})`);
+    const margin = { top: title ? 36 : 16, right: 80, bottom: 16, left: 80 };
+    const innerW = width - margin.left - margin.right;
+    const innerH = height - margin.top - margin.bottom;
 
-  const getX = (d) => (orientation === 'horizontal' ? d.y : d.x);
-  const getY = (d) => (orientation === 'horizontal' ? d.x : d.y);
+    const hierarchy = d3.hierarchy(rawRoot);
+    const treeLayout = d3.tree().size(
+      orientation === 'horizontal' ? [innerH, innerW] : [innerW, innerH],
+    );
+    const root = treeLayout(hierarchy);
 
-  // Links
-  g.selectAll('path.link')
-    .data(root.links())
-    .join('path')
-    .attr('class', 'link')
-    .attr('fill', 'none')
-    .attr('stroke', '#ccc')
-    .attr('stroke-width', 1.5)
-    .attr('d', (d) => {
-      const sx = getX(d.source), sy = getY(d.source);
-      const tx = getX(d.target), ty = getY(d.target);
-      if (orientation === 'horizontal') {
-        return `M${sx},${sy}C${(sx + tx) / 2},${sy} ${(sx + tx) / 2},${ty} ${tx},${ty}`;
-      }
-      return `M${sx},${sy}C${sx},${(sy + ty) / 2} ${tx},${(sy + ty) / 2} ${tx},${ty}`;
-    })
-    .style('opacity', 0)
-    .transition()
-    .duration(500)
-    .style('opacity', 1);
+    const svg = d3
+      .select(container)
+      .append('svg')
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet')
+      .style('width', '100%')
+      .style('height', '100%')
+      .style('display', 'block')
+      .style('font', '10px sans-serif');
 
-  // Nodes
-  const nodes = g
-    .selectAll('g.node')
-    .data(root.descendants())
-    .join('g')
-    .attr('class', 'node')
-    .attr('transform', (d) => `translate(${getX(d)},${getY(d)})`);
+    if (title) {
+      svg
+        .append('text')
+        .attr('x', width / 2)
+        .attr('y', 20)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '14px')
+        .style('font-weight', 'bold')
+        .text(title);
+    }
 
-  nodes
-    .append('circle')
-    .attr('r', 5)
-    .attr('fill', (d) => {
-      let node = d;
-      while (node.depth > 1) node = node.parent;
-      return colors(node.data.name);
-    })
-    .attr('stroke', '#fff')
-    .attr('stroke-width', 1.5);
+    const g = svg
+      .append('g')
+      .attr('transform', `translate(${margin.left},${margin.top})`);
 
-  nodes
-    .append('text')
-    .attr('dx', (d) => (d.children ? -8 : 8))
-    .attr('dy', '0.35em')
-    .attr('text-anchor', (d) => (d.children ? 'end' : 'start'))
-    .style('font-size', '11px')
-    .text((d) => d.data.name);
+    const getX = (d) => (orientation === 'horizontal' ? d.y : d.x);
+    const getY = (d) => (orientation === 'horizontal' ? d.x : d.y);
 
-  nodes
-    .on('mouseenter', function (event, d) {
-      d3.select(this).select('circle').attr('r', 8);
-      const path = d.ancestors().reverse().map((a) => a.data.name).join(' / ');
-      tooltip.style('opacity', '1').html(`<strong>${path}</strong>`);
-    })
-    .on('mousemove', function (event) {
-      const rect = container.getBoundingClientRect();
-      tooltip
-        .style('left', `${event.clientX - rect.left + 10}px`)
-        .style('top', `${event.clientY - rect.top - 10}px`);
-    })
-    .on('mouseleave', function () {
-      d3.select(this).select('circle').attr('r', 5);
-      tooltip.style('opacity', '0');
-    });
+    // Links
+    g.selectAll('path.link')
+      .data(root.links())
+      .join('path')
+      .attr('class', 'link')
+      .attr('fill', 'none')
+      .attr('stroke', '#ccc')
+      .attr('stroke-width', 1.5)
+      .attr('d', (d) => {
+        const sx = getX(d.source), sy = getY(d.source);
+        const tx = getX(d.target), ty = getY(d.target);
+        if (orientation === 'horizontal') {
+          return `M${sx},${sy}C${(sx + tx) / 2},${sy} ${(sx + tx) / 2},${ty} ${tx},${ty}`;
+        }
+        return `M${sx},${sy}C${sx},${(sy + ty) / 2} ${tx},${(sy + ty) / 2} ${tx},${ty}`;
+      })
+      .style('opacity', 0)
+      .transition()
+      .duration(500)
+      .style('opacity', 1);
+
+    // Nodes
+    const nodes = g
+      .selectAll('g.node')
+      .data(root.descendants())
+      .join('g')
+      .attr('class', 'node')
+      .attr('transform', (d) => `translate(${getX(d)},${getY(d)})`);
+
+    nodes
+      .append('circle')
+      .attr('r', 5)
+      .attr('fill', (d) => {
+        let node = d;
+        while (node.depth > 1) node = node.parent;
+        return colors(node.data.name);
+      })
+      .attr('stroke', '#fff')
+      .attr('stroke-width', 1.5);
+
+    nodes
+      .append('text')
+      .attr('dx', (d) => (d.children ? -8 : 8))
+      .attr('dy', '0.35em')
+      .attr('text-anchor', (d) => (d.children ? 'end' : 'start'))
+      .style('font-size', '11px')
+      .text((d) => d.data.name);
+
+    nodes
+      .on('mouseenter', function (event, d) {
+        d3.select(this).select('circle').attr('r', 8);
+        const path = d.ancestors().reverse().map((a) => a.data.name).join(' / ');
+        tooltip.style('opacity', '1').html(`<strong>${path}</strong>`);
+      })
+      .on('mousemove', function (event) {
+        const rect = container.getBoundingClientRect();
+        tooltip
+          .style('left', `${event.clientX - rect.left + 10}px`)
+          .style('top', `${event.clientY - rect.top - 10}px`);
+      })
+      .on('mouseleave', function () {
+        d3.select(this).select('circle').attr('r', 5);
+        tooltip.style('opacity', '0');
+      });
+  };
+
+  const getSize = (): [number, number] => [
+    container.clientWidth || 600,
+    container.clientHeight || 400,
+  ];
+
+  draw(...getSize());
+
+  const ro = new ResizeObserver(() => draw(...getSize()));
+  ro.observe(container);
 
   return () => {
+    ro.disconnect();
     tooltip.remove();
-    svg.remove();
+    d3.select(container).selectAll('svg').remove();
   };
 }

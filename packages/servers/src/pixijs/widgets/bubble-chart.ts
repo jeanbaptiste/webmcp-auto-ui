@@ -7,11 +7,17 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   await app.init({ width: W, height: H, backgroundAlpha: 0, antialias: true });
   container.appendChild(app.canvas);
 
+  const ro = new ResizeObserver(() => {
+    const newW = container.clientWidth || W;
+    app.renderer.resize(newW, H);
+  });
+  ro.observe(container);
+
   const { bubbles = [], title } = data as any;
   const colors = [0x3b82f6, 0x10b981, 0xf59e0b, 0xef4444, 0x8b5cf6, 0xec4899];
 
   if (title) {
-    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff } });
+    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 3 } } });
     t.x = W / 2 - t.width / 2;
     t.y = 8;
     app.stage.addChild(t);
@@ -83,7 +89,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       settled = true;
       for (const b of simBubbles) {
         if (b.targetR > 20 && b.label) {
-          const t = new PIXI.Text({ text: b.label, style: { fontSize: 11, fill: 0xffffff, fontWeight: 'bold' } });
+          const t = new PIXI.Text({ text: b.label, style: { fontSize: 11, fill: 0xffffff, fontWeight: 'bold', stroke: { color: 0x000000, width: 2 } } });
           t.x = b.x - t.width / 2;
           t.y = b.y - 6;
           labelContainer.addChild(t);
@@ -92,5 +98,5 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     }
   });
 
-  return () => { app.destroy(true); };
+  return () => { ro.disconnect(); app.destroy(true); };
 }

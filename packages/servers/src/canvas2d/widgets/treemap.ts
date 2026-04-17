@@ -20,7 +20,6 @@ function squarify(items: { name: string; value: number }[], x: number, y: number
 
   while (remaining.length) {
     const horizontal = cw >= ch;
-    const side = horizontal ? ch : cw;
     let row: typeof items = [];
     let rowSum = 0;
     let bestRatio = Infinity;
@@ -62,7 +61,6 @@ function squarify(items: { name: string; value: number }[], x: number, y: number
     if (horizontal) { cx += rowFrac * cw; cw -= rowFrac * cw; }
     else { cy += rowFrac * ch; ch -= rowFrac * ch; }
     remaining = remaining.slice(row.length);
-    total; // recalc not needed since we use original total
   }
   return rects;
 }
@@ -76,25 +74,33 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const items = (root.children ?? []).map(c => ({ name: c.name, value: getLeafValue(c) }));
   if (!items.length) { container.textContent = '[treemap: no children]'; return; }
 
-  const { canvas, ctx } = createCanvas(container);
-  const W = 500, H = 400;
-  const m = { top: title ? 30 : 8, right: 8, bottom: 8, left: 8 };
-  const pW = W - m.left - m.right, pH = H - m.top - m.bottom;
+  const { cleanup } = createCanvas(container, (ctx, W, H) => {
+    const m = { top: title ? 30 : 8, right: 8, bottom: 8, left: 8 };
+    const pW = W - m.left - m.right, pH = H - m.top - m.bottom;
 
-  if (title) { ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.fillText(title, W / 2, 18); }
+    if (title) { ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.fillText(title, W / 2, 18); }
 
-  const rects = squarify(items, m.left, m.top, pW, pH);
-  for (let i = 0; i < rects.length; i++) {
-    const r = rects[i];
-    ctx.fillStyle = COLORS[i % COLORS.length] + 'cc';
-    ctx.fillRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
-    ctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
-    if (r.w > 40 && r.h > 20) {
-      ctx.font = '11px system-ui'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(r.name, r.x + r.w / 2, r.y + r.h / 2);
+    const rects = squarify(items, m.left, m.top, pW, pH);
+    for (let i = 0; i < rects.length; i++) {
+      const r = rects[i];
+      ctx.fillStyle = COLORS[i % COLORS.length] + 'cc';
+      ctx.fillRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+      ctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+      if (r.w > 40 && r.h > 20) {
+        ctx.font = '11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const tx = r.x + r.w / 2;
+        const ty = r.y + r.h / 2;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+        ctx.lineWidth = 3;
+        ctx.strokeText(r.name, tx, ty);
+        ctx.restore();
+        ctx.fillStyle = '#fff';
+        ctx.fillText(r.name, tx, ty);
+      }
     }
-  }
+  });
 
-  return () => { canvas.remove(); };
+  return cleanup;
 }

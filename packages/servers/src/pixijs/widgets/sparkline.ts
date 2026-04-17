@@ -8,18 +8,24 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   await app.init({ width: W, height: H, backgroundAlpha: 0, antialias: true });
   container.appendChild(app.canvas);
 
+  const ro = new ResizeObserver(() => {
+    const newW = container.clientWidth || W;
+    app.renderer.resize(newW, H);
+  });
+  ro.observe(container);
+
   const { values = [], color = '#3b82f6', fill = false, title } = data as any;
   const hexColor = parseInt(color.replace('#', ''), 16);
   const topPad = title ? 26 : 4;
 
   if (title) {
-    const t = new PIXI.Text({ text: title, style: { fontSize: 12, fontWeight: 'bold', fill: 0xffffff } });
+    const t = new PIXI.Text({ text: title, style: { fontSize: 12, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 2 } } });
     t.x = 4;
     t.y = 4;
     app.stage.addChild(t);
   }
 
-  if (values.length < 2) return;
+  if (values.length < 2) return () => { ro.disconnect(); app.destroy(true); };
   const maxV = Math.max(...values);
   const minV = Math.min(...values);
   const range = maxV - minV || 1;
@@ -62,5 +68,5 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     }
   });
 
-  return () => { app.destroy(true); };
+  return () => { ro.disconnect(); app.destroy(true); };
 }

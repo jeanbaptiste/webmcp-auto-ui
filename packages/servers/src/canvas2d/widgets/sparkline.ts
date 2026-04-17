@@ -8,32 +8,34 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const filled = (data.filled as boolean) ?? true;
   if (!values.length) { container.textContent = '[sparkline: no data]'; return; }
 
-  const { canvas, ctx } = createCanvas(container, 200, 50);
-  const W = 200, H = 50, pad = 4;
   let vMin = Infinity, vMax = -Infinity;
   for (const v of values) { if (v < vMin) vMin = v; if (v > vMax) vMax = v; }
   if (vMin === vMax) { vMin -= 1; vMax += 1; }
   const vR = vMax - vMin;
   const n = values.length;
-  const stepX = (W - pad * 2) / (n - 1);
 
-  if (filled) {
-    ctx.beginPath(); ctx.moveTo(pad, H - pad);
-    for (let i = 0; i < n; i++) ctx.lineTo(pad + i * stepX, H - pad - ((values[i] - vMin) / vR) * (H - pad * 2));
-    ctx.lineTo(pad + (n - 1) * stepX, H - pad); ctx.closePath();
-    ctx.fillStyle = color + '30'; ctx.fill();
-  }
+  const { cleanup } = createCanvas(container, (ctx, W, H) => {
+    const pad = 4;
+    const stepX = (W - pad * 2) / (n - 1 || 1);
 
-  ctx.beginPath();
-  for (let i = 0; i < n; i++) {
-    const x = pad + i * stepX, y = H - pad - ((values[i] - vMin) / vR) * (H - pad * 2);
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  }
-  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+    if (filled) {
+      ctx.beginPath(); ctx.moveTo(pad, H - pad);
+      for (let i = 0; i < n; i++) ctx.lineTo(pad + i * stepX, H - pad - ((values[i] - vMin) / vR) * (H - pad * 2));
+      ctx.lineTo(pad + (n - 1) * stepX, H - pad); ctx.closePath();
+      ctx.fillStyle = color + '30'; ctx.fill();
+    }
 
-  // End dot
-  const lx = pad + (n - 1) * stepX, ly = H - pad - ((values[n - 1] - vMin) / vR) * (H - pad * 2);
-  ctx.beginPath(); ctx.arc(lx, ly, 2.5, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const x = pad + i * stepX, y = H - pad - ((values[i] - vMin) / vR) * (H - pad * 2);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
 
-  return () => { canvas.remove(); };
+    // End dot
+    const lx = pad + (n - 1) * stepX, ly = H - pad - ((values[n - 1] - vMin) / vR) * (H - pad * 2);
+    ctx.beginPath(); ctx.arc(lx, ly, 2.5, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+  }, 200, 50);
+
+  return cleanup;
 }

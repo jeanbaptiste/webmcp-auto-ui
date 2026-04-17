@@ -7,11 +7,17 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   await app.init({ width: W, height: H, backgroundAlpha: 0, antialias: true });
   container.appendChild(app.canvas);
 
+  const ro = new ResizeObserver(() => {
+    const newW = container.clientWidth || W;
+    app.renderer.resize(newW, H);
+  });
+  ro.observe(container);
+
   const { highlights = [], title, baseColor = '#334155' } = data as any;
   const baseDotColor = parseInt(baseColor.replace('#', ''), 16);
 
   if (title) {
-    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff } });
+    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 3 } } });
     t.x = W / 2 - t.width / 2;
     t.y = 8;
     app.stage.addChild(t);
@@ -63,7 +69,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     const px = toX(h.lon);
     const py = toY(h.lat);
     if (h.label) {
-      const t = new PIXI.Text({ text: h.label, style: { fontSize: 10, fill: 0xffffff } });
+      const t = new PIXI.Text({ text: h.label, style: { fontSize: 10, fill: 0xffffff, stroke: { color: 0x000000, width: 2 } } });
       t.x = px + (h.size || 6) + 4;
       t.y = py - 6;
       labelContainer.addChild(t);
@@ -82,5 +88,5 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     }
   });
 
-  return () => { app.destroy(true); };
+  return () => { ro.disconnect(); app.destroy(true); };
 }

@@ -34,26 +34,34 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const ROW_H = 20, GAP = 1;
   const neededH = (title ? 28 : 8) + (maxDepth + 1) * (ROW_H + GAP) + 8;
 
-  const { canvas, ctx } = createCanvas(container, 500, Math.max(400, neededH));
-  const W = 500;
-  const m = { top: title ? 28 : 8, left: 4, right: 4 };
-  const pW = W - m.left - m.right;
+  const { cleanup } = createCanvas(container, (ctx, W, _H) => {
+    const m = { top: title ? 28 : 8, left: 4, right: 4 };
+    const pW = W - m.left - m.right;
 
-  if (title) { ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.fillText(title, W / 2, 18); }
+    if (title) { ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.fillText(title, W / 2, 18); }
 
-  for (const r of rects) {
-    const rx = m.left + r.x0 * pW;
-    const rw = (r.x1 - r.x0) * pW;
-    const ry = m.top + r.depth * (ROW_H + GAP);
-    if (rw < 0.5) continue;
-    ctx.fillStyle = depthColor(r.depth);
-    ctx.fillRect(rx, ry, rw - GAP, ROW_H);
-    if (rw > 30) {
-      ctx.fillStyle = '#fff'; ctx.font = '11px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-      const label = r.name.length * 7 > rw - 4 ? r.name.slice(0, Math.floor((rw - 10) / 7)) + '..' : r.name;
-      ctx.fillText(label, rx + 3, ry + ROW_H / 2);
+    for (const r of rects) {
+      const rx = m.left + r.x0 * pW;
+      const rw = (r.x1 - r.x0) * pW;
+      const ry = m.top + r.depth * (ROW_H + GAP);
+      if (rw < 0.5) continue;
+      ctx.fillStyle = depthColor(r.depth);
+      ctx.fillRect(rx, ry, rw - GAP, ROW_H);
+      if (rw > 30) {
+        ctx.font = '11px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        const label = r.name.length * 7 > rw - 4 ? r.name.slice(0, Math.floor((rw - 10) / 7)) + '..' : r.name;
+        const tx = rx + 3;
+        const ty = ry + ROW_H / 2;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+        ctx.lineWidth = 3;
+        ctx.strokeText(label, tx, ty);
+        ctx.restore();
+        ctx.fillStyle = '#fff';
+        ctx.fillText(label, tx, ty);
+      }
     }
-  }
+  }, 500, Math.max(400, neededH));
 
-  return () => { canvas.remove(); };
+  return cleanup;
 }

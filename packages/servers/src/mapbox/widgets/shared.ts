@@ -32,5 +32,9 @@ export async function createMapboxMap(container: HTMLElement, options?: any) {
     projection: options?.projection || 'mercator',
     ...options?.mapOptions,
   });
-  return { mapboxgl: mapboxgl.default, map };
+  // Auto-resize when the container changes size (responsive layouts, split panels, etc.)
+  const ro = new ResizeObserver(() => map.resize());
+  ro.observe(container);
+  const cleanup = () => ro.disconnect();
+  return { mapboxgl: mapboxgl.default, map, cleanup };
 }

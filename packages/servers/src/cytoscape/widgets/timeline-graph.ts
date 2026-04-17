@@ -26,9 +26,11 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     elements: positioned,
     layout: { name: 'preset', ...data.layout as any },
     style: data.style as any[] || [
-      { selector: 'node', style: { 'background-color': '#8b5cf6', 'label': 'data(label)', 'color': '#fff', 'text-valign': 'center', 'font-size': '10px' } },
+      { selector: 'node', style: { 'background-color': '#8b5cf6', 'label': 'data(label)', 'color': '#fff', 'text-valign': 'center', 'font-size': '10px', 'text-outline-color': '#1f2937', 'text-outline-width': 2 } },
       { selector: 'edge', style: { 'width': 2, 'line-color': '#94a3b8', 'target-arrow-color': '#94a3b8', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier' } },
     ],
   });
-  return () => { cy.destroy(); };
+  const ro = new ResizeObserver(() => { cy.resize(); cy.fit(); });
+  ro.observe(container);
+  return () => { ro.disconnect(); cy.destroy(); };
 }

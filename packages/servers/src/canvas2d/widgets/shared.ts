@@ -3,23 +3,65 @@
 // Canvas 2D shared helpers — no external dependencies
 // ---------------------------------------------------------------------------
 
-/** Create a DPR-aware canvas element inside a container. */
+/**
+ * Create a DPR-aware canvas element inside a container, sized to the container's
+ * actual width with a fixed aspect ratio based on `initialW`/`initialH`.
+ *
+ * The `draw` callback is invoked once at mount and again each time the container
+ * is resized (via `ResizeObserver`). It receives the logical width/height to use
+ * as drawing coordinates — all coordinates inside the callback must be expressed
+ * relative to these values, NOT hard-coded 500/400.
+ *
+ * Returns `{ canvas, cleanup }`. Call `cleanup()` to disconnect the observer and
+ * remove the canvas from the DOM.
+ */
 export function createCanvas(
   container: HTMLElement,
-  width = 500,
-  height = 400,
-): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
-  const dpr = window.devicePixelRatio || 1;
+  draw: (ctx: CanvasRenderingContext2D, W: number, H: number) => void,
+  initialW = 500,
+  initialH = 400,
+): { canvas: HTMLCanvasElement; cleanup: () => void } {
+  const aspect = initialH / initialW;
   const canvas = document.createElement('canvas');
-  canvas.width = width * dpr;
-  canvas.height = height * dpr;
   canvas.style.width = '100%';
   canvas.style.height = 'auto';
   canvas.style.display = 'block';
   const ctx = canvas.getContext('2d')!;
-  ctx.scale(dpr, dpr);
   container.appendChild(canvas);
-  return { canvas, ctx };
+
+  let currentW = 0;
+  let currentH = 0;
+  function redraw(): void {
+    const dpr = window.devicePixelRatio || 1;
+    const measured = container.clientWidth || initialW;
+    const W = Math.max(1, measured);
+    const H = Math.max(1, W * aspect);
+    // Only reshape if dimensions changed
+    if (W !== currentW || H !== currentH) {
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      currentW = W;
+      currentH = H;
+    } else {
+      // Clear before redraw
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw(ctx, W, H);
+  }
+
+  redraw();
+
+  const observer = new ResizeObserver(() => redraw());
+  observer.observe(container);
+
+  const cleanup = (): void => {
+    observer.disconnect();
+    canvas.remove();
+  };
+
+  return { canvas, cleanup };
 }
 
 /** 10-color palette. */

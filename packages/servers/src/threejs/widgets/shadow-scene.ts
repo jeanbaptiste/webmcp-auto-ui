@@ -19,7 +19,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   if (d.title) {
     const h = document.createElement('div');
     h.textContent = d.title;
-    h.style.cssText = 'font-weight:600;font-size:14px;padding:4px 0;color:#e0e0e0;text-align:center;';
+    h.style.cssText = 'font-weight:600;font-size:14px;padding:4px 0;color:#1a1a1a;text-align:center;text-shadow:0 0 3px rgba(255,255,255,0.9);';
     container.appendChild(h);
   }
 

@@ -15,7 +15,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   if (d.title) {
     const h = document.createElement('div');
     h.textContent = d.title;
-    h.style.cssText = 'font-weight:600;font-size:14px;padding:4px 0;color:#e0e0e0;text-align:center;';
+    h.style.cssText = 'font-weight:600;font-size:14px;padding:4px 0;color:#1a1a1a;text-align:center;text-shadow:0 0 3px rgba(255,255,255,0.9);';
     container.appendChild(h);
   }
 
@@ -68,9 +68,14 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     const ctx = canvas.getContext('2d')!;
     canvas.width = 256; canvas.height = 64;
     ctx.font = 'bold 22px sans-serif';
-    ctx.fillStyle = '#cccccc';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.save();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    ctx.strokeText(uniqueLabels[i], 128, 32);
+    ctx.restore();
+    ctx.fillStyle = '#cccccc';
     ctx.fillText(uniqueLabels[i], 128, 32);
     const tex = new THREE.CanvasTexture(canvas);
     const spMat = new THREE.SpriteMaterial({ map: tex, transparent: true });

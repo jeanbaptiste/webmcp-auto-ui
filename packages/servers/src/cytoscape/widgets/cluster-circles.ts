@@ -26,10 +26,12 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     elements: compoundElements,
     layout: { name: 'cose', animate: true, ...data.layout as any },
     style: data.style as any[] || [
-      { selector: 'node[^parent]', style: { 'background-color': '#8b5cf6', 'label': 'data(label)', 'color': '#fff', 'text-valign': 'center', 'font-size': '10px' } },
+      { selector: 'node[^parent]', style: { 'background-color': '#8b5cf6', 'label': 'data(label)', 'color': '#fff', 'text-valign': 'center', 'font-size': '10px', 'text-outline-color': '#1f2937', 'text-outline-width': 2 } },
       { selector: ':parent', style: { 'background-opacity': 0.08, 'background-color': '#6366f1', 'border-width': 2, 'border-color': '#a5b4fc', 'label': 'data(label)', 'text-valign': 'top', 'font-size': '12px', 'color': '#6366f1' } },
       { selector: 'edge', style: { 'width': 2, 'line-color': '#ccc', 'target-arrow-color': '#ccc', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier' } },
     ],
   });
-  return () => { cy.destroy(); };
+  const ro = new ResizeObserver(() => { cy.resize(); cy.fit(); });
+  ro.observe(container);
+  return () => { ro.disconnect(); cy.destroy(); };
 }

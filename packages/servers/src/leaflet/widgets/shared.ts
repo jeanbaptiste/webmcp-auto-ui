@@ -33,5 +33,9 @@ export async function createMap(container: HTMLElement, options?: any) {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap'
   }).addTo(map);
-  return { L, map };
+  // Auto-invalidate size when the container resizes (responsive layouts, split panels, etc.)
+  const ro = new ResizeObserver(() => map.invalidateSize());
+  ro.observe(container);
+  const cleanup = () => ro.disconnect();
+  return { L, map, cleanup };
 }

@@ -8,15 +8,14 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const title = (data.title as string) ?? '';
   if (!nodes.length) { container.textContent = '[network-graph: no data]'; return; }
 
-  // Simple force-directed layout
-  const W = 500, H = 400;
-  const cx = W / 2, cy = H / 2;
+  // Simulation runs once in a canonical 500×400 space; draw scales to actual W×H.
+  const SIM_W = 500, SIM_H = 400;
+  const cx = SIM_W / 2, cy = SIM_H / 2;
   const positions = new Map<string, { x: number; y: number; vx: number; vy: number }>();
   for (const n of nodes) {
     positions.set(n.id, { x: cx + (Math.random() - 0.5) * 200, y: cy + (Math.random() - 0.5) * 200, vx: 0, vy: 0 });
   }
 
-  // Run simulation
   const iterations = 100;
   for (let iter = 0; iter < iterations; iter++) {
     const alpha = 1 - iter / iterations;
@@ -50,34 +49,40 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       p.vy += (cy - p.y) * 0.005 * alpha;
       p.vx *= 0.8; p.vy *= 0.8;
       p.x += p.vx; p.y += p.vy;
-      p.x = Math.max(20, Math.min(W - 20, p.x));
-      p.y = Math.max(20, Math.min(H - 20, p.y));
+      p.x = Math.max(20, Math.min(SIM_W - 20, p.x));
+      p.y = Math.max(20, Math.min(SIM_H - 20, p.y));
     }
   }
 
-  const { canvas, ctx } = createCanvas(container);
-  if (title) { ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.fillText(title, W / 2, 18); }
+  const { cleanup } = createCanvas(container, (ctx, W, H) => {
+    if (title) { ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.fillText(title, W / 2, 18); }
 
-  // Draw edges
-  ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1;
-  for (const e of edges) {
-    const pa = positions.get(e.source), pb = positions.get(e.target);
-    if (!pa || !pb) continue;
-    ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
-  }
+    const sx = W / SIM_W, sy = H / SIM_H;
+    const mapX = (x: number) => x * sx;
+    const mapY = (y: number) => y * sy;
 
-  // Draw nodes
-  for (const n of nodes) {
-    const p = positions.get(n.id)!;
-    const color = COLORS[(n.group ?? 0) % COLORS.length];
-    ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
-    ctx.fillStyle = color; ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-    if (n.label) {
-      ctx.font = '9px system-ui'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillText(n.label, p.x, p.y + 10);
+    // Draw edges
+    ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1;
+    for (const e of edges) {
+      const pa = positions.get(e.source), pb = positions.get(e.target);
+      if (!pa || !pb) continue;
+      ctx.beginPath(); ctx.moveTo(mapX(pa.x), mapY(pa.y)); ctx.lineTo(mapX(pb.x), mapY(pb.y)); ctx.stroke();
     }
-  }
 
-  return () => { canvas.remove(); };
+    // Draw nodes
+    for (const n of nodes) {
+      const p = positions.get(n.id)!;
+      const color = COLORS[(n.group ?? 0) % COLORS.length];
+      const px = mapX(p.x), py = mapY(p.y);
+      ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2);
+      ctx.fillStyle = color; ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+      if (n.label) {
+        ctx.font = '9px system-ui'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText(n.label, px, py + 10);
+      }
+    }
+  });
+
+  return cleanup;
 }

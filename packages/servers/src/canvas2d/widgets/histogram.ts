@@ -16,21 +16,21 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   for (const v of values) { const i = Math.min(Math.floor((v - vMin) / binW), bins - 1); counts[i]++; }
   const maxCount = Math.max(...counts);
 
-  const { canvas, ctx } = createCanvas(container);
-  const W = 500, H = 400;
-  const m = { top: title ? 30 : 14, right: 14, bottom: 44, left: 52 };
-  const pW = W - m.left - m.right, pH = H - m.top - m.bottom;
+  const { cleanup } = createCanvas(container, (ctx, W, H) => {
+    const m = { top: title ? 30 : 14, right: 14, bottom: 44, left: 52 };
+    const pW = W - m.left - m.right, pH = H - m.top - m.bottom;
 
-  if (title) { ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.fillText(title, W / 2, 18); }
-  drawAxis(ctx, m.left, m.top + pH, pW, vMin, vMax, true);
-  drawAxis(ctx, m.left, m.top + pH, pH, 0, maxCount, false);
+    if (title) { ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.fillText(title, W / 2, 18); }
+    drawAxis(ctx, m.left, m.top + pH, pW, vMin, vMax, true);
+    drawAxis(ctx, m.left, m.top + pH, pH, 0, maxCount, false);
 
-  const barW = pW / bins;
-  for (let i = 0; i < bins; i++) {
-    const barH = (counts[i] / (maxCount || 1)) * pH;
-    ctx.fillStyle = color;
-    ctx.fillRect(m.left + i * barW, m.top + pH - barH, barW - 1, barH);
-  }
+    const barW = pW / bins;
+    for (let i = 0; i < bins; i++) {
+      const barH = (counts[i] / (maxCount || 1)) * pH;
+      ctx.fillStyle = color;
+      ctx.fillRect(m.left + i * barW, m.top + pH - barH, barW - 1, barH);
+    }
+  });
 
-  return () => { canvas.remove(); };
+  return cleanup;
 }

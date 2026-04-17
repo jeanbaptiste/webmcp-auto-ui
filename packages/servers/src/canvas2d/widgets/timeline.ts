@@ -28,26 +28,35 @@ export async function render(container: HTMLElement, data: Record<string, unknow
 
   const rowH = 24, gap = 4;
   const neededH = Math.max(400, (title ? 40 : 20) + rows.length * (rowH + gap) + 40);
-  const { canvas, ctx } = createCanvas(container, 500, neededH);
-  const W = 500;
-  const m = { top: title ? 30 : 10, right: 14, bottom: 30, left: 14 };
-  const pW = W - m.left - m.right;
 
-  if (title) { ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.fillText(title, W / 2, 18); }
+  const { cleanup } = createCanvas(container, (ctx, W, _H) => {
+    const m = { top: title ? 30 : 10, right: 14, bottom: 30, left: 14 };
+    const pW = W - m.left - m.right;
 
-  for (let i = 0; i < events.length; i++) {
-    const e = events[i];
-    const x = m.left + ((e.start - tMin) / tRange) * pW;
-    const w = Math.max(2, ((e.end - e.start) / tRange) * pW);
-    const y = m.top + eventRows[i] * (rowH + gap);
-    const color = COLORS[(e.category ? (catMap.get(e.category) ?? 0) : i) % COLORS.length];
-    ctx.fillStyle = color; ctx.beginPath();
-    ctx.roundRect(x, y, w, rowH, 4); ctx.fill();
-    if (w > 30) {
-      ctx.font = '10px system-ui'; ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-      ctx.fillText(e.label, x + 4, y + rowH / 2, w - 8);
+    if (title) { ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.fillText(title, W / 2, 18); }
+
+    for (let i = 0; i < events.length; i++) {
+      const e = events[i];
+      const x = m.left + ((e.start - tMin) / tRange) * pW;
+      const w = Math.max(2, ((e.end - e.start) / tRange) * pW);
+      const y = m.top + eventRows[i] * (rowH + gap);
+      const color = COLORS[(e.category ? (catMap.get(e.category) ?? 0) : i) % COLORS.length];
+      ctx.fillStyle = color; ctx.beginPath();
+      ctx.roundRect(x, y, w, rowH, 4); ctx.fill();
+      if (w > 30) {
+        ctx.font = '10px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        const tx = x + 4;
+        const ty = y + rowH / 2;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+        ctx.lineWidth = 3;
+        ctx.strokeText(e.label, tx, ty, w - 8);
+        ctx.restore();
+        ctx.fillStyle = '#fff';
+        ctx.fillText(e.label, tx, ty, w - 8);
+      }
     }
-  }
+  }, 500, neededH);
 
-  return () => { canvas.remove(); };
+  return cleanup;
 }
