@@ -465,6 +465,8 @@ Unless a recipe specifies otherwise, use these tools to display your responses o
 
 ${actionTools.join('\n')}
 
+widget_display may ONLY be called with data returned by a non-autoui DATA tool actually invoked in the current session. Fabricating IDs, URLs, names, dates, or any content not returned by a tool is a critical violation. If no DATA tool has been called yet, go back to STEP 1.
+
 STEP 5 — Fallback
 
 If previous steps failed, fall back to a classic chat without tool calling.`;

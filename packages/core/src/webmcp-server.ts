@@ -349,6 +349,7 @@ export function mountWidget(
 
 const VALID_URL_PREFIXES = ['http://', 'https://', 'data:', '/'];
 const IMAGE_KEY_PATTERN = /^(src|image|avatar|photo|thumbnail|poster|icon|logo|cover|banner|background)$/i;
+const PLACEHOLDER_URL_PATTERN = /^https?:\/\/(via\.placeholder\.com|placehold\.(co|it)|dummyimage\.com|placeimg\.com|placekitten\.com|picsum\.photos|example\.(com|org|net))|[?&]text=/i;
 
 /** Recursively scan widget params and nullify image-like fields with invalid URLs. */
 function sanitizeImageUrls(obj: unknown): unknown {
@@ -357,18 +358,18 @@ function sanitizeImageUrls(obj: unknown): unknown {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
       if (IMAGE_KEY_PATTERN.test(key) && typeof value === 'string') {
-        if (VALID_URL_PREFIXES.some(p => value.startsWith(p))) {
+        if (VALID_URL_PREFIXES.some(p => value.startsWith(p)) && !PLACEHOLDER_URL_PATTERN.test(value)) {
           result[key] = value;
         } else {
-          // Invalid image URL — strip it (likely hallucinated)
+          // Invalid or placeholder image URL — strip it (likely hallucinated)
           // Keep the key but set to undefined so the widget can use its fallback
         }
       } else if (typeof value === 'object' && value !== null) {
         // Special case: avatar as object { src: '...' }
         if (IMAGE_KEY_PATTERN.test(key) && 'src' in (value as Record<string, unknown>)) {
           const srcVal = (value as Record<string, unknown>).src;
-          if (typeof srcVal === 'string' && !VALID_URL_PREFIXES.some(p => srcVal.startsWith(p))) {
-            // Strip the whole avatar object if src is invalid
+          if (typeof srcVal === 'string' && (!VALID_URL_PREFIXES.some(p => srcVal.startsWith(p)) || PLACEHOLDER_URL_PATTERN.test(srcVal))) {
+            // Strip the whole avatar object if src is invalid or a placeholder
             continue;
           }
         }
