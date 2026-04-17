@@ -189,12 +189,30 @@ export function resolveCanonicalTools(tools: McpToolDef[]): CanonicalMatch[] {
  */
 export const toolAliasMap = new Map<string, string>();
 
-/** Check if a schema is compatible with strict tool use (no additionalProperties: true anywhere) */
+/** Check if a schema is compatible with strict tool use.
+ *  Anthropic requires additionalProperties to be exactly `false` — reject `true` and schema objects. */
 function isStrictCompatible(schema: Record<string, unknown>): boolean {
   if (schema.additionalProperties === true) return false;
+  if (schema.additionalProperties && typeof schema.additionalProperties === 'object') return false;
   if (schema.properties) {
     for (const prop of Object.values(schema.properties as Record<string, Record<string, unknown>>)) {
       if (prop && typeof prop === 'object' && !isStrictCompatible(prop)) return false;
+    }
+  }
+  if (schema.items && typeof schema.items === 'object' && !Array.isArray(schema.items)) {
+    if (!isStrictCompatible(schema.items as Record<string, unknown>)) return false;
+  }
+  if (Array.isArray(schema.items)) {
+    for (const item of schema.items) {
+      if (item && typeof item === 'object' && !isStrictCompatible(item as Record<string, unknown>)) return false;
+    }
+  }
+  for (const key of ['anyOf', 'allOf'] as const) {
+    const arr = schema[key];
+    if (Array.isArray(arr)) {
+      for (const sub of arr) {
+        if (sub && typeof sub === 'object' && !isStrictCompatible(sub as Record<string, unknown>)) return false;
+      }
     }
   }
   return true;

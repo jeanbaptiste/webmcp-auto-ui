@@ -18,16 +18,16 @@ describe('sanitizeSchema', () => {
     expect(result['oneOf']).toBeUndefined();
   });
 
-  it('strips anyOf', () => {
+  it('preserves anyOf', () => {
     const schema = { type: 'object', anyOf: [{ type: 'string' }], properties: {} } as unknown as JsonSchema;
     const result = sanitizeSchema(schema) as Record<string, unknown>;
-    expect(result['anyOf']).toBeUndefined();
+    expect(result['anyOf']).toEqual([{ type: 'string' }]);
   });
 
-  it('strips allOf', () => {
+  it('preserves allOf', () => {
     const schema = { type: 'object', allOf: [{ type: 'string' }], properties: {} } as unknown as JsonSchema;
     const result = sanitizeSchema(schema) as Record<string, unknown>;
-    expect(result['allOf']).toBeUndefined();
+    expect(result['allOf']).toEqual([{ type: 'string' }]);
   });
 
   it('strips $ref', () => {
@@ -57,13 +57,13 @@ describe('sanitizeSchema', () => {
     expect(result.properties.child['oneOf']).toBeUndefined();
   });
 
-  it('handles array items', () => {
+  it('handles array items and preserves nested anyOf', () => {
     const schema = {
       type: 'array',
       items: { type: 'object', anyOf: [{ type: 'string' }], properties: {} },
     } as unknown as JsonSchema;
     const result = sanitizeSchema(schema) as { items: Record<string, unknown> };
-    expect(result.items['anyOf']).toBeUndefined();
+    expect(result.items['anyOf']).toEqual([{ type: 'string' }]);
   });
 
   it('passes through boolean schema', () => {

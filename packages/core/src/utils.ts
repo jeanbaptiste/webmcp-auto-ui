@@ -100,10 +100,9 @@ function sanitizeSchemaObjectWithReport(obj: JsonSchemaObject, seen: WeakSet<obj
 
   const result = { ...obj };
 
-  // Remove composition keywords that AI SDKs can't handle
+  // Remove composition keywords unsupported by Anthropic structured outputs.
+  // anyOf and allOf are supported — preserve them so schemas can express constraints.
   delete result.oneOf;
-  delete result.anyOf;
-  delete result.allOf;
   delete result.not;
 
   // Remove conditional keywords
@@ -201,6 +200,22 @@ function sanitizeSchemaObjectWithReport(obj: JsonSchemaObject, seen: WeakSet<obj
     }
   }
 
+  if (Array.isArray(result.anyOf)) {
+    result.anyOf = result.anyOf.map((sub, i) =>
+      typeof sub === 'boolean'
+        ? sub
+        : sanitizeSchemaObjectWithReport({ ...sub } as JsonSchemaObject, seen, `${path}.anyOf[${i}]`, patches)
+    );
+  }
+
+  if (Array.isArray(result.allOf)) {
+    result.allOf = result.allOf.map((sub, i) =>
+      typeof sub === 'boolean'
+        ? sub
+        : sanitizeSchemaObjectWithReport({ ...sub } as JsonSchemaObject, seen, `${path}.allOf[${i}]`, patches)
+    );
+  }
+
   // Strict tool use: ensure additionalProperties is set on any object type
   if ((result.type === 'object' || result.properties) && !('additionalProperties' in result)) {
     result.additionalProperties = false;
@@ -238,10 +253,9 @@ function sanitizeSchemaObject(obj: JsonSchemaObject, seen: WeakSet<object>): Jso
 
   const result = { ...obj };
 
-  // Remove composition keywords that AI SDKs can't handle
+  // Remove composition keywords unsupported by Anthropic structured outputs.
+  // anyOf and allOf are supported — preserve them so schemas can express constraints.
   delete result.oneOf;
-  delete result.anyOf;
-  delete result.allOf;
   delete result.not;
 
   // Remove conditional keywords
@@ -300,6 +314,22 @@ function sanitizeSchemaObject(obj: JsonSchemaObject, seen: WeakSet<object>): Jso
     } else if (typeof result.items !== 'boolean') {
       result.items = sanitizeSchemaObject({ ...result.items } as JsonSchemaObject, seen);
     }
+  }
+
+  if (Array.isArray(result.anyOf)) {
+    result.anyOf = result.anyOf.map((sub) =>
+      typeof sub === 'boolean'
+        ? sub
+        : sanitizeSchemaObject({ ...sub } as JsonSchemaObject, seen)
+    );
+  }
+
+  if (Array.isArray(result.allOf)) {
+    result.allOf = result.allOf.map((sub) =>
+      typeof sub === 'boolean'
+        ? sub
+        : sanitizeSchemaObject({ ...sub } as JsonSchemaObject, seen)
+    );
   }
 
   // Strict tool use: ensure additionalProperties is set on any object type
