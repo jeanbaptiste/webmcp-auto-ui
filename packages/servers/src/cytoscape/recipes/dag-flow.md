@@ -6,21 +6,29 @@ schema:
   properties:
     elements:
       type: array
-      description: Array of Cytoscape elements forming a DAG
+      description: Array of Cytoscape elements forming a DAG. Each element is either a node ({data:{id, label}}) or an edge ({data:{source, target}}), never both.
       items:
         type: object
         properties:
           data:
             type: object
-            properties:
-              id:
-                type: string
-              label:
-                type: string
-              source:
-                type: string
-              target:
-                type: string
+            anyOf:
+              - required: [id]
+                not:
+                  required: [source]
+                properties:
+                  id:
+                    type: string
+                  label:
+                    type: string
+              - required: [source, target]
+                not:
+                  required: [id]
+                properties:
+                  source:
+                    type: string
+                  target:
+                    type: string
     layout:
       type: object
       description: Optional layout overrides

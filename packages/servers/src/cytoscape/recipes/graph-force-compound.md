@@ -6,23 +6,31 @@ schema:
   properties:
     elements:
       type: array
-      description: Array of Cytoscape elements with optional parent field for compound nodes
+      description: Array of Cytoscape elements with optional parent field for compound nodes. Each element is either a node ({data:{id, label, parent}}) or an edge ({data:{source, target}}), never both.
       items:
         type: object
         properties:
           data:
             type: object
-            properties:
-              id:
-                type: string
-              label:
-                type: string
-              parent:
-                type: string
-              source:
-                type: string
-              target:
-                type: string
+            anyOf:
+              - required: [id]
+                not:
+                  required: [source]
+                properties:
+                  id:
+                    type: string
+                  label:
+                    type: string
+                  parent:
+                    type: string
+              - required: [source, target]
+                not:
+                  required: [id]
+                properties:
+                  source:
+                    type: string
+                  target:
+                    type: string
     layout:
       type: object
       description: Optional layout overrides

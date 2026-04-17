@@ -6,23 +6,31 @@ schema:
   properties:
     elements:
       type: array
-      description: Array of Cytoscape elements
+      description: Array of Cytoscape elements. Each element is either a node ({data:{id, label, mass}}) or an edge ({data:{source, target}}), never both.
       items:
         type: object
         properties:
           data:
             type: object
-            properties:
-              id:
-                type: string
-              label:
-                type: string
-              mass:
-                type: number
-              source:
-                type: string
-              target:
-                type: string
+            anyOf:
+              - required: [id]
+                not:
+                  required: [source]
+                properties:
+                  id:
+                    type: string
+                  label:
+                    type: string
+                  mass:
+                    type: number
+              - required: [source, target]
+                not:
+                  required: [id]
+                properties:
+                  source:
+                    type: string
+                  target:
+                    type: string
     layout:
       type: object
       description: Optional physics parameters (gravity, nodeRepulsion, edgeElasticity)

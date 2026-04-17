@@ -302,7 +302,26 @@ export function mountWidget(
       // Deep-clone to strip Svelte 5 $state proxies — third-party libs (Chart.js,
       // Cytoscape, Plotly, etc.) use Object.defineProperty which conflicts with proxies.
       const plainData = JSON.parse(JSON.stringify(data));
-      return (widget.renderer as (container: HTMLElement, data: Record<string, unknown>) => void | (() => void))(container, plainData);
+      let cleanup: (() => void) | void;
+      let cancelled = false;
+      try {
+        const result = (widget.renderer as (container: HTMLElement, data: Record<string, unknown>) => void | (() => void) | Promise<void | (() => void)>)(container, plainData);
+        if (result && typeof (result as Promise<unknown>).then === 'function') {
+          (result as Promise<void | (() => void)>).then(
+            (c) => { if (!cancelled) cleanup = c ?? undefined; },
+          ).catch((err) => { console.error('[mountWidget] async render failed:', err); });
+        } else {
+          cleanup = result as (() => void) | void;
+        }
+      } catch (err) {
+        console.error('[mountWidget] sync render failed:', err);
+      }
+      return () => {
+        cancelled = true;
+        if (typeof cleanup === 'function') {
+          try { cleanup(); } catch (err) { console.error('[mountWidget] cleanup failed:', err); }
+        }
+      };
     }
   }
   container.textContent = `[${type}]`;

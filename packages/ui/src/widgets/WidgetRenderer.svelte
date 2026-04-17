@@ -151,13 +151,30 @@
     if (!isVanillaRenderer || !vanillaContainer) return;
     // Clear previous content
     vanillaContainer.innerHTML = '';
-    // Call the vanilla renderer with proxy-free data, capture optional cleanup
-    const cleanup = (customRenderer as (container: HTMLElement, data: Record<string, unknown>) => void | (() => void))(
-      vanillaContainer, plainData,
-    );
-    // Return teardown for $effect
+
+    let cleanup: (() => void) | void;
+    let cancelled = false;
+
+    try {
+      const result = (customRenderer as (container: HTMLElement, data: Record<string, unknown>) => void | (() => void) | Promise<void | (() => void)>)(
+        vanillaContainer, plainData,
+      );
+      if (result && typeof (result as Promise<unknown>).then === 'function') {
+        (result as Promise<void | (() => void)>).then(
+          (c) => { if (!cancelled) cleanup = c ?? undefined; },
+        ).catch((err) => { console.error('[WidgetRenderer] async render failed:', err); });
+      } else {
+        cleanup = result as (() => void) | void;
+      }
+    } catch (err) {
+      console.error('[WidgetRenderer] sync render failed:', err);
+    }
+
     return () => {
-      cleanup?.();
+      cancelled = true;
+      if (typeof cleanup === 'function') {
+        try { cleanup(); } catch (err) { console.error('[WidgetRenderer] cleanup failed:', err); }
+      }
     };
   });
 

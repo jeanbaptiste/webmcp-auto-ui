@@ -6,24 +6,32 @@ schema:
   properties:
     elements:
       type: array
-      description: Array of Cytoscape elements with time data
+      description: Array of Cytoscape elements with time data. Each element is either a node ({data:{id, label, time}}) or an edge ({data:{source, target}}), never both.
       items:
         type: object
         properties:
           data:
             type: object
-            properties:
-              id:
-                type: string
-              label:
-                type: string
-              time:
-                type: number
-                description: Numeric time value for x-axis positioning
-              source:
-                type: string
-              target:
-                type: string
+            anyOf:
+              - required: [id]
+                not:
+                  required: [source]
+                properties:
+                  id:
+                    type: string
+                  label:
+                    type: string
+                  time:
+                    type: number
+                    description: Numeric time value for x-axis positioning
+              - required: [source, target]
+                not:
+                  required: [id]
+                properties:
+                  source:
+                    type: string
+                  target:
+                    type: string
     layout:
       type: object
       description: Optional layout overrides
