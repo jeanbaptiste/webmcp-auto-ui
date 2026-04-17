@@ -725,8 +725,21 @@ export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
     systemParts.push(systemPrompt);
   }
 
-  // Tool declarations removed — Gemma infers signatures from STEP hints + recipes.
-  // If this regresses, restore formatToolDeclaration injection here.
+  if (tools.length > 0) {
+    // Gemma small models struggle with too many tools — limit to most relevant
+    const MAX_TOOLS = 15;
+    const limitedTools = tools.length > MAX_TOOLS
+      ? [
+          // Always include render_* tools (UI)
+          ...tools.filter(t => t.name.startsWith('render_') || t.name === 'clear_canvas').slice(0, 8),
+          // Fill with data tools
+          ...tools.filter(t => !t.name.startsWith('render_') && t.name !== 'clear_canvas').slice(0, MAX_TOOLS - 8),
+        ]
+      : tools;
+
+    // Native Gemma 4 tool declarations
+    systemParts.push(limitedTools.map(t => WasmProvider.formatToolDeclaration(t)).join('\n'));
+  }
 
   // Build a map of tool_use_id → tool_name from all messages for tool_result resolution
   const toolNameById = new Map<string, string>();
