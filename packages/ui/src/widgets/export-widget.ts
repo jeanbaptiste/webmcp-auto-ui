@@ -95,12 +95,17 @@ async function exportPng(type: string, containerEl: HTMLElement): Promise<void> 
   const scrollH = Math.max(containerEl.scrollHeight, containerEl.clientHeight, 1);
   const pixelRatio = TARGET_PNG_WIDTH / scrollW;
 
+  const bg = (typeof document !== 'undefined'
+    ? getComputedStyle(document.documentElement).getPropertyValue('--color-surface').trim()
+    : '') || '#ffffff';
+
   try {
     const dataUrl = await toPng(containerEl, {
       pixelRatio,
       width: scrollW,
       height: scrollH,
       cacheBust: true,
+      backgroundColor: bg,
       style: {
         // Force children visibility inside the cloned node so overflow content renders
         overflow: 'visible',
