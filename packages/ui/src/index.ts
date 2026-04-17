@@ -12,6 +12,9 @@ export { default as GridLayout } from './primitives/GridLayout.svelte';
 export { default as List } from './primitives/List.svelte';
 export { default as Panel } from './primitives/Panel.svelte';
 export { default as Window } from './primitives/Window.svelte';
+export { default as MarkdownView } from './primitives/MarkdownView.svelte';
+export { default as CodeView } from './primitives/CodeView.svelte';
+export { renderMarkdown, highlightCode, createMarkdownRenderer } from './primitives/markdown-renderer.js';
 
 // Simple widgets (PJ blocks)
 export { default as StatBlock } from './widgets/simple/StatBlock.svelte';
