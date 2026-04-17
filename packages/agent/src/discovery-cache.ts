@@ -6,6 +6,9 @@
 
 import type { ProviderTool } from './types.js';
 
+/** Tool names that are resolved locally from cache — hidden from user-facing browsers. */
+export const DISCOVERY_TOOL_NAMES = new Set(['list_recipes', 'search_recipes', 'get_recipe', 'list_tools', 'search_tools']);
+
 export interface CachedRecipe {
   name: string;
   description?: string;
@@ -77,6 +80,12 @@ export class DiscoveryCache {
   /** Tool count for a specific server */
   toolCount(serverPrefix: string): number {
     return this.servers.get(serverPrefix)?.tools.length ?? 0;
+  }
+
+  /** Tool count excluding discovery tools (hidden from user-facing browsers) */
+  browsableToolCount(serverPrefix: string): number {
+    const tools = this.servers.get(serverPrefix)?.tools ?? [];
+    return tools.filter(t => !DISCOVERY_TOOL_NAMES.has(t.name)).length;
   }
 
   /**

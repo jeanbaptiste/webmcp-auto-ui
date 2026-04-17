@@ -8,7 +8,7 @@
   import {
     RemoteLLMProvider, WasmProvider, LocalLLMProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, trimConversationHistory, summarizeChat, TokenTracker,
-    buildToolsFromLayers, runDiagnostics, DiscoveryCache, ContextRAG,
+    buildToolsFromLayers, runDiagnostics, DiscoveryCache, DISCOVERY_TOOL_NAMES, ContextRAG,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer, BrowsableTool } from '@webmcp-auto-ui/agent';
   import { autoui } from '@webmcp-auto-ui/agent';
@@ -408,7 +408,6 @@
     }
   });
 
-  const DISCOVERY_TOOL_NAMES = new Set(['list_recipes', 'search_recipes', 'get_recipe', 'list_tools', 'search_tools']);
   const browsableTools = $derived.by((): BrowsableTool[] => {
     cacheVersion; // reactivity trigger
     return discoveryCache.allTools().filter(t => !DISCOVERY_TOOL_NAMES.has(t.name));
@@ -416,7 +415,7 @@
   const toolCountByServer = $derived.by(() => {
     cacheVersion; // reactivity trigger
     return Object.fromEntries(
-      multiClient.listServers().map(s => [s.url, discoveryCache.toolCount(s.name)])
+      multiClient.listServers().map(s => [s.url, discoveryCache.browsableToolCount(s.name)])
     );
   });
   const recipeCountByServer = $derived.by(() => {

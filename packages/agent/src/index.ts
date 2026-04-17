@@ -29,7 +29,7 @@ export { buildToolsFromLayers, buildDiscoveryTools, buildDiscoveryToolsWithAlias
 export type { ToolLayer, McpLayer, WebMcpLayer, SystemPromptResult, DiscoveryToolsResult, SchemaTransformOptions, BuildToolsResult } from './tool-layers.js';
 
 // Discovery cache
-export { DiscoveryCache } from './discovery-cache.js';
+export { DiscoveryCache, DISCOVERY_TOOL_NAMES } from './discovery-cache.js';
 export type { CachedRecipe, ServerCache } from './discovery-cache.js';
 
 // Re-export core WebMCP types
