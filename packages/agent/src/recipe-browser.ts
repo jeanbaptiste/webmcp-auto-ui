@@ -10,11 +10,16 @@ export function filterRecipes<T extends { name: string; description?: string }>(
 ): T[] {
   const q = query.trim().toLowerCase();
   if (!q) return recipes;
-  return recipes.filter(
-    (r) =>
+  return recipes.filter((r) => {
+    const srv = ((r as Record<string, unknown>).server as string | undefined)
+             ?? ((r as Record<string, unknown>).serverName as string | undefined)
+             ?? '';
+    return (
       r.name.toLowerCase().includes(q) ||
-      (r.description && r.description.toLowerCase().includes(q)),
-  );
+      (r.description && r.description.toLowerCase().includes(q)) ||
+      srv.toLowerCase().includes(q)
+    );
+  });
 }
 
 /**

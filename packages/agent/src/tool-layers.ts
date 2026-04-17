@@ -2,7 +2,7 @@
 
 import type { McpToolDef, ProviderTool } from './types.js';
 import type { McpRecipe } from './recipes/types.js';
-import type { WebMcpToolDef } from '@webmcp-auto-ui/core';
+import type { WebMcpToolDef, McpRecipeSummary } from '@webmcp-auto-ui/core';
 import { sanitizeSchema, sanitizeSchemaWithReport, flattenSchema } from '@webmcp-auto-ui/core';
 import type { SchemaPatch } from '@webmcp-auto-ui/core';
 import { DiscoveryCache, type ServerCache } from './discovery-cache.js';
@@ -39,6 +39,7 @@ export interface WebMcpLayer {
   serverName: string;
   description: string;
   tools: WebMcpToolDef[];
+  recipes?: McpRecipeSummary[];
 }
 
 export type ToolLayer = McpLayer | WebMcpLayer;

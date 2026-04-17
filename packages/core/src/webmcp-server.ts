@@ -22,6 +22,14 @@ export interface WebMcpToolDef {
   execute: (params: Record<string, unknown>) => Promise<unknown>;
 }
 
+/** Minimal summary of a recipe exposed by a WebMCP server. */
+export interface McpRecipeSummary {
+  name: string;
+  description?: string;
+  body?: string;
+  [key: string]: unknown;
+}
+
 /** A vanilla renderer: receives a container + data, optionally returns a cleanup function. */
 export type WidgetRenderer =
   | ((container: HTMLElement, data: Record<string, unknown>) => void | (() => void))
@@ -45,11 +53,15 @@ export interface WebMcpServer {
   registerWidget(recipeMarkdown: string, renderer: WidgetRenderer): void;
   addTool(tool: WebMcpToolDef): void;
 
+  /** Register a list of recipe summaries exposed to the UI for browsing. */
+  setRecipes(recipes: McpRecipeSummary[]): void;
+
   layer(): {
     protocol: 'webmcp';
     serverName: string;
     description: string;
     tools: WebMcpToolDef[];
+    recipes: McpRecipeSummary[];
   };
 
   getWidget(name: string): WidgetEntry | undefined;
@@ -377,6 +389,7 @@ export function createWebMcpServer(
   const widgets = new Map<string, WidgetEntry>();
   const customTools: WebMcpToolDef[] = [];
   let builtinTools: WebMcpToolDef[] | null = null;
+  let currentRecipes: McpRecipeSummary[] = [];
 
   function generateId(): string {
     return 'w_' + Math.random().toString(36).slice(2, 8);
@@ -518,6 +531,10 @@ export function createWebMcpServer(
       customTools.push(tool);
     },
 
+    setRecipes(recipes: McpRecipeSummary[]): void {
+      currentRecipes = recipes;
+    },
+
     layer() {
       if (!builtinTools && widgets.size > 0) {
         ensureBuiltinTools();
@@ -539,6 +556,7 @@ export function createWebMcpServer(
         serverName: name,
         description: options.description,
         tools: allTools,
+        recipes: currentRecipes,
       };
     },
 

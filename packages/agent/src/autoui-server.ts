@@ -2,7 +2,7 @@
 // AutoUI WebMCP Server — built-in UI widgets + canvas/recall tools
 // ---------------------------------------------------------------------------
 
-import { createWebMcpServer } from '@webmcp-auto-ui/core';
+import { createWebMcpServer, parseFrontmatter } from '@webmcp-auto-ui/core';
 
 // ---------------------------------------------------------------------------
 // Inline recipes (frontmatter + body)
@@ -1006,6 +1006,17 @@ const autoui = createWebMcpServer('autoui', {
 for (const recipe of RECIPES) {
   autoui.registerWidget(recipe, undefined);
 }
+
+// Expose recipe summaries to the UI browser
+const parsedRecipes = RECIPES.map((md) => {
+  const { frontmatter, body } = parseFrontmatter(md);
+  return {
+    name: (frontmatter.widget as string) ?? '',
+    description: (frontmatter.description as string) ?? '',
+    body,
+  };
+}).filter((r) => r.name);
+autoui.setRecipes(parsedRecipes);
 
 // ---------------------------------------------------------------------------
 // Custom tool: canvas

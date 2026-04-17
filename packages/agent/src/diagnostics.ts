@@ -22,7 +22,7 @@ export function runDiagnostics(
   layers: ToolLayer[],
   tools: ProviderTool[],
   systemPrompt: string,
-  schemaOptions?: { sanitize?: boolean; flatten?: boolean },
+  schemaOptions?: { sanitize?: boolean; flatten?: boolean; strict?: boolean },
   /** Original (pre-sanitize) tools — used for check #5 to detect patchable schemas */
   rawTools?: ProviderTool[],
 ): Diagnostic[] {

@@ -48,10 +48,6 @@ ARCH-*.md
 apps/composer/
 apps/mobile/
 apps/template/
-apps/flex/
-apps/viewer/
-apps/showcase/
-apps/todo/
 apps/wasm/
 ANALYSIS.md
 INVENTORY.md

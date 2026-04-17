@@ -69,6 +69,11 @@ export class DiscoveryCache {
     return this.servers.get(serverPrefix)?.recipes.length ?? 0;
   }
 
+  /** Get the cached recipes for a specific server prefix. */
+  recipesFor(serverPrefix: string): CachedRecipe[] {
+    return this.servers.get(serverPrefix)?.recipes ?? [];
+  }
+
   /** Tool count for a specific server */
   toolCount(serverPrefix: string): number {
     return this.servers.get(serverPrefix)?.tools.length ?? 0;

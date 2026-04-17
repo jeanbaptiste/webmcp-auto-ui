@@ -154,6 +154,17 @@ export class McpMultiClient {
   }
 
   /**
+   * Call a tool on a SPECIFIC server (identified by URL).
+   * Use this instead of callTool() when the same tool name may exist on multiple
+   * servers and you need to target one specifically (e.g. discovery `list_recipes`).
+   */
+  async callToolOn(serverUrl: string, name: string, args?: Record<string, unknown>): Promise<McpToolResult> {
+    const entry = this.servers.get(serverUrl);
+    if (entry) return entry.client.callTool(name, args);
+    throw new Error(`McpMultiClient: no server at ${serverUrl}`);
+  }
+
+  /**
    * Disconnect from all servers.
    */
   async disconnectAll(): Promise<void> {
