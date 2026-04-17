@@ -4,7 +4,7 @@ import type { ToolLayer } from './tool-layers.js';
 import type { ProviderTool } from './types.js';
 import { sanitizeServerName } from './tool-layers.js';
 import { sanitizeSchemaWithReport } from '@webmcp-auto-ui/core';
-import type { JsonSchema } from '@webmcp-auto-ui/core';
+import type { JsonSchema, SchemaPatch } from '@webmcp-auto-ui/core';
 
 export interface Diagnostic {
   severity: 'error' | 'warning';
@@ -117,17 +117,63 @@ export function runDiagnostics(
     for (const tool of checkTools) {
       const { patches } = sanitizeSchemaWithReport(tool.input_schema as JsonSchema);
       if (patches.length > 0) {
+        const addedPatches = patches.filter((p: SchemaPatch) => p.type === 'additionalProperties');
+        const removedPatches = patches.filter((p: SchemaPatch) => p.type === 'removed');
+
+        // Dedupe paths (with multiplier) for additionalProperties patches
+        const addedPathsFmt = formatCounted(addedPatches.map(p => p.path));
+        // Dedupe "keyword@path" entries for removed patches
+        const removedEntriesFmt = formatCounted(
+          removedPatches.map(p => `${p.keyword ?? 'unknown'}@${p.path}`),
+        );
+        const removedKeywords = Array.from(
+          new Set(removedPatches.map(p => p.keyword).filter((k): k is string => !!k)),
+        );
+
+        const detailParts: string[] = [];
+        if (addedPatches.length > 0) {
+          detailParts.push(
+            `${addedPatches.length} correction(s) for strict mode at ${addedPathsFmt}: additionalProperties: false added automatically.`,
+          );
+        }
+        if (removedPatches.length > 0) {
+          detailParts.push(
+            `${removedPatches.length} keyword(s) removed for strict mode: ${removedEntriesFmt}.`,
+          );
+        }
+
+        let codeFix: string;
+        if (addedPatches.length > 0 && removedPatches.length === 0) {
+          codeFix = `Add "additionalProperties": false to the MCP server schema for ${tool.name}.`;
+        } else if (removedPatches.length > 0 && addedPatches.length === 0) {
+          codeFix = `Remove unsupported JSON Schema keywords (${removedKeywords.join(', ')}) from the MCP server schema for ${tool.name}, or accept that Claude strict mode will ignore them.`;
+        } else {
+          codeFix = `Add "additionalProperties": false and remove unsupported keywords (${removedKeywords.join(', ')}) from the MCP server schema for ${tool.name}.`;
+        }
+
         diagnostics.push({
           severity: 'warning',
           title: `Schema patched: ${tool.name}`,
-          detail: `${patches.length} correction(s) for strict mode: ${patches.map(p => p.path).join(', ')}. additionalProperties: false added automatically.`,
-          codeFix: `Add "additionalProperties": false to the MCP server schema for ${tool.name}.`,
+          detail: detailParts.join(' '),
+          codeFix,
         });
       }
     }
   }
 
   return diagnostics;
+}
+
+/**
+ * Dedupe a list of entries and format with a count multiplier when > 1.
+ * ["a", "a", "b"] → "a ×2, b"
+ */
+function formatCounted(entries: string[]): string {
+  const counts = new Map<string, number>();
+  for (const e of entries) counts.set(e, (counts.get(e) ?? 0) + 1);
+  return Array.from(counts.entries())
+    .map(([entry, n]) => (n > 1 ? `${entry} ×${n}` : entry))
+    .join(', ');
 }
 
 /** Check if a JSON schema has nested object properties (depth > 1) */
