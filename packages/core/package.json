@@ -1,6 +1,6 @@
 {
   "name": "@webmcp-auto-ui/core",
-  "version": "2.5.23",
+  "version": "2.5.24",
   "description": "W3C WebMCP polyfill + MCP Streamable HTTP client — zero dependencies, framework-agnostic",
   "license": "AGPL-3.0-or-later",
   "author": "jb@media.mit.edu",
