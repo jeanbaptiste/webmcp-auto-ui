@@ -78,7 +78,16 @@
           id: (recipe as any).id ?? identifier,
         });
         const text = res.content?.find((c: { type: string }) => c.type === 'text') as { text?: string } | undefined;
-        if (text?.text) recipe.body = text.text;
+        if (text?.text) {
+          let body = text.text;
+          try {
+            const parsed = JSON.parse(body);
+            if (parsed && typeof parsed === 'object' && typeof parsed.content === 'string') {
+              body = parsed.content;
+            }
+          } catch { /* not JSON — keep raw text */ }
+          recipe.body = body;
+        }
       } catch (err) {
         console.warn('[RecipeBrowser] get_recipe failed:', err);
       }
