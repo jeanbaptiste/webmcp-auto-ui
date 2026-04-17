@@ -46,6 +46,7 @@
     schemaSanitize?: boolean;
     schemaFlatten?: boolean;
     schemaStrict?: boolean;
+    providerKind?: 'remote' | 'wasm' | 'gemma' | 'local';
     onconnect: () => void;
     connectedUrls?: string[];
     loadingUrls?: string[];
@@ -95,6 +96,7 @@
     schemaSanitize = $bindable(true),
     schemaFlatten = $bindable(false),
     schemaStrict = $bindable(false),
+    providerKind = 'remote',
     onconnect,
     connectedUrls = [],
     loadingUrls = [],
@@ -314,9 +316,12 @@
     <!-- Schema transforms -->
     <section class="flex flex-col gap-2">
       <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Schema LLM</div>
-      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
-        <input type="checkbox" bind:checked={schemaSanitize} class="accent-teal w-3.5 h-3.5" />
+      <label class="flex items-center gap-2 font-mono text-xs text-text1 {providerKind === 'gemma' ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}">
+        <input type="checkbox" bind:checked={schemaSanitize} disabled={providerKind === 'gemma'} class="accent-teal w-3.5 h-3.5" />
         Sanitize
+        {#if providerKind === 'gemma'}
+          <span class="text-[8px] text-text2/40 font-mono ml-auto">Ignoré par Gemma (format natif)</span>
+        {/if}
       </label>
       <div class="text-[9px] font-mono text-text2/60 pl-5">
         {schemaSanitize ? 'Strip oneOf/anyOf/allOf/$ref from schemas' : 'Schemas sent as-is to the LLM'}
@@ -328,10 +333,13 @@
       <div class="text-[9px] font-mono text-text2/60 pl-5">
         {schemaFlatten ? 'Flattens nested objects to key__subkey' : 'Schemas with native nesting'}
       </div>
-      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
-        <input type="checkbox" bind:checked={schemaStrict} class="accent-teal w-3.5 h-3.5" />
+      <label class="flex items-center gap-2 font-mono text-xs text-text1 {providerKind === 'gemma' ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}">
+        <input type="checkbox" bind:checked={schemaStrict} disabled={providerKind === 'gemma'} class="accent-teal w-3.5 h-3.5" />
         Strict tool use
         <span class="text-[8px] text-text2/40 font-mono">constrained grammar</span>
+        {#if providerKind === 'gemma'}
+          <span class="text-[8px] text-text2/40 font-mono ml-auto">Ignoré par Gemma (format natif)</span>
+        {/if}
       </label>
       <div class="text-[9px] font-mono text-text2/60 pl-5">
         {schemaStrict ? 'Grammar-constrained JSON sampling' : 'Free sampling (sanitize + auto-repair is enough)'}

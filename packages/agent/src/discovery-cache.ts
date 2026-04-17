@@ -112,9 +112,12 @@ export class DiscoveryCache {
       }
 
       case 'get_recipe': {
-        const name = (params.name ?? '') as string;
-        const recipe = cache.recipes.find(r => r.name.toLowerCase() === name.toLowerCase());
-        if (!recipe) return JSON.stringify({ error: `Recipe "${name}" not found` });
+        const key = String(params.name ?? params.id ?? '').toLowerCase();
+        const recipe = cache.recipes.find(r =>
+          (r.name?.toLowerCase() === key) ||
+          ((r as Record<string, unknown>).id as string | undefined)?.toLowerCase() === key
+        );
+        if (!recipe) return JSON.stringify({ error: `Recipe "${key}" not found` });
         return JSON.stringify(recipe);
       }
 

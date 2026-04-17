@@ -68,7 +68,7 @@
         {#each windows as win (win.id)}
           {#if win.visible !== false}
             {@const lw = makeLw(win)}
-            <div class="flex-grid-item rounded-lg">
+            <div class="flex-grid-item rounded-lg" style="zoom:{0.85 + scale * 0.15};">
               {@render children(win, lw, { scale })}
             </div>
           {/if}

@@ -160,7 +160,8 @@
   /** Merged recipes from discovery cache, with duplicate-name prefixing and serverUrl mapping */
   const mcpRecipes = $derived.by(() => {
     cacheVersion; // reactivity trigger
-    const all = discoveryCache.allRecipes();
+    const mcpServerNames = new Set(multiClient.listServers().map(s => s.name));
+    const all = discoveryCache.allRecipes().filter(r => r.server && mcpServerNames.has(r.server));
     const servers = multiClient.listServers();
     const nameToUrl = new Map(servers.map(s => [s.name, s.url]));
     const nameCounts = new Map<string, number>();
@@ -176,6 +177,10 @@
         serverUrl,
       };
     });
+  });
+
+  const webmcpRecipes = $derived.by(() => {
+    return layers.filter(l => l.protocol === 'webmcp').flatMap(l => (l as any).recipes ?? []);
   });
 
   // ── Tool call details for tooltips ──────────────────────────────────
@@ -215,7 +220,12 @@
           const text = r.content?.find((c: any) => c.type === 'text') as any;
           if (text?.text) {
             const parsed = JSON.parse(text.text);
-            cacheRecipes = Array.isArray(parsed) ? parsed : (parsed?.recipes ?? []);
+            const rawRecipes: any[] = Array.isArray(parsed) ? parsed : (parsed?.recipes ?? []);
+            cacheRecipes = rawRecipes.map((r) => ({
+              ...r,
+              name: r.name ?? r.id ?? r.recipe_id ?? '(unnamed)',
+              id: r.id ?? r.name,
+            }));
           }
         } catch { /* no recipes */ }
       }
@@ -398,9 +408,10 @@
     }
   });
 
+  const DISCOVERY_TOOL_NAMES = new Set(['list_recipes', 'search_recipes', 'get_recipe', 'list_tools', 'search_tools']);
   const browsableTools = $derived.by((): BrowsableTool[] => {
     cacheVersion; // reactivity trigger
-    return discoveryCache.allTools();
+    return discoveryCache.allTools().filter(t => !DISCOVERY_TOOL_NAMES.has(t.name));
   });
   const toolCountByServer = $derived.by(() => {
     cacheVersion; // reactivity trigger
@@ -414,7 +425,17 @@
       multiClient.listServers().map(s => [s.url, discoveryCache.recipeCount(s.name)])
     );
   });
-  const diagnostics = $derived(runDiagnostics(layers, providerTools, effectivePrompt ?? '', { sanitize: schemaSanitize, flatten: schemaFlatten, strict: schemaStrict }));
+  const providerKind = $derived<'remote' | 'wasm' | 'gemma' | 'local'>(
+    canvas.llm.startsWith('gemma') ? 'gemma'
+      : canvas.llm === 'local' ? 'local'
+      : 'remote'
+  );
+  const diagnostics = $derived(runDiagnostics(layers, providerTools, effectivePrompt ?? '', {
+    sanitize: schemaSanitize,
+    flatten: schemaFlatten,
+    strict: schemaStrict,
+    providerKind,
+  }));
 
   // ── Helpers ────────────────────────────────────────────────────────
   function uid() { return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
@@ -812,14 +833,14 @@
   onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true} onclear={clearAll}
   bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools bind:maxResultLength
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:showPipelineTrace
-  bind:schemaSanitize bind:schemaFlatten bind:schemaStrict bind:compressHistory bind:compressPreview
+  bind:schemaSanitize bind:schemaFlatten bind:schemaStrict {providerKind} bind:compressHistory bind:compressPreview
   bind:contextRAGEnabled bind:ragResidueSize
   bind:localUrl bind:localModel
   onconnect={() => addMcpServer(canvas.mcpUrl)}
   {connectedUrls} {loadingUrls}
   onaddserver={addMcpServer} onaddall={addAllServers} onremoveserver={removeMcpServer}
   {mcpRecipes}
-  webmcpRecipes={layers.find(l => l.protocol === 'webmcp')?.recipes ?? []}
+  {webmcpRecipes}
   onbrowserecipes={() => { settingsOpen = false; recipeBrowserOpen = true; recipeBrowserFilter = ''; }}
   {recipeCountByServer}
   onrecipeclick={(url) => { settingsOpen = false; recipeBrowserOpen = true; recipeBrowserFilter = multiClient.listServers().find(s => s.url === url)?.name ?? ''; }}
@@ -875,5 +896,5 @@
 <DebugPanel prompt={effectivePrompt} {layers} />
 
 <!-- RECIPE BROWSER -->
-<RecipeBrowser bind:open={recipeBrowserOpen} {mcpRecipes} webmcpRecipes={layers.find(l => l.protocol === 'webmcp')?.recipes ?? []} initialFilter={recipeBrowserFilter} {multiClient} />
+<RecipeBrowser bind:open={recipeBrowserOpen} {mcpRecipes} {webmcpRecipes} initialFilter={recipeBrowserFilter} {multiClient} />
 <ToolBrowser bind:open={toolBrowserOpen} tools={browsableTools} initialFilter={toolBrowserFilter} />

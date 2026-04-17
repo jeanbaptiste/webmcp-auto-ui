@@ -71,8 +71,10 @@
   async function openRecipe(recipe: RecipeItem) {
     if (!recipe.body && recipe.serverUrl && multiClient) {
       try {
+        const identifier = recipe.originalName ?? recipe.name;
         const res = await multiClient.callToolOn(recipe.serverUrl, 'get_recipe', {
-          name: recipe.originalName ?? recipe.name,
+          name: identifier,
+          id: (recipe as any).id ?? identifier,
         });
         const text = res.content?.find((c: { type: string }) => c.type === 'text') as { text?: string } | undefined;
         if (text?.text) recipe.body = text.text;

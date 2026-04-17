@@ -55,7 +55,7 @@
           <span class="font-mono text-sm font-bold text-text1 truncate flex-1">{selected.name}</span>
         {:else}
           <span class="font-mono text-sm font-bold text-text1 flex-1">Tool Browser</span>
-          <span class="text-[10px] font-mono text-text2">{tools.length} tools</span>
+          <span class="text-[10px] font-mono text-text2">{filtered.length} tools</span>
         {/if}
         <button class="text-text2 hover:text-text1 text-lg leading-none transition-colors"
                 onclick={close}>x</button>

@@ -45,8 +45,6 @@ PLAN.md
 ARCH-*.md
 
 # Deprecated apps
-apps/composer/
-apps/mobile/
 apps/template/
 apps/wasm/
 ANALYSIS.md

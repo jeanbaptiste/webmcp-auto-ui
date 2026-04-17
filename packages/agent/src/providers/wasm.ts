@@ -260,8 +260,6 @@ export class WasmProvider implements LLMProvider {
         let lastToken = '';
         let repeatCount = 0;
         const MAX_REPEATS = 20;
-        // P2 fix: track if we have a complete tool call to enable early cancellation
-        let hasCompleteToolCall = false;
         const TOOL_CALL_MAX_CHARS = 3000;
 
         const result = await this.inference.generateResponse(prompt, (partialResult: string, _done: boolean) => {
@@ -297,14 +295,18 @@ export class WasmProvider implements LLMProvider {
             }
           }
 
-          // Cancel immediately after complete tool call — don't let Gemma hallucinate
-          if (!hasCompleteToolCall && fullText.includes('<tool_call|>')) {
-            hasCompleteToolCall = true;
-            // Check if there's a new tool_call opening after the last closing
+          // Allow parallel tool calls but cap them and stop hallucinations.
+          // Count complete tool calls and decide whether Gemma is still emitting more.
+          if (fullText.includes('<tool_call|>')) {
+            const completeCalls = (fullText.match(/<tool_call\|>/g) ?? []).length;
+            const MAX_PARALLEL_TOOL_CALLS = 5;
             const lastEnd = fullText.lastIndexOf('<tool_call|>');
             const afterEnd = fullText.slice(lastEnd + '<tool_call|>'.length);
-            if (!afterEnd.includes('<|tool_call>')) {
-              // No new tool call — cancel immediately
+            // Is Gemma starting a new tool call? (opening marker seen after last close)
+            const hasNewCall = afterEnd.includes('<|tool_call>');
+            // Cancel if either we've reached the parallel cap OR Gemma has clearly moved on
+            // (no new tool_call opened after enough trailing chars).
+            if (completeCalls >= MAX_PARALLEL_TOOL_CALLS || (!hasNewCall && afterEnd.length > 50)) {
               this.inference?.cancelProcessing();
               return;
             }

@@ -22,11 +22,15 @@ export function runDiagnostics(
   layers: ToolLayer[],
   tools: ProviderTool[],
   systemPrompt: string,
-  schemaOptions?: { sanitize?: boolean; flatten?: boolean; strict?: boolean },
+  schemaOptions?: { sanitize?: boolean; flatten?: boolean; strict?: boolean; providerKind?: 'remote' | 'wasm' | 'gemma' | 'local' },
   /** Original (pre-sanitize) tools — used for check #5 to detect patchable schemas */
   rawTools?: ProviderTool[],
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
+  // Gemma uses a native tool-declaration format that ignores JSON-Schema features
+  // like additionalProperties, oneOf/anyOf/$ref, strict mode, etc.
+  // Skip schema-schema checks for Gemma — they produce noise without actionable value.
+  const skipSchemaChecks = schemaOptions?.providerKind === 'gemma';
 
   // 1. Tool name hygiene — check for residual "mcp"/"server" noise in prefixes
   for (const layer of layers) {
@@ -63,7 +67,9 @@ export function runDiagnostics(
   }
 
   // 3. Schema depth warning for Gemma when flatten is OFF
-  if (schemaOptions && !schemaOptions.flatten) {
+  // Skipped entirely for Gemma provider — its native format ignores schema structure beyond one level,
+  // so the "flatten" toggle has no effect there.
+  if (!skipSchemaChecks && schemaOptions && !schemaOptions.flatten) {
     for (const tool of tools) {
       const schema = tool.input_schema as Record<string, unknown>;
       if (hasNestedObjects(schema)) {
@@ -105,16 +111,19 @@ export function runDiagnostics(
 
   // 5. Strict mode — schemas that were auto-patched
   // Must run on raw (pre-sanitize) schemas; sanitized tools will never show patches.
-  const checkTools = rawTools ?? tools;
-  for (const tool of checkTools) {
-    const { patches } = sanitizeSchemaWithReport(tool.input_schema as JsonSchema);
-    if (patches.length > 0) {
-      diagnostics.push({
-        severity: 'warning',
-        title: `Schema patched: ${tool.name}`,
-        detail: `${patches.length} correction(s) for strict mode: ${patches.map(p => p.path).join(', ')}. additionalProperties: false added automatically.`,
-        codeFix: `Add "additionalProperties": false to the MCP server schema for ${tool.name}.`,
-      });
+  // Skipped for Gemma — it doesn't use additionalProperties/strict mode at all.
+  if (!skipSchemaChecks) {
+    const checkTools = rawTools ?? tools;
+    for (const tool of checkTools) {
+      const { patches } = sanitizeSchemaWithReport(tool.input_schema as JsonSchema);
+      if (patches.length > 0) {
+        diagnostics.push({
+          severity: 'warning',
+          title: `Schema patched: ${tool.name}`,
+          detail: `${patches.length} correction(s) for strict mode: ${patches.map(p => p.path).join(', ')}. additionalProperties: false added automatically.`,
+          codeFix: `Add "additionalProperties": false to the MCP server schema for ${tool.name}.`,
+        });
+      }
     }
   }
 
