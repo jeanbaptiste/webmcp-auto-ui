@@ -35,11 +35,8 @@ export interface ProviderTool {
   name: string;
   description: string;
   input_schema: Record<string, unknown>;
-  strict?: boolean;  // Anthropic strict tool use — grammar-constrained sampling
+  strict?: boolean;  // Strict tool use — grammar-constrained sampling (provider-dependent)
 }
-
-/** @deprecated Use ProviderTool */
-export type AnthropicTool = ProviderTool;
 
 export interface LLMResponse {
   content: ContentBlock[];

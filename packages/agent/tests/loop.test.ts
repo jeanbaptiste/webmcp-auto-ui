@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { buildSystemPrompt, mcpToolsToAnthropic, fromMcpTools } from '../src/loop.js';
-import type { McpToolDef, LLMProvider, LLMResponse, AnthropicTool, ChatMessage } from '../src/types.js';
+import { buildSystemPrompt, toProviderTools, fromMcpTools } from '../src/loop.js';
+import type { McpToolDef, LLMProvider, LLMResponse, ProviderTool, ChatMessage } from '../src/types.js';
 
 const TOOLS: McpToolDef[] = [
   { name: 'search', description: 'Search for things', inputSchema: { type: 'object', properties: { q: { type: 'string' } } } },
@@ -16,12 +16,12 @@ describe('buildSystemPrompt', () => {
   });
 });
 
-describe('mcpToolsToAnthropic', () => {
+describe('toProviderTools', () => {
   it('converts tool definitions correctly', () => {
-    const anthropic = mcpToolsToAnthropic(TOOLS);
-    expect(anthropic[0].name).toBe('search');
-    expect(anthropic[0].description).toBe('Search for things');
-    expect(anthropic[0].input_schema).toBeDefined();
+    const result = toProviderTools(TOOLS);
+    expect(result[0].name).toBe('search');
+    expect(result[0].description).toBe('Search for things');
+    expect(result[0].input_schema).toBeDefined();
   });
 
   it('strips oneOf/anyOf/allOf via sanitizeSchema', () => {
@@ -30,14 +30,14 @@ describe('mcpToolsToAnthropic', () => {
       description: 'x',
       inputSchema: { type: 'object', oneOf: [{ type: 'string' }], properties: {} } as Record<string,unknown>,
     }];
-    const result = mcpToolsToAnthropic(tools);
-    expect((result[0].input_schema as Record<string, unknown>)['oneOf']).toBeUndefined();
+    const converted = toProviderTools(tools);
+    expect((converted[0].input_schema as Record<string, unknown>)['oneOf']).toBeUndefined();
   });
 
   it('falls back to empty schema when inputSchema absent', () => {
     const tools: McpToolDef[] = [{ name: 'bare', description: 'no schema' }];
-    const result = mcpToolsToAnthropic(tools);
-    expect(result[0].input_schema).toBeDefined();
+    const converted = toProviderTools(tools);
+    expect(converted[0].input_schema).toBeDefined();
   });
 });
 

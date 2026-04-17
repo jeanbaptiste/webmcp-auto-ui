@@ -100,7 +100,7 @@ function sanitizeSchemaObjectWithReport(obj: JsonSchemaObject, seen: WeakSet<obj
 
   const result = { ...obj };
 
-  // Remove composition keywords unsupported by Anthropic structured outputs.
+  // Remove composition keywords unsupported by strict structured outputs.
   // anyOf and allOf are supported — preserve them so schemas can express constraints.
   delete result.oneOf;
   delete result.not;
@@ -113,7 +113,7 @@ function sanitizeSchemaObjectWithReport(obj: JsonSchemaObject, seen: WeakSet<obj
   // Remove $ref (needs dereferencing first)
   delete result.$ref;
 
-  // Remove numerical constraints not supported by Anthropic API
+  // Remove numerical constraints not supported by strict tool schemas
   if (result.minimum !== undefined) {
     patches.push({ path, type: 'removed', keyword: 'minimum', detail: `Removed minimum=${result.minimum}` });
     delete result.minimum;
@@ -253,7 +253,7 @@ function sanitizeSchemaObject(obj: JsonSchemaObject, seen: WeakSet<object>): Jso
 
   const result = { ...obj };
 
-  // Remove composition keywords unsupported by Anthropic structured outputs.
+  // Remove composition keywords unsupported by strict structured outputs.
   // anyOf and allOf are supported — preserve them so schemas can express constraints.
   delete result.oneOf;
   delete result.not;
@@ -266,7 +266,7 @@ function sanitizeSchemaObject(obj: JsonSchemaObject, seen: WeakSet<object>): Jso
   // Remove $ref (needs dereferencing first)
   delete result.$ref;
 
-  // Remove numerical constraints not supported by Anthropic API
+  // Remove numerical constraints not supported by strict tool schemas
   delete result.minimum;
   delete result.maximum;
   delete result.exclusiveMinimum;
@@ -333,7 +333,7 @@ function sanitizeSchemaObject(obj: JsonSchemaObject, seen: WeakSet<object>): Jso
   }
 
   // Strict tool use: ensure additionalProperties is set on any object type
-  // Anthropic requires this on ALL objects, even without properties
+  // Strict mode requires this on ALL objects, even without properties
   if ((result.type === 'object' || result.properties) && !('additionalProperties' in result)) {
     result.additionalProperties = false;
   }

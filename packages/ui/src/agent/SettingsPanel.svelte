@@ -11,6 +11,7 @@
     compressHistory?: boolean;
     compressPreview?: number;
     contextRAGEnabled?: boolean;
+    ragResidueSize?: number;
     cacheEnabled?: boolean;
     temperature?: number;
     topK?: number;
@@ -29,6 +30,7 @@
     compressHistory = $bindable(false),
     compressPreview = $bindable(500),
     contextRAGEnabled = $bindable(false),
+    ragResidueSize = $bindable(200),
     cacheEnabled = $bindable(true),
     temperature = $bindable(0.7),
     topK = $bindable(10),
@@ -210,7 +212,7 @@
     <div>
       <label class="flex items-center gap-2 cursor-pointer select-none mb-1">
         <input type="checkbox" bind:checked={compressHistory} class="accent-accent w-3.5 h-3.5" />
-        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Compresser l'historique</span>
+        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Tronquer l'historique</span>
       </label>
       {#if compressHistory}
       <div class="flex justify-between items-baseline mb-1">
@@ -230,8 +232,17 @@
       <span class="text-[8px] font-mono text-text2/40 ml-auto">experimental</span>
     </label>
     {#if contextRAGEnabled}
-      <div class="text-[9px] font-mono text-text2/60 pl-5">
+      <div class="text-[9px] font-mono text-text2/60 pl-5 mb-2">
         Semantic context compaction via vector embeddings
+      </div>
+      <div class="pl-5">
+        <div class="flex justify-between items-baseline mb-1">
+          <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Résidu inline (chars)</span>
+          <span class="font-mono text-xs text-text1">{ragResidueSize}</span>
+        </div>
+        <input type="range" bind:value={ragResidueSize}
+               min={0} max={2000} step={50}
+               class="w-full accent-accent" />
       </div>
     {/if}
   </section>

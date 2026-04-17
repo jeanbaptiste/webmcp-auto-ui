@@ -144,7 +144,7 @@
   let mobileTab = $state<'list' | 'detail' | 'preview'>('list');
 
   // Provider
-  const anthropicProvider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
+  const remoteProvider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
   const tokenTracker = new TokenTracker();
 
   // Gemma WASM state
@@ -190,8 +190,8 @@
       }
       return gemmaProvider;
     }
-    anthropicProvider.setModel(canvas.llm as any);
-    return anthropicProvider;
+    remoteProvider.setModel(canvas.llm as any);
+    return remoteProvider;
   }
 
   function unloadGemma() {

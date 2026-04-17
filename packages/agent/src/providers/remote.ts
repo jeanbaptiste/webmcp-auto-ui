@@ -1,4 +1,4 @@
-import type { LLMProvider, LLMResponse, ChatMessage, AnthropicTool, RemoteModelId, ContentBlock } from '../types.js';
+import type { LLMProvider, LLMResponse, ChatMessage, ProviderTool, RemoteModelId, ContentBlock } from '../types.js';
 
 export interface RemoteLLMProviderOptions {
   proxyUrl: string;
@@ -34,7 +34,7 @@ export class RemoteLLMProvider implements LLMProvider {
 
   async chat(
     messages: ChatMessage[],
-    tools: AnthropicTool[],
+    tools: ProviderTool[],
     options?: { signal?: AbortSignal; cacheEnabled?: boolean; system?: string; maxTokens?: number; temperature?: number; topK?: number }
   ): Promise<LLMResponse> {
     const cache = options?.cacheEnabled ?? false;

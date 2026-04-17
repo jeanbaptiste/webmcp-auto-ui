@@ -17,7 +17,7 @@ export { GemmaProvider } from './providers/gemma.js';
 export type { GemmaProviderOptions, GemmaStatus } from './providers/gemma.js';
 
 // Agent loop
-export { runAgentLoop, toProviderTools, mcpToolsToAnthropic, fromMcpTools, trimConversationHistory } from './loop.js';
+export { runAgentLoop, toProviderTools, fromMcpTools, trimConversationHistory } from './loop.js';
 export { buildSystemPrompt } from './tool-layers.js';
 export type { AgentLoopOptions } from './loop.js';
 
@@ -69,7 +69,7 @@ export { ContextRAG, type ContextRAGOptions } from './nano-rag/mod.js';
 // Types
 export type {
   RemoteModelId, WasmModelId, LLMId, ModelId,
-  ChatMessage, ContentBlock, McpToolDef, ProviderTool, AnthropicTool,
+  ChatMessage, ContentBlock, McpToolDef, ProviderTool,
   LLMProvider, LLMResponse, ToolCall, AgentMetrics, AgentResult, AgentCallbacks,
   Recipe, McpRecipe,
 } from './types.js';

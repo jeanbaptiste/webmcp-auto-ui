@@ -68,8 +68,6 @@ function compressOldToolResults(messages: ChatMessage[], previewSize: number, re
 
 // Re-export toProviderTools
 export { toProviderTools };
-/** @deprecated Use toProviderTools */
-export const mcpToolsToAnthropic = toProviderTools;
 
 function truncateResult(result: string, maxLen: number = MAX_RESULT_LEN): string {
   if (result.length <= maxLen) return result;

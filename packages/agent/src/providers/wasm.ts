@@ -3,7 +3,7 @@
  * No Web Worker needed — @mediapipe/tasks-genai is not compatible with ES module workers.
  * Uses dynamic import() to avoid bundling MediaPipe when only Claude is used.
  */
-import type { LLMProvider, LLMResponse, ChatMessage, AnthropicTool, WasmModelId, ContentBlock } from '../types.js';
+import type { LLMProvider, LLMResponse, ChatMessage, ProviderTool, WasmModelId, ContentBlock } from '../types.js';
 import type { PipelineTrace } from '../pipeline-trace.js';
 
 export type WasmStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -175,7 +175,7 @@ export class WasmProvider implements LLMProvider {
 
   async chat(
     messages: ChatMessage[],
-    tools: AnthropicTool[],
+    tools: ProviderTool[],
     options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string; maxTools?: number }
   ): Promise<LLMResponse> {
     if (this.status !== 'ready') await this.initialize();
@@ -201,7 +201,7 @@ export class WasmProvider implements LLMProvider {
 
   private async _chat(
     messages: ChatMessage[],
-    tools: AnthropicTool[],
+    tools: ProviderTool[],
     options?: { signal?: AbortSignal; maxTokens?: number; temperature?: number; topK?: number; onToken?: (token: string) => void; system?: string; maxTools?: number }
   ): Promise<LLMResponse> {
     // Apply per-request options
@@ -601,7 +601,7 @@ export class WasmProvider implements LLMProvider {
   /**
    * Format a tool declaration in Gemma 4 native syntax.
    */
-  private static formatToolDeclaration(tool: AnthropicTool): string {
+  private static formatToolDeclaration(tool: ProviderTool): string {
     const q = '<|"|>';
     let decl = `<|tool>declaration:${tool.name}{\n`;
     decl += `  description:${q}${tool.description}${q}`;
@@ -671,7 +671,7 @@ export class WasmProvider implements LLMProvider {
     return `<|tool_call>call:${name}{${entries.join(',')}}<tool_call|>`;
   }
 
-  private buildPrompt(messages: ChatMessage[], tools: AnthropicTool[], systemPrompt?: string, maxTools?: number): string {
+  private buildPrompt(messages: ChatMessage[], tools: ProviderTool[], systemPrompt?: string, maxTools?: number): string {
     const systemParts: string[] = [];
 
     // Inject system prompt from settings if provided
@@ -691,16 +691,8 @@ export class WasmProvider implements LLMProvider {
           ]
         : tools;
 
-      // Minimal instruction — Gemma 4 is trained on native tool format
-      systemParts.push(`You are a UI assistant connected to MCP servers.
-Use the available tools to respond. After each DATA call, render visually with component().
-Do NOT ask for confirmation. Execute directly.`);
-
       // Native Gemma 4 tool declarations
       systemParts.push(limitedTools.map(t => WasmProvider.formatToolDeclaration(t)).join('\n'));
-
-      // Enable thinking mode — Gemma 4 reasons before tool calls
-      systemParts.push('Before each tool call, think briefly in a <|channel>thought block then call the tool.');
     }
 
     // Build a map of tool_use_id → tool_name from all messages for tool_result resolution
