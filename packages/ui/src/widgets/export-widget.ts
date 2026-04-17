@@ -89,23 +89,28 @@ function exportCsv(type: string, data: Record<string, unknown>): void {
 
 async function exportPng(type: string, containerEl: HTMLElement): Promise<void> {
   const name = filename(type, 'png');
-  const clientW = Math.max(containerEl.clientWidth, 1);
-  const clientH = Math.max(containerEl.clientHeight, 1);
-  const pixelRatio = TARGET_PNG_WIDTH / clientW;
+  // Use scroll dimensions to capture the FULL content, not just the visible viewport.
+  // Widgets like data-table can overflow horizontally; clientWidth would crop them.
+  const scrollW = Math.max(containerEl.scrollWidth, containerEl.clientWidth, 1);
+  const scrollH = Math.max(containerEl.scrollHeight, containerEl.clientHeight, 1);
+  const pixelRatio = TARGET_PNG_WIDTH / scrollW;
 
   try {
     const dataUrl = await toPng(containerEl, {
       pixelRatio,
+      width: scrollW,
+      height: scrollH,
       cacheBust: true,
-      // Let the DOM speak for its own styles — no forced background
-      // so dark/light themes both render correctly.
+      style: {
+        // Force children visibility inside the cloned node so overflow content renders
+        overflow: 'visible',
+      },
     });
     downloadFile(dataUrl, name);
   } catch (err) {
     console.error('[exportWidget] PNG export failed for type', type, err);
     alert(`Export PNG impossible : ${err instanceof Error ? err.message : String(err)}`);
   }
-  // pixelRatio used as-is; final canvas size = clientW*pixelRatio × clientH*pixelRatio = 2048 × (2048 * clientH / clientW)
 }
 
 // ── Markdown ──────────────────────────────────────────────────────────────────
