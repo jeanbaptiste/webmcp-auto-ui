@@ -23,6 +23,10 @@ npm-debug.log*
 # TypeScript incremental build cache
 *.tsbuildinfo
 
+# Playwright test output
+test-results/
+playwright-report/
+
 # TypeScript declaration files (build artifacts in src/)
 packages/core/src/*.d.ts
 
