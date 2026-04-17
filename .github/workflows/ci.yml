@@ -30,7 +30,7 @@ jobs:
 
       - name: Generate SvelteKit types
         run: |
-          npx -w apps/flex2 svelte-kit sync
+          npx -w apps/flex svelte-kit sync
 
-      - name: Type check (flex2)
-        run: npx svelte-check --workspace apps/flex2 --fail-on-warnings false --threshold error
+      - name: Type check (flex)
+        run: npx svelte-check --workspace apps/flex --fail-on-warnings false --threshold error
