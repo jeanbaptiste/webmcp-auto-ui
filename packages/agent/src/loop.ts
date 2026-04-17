@@ -177,7 +177,9 @@ export async function runAgentLoop(
   if (options.systemPrompt) {
     baseSystemPrompt = options.systemPrompt;
   } else {
-    const sp = buildSystemPromptWithAliases(options.layers ?? []);
+    const sp = buildSystemPromptWithAliases(options.layers ?? [], {
+      providerKind: provider.promptKind ?? 'generic',
+    });
     baseSystemPrompt = sp.prompt;
     for (const [k, v] of sp.aliasMap) localAliasMap.set(k, v);
   }

@@ -48,6 +48,11 @@ export interface LLMResponse {
 export interface LLMProvider {
   readonly name: string;
   readonly model: string;
+  /** Hint for system prompt builders: which syntax this provider expects for tool
+   *  references. `undefined` → treated as `'generic'`. Providers using a non-standard
+   *  native call syntax (e.g. Gemma) should set this so the agent loop can build
+   *  the prompt with the correct formatting. */
+  readonly promptKind?: 'generic' | 'gemma';
   chat(
     messages: ChatMessage[],
     tools: ProviderTool[],

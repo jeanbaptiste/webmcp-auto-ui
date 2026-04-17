@@ -385,8 +385,17 @@
     return result;
   });
 
+  const providerKind = $derived<'remote' | 'wasm' | 'gemma' | 'local'>(
+    canvas.llm.startsWith('gemma') ? 'gemma'
+      : canvas.llm === 'local' ? 'local'
+      : 'remote'
+  );
+
   const effectivePrompt = $derived.by(() => {
-    const base = buildSystemPrompt(layers);
+    // Build with the provider-specific tool syntax. For Gemma, emit native
+    // `<|tool_call>call:...{}<tool_call|>` references directly — no runtime regex rewrite.
+    const kind = providerKind === 'gemma' ? 'gemma' : 'generic';
+    const base = buildSystemPrompt(layers, { providerKind: kind });
     // If the user customised the prompt in settings, prepend it
     const hasCustom = systemPrompt && systemPrompt.trim().length > 0;
     return hasCustom ? `${systemPrompt}\n\n${base}` : base;
@@ -424,16 +433,11 @@
       multiClient.listServers().map(s => [s.url, discoveryCache.recipeCount(s.name)])
     );
   });
-  const providerKind = $derived<'remote' | 'wasm' | 'gemma' | 'local'>(
-    canvas.llm.startsWith('gemma') ? 'gemma'
-      : canvas.llm === 'local' ? 'local'
-      : 'remote'
-  );
-  // Prompt shown in Settings → System Prompt panel. For Gemma, we apply the same
-  // transformation WasmProvider.buildPrompt() does (paren rewriting, MAX_TOOLS cap,
-  // tool declarations, <|turn>user wrap) so the user sees what the model actually gets.
-  // `effectivePrompt` (the canonical/textual version) is kept intact for
-  // runDiagnostics, the agent loop (options.systemPrompt), agentLogs, and DebugPanel.
+  // Prompt shown in Settings → System Prompt panel. For Gemma, we wrap the already-
+  // Gemma-syntax `effectivePrompt` with the turn structure and tool declarations
+  // that WasmProvider.buildPrompt() emits, so the user sees what the model actually gets.
+  // `effectivePrompt` (built with the right providerKind) is used by runDiagnostics,
+  // the agent loop (options.systemPrompt), agentLogs, and DebugPanel.
   const displayedPrompt = $derived.by(() => {
     if (providerKind === 'gemma') {
       return buildGemmaPrompt({

@@ -23,6 +23,8 @@ const LITERT_MODELS: Record<string, { repo: string; file: string; size: number }
 export class WasmProvider implements LLMProvider {
   readonly name = 'wasm';
   readonly model: string;
+  /** Signals to the agent loop that the system prompt must be built in Gemma native syntax. */
+  readonly promptKind = 'gemma' as const;
 
   /** Optional pipeline trace — set externally to trace parsing strategy fallbacks */
   trace?: PipelineTrace;
@@ -681,7 +683,8 @@ export class WasmProvider implements LLMProvider {
  * panels that want to display the exact transformed prompt Gemma will see.
  */
 export interface BuildGemmaPromptInput {
-  /** Raw system prompt (will have `tool_name(args)` rewritten to `<|tool_call>` syntax). */
+  /** System prompt — expected to already be in Gemma native syntax (use
+   *  `buildSystemPromptWithAliases(layers, { providerKind: 'gemma' })`). */
   systemPrompt?: string;
   /** Provider tools (will be declared via `<|tool>declaration>` and hardcapped at 15). */
   tools: ProviderTool[];
@@ -697,40 +700,29 @@ export interface BuildGemmaPromptInput {
  * calling LlmInference — exported so UI debug panels can display the prompt
  * as it will actually be sent to the model.
  *
+ * The system prompt is expected to already be in Gemma native syntax — build
+ * it with `buildSystemPromptWithAliases(layers, { providerKind: 'gemma' })`.
+ * This function no longer rewrites tool references; it only wraps the prompt
+ * in the Gemma 4 turn structure.
+ *
  * Transformations applied:
- * 1. Rewrites `tool_name(args)` patterns in the system prompt to
- *    `<|tool_call>call:name{args:<|"|>...<|"|>}<tool_call|>` so Gemma does not
- *    mimic paren syntax as plain text.
- * 2. Limits tools to a hardcoded cap of 15 (8 `render_*`/`clear_canvas`
+ * 1. Limits tools to a hardcoded cap of 15 (8 `render_*`/`clear_canvas`
  *    + the remaining budget for data tools).
- * 3. Emits `<|tool>declaration>` blocks for each retained tool.
- * 4. Wraps the system part in `<|turn>user\n...<turn|>` (Gemma 4 has no
+ * 2. Emits `<|tool>declaration>` blocks for each retained tool.
+ * 3. Wraps the system part in `<|turn>user\n...<turn|>` (Gemma 4 has no
  *    `system` role).
- * 5. Serializes messages as `<|turn>user|model\n...<turn|>` with tool_use →
+ * 4. Serializes messages as `<|turn>user|model\n...<turn|>` with tool_use →
  *    `<|tool_call>`, tool_result → `<|tool_response>`.
- * 6. Terminates with an open `<|turn>model\n` for generation.
+ * 5. Terminates with an open `<|turn>model\n` for generation.
  */
 export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
   const { systemPrompt, tools, messages = [] } = input;
   const systemParts: string[] = [];
 
-  // Inject system prompt from settings if provided.
-  // Rewrite paren syntax "tool_name()" / "tool_name(args)" to Gemma 4 native call syntax.
-  // Without this, Gemma mimics the paren syntax as plain text (regression from commit 2724b9e).
+  // System prompt is expected to already be in Gemma native syntax (built via
+  // buildSystemPromptWithAliases with providerKind: 'gemma'). We just pass it through.
   if (systemPrompt) {
-    const gemmaPrompt = systemPrompt.replace(
-      /\b([a-zA-Z_][a-zA-Z0-9_]*)\(([^)]*)\)/g,
-      (_full, name, args) => {
-        const trimmed = args.trim();
-        if (!trimmed) return `<|tool_call>call:${name}{}<tool_call|>`;
-        const argBody = trimmed
-          .split(',')
-          .map((a: string) => `${a.trim()}:<|"|>...<|"|>`)
-          .join(',');
-        return `<|tool_call>call:${name}{${argBody}}<tool_call|>`;
-      }
-    );
-    systemParts.push(gemmaPrompt);
+    systemParts.push(systemPrompt);
   }
 
   if (tools.length > 0) {

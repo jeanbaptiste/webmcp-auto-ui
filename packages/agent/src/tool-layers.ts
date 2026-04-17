@@ -44,6 +44,24 @@ export interface WebMcpLayer {
 
 export type ToolLayer = McpLayer | WebMcpLayer;
 
+/** Which provider syntax to emit in the system prompt.
+ *  - `generic`: `tool_name()` / `tool_name(arg1, arg2)` — Claude, Ollama, most providers.
+ *  - `gemma`:   `<|tool_call>call:tool_name{}<tool_call|>` — Gemma 4 native format. */
+export type ProviderKind = 'generic' | 'gemma';
+
+/** Format a tool reference for inclusion in the system prompt.
+ *  Generic (Claude/Ollama/etc): `name()` or `name(arg1, arg2)`.
+ *  Gemma: `<|tool_call>call:name{}<tool_call|>` or `<|tool_call>call:name{arg:<|"|>...<|"|>}<tool_call|>`.
+ */
+function fmtToolRef(prefixedName: string, args: string[] = [], kind: ProviderKind = 'generic'): string {
+  if (kind === 'gemma') {
+    if (args.length === 0) return `<|tool_call>call:${prefixedName}{}<tool_call|>`;
+    const body = args.map(a => `${a}:<|"|>...<|"|>`).join(',');
+    return `<|tool_call>call:${prefixedName}{${body}}<tool_call|>`;
+  }
+  return args.length ? `${prefixedName}(${args.join(', ')})` : `${prefixedName}()`;
+}
+
 /** Options controlling how tool schemas are transformed before sending to the LLM */
 export interface SchemaTransformOptions {
   /** Strip oneOf/anyOf/allOf/not/if-then-else/$ref (default: true) */
@@ -347,8 +365,16 @@ export interface SystemPromptResult {
 /**
  * Build system prompt with a local alias map (parallel-safe).
  * Prefer this over buildSystemPrompt() when running multiple agent loops.
+ *
+ * The `providerKind` option controls the syntax of tool references in the prompt:
+ *  - `'generic'` (default): `tool_name()` / `tool_name(arg)` — for Claude, Ollama, etc.
+ *  - `'gemma'`: `<|tool_call>call:tool_name{}<tool_call|>` — Gemma 4 native format.
  */
-export function buildSystemPromptWithAliases(layers: ToolLayer[]): SystemPromptResult {
+export function buildSystemPromptWithAliases(
+  layers: ToolLayer[],
+  options: { providerKind?: ProviderKind } = {},
+): SystemPromptResult {
+  const kind = options.providerKind ?? 'generic';
   const mcpLayers = layers.filter((l): l is McpLayer => l.protocol === 'mcp');
   const webmcpLayers = layers.filter((l): l is WebMcpLayer => l.protocol === 'webmcp');
 
@@ -365,13 +391,13 @@ export function buildSystemPromptWithAliases(layers: ToolLayer[]): SystemPromptR
   for (const l of webmcpLayers) {
     const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
     for (const t of l.tools) {
-      if (t.name === 'search_recipes') searchRecipes.push(`${prefix}search_recipes()`);
-      if (t.name === 'list_recipes') listRecipes.push(`${prefix}list_recipes()`);
-      if (t.name === 'get_recipe') getRecipes.push(`${prefix}get_recipe()`);
+      if (t.name === 'search_recipes') searchRecipes.push(fmtToolRef(`${prefix}search_recipes`, [], kind));
+      if (t.name === 'list_recipes') listRecipes.push(fmtToolRef(`${prefix}list_recipes`, [], kind));
+      if (t.name === 'get_recipe') getRecipes.push(fmtToolRef(`${prefix}get_recipe`, [], kind));
     }
     // Pseudo-tools for tool discovery on WebMCP servers
-    searchTools.push(`${prefix}search_tools(query)`);
-    listTools.push(`${prefix}list_tools()`);
+    searchTools.push(fmtToolRef(`${prefix}search_tools`, ['query'], kind));
+    listTools.push(fmtToolRef(`${prefix}list_tools`, [], kind));
   }
 
   // MCP layers: 4-layer matching + alias registration
@@ -388,23 +414,27 @@ export function buildSystemPromptWithAliases(layers: ToolLayer[]): SystemPromptR
         aliasMap.set(canonicalPrefixed, realPrefixed);
       }
 
-      if (m.role === 'search_recipes') searchRecipes.push(`${canonicalPrefixed}()`);
-      if (m.role === 'list_recipes') listRecipes.push(`${canonicalPrefixed}()`);
-      if (m.role === 'get_recipe') getRecipes.push(`${canonicalPrefixed}()`);
+      if (m.role === 'search_recipes') searchRecipes.push(fmtToolRef(canonicalPrefixed, [], kind));
+      if (m.role === 'list_recipes') listRecipes.push(fmtToolRef(canonicalPrefixed, [], kind));
+      if (m.role === 'get_recipe') getRecipes.push(fmtToolRef(canonicalPrefixed, [], kind));
     }
 
     // Pseudo-tools for tool discovery on all MCP servers
-    searchTools.push(`${prefix}search_tools(query)`);
-    listTools.push(`${prefix}list_tools()`);
+    searchTools.push(fmtToolRef(`${prefix}search_tools`, ['query'], kind));
+    listTools.push(fmtToolRef(`${prefix}list_tools`, [], kind));
   }
 
   // ── WebMCP action tools (widget_display, canvas, recall) ──
+  // Iterate in canonical order (widget_display, canvas, recall) so the prompt
+  // always lists them in the same sequence regardless of tool definition order.
   const actionTools: string[] = [];
   const ACTION_NAMES = ['widget_display', 'canvas', 'recall'];
   for (const l of webmcpLayers) {
     const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
-    for (const t of l.tools) {
-      if (ACTION_NAMES.includes(t.name)) actionTools.push(`${prefix}${t.name}`);
+    for (const actionName of ACTION_NAMES) {
+      if (l.tools.some(t => t.name === actionName)) {
+        actionTools.push(fmtToolRef(`${prefix}${actionName}`, [], kind));
+      }
     }
   }
 
@@ -478,8 +508,8 @@ If previous steps failed, fall back to a classic chat without tool calling.`;
  *  Also populates the deprecated global toolAliasMap for legacy consumers.
  *  For parallel-safe usage, use buildSystemPromptWithAliases() instead.
  */
-export function buildSystemPrompt(layers: ToolLayer[]): string {
-  const { prompt, aliasMap } = buildSystemPromptWithAliases(layers);
+export function buildSystemPrompt(layers: ToolLayer[], options?: { providerKind?: ProviderKind }): string {
+  const { prompt, aliasMap } = buildSystemPromptWithAliases(layers, options);
 
   // Populate deprecated global singleton for backward compat
   toolAliasMap.clear();
