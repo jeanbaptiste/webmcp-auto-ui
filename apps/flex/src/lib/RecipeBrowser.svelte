@@ -2,6 +2,7 @@
   import { fade, fly } from 'svelte/transition';
   import { filterRecipes, sortRecipes, recipeToMarkdown, recipeToDownloadBlob } from '@webmcp-auto-ui/agent';
   import { encode } from '@webmcp-auto-ui/sdk';
+  import { MarkdownView } from '@webmcp-auto-ui/ui';
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
 
   interface RecipeItem {
@@ -174,7 +175,7 @@
           {#if selected.body}
             <div>
               <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-2">Body</div>
-              <pre class="font-mono text-xs text-text1 leading-relaxed whitespace-pre-wrap bg-surface2 border border-border2 rounded-lg p-4 overflow-x-auto">{selected.body}</pre>
+              <MarkdownView source={selected.body} />
             </div>
           {/if}
         </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Recipe, McpRecipe } from '@webmcp-auto-ui/agent';
+  import { MarkdownView } from '@webmcp-auto-ui/ui';
 
   interface Props {
     recipe: Recipe | null;
@@ -96,8 +97,9 @@
     <!-- Body (markdown) -->
     <div class="flex flex-col gap-1">
       <span class="text-[9px] font-mono uppercase tracking-wider text-text2">Body</span>
-      <pre class="text-xs font-mono text-text1 bg-surface2 rounded px-3 py-2 border border-border2
-                  whitespace-pre-wrap break-words overflow-x-auto max-h-[400px] overflow-y-auto">{recipe.body}</pre>
+      <div class="text-xs text-text1 bg-surface2 rounded px-3 py-2 border border-border2 max-h-[400px] overflow-y-auto">
+        <MarkdownView source={recipe.body} />
+      </div>
     </div>
   </div>
 {:else if mcpRecipe}

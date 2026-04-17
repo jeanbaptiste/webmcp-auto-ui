@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fade, fly } from 'svelte/transition';
+  import { MarkdownView } from '@webmcp-auto-ui/ui';
 
   interface RecipeData {
     id?: string;
@@ -30,31 +31,6 @@
 
   function onKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') close();
-  }
-
-  /** Minimal markdown to HTML renderer */
-  function renderMarkdown(md: string): string {
-    let html = md
-      // Code blocks (``` ... ```)
-      .replace(/```(\w*)\n([\s\S]*?)```/g, (_m, _lang, code) =>
-        `<pre class="md-code-block"><code>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`)
-      // Inline code
-      .replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>')
-      // Headings
-      .replace(/^### (.+)$/gm, '<h4 class="md-h4">$1</h4>')
-      .replace(/^## (.+)$/gm, '<h3 class="md-h3">$1</h3>')
-      .replace(/^# (.+)$/gm, '<h2 class="md-h2">$1</h2>')
-      // Bold
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      // Italic
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      // Unordered lists
-      .replace(/^- (.+)$/gm, '<li class="md-li">$1</li>');
-    // Wrap consecutive <li> in <ul>
-    html = html.replace(/((?:<li class="md-li">.*<\/li>\n?)+)/g, '<ul class="md-ul">$1</ul>');
-    // Paragraphs: wrap remaining non-tag lines
-    html = html.replace(/^(?!<[huplo]|<\/|<li|<ul|<pre|<code|<strong|<em)(.+)$/gm, '<p class="md-p">$1</p>');
-    return html;
   }
 </script>
 
@@ -126,9 +102,7 @@
         {#if recipe.body}
           <div>
             <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-2">Contenu</div>
-            <div class="recipe-body font-mono text-xs text-text1 leading-relaxed">
-              {@html renderMarkdown(recipe.body)}
-            </div>
+            <MarkdownView source={recipe.body} />
           </div>
         {/if}
 
@@ -153,27 +127,3 @@
   </div>
 {/if}
 
-<style>
-  .recipe-body :global(.md-h2) { font-size: 14px; font-weight: 700; margin: 12px 0 6px; color: var(--color-text1); }
-  .recipe-body :global(.md-h3) { font-size: 12px; font-weight: 700; margin: 10px 0 4px; color: var(--color-text1); }
-  .recipe-body :global(.md-h4) { font-size: 11px; font-weight: 600; margin: 8px 0 4px; color: var(--color-text2); }
-  .recipe-body :global(.md-p) { margin: 4px 0; }
-  .recipe-body :global(.md-ul) { list-style: disc; padding-left: 18px; margin: 4px 0; }
-  .recipe-body :global(.md-li) { margin: 2px 0; }
-  .recipe-body :global(.md-inline-code) {
-    background: var(--color-surface2, #1e1e2e);
-    padding: 1px 5px;
-    border-radius: 4px;
-    font-size: 10px;
-  }
-  .recipe-body :global(.md-code-block) {
-    background: var(--color-surface2, #1e1e2e);
-    border: 1px solid var(--color-border2, #333);
-    border-radius: 6px;
-    padding: 10px 12px;
-    margin: 8px 0;
-    overflow-x: auto;
-    font-size: 10px;
-    line-height: 1.5;
-  }
-</style>

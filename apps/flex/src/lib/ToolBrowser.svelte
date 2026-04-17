@@ -1,6 +1,7 @@
 <script lang="ts">
   import { filterRecipes, sortRecipes, groupToolsByServer, formatToolSchema } from '@webmcp-auto-ui/agent';
   import type { BrowsableTool } from '@webmcp-auto-ui/agent';
+  import { MarkdownView, CodeView } from '@webmcp-auto-ui/ui';
 
   interface Props {
     open: boolean;
@@ -65,7 +66,7 @@
         <!-- Detail view -->
         <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
           {#if selected.description}
-            <p class="text-sm text-text2 leading-relaxed">{selected.description}</p>
+            <MarkdownView source={selected.description} class="text-text2" />
           {:else}
             <p class="text-sm text-text2 italic">No description available</p>
           {/if}
@@ -80,7 +81,9 @@
           {#if selected.inputSchema}
             <div class="flex flex-col gap-1">
               <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Input schema</span>
-              <pre class="text-[11px] font-mono text-text1 bg-surface2 rounded px-3 py-2 border border-border2 whitespace-pre-wrap break-words overflow-x-auto max-h-[400px] overflow-y-auto">{formatToolSchema(selected)}</pre>
+              <div class="max-h-[400px] overflow-y-auto">
+                <CodeView lang="json" source={formatToolSchema(selected) ?? ''} />
+              </div>
             </div>
           {/if}
         </div>
