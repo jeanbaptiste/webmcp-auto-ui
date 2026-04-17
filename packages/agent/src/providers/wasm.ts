@@ -570,8 +570,9 @@ export class WasmProvider implements LLMProvider {
   /**
    * Format a value for Gemma 4 native tool syntax.
    * Strings use <|"|> delimiters, numbers/booleans/null are bare.
+   * @internal — used by buildGemmaPrompt (exported at module level)
    */
-  private static gemmaValue(v: unknown): string {
+  static gemmaValue(v: unknown): string {
     const q = '<|"|>';
     if (v === null || v === undefined) return 'null';
     if (typeof v === 'number' || typeof v === 'boolean') return String(v);
@@ -586,8 +587,9 @@ export class WasmProvider implements LLMProvider {
 
   /**
    * Format a tool declaration in Gemma 4 native syntax.
+   * @internal — used by buildGemmaPrompt
    */
-  private static formatToolDeclaration(tool: ProviderTool): string {
+  static formatToolDeclaration(tool: ProviderTool): string {
     const q = '<|"|>';
     let decl = `<|tool>declaration:${tool.name}{\n`;
     decl += `  description:${q}${tool.description}${q}`;
@@ -635,8 +637,9 @@ export class WasmProvider implements LLMProvider {
 
   /**
    * Format a tool response in Gemma 4 native syntax.
+   * @internal — used by buildGemmaPrompt
    */
-  private static formatToolResponse(toolName: string, content: string): string {
+  static formatToolResponse(toolName: string, content: string): string {
     const q = '<|"|>';
     // Try to parse as JSON for structured output
     try {
@@ -650,95 +653,16 @@ export class WasmProvider implements LLMProvider {
 
   /**
    * Format a tool call in Gemma 4 native syntax.
+   * @internal — used by buildGemmaPrompt
    */
-  private static formatToolCall(name: string, input: Record<string, unknown>): string {
+  static formatToolCall(name: string, input: Record<string, unknown>): string {
     const entries = Object.entries(input)
       .map(([k, v]) => `${k}:${WasmProvider.gemmaValue(v)}`);
     return `<|tool_call>call:${name}{${entries.join(',')}}<tool_call|>`;
   }
 
   private buildPrompt(messages: ChatMessage[], tools: ProviderTool[], systemPrompt?: string, maxTools?: number): string {
-    const systemParts: string[] = [];
-
-    // Inject system prompt from settings if provided.
-    // Rewrite paren syntax "tool_name()" / "tool_name(args)" to Gemma 4 native call syntax.
-    // Without this, Gemma mimics the paren syntax as plain text (regression from commit 2724b9e).
-    if (systemPrompt) {
-      const gemmaPrompt = systemPrompt.replace(
-        /\b([a-zA-Z_][a-zA-Z0-9_]*)\(([^)]*)\)/g,
-        (_full, name, args) => {
-          const trimmed = args.trim();
-          if (!trimmed) return `<|tool_call>call:${name}{}<tool_call|>`;
-          const argBody = trimmed
-            .split(',')
-            .map((a: string) => `${a.trim()}:<|"|>...<|"|>`)
-            .join(',');
-          return `<|tool_call>call:${name}{${argBody}}<tool_call|>`;
-        }
-      );
-      systemParts.push(gemmaPrompt);
-    }
-
-    if (tools.length > 0) {
-      // Gemma small models struggle with too many tools — limit to most relevant
-      const MAX_TOOLS = maxTools ?? 15;
-      const limitedTools = tools.length > MAX_TOOLS
-        ? [
-            // Always include render_* tools (UI)
-            ...tools.filter(t => t.name.startsWith('render_') || t.name === 'clear_canvas').slice(0, 8),
-            // Fill with data tools
-            ...tools.filter(t => !t.name.startsWith('render_') && t.name !== 'clear_canvas').slice(0, MAX_TOOLS - 8),
-          ]
-        : tools;
-
-      // Native Gemma 4 tool declarations
-      systemParts.push(limitedTools.map(t => WasmProvider.formatToolDeclaration(t)).join('\n'));
-    }
-
-    // Build a map of tool_use_id → tool_name from all messages for tool_result resolution
-    const toolNameById = new Map<string, string>();
-    for (const msg of messages) {
-      if (typeof msg.content !== 'string') {
-        for (const block of msg.content as ContentBlock[]) {
-          if (block.type === 'tool_use') {
-            const b = block as { type: 'tool_use'; id: string; name: string };
-            toolNameById.set(b.id, b.name);
-          }
-        }
-      }
-    }
-
-    const parts: string[] = [];
-    if (systemParts.length > 0) {
-      // Gemma 4 has no system role — inject system content as a user turn
-      parts.push(`<|turn>user\n${systemParts.join('\n')}<turn|>`);
-    }
-    for (const msg of messages) {
-      const role = msg.role === 'assistant' ? 'model' : 'user';
-      if (typeof msg.content === 'string') {
-        parts.push(`<|turn>${role}\n${msg.content}<turn|>`);
-      } else {
-        // Serialize all block types in Gemma 4 native format
-        const segments: string[] = [];
-        for (const block of msg.content as ContentBlock[]) {
-          if (block.type === 'text') {
-            segments.push((block as { type: 'text'; text: string }).text);
-          } else if (block.type === 'tool_use') {
-            const b = block as { type: 'tool_use'; name: string; input: Record<string, unknown> };
-            segments.push(WasmProvider.formatToolCall(b.name, b.input));
-          } else if (block.type === 'tool_result') {
-            const b = block as { type: 'tool_result'; tool_use_id: string; content: string };
-            const toolName = toolNameById.get(b.tool_use_id) ?? 'unknown';
-            segments.push(WasmProvider.formatToolResponse(toolName, b.content));
-          }
-        }
-        if (segments.length > 0) {
-          parts.push(`<|turn>${role}\n${segments.join('\n')}<turn|>`);
-        }
-      }
-    }
-    parts.push('<|turn>model\n');
-    return parts.join('\n');
+    return buildGemmaPrompt({ systemPrompt, tools, messages, maxTools });
   }
 
   destroy() {
@@ -747,4 +671,128 @@ export class WasmProvider implements LLMProvider {
     this.setStatus('idle');
     this.initPromise = null;
   }
+}
+
+/**
+ * Input for {@link buildGemmaPrompt}.
+ *
+ * Pass `messages: []` (or omit it) to produce a preview of the system/tool
+ * portion of the prompt without any conversation turns — useful for debug
+ * panels that want to display the exact transformed prompt Gemma will see.
+ */
+export interface BuildGemmaPromptInput {
+  /** Raw system prompt (will have `tool_name(args)` rewritten to `<|tool_call>` syntax). */
+  systemPrompt?: string;
+  /** Provider tools (will be declared via `<|tool>declaration>` and limited to `maxTools`). */
+  tools: ProviderTool[];
+  /** Conversation turns. Defaults to `[]` (preview mode — no `<|turn>` user/model blocks). */
+  messages?: ChatMessage[];
+  /** Hard cap on number of tool declarations (default 15 — Gemma small models struggle beyond this). */
+  maxTools?: number;
+}
+
+/**
+ * Build the final Gemma 4 native prompt string from a system prompt, a set of
+ * provider tools, and a conversation history.
+ *
+ * This is the exact transformation applied by {@link WasmProvider} before
+ * calling LlmInference — exported so UI debug panels can display the prompt
+ * as it will actually be sent to the model.
+ *
+ * Transformations applied:
+ * 1. Rewrites `tool_name(args)` patterns in the system prompt to
+ *    `<|tool_call>call:name{args:<|"|>...<|"|>}<tool_call|>` so Gemma does not
+ *    mimic paren syntax as plain text.
+ * 2. Limits tools to `maxTools` (default 15 — 8 `render_*`/`clear_canvas`
+ *    + the remaining budget for data tools).
+ * 3. Emits `<|tool>declaration>` blocks for each retained tool.
+ * 4. Wraps the system part in `<|turn>user\n...<turn|>` (Gemma 4 has no
+ *    `system` role).
+ * 5. Serializes messages as `<|turn>user|model\n...<turn|>` with tool_use →
+ *    `<|tool_call>`, tool_result → `<|tool_response>`.
+ * 6. Terminates with an open `<|turn>model\n` for generation.
+ */
+export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
+  const { systemPrompt, tools, messages = [], maxTools } = input;
+  const systemParts: string[] = [];
+
+  // Inject system prompt from settings if provided.
+  // Rewrite paren syntax "tool_name()" / "tool_name(args)" to Gemma 4 native call syntax.
+  // Without this, Gemma mimics the paren syntax as plain text (regression from commit 2724b9e).
+  if (systemPrompt) {
+    const gemmaPrompt = systemPrompt.replace(
+      /\b([a-zA-Z_][a-zA-Z0-9_]*)\(([^)]*)\)/g,
+      (_full, name, args) => {
+        const trimmed = args.trim();
+        if (!trimmed) return `<|tool_call>call:${name}{}<tool_call|>`;
+        const argBody = trimmed
+          .split(',')
+          .map((a: string) => `${a.trim()}:<|"|>...<|"|>`)
+          .join(',');
+        return `<|tool_call>call:${name}{${argBody}}<tool_call|>`;
+      }
+    );
+    systemParts.push(gemmaPrompt);
+  }
+
+  if (tools.length > 0) {
+    // Gemma small models struggle with too many tools — limit to most relevant
+    const MAX_TOOLS = maxTools ?? 15;
+    const limitedTools = tools.length > MAX_TOOLS
+      ? [
+          // Always include render_* tools (UI)
+          ...tools.filter(t => t.name.startsWith('render_') || t.name === 'clear_canvas').slice(0, 8),
+          // Fill with data tools
+          ...tools.filter(t => !t.name.startsWith('render_') && t.name !== 'clear_canvas').slice(0, MAX_TOOLS - 8),
+        ]
+      : tools;
+
+    // Native Gemma 4 tool declarations
+    systemParts.push(limitedTools.map(t => WasmProvider.formatToolDeclaration(t)).join('\n'));
+  }
+
+  // Build a map of tool_use_id → tool_name from all messages for tool_result resolution
+  const toolNameById = new Map<string, string>();
+  for (const msg of messages) {
+    if (typeof msg.content !== 'string') {
+      for (const block of msg.content as ContentBlock[]) {
+        if (block.type === 'tool_use') {
+          const b = block as { type: 'tool_use'; id: string; name: string };
+          toolNameById.set(b.id, b.name);
+        }
+      }
+    }
+  }
+
+  const parts: string[] = [];
+  if (systemParts.length > 0) {
+    // Gemma 4 has no system role — inject system content as a user turn
+    parts.push(`<|turn>user\n${systemParts.join('\n')}<turn|>`);
+  }
+  for (const msg of messages) {
+    const role = msg.role === 'assistant' ? 'model' : 'user';
+    if (typeof msg.content === 'string') {
+      parts.push(`<|turn>${role}\n${msg.content}<turn|>`);
+    } else {
+      // Serialize all block types in Gemma 4 native format
+      const segments: string[] = [];
+      for (const block of msg.content as ContentBlock[]) {
+        if (block.type === 'text') {
+          segments.push((block as { type: 'text'; text: string }).text);
+        } else if (block.type === 'tool_use') {
+          const b = block as { type: 'tool_use'; name: string; input: Record<string, unknown> };
+          segments.push(WasmProvider.formatToolCall(b.name, b.input));
+        } else if (block.type === 'tool_result') {
+          const b = block as { type: 'tool_result'; tool_use_id: string; content: string };
+          const toolName = toolNameById.get(b.tool_use_id) ?? 'unknown';
+          segments.push(WasmProvider.formatToolResponse(toolName, b.content));
+        }
+      }
+      if (segments.length > 0) {
+        parts.push(`<|turn>${role}\n${segments.join('\n')}<turn|>`);
+      }
+    }
+  }
+  parts.push('<|turn>model\n');
+  return parts.join('\n');
 }

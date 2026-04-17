@@ -3,8 +3,8 @@
 // Providers
 export { RemoteLLMProvider } from './providers/remote.js';
 export type { RemoteLLMProviderOptions } from './providers/remote.js';
-export { WasmProvider } from './providers/wasm.js';
-export type { WasmProviderOptions, WasmStatus } from './providers/wasm.js';
+export { WasmProvider, buildGemmaPrompt } from './providers/wasm.js';
+export type { WasmProviderOptions, WasmStatus, BuildGemmaPromptInput } from './providers/wasm.js';
 export { LocalLLMProvider } from './providers/local.js';
 export type { LocalLLMProviderOptions, LocalBackend } from './providers/local.js';
 export { createProvider } from './providers/factory.js';

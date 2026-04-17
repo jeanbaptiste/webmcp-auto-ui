@@ -9,6 +9,7 @@
     RemoteLLMProvider, WasmProvider, LocalLLMProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, trimConversationHistory, summarizeChat, TokenTracker,
     buildToolsFromLayers, runDiagnostics, DiscoveryCache, DISCOVERY_TOOL_NAMES, ContextRAG,
+    buildGemmaPrompt,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer, BrowsableTool } from '@webmcp-auto-ui/agent';
   import { autoui } from '@webmcp-auto-ui/agent';
@@ -435,6 +436,21 @@
       : canvas.llm === 'local' ? 'local'
       : 'remote'
   );
+  // Prompt shown in Settings → System Prompt panel. For Gemma, we apply the same
+  // transformation WasmProvider.buildPrompt() does (paren rewriting, MAX_TOOLS cap,
+  // tool declarations, <|turn>user wrap) so the user sees what the model actually gets.
+  // `effectivePrompt` (the canonical/textual version) is kept intact for
+  // runDiagnostics, the agent loop (options.systemPrompt), agentLogs, and DebugPanel.
+  const displayedPrompt = $derived.by(() => {
+    if (providerKind === 'gemma') {
+      return buildGemmaPrompt({
+        systemPrompt: effectivePrompt,
+        tools: providerTools,
+        maxTools: maxTools ?? 15,
+      });
+    }
+    return effectivePrompt;
+  });
   const diagnostics = $derived(runDiagnostics(layers, providerTools, effectivePrompt ?? '', {
     sanitize: schemaSanitize,
     flatten: schemaFlatten,
@@ -836,7 +852,7 @@
   bind:open={settingsOpen}
   bind:composerMode bind:layoutMode bind:includeSummary
   onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true} onclear={clearAll}
-  bind:mcpToken bind:systemPrompt {effectivePrompt} bind:maxTokens bind:maxContextTokens bind:maxTools bind:maxMessages bind:maxResultLength
+  bind:mcpToken bind:systemPrompt effectivePrompt={displayedPrompt} bind:maxTokens bind:maxContextTokens bind:maxTools bind:maxMessages bind:maxResultLength
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:showPipelineTrace
   bind:schemaSanitize bind:schemaFlatten bind:schemaStrict {providerKind} bind:compressHistory bind:compressPreview
   bind:contextRAGEnabled bind:ragResidueSize
