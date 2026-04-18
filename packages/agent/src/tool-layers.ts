@@ -835,12 +835,12 @@ Reply: one-line summary + result.`;
       const currentDateTime = new Date().toISOString();
 
       const mcpServersList = mcpLayers.map(l => {
-        const slug = l.description || SERVER_SLUGS[l.serverName] || '';
+        const slug = l.description || SERVER_SLUGS[l.serverName.toLowerCase()] || '';
         return `- ${l.serverName}${slug ? ` — ${slug}` : ''}`;
       }).join('\n') || '(none)';
 
       const webmcpServersList = webmcpLayers.map(l => {
-        const slug = l.description || SERVER_SLUGS[l.serverName] || '';
+        const slug = l.description || SERVER_SLUGS[l.serverName.toLowerCase()] || '';
         return `- ${l.serverName}${slug ? ` — ${slug}` : ''}`;
       }).join('\n') || '(none)';
 
@@ -899,9 +899,13 @@ CRITICAL RULE: You MUST execute all steps silently. Do NOT generate or output an
 
 You MUST answer the user using tools you call.
 
-You find tools underneath or inside recipes that describe how to use them.
+Recipes are PROCEDURES (markdown with SQL, scripts, or tool-call examples), NOT tools. To execute a recipe:
+1. List recipes: call allRecipes(server)
+2. Load the chosen recipe: call get_recipe(name, server) — returns full instructions
+3. Follow the instructions: they tell you which DATA tools to call. If you need a tool's schema, call allTools(server)
+4. Render the result: call widget_display if the user wants a visual
 
-You find recipes by using tools that list them (e.g. allRecipes(server)), then get them (e.g. get_recipe(name, server)) from connected servers.
+Never call a recipe name as a tool. Never fabricate data — only use data returned by an actual tool call.
 
 There are two kind of servers: MCP servers for DATA retrieval and WebMCP servers for UI display.
 
