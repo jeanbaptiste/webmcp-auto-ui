@@ -395,9 +395,9 @@
     // `<|tool_call>call:...{}<tool_call|>` references directly — no runtime regex rewrite.
     const kind = providerKind === 'gemma' ? 'gemma' : 'generic';
     const base = buildSystemPrompt(layers, { providerKind: kind, template: advancedPromptTemplate });
-    // If the user customised the prompt in settings, prepend it
+    // If the user customised the prompt in settings, it REPLACES base entirely
     const hasCustom = systemPrompt && systemPrompt.trim().length > 0;
-    return hasCustom ? `${systemPrompt}\n\n${base}` : base;
+    return hasCustom ? systemPrompt : base;
   });
 
   const providerTools = $derived(buildToolsFromLayers(layers, { sanitize: schemaStrict, flatten: schemaFlatten, strict: schemaStrict }).tools);
