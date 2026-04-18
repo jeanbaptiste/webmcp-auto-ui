@@ -35,6 +35,18 @@
       description: 'Baked skill list in prompt, no discovery tools. Gemma only.',
       providerKinds: ['gemma'],
     },
+    {
+      id: 'gemma-strict-cascade',
+      name: 'Gemma — Strict 5-step cascade',
+      description: 'Classic 5-step cascade (list → search → tools → search → get → execute) with "MUST NOT skip steps" rule. Gemma only.',
+      providerKinds: ['gemma'],
+    },
+    {
+      id: 'ghost',
+      name: 'Gemma — Ghost (Claude port)',
+      description: 'Current Claude prompt (post-fixes) translated to Gemma tool-declaration syntax. Gemma only.',
+      providerKinds: ['gemma'],
+    },
   ];
 
   function close() {
