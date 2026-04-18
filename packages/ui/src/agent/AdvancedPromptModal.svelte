@@ -47,6 +47,12 @@
       description: 'Current Claude prompt (post-fixes) translated to Gemma tool-declaration syntax. Gemma only.',
       providerKinds: ['gemma'],
     },
+    {
+      id: 'gemma-lazy-cascade',
+      name: 'Gemma — Lazy cascade (DATA/DISPLAY split)',
+      description: 'Previous default: 5-step cascade with list→search fallback, DATA/DISPLAY routing. Gemma only.',
+      providerKinds: ['gemma'],
+    },
   ];
 
   function close() {

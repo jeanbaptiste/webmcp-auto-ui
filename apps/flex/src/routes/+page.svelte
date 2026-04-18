@@ -540,7 +540,13 @@
       result = await runAgentLoop(msg, {
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
-        systemPrompt: effectivePrompt || undefined,
+        // Thunk: refreshes current date + any other time-sensitive fields at each iteration.
+        systemPrompt: () => {
+          const kind = providerKind === 'gemma' ? 'gemma' : 'generic';
+          const base = buildSystemPrompt(layers, { providerKind: kind, template: advancedPromptTemplate });
+          const hasCustom = systemPrompt && systemPrompt.trim().length > 0;
+          return hasCustom ? systemPrompt : base;
+        },
         maxIterations: 15, maxTokens, maxResultLength, temperature, topK, cacheEnabled,
         truncateResults, compressHistory: compressHistory ? compressPreview : false,
         signal: abortController!.signal,

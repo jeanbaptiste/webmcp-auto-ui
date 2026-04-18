@@ -7,6 +7,7 @@ import { sanitizeSchema, sanitizeSchemaWithReport, flattenSchema } from '@webmcp
 import type { SchemaPatch } from '@webmcp-auto-ui/core';
 import { DiscoveryCache, type ServerCache } from './discovery-cache.js';
 import type { PipelineTrace } from './pipeline-trace.js';
+import { SERVER_SLUGS } from './server-slugs.js';
 
 /** Sanitize a server name for use in tool name prefixes.
  *  Returns a clean underscore-separated identifier with no "mcp"/"server" noise.
@@ -789,8 +790,8 @@ widget_display requires data from a DATA tool call made earlier in this session.
 STEP 5 — Plain chat (no tools)
 
 Use when: (a) the request is a greeting / small talk, (b) no recipe or tool fits, (c) previous steps failed to yield a match.`;
-    } else {
-      // ── Default: lazy cascade, DATA/DISPLAY split, Gemma syntax ──
+    } else if (template === 'gemma-lazy-cascade') {
+      // ── Previous default: lazy cascade, DATA/DISPLAY split, Gemma syntax ──
       prompt = `You answer the user using recipes (skills) or direct tools. For greetings/small talk → reply directly with no tools.
 
 Route: DATA (fetch) or DISPLAY (render on canvas).
@@ -827,6 +828,100 @@ ${actionTools.join('\n')}
 
 Only use data returned by tools or given by the user. Never fabricate.
 Reply: one-line summary + result.`;
+    } else {
+      // ── Default: lazy discovery via 3 global tools (allRecipes, allTools, get_recipe) ──
+      // Gemma sees a minimal surface: server listings + 3 discovery globals + WebMCP action tools.
+      // Everything else is fetched on-demand via allRecipes/allTools/get_recipe.
+      const currentDateTime = new Date().toISOString();
+
+      const mcpServersList = mcpLayers.map(l => {
+        const slug = l.description || SERVER_SLUGS[l.serverName] || '';
+        return `- ${l.serverName}${slug ? ` — ${slug}` : ''}`;
+      }).join('\n') || '(none)';
+
+      const webmcpServersList = webmcpLayers.map(l => {
+        const slug = l.description || SERVER_SLUGS[l.serverName] || '';
+        return `- ${l.serverName}${slug ? ` — ${slug}` : ''}`;
+      }).join('\n') || '(none)';
+
+      // 3 discovery globals (pseudo-tools hardcoded — not prefixed by server)
+      const discoveryToolsDeclarations = [
+        formatGemmaToolDeclaration({
+          name: 'allRecipes',
+          description: 'List recipe names + descriptions for a specific server (light, no body).',
+          input_schema: {
+            type: 'object',
+            properties: { server: { type: 'string', description: 'Server name as listed above.' } },
+            required: ['server'],
+          },
+        }),
+        formatGemmaToolDeclaration({
+          name: 'allTools',
+          description: 'List ALL tools (with full input schemas) for a specific server.',
+          input_schema: {
+            type: 'object',
+            properties: { server: { type: 'string', description: 'Server name as listed above.' } },
+            required: ['server'],
+          },
+        }),
+        formatGemmaToolDeclaration({
+          name: 'get_recipe',
+          description: 'Retrieve full body + instructions of a specific recipe on a specific server.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Exact recipe name as returned by allRecipes.' },
+              server: { type: 'string', description: 'Server name as listed above.' },
+            },
+            required: ['name', 'server'],
+          },
+        }),
+      ].join('\n');
+
+      // WebMCP action tools (widget_display, canvas, recall) — full schemas, prefixed.
+      const webmcpToolsDeclarations = webmcpLayers.flatMap(l => {
+        const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
+        const names = ['widget_display', 'canvas', 'recall'];
+        return names
+          .filter(n => l.tools.some(t => t.name === n))
+          .map(n => providerToolsByName.get(`${prefix}${n}`))
+          .filter((t): t is ProviderTool => !!t)
+          .map(t => formatGemmaToolDeclaration(t));
+      }).join('\n') || '(no display tools available)';
+
+      prompt = `We are the ${currentDateTime}
+
+You are an AI assistant that helps users by answering questions and completes tasks using recipes.
+
+For EVERY new task or request or question, you MUST execute the following steps in exact order.
+
+CRITICAL RULE: You MUST execute all steps silently. Do NOT generate or output any internal thoughts, reasoning, explanations, or intermediate text at ANY step.
+
+You MUST answer the user using tools you call.
+
+You find tools underneath or inside recipes that describe how to use them.
+
+You find recipes by using tools that list them (e.g. allRecipes(server)), then get them (e.g. get_recipe(name, server)) from connected servers.
+
+There are two kind of servers: MCP servers for DATA retrieval and WebMCP servers for UI display.
+
+Outside of tool calling e.g. greetings or small talk, or if tool calling fails, reply directly in a chat.
+
+Currently connected MCP servers (DATA):
+
+${mcpServersList}
+
+MCP tools (call with a specific server name to explore):
+
+${discoveryToolsDeclarations}
+
+Currently connected WebMCP servers (UI display):
+
+${webmcpServersList}
+
+WebMCP tools (full schemas — always callable to render on canvas):
+
+${webmcpToolsDeclarations}`;
     }
   } else {
     // ── Existing generic template for Claude/remote — DO NOT MODIFY ──
