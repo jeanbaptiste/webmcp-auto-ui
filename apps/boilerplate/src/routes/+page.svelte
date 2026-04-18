@@ -123,7 +123,8 @@
   });
 
   const discoveryCache = $derived(buildDiscoveryCache(layers));
-  const systemPrompt = $derived(buildSystemPrompt(layers));
+  // Boilerplate only uses RemoteLLMProvider (proxy); Gemma native syntax is not needed here.
+  const systemPrompt = $derived(buildSystemPrompt(layers, { providerKind: 'generic' }));
 
   // ── Servers: custom WebMCP servers for WidgetRenderer ─────────────────
   const servers = $derived(localWebMcpServers.filter(e => e.enabled).map(e => e.server));

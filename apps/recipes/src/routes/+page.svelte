@@ -366,7 +366,9 @@
     const timerInterval = setInterval(() => chatTimer++, 1000);
 
     try {
-      const systemPrompt = buildSystemPrompt(layers);
+      // Gemma (WasmProvider) expects native `<|tool_call>…<tool_call|>` syntax in the prompt.
+      const providerKind = canvas.llm.startsWith('gemma') ? 'gemma' : 'generic';
+      const systemPrompt = buildSystemPrompt(layers, { providerKind });
 
       const result = await runAgentLoop(prompt, {
         client: multiClient.hasConnections ? multiClient as any : undefined,

@@ -273,7 +273,9 @@ export const agentStore = {
 
     layers.push(autoui.layer());
 
-    const systemPrompt = buildSystemPrompt(layers);
+    // Gemma (WasmProvider) expects native `<|tool_call>…<tool_call|>` syntax in the prompt.
+    const providerKind = canvas.llm.startsWith('gemma') ? 'gemma' : 'generic';
+    const systemPrompt = buildSystemPrompt(layers, { providerKind });
     const discoveryCache = buildDiscoveryCache(layers);
 
     try {

@@ -366,127 +366,34 @@ export class WasmProvider implements LLMProvider {
       }
     } catch {}
 
-    // Parse tool calls — supports multiple formats:
-    // 1. Gemma 4 native: <|tool_call>call:tool_name{key:<|"|>value<|"|>}<tool_call|>
-    // 2. JSON format (legacy): <|tool_call>call:tool_name{"key":"value"}<tool_call|>
-    // 3. Loose JSON: { "tool": "name", "args": {...} }
     const content: ContentBlock[] = [];
-    const gemmaToolCallRe = /<\|tool_call>call:(\w+)(\{[^]*?\})<tool_call\|>/g;
-    // Fallback: parenthesized format — call:name("arg1", {arg2})
-    const parenToolCallRe = /<\|tool_call>call:(\w+)\(([^)]*(?:\{[^]*?\}[^)]*)?)\)(?:<tool_call\|>|$)/g;
-    let match: RegExpExecArray | null;
+    const START_TAG = '<|tool_call>call:';
+    const END_TAG = '<tool_call|>';
     let foundToolCall = false;
-
-    while ((match = gemmaToolCallRe.exec(fullText)) !== null) {
+    let scanIdx = 0;
+    while (true) {
+      const startIdx = fullText.indexOf(START_TAG, scanIdx);
+      if (startIdx === -1) break;
+      const nameStart = startIdx + START_TAG.length;
+      const braceIdx = fullText.indexOf('{', nameStart);
+      if (braceIdx === -1) break;
+      const name = fullText.slice(nameStart, braceIdx);
+      if (!/^\w+$/.test(name)) { scanIdx = nameStart; continue; }
+      const argsBlock = WasmProvider.extractArgsBlock(fullText, braceIdx);
+      if (!argsBlock) break;
+      const afterArgs = braceIdx + argsBlock.length;
+      if (!fullText.startsWith(END_TAG, afterArgs)) { scanIdx = afterArgs; continue; }
       foundToolCall = true;
-      const toolName = match[1];
-      let toolArgs: Record<string, unknown> = {};
-      const rawArgs = match[2];
-
-      // Strategy 1: Extract key-value pairs using <|"|> delimiters BEFORE replacing them.
-      // This correctly handles internal quotes like: query:<|"|>SELECT data."date"<|"|>
-      toolArgs = WasmProvider.parseGemmaArgs(rawArgs);
-
-      // Strategy 2: If no pairs found, try simple replacement + JSON.parse
-      if (Object.keys(toolArgs).length === 0) {
-        const argsStr = rawArgs.replace(/<\|"\|>/g, '"');
-        try {
-          toolArgs = JSON.parse(argsStr);
-          this.trace?.push('parse', toolName, 'fell back to quote replacement strategy', 'warn');
-        } catch {
-          // Strategy 3: regex key:value extraction on replaced string
-          try {
-            const obj: Record<string, unknown> = {};
-            const kvRe = /(\w+)\s*:\s*(?:"([^"]*)"|([\d.]+(?:e[+-]?\d+)?)|(\[.*?\])|(true|false|null))/g;
-            let kv: RegExpExecArray | null;
-            while ((kv = kvRe.exec(argsStr)) !== null) {
-              const [, k, strVal, numVal, arrVal, litVal] = kv;
-              if (strVal !== undefined) obj[k] = strVal;
-              else if (numVal !== undefined) obj[k] = Number(numVal);
-              else if (arrVal !== undefined) { try { obj[k] = JSON.parse(arrVal); } catch { obj[k] = arrVal; } }
-              else if (litVal !== undefined) obj[k] = JSON.parse(litVal);
-            }
-            if (Object.keys(obj).length > 0) {
-              toolArgs = obj;
-              this.trace?.push('parse', toolName, 'fell back to regex key:value strategy', 'warn');
-            }
-          } catch {}
-        }
-      }
-
-      // P4 fix: recursively parse string fields that look like JSON objects/arrays.
-      // Gemma wraps params in <|"|>{...}<|"|> which after replacement becomes "{...}" — a string.
-      for (const [k, v] of Object.entries(toolArgs)) {
-        if (typeof v === 'string' && (v.startsWith('{') || v.startsWith('['))) {
-          try { toolArgs[k] = JSON.parse(v); } catch { /* keep as string */ }
-        }
-      }
-
       content.push({
         type: 'tool_use',
         id: `tc-${Date.now()}-${content.length}`,
-        name: toolName,
-        input: toolArgs,
+        name,
+        input: WasmProvider.parseGemmaArgs(argsBlock),
       });
-    }
-
-    // Fallback: try parenthesized format — call:component("table", {data: [...]})
-    if (!foundToolCall) {
-      while ((match = parenToolCallRe.exec(fullText)) !== null) {
-        foundToolCall = true;
-        const toolName = match[1];
-        const argsRaw = match[2].replace(/<\|"\|>/g, '"').trim();
-        let toolArgs: Record<string, unknown> = {};
-
-        // Parse parenthesized args: could be ("name", {params}) or just ({params})
-        try {
-          // Try wrapping in array and parsing: ["name", {params}] or [{params}]
-          const asArray = JSON.parse(`[${argsRaw}]`);
-          if (asArray.length === 2 && typeof asArray[0] === 'string' && typeof asArray[1] === 'object') {
-            // component("table", {data: [...]}) → {name: "table", params: {data: [...]}}
-            toolArgs = { name: asArray[0], params: asArray[1] };
-          } else if (asArray.length === 1 && typeof asArray[0] === 'object') {
-            toolArgs = asArray[0];
-          } else if (asArray.length >= 1) {
-            // Generic: first string arg as name, rest as params
-            toolArgs = { name: String(asArray[0]), ...(typeof asArray[1] === 'object' ? { params: asArray[1] } : {}) };
-          }
-        } catch {
-          // Last resort: try parsing the whole thing as JSON object
-          try { toolArgs = JSON.parse(argsRaw); } catch {}
-        }
-
-        content.push({
-          type: 'tool_use',
-          id: `tc-${Date.now()}-${content.length}`,
-          name: toolName,
-          input: toolArgs,
-        });
-      }
+      scanIdx = afterArgs + END_TAG.length;
     }
 
     if (!foundToolCall) {
-      // Try JSON format fallback — strip markdown code blocks first
-      let cleaned = fullText.trim();
-      const mdMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
-      if (mdMatch) cleaned = mdMatch[1].trim();
-
-      try {
-        const parsed = JSON.parse(cleaned) as { tool?: string; args?: Record<string, unknown> };
-        if (parsed.tool && parsed.args) {
-          foundToolCall = true;
-          content.push({
-            type: 'tool_use',
-            id: `tc-${Date.now()}`,
-            name: parsed.tool,
-            input: parsed.args,
-          });
-        }
-      } catch {}
-    }
-
-    if (!foundToolCall) {
-      // Extract text without tool call tags
       const cleanText = fullText.replace(/<\|tool_call>.*?<tool_call\|>/g, '').trim();
       content.push({ type: 'text', text: cleanText || fullText });
     }
@@ -507,6 +414,35 @@ export class WasmProvider implements LLMProvider {
   }
 
   /**
+   * Extract a brace-balanced {...} block starting at text[startIdx].
+   * Ignores { and } that appear inside <|"|>...<|"|> string delimiters.
+   * Returns the full block including outer braces, or null if unbalanced.
+   */
+  private static extractArgsBlock(text: string, startIdx: number): string | null {
+    if (text[startIdx] !== '{') return null;
+    const DELIM = '<|"|>';
+    let depth = 0;
+    let inString = false;
+    let i = startIdx;
+    while (i < text.length) {
+      if (text.startsWith(DELIM, i)) {
+        inString = !inString;
+        i += DELIM.length;
+        continue;
+      }
+      if (!inString) {
+        if (text[i] === '{') depth++;
+        else if (text[i] === '}') {
+          depth--;
+          if (depth === 0) return text.slice(startIdx, i + 1);
+        }
+      }
+      i++;
+    }
+    return null;
+  }
+
+  /**
    * Parse Gemma native tool call args by normalizing to JSON in one pass.
    *   1. `<|"|>...<|"|>`      → `"..."`          (string delimiters)
    *   2. Unquoted keys         → `"quoted":`      (valid JSON keys)
@@ -515,7 +451,7 @@ export class WasmProvider implements LLMProvider {
    */
   private static parseGemmaArgs(raw: string): Record<string, unknown> {
     const jsonStr = raw
-      .replace(/<\|"\|>/g, '"')
+      .replace(/<\|"\|>([\s\S]*?)<\|"\|>/g, (_, s) => JSON.stringify(s))
       .replace(/([{,])\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
     try {
       const parsed = JSON.parse(jsonStr);

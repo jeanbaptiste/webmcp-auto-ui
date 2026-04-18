@@ -39,8 +39,9 @@ export function buildLayers(): ToolLayer[] {
 }
 
 // ── Build system prompt from layers ───────────────────────────────────
+// Boilerplate only uses RemoteLLMProvider (proxy); Gemma native syntax is not needed here.
 export function buildPrompt(layers: ToolLayer[]): string {
-  return buildSystemPrompt(layers);
+  return buildSystemPrompt(layers, { providerKind: 'generic' });
 }
 
 export { runAgentLoop, canvas };
