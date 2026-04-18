@@ -115,6 +115,7 @@
 
   let diagModalOpen = $state(false);
   let serversCollapsed = $state(true);
+  let mcpShowToken = $state(false);
 
   function toggleServer(id: string) {
     const next = new Set(enabledServers);
@@ -143,11 +144,22 @@
 
     <!-- MCP custom URL -->
     <section class="flex flex-col gap-2">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">MCP server (manual URL)</div>
+      <div class="flex items-center gap-1.5">
+        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">MCP server (manual URL)</span>
+        <button
+          onclick={() => mcpShowToken = !mcpShowToken}
+          class="text-text2 hover:text-text1 transition-colors flex-shrink-0"
+          title="Bearer token"
+          aria-label="Toggle bearer token input"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
       <McpConnector
         url={canvas.mcpUrl}
         onurlchange={(v) => canvas.setMcpUrl(v)}
         bind:token={mcpToken}
+        bind:showToken={mcpShowToken}
         connecting={canvas.mcpConnecting}
         connected={canvas.mcpConnected}
         serverName={connectedUrls.length > 1 ? `multi-server (${connectedUrls.length})` : canvas.mcpName ?? ''}
