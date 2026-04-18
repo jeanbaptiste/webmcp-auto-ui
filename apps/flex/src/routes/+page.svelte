@@ -55,6 +55,7 @@
   let compressHistory = $state(false);
   let compressPreview = $state(500);
   let systemPrompt = $state('');
+  let advancedPromptTemplate = $state('default');
   let localUrl = $state('http://localhost:11434');
   let localModel = $state('');
   let composerMode = $state(true); // true = composer, false = consumer
@@ -393,7 +394,7 @@
     // Build with the provider-specific tool syntax. For Gemma, emit native
     // `<|tool_call>call:...{}<tool_call|>` references directly — no runtime regex rewrite.
     const kind = providerKind === 'gemma' ? 'gemma' : 'generic';
-    const base = buildSystemPrompt(layers, { providerKind: kind });
+    const base = buildSystemPrompt(layers, { providerKind: kind, template: advancedPromptTemplate });
     // If the user customised the prompt in settings, prepend it
     const hasCustom = systemPrompt && systemPrompt.trim().length > 0;
     return hasCustom ? `${systemPrompt}\n\n${base}` : base;
@@ -845,7 +846,7 @@
   bind:open={settingsOpen}
   bind:composerMode bind:layoutMode bind:includeSummary
   onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true} onclear={clearAll}
-  bind:mcpToken bind:systemPrompt effectivePrompt={displayedPrompt} bind:maxTokens bind:maxContextTokens bind:maxResultLength
+  bind:mcpToken bind:systemPrompt bind:advancedPromptTemplate effectivePrompt={displayedPrompt} bind:maxTokens bind:maxContextTokens bind:maxResultLength
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:showPipelineTrace
   bind:schemaFlatten bind:schemaStrict {providerKind} bind:compressHistory bind:compressPreview
   bind:contextRAGEnabled bind:ragResidueSize

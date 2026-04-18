@@ -461,7 +461,7 @@ export interface SystemPromptResult {
  */
 export function buildSystemPromptWithAliases(
   layers: ToolLayer[],
-  options: { providerKind?: ProviderKind } = {},
+  options: { providerKind?: ProviderKind; template?: string } = {},
 ): SystemPromptResult {
   const kind = options.providerKind ?? 'generic';
   const mcpLayers = layers.filter((l): l is McpLayer => l.protocol === 'mcp');
@@ -610,55 +610,99 @@ export function buildSystemPromptWithAliases(
   let prompt: string;
 
   if (kind === 'gemma') {
-    // ── Minimalist template for Gemma (4B/E4B), inline declarations included ──
-    const dataListSearch = [
-      ...listRecipesByCat.data,
-      ...searchRecipesByCat.data,
-    ].join('\n');
-    const displayListSearch = [
-      ...listRecipesByCat.display,
-      ...searchRecipesByCat.display,
-    ].join('\n');
+    const template = options.template ?? 'default';
+
+    // Pre-split by DATA/DISPLAY
+    const dataListRecipes = listRecipesByCat.data.join('\n');
+    const displayListRecipes = listRecipesByCat.display.join('\n');
+    const dataSearchRecipes = searchRecipesByCat.data.join('\n');
+    const displaySearchRecipes = searchRecipesByCat.display.join('\n');
     const allGetRecipes = [
       ...getRecipesByCat.data,
       ...getRecipesByCat.display,
     ].join('\n');
 
-    prompt = `Route: DATA (fetch) or DISPLAY (render). Greetings → chat.
+    if (template === 'gemma-google-style') {
+      // ── Google-style: pre-baked skill catalog, no list/search discovery ──
+      const bakedSkills: string[] = [];
+      for (const l of layers) {
+        const prefix = `${sanitizeServerName(l.serverName)}_${l.protocol}_`;
+        const recipes = ((l as any).recipes ?? []) as Array<{ name: string; description?: string }>;
+        for (const r of recipes) {
+          const desc = (r.description || '').split('\n')[0].slice(0, 120);
+          bakedSkills.push(`- ${prefix}${r.name}${desc ? ` — ${desc}` : ''}`);
+        }
+      }
 
-STEP 1 — List or search a recipe.
+      prompt = `YOU are an AI assistant. Answer the user by executing SKILLS (named procedures with schemas and instructions).
+
+YOU MUST execute all three steps silently. YOU MUST NOT expose intermediate output to the user.
+
+SKILL CATALOG:
+${bakedSkills.join('\n')}
+
+STEP 1 — Pick the single most relevant skill from the catalog above.
+
+STEP 2 — Load the skill:
+${allGetRecipes}
+Pass the skill name from STEP 1.
+
+STEP 3 — Execute the loaded instructions. Reply ONLY the final result, one line summary + output.
+
+Action tools (for display skills):
+${actionTools.join('\n')}
+
+YOU MUST NOT respond before STEP 3. Execute silently.`;
+    } else {
+      // ── Default: lazy cascade, DATA/DISPLAY split, Gemma syntax ──
+      prompt = `You answer the user using recipes (skills) or direct tools. For greetings/small talk → reply directly with no tools.
+
+Route: DATA (fetch) or DISPLAY (render on canvas).
+
+STEP 1 — List recipes (try first, cheapest):
 DATA:
-${dataListSearch}
+${dataListRecipes}
 DISPLAY:
-${displayListSearch}
-The result is for YOU. Pick the best match and go to STEP 2. Never ask the user to choose.
+${displayListRecipes}
+If a relevant recipe appears → STEP 2. Else → STEP 1b.
 
-STEP 2 — Read the recipe.
+STEP 1b — Search recipes (fallback from STEP 1):
+DATA:
+${dataSearchRecipes}
+DISPLAY:
+${displaySearchRecipes}
+If a recipe matches → STEP 2. Else → STEP 1c.
+
+STEP 1c — List tools directly:
+${listTools.join('\n')}
+If a relevant tool appears → use it directly (skip STEP 2, GO STEP 3). Else → STEP 1d.
+
+STEP 1d — Search tools with a keyword:
+${searchTools.join('\n')}
+Pick the best tool and use it directly (GO STEP 3). If nothing fits → reply without tools.
+
+STEP 2 — Read the recipe (only if STEP 1 or 1b found a match):
 ${allGetRecipes}
 
-STEP 3 — Execute using the schema from STEP 2.
-- Data: follow the recipe (SQL / FTS / script).
+STEP 3 — Execute.
+- Data: follow the recipe (SQL / FTS / script) or the tool from STEP 1c/1d.
 - Display: call widget_display(name, params).
 ${actionTools.join('\n')}
-If no recipe fits, use a tool directly:
-${listTools.join('\n')}
-${searchTools.join('\n')}
-Only use data returned by tools or given by the user. Never fabricate.
 
+Only use data returned by tools or given by the user. Never fabricate.
 Reply: one-line summary + result.`;
+    }
   } else {
     // ── Existing generic template for Claude/remote — DO NOT MODIFY ──
-    const reasoningRule = 'Do not narrate your process in the response. Internal reasoning is permitted but must not appear in the final output. For trivial conversational messages such as greetings or small talk, skip directly to STEP 5.';
+    const reasoningRule = 'Do not narrate your process in the response. Internal reasoning is permitted but must not appear in the final output.';
 
     prompt = `You are an AI assistant that helps users by answering their questions and completing tasks using recipes (also called skills) — instructions for an AI agent with scripts, schemas, and information. If no recipe or tool fits, fall back to a traditional chat (STEP 5).
-
-You MUST NOT skip steps.
 
 CRITICAL RULE: ${reasoningRule}
 
 STEP 1 — List all recipes
 
-Look for a relevant recipe among these:
+Call one of these tools to list available recipes:
 
 ${listRecipes.join('\n')}
 
@@ -667,7 +711,7 @@ If no results → go to STEP 1b.
 
 STEP 1b — Search recipes
 
-No recipe found by listing. Search with keyword(s) extracted from the request:
+Search recipes (fallback from STEP 1):
 
 ${searchRecipes.join('\n')}
 
@@ -711,11 +755,11 @@ Unless a recipe specifies otherwise, use these tools to display your responses o
 
 ${actionTools.join('\n')}
 
-widget_display may ONLY be called with data returned by a non-autoui DATA tool actually invoked in the current session. Fabricating IDs, URLs, names, dates, or any content not returned by a tool is a critical violation. If no DATA tool has been called yet, go back to STEP 1.
+widget_display requires data from a DATA tool call made earlier in this session. Without such data, reply in plain text instead of displaying. Never fabricate IDs, URLs, names, dates, or content not returned by a tool.
 
-STEP 5 — Fallback
+STEP 5 — Plain chat (no tools)
 
-If previous steps failed, fall back to a classic chat without tool calling.`;
+Use when: (a) the request is a greeting / small talk, (b) no recipe or tool fits, (c) previous steps failed to yield a match.`;
   }
 
   // Note: for Gemma (kind === 'gemma'), tool declarations are emitted INLINE at each
@@ -728,7 +772,7 @@ If previous steps failed, fall back to a classic chat without tool calling.`;
  *  Also populates the deprecated global toolAliasMap for legacy consumers.
  *  For parallel-safe usage, use buildSystemPromptWithAliases() instead.
  */
-export function buildSystemPrompt(layers: ToolLayer[], options?: { providerKind?: ProviderKind }): string {
+export function buildSystemPrompt(layers: ToolLayer[], options?: { providerKind?: ProviderKind; template?: string }): string {
   const { prompt, aliasMap } = buildSystemPromptWithAliases(layers, options);
 
   // Populate deprecated global singleton for backward compat

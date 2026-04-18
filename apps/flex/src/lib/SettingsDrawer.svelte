@@ -63,6 +63,8 @@
     onrecipeclick?: (url: string) => void;
     toolCountByServer?: Record<string, number>;
     ontoolclick?: (url: string) => void;
+    advancedPromptTemplate?: string;
+    onAdvancedPromptChange?: (id: string) => void;
   }
 
   let {
@@ -111,6 +113,8 @@
     onrecipeclick,
     toolCountByServer,
     ontoolclick,
+    advancedPromptTemplate = $bindable('default'),
+    onAdvancedPromptChange,
   }: Props = $props();
 
   let diagModalOpen = $state(false);
@@ -270,6 +274,9 @@
         bind:topK
         modelType={canvas.llm.startsWith('gemma') ? 'wasm' : 'remote'}
         modelId={canvas.llm}
+        bind:advancedPromptTemplate
+        {onAdvancedPromptChange}
+        {providerKind}
       />
     </section>
 
@@ -335,7 +342,7 @@
         Strict tool use
         <span class="text-[8px] text-text2/40 font-mono">constrained grammar</span>
         {#if providerKind === 'gemma'}
-          <span class="text-[8px] text-text2/40 font-mono ml-auto">Ignoré par Gemma (format natif)</span>
+          <span class="text-[8px] text-text2/40 font-mono ml-auto">Ignored by Gemma (native format)</span>
         {/if}
       </label>
       <div class="text-[9px] font-mono text-text2/60 pl-5">
