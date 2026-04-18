@@ -337,7 +337,7 @@ export async function runAgentLoop(
 
         // ── Discovery cache — resolve search/list/get locally if cached ──
         if (discoveryCache && toolMatch) {
-          const cached = discoveryCache.resolve(toolMatch[1], toolMatch[3], block.input as Record<string, unknown>);
+          const cached = discoveryCache.resolve(toolMatch[1], toolMatch[3], block.input as Record<string, unknown>, trace);
           if (cached !== null) {
             result = cached;
             // Store + push result, then continue to next tool block

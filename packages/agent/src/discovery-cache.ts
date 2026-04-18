@@ -5,6 +5,7 @@
  */
 
 import type { ProviderTool } from './types.js';
+import type { PipelineTrace } from './pipeline-trace.js';
 
 /** Tool names that are resolved locally from cache — hidden from user-facing browsers. */
 export const DISCOVERY_TOOL_NAMES = new Set(['list_recipes', 'search_recipes', 'get_recipe', 'list_tools', 'search_tools']);
@@ -100,13 +101,18 @@ export class DiscoveryCache {
     serverPrefix: string,
     realToolName: string,
     params: Record<string, unknown>,
+    trace?: PipelineTrace,
   ): string | null {
     const cache = this.servers.get(serverPrefix);
     if (!cache) return null;
 
     switch (realToolName) {
       case 'search_recipes': {
-        const query = ((params.query ?? '') as string).toLowerCase();
+        const rawQuery = params.query ?? params.q ?? params.keyword ?? params.search;
+        const query = String(rawQuery ?? '').toLowerCase();
+        if (rawQuery === undefined && Object.keys(params).length > 0) {
+          trace?.push('discovery', realToolName, `unknown param keys: ${Object.keys(params).join(',')} — expected query/q/keyword/search`, 'warn');
+        }
         const results = query
           ? cache.recipes.filter(r =>
               r.name.toLowerCase().includes(query) ||
@@ -121,7 +127,11 @@ export class DiscoveryCache {
       }
 
       case 'get_recipe': {
-        const key = String(params.name ?? params.id ?? '').toLowerCase();
+        const rawKey = params.name ?? params.id ?? params.recipe_id ?? params.key;
+        const key = String(rawKey ?? '').toLowerCase();
+        if (rawKey === undefined && Object.keys(params).length > 0) {
+          trace?.push('discovery', realToolName, `unknown param keys: ${Object.keys(params).join(',')} — expected name/id/recipe_id/key`, 'warn');
+        }
         const recipe = cache.recipes.find(r =>
           (r.name?.toLowerCase() === key) ||
           ((r as Record<string, unknown>).id as string | undefined)?.toLowerCase() === key
@@ -131,7 +141,11 @@ export class DiscoveryCache {
       }
 
       case 'search_tools': {
-        const query = ((params.query ?? '') as string).toLowerCase();
+        const rawQuery = params.query ?? params.q ?? params.keyword ?? params.search;
+        const query = String(rawQuery ?? '').toLowerCase();
+        if (rawQuery === undefined && Object.keys(params).length > 0) {
+          trace?.push('discovery', realToolName, `unknown param keys: ${Object.keys(params).join(',')} — expected query/q/keyword/search`, 'warn');
+        }
         const results = query
           ? cache.tools.filter(t =>
               t.name.toLowerCase().includes(query) ||
