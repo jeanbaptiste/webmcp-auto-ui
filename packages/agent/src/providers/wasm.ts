@@ -550,28 +550,22 @@ export interface BuildGemmaPromptInput {
  * as it will actually be sent to the model.
  *
  * The system prompt is expected to already be in Gemma native syntax AND to
- * already embed the `<|tool>declaration>` blocks — build it with
+ * already embed the `<|tool>declaration>` blocks inline — build it with
  * `buildSystemPromptWithAliases(layers, { providerKind: 'gemma' })`.
- * This function no longer emits tool declarations; it only wraps the prompt
- * in the Gemma 4 turn structure.
  *
  * Transformations applied:
- * 1. Wraps the system part in `<|turn>user\n...<turn|>` (Gemma 4 has no
- *    `system` role).
+ * 1. Wraps the system prompt in `<|turn>system\n<|think|>\n...<turn|>` — this
+ *    activates Gemma 4's native thinking mode so the model emits its internal
+ *    reasoning inside a `<|channel>thought\n...<channel|>` block which is then
+ *    stripped from the final user-visible output (see the streaming cleanup in
+ *    {@link WasmProvider}).
  * 2. Serializes messages as `<|turn>user|model\n...<turn|>` with tool_use →
  *    `<|tool_call>`, tool_result → `<|tool_response>`.
  * 3. Terminates with an open `<|turn>model\n` for generation.
+ * 4. No explicit `<bos>` — LlmInference adds it via the tokenizer.
  */
 export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
   const { systemPrompt, messages = [] } = input;
-  const systemParts: string[] = [];
-
-  // System prompt is expected to already be in Gemma native syntax (built via
-  // buildSystemPromptWithAliases with providerKind: 'gemma') and already contains
-  // the tool declarations. We just pass it through.
-  if (systemPrompt) {
-    systemParts.push(systemPrompt);
-  }
 
   // Build a map of tool_use_id → tool_name from all messages for tool_result resolution
   const toolNameById = new Map<string, string>();
@@ -587,10 +581,14 @@ export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
   }
 
   const parts: string[] = [];
-  if (systemParts.length > 0) {
-    // Gemma 4 has no system role — inject system content as a user turn
-    parts.push(`<|turn>user\n${systemParts.join('\n')}<turn|>`);
+
+  // Gemma 4 native structure: use `<|turn>system` with `<|think|>` to activate
+  // the thinking channel. The system prompt already embeds tool declarations
+  // inline at each STEP (built via buildSystemPromptWithAliases with providerKind: 'gemma').
+  if (systemPrompt) {
+    parts.push(`<|turn>system\n<|think|>\n${systemPrompt}\n<turn|>`);
   }
+
   for (const msg of messages) {
     const role = msg.role === 'assistant' ? 'model' : 'user';
     if (typeof msg.content === 'string') {

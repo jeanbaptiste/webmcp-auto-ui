@@ -49,13 +49,35 @@ export type ToolLayer = McpLayer | WebMcpLayer;
  *  - `gemma`:   `<|tool_call>call:tool_name{}<tool_call|>` — Gemma 4 native format. */
 export type ProviderKind = 'generic' | 'gemma';
 
+/** Extract the first parameter name from a ProviderTool's input_schema.
+ *  Priority: first required field > first property > fallback.
+ *  Used to emit real parameter names in tool references for better prompting. */
+function firstParamName(tool?: ProviderTool, fallback = 'query'): string {
+  if (!tool?.input_schema) return fallback;
+  const schema = tool.input_schema as Record<string, unknown>;
+  const required = (schema.required as string[] | undefined) ?? [];
+  if (required.length > 0) return required[0];
+  const props = (schema.properties as Record<string, unknown> | undefined) ?? {};
+  return Object.keys(props)[0] ?? fallback;
+}
+
 /** Format a tool reference for inclusion in the system prompt.
  *  Generic (Claude/Ollama/etc): `name()` or `name(arg1, arg2)`.
- *  Gemma: plain backtick reference — declarations are emitted separately in the prompt tail.
+ *  Gemma: emits the full `<|tool>declaration:...<tool|>` block inline when a tool is provided,
+ *         so declarations appear in context at each step of the workflow (no appendix).
+ *         Falls back to a plain backtick reference if no tool is provided.
  */
-function fmtToolRef(prefixedName: string, args: string[] = [], kind: ProviderKind = 'generic'): string {
+function fmtToolRef(
+  prefixedName: string,
+  args: string[] = [],
+  kind: ProviderKind = 'generic',
+  tool?: ProviderTool,
+): string {
+  if (kind === 'gemma' && tool) {
+    // Inline: full Gemma declaration with canonical prefixed name but real schema
+    return formatGemmaToolDeclaration({ ...tool, name: prefixedName });
+  }
   if (kind === 'gemma') {
-    // Plain name reference — declarations are emitted separately in the prompt tail.
     return args.length ? `\`${prefixedName}(${args.join(', ')})\`` : `\`${prefixedName}\``;
   }
   return args.length ? `${prefixedName}(${args.join(', ')})` : `${prefixedName}()`;
@@ -445,6 +467,12 @@ export function buildSystemPromptWithAliases(
   const mcpLayers = layers.filter((l): l is McpLayer => l.protocol === 'mcp');
   const webmcpLayers = layers.filter((l): l is WebMcpLayer => l.protocol === 'webmcp');
 
+  // Pre-build an index of prefixed tool name → ProviderTool so we can emit
+  // real param names (and, for Gemma, inline declarations) at each call site.
+  const providerToolsByName = new Map<string, ProviderTool>(
+    buildToolsFromLayers(layers, { sanitize: true }).tools.map(t => [t.name, t]),
+  );
+
   const aliasMap = new Map<string, string>();
 
   // ── Collect search_recipes / list_recipes / get_recipe from all layers ──
@@ -458,13 +486,36 @@ export function buildSystemPromptWithAliases(
   for (const l of webmcpLayers) {
     const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
     for (const t of l.tools) {
-      if (t.name === 'search_recipes') searchRecipes.push(fmtToolRef(`${prefix}search_recipes`, ['query'], kind));
-      if (t.name === 'list_recipes') listRecipes.push(fmtToolRef(`${prefix}list_recipes`, [], kind));
-      if (t.name === 'get_recipe') getRecipes.push(fmtToolRef(`${prefix}get_recipe`, ['id'], kind));
+      if (t.name === 'search_recipes') {
+        const name = `${prefix}search_recipes`;
+        const toolDef = providerToolsByName.get(name);
+        searchRecipes.push(fmtToolRef(name, [firstParamName(toolDef, 'query')], kind, toolDef));
+      }
+      if (t.name === 'list_recipes') {
+        const name = `${prefix}list_recipes`;
+        const toolDef = providerToolsByName.get(name);
+        listRecipes.push(fmtToolRef(name, [], kind, toolDef));
+      }
+      if (t.name === 'get_recipe') {
+        const name = `${prefix}get_recipe`;
+        const toolDef = providerToolsByName.get(name);
+        getRecipes.push(fmtToolRef(name, [firstParamName(toolDef, 'id')], kind, toolDef));
+      }
     }
-    // Pseudo-tools for tool discovery on WebMCP servers
-    searchTools.push(fmtToolRef(`${prefix}search_tools`, ['query'], kind));
-    listTools.push(fmtToolRef(`${prefix}list_tools`, [], kind));
+    // Pseudo-tools for tool discovery on WebMCP servers — not in providerToolsByName,
+    // so we build synthetic ProviderTools for inline declarations.
+    const searchToolsPseudo: ProviderTool = {
+      name: `${prefix}search_tools`,
+      description: `Search tools by keyword on the ${l.serverName} server.`,
+      input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Keyword to search for.' } }, required: ['query'] },
+    };
+    searchTools.push(fmtToolRef(`${prefix}search_tools`, ['query'], kind, searchToolsPseudo));
+    const listToolsPseudo: ProviderTool = {
+      name: `${prefix}list_tools`,
+      description: `List ALL tools on the ${l.serverName} server.`,
+      input_schema: { type: 'object', properties: {} },
+    };
+    listTools.push(fmtToolRef(`${prefix}list_tools`, [], kind, listToolsPseudo));
   }
 
   // MCP layers: 4-layer matching + alias registration
@@ -481,14 +532,33 @@ export function buildSystemPromptWithAliases(
         aliasMap.set(canonicalPrefixed, realPrefixed);
       }
 
-      if (m.role === 'search_recipes') searchRecipes.push(fmtToolRef(canonicalPrefixed, ['query'], kind));
-      if (m.role === 'list_recipes') listRecipes.push(fmtToolRef(canonicalPrefixed, [], kind));
-      if (m.role === 'get_recipe') getRecipes.push(fmtToolRef(canonicalPrefixed, ['id'], kind));
+      // Look up the REAL tool (by real prefixed name) to get the actual schema
+      const realToolDef = providerToolsByName.get(realPrefixed);
+
+      if (m.role === 'search_recipes') {
+        searchRecipes.push(fmtToolRef(canonicalPrefixed, [firstParamName(realToolDef, 'query')], kind, realToolDef));
+      }
+      if (m.role === 'list_recipes') {
+        listRecipes.push(fmtToolRef(canonicalPrefixed, [], kind, realToolDef));
+      }
+      if (m.role === 'get_recipe') {
+        getRecipes.push(fmtToolRef(canonicalPrefixed, [firstParamName(realToolDef, 'id')], kind, realToolDef));
+      }
     }
 
     // Pseudo-tools for tool discovery on all MCP servers
-    searchTools.push(fmtToolRef(`${prefix}search_tools`, ['query'], kind));
-    listTools.push(fmtToolRef(`${prefix}list_tools`, [], kind));
+    const searchToolsPseudo: ProviderTool = {
+      name: `${prefix}search_tools`,
+      description: `Search tools by keyword on the ${l.serverName} server.`,
+      input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Keyword to search for.' } }, required: ['query'] },
+    };
+    searchTools.push(fmtToolRef(`${prefix}search_tools`, ['query'], kind, searchToolsPseudo));
+    const listToolsPseudo: ProviderTool = {
+      name: `${prefix}list_tools`,
+      description: `List ALL tools on the ${l.serverName} server.`,
+      input_schema: { type: 'object', properties: {} },
+    };
+    listTools.push(fmtToolRef(`${prefix}list_tools`, [], kind, listToolsPseudo));
   }
 
   // ── WebMCP action tools (widget_display, canvas, recall) ──
@@ -500,15 +570,17 @@ export function buildSystemPromptWithAliases(
     const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
     for (const actionName of ACTION_NAMES) {
       if (l.tools.some(t => t.name === actionName)) {
+        const prefixedName = `${prefix}${actionName}`;
+        const toolDef = providerToolsByName.get(prefixedName);
         const args = actionName === 'widget_display' ? ['name', 'params'] : [];
-        actionTools.push(fmtToolRef(`${prefix}${actionName}`, args, kind));
+        actionTools.push(fmtToolRef(prefixedName, args, kind, toolDef));
       }
     }
   }
 
   // ── Build prompt (cascade: list recipes → search recipes → list tools → search tools) ──
   const reasoningRule = kind === 'gemma'
-    ? 'Do not output reasoning, thinking, or intermediate text in the final response. Silent internal processing to select the right recipe or tool is expected.'
+    ? 'Use the <|channel>thought\\n...<channel|> block for your internal reasoning (selecting recipe, picking params, planning). The content after <channel|> is your visible answer. For trivial conversational messages such as greetings or small talk, skip directly to STEP 5.'
     : 'Do not narrate your process in the response. Internal reasoning is permitted but must not appear in the final output. For trivial conversational messages such as greetings or small talk, skip directly to STEP 5.';
 
   let prompt = `You are an AI assistant that helps users by answering their questions and completing tasks using recipes (also called skills) — instructions for an AI agent with scripts, schemas, and information. If no recipe or tool fits, fall back to a traditional chat (STEP 5).
@@ -578,26 +650,8 @@ STEP 5 — Fallback
 
 If previous steps failed, fall back to a classic chat without tool calling.`;
 
-  // ── Gemma: append native tool declarations at the end of the prompt ──
-  // Claude/remote providers receive tool schemas via the `tools` API field —
-  // Gemma runs on-device and needs them inlined in the system prompt.
-  if (kind === 'gemma') {
-    const allProviderTools = buildToolsFromLayers(layers, { sanitize: true }).tools;
-    // Priority sort: action tools first, then get/search/list discovery, then data tools.
-    const priority = (name: string): number => {
-      if (name.endsWith('_widget_display')) return 0;
-      if (name.endsWith('_canvas')) return 1;
-      if (name.endsWith('_recall')) return 2;
-      if (name.endsWith('_get_recipe')) return 3;
-      if (name.endsWith('_list_recipes') || name.endsWith('_search_recipes')) return 4;
-      if (name.endsWith('_list_tools') || name.endsWith('_search_tools')) return 5;
-      return 6;
-    };
-    const sorted = [...allProviderTools].sort((a, b) => priority(a.name) - priority(b.name));
-    if (sorted.length > 0) {
-      prompt += '\n\nAvailable tools:\n' + sorted.map(formatGemmaToolDeclaration).join('\n');
-    }
-  }
+  // Note: for Gemma (kind === 'gemma'), tool declarations are emitted INLINE at each
+  // STEP via `fmtToolRef(..., kind, tool)` — no appendix is appended here.
 
   return { prompt, aliasMap };
 }
