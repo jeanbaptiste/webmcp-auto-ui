@@ -112,7 +112,7 @@ export function runDiagnostics(
   // 5. Strict mode — schemas that were auto-patched
   // Must run on raw (pre-sanitize) schemas; sanitized tools will never show patches.
   // Skipped for Gemma — it doesn't use additionalProperties/strict mode at all.
-  if (!skipSchemaChecks) {
+  if (!skipSchemaChecks && schemaOptions?.strict) {
     const checkTools = rawTools ?? tools;
     for (const tool of checkTools) {
       const { patches } = sanitizeSchemaWithReport(tool.input_schema as JsonSchema);
