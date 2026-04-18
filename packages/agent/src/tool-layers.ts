@@ -828,10 +828,8 @@ ${actionTools.join('\n')}
 
 Only use data returned by tools or given by the user. Never fabricate.
 Reply: one-line summary + result.`;
-    } else {
-      // ── Default: lazy discovery via 3 global tools (allRecipes, allTools, get_recipe) ──
-      // Gemma sees a minimal surface: server listings + 3 discovery globals + WebMCP action tools.
-      // Everything else is fetched on-demand via allRecipes/allTools/get_recipe.
+    } else if (template === 'gemma-lazy-discovery') {
+      // ── Archived previous default: lazy discovery via 3 globals, single flow ──
       const currentDateTime = new Date().toISOString();
 
       const mcpServersList = mcpLayers.map(l => {
@@ -844,7 +842,6 @@ Reply: one-line summary + result.`;
         return `- ${l.serverName}${slug ? ` — ${slug}` : ''}`;
       }).join('\n') || '(none)';
 
-      // 3 discovery globals (pseudo-tools hardcoded — not prefixed by server)
       const discoveryToolsDeclarations = [
         formatGemmaToolDeclaration({
           name: 'allRecipes',
@@ -878,7 +875,6 @@ Reply: one-line summary + result.`;
         }),
       ].join('\n');
 
-      // WebMCP action tools (widget_display, canvas, recall) — full schemas, prefixed.
       const webmcpToolsDeclarations = webmcpLayers.flatMap(l => {
         const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
         const names = ['widget_display', 'canvas', 'recall'];
@@ -910,6 +906,108 @@ Never call a recipe name as a tool. Never fabricate data — only use data retur
 There are two kind of servers: MCP servers for DATA retrieval and WebMCP servers for UI display.
 
 Outside of tool calling e.g. greetings or small talk, or if tool calling fails, reply directly in a chat.
+
+Currently connected MCP servers (DATA):
+
+${mcpServersList}
+
+MCP tools (call with a specific server name to explore):
+
+${discoveryToolsDeclarations}
+
+Currently connected WebMCP servers (UI display):
+
+${webmcpServersList}
+
+WebMCP tools (full schemas — always callable to render on canvas):
+
+${webmcpToolsDeclarations}`;
+    } else {
+      // ── Default: two-workflow prompt (A: browse catalog, B: execute task) ──
+      // Explicit workflow picking to avoid Gemma freezing or asking for clarification.
+      const currentDateTime = new Date().toISOString();
+
+      const mcpServersList = mcpLayers.map(l => {
+        const slug = l.description || SERVER_SLUGS[l.serverName.toLowerCase()] || '';
+        return `- ${l.serverName}${slug ? ` — ${slug}` : ''}`;
+      }).join('\n') || '(none)';
+
+      const webmcpServersList = webmcpLayers.map(l => {
+        const slug = l.description || SERVER_SLUGS[l.serverName.toLowerCase()] || '';
+        return `- ${l.serverName}${slug ? ` — ${slug}` : ''}`;
+      }).join('\n') || '(none)';
+
+      const discoveryToolsDeclarations = [
+        formatGemmaToolDeclaration({
+          name: 'allRecipes',
+          description: 'List recipe names + descriptions for a specific server (light, no body).',
+          input_schema: {
+            type: 'object',
+            properties: { server: { type: 'string', description: 'Server name as listed above.' } },
+            required: ['server'],
+          },
+        }),
+        formatGemmaToolDeclaration({
+          name: 'allTools',
+          description: 'List ALL tools (with full input schemas) for a specific server.',
+          input_schema: {
+            type: 'object',
+            properties: { server: { type: 'string', description: 'Server name as listed above.' } },
+            required: ['server'],
+          },
+        }),
+        formatGemmaToolDeclaration({
+          name: 'get_recipe',
+          description: 'Retrieve full body + instructions of a specific recipe on a specific server.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Exact recipe name as returned by allRecipes.' },
+              server: { type: 'string', description: 'Server name as listed above.' },
+            },
+            required: ['name', 'server'],
+          },
+        }),
+      ].join('\n');
+
+      const webmcpToolsDeclarations = webmcpLayers.flatMap(l => {
+        const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
+        const names = ['widget_display', 'canvas', 'recall'];
+        return names
+          .filter(n => l.tools.some(t => t.name === n))
+          .map(n => providerToolsByName.get(`${prefix}${n}`))
+          .filter((t): t is ProviderTool => !!t)
+          .map(t => formatGemmaToolDeclaration(t));
+      }).join('\n') || '(no display tools available)';
+
+      prompt = `We are the ${currentDateTime}
+
+You are an AI assistant that helps users by answering questions and completing tasks using recipes and tools.
+
+There are two kinds of servers: MCP servers for DATA retrieval and WebMCP servers for UI display.
+
+CRITICAL RULE: You MUST execute all steps silently. Do NOT generate internal thoughts, reasoning, explanations, or intermediate text between steps.
+
+You MUST answer the user by calling tools. You MUST pick the workflow that matches the user's request and execute it fully:
+
+WORKFLOW A — User wants to browse/see what's available ("list the recipes", "what can you do", "show me the MCP tools"):
+1. Call allRecipes(server) for each relevant server — the server comes from the MCP/WebMCP listings below.
+2. Call widget_display to render the list on canvas. Use the recipe names + descriptions returned by allRecipes as the data payload. Do NOT summarize in plain text.
+
+WORKFLOW B — User wants to execute a task ("show me the last 3 votes", "get the latest amendments", "find bills about climate"):
+1. Pick the target server from the listings below based on the topic.
+2. Call allRecipes(server) to list recipe names + descriptions.
+3. Call get_recipe(name, server) on the best match — returns full instructions.
+4. Follow the recipe's instructions: call the DATA tools it references. If you need a tool's schema, call allTools(server).
+5. Call widget_display to render the result on canvas.
+
+HARD RULES:
+- NEVER call a recipe name as a tool. Recipes are markdown procedures, not tools.
+- NEVER fabricate data. Only use values returned by an actual tool call in this session.
+- NEVER ask the user to clarify, choose, or confirm — pick the best match and execute.
+- NEVER reply in plain text when a workflow applies. Always render via widget_display.
+
+Only exception: pure greetings or small talk with no task ("hi", "thanks") — reply directly without tools.
 
 Currently connected MCP servers (DATA):
 

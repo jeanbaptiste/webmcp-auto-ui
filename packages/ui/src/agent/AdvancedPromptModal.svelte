@@ -26,8 +26,14 @@
     {
       id: 'default',
       name: 'Default',
-      description: 'Lazy cascade with list → search fallback, DATA/DISPLAY routing',
+      description: 'Two-workflow: A (browse catalog) or B (execute task). Strict no-fabricate / no-clarify rules.',
       providerKinds: ['remote', 'wasm', 'gemma', 'local'],
+    },
+    {
+      id: 'gemma-lazy-discovery',
+      name: 'Gemma — Lazy discovery (3 globals)',
+      description: 'Previous default: allRecipes/allTools/get_recipe globals, single flow. Gemma only.',
+      providerKinds: ['gemma'],
     },
     {
       id: 'gemma-google-style',
