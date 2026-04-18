@@ -467,6 +467,11 @@ export function buildSystemPromptWithAliases(
   const mcpLayers = layers.filter((l): l is McpLayer => l.protocol === 'mcp');
   const webmcpLayers = layers.filter((l): l is WebMcpLayer => l.protocol === 'webmcp');
 
+  // DISPLAY servers = WebMCP layers that expose widget_display (can render on canvas).
+  // DATA servers = everything else (MCP servers + WebMCP without widget_display).
+  const displayLayers = webmcpLayers.filter(l => l.tools.some(t => t.name === 'widget_display'));
+  const dataLayers = layers.filter(l => !displayLayers.includes(l as WebMcpLayer));
+
   // Pre-build an index of prefixed tool name → ProviderTool so we can emit
   // real param names (and, for Gemma, inline declarations) at each call site.
   const providerToolsByName = new Map<string, ProviderTool>(
@@ -578,12 +583,67 @@ export function buildSystemPromptWithAliases(
     }
   }
 
-  // ── Build prompt (cascade: list recipes → search recipes → list tools → search tools) ──
-  const reasoningRule = kind === 'gemma'
-    ? 'Do not output reasoning, thinking, or intermediate text in the final response. For trivial conversational messages such as greetings or small talk, skip directly to STEP 5.'
-    : 'Do not narrate your process in the response. Internal reasoning is permitted but must not appear in the final output. For trivial conversational messages such as greetings or small talk, skip directly to STEP 5.';
+  // Same refs, grouped by DATA vs DISPLAY category, for the gemma-minimalist template.
+  const dataPrefixes = new Set(dataLayers.map(l => `${sanitizeServerName(l.serverName)}_${l.protocol}_`));
+  const displayPrefixes = new Set(displayLayers.map(l => `${sanitizeServerName(l.serverName)}_webmcp_`));
 
-  let prompt = `You are an AI assistant that helps users by answering their questions and completing tasks using recipes (also called skills) — instructions for an AI agent with scripts, schemas, and information. If no recipe or tool fits, fall back to a traditional chat (STEP 5).
+  function splitByCategory(refs: string[]): { data: string[]; display: string[] } {
+    // Refs may be backticked names, full declarations, or tool_name(arg) — in all cases,
+    // the prefixed name (e.g. `tricoteuses_mcp_search_recipes`) is detectable by substring match.
+    const data: string[] = [];
+    const display: string[] = [];
+    for (const ref of refs) {
+      const isDisplay = [...displayPrefixes].some(p => ref.includes(p));
+      if (isDisplay) display.push(ref);
+      else data.push(ref);
+    }
+    return { data, display };
+  }
+
+  const listRecipesByCat = splitByCategory(listRecipes);
+  const searchRecipesByCat = splitByCategory(searchRecipes);
+  const getRecipesByCat = splitByCategory(getRecipes);
+  // Suppress unused-variable warnings — dataPrefixes is referenced indirectly via dataLayers.
+  void dataPrefixes;
+
+  // ── Build prompt ──
+  let prompt: string;
+
+  if (kind === 'gemma') {
+    // ── Minimalist template for Gemma (4B/E4B), inline declarations included ──
+    const dataCategoryBlock = [
+      ...listRecipesByCat.data,
+      ...searchRecipesByCat.data,
+      ...getRecipesByCat.data,
+    ].join('\n');
+    const displayCategoryBlock = [
+      ...listRecipesByCat.display,
+      ...searchRecipesByCat.display,
+      ...getRecipesByCat.display,
+    ].join('\n');
+
+    prompt = `Route: DATA servers (fetch info) or DISPLAY servers (render on canvas). Greetings → chat.
+
+1. Search a recipe, read it, follow it.
+DATA:
+${dataCategoryBlock}
+DISPLAY:
+${displayCategoryBlock}
+
+2. No recipe? Use a tool directly.
+${listTools.join('\n')}
+${searchTools.join('\n')}
+
+3. Render (optional).
+${actionTools.join('\n')}
+Only use data returned by tools or given by the user. Never fabricate.
+
+Reply: one-line summary + result.`;
+  } else {
+    // ── Existing generic template for Claude/remote — DO NOT MODIFY ──
+    const reasoningRule = 'Do not narrate your process in the response. Internal reasoning is permitted but must not appear in the final output. For trivial conversational messages such as greetings or small talk, skip directly to STEP 5.';
+
+    prompt = `You are an AI assistant that helps users by answering their questions and completing tasks using recipes (also called skills) — instructions for an AI agent with scripts, schemas, and information. If no recipe or tool fits, fall back to a traditional chat (STEP 5).
 
 You MUST NOT skip steps.
 
@@ -649,6 +709,7 @@ widget_display may ONLY be called with data returned by a non-autoui DATA tool a
 STEP 5 — Fallback
 
 If previous steps failed, fall back to a classic chat without tool calling.`;
+  }
 
   // Note: for Gemma (kind === 'gemma'), tool declarations are emitted INLINE at each
   // STEP via `fmtToolRef(..., kind, tool)` — no appendix is appended here.
