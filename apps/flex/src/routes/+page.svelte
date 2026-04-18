@@ -46,7 +46,6 @@
   let maxContextTokens = $state(120_000);
   let maxTokens = $state(4096);
   let cacheEnabled = $state(true);
-  let schemaSanitize = $state(true);
   let schemaFlatten = $state(false);
   let schemaStrict = $state(false);
   let temperature = $state(1.0);
@@ -335,7 +334,6 @@
     const isGemma = canvas.llm.startsWith('gemma');
     const isE4B = canvas.llm === 'gemma-e4b';
     const isLocal = canvas.llm === 'local';
-    schemaSanitize = isLocal ? true : !isGemma;
     schemaFlatten = isGemma || isLocal;
     truncateResults = isGemma || isLocal;
     compressHistory = isLocal;
@@ -401,7 +399,7 @@
     return hasCustom ? `${systemPrompt}\n\n${base}` : base;
   });
 
-  const providerTools = $derived(buildToolsFromLayers(layers, { sanitize: schemaSanitize, flatten: schemaFlatten, strict: schemaStrict }).tools);
+  const providerTools = $derived(buildToolsFromLayers(layers, { sanitize: schemaStrict, flatten: schemaFlatten, strict: schemaStrict }).tools);
 
   // Sync WebMCP layers into discovery cache
   $effect(() => {
@@ -448,7 +446,7 @@
     return effectivePrompt;
   });
   const diagnostics = $derived(runDiagnostics(layers, providerTools, effectivePrompt ?? '', {
-    sanitize: schemaSanitize,
+    sanitize: schemaStrict,
     flatten: schemaFlatten,
     strict: schemaStrict,
     providerKind,
@@ -551,7 +549,7 @@
         contextRAG: contextRAG ?? undefined,
         ragResidueSize,
         schemaOptions: {
-          sanitize: schemaSanitize,
+          sanitize: schemaStrict,
           flatten: schemaFlatten,
           strict: schemaStrict,
         },
@@ -569,10 +567,9 @@
               return sum + (m.content as any[]).reduce((s, b) => s + (b.text?.length ?? JSON.stringify(b).length ?? 0), 0);
             }, 0);
             const ctxTokens = Math.round(ctxChars / 4);
-            const sanitizeLabel = schemaSanitize ? 'ON' : 'OFF';
             const flattenLabel = schemaFlatten ? 'ON' : 'OFF';
             const strictLabel = schemaStrict ? 'ON' : 'OFF';
-            agentLogs = [...agentLogs, { ts: Date.now(), type: 'request', detail: `${messages.length} messages, ${tools.length} tools (sanitize=${sanitizeLabel}, flatten=${flattenLabel}, strict=${strictLabel})`, ctxSize: ctxTokens }];
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'request', detail: `${messages.length} messages, ${tools.length} tools (flatten=${flattenLabel}, strict=${strictLabel})`, ctxSize: ctxTokens }];
             // Log tool schemas on first call or when tool count changes (server activation)
             if (tools.length !== lastLoggedToolCount) {
               lastLoggedToolCount = tools.length;
@@ -850,7 +847,7 @@
   onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true} onclear={clearAll}
   bind:mcpToken bind:systemPrompt effectivePrompt={displayedPrompt} bind:maxTokens bind:maxContextTokens bind:maxResultLength
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:showPipelineTrace
-  bind:schemaSanitize bind:schemaFlatten bind:schemaStrict {providerKind} bind:compressHistory bind:compressPreview
+  bind:schemaFlatten bind:schemaStrict {providerKind} bind:compressHistory bind:compressPreview
   bind:contextRAGEnabled bind:ragResidueSize
   bind:localUrl bind:localModel
   onconnect={() => addMcpServer(canvas.mcpUrl)}

@@ -42,7 +42,6 @@
     showTokens?: boolean;
     showToolJSON?: boolean;
     showPipelineTrace?: boolean;
-    schemaSanitize?: boolean;
     schemaFlatten?: boolean;
     schemaStrict?: boolean;
     providerKind?: 'remote' | 'wasm' | 'gemma' | 'local';
@@ -91,7 +90,6 @@
     showTokens = $bindable(true),
     showToolJSON = $bindable(false),
     showPipelineTrace = $bindable(false),
-    schemaSanitize = $bindable(true),
     schemaFlatten = $bindable(false),
     schemaStrict = $bindable(false),
     providerKind = 'remote',
@@ -313,16 +311,6 @@
     <!-- Schema transforms -->
     <section class="flex flex-col gap-2">
       <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Schema LLM</div>
-      <label class="flex items-center gap-2 font-mono text-xs text-text1 {providerKind === 'gemma' ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}">
-        <input type="checkbox" bind:checked={schemaSanitize} disabled={providerKind === 'gemma'} class="accent-teal w-3.5 h-3.5" />
-        Sanitize
-        {#if providerKind === 'gemma'}
-          <span class="text-[8px] text-text2/40 font-mono ml-auto">Ignoré par Gemma (format natif)</span>
-        {/if}
-      </label>
-      <div class="text-[9px] font-mono text-text2/60 pl-5">
-        {schemaSanitize ? 'Strip oneOf/anyOf/allOf/$ref from schemas' : 'Schemas sent as-is to the LLM'}
-      </div>
       <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
         <input type="checkbox" bind:checked={schemaFlatten} class="accent-teal w-3.5 h-3.5" />
         Flatten <span class="text-[8px] text-text2/40 font-mono">(experimental)</span>
@@ -339,7 +327,7 @@
         {/if}
       </label>
       <div class="text-[9px] font-mono text-text2/60 pl-5">
-        {schemaStrict ? 'Grammar-constrained JSON sampling' : 'Free sampling (sanitize + auto-repair is enough)'}
+        {schemaStrict ? 'Grammar-constrained sampling + strips oneOf/anyOf/allOf/$ref from schemas' : 'Free sampling, schemas sent as-is (may break on complex MCP schemas)'}
       </div>
     </section>
 
