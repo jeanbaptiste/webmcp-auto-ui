@@ -340,10 +340,10 @@
     compressHistory = isLocal;
     schemaStrict = false;
     if (isGemma) {
-      maxResultLength = 2000;
+      maxResultLength = 16000;
       ragResidueSize = 500;
-      temperature = 0.7;
-      topK = 40;
+      temperature = 1.0;
+      topK = 64;
       maxContextTokens = isE4B ? 32768 : 32768;
       cacheEnabled = false;
     } else if (isLocal) {
