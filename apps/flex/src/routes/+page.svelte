@@ -343,7 +343,7 @@
       ragResidueSize = 500;
       temperature = 0.7;
       topK = 40;
-      maxContextTokens = isE4B ? 16384 : 8192;
+      maxContextTokens = isE4B ? 32768 : 32768;
       cacheEnabled = false;
     } else if (isLocal) {
       maxResultLength = 3000;
