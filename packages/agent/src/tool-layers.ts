@@ -611,31 +611,38 @@ export function buildSystemPromptWithAliases(
 
   if (kind === 'gemma') {
     // ── Minimalist template for Gemma (4B/E4B), inline declarations included ──
-    const dataCategoryBlock = [
+    const dataListSearch = [
       ...listRecipesByCat.data,
       ...searchRecipesByCat.data,
-      ...getRecipesByCat.data,
     ].join('\n');
-    const displayCategoryBlock = [
+    const displayListSearch = [
       ...listRecipesByCat.display,
       ...searchRecipesByCat.display,
+    ].join('\n');
+    const allGetRecipes = [
+      ...getRecipesByCat.data,
       ...getRecipesByCat.display,
     ].join('\n');
 
-    prompt = `Route: DATA servers (fetch info) or DISPLAY servers (render on canvas). Greetings → chat.
+    prompt = `Route: DATA (fetch) or DISPLAY (render). Greetings → chat.
 
-1. Search a recipe, read it, follow it.
+STEP 1 — List or search a recipe.
 DATA:
-${dataCategoryBlock}
+${dataListSearch}
 DISPLAY:
-${displayCategoryBlock}
+${displayListSearch}
+The result is for YOU. Pick the best match and go to STEP 2. Never ask the user to choose.
 
-2. No recipe? Use a tool directly.
+STEP 2 — Read the recipe.
+${allGetRecipes}
+
+STEP 3 — Execute using the schema from STEP 2.
+- Data: follow the recipe (SQL / FTS / script).
+- Display: call widget_display(name, params).
+${actionTools.join('\n')}
+If no recipe fits, use a tool directly:
 ${listTools.join('\n')}
 ${searchTools.join('\n')}
-
-3. Render (optional).
-${actionTools.join('\n')}
 Only use data returned by tools or given by the user. Never fabricate.
 
 Reply: one-line summary + result.`;
