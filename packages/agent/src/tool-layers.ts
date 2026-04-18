@@ -580,7 +580,7 @@ export function buildSystemPromptWithAliases(
 
   // ── Build prompt (cascade: list recipes → search recipes → list tools → search tools) ──
   const reasoningRule = kind === 'gemma'
-    ? 'Use the <|channel>thought\\n...<channel|> block for your internal reasoning (selecting recipe, picking params, planning). The content after <channel|> is your visible answer. For trivial conversational messages such as greetings or small talk, skip directly to STEP 5.'
+    ? 'Do not output reasoning, thinking, or intermediate text in the final response. For trivial conversational messages such as greetings or small talk, skip directly to STEP 5.'
     : 'Do not narrate your process in the response. Internal reasoning is permitted but must not appear in the final output. For trivial conversational messages such as greetings or small talk, skip directly to STEP 5.';
 
   let prompt = `You are an AI assistant that helps users by answering their questions and completing tasks using recipes (also called skills) — instructions for an AI agent with scripts, schemas, and information. If no recipe or tool fits, fall back to a traditional chat (STEP 5).

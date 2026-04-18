@@ -354,9 +354,6 @@ export class WasmProvider implements LLMProvider {
     // (the model should never generate these — they're injected by the framework)
     fullText = fullText.replace(/<\|tool_response>[\s\S]*?<tool_response\|>/g, '');
 
-    // Strip thinking blocks — Gemma 4 wraps reasoning in <|channel>thought\n...<channel|>
-    fullText = fullText.replace(/<\|channel>thought[\s\S]*?<channel\|>/g, '');
-
     const latencyMs = performance.now() - t0;
 
     // Use sizeInTokens for accurate token count if available
@@ -582,11 +579,11 @@ export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
 
   const parts: string[] = [];
 
-  // Gemma 4 native structure: use `<|turn>system` with `<|think|>` to activate
-  // the thinking channel. The system prompt already embeds tool declarations
-  // inline at each STEP (built via buildSystemPromptWithAliases with providerKind: 'gemma').
+  // Gemma 4 native structure: the system prompt already embeds tool
+  // declarations inline at each STEP (built via buildSystemPromptWithAliases
+  // with providerKind: 'gemma').
   if (systemPrompt) {
-    parts.push(`<|turn>system\n<|think|>\n${systemPrompt}\n<turn|>`);
+    parts.push(`<|turn>system\n${systemPrompt}\n<turn|>`);
   }
 
   for (const msg of messages) {
