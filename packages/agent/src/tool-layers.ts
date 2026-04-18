@@ -51,15 +51,82 @@ export type ProviderKind = 'generic' | 'gemma';
 
 /** Format a tool reference for inclusion in the system prompt.
  *  Generic (Claude/Ollama/etc): `name()` or `name(arg1, arg2)`.
- *  Gemma: `<|tool_call>call:name{}<tool_call|>` or `<|tool_call>call:name{arg:<|"|>...<|"|>}<tool_call|>`.
+ *  Gemma: plain backtick reference — declarations are emitted separately in the prompt tail.
  */
 function fmtToolRef(prefixedName: string, args: string[] = [], kind: ProviderKind = 'generic'): string {
   if (kind === 'gemma') {
-    if (args.length === 0) return `<|tool_call>call:${prefixedName}{}<tool_call|>`;
-    const body = args.map(a => `${a}:<|"|>...<|"|>`).join(',');
-    return `<|tool_call>call:${prefixedName}{${body}}<tool_call|>`;
+    // Plain name reference — declarations are emitted separately in the prompt tail.
+    return args.length ? `\`${prefixedName}(${args.join(', ')})\`` : `\`${prefixedName}\``;
   }
   return args.length ? `${prefixedName}(${args.join(', ')})` : `${prefixedName}()`;
+}
+
+/**
+ * Format a value for Gemma 4 native tool syntax.
+ * Strings use <|"|> delimiters, numbers/booleans/null are bare.
+ */
+export function gemmaValue(v: unknown): string {
+  const q = '<|"|>';
+  if (v === null || v === undefined) return 'null';
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) return `[${v.map(i => gemmaValue(i)).join(',')}]`;
+  if (typeof v === 'object') {
+    const entries = Object.entries(v as Record<string, unknown>)
+      .map(([k, val]) => `${k}:${gemmaValue(val)}`);
+    return `{${entries.join(',')}}`;
+  }
+  return `${q}${String(v)}${q}`;
+}
+
+/**
+ * Format a tool declaration in Gemma 4 native syntax.
+ * Emitted in the system prompt tail so Gemma sees tool schemas alongside the
+ * STEP-by-STEP instructions.
+ */
+export function formatGemmaToolDeclaration(tool: ProviderTool): string {
+  const q = '<|"|>';
+  let decl = `<|tool>declaration:${tool.name}{\n`;
+  decl += `  description:${q}${tool.description}${q}`;
+
+  const schema = tool.input_schema;
+  if (schema?.properties) {
+    const props = schema.properties as Record<string, { description?: string; type?: string; enum?: string[]; format?: string; default?: unknown }>;
+    decl += `,\n  parameters:{\n    properties:{\n`;
+
+    const propEntries = Object.entries(props);
+    for (let i = 0; i < propEntries.length; i++) {
+      const [key, val] = propEntries[i];
+      decl += `      ${key}:{`;
+      const parts: string[] = [];
+      if (val.description) parts.push(`description:${q}${val.description}${q}`);
+      // If no type specified, infer OBJECT for params-like fields to avoid
+      // Gemma wrapping the value in <|"|>...<|"|> (treating it as a string)
+      let inferredType = val.type;
+      if (!inferredType) {
+        const descLower = (val.description ?? '').toLowerCase();
+        if (descLower.includes('objet') || descLower.includes('object') || descLower.includes('parameter') || descLower.includes('paramètre') || key === 'params') {
+          inferredType = 'object';
+        } else {
+          inferredType = 'string';
+        }
+      }
+      parts.push(`type:${q}${inferredType.toUpperCase()}${q}`);
+      if (val.enum) parts.push(`enum:[${val.enum.map(e => `${q}${e}${q}`).join(',')}]`);
+      if (val.format) parts.push(`format:${q}${val.format}${q}`);
+      if (val.default !== undefined) parts.push(`default:${gemmaValue(val.default)}`);
+      decl += parts.join(',');
+      decl += `}${i < propEntries.length - 1 ? ',' : ''}\n`;
+    }
+
+    decl += `    }`;
+    if (schema.required && Array.isArray(schema.required)) {
+      decl += `,\n    required:[${(schema.required as string[]).map(r => `${q}${r}${q}`).join(',')}]`;
+    }
+    decl += `,\n    type:${q}OBJECT${q}\n  }`;
+  }
+
+  decl += `\n}<tool|>`;
+  return decl;
 }
 
 /** Options controlling how tool schemas are transformed before sending to the LLM */
@@ -391,9 +458,9 @@ export function buildSystemPromptWithAliases(
   for (const l of webmcpLayers) {
     const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
     for (const t of l.tools) {
-      if (t.name === 'search_recipes') searchRecipes.push(fmtToolRef(`${prefix}search_recipes`, [], kind));
+      if (t.name === 'search_recipes') searchRecipes.push(fmtToolRef(`${prefix}search_recipes`, ['query'], kind));
       if (t.name === 'list_recipes') listRecipes.push(fmtToolRef(`${prefix}list_recipes`, [], kind));
-      if (t.name === 'get_recipe') getRecipes.push(fmtToolRef(`${prefix}get_recipe`, [], kind));
+      if (t.name === 'get_recipe') getRecipes.push(fmtToolRef(`${prefix}get_recipe`, ['id'], kind));
     }
     // Pseudo-tools for tool discovery on WebMCP servers
     searchTools.push(fmtToolRef(`${prefix}search_tools`, ['query'], kind));
@@ -414,9 +481,9 @@ export function buildSystemPromptWithAliases(
         aliasMap.set(canonicalPrefixed, realPrefixed);
       }
 
-      if (m.role === 'search_recipes') searchRecipes.push(fmtToolRef(canonicalPrefixed, [], kind));
+      if (m.role === 'search_recipes') searchRecipes.push(fmtToolRef(canonicalPrefixed, ['query'], kind));
       if (m.role === 'list_recipes') listRecipes.push(fmtToolRef(canonicalPrefixed, [], kind));
-      if (m.role === 'get_recipe') getRecipes.push(fmtToolRef(canonicalPrefixed, [], kind));
+      if (m.role === 'get_recipe') getRecipes.push(fmtToolRef(canonicalPrefixed, ['id'], kind));
     }
 
     // Pseudo-tools for tool discovery on all MCP servers
@@ -433,17 +500,22 @@ export function buildSystemPromptWithAliases(
     const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
     for (const actionName of ACTION_NAMES) {
       if (l.tools.some(t => t.name === actionName)) {
-        actionTools.push(fmtToolRef(`${prefix}${actionName}`, [], kind));
+        const args = actionName === 'widget_display' ? ['name', 'params'] : [];
+        actionTools.push(fmtToolRef(`${prefix}${actionName}`, args, kind));
       }
     }
   }
 
   // ── Build prompt (cascade: list recipes → search recipes → list tools → search tools) ──
-  let prompt = `You are an AI assistant that helps users by answering their questions and completing tasks using recipes (also called skills). These are not cooking recipes but instructions for an AI agent with scripts, schemas, and information to help it. If you cannot find a relevant recipe or tool, you may fall back to a traditional chat without tool calling (STEP 5).
+  const reasoningRule = kind === 'gemma'
+    ? 'Do not output reasoning, thinking, or intermediate text in the final response. Silent internal processing to select the right recipe or tool is expected.'
+    : 'Do not narrate your process in the response. Internal reasoning is permitted but must not appear in the final output. For trivial conversational messages such as greetings or small talk, skip directly to STEP 5.';
+
+  let prompt = `You are an AI assistant that helps users by answering their questions and completing tasks using recipes (also called skills) — instructions for an AI agent with scripts, schemas, and information. If no recipe or tool fits, fall back to a traditional chat (STEP 5).
 
 You MUST NOT skip steps.
 
-CRITICAL RULE: You MUST execute all steps silently. Do NOT generate any internal reasoning, thinking, or intermediate text.
+CRITICAL RULE: ${reasoningRule}
 
 STEP 1 — List all recipes
 
@@ -482,12 +554,17 @@ Pick the most relevant tool(s) and use them to respond (go to STEP 3).
 STEP 2 — Read the recipe
 
 ${getRecipes.join('\n')}
+The id comes from the result of list_recipes (STEP 1) or search_recipes (STEP 1b), whichever was called.
 
 Read the full instructions of the selected recipe.
 
 STEP 3 — Execute
 
-Follow the recipe instructions exactly if you have one. Otherwise use the tools directly. Produce ONLY the final result, a one-sentence summary of the action performed, and the result.
+Prefer recipes over direct tool calls when a recipe matches the task. Use low-level tools (DB queries, schema introspection, raw scripts) only when invoked from within a recipe's instructions.
+
+Follow the recipe instructions exactly if you have one. Otherwise use the tools directly.
+
+Output format: (1) a one-sentence summary of the action performed, then (2) the result. Nothing else.
 
 STEP 4 — UI display
 
@@ -500,6 +577,27 @@ widget_display may ONLY be called with data returned by a non-autoui DATA tool a
 STEP 5 — Fallback
 
 If previous steps failed, fall back to a classic chat without tool calling.`;
+
+  // ── Gemma: append native tool declarations at the end of the prompt ──
+  // Claude/remote providers receive tool schemas via the `tools` API field —
+  // Gemma runs on-device and needs them inlined in the system prompt.
+  if (kind === 'gemma') {
+    const allProviderTools = buildToolsFromLayers(layers, { sanitize: true }).tools;
+    // Priority sort: action tools first, then get/search/list discovery, then data tools.
+    const priority = (name: string): number => {
+      if (name.endsWith('_widget_display')) return 0;
+      if (name.endsWith('_canvas')) return 1;
+      if (name.endsWith('_recall')) return 2;
+      if (name.endsWith('_get_recipe')) return 3;
+      if (name.endsWith('_list_recipes') || name.endsWith('_search_recipes')) return 4;
+      if (name.endsWith('_list_tools') || name.endsWith('_search_tools')) return 5;
+      return 6;
+    };
+    const sorted = [...allProviderTools].sort((a, b) => priority(a.name) - priority(b.name));
+    if (sorted.length > 0) {
+      prompt += '\n\nAvailable tools:\n' + sorted.map(formatGemmaToolDeclaration).join('\n');
+    }
+  }
 
   return { prompt, aliasMap };
 }

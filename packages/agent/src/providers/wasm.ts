@@ -5,6 +5,7 @@
  */
 import type { LLMProvider, LLMResponse, ChatMessage, ProviderTool, WasmModelId, ContentBlock } from '../types.js';
 import type { PipelineTrace } from '../pipeline-trace.js';
+import { formatGemmaToolDeclaration, gemmaValue } from '../tool-layers.js';
 
 export type WasmStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -463,70 +464,23 @@ export class WasmProvider implements LLMProvider {
 
   /**
    * Format a value for Gemma 4 native tool syntax.
-   * Strings use <|"|> delimiters, numbers/booleans/null are bare.
-   * @internal — used by buildGemmaPrompt (exported at module level)
+   * Backward-compat wrapper — delegates to the module-level `gemmaValue`
+   * exported from `tool-layers.ts` so the logic is shared with the
+   * system-prompt declaration block.
+   * @internal — used by formatToolCall / formatToolResponse
    */
   static gemmaValue(v: unknown): string {
-    const q = '<|"|>';
-    if (v === null || v === undefined) return 'null';
-    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-    if (Array.isArray(v)) return `[${v.map(i => WasmProvider.gemmaValue(i)).join(',')}]`;
-    if (typeof v === 'object') {
-      const entries = Object.entries(v as Record<string, unknown>)
-        .map(([k, val]) => `${k}:${WasmProvider.gemmaValue(val)}`);
-      return `{${entries.join(',')}}`;
-    }
-    return `${q}${String(v)}${q}`;
+    return gemmaValue(v);
   }
 
   /**
    * Format a tool declaration in Gemma 4 native syntax.
-   * @internal — used by buildGemmaPrompt
+   * Backward-compat wrapper — delegates to `formatGemmaToolDeclaration`
+   * exported from `tool-layers.ts`.
+   * @internal
    */
   static formatToolDeclaration(tool: ProviderTool): string {
-    const q = '<|"|>';
-    let decl = `<|tool>declaration:${tool.name}{\n`;
-    decl += `  description:${q}${tool.description}${q}`;
-
-    const schema = tool.input_schema;
-    if (schema?.properties) {
-      const props = schema.properties as Record<string, { description?: string; type?: string; enum?: string[]; format?: string; default?: unknown }>;
-      decl += `,\n  parameters:{\n    properties:{\n`;
-
-      const propEntries = Object.entries(props);
-      for (let i = 0; i < propEntries.length; i++) {
-        const [key, val] = propEntries[i];
-        decl += `      ${key}:{`;
-        const parts: string[] = [];
-        if (val.description) parts.push(`description:${q}${val.description}${q}`);
-        // P1 fix: if no type specified, infer OBJECT for params-like fields to avoid
-        // Gemma wrapping the value in <|"|>...<|"|> (treating it as a string)
-        let inferredType = val.type;
-        if (!inferredType) {
-          const descLower = (val.description ?? '').toLowerCase();
-          if (descLower.includes('objet') || descLower.includes('object') || descLower.includes('parameter') || descLower.includes('paramètre') || key === 'params') {
-            inferredType = 'object';
-          } else {
-            inferredType = 'string';
-          }
-        }
-        parts.push(`type:${q}${inferredType.toUpperCase()}${q}`);
-        if (val.enum) parts.push(`enum:[${val.enum.map(e => `${q}${e}${q}`).join(',')}]`);
-        if (val.format) parts.push(`format:${q}${val.format}${q}`);
-        if (val.default !== undefined) parts.push(`default:${WasmProvider.gemmaValue(val.default)}`);
-        decl += parts.join(',');
-        decl += `}${i < propEntries.length - 1 ? ',' : ''}\n`;
-      }
-
-      decl += `    }`;
-      if (schema.required && Array.isArray(schema.required)) {
-        decl += `,\n    required:[${(schema.required as string[]).map(r => `${q}${r}${q}`).join(',')}]`;
-      }
-      decl += `,\n    type:${q}OBJECT${q}\n  }`;
-    }
-
-    decl += `\n}<tool|>`;
-    return decl;
+    return formatGemmaToolDeclaration(tool);
   }
 
   /**
@@ -538,7 +492,7 @@ export class WasmProvider implements LLMProvider {
     // Try to parse as JSON for structured output
     try {
       const parsed = JSON.parse(content);
-      return `<|tool_response>response:${toolName}${WasmProvider.gemmaValue(parsed)}<tool_response|>`;
+      return `<|tool_response>response:${toolName}${gemmaValue(parsed)}<tool_response|>`;
     } catch {
       // Plain string result
       return `<|tool_response>response:${toolName}{result:${q}${content}${q}}<tool_response|>`;
@@ -551,7 +505,7 @@ export class WasmProvider implements LLMProvider {
    */
   static formatToolCall(name: string, input: Record<string, unknown>): string {
     const entries = Object.entries(input)
-      .map(([k, v]) => `${k}:${WasmProvider.gemmaValue(v)}`);
+      .map(([k, v]) => `${k}:${gemmaValue(v)}`);
     return `<|tool_call>call:${name}{${entries.join(',')}}<tool_call|>`;
   }
 
@@ -576,9 +530,12 @@ export class WasmProvider implements LLMProvider {
  */
 export interface BuildGemmaPromptInput {
   /** System prompt — expected to already be in Gemma native syntax (use
-   *  `buildSystemPromptWithAliases(layers, { providerKind: 'gemma' })`). */
+   *  `buildSystemPromptWithAliases(layers, { providerKind: 'gemma' })`).
+   *  The tool declarations are embedded inside this system prompt — they are
+   *  NOT re-emitted from `tools` by this function anymore. */
   systemPrompt?: string;
-  /** Provider tools (will be declared via `<|tool>declaration>` and hardcapped at 15). */
+  /** Provider tools — used only for message serialization (tool_use / tool_result
+   *  ID → name mapping). Declarations live inside `systemPrompt`. */
   tools: ProviderTool[];
   /** Conversation turns. Defaults to `[]` (preview mode — no `<|turn>` user/model blocks). */
   messages?: ChatMessage[];
@@ -592,45 +549,28 @@ export interface BuildGemmaPromptInput {
  * calling LlmInference — exported so UI debug panels can display the prompt
  * as it will actually be sent to the model.
  *
- * The system prompt is expected to already be in Gemma native syntax — build
- * it with `buildSystemPromptWithAliases(layers, { providerKind: 'gemma' })`.
- * This function no longer rewrites tool references; it only wraps the prompt
+ * The system prompt is expected to already be in Gemma native syntax AND to
+ * already embed the `<|tool>declaration>` blocks — build it with
+ * `buildSystemPromptWithAliases(layers, { providerKind: 'gemma' })`.
+ * This function no longer emits tool declarations; it only wraps the prompt
  * in the Gemma 4 turn structure.
  *
  * Transformations applied:
- * 1. Limits tools to a hardcoded cap of 15 (8 `render_*`/`clear_canvas`
- *    + the remaining budget for data tools).
- * 2. Emits `<|tool>declaration>` blocks for each retained tool.
- * 3. Wraps the system part in `<|turn>user\n...<turn|>` (Gemma 4 has no
+ * 1. Wraps the system part in `<|turn>user\n...<turn|>` (Gemma 4 has no
  *    `system` role).
- * 4. Serializes messages as `<|turn>user|model\n...<turn|>` with tool_use →
+ * 2. Serializes messages as `<|turn>user|model\n...<turn|>` with tool_use →
  *    `<|tool_call>`, tool_result → `<|tool_response>`.
- * 5. Terminates with an open `<|turn>model\n` for generation.
+ * 3. Terminates with an open `<|turn>model\n` for generation.
  */
 export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
-  const { systemPrompt, tools, messages = [] } = input;
+  const { systemPrompt, messages = [] } = input;
   const systemParts: string[] = [];
 
   // System prompt is expected to already be in Gemma native syntax (built via
-  // buildSystemPromptWithAliases with providerKind: 'gemma'). We just pass it through.
+  // buildSystemPromptWithAliases with providerKind: 'gemma') and already contains
+  // the tool declarations. We just pass it through.
   if (systemPrompt) {
     systemParts.push(systemPrompt);
-  }
-
-  if (tools.length > 0) {
-    // Gemma small models struggle with too many tools — limit to most relevant
-    const MAX_TOOLS = 15;
-    const limitedTools = tools.length > MAX_TOOLS
-      ? [
-          // Always include render_* tools (UI)
-          ...tools.filter(t => t.name.startsWith('render_') || t.name === 'clear_canvas').slice(0, 8),
-          // Fill with data tools
-          ...tools.filter(t => !t.name.startsWith('render_') && t.name !== 'clear_canvas').slice(0, MAX_TOOLS - 8),
-        ]
-      : tools;
-
-    // Native Gemma 4 tool declarations
-    systemParts.push(limitedTools.map(t => WasmProvider.formatToolDeclaration(t)).join('\n'));
   }
 
   // Build a map of tool_use_id → tool_name from all messages for tool_result resolution
