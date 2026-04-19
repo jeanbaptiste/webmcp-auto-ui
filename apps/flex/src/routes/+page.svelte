@@ -431,6 +431,33 @@
       multiClient.listServers().map(s => [s.url, discoveryCache.recipeCount(s.name)])
     );
   });
+  // Same as above, but for WebMCP servers. Keyed by srv.id (which matches
+  // layer.serverName for the built-in WebMCP servers).
+  const webmcpRecipeCountByServer = $derived.by(() => {
+    cacheVersion; // reactivity trigger
+    const out: Record<string, number> = {};
+    for (const entry of SERVER_REGISTRY) {
+      const serverName = entry.server.layer().serverName;
+      out[entry.id] = discoveryCache.recipeCount(serverName);
+    }
+    return out;
+  });
+  const webmcpToolCountByServer = $derived.by(() => {
+    cacheVersion; // reactivity trigger
+    const out: Record<string, number> = {};
+    // Tools explicitly filtered out from the "real tools" count for WebMCP:
+    // - discovery tools (search_recipes/list_recipes/get_recipe)
+    // - action/system tools (widget_display, canvas, recall)
+    const SYSTEM_TOOLS = new Set(['widget_display', 'canvas', 'recall']);
+    for (const entry of SERVER_REGISTRY) {
+      const layer = entry.server.layer();
+      const count = layer.tools.filter(t =>
+        !DISCOVERY_TOOL_NAMES.has(t.name) && !SYSTEM_TOOLS.has(t.name)
+      ).length;
+      out[entry.id] = count;
+    }
+    return out;
+  });
   // Prompt shown in Settings → System Prompt panel. For Gemma, we wrap the already-
   // Gemma-syntax `effectivePrompt` with the turn structure and tool declarations
   // that WasmProvider.buildPrompt() emits, so the user sees what the model actually gets.
@@ -860,6 +887,20 @@
   onrecipeclick={(url) => { settingsOpen = false; recipeBrowserOpen = true; recipeBrowserFilter = multiClient.listServers().find(s => s.url === url)?.name ?? ''; }}
   {toolCountByServer}
   ontoolclick={(url) => { settingsOpen = false; toolBrowserOpen = true; const srv = multiClient.listServers().find(s => s.url === url); toolBrowserFilter = srv?.name ?? ''; }}
+  {webmcpRecipeCountByServer}
+  {webmcpToolCountByServer}
+  onwebmcprecipeclick={(id) => {
+    settingsOpen = false;
+    recipeBrowserOpen = true;
+    const entry = SERVER_REGISTRY.find(s => s.id === id);
+    recipeBrowserFilter = entry?.server.layer().serverName ?? id;
+  }}
+  onwebmcptoolclick={(id) => {
+    settingsOpen = false;
+    toolBrowserOpen = true;
+    const entry = SERVER_REGISTRY.find(s => s.id === id);
+    toolBrowserFilter = entry?.server.layer().serverName ?? id;
+  }}
   {diagnostics}
   serverRegistry={SERVER_REGISTRY.map(s => ({ id: s.id, label: s.label, description: s.description, widgetCount: s.server.listWidgets().length }))}
   bind:enabledServers

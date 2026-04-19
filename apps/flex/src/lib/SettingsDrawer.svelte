@@ -7,7 +7,7 @@
 <script lang="ts">
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
-  import { McpConnector, LLMSelector, SettingsPanel, RemoteMCPserversDemo, DiagnosticModal, DiagnosticIcon } from '@webmcp-auto-ui/ui';
+  import { McpConnector, LLMSelector, SettingsPanel, RemoteMCPserversDemo, WebMCPserversList, DiagnosticModal, DiagnosticIcon } from '@webmcp-auto-ui/ui';
 
   const buildStamp = typeof __BUILD_TIME__ === 'string'
     ? __BUILD_TIME__.replace('T', ' ').replace('Z', '').slice(0, 23) : '';
@@ -63,6 +63,10 @@
     onrecipeclick?: (url: string) => void;
     toolCountByServer?: Record<string, number>;
     ontoolclick?: (url: string) => void;
+    webmcpRecipeCountByServer?: Record<string, number>;
+    webmcpToolCountByServer?: Record<string, number>;
+    onwebmcprecipeclick?: (id: string) => void;
+    onwebmcptoolclick?: (id: string) => void;
   }
 
   let {
@@ -111,10 +115,13 @@
     onrecipeclick,
     toolCountByServer,
     ontoolclick,
+    webmcpRecipeCountByServer,
+    webmcpToolCountByServer,
+    onwebmcprecipeclick,
+    onwebmcptoolclick,
   }: Props = $props();
 
   let diagModalOpen = $state(false);
-  let serversCollapsed = $state(true);
   let mcpShowToken = $state(false);
 
   function toggleServer(id: string) {
@@ -186,34 +193,15 @@
     <!-- WebMCP servers -->
     {#if serverRegistry.length > 0}
       <section class="flex flex-col gap-2">
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="flex items-center gap-1 cursor-pointer select-none"
-             onclick={() => serversCollapsed = !serversCollapsed}>
-          <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">WebMCP servers</span>
-          <span class="text-[9px] text-text2/60 font-mono">({enabledServers.size}/{serverRegistry.length})</span>
-          <span class="text-[10px] text-text2 ml-auto transition-transform {serversCollapsed ? '' : 'rotate-90'}">{@html '&#x25B6;'}</span>
-        </div>
-        {#if !serversCollapsed}
-          <div class="flex flex-col gap-1">
-            {#each serverRegistry as srv (srv.id)}
-              <label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface2/50 cursor-pointer transition-colors group">
-                <input
-                  type="checkbox"
-                  checked={enabledServers.has(srv.id)}
-                  onchange={() => toggleServer(srv.id)}
-                  class="w-3.5 h-3.5 rounded border-border2 accent-accent cursor-pointer"
-                />
-                <span class="flex flex-col flex-1 min-w-0">
-                  <span class="text-xs font-mono text-text1 group-hover:text-accent transition-colors truncate">{srv.label}</span>
-                  {#if srv.description}
-                    <span class="text-[8px] font-mono text-text2/40 block truncate">{srv.description}</span>
-                  {/if}
-                </span>
-                <span class="text-[9px] font-mono text-text2/50">{srv.widgetCount}w</span>
-              </label>
-            {/each}
-          </div>
-        {/if}
+        <WebMCPserversList
+          servers={serverRegistry}
+          {enabledServers}
+          onToggle={toggleServer}
+          recipeCountByServer={webmcpRecipeCountByServer}
+          toolCountByServer={webmcpToolCountByServer}
+          onrecipeclick={(id) => onwebmcprecipeclick?.(id)}
+          ontoolclick={(id) => onwebmcptoolclick?.(id)}
+        />
       </section>
     {/if}
 
