@@ -651,9 +651,9 @@ DATA:
 ${dataListSearch}
 DISPLAY:
 ${displayListSearch}
-The result is for YOU. Pick the best match and go to STEP 2. Never ask the user to choose.
+The tool results are for you, not for the user. Pick the best match and go to STEP 2. Never ask the user to choose.
 
-STEP 2 — Read the recipe.
+STEP 2 — Fetch the recipe.
 ${allGetRecipes}
 
 STEP 3 — Execute using the schema from STEP 2.
