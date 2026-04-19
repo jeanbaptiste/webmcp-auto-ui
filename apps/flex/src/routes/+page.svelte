@@ -543,6 +543,14 @@
       return;
     }
 
+    // Intercept "test" command — chain both canary and hummingbird test flows.
+    if (msg.trim().toLowerCase() === 'test') {
+      input = '';
+      await sendMessage('affiche le canary');
+      await sendMessage('affiche le hummingbird');
+      return;
+    }
+
     // Push to input history (limit 50)
     inputHistory = [...inputHistory.slice(-(49)), msg.trim()];
     historyIndex = -1;
