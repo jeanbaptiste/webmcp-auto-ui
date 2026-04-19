@@ -11,7 +11,7 @@ export type WasmStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface WasmProviderOptions {
   model?: WasmModelId;
-  contextSize?: number;  // MediaPipe maxTokens — default 4096
+  contextSize?: number;  // MediaPipe maxTokens — default 32768
   onProgress?: (progress: number, status: string, loaded?: number, total?: number) => void;
   onStatusChange?: (status: WasmStatus) => void;
 }
@@ -86,7 +86,7 @@ export class WasmProvider implements LLMProvider {
       baseOptions: {
         modelAssetBuffer: modelStream.getReader() as unknown as Uint8Array,
       },
-      maxTokens: this.opts.contextSize ?? 4096,
+      maxTokens: this.opts.contextSize ?? 32768,
       temperature: 1.0,
       topK: 64,
     });
@@ -224,7 +224,7 @@ export class WasmProvider implements LLMProvider {
     let prompt = this.buildPrompt(messages, tools, options?.system);
 
     // Aggressive clipping: Gemma struggles with long conversations — dynamic cap based on context size
-    const contextTokens = this.opts.contextSize ?? 4096;
+    const contextTokens = this.opts.contextSize ?? 32768;
     const MAX_MESSAGES = Math.max(4, Math.floor(contextTokens / 512));
     while (messages.length > MAX_MESSAGES) {
       messages = messages.slice(1);
@@ -232,7 +232,7 @@ export class WasmProvider implements LLMProvider {
     prompt = this.buildPrompt(messages, tools, options?.system);
 
     // Token-based clipping: if prompt is still too large, drop oldest messages
-    const maxPromptTokens = (this.opts.contextSize ?? 4096) - 512;
+    const maxPromptTokens = (this.opts.contextSize ?? 32768) - 512;
     try {
       while (this.inference.sizeInTokens(prompt) > maxPromptTokens && messages.length > 1) {
         messages = messages.slice(1);
