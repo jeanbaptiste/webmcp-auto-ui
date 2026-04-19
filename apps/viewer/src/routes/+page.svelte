@@ -4,7 +4,7 @@
 
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
-  import { WidgetRenderer, Button, Input } from '@webmcp-auto-ui/ui';
+  import { WidgetRenderer, Button, Input, MarkdownView } from '@webmcp-auto-ui/ui';
   import {
     decodeHyperSkill, encodeHyperSkill, decode,
     getHsParam, type HyperSkill, type HyperSkillMeta,
@@ -27,6 +27,24 @@
 
   function uid() { return 'b' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36); }
 
+  const rawMarkdown = $derived.by(() => {
+    if (!skill) return null;
+    const c = skill.content as Record<string, unknown> | undefined;
+    return (c && typeof c.rawMarkdown === 'string') ? c.rawMarkdown : null;
+  });
+
+  const fmMeta = $derived.by(() => {
+    const m = (skill?.meta ?? {}) as Record<string, unknown>;
+    return {
+      when: typeof m.when === 'string' ? m.when : null,
+      components_used: Array.isArray(m.components_used) ? (m.components_used as string[]) : null,
+      servers: Array.isArray(m.servers) ? (m.servers as string[]) : null,
+      layout: (m.layout && typeof m.layout === 'object')
+        ? (m.layout as { type?: string; columns?: number; arrangement?: string })
+        : null,
+    };
+  });
+
   // Try decodeHyperSkill (JSON). If it fails, fall back to raw decode + markdown/YAML parse.
   // Wraps the markdown body as a single `code` block so the existing render pipeline can consume it.
   async function decodeWithMarkdownFallback(url: string): Promise<HyperSkill> {
@@ -38,11 +56,7 @@
         const { frontmatter, body } = parseFrontmatter(raw.content);
         return {
           meta: (frontmatter ?? {}) as HyperSkillMeta,
-          content: {
-            blocks: [
-              { type: 'code', data: { lang: 'markdown', code: body } },
-            ],
-          },
+          content: { blocks: [], rawMarkdown: body },
         } as HyperSkill;
       } catch {
         throw jsonErr;
@@ -331,6 +345,53 @@
             {#if skill.meta?.version}<span>v{skill.meta.version}</span>{/if}
           </div>
         </div>
+
+        <!-- Raw markdown (fallback for non-JSON HyperSkills) -->
+        {#if rawMarkdown}
+          <div class="flex flex-col gap-4">
+            {#if fmMeta.when}
+              <div>
+                <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1">Quand utiliser</div>
+                <p class="font-mono text-xs text-text1 leading-relaxed">{fmMeta.when}</p>
+              </div>
+            {/if}
+
+            {#if fmMeta.components_used && fmMeta.components_used.length > 0}
+              <div>
+                <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Composants</div>
+                <div class="flex flex-wrap gap-1.5">
+                  {#each fmMeta.components_used as comp}
+                    <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono border border-accent/40 text-accent bg-accent/5">{comp}</span>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+
+            {#if fmMeta.servers && fmMeta.servers.length > 0}
+              <div>
+                <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Serveurs</div>
+                <div class="flex flex-wrap gap-1.5">
+                  {#each fmMeta.servers as server}
+                    <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono border border-teal/40 text-teal bg-teal/5">{server}</span>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+
+            {#if fmMeta.layout}
+              <div>
+                <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1">Layout</div>
+                <p class="font-mono text-xs text-text1">
+                  {fmMeta.layout.type ?? ''}{#if fmMeta.layout.columns}, {fmMeta.layout.columns} colonnes{/if}{#if fmMeta.layout.arrangement} — {fmMeta.layout.arrangement}{/if}
+                </p>
+              </div>
+            {/if}
+
+            <div class="rounded-lg border border-border bg-surface p-6">
+              <MarkdownView source={rawMarkdown} />
+            </div>
+          </div>
+        {/if}
 
         <!-- Blocks -->
         {#each blocks as block (block.id)}
