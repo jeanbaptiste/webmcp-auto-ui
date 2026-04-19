@@ -23,6 +23,16 @@ export function sanitizeServerName(name: string): string {
   return result || 'mcp';
 }
 
+// ── Discovery pseudo-tool descriptions (shared between prompt and tool schemas) ──
+const shortSearchToolsDesc = (serverName: string) =>
+  `Search tools by keyword on the ${serverName} server.`;
+const shortListToolsDesc = (serverName: string) =>
+  `List ALL tools on the ${serverName} server.`;
+const longSearchToolsDesc = (serverName: string) =>
+  `Search tools by keyword on the ${serverName} server. Use this when you need to find a specific data-fetching or action tool but don't know its exact name. Pass a keyword related to the task (e.g. "weather", "search", "create") and get back matching tool names with descriptions and input schemas. This is more targeted than list_tools — prefer it when you have a clear idea of what you're looking for. Returns an array of {name, description, inputSchema} objects.`;
+const longListToolsDesc = (serverName: string) =>
+  `List ALL available tools on the ${serverName} server with their names, descriptions, and input schemas. Use this when search_tools returned no results, or when you want to browse the full capabilities of the server. Returns the complete tool catalog — useful when the user's request doesn't map to an obvious keyword. Does not accept any parameters.`;
+
 /** MCP data layer — tools and recipes from a connected MCP server */
 export interface McpLayer {
   protocol: 'mcp';
@@ -511,13 +521,13 @@ export function buildSystemPromptWithAliases(
     // so we build synthetic ProviderTools for inline declarations.
     const searchToolsPseudo: ProviderTool = {
       name: `${prefix}search_tools`,
-      description: `Search tools by keyword on the ${l.serverName} server.`,
+      description: shortSearchToolsDesc(l.serverName),
       input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Keyword to search for.' } }, required: ['query'] },
     };
     searchTools.push(fmtToolRef(`${prefix}search_tools`, ['query'], kind, searchToolsPseudo));
     const listToolsPseudo: ProviderTool = {
       name: `${prefix}list_tools`,
-      description: `List ALL tools on the ${l.serverName} server.`,
+      description: shortListToolsDesc(l.serverName),
       input_schema: { type: 'object', properties: {} },
     };
     listTools.push(fmtToolRef(`${prefix}list_tools`, [], kind, listToolsPseudo));
@@ -554,13 +564,13 @@ export function buildSystemPromptWithAliases(
     // Pseudo-tools for tool discovery on all MCP servers
     const searchToolsPseudo: ProviderTool = {
       name: `${prefix}search_tools`,
-      description: `Search tools by keyword on the ${l.serverName} server.`,
+      description: shortSearchToolsDesc(l.serverName),
       input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Keyword to search for.' } }, required: ['query'] },
     };
     searchTools.push(fmtToolRef(`${prefix}search_tools`, ['query'], kind, searchToolsPseudo));
     const listToolsPseudo: ProviderTool = {
       name: `${prefix}list_tools`,
-      description: `List ALL tools on the ${l.serverName} server.`,
+      description: shortListToolsDesc(l.serverName),
       input_schema: { type: 'object', properties: {} },
     };
     listTools.push(fmtToolRef(`${prefix}list_tools`, [], kind, listToolsPseudo));
@@ -777,12 +787,12 @@ export function buildDiscoveryToolsWithAliases(layers: ToolLayer[], schemaOption
       // Pseudo-tools for tool discovery on MCP servers
       tools.push({
         name: `${prefix}search_tools`,
-        description: `Search tools by keyword on the ${layer.serverName} server. Use this when you need to find a specific data-fetching or action tool but don't know its exact name. Pass a keyword related to the task (e.g. "weather", "search", "create") and get back matching tool names with descriptions and input schemas. This is more targeted than list_tools — prefer it when you have a clear idea of what you're looking for. Returns an array of {name, description, inputSchema} objects.`,
+        description: longSearchToolsDesc(layer.serverName),
         input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Keyword to search for in tool names and descriptions, e.g. "weather", "user", "search". Case-insensitive.' } }, required: ['query'] },
       });
       tools.push({
         name: `${prefix}list_tools`,
-        description: `List ALL available tools on the ${layer.serverName} server with their names, descriptions, and input schemas. Use this when search_tools returned no results, or when you want to browse the full capabilities of the server. Returns the complete tool catalog — useful when the user's request doesn't map to an obvious keyword. Does not accept any parameters.`,
+        description: longListToolsDesc(layer.serverName),
         input_schema: { type: 'object', properties: {} },
       });
     } else {
@@ -797,12 +807,12 @@ export function buildDiscoveryToolsWithAliases(layers: ToolLayer[], schemaOption
       // Pseudo-tools for tool discovery on WebMCP servers
       tools.push({
         name: `${prefix}search_tools`,
-        description: `Search tools by keyword on the ${layer.serverName} server. Use this when you need to find a specific data-fetching or action tool but don't know its exact name. Pass a keyword related to the task (e.g. "weather", "search", "create") and get back matching tool names with descriptions and input schemas. This is more targeted than list_tools — prefer it when you have a clear idea of what you're looking for. Returns an array of {name, description, inputSchema} objects.`,
+        description: longSearchToolsDesc(layer.serverName),
         input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Keyword to search for in tool names and descriptions, e.g. "weather", "user", "search". Case-insensitive.' } }, required: ['query'] },
       });
       tools.push({
         name: `${prefix}list_tools`,
-        description: `List ALL available tools on the ${layer.serverName} server with their names, descriptions, and input schemas. Use this when search_tools returned no results, or when you want to browse the full capabilities of the server. Returns the complete tool catalog — useful when the user's request doesn't map to an obvious keyword. Does not accept any parameters.`,
+        description: longListToolsDesc(layer.serverName),
         input_schema: { type: 'object', properties: {} },
       });
     }
