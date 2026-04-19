@@ -335,7 +335,7 @@
         Strict tool use
         <span class="text-[8px] text-text2/40 font-mono">constrained grammar</span>
         {#if providerKind === 'gemma'}
-          <span class="text-[8px] text-text2/40 font-mono ml-auto">Ignoré par Gemma (format natif)</span>
+          <span class="text-[8px] text-text2/40 font-mono ml-auto">Ignored by Gemma (native format)</span>
         {/if}
       </label>
       <div class="text-[9px] font-mono text-text2/60 pl-5">

@@ -102,15 +102,15 @@
       <label class="text-[9px] font-mono text-text2 uppercase tracking-wider">System Prompt</label>
       <div class="flex items-center gap-2">
         {#if promptSaved && customMode}
-          <span class="text-[9px] font-mono text-teal transition-opacity">✓ applique</span>
+          <span class="text-[9px] font-mono text-teal transition-opacity">✓ applied</span>
         {/if}
         {#if hasEffective}
           {#if customMode}
             <button class="text-[9px] font-mono text-accent2 hover:text-accent transition-colors"
-                    onclick={resetToAuto}>reinitialiser</button>
+                    onclick={resetToAuto}>reset</button>
           {:else}
             <button class="text-[9px] font-mono text-accent hover:text-text1 transition-colors"
-                    onclick={enterCustomMode}>personnaliser</button>
+                    onclick={enterCustomMode}>customize</button>
           {/if}
         {/if}
       </div>
@@ -121,15 +121,15 @@
         value={displayedPrompt}
         rows={8}
         class="w-full bg-surface2/50 border border-border2/50 rounded-lg px-3 py-2 text-xs font-mono text-text2 outline-none resize-none cursor-default"
-        placeholder="Prompt auto-genere"
+        placeholder="Auto-generated prompt"
       ></textarea>
-      <div class="text-[8px] font-mono text-text2/50">prompt auto-genere — cliquer personnaliser pour editer</div>
+      <div class="text-[8px] font-mono text-text2/50">auto-generated prompt — click customize to edit</div>
     {:else}
       <textarea
         bind:value={systemPrompt}
         rows={5}
         class="w-full bg-surface2 border border-border2 rounded-lg px-3 py-2 text-xs font-mono text-text1 outline-none resize-none focus:border-accent/50 transition-colors placeholder:text-text2/40"
-        placeholder="Instructions systeme pour l'agent…"
+        placeholder="System instructions for the agent…"
       ></textarea>
     {/if}
   </div>
@@ -197,7 +197,7 @@
     <div>
       <label class="flex items-center gap-2 cursor-pointer select-none mb-1">
         <input type="checkbox" bind:checked={compressHistory} class="accent-accent w-3.5 h-3.5" />
-        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Tronquer l'historique</span>
+        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Truncate history</span>
       </label>
       {#if compressHistory}
       <div class="flex justify-between items-baseline mb-1">
@@ -222,7 +222,7 @@
       </div>
       <div class="pl-5">
         <div class="flex justify-between items-baseline mb-1">
-          <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Résidu inline (chars)</span>
+          <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Inline residue (chars)</span>
           <span class="font-mono text-xs text-text1">{ragResidueSize}</span>
         </div>
         <input type="range" bind:value={ragResidueSize}
