@@ -179,7 +179,13 @@
   });
 
   const webmcpRecipes = $derived.by(() => {
-    return layers.filter(l => l.protocol === 'webmcp').flatMap(l => (l as any).recipes ?? []);
+    return layers.filter(l => l.protocol === 'webmcp').flatMap((l) => {
+      const webmcpLayer = l as { serverName: string; recipes?: unknown[] };
+      return (webmcpLayer.recipes ?? []).map((r) => ({
+        ...(r as Record<string, unknown>),
+        serverName: webmcpLayer.serverName,
+      }));
+    });
   });
 
   // ── Tool call details for tooltips ──────────────────────────────────
