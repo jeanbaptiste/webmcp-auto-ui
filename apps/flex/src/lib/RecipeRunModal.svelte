@@ -1,7 +1,7 @@
 <script lang="ts">
   import { fly } from 'svelte/transition';
-  import type { RunTab } from './recipes/types.js';
-  import { safeStringify } from './recipes/runner.js';
+  import type { RunTab } from '@webmcp-auto-ui/sdk';
+  import { safeStringify } from '@webmcp-auto-ui/sdk';
 
   interface Props {
     open: boolean;

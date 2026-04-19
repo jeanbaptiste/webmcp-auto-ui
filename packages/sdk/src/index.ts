@@ -90,3 +90,7 @@ export type { McpDemoServer } from './mcp-demo-servers.js';
 
 // Canvas store — browser-only (Svelte 5 runes), import directly from src:
 // import { canvas } from '@webmcp-auto-ui/sdk/canvas'
+
+// Recipe runner — markdown-fence parser + JS/TS/SQL/etc executor over MCP
+export { parseBody, runCode, estimateTokens, safeStringify } from './recipes/index.js';
+export type { ParsedSegment, RunResult, RunLog, RunTab, RecipeData } from './recipes/index.js';

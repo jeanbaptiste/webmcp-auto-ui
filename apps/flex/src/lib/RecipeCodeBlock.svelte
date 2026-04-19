@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
-  import type { RunResult } from './recipes/types.js';
-  import { runCode, estimateTokens } from './recipes/runner.js';
+  import type { RunResult } from '@webmcp-auto-ui/sdk';
+  import { runCode, estimateTokens } from '@webmcp-auto-ui/sdk';
 
   interface Props {
     code: string;

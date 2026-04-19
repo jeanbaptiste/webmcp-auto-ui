@@ -11,6 +11,19 @@ const JS_LANGS = new Set(['js', 'javascript', 'mjs', 'cjs']);
 const TS_LANGS = new Set(['ts', 'typescript']);
 
 /**
+ * Mapping of language → preferred MCP tool name.
+ *
+ * Rationale: on the `tricoteuses` / code4code MCP server, SQL amendments are
+ * exposed via `query_sql`, while `run_script` is intended for JS/TS adapters
+ * calling `agentTask(tricoteuses)`. Dispatching a raw ```sql``` block through
+ * `run_script` fails validation.
+ */
+const LANG_TO_TOOL: Record<string, string> = {
+  sql: 'query_sql',
+  // js/ts runs locally (handled before), not here
+};
+
+/**
  * `new Function` flavor that returns a promise (via AsyncFunction).
  * We wrap user code in an async IIFE so users can `await` at top level and
  * `return` a value.
@@ -47,19 +60,51 @@ async function runJsLike(code: string, ctx: RunnerCtx): Promise<unknown> {
   return out;
 }
 
+interface McpToolDef {
+  name: string;
+  description?: string;
+  inputSchema?: unknown;
+}
+
 /**
- * Find the first connected MCP server that exposes a given tool name.
- * Returns `{ url, name }` or null.
+ * Inspects a tool's inputSchema to find the string parameter that likely
+ * holds the code/script/query. Returns the param name or null.
  */
-function findServerWithTool(
+function findCodeParamName(schema: unknown): string | null {
+  const s = schema as
+    | { properties?: Record<string, { type?: string }>; required?: string[] }
+    | null
+    | undefined;
+  if (!s?.properties) return null;
+  const candidates = ['script', 'code', 'query', 'sql', 'source'];
+  // Prefer named candidates matching a string property
+  for (const name of candidates) {
+    const prop = s.properties[name];
+    if (prop?.type === 'string') return name;
+  }
+  // Fallback: first required string param
+  for (const req of s.required ?? []) {
+    if (s.properties[req]?.type === 'string') return req;
+  }
+  // Last resort: first string param
+  for (const [name, prop] of Object.entries(s.properties)) {
+    if (prop?.type === 'string') return name;
+  }
+  return null;
+}
+
+/**
+ * Find the first connected MCP server that exposes a given tool name, along
+ * with the tool definition (for inputSchema introspection).
+ */
+function findToolOnAnyServer(
   multiClient: McpMultiClient | undefined,
   toolName: string
-): { url: string; name: string } | null {
+): { url: string; name: string; tool: McpToolDef } | null {
   if (!multiClient) return null;
   for (const s of multiClient.listServers()) {
-    if (s.tools.some((t) => t.name === toolName)) {
-      return { url: s.url, name: s.name };
-    }
+    const tool = s.tools.find((t) => t.name === toolName) as McpToolDef | undefined;
+    if (tool) return { url: s.url, name: s.name, tool };
   }
   return null;
 }
@@ -70,15 +115,19 @@ async function runViaMcp(
   multiClient: McpMultiClient | undefined,
   ctx: RunnerCtx
 ): Promise<unknown> {
-  const server = findServerWithTool(multiClient, 'run_script');
-  if (!server || !multiClient) {
-    throw new Error(`No MCP server with run_script available for language "${lang}"`);
+  const toolName = LANG_TO_TOOL[lang] ?? 'run_script';
+  const found = findToolOnAnyServer(multiClient, toolName);
+  if (!found || !multiClient) {
+    throw new Error(
+      `No MCP server exposes tool "${toolName}" (needed for language "${lang}")`
+    );
   }
-  ctx.log(`dispatched to ${server.name} (run_script, lang=${lang})`);
-  const res = await multiClient.callToolOn(server.url, 'run_script', {
-    code,
-    language: lang,
-    lang,
+  const paramName = findCodeParamName(found.tool.inputSchema) ?? 'script';
+  ctx.log(
+    `dispatched to ${found.name} (tool=${toolName}, param=${paramName}, lang=${lang})`
+  );
+  const res = await multiClient.callToolOn(found.url, toolName, {
+    [paramName]: code,
   });
   ctx.log('response received');
   // Normalize: extract text content if present, else raw result
@@ -100,8 +149,9 @@ async function runViaMcp(
  *
  * - JS / TS: executed inline via AsyncFunction (TS is NOT transpiled; code must
  *   be valid JS or the caller should keep type annotations minimal).
- * - Other languages: proxied to an MCP `run_script` tool if any connected
- *   server exposes it. Otherwise returns an error RunResult.
+ * - SQL: dispatched to `query_sql` on any connected MCP server that exposes it.
+ * - Other languages: dispatched to `run_script`. The param name (`script`,
+ *   `code`, `query`, ...) is picked dynamically from the tool's inputSchema.
  */
 export async function runCode(
   code: string,

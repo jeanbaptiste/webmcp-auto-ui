@@ -4,7 +4,7 @@
   import { encode } from '@webmcp-auto-ui/sdk';
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import RecipeModal from './RecipeModal.svelte';
-  import type { RecipeData } from './recipes/types.js';
+  import type { RecipeData } from '@webmcp-auto-ui/sdk';
 
   interface RecipeItem {
     name: string;

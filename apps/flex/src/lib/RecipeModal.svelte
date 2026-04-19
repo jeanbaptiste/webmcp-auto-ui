@@ -2,9 +2,8 @@
   import { fade, fly } from 'svelte/transition';
   import { MarkdownView } from '@webmcp-auto-ui/ui';
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
-  import { parseBody } from './recipes/parse.js';
-  import { runCode } from './recipes/runner.js';
-  import type { RecipeData, RunResult, RunTab } from './recipes/types.js';
+  import { parseBody, runCode } from '@webmcp-auto-ui/sdk';
+  import type { RecipeData, RunResult, RunTab } from '@webmcp-auto-ui/sdk';
   import RecipeCodeBlock from './RecipeCodeBlock.svelte';
   import RecipeRunModal from './RecipeRunModal.svelte';
 

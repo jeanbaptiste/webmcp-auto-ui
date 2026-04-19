@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@sveltejs/package": "^2.3.0",
+    "@webmcp-auto-ui/core": "file:../core",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "typescript": "^5.0.0"
