@@ -347,8 +347,9 @@
     if (isGemma) {
       maxResultLength = 2000;
       ragResidueSize = 500;
-      temperature = 0.7;
-      topK = 40;
+      // Google's AI Edge Gallery default for Gemma — sweet spot for quality
+      temperature = 1.0;
+      topK = 64;
       maxContextTokens = isE4B ? 32768 : 32768;
       cacheEnabled = false;
     } else if (isLocal) {
@@ -358,7 +359,7 @@
       // Claude defaults
       maxResultLength = 10000;
       ragResidueSize = 200;
-      temperature = 1.0;
+      temperature = 0.7;
       topK = 64;
       maxContextTokens = 120_000;
       cacheEnabled = true;
