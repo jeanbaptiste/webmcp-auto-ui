@@ -504,17 +504,16 @@ export class WasmProvider implements LLMProvider {
 
   /**
    * Format a tool response in Gemma 4 native syntax.
+   * Spec §7 + §10.x: content is passed through literally. JSON-parseable input
+   * is embedded verbatim; plain strings are wrapped with `<|"|>` delimiters.
    * @internal — used by buildGemmaPrompt
    */
-  static formatToolResponse(toolName: string, content: string): string {
-    const q = '<|"|>';
-    // Try to parse as JSON for structured output
+  static formatToolResponse(content: string): string {
     try {
-      const parsed = JSON.parse(content);
-      return `<|tool_response>response:${toolName}${gemmaValue(parsed)}<tool_response|>`;
+      JSON.parse(content);
+      return `<|tool_response>response:${content}<tool_response|>`;
     } catch {
-      // Plain string result
-      return `<|tool_response>response:${toolName}{result:${q}${content}${q}}<tool_response|>`;
+      return `<|tool_response>response:<|"|>${content}<|"|><tool_response|>`;
     }
   }
 
@@ -523,7 +522,7 @@ export class WasmProvider implements LLMProvider {
    * @internal — used by buildGemmaPrompt
    */
   static formatToolCall(name: string, input: Record<string, unknown>): string {
-    const entries = Object.entries(input)
+    const entries = Object.entries(input ?? {})
       .map(([k, v]) => `${k}:${gemmaValue(v)}`);
     return `<|tool_call>call:${name}{${entries.join(',')}}<tool_call|>`;
   }
@@ -587,19 +586,6 @@ export interface BuildGemmaPromptInput {
 export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
   const { systemPrompt, messages = [] } = input;
 
-  // Build a map of tool_use_id → tool_name from all messages for tool_result resolution
-  const toolNameById = new Map<string, string>();
-  for (const msg of messages) {
-    if (typeof msg.content !== 'string') {
-      for (const block of msg.content as ContentBlock[]) {
-        if (block.type === 'tool_use') {
-          const b = block as { type: 'tool_use'; id: string; name: string };
-          toolNameById.set(b.id, b.name);
-        }
-      }
-    }
-  }
-
   const parts: string[] = [];
 
   // Gemma 4 native structure: the system prompt already embeds tool
@@ -610,13 +596,17 @@ export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
   }
 
   for (const msg of messages) {
-    const role = msg.role === 'assistant' ? 'model' : 'user';
+    const role: 'model' | 'user' | 'system' =
+      msg.role === 'assistant' ? 'model' : msg.role === 'system' ? 'system' : 'user';
+
+    let segments: string[];
+    let toolResultOnly = false;
     if (typeof msg.content === 'string') {
-      parts.push(`<|turn>${role}\n${msg.content}<turn|>`);
+      segments = [msg.content];
     } else {
-      // Serialize all block types in Gemma 4 native format
-      const segments: string[] = [];
-      for (const block of msg.content as ContentBlock[]) {
+      segments = [];
+      const blocks = msg.content as ContentBlock[];
+      for (const block of blocks) {
         if (block.type === 'text') {
           segments.push((block as { type: 'text'; text: string }).text);
         } else if (block.type === 'tool_use') {
@@ -624,13 +614,21 @@ export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
           segments.push(WasmProvider.formatToolCall(b.name, b.input));
         } else if (block.type === 'tool_result') {
           const b = block as { type: 'tool_result'; tool_use_id: string; content: string };
-          const toolName = toolNameById.get(b.tool_use_id) ?? 'unknown';
-          segments.push(WasmProvider.formatToolResponse(toolName, b.content));
+          segments.push(WasmProvider.formatToolResponse(b.content));
         }
       }
-      if (segments.length > 0) {
-        parts.push(`<|turn>${role}\n${segments.join('\n')}<turn|>`);
-      }
+      toolResultOnly = blocks.length > 0 && blocks.every(b => b.type === 'tool_result');
+    }
+    if (segments.length === 0) continue;
+
+    // Spec §7 + §10.1: tool_result messages fuse into the preceding model turn,
+    // so <|tool_call> and <|tool_response> share a single turn.
+    const prev = parts[parts.length - 1];
+    if (toolResultOnly && role === 'user' && prev?.startsWith('<|turn>model\n')) {
+      const body = prev.slice(0, -'<turn|>'.length);
+      parts[parts.length - 1] = `${body}${segments.join('')}\n<turn|>`;
+    } else {
+      parts.push(`<|turn>${role}\n${segments.join('\n')}<turn|>`);
     }
   }
   parts.push('<|turn>model\n');
