@@ -682,7 +682,15 @@
             const nextDetails = new Map(toolCallDetails);
             nextDetails.set(callId, detail);
             toolCallDetails = nextDetails;
-            updateEphemeral(assistantId, `<strong>${call.name}</strong>`);
+            const isRecipeIngest = /(^|_)get_recipe$/.test(call.name) && !call.error;
+            let pill = `<strong>${call.name}</strong>`;
+            if (isRecipeIngest) {
+              const a = call.args as Record<string, unknown> | undefined;
+              const rid = (typeof a?.id === 'string' && a.id) || (typeof a?.name === 'string' && a.name)
+                || (typeof a?.recipe === 'string' && a.recipe) || (Object.values(a ?? {}).find(v => typeof v === 'string') as string | undefined) || '?';
+              pill = `<span style="display:inline-flex;align-items:center;gap:6px;"><span style="font-size:10px;font-weight:700;letter-spacing:0.03em;color:#ec4899;background:rgba(236,72,153,0.12);border-radius:3px;padding:1px 5px;">📄 ${rid}</span><strong>${call.name}</strong></span>`;
+            }
+            updateEphemeral(assistantId, pill);
           },
           onDone: (metrics) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'done', detail: `${metrics.iterations} iter, ${metrics.toolCalls} tools, ${metrics.totalTokens} tokens, ${Math.round(metrics.totalLatencyMs)}ms` }];
