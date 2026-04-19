@@ -665,6 +665,13 @@
             const argsJson = JSON.stringify(call.args, null, 2);
             const resultFull = call.result ?? call.error ?? '';
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'tool', detail: `${tag} ${call.name}(${argsJson}) -> ${resultFull} [${call.elapsed ?? '?'}ms]` }];
+            if (/(^|_)get_recipe$/.test(call.name) && !call.error) {
+              const a = call.args as Record<string, unknown> | undefined;
+              const rid = (typeof a?.id === 'string' && a.id) || (typeof a?.name === 'string' && a.name)
+                || (typeof a?.recipe === 'string' && a.recipe) || (Object.values(a ?? {}).find(v => typeof v === 'string') as string | undefined) || '?';
+              const bodyLen = typeof call.result === 'string' ? call.result.length : 0;
+              agentLogs = [...agentLogs, { ts: Date.now(), type: 'recipe', detail: `📄 loaded: ${rid} (${bodyLen}c ingested)` }];
+            }
             // Store full details for tooltip
             const callId = `tc_${Date.now()}_${chatToolCount}`;
             const detail: ToolCallDetail = {

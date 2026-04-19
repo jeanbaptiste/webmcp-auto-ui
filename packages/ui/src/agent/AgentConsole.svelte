@@ -27,6 +27,7 @@
     prompt: '#6366f1',
     schema: '#06b6d4',
     warning: '#eab308',
+    recipe: '#ec4899',
   };
 
   function fmtTime(ts: number): string {
