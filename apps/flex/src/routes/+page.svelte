@@ -670,7 +670,7 @@
               const rid = (typeof a?.id === 'string' && a.id) || (typeof a?.name === 'string' && a.name)
                 || (typeof a?.recipe === 'string' && a.recipe) || (Object.values(a ?? {}).find(v => typeof v === 'string') as string | undefined) || '?';
               const bodyLen = typeof call.result === 'string' ? call.result.length : 0;
-              agentLogs = [...agentLogs, { ts: Date.now(), type: 'recipe', detail: `📄 loaded: ${rid} (${bodyLen}c ingested)` }];
+              agentLogs = [...agentLogs, { ts: Date.now(), type: 'recipe', detail: `${rid} · ${bodyLen}c ingested` }];
             }
             // Store full details for tooltip
             const callId = `tc_${Date.now()}_${chatToolCount}`;

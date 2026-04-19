@@ -88,6 +88,12 @@
               <span class="ac-tag" class:ac-tag-recette={prov.tag === 'recette'} class:ac-tag-impro={prov.tag === 'impro'}>{prov.tag}</span>
             {/if}
             <span class="ac-detail">{prov.rest}</span>
+          {:else if log.type === 'recipe'}
+            {@const sepIdx = log.detail.indexOf(' · ')}
+            {@const rid = sepIdx > 0 ? log.detail.slice(0, sepIdx) : log.detail}
+            {@const rest = sepIdx > 0 ? log.detail.slice(sepIdx + 3) : ''}
+            <span class="ac-tag ac-tag-recipe">📄 {rid}</span>
+            <span class="ac-detail">{rest}</span>
           {:else}
             <span class="ac-detail">
               {log.detail}
@@ -243,6 +249,10 @@
   .ac-tag-impro {
     color: #fb923c;
     background: rgba(251, 146, 60, 0.1);
+  }
+  .ac-tag-recipe {
+    color: #ec4899;
+    background: rgba(236, 72, 153, 0.1);
   }
 
   .ac-clickable {
