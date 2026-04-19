@@ -50,19 +50,18 @@ Call `widget_display` with component `js-sandbox` passing the JS code from STEP 
 }
 ```
 
-NOTE: if the JS code uses `return`, wrap its result into the DOM so the sandbox shows it:
-`document.getElementById('out').textContent = (function(){ <code> })();`
+Pass the JS code verbatim in the `code` field — no wrapping needed, the recipe already provides a complete IIFE that writes to `#out`.
 
 ### STEP 4 — Render the retex widget
 
-Call `widget_display` with component `kv` and these pairs IN THIS ORDER:
+Call `widget_display` with component `kv` and these rows IN THIS ORDER:
 
 ```
 {
   name: "kv",
   params: {
     title: "🐤 Canary Retex — verbose style",
-    pairs: [
+    rows: [
       ["entry_id", "canary-display"],
       ["entry_token", "CANARY-DISPLAY-A4821"],
       ["entry_phrase", "The fox jumps twice at dawn before the river freezes."],

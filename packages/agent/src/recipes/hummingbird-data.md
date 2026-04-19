@@ -13,11 +13,13 @@ Phrase: "The weaver counts backwards from seven."
 ## JS
 
 ```js
-const p = 'EXEC-HUMMINGBIRD-H2947';
-const a = 23 * 2;
-const b = a + 8;
-const c = b % 10;
-return `${p}-${c}${b}`;
+document.getElementById('out').textContent = (function(){
+  const p = 'EXEC-HUMMINGBIRD-H2947';
+  const a = 23 * 2;
+  const b = a + 8;
+  const c = b % 10;
+  return `${p}-${c}${b}`;
+})();
 ```
 
 Expected: `EXEC-HUMMINGBIRD-H2947-454`

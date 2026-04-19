@@ -15,8 +15,8 @@ Phrase: "Nine moths circle the candle."
 
 1. `get_recipe("hummingbird-middle")` → extract `middleToken`, `middlePhrase`.
 2. `get_recipe("hummingbird-data")` → extract `dataToken`, `dataPhrase`, `jsCode`, `expectedOutput`.
-3. `widget_display({name: "js-sandbox", params: {title: "Hummingbird JS", code: "document.getElementById('out').textContent=(function(){<jsCode from step 2 verbatim>})();", html: "<div id='out' style='font-family:monospace;padding:8px;'></div>", css: "body{margin:0;background:#1a1a1a;color:#eee;}"}})`
-4. `widget_display({name: "kv", params: {title: "🐦 Hummingbird Retex — tight style", pairs: [
+3. `widget_display({name: "js-sandbox", params: {title: "Hummingbird JS", code: "<jsCode from step 2 verbatim>", html: "<div id='out' style='font-family:monospace;padding:8px;'></div>", css: "body{margin:0;background:#1a1a1a;color:#eee;}"}})`
+4. `widget_display({name: "kv", params: {title: "🐦 Hummingbird Retex — tight style", rows: [
      ["entry_id", "hummingbird-display"],
      ["entry_token", "HUMMINGBIRD-DISPLAY-C5619"],
      ["entry_phrase", "Nine moths circle the candle."],

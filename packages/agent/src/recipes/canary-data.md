@@ -14,11 +14,13 @@ CANARY-DATA-B9307
 ## JS code block (must be transcribed verbatim into the retex AND into js-sandbox)
 
 ```js
-const prefix = 'EXEC-CANARY-G4872';
-const a = 17 * 3;
-const b = a - 7;
-const c = b % 10;
-return `${prefix}-${c}${b}`;
+document.getElementById('out').textContent = (function(){
+  const prefix = 'EXEC-CANARY-G4872';
+  const a = 17 * 3;
+  const b = a - 7;
+  const c = b % 10;
+  return `${prefix}-${c}${b}`;
+})();
 ```
 
 ## Expected JS output
