@@ -209,7 +209,6 @@ export async function runAgentLoop(
   const allToolCalls: ToolCall[] = [];
   let lastText = '';
   let finishedNormally = false;
-  let discoveryPhase = false;
   let iterationsWithoutRender = 0;
   let nudgedOnce = false;
   let hasRendered = false;
@@ -320,14 +319,6 @@ export async function runAgentLoop(
     const toolResults: ContentBlock[] = [];
     for (const block of toolBlocks) {
       const call: ToolCall = { id: block.id, name: block.name, args: block.input };
-      const wasDiscovering = discoveryPhase;
-      if (isDiscoveryTool(block.name)) {
-        discoveryPhase = true;
-        call.guided = false;
-      } else {
-        call.guided = wasDiscovering;
-        discoveryPhase = false;
-      }
       const t1 = performance.now();
 
       try {

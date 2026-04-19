@@ -48,12 +48,6 @@
     setTimeout(() => { copyLabel = 'copy'; }, 2000);
   }
 
-  /** Extract provenance tag from tool log detail */
-  function parseProvenance(detail: string): { tag: 'recette' | 'impro' | null; rest: string } {
-    if (detail.startsWith('[recette] ')) return { tag: 'recette', rest: detail.slice(10) };
-    if (detail.startsWith('[impro] ')) return { tag: 'impro', rest: detail.slice(8) };
-    return { tag: null, rest: detail };
-  }
 </script>
 
 <div class="agent-console {cls}">
@@ -82,13 +76,7 @@
              tabindex={log.detail.length > 80 ? 0 : undefined}>
           <span class="ac-ts">{fmtTime(log.ts)}</span>
           <span class="ac-type" style="color:{typeColor[log.type] ?? 'var(--color-text2, #888)'}">{log.type}</span>
-          {#if log.type === 'tool'}
-            {@const prov = parseProvenance(log.detail)}
-            {#if prov.tag}
-              <span class="ac-tag" class:ac-tag-recette={prov.tag === 'recette'} class:ac-tag-impro={prov.tag === 'impro'}>{prov.tag}</span>
-            {/if}
-            <span class="ac-detail">{prov.rest}</span>
-          {:else if log.type === 'recipe'}
+          {#if log.type === 'recipe'}
             {@const sepIdx = log.detail.indexOf(' · ')}
             {@const rid = sepIdx > 0 ? log.detail.slice(0, sepIdx) : log.detail}
             {@const rest = sepIdx > 0 ? log.detail.slice(sepIdx + 3) : ''}
@@ -241,14 +229,6 @@
     padding: 0 3px;
     border-radius: 2px;
     line-height: 1.6;
-  }
-  .ac-tag-recette {
-    color: #4ade80;
-    background: rgba(74, 222, 128, 0.1);
-  }
-  .ac-tag-impro {
-    color: #fb923c;
-    background: rgba(251, 146, 60, 0.1);
   }
   .ac-tag-recipe {
     color: #ec4899;

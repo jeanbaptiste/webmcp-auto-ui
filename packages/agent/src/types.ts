@@ -67,8 +67,6 @@ export interface ToolCall {
   result?: string;
   error?: string;
   elapsed?: number;
-  /** true if this call was preceded by a discovery tool (search_recipes, get_recipe, etc.) */
-  guided?: boolean;
 }
 
 export interface AgentMetrics {

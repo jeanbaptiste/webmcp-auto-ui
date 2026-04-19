@@ -660,10 +660,9 @@
           onToolCall: (call) => {
             chatToolCount++; chatLastTool = call.name;
             allToolsUsed = [...allToolsUsed, call.name];
-            const tag = call.guided ? '[recette]' : '[impro]';
             const argsJson = JSON.stringify(call.args, null, 2);
             const resultFull = call.result ?? call.error ?? '';
-            agentLogs = [...agentLogs, { ts: Date.now(), type: 'tool', detail: `${tag} ${call.name}(${argsJson}) -> ${resultFull} [${call.elapsed ?? '?'}ms]` }];
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'tool', detail: `${call.name}(${argsJson}) -> ${resultFull} [${call.elapsed ?? '?'}ms]` }];
             if (/(^|_)get_recipe$/.test(call.name) && !call.error) {
               const a = call.args as Record<string, unknown> | undefined;
               const rid = (typeof a?.id === 'string' && a.id) || (typeof a?.name === 'string' && a.name)
