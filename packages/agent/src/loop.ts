@@ -184,9 +184,7 @@ export async function runAgentLoop(
     for (const [k, v] of sp.aliasMap) localAliasMap.set(k, v);
   }
 
-  const systemPrompt = maxTokens
-    ? `${baseSystemPrompt}\n\nIMPORTANT: Limit your responses to ${maxTokens} tokens.`
-    : baseSystemPrompt;
+  const systemPrompt = baseSystemPrompt;
 
   const messages: ChatMessage[] = [
     ...initialMessages.map(m => ({
