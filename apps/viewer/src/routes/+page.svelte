@@ -6,9 +6,10 @@
   import { base } from '$app/paths';
   import { WidgetRenderer, Button, Input } from '@webmcp-auto-ui/ui';
   import {
-    decodeHyperSkill, encodeHyperSkill,
+    decodeHyperSkill, encodeHyperSkill, decode,
     getHsParam, type HyperSkill, type HyperSkillMeta,
   } from '@webmcp-auto-ui/sdk';
+  import { parseFrontmatter } from '@webmcp-auto-ui/core';
   import { ExternalLink, Pencil, Plus, Trash2, FlaskConical, GitBranch, Github } from 'lucide-svelte';
 
   interface Block { id: string; type: string; data: Record<string, unknown>; }
@@ -25,6 +26,29 @@
   let showDag = $state(false);
 
   function uid() { return 'b' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36); }
+
+  // Try decodeHyperSkill (JSON). If it fails, fall back to raw decode + markdown/YAML parse.
+  // Wraps the markdown body as a single `code` block so the existing render pipeline can consume it.
+  async function decodeWithMarkdownFallback(url: string): Promise<HyperSkill> {
+    try {
+      return await decodeHyperSkill(url);
+    } catch (jsonErr) {
+      try {
+        const raw = await decode(url);
+        const { frontmatter, body } = parseFrontmatter(raw.content);
+        return {
+          meta: (frontmatter ?? {}) as HyperSkillMeta,
+          content: {
+            blocks: [
+              { type: 'code', data: { lang: 'markdown', code: body } },
+            ],
+          },
+        } as HyperSkill;
+      } catch {
+        throw jsonErr;
+      }
+    }
+  }
 
   function editUrl(): string {
     const prefix = base.replace(/\/viewer$/, '');
@@ -49,7 +73,7 @@
     loading = true;
     error = '';
     try {
-      const decoded = await decodeHyperSkill(url);
+      const decoded = await decodeWithMarkdownFallback(url);
       skill = decoded;
       blocks = extractBlocks(decoded);
       // Update browser URL
@@ -170,7 +194,7 @@
       return;
     }
     try {
-      const decoded = await decodeHyperSkill(window.location.href);
+      const decoded = await decodeWithMarkdownFallback(window.location.href);
       skill = decoded;
       blocks = extractBlocks(decoded);
       buildDag();
