@@ -473,7 +473,6 @@
     if (providerKind === 'gemma') {
       return buildGemmaPrompt({
         systemPrompt: effectivePrompt,
-        tools: providerTools,
       });
     }
     return effectivePrompt;

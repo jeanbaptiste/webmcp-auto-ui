@@ -260,51 +260,92 @@ export class WasmProvider implements LLMProvider {
     // even after our busy guard clears, because GPU resources release asynchronously.
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        let lastToken = '';
-        let repeatCount = 0;
         const MAX_REPEATS = 20;
         const TOOL_CALL_MAX_CHARS = 3000;
 
-        const result = await this.inference.generateResponse(prompt, (partialResult: string, _done: boolean) => {
-          if (options?.signal?.aborted) {
-            this.inference?.cancelProcessing();
+        // ── Chrome M4 memory leak workaround (MediaPipe #6270) ─────────────
+        // Rather than accumulating chunks directly in a closure over the
+        // ProgressListener callback — which pins references and leaks on
+        // Chrome/Mac M4 — we bridge the callback into a ReadableStream and
+        // consume it via a ReadableStreamDefaultReader. Each chunk is fully
+        // processed and released before the next `await reader.read()`, which
+        // lets the GC reclaim intermediate strings between chunks.
+        const inference = this.inference;
+        const signal = options?.signal;
+        const streamControllerRef: { current: ReadableStreamDefaultController<string> | null } = { current: null };
+        const tokenStream = new ReadableStream<string>({
+          start(controller: ReadableStreamDefaultController<string>) {
+            streamControllerRef.current = controller;
+          },
+        });
+
+        const generationPromise = inference.generateResponse(prompt, (partialResult: string, done: boolean) => {
+          if (signal?.aborted) {
+            inference?.cancelProcessing();
+            try { streamControllerRef.current?.close(); } catch {}
             return;
           }
-          // Detect infinite repetition loop (e.g. Gemma repeating 't' 150 times)
-          if (partialResult === lastToken) {
-            repeatCount++;
-            if (repeatCount > MAX_REPEATS) {
-              this.inference?.cancelProcessing();
-              return;
-            }
-          } else {
-            lastToken = partialResult;
-            repeatCount = 0;
-          }
-          fullText += partialResult;
-          tokenCount++;
-          options?.onToken?.(partialResult);
-
-          // Early detect and strip fake tool_response in streaming
-          if (fullText.includes('<|tool_response>') && fullText.includes('<tool_call|>')) {
-            const lastCallEnd = fullText.lastIndexOf('<tool_call|>');
-            const responseStart = fullText.indexOf('<|tool_response>', lastCallEnd);
-            if (responseStart !== -1) {
-              // Gemma is hallucinating a response — cancel immediately
-              this.inference?.cancelProcessing();
-              // Truncate to last valid tool call
-              fullText = fullText.slice(0, lastCallEnd + '<tool_call|>'.length);
-              return;
-            }
-          }
-
-          // Safety: if text grows way too long, force cancel
-          if (fullText.length > TOOL_CALL_MAX_CHARS * 2) {
-            this.inference?.cancelProcessing();
-            return;
+          try { streamControllerRef.current?.enqueue(partialResult); } catch {}
+          if (done) {
+            try { streamControllerRef.current?.close(); } catch {}
           }
         });
 
+        const reader: ReadableStreamDefaultReader<string> = tokenStream.getReader();
+        let lastToken = '';
+        let repeatCount = 0;
+        let cancelledEarly = false;
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            const partialResult = value ?? '';
+
+            // Detect infinite repetition loop (e.g. Gemma repeating 't' 150 times)
+            if (partialResult === lastToken) {
+              repeatCount++;
+              if (repeatCount > MAX_REPEATS) {
+                this.inference?.cancelProcessing();
+                cancelledEarly = true;
+                break;
+              }
+            } else {
+              lastToken = partialResult;
+              repeatCount = 0;
+            }
+            fullText += partialResult;
+            tokenCount++;
+            options?.onToken?.(partialResult);
+
+            // Early detect and strip fake tool_response in streaming
+            if (fullText.includes('<|tool_response>') && fullText.includes('<tool_call|>')) {
+              const lastCallEnd = fullText.lastIndexOf('<tool_call|>');
+              const responseStart = fullText.indexOf('<|tool_response>', lastCallEnd);
+              if (responseStart !== -1) {
+                // Gemma is hallucinating a response — cancel immediately
+                this.inference?.cancelProcessing();
+                // Truncate to last valid tool call
+                fullText = fullText.slice(0, lastCallEnd + '<tool_call|>'.length);
+                cancelledEarly = true;
+                break;
+              }
+            }
+
+            // Safety: if text grows way too long, force cancel
+            if (fullText.length > TOOL_CALL_MAX_CHARS * 2) {
+              this.inference?.cancelProcessing();
+              cancelledEarly = true;
+              break;
+            }
+          }
+        } finally {
+          try { reader.releaseLock(); } catch {}
+          if (cancelledEarly) {
+            try { streamControllerRef.current?.close(); } catch {}
+          }
+        }
+
+        const result = await generationPromise.catch(() => '');
         // Fallback if the streaming callback didn't accumulate
         if (result && !fullText) fullText = result;
         break; // Success — exit retry loop
@@ -325,9 +366,15 @@ export class WasmProvider implements LLMProvider {
       }
     }
 
-    // Strip any standalone <|tool_response> blocks in model output
-    // (the model should never generate these — they're injected by the framework)
-    fullText = fullText.replace(/<\|tool_response>[\s\S]*?<tool_response\|>/g, '');
+    // Strip hallucinated framework tokens the model should never emit on its own:
+    // - <|tool_response>...<tool_response|>  (injected by the framework, never generated)
+    // - <|channel>thought...<channel|>      (ghost thought channels if Gemma emits one
+    //   without <|think|> activation — stray artefacts from pretraining)
+    // - <|think|>                            (stray thinking-mode markers)
+    fullText = fullText
+      .replace(/<\|tool_response>[\s\S]*?<tool_response\|>/g, '')
+      .replace(/<\|channel>thought[\s\S]*?<channel\|>/g, '')
+      .replace(/<\|think\|>/g, '');
 
     const latencyMs = performance.now() - t0;
 
@@ -481,8 +528,10 @@ export class WasmProvider implements LLMProvider {
     return `<|tool_call>call:${name}{${entries.join(',')}}<tool_call|>`;
   }
 
-  private buildPrompt(messages: ChatMessage[], tools: ProviderTool[], systemPrompt?: string): string {
-    return buildGemmaPrompt({ systemPrompt, tools, messages });
+  private buildPrompt(messages: ChatMessage[], _tools: ProviderTool[], systemPrompt?: string): string {
+    // `_tools` is intentionally ignored — tool declarations are embedded inline
+    // inside `systemPrompt` via buildSystemPromptWithAliases({ providerKind: 'gemma' }).
+    return buildGemmaPrompt({ systemPrompt, messages });
   }
 
   destroy() {
@@ -503,38 +552,37 @@ export class WasmProvider implements LLMProvider {
 export interface BuildGemmaPromptInput {
   /** System prompt — expected to already be in Gemma native syntax (use
    *  `buildSystemPromptWithAliases(layers, { providerKind: 'gemma' })`).
-   *  The tool declarations are embedded inside this system prompt — they are
-   *  NOT re-emitted from `tools` by this function anymore. */
+   *  Tool declarations are embedded inline inside this system prompt; this
+   *  function no longer takes a separate `tools` parameter. */
   systemPrompt?: string;
-  /** Provider tools — used only for message serialization (tool_use / tool_result
-   *  ID → name mapping). Declarations live inside `systemPrompt`. */
-  tools: ProviderTool[];
-  /** Conversation turns. Defaults to `[]` (preview mode — no `<|turn>` user/model blocks). */
+  /** Conversation turns. Defaults to `[]` (preview mode — no `<|turn>` user/model blocks).
+   *  Tool-use / tool-result blocks are serialized using the `name` field carried
+   *  by each `tool_use` ContentBlock — no external tool map is required. */
   messages?: ChatMessage[];
 }
 
 /**
- * Build the final Gemma 4 native prompt string from a system prompt, a set of
- * provider tools, and a conversation history.
+ * Build the final Gemma 4 native prompt string from a system prompt and a
+ * conversation history.
  *
  * This is the exact transformation applied by {@link WasmProvider} before
  * calling LlmInference — exported so UI debug panels can display the prompt
  * as it will actually be sent to the model.
  *
  * The system prompt is expected to already be in Gemma native syntax AND to
- * already embed the `<|tool>declaration>` blocks inline — build it with
- * `buildSystemPromptWithAliases(layers, { providerKind: 'gemma' })`.
+ * already embed the `<|tool>declaration:...<tool|>` blocks inline — build it
+ * with `buildSystemPromptWithAliases(layers, { providerKind: 'gemma' })`.
  *
  * Transformations applied:
- * 1. Wraps the system prompt in `<|turn>system\n<|think|>\n...<turn|>` — this
- *    activates Gemma 4's native thinking mode so the model emits its internal
- *    reasoning inside a `<|channel>thought\n...<channel|>` block which is then
- *    stripped from the final user-visible output (see the streaming cleanup in
- *    {@link WasmProvider}).
+ * 1. Wraps the system prompt in `<|turn>system\n...<turn|>`.
  * 2. Serializes messages as `<|turn>user|model\n...<turn|>` with tool_use →
- *    `<|tool_call>`, tool_result → `<|tool_response>`.
+ *    `<|tool_call>` and tool_result → `<|tool_response>`. Each `tool_use`
+ *    block already carries its `name`, so no external tool map is required.
  * 3. Terminates with an open `<|turn>model\n` for generation.
  * 4. No explicit `<bos>` — LlmInference adds it via the tokenizer.
+ *
+ * Thinking mode (`<|think|>`) is not activated here — any stray thought
+ * channels Gemma may emit are stripped post-hoc in {@link WasmProvider}.
  */
 export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
   const { systemPrompt, messages = [] } = input;
