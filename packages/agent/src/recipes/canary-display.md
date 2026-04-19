@@ -45,7 +45,7 @@ Call `widget_display` with component `js-sandbox` passing the JS code from STEP 
     title: "Canary JS execution",
     code: "<PASTE the JS code from canary-data verbatim — do not modify>",
     html: "<div id='out' style='font-family:monospace;padding:8px;'></div>",
-    css: "body{margin:0;background:#1a1a1a;color:#eee;}"
+    css: "body{margin:0;background:#fff;color:#000;font-size:14px;}"
   }
 }
 ```
