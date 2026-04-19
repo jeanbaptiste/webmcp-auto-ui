@@ -325,32 +325,7 @@ export class WasmProvider implements LLMProvider {
       }
     }
 
-    // Clean up hallucinated content after tool calls.
-    // Gemma often hallucinates fake <|tool_response> blocks after <tool_call|>.
-    // Strategy: keep only the FIRST complete tool call, strip everything after.
-    const firstCallStart = fullText.indexOf('<|tool_call>');
-    if (firstCallStart !== -1) {
-      const firstCallEnd = fullText.indexOf('<tool_call|>', firstCallStart);
-      if (firstCallEnd !== -1) {
-        const afterFirstCall = fullText.slice(firstCallEnd + '<tool_call|>'.length);
-        // Check if there's a REAL second tool call (not preceded by a fake tool_response)
-        const nextCallStart = afterFirstCall.indexOf('<|tool_call>');
-        if (nextCallStart !== -1) {
-          // Check if there's a fake tool_response between the two calls
-          const betweenCalls = afterFirstCall.slice(0, nextCallStart);
-          if (betweenCalls.includes('<|tool_response>') || betweenCalls.includes('<tool_response|>')) {
-            // Fake chained response — truncate after first tool call
-            fullText = fullText.slice(0, firstCallEnd + '<tool_call|>'.length);
-          }
-          // Otherwise: legitimate multi-tool call, keep both
-        } else {
-          // No second tool call — truncate any trailing hallucination
-          fullText = fullText.slice(0, firstCallEnd + '<tool_call|>'.length);
-        }
-      }
-    }
-
-    // Also strip any standalone <|tool_response> blocks in model output
+    // Strip any standalone <|tool_response> blocks in model output
     // (the model should never generate these — they're injected by the framework)
     fullText = fullText.replace(/<\|tool_response>[\s\S]*?<tool_response\|>/g, '');
 
