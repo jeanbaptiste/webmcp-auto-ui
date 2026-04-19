@@ -309,6 +309,56 @@ function stripHallucinatedTokens(s: string): string {
     .replace(/<\|think\|>/g, '');
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// parseGemmaArgs — nested & mixed syntax (§6)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('parseGemmaArgs — nested & mixed syntax', () => {
+  const parse = (raw: string): Record<string, unknown> =>
+    (WasmProvider as unknown as { parseGemmaArgs: (r: string) => Record<string, unknown> })
+      .parseGemmaArgs ? (WasmProvider as any).parseGemmaArgs(raw) : (() => { throw new Error('no'); })();
+
+  it('pure Gemma native, nested object + array of arrays', () => {
+    const raw = '{name:<|"|>kv<|"|>,params:{title:<|"|>x<|"|>,rows:[[<|"|>a<|"|>,<|"|>b<|"|>]]}}';
+    expect(parse(raw)).toEqual({
+      name: 'kv',
+      params: { title: 'x', rows: [['a', 'b']] },
+    });
+  });
+
+  it('mixed native + JSON-quoted string with raw newlines, backticks, ${} and apostrophes', () => {
+    const code =
+      "```js\ndocument.getElementById('out').textContent = (function(){\n" +
+      "  const prefix = 'EXEC-HUMMINGBIRD-H2947';\n" +
+      "  return `${prefix}`;\n" +
+      "})();\n```";
+    // Gemma emits this with a real double-quoted string containing raw newlines.
+    const raw = '{name:<|"|>js-sandbox<|"|>,params:{code:' + JSON.stringify(code).replace(/\\n/g, '\n') + '}}';
+    const got = parse(raw);
+    expect(got.name).toBe('js-sandbox');
+    expect((got.params as Record<string, unknown>).code).toBe(code);
+  });
+
+  it('array of Gemma native strings', () => {
+    expect(parse('{tags:[<|"|>a<|"|>,<|"|>b<|"|>,<|"|>c<|"|>]}'))
+      .toEqual({ tags: ['a', 'b', 'c'] });
+  });
+
+  it('empty object {} returns {}', () => {
+    expect(parse('{}')).toEqual({});
+  });
+
+  it('malformed input returns {} (safe fallback)', () => {
+    expect(parse('{name:<|"|>unterminated')).toEqual({});
+    expect(parse('not an object at all')).toEqual({});
+    expect(parse('{name:<|"|>x<|"|>,broken:')).toEqual({});
+  });
+
+  it('numbers, booleans, null are preserved', () => {
+    expect(parse('{n:42,f:-1.5,t:true,fa:false,z:null}'))
+      .toEqual({ n: 42, f: -1.5, t: true, fa: false, z: null });
+  });
+});
+
 describe('stripHallucinatedTokens — spec §9', () => {
   it('removes hallucinated <|tool_response>...<tool_response|> (§9, §10.6)', () => {
     expect(stripHallucinatedTokens('hello<|tool_response>response:x{}<tool_response|>world'))

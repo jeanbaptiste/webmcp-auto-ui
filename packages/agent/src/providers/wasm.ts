@@ -442,20 +442,28 @@ export class WasmProvider implements LLMProvider {
     if (text[startIdx] !== '{') return null;
     const DELIM = '<|"|>';
     let depth = 0;
-    let inString = false;
     let i = startIdx;
     while (i < text.length) {
       if (text.startsWith(DELIM, i)) {
-        inString = !inString;
         i += DELIM.length;
+        const end = text.indexOf(DELIM, i);
+        if (end === -1) return null;
+        i = end + DELIM.length;
         continue;
       }
-      if (!inString) {
-        if (text[i] === '{') depth++;
-        else if (text[i] === '}') {
-          depth--;
-          if (depth === 0) return text.slice(startIdx, i + 1);
+      if (text[i] === '"') {
+        i++;
+        while (i < text.length && text[i] !== '"') {
+          if (text[i] === '\\' && i + 1 < text.length) { i += 2; continue; }
+          i++;
         }
+        i++;
+        continue;
+      }
+      if (text[i] === '{') depth++;
+      else if (text[i] === '}') {
+        depth--;
+        if (depth === 0) return text.slice(startIdx, i + 1);
       }
       i++;
     }
@@ -463,19 +471,62 @@ export class WasmProvider implements LLMProvider {
   }
 
   /**
-   * Parse Gemma native tool call args by normalizing to JSON in one pass.
-   *   1. `<|"|>...<|"|>`      → `"..."`          (string delimiters)
-   *   2. Unquoted keys         → `"quoted":`      (valid JSON keys)
-   * Then `JSON.parse` handles nesting, arrays, numbers, booleans, null natively.
-   * Example: {schema:<|"|>senat<|"|>,params:{data:[{id:1}]}} → {schema:"senat",params:{data:[{id:1}]}}
+   * Parse Gemma native tool call args by normalizing to strict JSON.
+   * Handles both `<|"|>...<|"|>` (Gemma native) and `"..."` (JSON-style, emitted
+   * when the model copies JS-syntax examples from recipe bodies). Raw newlines
+   * inside JSON strings are escaped. Unquoted keys are quoted.
    */
   private static parseGemmaArgs(raw: string): Record<string, unknown> {
-    const jsonStr = raw
-      .replace(/<\|"\|>([\s\S]*?)<\|"\|>/g, (_, s) => JSON.stringify(s))
-      .replace(/([{,])\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
+    const DELIM = '<|"|>';
+    let out = '';
+    let i = 0;
+    while (i < raw.length) {
+      if (raw.startsWith(DELIM, i)) {
+        i += DELIM.length;
+        const end = raw.indexOf(DELIM, i);
+        if (end === -1) return {};
+        out += JSON.stringify(raw.slice(i, end));
+        i = end + DELIM.length;
+        continue;
+      }
+      const c = raw[i];
+      if (c === '"') {
+        let content = '';
+        i++;
+        while (i < raw.length && raw[i] !== '"') {
+          const ch = raw[i];
+          if (ch === '\\' && i + 1 < raw.length) { content += ch + raw[i + 1]; i += 2; continue; }
+          if (ch === '\n') content += '\\n';
+          else if (ch === '\r') content += '\\r';
+          else if (ch === '\t') content += '\\t';
+          else content += ch;
+          i++;
+        }
+        if (i >= raw.length) return {};
+        out += '"' + content + '"';
+        i++;
+        continue;
+      }
+      if (c === '{' || c === ',') {
+        out += c;
+        i++;
+        while (i < raw.length && /\s/.test(raw[i])) { out += raw[i++]; }
+        const keyStart = i;
+        while (i < raw.length && /[a-zA-Z0-9_$]/.test(raw[i])) i++;
+        if (i > keyStart) {
+          let j = i;
+          while (j < raw.length && /\s/.test(raw[j])) j++;
+          if (raw[j] === ':') out += '"' + raw.slice(keyStart, i) + '"';
+          else out += raw.slice(keyStart, i);
+        }
+        continue;
+      }
+      out += c;
+      i++;
+    }
     try {
-      const parsed = JSON.parse(jsonStr);
-      return (typeof parsed === 'object' && parsed !== null) ? parsed : {};
+      const parsed = JSON.parse(out);
+      return (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) ? parsed : {};
     } catch {
       return {};
     }
