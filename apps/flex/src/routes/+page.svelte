@@ -652,8 +652,17 @@
                 lastLoggedTextLen = text.length;
                 agentLogs = [...agentLogs, { ts: Date.now(), type: 'text', detail: text }];
               }
-              // Strip Gemma tool call tags from ephemeral display
-              const clean = text.replace(/<\|tool_call>[\s\S]*?(<tool_call\|>)?/g, '').replace(/<\|tool_response>[\s\S]*?(<tool_response\|>)?/g, '').replace(/<\|"\|>/g, '').trim();
+              // Strip Gemma tool call tags from ephemeral display.
+              // Handle both closed and unclosed (mid-stream) tags — a bare
+              // non-greedy + optional closing matches only the opening tag
+              // and leaks the body into the pill until the closing arrives.
+              const clean = text
+                .replace(/<\|tool_call>[\s\S]*?<tool_call\|>/g, '')
+                .replace(/<\|tool_call>[\s\S]*$/g, '')
+                .replace(/<\|tool_response>[\s\S]*?<tool_response\|>/g, '')
+                .replace(/<\|tool_response>[\s\S]*$/g, '')
+                .replace(/<\|"\|>/g, '')
+                .trim();
               if (clean) updateEphemeral(assistantId, clean);
             }
           },
