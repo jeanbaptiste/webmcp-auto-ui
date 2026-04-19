@@ -94,9 +94,7 @@ export interface AgentLoopOptions {
   temperature?: number;
   topK?: number;
   cacheEnabled?: boolean;
-  /** System prompt as a string or a thunk. When a thunk, it's invoked each iteration — useful
-   *  for refreshing time-sensitive fields (e.g. current date) without rebuilding the whole loop. */
-  systemPrompt?: string | (() => string);
+  systemPrompt?: string;
   initialMessages?: ChatMessage[]; // conversation history from previous turns
   callbacks?: AgentCallbacks;
   signal?: AbortSignal;
@@ -175,38 +173,20 @@ export async function runAgentLoop(
     trace.clear();
   }
 
-  // Resolve systemPrompt: may be a plain string, a thunk (called per iteration for freshness),
-  // or absent (rebuild from layers). Thunk is captured once; we invoke it at each iteration.
-  const userSystemPrompt: string | (() => string) | undefined = options.systemPrompt;
-  const isThunkSystemPrompt = typeof userSystemPrompt === 'function';
-
-  if (!userSystemPrompt) {
-    // Seed localAliasMap from initial buildSystemPromptWithAliases (for alias resolution)
+  let baseSystemPrompt: string;
+  if (options.systemPrompt) {
+    baseSystemPrompt = options.systemPrompt;
+  } else {
     const sp = buildSystemPromptWithAliases(options.layers ?? [], {
       providerKind: provider.promptKind ?? 'generic',
     });
+    baseSystemPrompt = sp.prompt;
     for (const [k, v] of sp.aliasMap) localAliasMap.set(k, v);
   }
 
-  /** Resolve the current system prompt, applying the maxTokens suffix if set. */
-  const resolveSystemPrompt = (): string => {
-    let base: string;
-    if (isThunkSystemPrompt) {
-      base = (userSystemPrompt as () => string)();
-    } else if (typeof userSystemPrompt === 'string') {
-      base = userSystemPrompt;
-    } else {
-      // No user override — rebuild default prompt
-      base = buildSystemPromptWithAliases(options.layers ?? [], {
-        providerKind: provider.promptKind ?? 'generic',
-      }).prompt;
-    }
-    return maxTokens
-      ? `${base}\n\nIMPORTANT: Limit your responses to ${maxTokens} tokens.`
-      : base;
-  };
-
-  const systemPrompt = resolveSystemPrompt();
+  const systemPrompt = maxTokens
+    ? `${baseSystemPrompt}\n\nIMPORTANT: Limit your responses to ${maxTokens} tokens.`
+    : baseSystemPrompt;
 
   const messages: ChatMessage[] = [
     ...initialMessages.map(m => ({
@@ -258,8 +238,7 @@ export async function runAgentLoop(
     }
 
     // Nano-RAG: inject relevant context before LLM call
-    // Re-resolve system prompt each iteration when it's a thunk (for time-sensitive fields like current date)
-    let iterationSystemPrompt = isThunkSystemPrompt ? resolveSystemPrompt() : systemPrompt;
+    let iterationSystemPrompt = systemPrompt;
     if (contextRAG && contextRAG.size > 0) {
       const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
       const queryText = typeof lastUserMsg?.content === 'string'
@@ -355,24 +334,6 @@ export async function runAgentLoop(
 
         // Parse tool name: {serverName}_{protocol}_{toolName}
         const toolMatch = resolvedName.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
-
-        // ── Global (non-prefixed) discovery tools — allRecipes, allTools, get_recipe ──
-        // When the LLM calls a bare tool name like `allRecipes(server: "tricoteuses")`,
-        // route it through DiscoveryCache.resolveGlobal() instead of dispatching to a server.
-        if (discoveryCache && !toolMatch) {
-          const globalResult = discoveryCache.resolveGlobal(resolvedName, block.input as Record<string, unknown>, trace);
-          if (globalResult !== null) {
-            result = globalResult;
-            resultBuffer.set(block.id, result);
-            call.result = result;
-            toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result });
-            call.elapsed = Math.round(performance.now() - t1);
-            metrics.toolCalls++;
-            allToolCalls.push(call);
-            callbacks.onToolCall?.(call);
-            continue;
-          }
-        }
 
         // ── Discovery cache — resolve search/list/get locally if cached ──
         if (discoveryCache && toolMatch) {

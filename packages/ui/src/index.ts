@@ -99,4 +99,3 @@ export { default as EphemeralBubble } from './agent/EphemeralBubble.svelte';
 export { default as TokenBubble } from './agent/TokenBubble.svelte';
 export { default as DiagnosticModal } from './agent/DiagnosticModal.svelte';
 export { default as DiagnosticIcon } from './agent/DiagnosticIcon.svelte';
-export { default as AdvancedPromptModal } from './agent/AdvancedPromptModal.svelte';

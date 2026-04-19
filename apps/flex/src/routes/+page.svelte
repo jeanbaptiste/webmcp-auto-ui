@@ -55,7 +55,6 @@
   let compressHistory = $state(false);
   let compressPreview = $state(500);
   let systemPrompt = $state('');
-  let advancedPromptTemplate = $state('default');
   let localUrl = $state('http://localhost:11434');
   let localModel = $state('');
   let composerMode = $state(true); // true = composer, false = consumer
@@ -221,24 +220,10 @@
           if (text?.text) {
             const parsed = JSON.parse(text.text);
             const rawRecipes: any[] = Array.isArray(parsed) ? parsed : (parsed?.recipes ?? []);
-            const base = rawRecipes.map((r) => ({
+            cacheRecipes = rawRecipes.map((r) => ({
               ...r,
               name: r.name ?? r.id ?? r.recipe_id ?? '(unnamed)',
               id: r.id ?? r.name,
-            }));
-            // Pre-fetch full bodies in parallel so agents see real instructions, not metadata.
-            cacheRecipes = await Promise.all(base.map(async (b) => {
-              try {
-                const res = await multiClient.callToolOn(url.trim(), 'get_recipe', { name: b.name, id: b.id });
-                const t = (res.content?.find((c: any) => c.type === 'text') as any)?.text;
-                if (!t) return b;
-                let body = t;
-                try {
-                  const p = JSON.parse(t);
-                  if (p && typeof p === 'object' && typeof p.content === 'string') body = p.content;
-                } catch { /* raw text */ }
-                return { ...b, body };
-              } catch { return b; }
             }));
           }
         } catch { /* no recipes */ }
@@ -354,10 +339,10 @@
     compressHistory = isLocal;
     schemaStrict = false;
     if (isGemma) {
-      maxResultLength = 16000;
+      maxResultLength = 2000;
       ragResidueSize = 500;
-      temperature = 1.0;
-      topK = 64;
+      temperature = 0.7;
+      topK = 40;
       maxContextTokens = isE4B ? 32768 : 32768;
       cacheEnabled = false;
     } else if (isLocal) {
@@ -408,7 +393,7 @@
     // Build with the provider-specific tool syntax. For Gemma, emit native
     // `<|tool_call>call:...{}<tool_call|>` references directly — no runtime regex rewrite.
     const kind = providerKind === 'gemma' ? 'gemma' : 'generic';
-    const base = buildSystemPrompt(layers, { providerKind: kind, template: advancedPromptTemplate });
+    const base = buildSystemPrompt(layers, { providerKind: kind });
     // If the user customised the prompt in settings, it REPLACES base entirely
     const hasCustom = systemPrompt && systemPrompt.trim().length > 0;
     return hasCustom ? systemPrompt : base;
@@ -554,13 +539,7 @@
       result = await runAgentLoop(msg, {
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
-        // Thunk: refreshes current date + any other time-sensitive fields at each iteration.
-        systemPrompt: () => {
-          const kind = providerKind === 'gemma' ? 'gemma' : 'generic';
-          const base = buildSystemPrompt(layers, { providerKind: kind, template: advancedPromptTemplate });
-          const hasCustom = systemPrompt && systemPrompt.trim().length > 0;
-          return hasCustom ? systemPrompt : base;
-        },
+        systemPrompt: effectivePrompt || undefined,
         maxIterations: 15, maxTokens, maxResultLength, temperature, topK, cacheEnabled,
         truncateResults, compressHistory: compressHistory ? compressPreview : false,
         signal: abortController!.signal,
@@ -866,7 +845,7 @@
   bind:open={settingsOpen}
   bind:composerMode bind:layoutMode bind:includeSummary
   onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true} onclear={clearAll}
-  bind:mcpToken bind:systemPrompt bind:advancedPromptTemplate effectivePrompt={displayedPrompt} bind:maxTokens bind:maxContextTokens bind:maxResultLength
+  bind:mcpToken bind:systemPrompt effectivePrompt={displayedPrompt} bind:maxTokens bind:maxContextTokens bind:maxResultLength
   bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:showPipelineTrace
   bind:schemaFlatten bind:schemaStrict {providerKind} bind:compressHistory bind:compressPreview
   bind:contextRAGEnabled bind:ragResidueSize

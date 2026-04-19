@@ -7,7 +7,6 @@ import { sanitizeSchema, sanitizeSchemaWithReport, flattenSchema } from '@webmcp
 import type { SchemaPatch } from '@webmcp-auto-ui/core';
 import { DiscoveryCache, type ServerCache } from './discovery-cache.js';
 import type { PipelineTrace } from './pipeline-trace.js';
-import { SERVER_SLUGS } from './server-slugs.js';
 
 /** Sanitize a server name for use in tool name prefixes.
  *  Returns a clean underscore-separated identifier with no "mcp"/"server" noise.
@@ -462,7 +461,7 @@ export interface SystemPromptResult {
  */
 export function buildSystemPromptWithAliases(
   layers: ToolLayer[],
-  options: { providerKind?: ProviderKind; template?: string } = {},
+  options: { providerKind?: ProviderKind } = {},
 ): SystemPromptResult {
   const kind = options.providerKind ?? 'generic';
   const mcpLayers = layers.filter((l): l is McpLayer => l.protocol === 'mcp');
@@ -611,56 +610,51 @@ export function buildSystemPromptWithAliases(
   let prompt: string;
 
   if (kind === 'gemma') {
-    const template = options.template ?? 'default';
-
-    // Pre-split by DATA/DISPLAY
-    const dataListRecipes = listRecipesByCat.data.join('\n');
-    const displayListRecipes = listRecipesByCat.display.join('\n');
-    const dataSearchRecipes = searchRecipesByCat.data.join('\n');
-    const displaySearchRecipes = searchRecipesByCat.display.join('\n');
+    // ── Minimalist template for Gemma (4B/E4B), inline declarations included ──
+    const dataListSearch = [
+      ...listRecipesByCat.data,
+      ...searchRecipesByCat.data,
+    ].join('\n');
+    const displayListSearch = [
+      ...listRecipesByCat.display,
+      ...searchRecipesByCat.display,
+    ].join('\n');
     const allGetRecipes = [
       ...getRecipesByCat.data,
       ...getRecipesByCat.display,
     ].join('\n');
 
-    if (template === 'gemma-google-style') {
-      // ── Google-style: pre-baked skill catalog, no list/search discovery ──
-      const bakedSkills: string[] = [];
-      for (const l of layers) {
-        const prefix = `${sanitizeServerName(l.serverName)}_${l.protocol}_`;
-        const recipes = ((l as any).recipes ?? []) as Array<{ name: string; description?: string }>;
-        for (const r of recipes) {
-          const desc = (r.description || '').split('\n')[0].slice(0, 120);
-          bakedSkills.push(`- ${prefix}${r.name}${desc ? ` — ${desc}` : ''}`);
-        }
-      }
+    prompt = `Route: DATA (fetch) or DISPLAY (render). Greetings → chat.
 
-      prompt = `YOU are an AI assistant. Answer the user by executing SKILLS (named procedures with schemas and instructions).
+STEP 1 — List or search a recipe.
+DATA:
+${dataListSearch}
+DISPLAY:
+${displayListSearch}
+The result is for YOU. Pick the best match and go to STEP 2. Never ask the user to choose.
 
-YOU MUST execute all three steps silently. YOU MUST NOT expose intermediate output to the user.
-
-SKILL CATALOG:
-${bakedSkills.join('\n')}
-
-STEP 1 — Pick the single most relevant skill from the catalog above.
-
-STEP 2 — Load the skill:
+STEP 2 — Read the recipe.
 ${allGetRecipes}
-Pass the skill name from STEP 1.
 
-STEP 3 — Execute the loaded instructions. Reply ONLY the final result, one line summary + output.
-
-Action tools (for display skills):
+STEP 3 — Execute using the schema from STEP 2.
+- Data: follow the recipe (SQL / FTS / script).
+- Display: call widget_display(name, params).
 ${actionTools.join('\n')}
+If no recipe fits, use a tool directly:
+${listTools.join('\n')}
+${searchTools.join('\n')}
+Only use data returned by tools or given by the user. Never fabricate.
 
-YOU MUST NOT respond before STEP 3. Execute silently.`;
-    } else if (template === 'gemma-strict-cascade') {
-      // ── Strict 5-step cascade with "MUST NOT skip steps" rule ──
-      prompt = `You are an AI assistant that helps users by answering their questions and completing tasks using recipes (also called skills) — instructions for an AI agent with scripts, schemas, and information. If no recipe or tool fits, fall back to a traditional chat (STEP 5).
+Reply: one-line summary + result.`;
+  } else {
+    // ── Existing generic template for Claude/remote — DO NOT MODIFY ──
+    const reasoningRule = 'Do not narrate your process in the response. Internal reasoning is permitted but must not appear in the final output. For trivial conversational messages such as greetings or small talk, skip directly to STEP 5.';
+
+    prompt = `You are an AI assistant that helps users by answering their questions and completing tasks using recipes (also called skills) — instructions for an AI agent with scripts, schemas, and information. If no recipe or tool fits, fall back to a traditional chat (STEP 5).
 
 You MUST NOT skip steps.
 
-CRITICAL RULE: Do not output reasoning, thinking, or intermediate text in the final response. For trivial conversational messages such as greetings or small talk, skip directly to STEP 5.
+CRITICAL RULE: ${reasoningRule}
 
 STEP 1 — List all recipes
 
@@ -722,377 +716,6 @@ widget_display may ONLY be called with data returned by a non-autoui DATA tool a
 STEP 5 — Fallback
 
 If previous steps failed, fall back to a classic chat without tool calling.`;
-    } else if (template === 'ghost') {
-      // ── Ghost: Claude prompt (post-fixes) with Gemma tool-declaration syntax ──
-      const reasoningRule = 'Do not narrate your process in the response. Internal reasoning is permitted but must not appear in the final output.';
-
-      prompt = `You are an AI assistant that helps users by answering their questions and completing tasks using recipes (also called skills) — instructions for an AI agent with scripts, schemas, and information. If no recipe or tool fits, fall back to a traditional chat (STEP 5).
-
-CRITICAL RULE: ${reasoningRule}
-
-STEP 1 — List all recipes
-
-Call one of these tools to list available recipes:
-
-${listRecipes.join('\n')}
-
-If at least one relevant recipe is found → go to STEP 2.
-If no results → go to STEP 1b.
-
-STEP 1b — Search recipes
-
-Search recipes (fallback from STEP 1):
-
-${searchRecipes.join('\n')}
-
-Pick the most relevant recipe for the request.
-If a recipe matches → go to STEP 2.
-If no recipe is available or relevant → go to STEP 1c.
-
-STEP 1c — List tools
-
-No applicable recipe. List a relevant tool:
-
-${listTools.join('\n')}
-
-If a relevant tool is found → use it directly to respond (go to STEP 3).
-If no results → go to STEP 1d.
-
-STEP 1d — Search tools
-
-${searchTools.join('\n')}
-
-Pick the most relevant tool(s) and use them to respond (go to STEP 3).
-
-STEP 2 — Read the recipe
-
-${getRecipes.join('\n')}
-The id comes from the result of list_recipes (STEP 1) or search_recipes (STEP 1b), whichever was called.
-
-Read the full instructions of the selected recipe.
-
-STEP 3 — Execute
-
-Prefer recipes over direct tool calls when a recipe matches the task. Use low-level tools (DB queries, schema introspection, raw scripts) only when invoked from within a recipe's instructions.
-
-Follow the recipe instructions exactly if you have one. Otherwise use the tools directly.
-
-Output format: (1) a one-sentence summary of the action performed, then (2) the result. Nothing else.
-
-STEP 4 — UI display
-
-Unless a recipe specifies otherwise, use these tools to display your responses on the canvas:
-
-${actionTools.join('\n')}
-
-widget_display requires data from a DATA tool call made earlier in this session. Without such data, reply in plain text instead of displaying. Never fabricate IDs, URLs, names, dates, or content not returned by a tool.
-
-STEP 5 — Plain chat (no tools)
-
-Use when: (a) the request is a greeting / small talk, (b) no recipe or tool fits, (c) previous steps failed to yield a match.`;
-    } else if (template === 'gemma-lazy-cascade') {
-      // ── Previous default: lazy cascade, DATA/DISPLAY split, Gemma syntax ──
-      prompt = `You answer the user using recipes (skills) or direct tools. For greetings/small talk → reply directly with no tools.
-
-Route: DATA (fetch) or DISPLAY (render on canvas).
-
-STEP 1 — List recipes (try first, cheapest):
-DATA:
-${dataListRecipes}
-DISPLAY:
-${displayListRecipes}
-If a relevant recipe appears → STEP 2. Else → STEP 1b.
-
-STEP 1b — Search recipes (fallback from STEP 1):
-DATA:
-${dataSearchRecipes}
-DISPLAY:
-${displaySearchRecipes}
-If a recipe matches → STEP 2. Else → STEP 1c.
-
-STEP 1c — List tools directly:
-${listTools.join('\n')}
-If a relevant tool appears → use it directly (skip STEP 2, GO STEP 3). Else → STEP 1d.
-
-STEP 1d — Search tools with a keyword:
-${searchTools.join('\n')}
-Pick the best tool and use it directly (GO STEP 3). If nothing fits → reply without tools.
-
-STEP 2 — Read the recipe (only if STEP 1 or 1b found a match):
-${allGetRecipes}
-
-STEP 3 — Execute.
-- Data: follow the recipe (SQL / FTS / script) or the tool from STEP 1c/1d.
-- Display: call widget_display(name, params).
-${actionTools.join('\n')}
-
-Only use data returned by tools or given by the user. Never fabricate.
-Reply: one-line summary + result.`;
-    } else if (template === 'gemma-lazy-discovery') {
-      // ── Archived previous default: lazy discovery via 3 globals, single flow ──
-      const currentDateTime = new Date().toISOString();
-
-      const mcpServersList = mcpLayers.map(l => {
-        const slug = l.description || SERVER_SLUGS[l.serverName.toLowerCase()] || '';
-        return `- ${l.serverName}${slug ? ` — ${slug}` : ''}`;
-      }).join('\n') || '(none)';
-
-      const webmcpServersList = webmcpLayers.map(l => {
-        const slug = l.description || SERVER_SLUGS[l.serverName.toLowerCase()] || '';
-        return `- ${l.serverName}${slug ? ` — ${slug}` : ''}`;
-      }).join('\n') || '(none)';
-
-      const discoveryToolsDeclarations = [
-        formatGemmaToolDeclaration({
-          name: 'allRecipes',
-          description: 'List recipe names + descriptions for a specific server (light, no body).',
-          input_schema: {
-            type: 'object',
-            properties: { server: { type: 'string', description: 'Server name as listed above.' } },
-            required: ['server'],
-          },
-        }),
-        formatGemmaToolDeclaration({
-          name: 'allTools',
-          description: 'List ALL tools (with full input schemas) for a specific server.',
-          input_schema: {
-            type: 'object',
-            properties: { server: { type: 'string', description: 'Server name as listed above.' } },
-            required: ['server'],
-          },
-        }),
-        formatGemmaToolDeclaration({
-          name: 'get_recipe',
-          description: 'Retrieve full body + instructions of a specific recipe on a specific server.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              name: { type: 'string', description: 'Exact recipe name as returned by allRecipes.' },
-              server: { type: 'string', description: 'Server name as listed above.' },
-            },
-            required: ['name', 'server'],
-          },
-        }),
-      ].join('\n');
-
-      const webmcpToolsDeclarations = webmcpLayers.flatMap(l => {
-        const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
-        const names = ['widget_display', 'canvas', 'recall'];
-        return names
-          .filter(n => l.tools.some(t => t.name === n))
-          .map(n => providerToolsByName.get(`${prefix}${n}`))
-          .filter((t): t is ProviderTool => !!t)
-          .map(t => formatGemmaToolDeclaration(t));
-      }).join('\n') || '(no display tools available)';
-
-      prompt = `We are the ${currentDateTime}
-
-You are an AI assistant that helps users by answering questions and completes tasks using recipes.
-
-For EVERY new task or request or question, you MUST execute the following steps in exact order.
-
-CRITICAL RULE: You MUST execute all steps silently. Do NOT generate or output any internal thoughts, reasoning, explanations, or intermediate text at ANY step.
-
-You MUST answer the user using tools you call.
-
-Recipes are PROCEDURES (markdown with SQL, scripts, or tool-call examples), NOT tools. To execute a recipe:
-1. List recipes: call allRecipes(server)
-2. Load the chosen recipe: call get_recipe(name, server) — returns full instructions
-3. Follow the instructions: they tell you which DATA tools to call. If you need a tool's schema, call allTools(server)
-4. Render the result: call widget_display if the user wants a visual
-
-Never call a recipe name as a tool. Never fabricate data — only use data returned by an actual tool call.
-
-There are two kind of servers: MCP servers for DATA retrieval and WebMCP servers for UI display.
-
-Outside of tool calling e.g. greetings or small talk, or if tool calling fails, reply directly in a chat.
-
-Currently connected MCP servers (DATA):
-
-${mcpServersList}
-
-MCP tools (call with a specific server name to explore):
-
-${discoveryToolsDeclarations}
-
-Currently connected WebMCP servers (UI display):
-
-${webmcpServersList}
-
-WebMCP tools (full schemas — always callable to render on canvas):
-
-${webmcpToolsDeclarations}`;
-    } else {
-      // ── Default: two-workflow prompt (A: browse catalog, B: execute task) ──
-      // Explicit workflow picking to avoid Gemma freezing or asking for clarification.
-      const currentDateTime = new Date().toISOString();
-
-      const mcpServersList = mcpLayers.map(l => {
-        const slug = l.description || SERVER_SLUGS[l.serverName.toLowerCase()] || '';
-        return `- ${l.serverName}${slug ? ` — ${slug}` : ''}`;
-      }).join('\n') || '(none)';
-
-      const webmcpServersList = webmcpLayers.map(l => {
-        const slug = l.description || SERVER_SLUGS[l.serverName.toLowerCase()] || '';
-        return `- ${l.serverName}${slug ? ` — ${slug}` : ''}`;
-      }).join('\n') || '(none)';
-
-      const discoveryToolsDeclarations = [
-        formatGemmaToolDeclaration({
-          name: 'allRecipes',
-          description: 'List recipe names + descriptions for a specific server (light, no body).',
-          input_schema: {
-            type: 'object',
-            properties: { server: { type: 'string', description: 'Server name as listed above.' } },
-            required: ['server'],
-          },
-        }),
-        formatGemmaToolDeclaration({
-          name: 'allTools',
-          description: 'List ALL tools (with full input schemas) for a specific server.',
-          input_schema: {
-            type: 'object',
-            properties: { server: { type: 'string', description: 'Server name as listed above.' } },
-            required: ['server'],
-          },
-        }),
-        formatGemmaToolDeclaration({
-          name: 'get_recipe',
-          description: 'Retrieve full body + instructions of a specific recipe on a specific server.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              name: { type: 'string', description: 'Exact recipe name as returned by allRecipes.' },
-              server: { type: 'string', description: 'Server name as listed above.' },
-            },
-            required: ['name', 'server'],
-          },
-        }),
-      ].join('\n');
-
-      const webmcpToolsDeclarations = webmcpLayers.flatMap(l => {
-        const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
-        const names = ['widget_display', 'canvas', 'recall'];
-        return names
-          .filter(n => l.tools.some(t => t.name === n))
-          .map(n => providerToolsByName.get(`${prefix}${n}`))
-          .filter((t): t is ProviderTool => !!t)
-          .map(t => formatGemmaToolDeclaration(t));
-      }).join('\n') || '(no display tools available)';
-
-      prompt = `We are the ${currentDateTime}
-
-You are an AI assistant that helps users by answering questions and completing tasks using recipes and tools.
-
-There are two kinds of servers: MCP servers for DATA retrieval and WebMCP servers for UI display.
-
-CRITICAL RULE: You MUST execute all steps silently. Do NOT generate internal thoughts, reasoning, explanations, or intermediate text between steps.
-
-You MUST answer the user by calling tools. You MUST pick the workflow that matches the user's request and execute it fully:
-
-WORKFLOW A — User wants to browse/see what's available ("list the recipes", "what can you do", "show me the MCP tools"):
-1. Call allRecipes(server) for each relevant server — the server comes from the MCP/WebMCP listings below.
-2. Call widget_display to render the list on canvas. Use the recipe names + descriptions returned by allRecipes as the data payload. Do NOT summarize in plain text.
-
-WORKFLOW B — User wants to execute a task ("show me the last 3 votes", "get the latest amendments", "find bills about climate"):
-1. Pick the target server from the listings below based on the topic.
-2. Call allRecipes(server) to list recipe names + descriptions.
-3. Call get_recipe(name, server) on the best match — returns full instructions.
-4. Follow the recipe's instructions: call the DATA tools it references. If you need a tool's schema, call allTools(server).
-5. Call widget_display to render the result on canvas.
-
-HARD RULES:
-- NEVER call a recipe name as a tool. Recipes are markdown procedures, not tools.
-- NEVER fabricate data. Only use values returned by an actual tool call in this session.
-- NEVER ask the user to clarify, choose, or confirm — pick the best match and execute.
-- NEVER reply in plain text when a workflow applies. Always render via widget_display.
-
-Only exception: pure greetings or small talk with no task ("hi", "thanks") — reply directly without tools.
-
-Currently connected MCP servers (DATA):
-
-${mcpServersList}
-
-MCP tools (call with a specific server name to explore):
-
-${discoveryToolsDeclarations}
-
-Currently connected WebMCP servers (UI display):
-
-${webmcpServersList}
-
-WebMCP tools (full schemas — always callable to render on canvas):
-
-${webmcpToolsDeclarations}`;
-    }
-  } else {
-    // ── Existing generic template for Claude/remote — DO NOT MODIFY ──
-    const reasoningRule = 'Do not narrate your process in the response. Internal reasoning is permitted but must not appear in the final output.';
-
-    prompt = `You are an AI assistant that helps users by answering their questions and completing tasks using recipes (also called skills) — instructions for an AI agent with scripts, schemas, and information. If no recipe or tool fits, fall back to a traditional chat (STEP 5).
-
-CRITICAL RULE: ${reasoningRule}
-
-STEP 1 — List all recipes
-
-Call one of these tools to list available recipes:
-
-${listRecipes.join('\n')}
-
-If at least one relevant recipe is found → go to STEP 2.
-If no results → go to STEP 1b.
-
-STEP 1b — Search recipes
-
-Search recipes (fallback from STEP 1):
-
-${searchRecipes.join('\n')}
-
-Pick the most relevant recipe for the request.
-If a recipe matches → go to STEP 2.
-If no recipe is available or relevant → go to STEP 1c.
-
-STEP 1c — List tools
-
-No applicable recipe. List a relevant tool:
-
-${listTools.join('\n')}
-
-If a relevant tool is found → use it directly to respond (go to STEP 3).
-If no results → go to STEP 1d.
-
-STEP 1d — Search tools
-
-${searchTools.join('\n')}
-
-Pick the most relevant tool(s) and use them to respond (go to STEP 3).
-
-STEP 2 — Read the recipe
-
-${getRecipes.join('\n')}
-The id comes from the result of list_recipes (STEP 1) or search_recipes (STEP 1b), whichever was called.
-
-Read the full instructions of the selected recipe.
-
-STEP 3 — Execute
-
-Prefer recipes over direct tool calls when a recipe matches the task. Use low-level tools (DB queries, schema introspection, raw scripts) only when invoked from within a recipe's instructions.
-
-Follow the recipe instructions exactly if you have one. Otherwise use the tools directly.
-
-Output format: (1) a one-sentence summary of the action performed, then (2) the result. Nothing else.
-
-STEP 4 — UI display
-
-Unless a recipe specifies otherwise, use these tools to display your responses on the canvas:
-
-${actionTools.join('\n')}
-
-widget_display requires data from a DATA tool call made earlier in this session. Without such data, reply in plain text instead of displaying. Never fabricate IDs, URLs, names, dates, or content not returned by a tool.
-
-STEP 5 — Plain chat (no tools)
-
-Use when: (a) the request is a greeting / small talk, (b) no recipe or tool fits, (c) previous steps failed to yield a match.`;
   }
 
   // Note: for Gemma (kind === 'gemma'), tool declarations are emitted INLINE at each
@@ -1105,7 +728,7 @@ Use when: (a) the request is a greeting / small talk, (b) no recipe or tool fits
  *  Also populates the deprecated global toolAliasMap for legacy consumers.
  *  For parallel-safe usage, use buildSystemPromptWithAliases() instead.
  */
-export function buildSystemPrompt(layers: ToolLayer[], options?: { providerKind?: ProviderKind; template?: string }): string {
+export function buildSystemPrompt(layers: ToolLayer[], options?: { providerKind?: ProviderKind }): string {
   const { prompt, aliasMap } = buildSystemPromptWithAliases(layers, options);
 
   // Populate deprecated global singleton for backward compat

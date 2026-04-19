@@ -32,9 +32,6 @@ export type { ToolLayer, McpLayer, WebMcpLayer, SystemPromptResult, DiscoveryToo
 export { DiscoveryCache, DISCOVERY_TOOL_NAMES } from './discovery-cache.js';
 export type { CachedRecipe, ServerCache } from './discovery-cache.js';
 
-// Server slugs — default descriptions for well-known servers
-export { SERVER_SLUGS } from './server-slugs.js';
-
 // Re-export core WebMCP types
 export type { WebMcpServer, WebMcpToolDef, WidgetEntry } from '@webmcp-auto-ui/core';
 

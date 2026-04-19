@@ -8,11 +8,7 @@ import type { ProviderTool } from './types.js';
 import type { PipelineTrace } from './pipeline-trace.js';
 
 /** Tool names that are resolved locally from cache — hidden from user-facing browsers. */
-export const DISCOVERY_TOOL_NAMES = new Set([
-  'list_recipes', 'search_recipes', 'get_recipe',
-  'list_tools', 'search_tools',
-  'allRecipes', 'allTools', // global (non-prefixed) discovery tools
-]);
+export const DISCOVERY_TOOL_NAMES = new Set(['list_recipes', 'search_recipes', 'get_recipe', 'list_tools', 'search_tools']);
 
 export interface CachedRecipe {
   name: string;
@@ -166,65 +162,5 @@ export class DiscoveryCache {
       default:
         return null;
     }
-  }
-
-  /**
-   * Resolve a global (non-prefixed) discovery tool call across all cached servers.
-   * Used by allRecipes/allTools/get_recipe which take a `server` param.
-   * Returns the result string if handled, or null if not a global discovery tool.
-   */
-  resolveGlobal(
-    toolName: string,
-    params: Record<string, unknown>,
-    trace?: PipelineTrace,
-  ): string | null {
-    switch (toolName) {
-      case 'allRecipes': {
-        const server = String(params.server ?? '');
-        if (!server) {
-          trace?.push('discovery', toolName, 'missing required param: server', 'warn');
-          return JSON.stringify({ error: 'Missing required param: server' });
-        }
-        // Match server by exact name, prefix, or sanitized prefix
-        const cache = this.findCacheByServer(server);
-        if (!cache) return JSON.stringify({ error: `Server "${server}" not found or not connected` });
-        return JSON.stringify(cache.recipes.map(r => ({ name: r.name, description: r.description })));
-      }
-      case 'allTools': {
-        const server = String(params.server ?? '');
-        if (!server) {
-          trace?.push('discovery', toolName, 'missing required param: server', 'warn');
-          return JSON.stringify({ error: 'Missing required param: server' });
-        }
-        const cache = this.findCacheByServer(server);
-        if (!cache) return JSON.stringify({ error: `Server "${server}" not found or not connected` });
-        return JSON.stringify(cache.tools);
-      }
-      case 'get_recipe': {
-        const server = String(params.server ?? '');
-        const name = String(params.name ?? params.id ?? '');
-        if (!server || !name) {
-          return JSON.stringify({ error: 'Missing required param(s): server and name' });
-        }
-        const cache = this.findCacheByServer(server);
-        if (!cache) return JSON.stringify({ error: `Server "${server}" not found` });
-        const recipe = cache.recipes.find(r => (r.name?.toLowerCase() === name.toLowerCase()));
-        if (!recipe) return JSON.stringify({ error: `Recipe "${name}" not found on server "${server}"` });
-        return JSON.stringify(recipe);
-      }
-      default:
-        return null;
-    }
-  }
-
-  private findCacheByServer(server: string): ServerCache | undefined {
-    const normalized = server.toLowerCase();
-    for (const [prefix, cache] of this.servers) {
-      if (prefix.toLowerCase() === normalized) return cache;
-      // Try sanitized prefix too (e.g. "tricoteuses_mcp" or "tricoteuses")
-      const bare = prefix.toLowerCase().replace(/_mcp$|_webmcp$/, '');
-      if (bare === normalized) return cache;
-    }
-    return undefined;
   }
 }
