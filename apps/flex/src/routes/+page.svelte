@@ -221,10 +221,24 @@
           if (text?.text) {
             const parsed = JSON.parse(text.text);
             const rawRecipes: any[] = Array.isArray(parsed) ? parsed : (parsed?.recipes ?? []);
-            cacheRecipes = rawRecipes.map((r) => ({
+            const base = rawRecipes.map((r) => ({
               ...r,
               name: r.name ?? r.id ?? r.recipe_id ?? '(unnamed)',
               id: r.id ?? r.name,
+            }));
+            // Pre-fetch full bodies in parallel so agents see real instructions, not metadata.
+            cacheRecipes = await Promise.all(base.map(async (b) => {
+              try {
+                const res = await multiClient.callToolOn(url.trim(), 'get_recipe', { name: b.name, id: b.id });
+                const t = (res.content?.find((c: any) => c.type === 'text') as any)?.text;
+                if (!t) return b;
+                let body = t;
+                try {
+                  const p = JSON.parse(t);
+                  if (p && typeof p === 'object' && typeof p.content === 'string') body = p.content;
+                } catch { /* raw text */ }
+                return { ...b, body };
+              } catch { return b; }
             }));
           }
         } catch { /* no recipes */ }
