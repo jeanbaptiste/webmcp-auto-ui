@@ -2,6 +2,8 @@
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import type { RunResult } from '@webmcp-auto-ui/sdk';
   import { runCode, estimateTokens } from '@webmcp-auto-ui/sdk';
+  import { highlightCode } from '@webmcp-auto-ui/ui';
+  // github-dark.css is already loaded via MarkdownView in the same page
 
   interface Props {
     code: string;
@@ -31,6 +33,17 @@
   $effect(() => {
     editable = code;
   });
+
+  let highlightedHtml = $derived(highlightCode(editable, lang || 'plaintext'));
+  let preEl: HTMLPreElement | undefined = $state(undefined);
+  let taEl: HTMLTextAreaElement | undefined = $state(undefined);
+
+  function syncScroll() {
+    if (preEl && taEl) {
+      preEl.scrollTop = taEl.scrollTop;
+      preEl.scrollLeft = taEl.scrollLeft;
+    }
+  }
 
   function formatTokens(n: number): string {
     if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
@@ -117,12 +130,15 @@
     {#if lang && lang !== 'text'}
       <div class="lang-tag font-mono">{lang}</div>
     {/if}
+    <pre bind:this={preEl} class="editor highlight-layer hljs font-mono" aria-hidden="true"><code class="hljs language-{lang || 'plaintext'}">{@html highlightedHtml}</code></pre>
     <textarea
+      bind:this={taEl}
       bind:value={editable}
+      onscroll={syncScroll}
       spellcheck="false"
       autocomplete="off"
       rows={Math.min(Math.max(editable.split('\n').length, 3), 20)}
-      class="editor font-mono"
+      class="editor input-layer font-mono"
     ></textarea>
   </div>
 </div>
@@ -213,12 +229,40 @@
     padding: 0.7rem;
     font-size: 0.7rem;
     line-height: 1.5;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    white-space: pre;
+    tab-size: 2;
+    margin: 0;
+  }
+  /* Overlay: highlighted <pre> below, transparent <textarea> on top */
+  .highlight-layer {
+    position: absolute;
+    inset: 0;
+    overflow: auto;
+    pointer-events: none;
+    border-color: transparent;
+  }
+  .highlight-layer :global(code.hljs) {
+    background: transparent;
+    padding: 0;
+  }
+  .input-layer {
+    position: relative;
+    color: transparent;
+    caret-color: rgb(220, 220, 220);
+    background: transparent;
     resize: vertical;
     outline: none;
-    overflow-x: auto;
-    white-space: pre;
+    overflow: auto;
   }
-  .editor:focus {
+  .input-layer::selection {
+    color: transparent;
+    background: rgba(96, 165, 250, 0.35);
+  }
+  .input-layer:focus {
     border-color: rgba(96, 165, 250, 0.45);
+  }
+  .editor-wrap {
+    min-height: 0;
   }
 </style>
