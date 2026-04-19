@@ -94,6 +94,67 @@ function findCodeParamName(schema: unknown): string | null {
 }
 
 /**
+ * Heuristics for filling required params. Currently handles:
+ * - `schema` (string enum): extract from `FROM <schema>.<table>` or
+ *   `JOIN <schema>.<table>` in SQL queries. Match against enum values
+ *   (case-insensitive). Falls back to first enum value if no match.
+ */
+function inferParamValue(
+  name: string,
+  prop: { type?: string; enum?: unknown[] } | undefined,
+  code: string,
+  lang: string,
+): unknown | undefined {
+  if (!prop) return undefined;
+
+  // Param `schema` on sql tools: sniff FROM/JOIN <schema>.<table>
+  if (name === 'schema' && lang === 'sql' && Array.isArray(prop.enum) && prop.enum.length > 0) {
+    const re = /\b(?:FROM|JOIN)\s+([a-zA-Z_][a-zA-Z0-9_]*)\.[a-zA-Z_]/gi;
+    const matches = new Set<string>();
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(code)) !== null) matches.add(m[1].toLowerCase());
+    const enumLower = prop.enum.map((v) => String(v).toLowerCase());
+    for (const sch of matches) {
+      const idx = enumLower.indexOf(sch);
+      if (idx >= 0) return prop.enum[idx];
+    }
+    // Fallback: no detectable schema, no good guess → leave unset
+    return undefined;
+  }
+
+  return undefined;
+}
+
+/**
+ * Build the full arg object for a tool call. Fills:
+ * - the code-carrying param (found by findCodeParamName)
+ * - every OTHER required param by inferring a value from the code (heuristics),
+ *   or leaving it unset if nothing can be inferred (MCP will error explicitly
+ *   so the user knows what to add).
+ */
+function buildToolArgs(
+  schema: unknown,
+  codeParam: string,
+  code: string,
+  lang: string,
+): Record<string, unknown> {
+  const s = schema as { properties?: Record<string, any>; required?: string[] } | null | undefined;
+  const args: Record<string, unknown> = { [codeParam]: code };
+  if (!s?.properties) return args;
+
+  for (const req of s.required ?? []) {
+    if (req === codeParam) continue;
+    if (args[req] !== undefined) continue;
+
+    const prop = s.properties[req];
+    const inferred = inferParamValue(req, prop, code, lang);
+    if (inferred !== undefined) args[req] = inferred;
+  }
+
+  return args;
+}
+
+/**
  * Find the first connected MCP server that exposes a given tool name, along
  * with the tool definition (for inputSchema introspection).
  */
@@ -126,9 +187,14 @@ async function runViaMcp(
   ctx.log(
     `dispatched to ${found.name} (tool=${toolName}, param=${paramName}, lang=${lang})`
   );
-  const res = await multiClient.callToolOn(found.url, toolName, {
-    [paramName]: code,
-  });
+  const args = buildToolArgs(found.tool.inputSchema, paramName, code, lang);
+  const extraKeys = Object.keys(args).filter((k) => k !== paramName);
+  if (extraKeys.length) {
+    ctx.log(
+      `inferred args: ${extraKeys.map((k) => `${k}=${JSON.stringify(args[k])}`).join(', ')}`
+    );
+  }
+  const res = await multiClient.callToolOn(found.url, toolName, args);
   ctx.log('response received');
   // Normalize: extract text content if present, else raw result
   const textPart = res?.content?.find((c: { type: string }) => c.type === 'text') as
