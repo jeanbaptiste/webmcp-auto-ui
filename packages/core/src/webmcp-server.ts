@@ -46,11 +46,22 @@ export interface WidgetEntry {
   vanilla: boolean;
 }
 
+/** A flow recipe (non-widget): a multi-step procedure registered on a WebMCP server. */
+export interface FlowRecipeEntry {
+  name: string;
+  description: string;
+  when: string;
+  body: string;
+  group: 'flow';
+}
+
 export interface WebMcpServer {
   readonly name: string;
   readonly description: string;
 
   registerWidget(recipeMarkdown: string, renderer: WidgetRenderer): void;
+  /** Register a non-widget recipe (a multi-step flow described in markdown with YAML frontmatter). */
+  registerRecipe(recipeMarkdown: string): void;
   addTool(tool: WebMcpToolDef): void;
 
   /** Register a list of recipe summaries exposed to the UI for browsing. */
@@ -66,6 +77,8 @@ export interface WebMcpServer {
 
   getWidget(name: string): WidgetEntry | undefined;
   listWidgets(): WidgetEntry[];
+  getFlowRecipe(name: string): FlowRecipeEntry | undefined;
+  listFlowRecipes(): FlowRecipeEntry[];
 }
 
 // ---------------------------------------------------------------------------
@@ -388,6 +401,7 @@ export function createWebMcpServer(
   options: WebMcpServerOptions,
 ): WebMcpServer {
   const widgets = new Map<string, WidgetEntry>();
+  const flowRecipes = new Map<string, FlowRecipeEntry>();
   const customTools: WebMcpToolDef[] = [];
   let builtinTools: WebMcpToolDef[] | null = null;
   let currentRecipes: McpRecipeSummary[] = [];
@@ -416,40 +430,48 @@ export function createWebMcpServer(
         },
         execute: async (params: Record<string, unknown>) => {
           const query = (params.query as string | undefined)?.toLowerCase();
-          const all = [...widgets.values()].map(w => ({ name: w.name, description: w.description, group: w.group }));
-          return all.filter(w => !query || w.name.includes(query) || w.description.toLowerCase().includes(query));
+          const widgetSummaries = [...widgets.values()].map(w => ({ name: w.name, description: w.description, group: w.group ?? 'widget' }));
+          const flowSummaries = [...flowRecipes.values()].map(f => ({ name: f.name, description: f.description, group: f.group, when: f.when }));
+          const all = [...widgetSummaries, ...flowSummaries];
+          return all.filter(r => !query || r.name.toLowerCase().includes(query) || (r.description?.toLowerCase().includes(query) ?? false));
         },
       },
       {
         name: 'list_recipes',
-        description: 'List ALL available widget recipes with their name, description, and group. Use this when search_recipes returned no results, or when the user wants to explore all display capabilities. Returns the complete catalog of widgets — useful for choosing the best visualization when the exact widget type is unclear. Does not accept any parameters.',
+        description: 'List ALL available recipes — both widget recipes (display primitives) and flow recipes (multi-step procedures). Use this when search_recipes returned no results, or when the user wants to explore all available capabilities. Returns the complete catalog with {name, description, group} for each entry; the `group` field is "widget" for display primitives and "flow" for multi-step procedures. Does not accept any parameters.',
         inputSchema: {
           type: 'object',
           properties: {},
           additionalProperties: false,
         },
         execute: async () => {
-          return [...widgets.values()].map(w => ({ name: w.name, description: w.description, group: w.group }));
+          const widgetSummaries = [...widgets.values()].map(w => ({ name: w.name, description: w.description, group: w.group ?? 'widget' }));
+          const flowSummaries = [...flowRecipes.values()].map(f => ({ name: f.name, description: f.description, group: f.group, when: f.when }));
+          return [...widgetSummaries, ...flowSummaries];
         },
       },
       {
         name: 'get_recipe',
-        description: 'Retrieve the full recipe for a specific widget type, including its JSON schema and step-by-step usage instructions. Call this BEFORE calling widget_display to understand the exact parameter structure expected by the widget. Returns {name, description, schema, recipe} where schema is the JSON Schema for params validation and recipe contains markdown instructions. If the widget name is not found, returns an error with the list of available widget names.',
+        description: 'Retrieve the full recipe for a specific widget or flow. For widgets, returns {name, description, schema, recipe} where schema is the JSON Schema for params validation and recipe contains markdown instructions. For flows, returns {name, description, when, body, group: "flow"} with the full markdown body describing the multi-step procedure. Call this BEFORE acting on a recipe to read its instructions. If the name is not found, returns an error with the list of available names.',
         inputSchema: {
           type: 'object',
           properties: {
-            name: { type: 'string', description: 'Exact widget type name as returned by search_recipes or list_recipes, e.g. "chart-rich", "data-table", "stat-card", "hemicycle". Must match exactly — no partial matches.' },
+            name: { type: 'string', description: 'Exact recipe name as returned by search_recipes or list_recipes. For widgets: e.g. "chart-rich", "data-table", "kv". For flows: e.g. "canary-display", "weather-viz". Must match exactly — no partial matches.' },
           },
           required: ['name'],
           additionalProperties: false,
         },
         execute: async (params: Record<string, unknown>) => {
-          const widgetName = params.name as string;
-          const entry = widgets.get(widgetName);
-          if (entry) {
-            return { name: entry.name, description: entry.description, schema: entry.inputSchema, recipe: entry.recipe };
+          const recipeName = params.name as string;
+          const widgetEntry = widgets.get(recipeName);
+          if (widgetEntry) {
+            return { name: widgetEntry.name, description: widgetEntry.description, schema: widgetEntry.inputSchema, recipe: widgetEntry.recipe, group: widgetEntry.group ?? 'widget' };
           }
-          return { error: `Recipe "${widgetName}" not found`, available: [...widgets.keys()] };
+          const flowEntry = flowRecipes.get(recipeName);
+          if (flowEntry) {
+            return { name: flowEntry.name, description: flowEntry.description, when: flowEntry.when, body: flowEntry.body, group: 'flow' };
+          }
+          return { error: `Recipe "${recipeName}" not found`, available: [...widgets.keys(), ...flowRecipes.keys()] };
         },
       },
       {
@@ -528,6 +550,26 @@ export function createWebMcpServer(
       ensureBuiltinTools();
     },
 
+    registerRecipe(recipeMarkdown: string): void {
+      const { frontmatter, body } = parseFrontmatter(recipeMarkdown);
+
+      const recipeName = (frontmatter.id as string | undefined) ?? (frontmatter.name as string | undefined);
+      if (!recipeName) {
+        throw new Error('Flow recipe frontmatter must include an "id" or "name" field.');
+      }
+
+      const entry: FlowRecipeEntry = {
+        name: recipeName,
+        description: (frontmatter.description as string | undefined) ?? (frontmatter.name as string | undefined) ?? '',
+        when: (frontmatter.when as string | undefined) ?? '',
+        body,
+        group: 'flow',
+      };
+
+      flowRecipes.set(recipeName, entry);
+      ensureBuiltinTools();
+    },
+
     addTool(tool: WebMcpToolDef): void {
       customTools.push(tool);
     },
@@ -537,7 +579,7 @@ export function createWebMcpServer(
     },
 
     layer() {
-      if (!builtinTools && widgets.size > 0) {
+      if (!builtinTools && (widgets.size > 0 || flowRecipes.size > 0)) {
         ensureBuiltinTools();
       }
 
@@ -552,12 +594,22 @@ export function createWebMcpServer(
         allTools.push(...builtinTools);
       }
 
+      // Merge flow recipes into the layer's recipe list so the UI can browse them
+      // alongside any explicitly set McpRecipeSummary entries.
+      const flowSummaries: McpRecipeSummary[] = [...flowRecipes.values()].map((f) => ({
+        name: f.name,
+        description: f.description,
+        body: f.body,
+        group: 'flow',
+      }));
+      const mergedRecipes = [...currentRecipes, ...flowSummaries];
+
       return {
         protocol: 'webmcp' as const,
         serverName: name,
         description: options.description,
         tools: allTools,
-        recipes: currentRecipes,
+        recipes: mergedRecipes,
       };
     },
 
@@ -567,6 +619,14 @@ export function createWebMcpServer(
 
     listWidgets(): WidgetEntry[] {
       return [...widgets.values()];
+    },
+
+    getFlowRecipe(recipeName: string): FlowRecipeEntry | undefined {
+      return flowRecipes.get(recipeName);
+    },
+
+    listFlowRecipes(): FlowRecipeEntry[] {
+      return [...flowRecipes.values()];
     },
   };
 

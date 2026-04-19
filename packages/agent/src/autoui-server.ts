@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { createWebMcpServer, parseFrontmatter } from '@webmcp-auto-ui/core';
+import { RAW_RECIPES } from './recipes/_generated.js';
 
 // ---------------------------------------------------------------------------
 // Inline recipes (frontmatter + body)
@@ -1005,6 +1006,22 @@ const autoui = createWebMcpServer('autoui', {
 // Register all native widgets (renderer = undefined, resolved by NATIVE_MAP in UI)
 for (const recipe of RECIPES) {
   autoui.registerWidget(recipe, undefined);
+}
+
+// Register flow recipes (multi-step procedures) from the global recipe registry
+// that declare this server (autoui) in their frontmatter.
+for (const [key, rawMd] of Object.entries(RAW_RECIPES)) {
+  const { frontmatter } = parseFrontmatter(rawMd);
+  const servers = (Array.isArray(frontmatter.servers) ? frontmatter.servers : []) as string[];
+  if (servers.map((s) => s.toLowerCase()).includes('autoui')) {
+    try {
+      autoui.registerRecipe(rawMd);
+    } catch (e) {
+      // Skip malformed recipes (missing id/name) — log for debugging
+      // eslint-disable-next-line no-console
+      console.warn(`[autoui] Failed to register flow recipe "${key}":`, e);
+    }
+  }
 }
 
 // Expose recipe summaries to the UI browser
