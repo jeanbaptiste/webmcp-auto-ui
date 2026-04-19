@@ -709,9 +709,9 @@ Read the full instructions of the selected recipe.
 
 STEP 3 — Execute
 
-Prefer recipes over direct tool calls when a recipe matches the task. Use low-level tools (DB queries, schema introspection, raw scripts) only when invoked from within a recipe's instructions.
+Prefer recipes over direct tool calls when a recipe matches the task. Use low-level instructions (DB queries, schema introspection, raw scripts) only when invoked from within a recipe's instructions.
 
-Follow the recipe instructions exactly if you have one. Otherwise use the tools directly.
+Follow the recipe instructions exactly if you have one. Otherwise use the tools with their schemas.
 
 Output format: (1) a one-sentence summary of the action performed, then (2) the result. Nothing else.
 
