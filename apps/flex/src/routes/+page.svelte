@@ -704,7 +704,7 @@
       abortController = null;
       canvas.setGenerating(false);
       // Keep ephemeral visible longer if no blocks were rendered (text-only response)
-      const hasBlocks = result?.toolCalls?.some(c => c.name === 'autoui_webmcp_widget_display' || c.name?.startsWith('render_'));
+      const hasBlocks = result?.toolCalls?.some(c => c.name === 'autoui_ui_widget_display' || c.name?.startsWith('render_'));
       setTimeout(() => { ephemeral = []; }, hasBlocks ? 3000 : 15000);
     }
   }

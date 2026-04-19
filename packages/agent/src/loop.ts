@@ -28,9 +28,16 @@ const DISCOVERY_TOOL_NAMES = new Set([
 ]);
 
 function isDiscoveryTool(prefixedName: string): boolean {
-  const match = prefixedName.match(/^.+?_(mcp|webmcp)_(.+)$/);
+  const match = prefixedName.match(/^.+?_(data|ui)_(.+)$/);
   if (!match) return false;
   return DISCOVERY_TOOL_NAMES.has(match[2]);
+}
+
+/** Map a tool-name token (data/ui) back to its protocol discriminator (mcp/webmcp). */
+function tokenToProtocol(token: string): 'mcp' | 'webmcp' | null {
+  if (token === 'data') return 'mcp';
+  if (token === 'ui') return 'webmcp';
+  return null;
 }
 
 /**
@@ -330,8 +337,8 @@ export async function runAgentLoop(
         // Resolve alias (canonical name → real tool name) if needed
         const resolvedName = localAliasMap.get(name) ?? name;
 
-        // Parse tool name: {serverName}_{protocol}_{toolName}
-        const toolMatch = resolvedName.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
+        // Parse tool name: {serverName}_{token}_{toolName} where token ∈ {data, ui}
+        const toolMatch = resolvedName.match(/^(.+?)_(data|ui)_(.+)$/);
 
         // ── Discovery cache — resolve search/list/get locally if cached ──
         if (discoveryCache && toolMatch) {
@@ -353,7 +360,8 @@ export async function runAgentLoop(
         // ── Intercept list_tools / search_tools (local pseudo-tools) ──
         // These are read-only discovery operations — do NOT activate the server.
         if (toolMatch && (toolMatch[3] === 'list_tools' || toolMatch[3] === 'search_tools')) {
-          const [, serverName, protocol, pseudoTool] = toolMatch;
+          const [, serverName, token, pseudoTool] = toolMatch;
+          const protocol = tokenToProtocol(token);
           const layer = (options.layers ?? []).find(l => sanitizeServerName(l.serverName) === serverName && l.protocol === protocol);
           if (!layer) {
             result = 'Error: server not found';
@@ -379,10 +387,11 @@ export async function runAgentLoop(
 
         // Parse tool name to extract server — activate on first contact
         {
-          const activateMatch = resolvedName.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
+          const activateMatch = resolvedName.match(/^(.+?)_(data|ui)_(.+)$/);
           if (activateMatch) {
-            const [, serverName, protocol] = activateMatch;
-            const serverKey = `${serverName}_${protocol}`;
+            const [, serverName, token] = activateMatch;
+            const protocol = tokenToProtocol(token);
+            const serverKey = `${serverName}_${token}`;
             if (!activatedServers.has(serverKey)) {
               activatedServers.add(serverKey);
               const layer = (options.layers ?? []).find(l => sanitizeServerName(l.serverName) === serverName && l.protocol === protocol);
@@ -393,10 +402,11 @@ export async function runAgentLoop(
           }
         }
         if (!toolMatch) {
-          trace.push('dispatch', name, `unknown tool format, expected {source}_{protocol}_{tool}`, 'error');
-          result = `Error: unknown tool format "${name}". Expected {source}_{protocol}_{tool}.`;
+          trace.push('dispatch', name, `unknown tool format, expected {source}_{token}_{tool} where token in {data,ui}`, 'error');
+          result = `Error: unknown tool format "${name}". Expected {source}_{token}_{tool} where token in {data,ui}.`;
         } else {
-          const [, serverName, protocol, realToolName] = toolMatch;
+          const [, serverName, token, realToolName] = toolMatch;
+          const protocol = tokenToProtocol(token);
 
           // Auto-repair + validate params before dispatch
           let toolInput = block.input as Record<string, unknown>;
@@ -582,7 +592,7 @@ export async function runAgentLoop(
 
     // Track iterations without render — widget_display means a render happened
     const renderedThisIteration = toolBlocks.some(b => {
-      const match = b.name.match(/^.+?_(mcp|webmcp)_(.+)$/);
+      const match = b.name.match(/^.+?_(data|ui)_(.+)$/);
       return match && match[2] === 'widget_display';
     });
     if (renderedThisIteration) {

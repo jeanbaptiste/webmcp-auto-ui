@@ -321,7 +321,7 @@ export const RICH_BLOCKS: DemoBlock[] = [
       entries: [
         { timestamp: '14:23:01.123', level: 'info', message: 'Agent loop started', source: 'agent' },
         { timestamp: '14:23:01.456', level: 'debug', message: 'Sending prompt to Gemma WASM provider', source: 'gemma' },
-        { timestamp: '14:23:03.789', level: 'info', message: 'Tool call: autoui_webmcp_widget_display({ name: "stat", params: {...} })', source: 'agent' },
+        { timestamp: '14:23:03.789', level: 'info', message: 'Tool call: autoui_ui_widget_display({ name: "stat", params: {...} })', source: 'agent' },
         { timestamp: '14:23:03.801', level: 'info', message: 'Widget stat_revenue rendered', source: 'canvas' },
         { timestamp: '14:23:04.100', level: 'warn', message: 'Token budget at 82% (3280/4000)', source: 'agent' },
         { timestamp: '14:23:05.500', level: 'error', message: 'MCP tool fetch_data timed out after 5000ms', source: 'mcp' },

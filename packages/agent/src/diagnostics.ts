@@ -2,7 +2,7 @@
 
 import type { ToolLayer } from './tool-layers.js';
 import type { ProviderTool } from './types.js';
-import { sanitizeServerName } from './tool-layers.js';
+import { sanitizeServerName, protocolToken } from './tool-layers.js';
 import { sanitizeSchemaWithReport } from '@webmcp-auto-ui/core';
 import type { JsonSchema, SchemaPatch } from '@webmcp-auto-ui/core';
 
@@ -41,8 +41,8 @@ export function runDiagnostics(
       diagnostics.push({
         severity: 'error',
         title: `Bruit dans le prefixe "${prefix}"`,
-        detail: `Le serveur "${layer.serverName}" produit un prefixe contenant "${noise.join(', ')}". Les outils auront des noms ambigus comme ${prefix}_mcp_list_recipes.`,
-        quickFix: `Ajoutez au system prompt:\n"Note: le serveur ${layer.serverName} utilise le prefixe '${prefix}'. Utilisez ${prefix}_mcp_<tool> ou ${prefix}_webmcp_<tool>."`,
+        detail: `Le serveur "${layer.serverName}" produit un prefixe contenant "${noise.join(', ')}". Les outils auront des noms ambigus comme ${prefix}_data_list_recipes.`,
+        quickFix: `Ajoutez au system prompt:\n"Note: le serveur ${layer.serverName} utilise le prefixe '${prefix}'. Utilisez ${prefix}_data_<tool> ou ${prefix}_ui_<tool>."`,
         codeFix: `Renommer le serveur MCP cote serveur pour ne pas inclure "mcp"/"server" dans le nom.`,
       });
     }
@@ -88,14 +88,14 @@ export function runDiagnostics(
   // Include discovery tools (search_tools, list_tools) which are generated dynamically
   const toolNames = new Set(tools.map(t => t.name));
   for (const layer of layers) {
-    const prefix = `${sanitizeServerName(layer.serverName)}_${layer.protocol}_`;
+    const prefix = `${sanitizeServerName(layer.serverName)}_${protocolToken(layer.protocol)}_`;
     toolNames.add(`${prefix}search_tools`);
     toolNames.add(`${prefix}list_tools`);
     toolNames.add(`${prefix}search_recipes`);
     toolNames.add(`${prefix}list_recipes`);
     toolNames.add(`${prefix}get_recipe`);
   }
-  const toolPattern = /\b([a-z][a-z0-9_]{2,})_(mcp|webmcp)_([a-z][a-z0-9_]+)\b/g;
+  const toolPattern = /\b([a-z][a-z0-9_]{2,})_(data|ui)_([a-z][a-z0-9_]+)\b/g;
   let match;
   while ((match = toolPattern.exec(systemPrompt)) !== null) {
     const fullName = match[0];

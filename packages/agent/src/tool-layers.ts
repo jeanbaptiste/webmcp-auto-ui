@@ -8,9 +8,19 @@ import type { SchemaPatch } from '@webmcp-auto-ui/core';
 import { DiscoveryCache, type ServerCache } from './discovery-cache.js';
 import type { PipelineTrace } from './pipeline-trace.js';
 
+/** Map an internal protocol type to the token used in tool-name prefixes.
+ *  - `mcp`    (remote data sources) → `data`
+ *  - `webmcp` (local UI widgets)     → `ui`
+ *  Final tool names follow {server}_{token}_{tool} (e.g. `tricoteuses_data_search_recipes`,
+ *  `autoui_ui_widget_display`). Using neutral tokens avoids lexical confusion between
+ *  MCP and WebMCP for small LLMs. */
+export function protocolToken(protocol: 'mcp' | 'webmcp'): 'data' | 'ui' {
+  return protocol === 'mcp' ? 'data' : 'ui';
+}
+
 /** Sanitize a server name for use in tool name prefixes.
  *  Returns a clean underscore-separated identifier with no "mcp"/"server" noise.
- *  Final tool names follow {server}_{protocol}_{tool} convention. */
+ *  Final tool names follow {server}_{token}_{tool} convention. */
 export function sanitizeServerName(name: string): string {
   let result = name.toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')       // all non-alphanumeric → underscore
@@ -406,7 +416,7 @@ export function buildToolsFromLayers(layers: ToolLayer[], schemaOptions?: Schema
   const tools: ProviderTool[] = [];
 
   for (const layer of layers) {
-    const prefix = `${sanitizeServerName(layer.serverName)}_${layer.protocol}_`;
+    const prefix = `${sanitizeServerName(layer.serverName)}_${protocolToken(layer.protocol)}_`;
 
     if (layer.protocol === 'mcp') {
       for (const tool of toProviderTools(layer.tools, schemaOptions, trace)) {
@@ -499,7 +509,7 @@ export function buildSystemPromptWithAliases(
 
   // WebMCP layers: always exact match (we control the naming)
   for (const l of webmcpLayers) {
-    const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
+    const prefix = `${sanitizeServerName(l.serverName)}_ui_`;
     for (const t of l.tools) {
       if (t.name === 'search_recipes') {
         const name = `${prefix}search_recipes`;
@@ -535,7 +545,7 @@ export function buildSystemPromptWithAliases(
 
   // MCP layers: 4-layer matching + alias registration
   for (const l of mcpLayers) {
-    const prefix = `${sanitizeServerName(l.serverName)}_mcp_`;
+    const prefix = `${sanitizeServerName(l.serverName)}_data_`;
     const matches = resolveCanonicalTools(l.tools);
 
     for (const m of matches) {
@@ -582,7 +592,7 @@ export function buildSystemPromptWithAliases(
   const actionTools: string[] = [];
   const ACTION_NAMES = ['widget_display', 'canvas', 'recall'];
   for (const l of webmcpLayers) {
-    const prefix = `${sanitizeServerName(l.serverName)}_webmcp_`;
+    const prefix = `${sanitizeServerName(l.serverName)}_ui_`;
     for (const actionName of ACTION_NAMES) {
       if (l.tools.some(t => t.name === actionName)) {
         const prefixedName = `${prefix}${actionName}`;
@@ -594,12 +604,12 @@ export function buildSystemPromptWithAliases(
   }
 
   // Same refs, grouped by DATA vs DISPLAY category, for the gemma-minimalist template.
-  const dataPrefixes = new Set(dataLayers.map(l => `${sanitizeServerName(l.serverName)}_${l.protocol}_`));
-  const displayPrefixes = new Set(displayLayers.map(l => `${sanitizeServerName(l.serverName)}_webmcp_`));
+  const dataPrefixes = new Set(dataLayers.map(l => `${sanitizeServerName(l.serverName)}_${protocolToken(l.protocol)}_`));
+  const displayPrefixes = new Set(displayLayers.map(l => `${sanitizeServerName(l.serverName)}_ui_`));
 
   function splitByCategory(refs: string[]): { data: string[]; display: string[] } {
     // Refs may be backticked names, full declarations, or tool_name(arg) — in all cases,
-    // the prefixed name (e.g. `tricoteuses_mcp_search_recipes`) is detectable by substring match.
+    // the prefixed name (e.g. `tricoteuses_data_search_recipes`) is detectable by substring match.
     const data: string[] = [];
     const display: string[] = [];
     for (const ref of refs) {
@@ -765,7 +775,7 @@ export function buildDiscoveryToolsWithAliases(layers: ToolLayer[], schemaOption
   const aliasMap = new Map<string, string>();
 
   for (const layer of layers) {
-    const prefix = `${sanitizeServerName(layer.serverName)}_${layer.protocol}_`;
+    const prefix = `${sanitizeServerName(layer.serverName)}_${protocolToken(layer.protocol)}_`;
 
     if (layer.protocol === 'mcp') {
       const allProviderTools = toProviderTools(layer.tools, schemaOptions, trace);
@@ -852,7 +862,7 @@ export function activateServerTools(
   schemaOptions?: SchemaTransformOptions,
   trace?: PipelineTrace,
 ): ProviderTool[] {
-  const prefix = `${sanitizeServerName(layer.serverName)}_${layer.protocol}_`;
+  const prefix = `${sanitizeServerName(layer.serverName)}_${protocolToken(layer.protocol)}_`;
   const existing = new Set(currentTools.map(t => t.name));
   const newTools = [...currentTools];
 

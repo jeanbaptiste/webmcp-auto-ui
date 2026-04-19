@@ -77,7 +77,7 @@ describe('runAgentLoop', () => {
       name: 'mock', model: 'claude-haiku',
       // Always returns a tool call — never end_turn (using prefixed tool name)
       chat: vi.fn().mockResolvedValue({
-        content: [{ type: 'tool_use', id: 'tc1', name: 'test_mcp_search', input: { q: 'x' } }],
+        content: [{ type: 'tool_use', id: 'tc1', name: 'test_data_search', input: { q: 'x' } }],
         stopReason: 'tool_use',
       } satisfies LLMResponse),
     };
@@ -100,7 +100,7 @@ describe('runAgentLoop', () => {
       name: 'mock', model: 'claude-haiku',
       chat: vi.fn()
         .mockImplementationOnce(async () => {
-          return { content: [{ type: 'tool_use', id: 'tc1', name: 'test_mcp_search', input: { q: 'x' } }], stopReason: 'tool_use' } satisfies LLMResponse;
+          return { content: [{ type: 'tool_use', id: 'tc1', name: 'test_data_search', input: { q: 'x' } }], stopReason: 'tool_use' } satisfies LLMResponse;
         })
         .mockImplementationOnce(async () => {
           ac.abort();
