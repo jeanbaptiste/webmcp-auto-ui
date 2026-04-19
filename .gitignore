@@ -59,3 +59,6 @@ AUDIT-PHASE9.md
 AUDIT-WIDGETS.md
 AUDIT.md
 test-nano-rag/
+
+# Parasitic shell-escape artifact (Gemma tokenizer dump, accidental filename)
+\\|<start_function*
