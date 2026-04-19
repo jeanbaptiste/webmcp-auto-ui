@@ -2,8 +2,9 @@
   import { fade, fly } from 'svelte/transition';
   import { filterRecipes, sortRecipes, recipeToMarkdown, recipeToDownloadBlob } from '@webmcp-auto-ui/agent';
   import { encode } from '@webmcp-auto-ui/sdk';
-  import { MarkdownView } from '@webmcp-auto-ui/ui';
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
+  import RecipeModal from './RecipeModal.svelte';
+  import type { RecipeData } from './recipes/types.js';
 
   interface RecipeItem {
     name: string;
@@ -30,6 +31,7 @@
 
   let query = $state('');
   let selected = $state<RecipeItem | null>(null);
+  let recipeModalOpen = $state(false);
   let mcpCollapsed = $state(false);
   let webmcpCollapsed = $state(false);
   let copyState = $state<'idle' | 'copied'>('idle');
@@ -40,6 +42,7 @@
     if (open) {
       query = initialFilter ?? '';
       selected = null;
+      recipeModalOpen = false;
     }
   });
 
@@ -47,13 +50,13 @@
   const filteredWebmcp = $derived(sortRecipes(filterRecipes(webmcpRecipes, query)));
   const totalResults = $derived(filteredMcp.length + filteredWebmcp.length);
 
-  function close() { open = false; selected = null; }
-  function back() { selected = null; }
+  function close() { open = false; selected = null; recipeModalOpen = false; }
 
   function onKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
-      if (selected) back();
-      else close();
+      // When the recipe modal is open, let RecipeModal handle its own Escape.
+      if (recipeModalOpen) return;
+      close();
     }
   }
 
@@ -93,6 +96,7 @@
       }
     }
     selected = recipe;
+    recipeModalOpen = true;
   }
 
   async function copyHyperSkillUrl(recipe: RecipeItem) {
@@ -122,95 +126,6 @@
       class="w-full max-w-2xl max-h-[85vh] bg-surface border border-border2 rounded-2xl flex flex-col shadow-2xl overflow-hidden"
       transition:fly={{ y: 24, duration: 240 }}
     >
-      {#if selected}
-        <!-- ── Detail mode ─────────────────────────────────────────── -->
-
-        <!-- Header -->
-        <div class="flex items-center gap-3 px-6 py-4 border-b border-border flex-shrink-0">
-          <button
-            class="text-text2 hover:text-text1 font-mono text-sm transition-colors"
-            onclick={back}
-          >&larr;</button>
-          <span class="font-mono text-sm font-bold text-text1 flex-1 truncate">{selected.name}</span>
-          <button class="text-text2 hover:text-text1 font-mono text-base leading-none transition-colors"
-                  onclick={close}>x</button>
-        </div>
-
-        <!-- Body -->
-        <div class="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
-          {#if selected.description}
-            <p class="font-mono text-xs text-text2 leading-relaxed">{selected.description}</p>
-          {/if}
-
-          <!-- Metadata badges -->
-          {#if selected.when}
-            <div>
-              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1">When</div>
-              <p class="font-mono text-xs text-text1 leading-relaxed">{selected.when}</p>
-            </div>
-          {/if}
-
-          {#if selected.components_used && selected.components_used.length > 0}
-            <div>
-              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Components</div>
-              <div class="flex flex-wrap gap-1.5">
-                {#each selected.components_used as comp}
-                  <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono border border-accent/40 text-accent bg-accent/5">{comp}</span>
-                {/each}
-              </div>
-            </div>
-          {/if}
-
-          {#if selected.servers && selected.servers.length > 0}
-            <div>
-              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Servers</div>
-              <div class="flex flex-wrap gap-1.5">
-                {#each selected.servers as server}
-                  <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono border border-teal/40 text-teal bg-teal/5">{server}</span>
-                {/each}
-              </div>
-            </div>
-          {/if}
-
-          {#if selected.layout}
-            <div>
-              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1">Layout</div>
-              <p class="font-mono text-xs text-text1">
-                {selected.layout.type}{#if selected.layout.columns}, {selected.layout.columns} columns{/if}{#if selected.layout.arrangement} — {selected.layout.arrangement}{/if}
-              </p>
-            </div>
-          {/if}
-
-          {#if selected.body}
-            <div>
-              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-2">Body</div>
-              <MarkdownView source={selected.body} />
-            </div>
-          {/if}
-        </div>
-
-        <!-- Action buttons -->
-        <div class="flex items-center justify-end gap-2 px-6 py-3 border-t border-border flex-shrink-0">
-          <button
-            class="font-mono text-xs h-7 px-4 rounded border border-border2 text-text2 hover:text-text1 transition-colors"
-            onclick={() => downloadRecipe(selected!)}
-          >
-            Download .md
-          </button>
-          <button
-            class="font-mono text-xs h-7 px-4 rounded border transition-colors
-                   {copyState === 'copied' ? 'border-teal/40 text-teal' : 'border-accent/40 text-accent hover:bg-accent/10'}"
-            onclick={() => copyHyperSkillUrl(selected!)}
-          >
-            {#if copyState === 'copied'}
-              Copied &#x2713;
-            {:else}
-              Copy HyperSkill URL
-            {/if}
-          </button>
-        </div>
-
-      {:else}
         <!-- ── List mode ───────────────────────────────────────────── -->
 
         <!-- Header -->
@@ -252,15 +167,29 @@
               {#if !mcpCollapsed}
                 <div class="flex flex-col gap-1">
                   {#each filteredMcp as recipe, i (`mcp:${recipe.name}:${i}`)}
-                    <button
-                      class="px-3 py-2 bg-surface2/50 rounded-lg text-left w-full cursor-pointer hover:bg-surface2 transition-colors"
-                      onclick={() => openRecipe(recipe)}
-                    >
-                      <div class="font-mono text-[11px] text-text1 font-medium">{recipe.name}</div>
-                      {#if recipe.description}
-                        <div class="font-mono text-[9px] text-text2 line-clamp-1 mt-0.5">{recipe.description}</div>
-                      {/if}
-                    </button>
+                    <div class="group flex items-center gap-2 px-3 py-2 bg-surface2/50 rounded-lg hover:bg-surface2 transition-colors">
+                      <button
+                        class="flex-1 min-w-0 text-left cursor-pointer"
+                        onclick={() => openRecipe(recipe)}
+                      >
+                        <div class="font-mono text-[11px] text-text1 font-medium truncate">{recipe.name}</div>
+                        {#if recipe.description}
+                          <div class="font-mono text-[9px] text-text2 line-clamp-1 mt-0.5">{recipe.description}</div>
+                        {/if}
+                      </button>
+                      <div class="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          title="Download .md"
+                          class="font-mono text-[10px] h-6 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-colors"
+                          onclick={(e) => { e.stopPropagation(); downloadRecipe(recipe); }}
+                        >.md</button>
+                        <button
+                          title="Copy HyperSkill URL"
+                          class="font-mono text-[10px] h-6 px-2 rounded border transition-colors {copyState === 'copied' ? 'border-teal/40 text-teal' : 'border-accent/40 text-accent hover:bg-accent/10'}"
+                          onclick={(e) => { e.stopPropagation(); copyHyperSkillUrl(recipe); }}
+                        >{copyState === 'copied' ? '✓' : 'hs'}</button>
+                      </div>
+                    </div>
                   {/each}
                 </div>
               {/if}
@@ -279,15 +208,29 @@
               {#if !webmcpCollapsed}
                 <div class="flex flex-col gap-1">
                   {#each filteredWebmcp as recipe, i (`webmcp:${recipe.name}:${i}`)}
-                    <button
-                      class="px-3 py-2 bg-surface2/50 rounded-lg text-left w-full cursor-pointer hover:bg-surface2 transition-colors"
-                      onclick={() => openRecipe(recipe)}
-                    >
-                      <div class="font-mono text-[11px] text-text1 font-medium">{recipe.name}</div>
-                      {#if recipe.description}
-                        <div class="font-mono text-[9px] text-text2 line-clamp-1 mt-0.5">{recipe.description}</div>
-                      {/if}
-                    </button>
+                    <div class="group flex items-center gap-2 px-3 py-2 bg-surface2/50 rounded-lg hover:bg-surface2 transition-colors">
+                      <button
+                        class="flex-1 min-w-0 text-left cursor-pointer"
+                        onclick={() => openRecipe(recipe)}
+                      >
+                        <div class="font-mono text-[11px] text-text1 font-medium truncate">{recipe.name}</div>
+                        {#if recipe.description}
+                          <div class="font-mono text-[9px] text-text2 line-clamp-1 mt-0.5">{recipe.description}</div>
+                        {/if}
+                      </button>
+                      <div class="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          title="Download .md"
+                          class="font-mono text-[10px] h-6 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-colors"
+                          onclick={(e) => { e.stopPropagation(); downloadRecipe(recipe); }}
+                        >.md</button>
+                        <button
+                          title="Copy HyperSkill URL"
+                          class="font-mono text-[10px] h-6 px-2 rounded border transition-colors {copyState === 'copied' ? 'border-teal/40 text-teal' : 'border-accent/40 text-accent hover:bg-accent/10'}"
+                          onclick={(e) => { e.stopPropagation(); copyHyperSkillUrl(recipe); }}
+                        >{copyState === 'copied' ? '✓' : 'hs'}</button>
+                      </div>
+                    </div>
                   {/each}
                 </div>
               {/if}
@@ -295,7 +238,13 @@
 
           {/if}
         </div>
-      {/if}
     </div>
   </div>
 {/if}
+
+<RecipeModal
+  bind:open={recipeModalOpen}
+  recipe={selected as RecipeData | null}
+  {multiClient}
+  onclose={() => { recipeModalOpen = false; selected = null; }}
+/>
