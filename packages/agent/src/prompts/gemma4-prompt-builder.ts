@@ -112,6 +112,8 @@ ${allGetRecipes}
 STEP 3 — Execute using the schema from STEP 2.
 - Data: follow the recipe (SQL / FTS / script).
 - Display: call widget_display(name, params).
+- Tool args use Gemma native syntax: <|"|>string<|"|> for strings, {k:v} for objects. NEVER copy recipe body examples (JS syntax) verbatim.
+- <placeholder> markers in recipes are slots to fill with real values from previous tool responses, not literal text.
 ${actionTools.join('\n')}
 If no recipe fits, use a tool directly:
 ${listTools.join('\n')}
