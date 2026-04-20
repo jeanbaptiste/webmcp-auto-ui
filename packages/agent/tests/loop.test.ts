@@ -10,9 +10,9 @@ const TOOLS: McpToolDef[] = [
 describe('buildSystemPrompt', () => {
   it('returns concise behavioral prompt', () => {
     const prompt = buildSystemPrompt([]);
-    expect(prompt).toContain('assistant IA');
-    expect(prompt).toContain('images');
-    expect(prompt.length).toBeLessThan(2000); // procedural prompt with recipe workflow
+    expect(prompt).toContain('FLEX');
+    expect(prompt).toContain('recipes');
+    expect(prompt.length).toBeLessThan(4000); // procedural prompt with recipe workflow
   });
 });
 
