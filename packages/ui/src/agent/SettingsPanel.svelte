@@ -186,10 +186,10 @@
     <div>
       <div class="flex justify-between items-baseline mb-1">
         <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Max result (chars)</span>
-        <span class="font-mono text-xs text-text1">{formatNumber(maxResultLength)}</span>
+        <span class="font-mono text-xs text-text1">{maxResultLength >= 50000 ? '∞' : formatNumber(maxResultLength)}</span>
       </div>
       <input type="range" bind:value={maxResultLength}
-             min={500} max={20000} step={500}
+             min={500} max={50000} step={500}
              class="w-full accent-accent" />
     </div>
 

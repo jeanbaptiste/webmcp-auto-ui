@@ -649,7 +649,7 @@
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
-        maxIterations: 15, maxTokens, maxResultLength, temperature, topK, cacheEnabled,
+        maxIterations: 15, maxTokens, maxResultLength: maxResultLength >= 50000 ? Infinity : maxResultLength, temperature, topK, cacheEnabled,
         truncateResults, compressHistory: compressHistory ? compressPreview : false,
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, maxContextTokens),
