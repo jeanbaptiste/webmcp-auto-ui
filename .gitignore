@@ -60,6 +60,8 @@ AUDIT-WIDGETS.md
 AUDIT.md
 AUDIT-TRICOTEUSES-RECIPES.md
 test-nano-rag/
+docs/GEMMA4-SPEC.md
+docs/GEMMA4-BUG-ANALYSIS.md
 
 # Parasitic shell-escape artifact (Gemma tokenizer dump, accidental filename)
 \\|<start_function*

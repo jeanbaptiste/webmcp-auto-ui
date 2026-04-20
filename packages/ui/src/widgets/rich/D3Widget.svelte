@@ -227,6 +227,11 @@
     const w = width || 400;
     const h = Math.max(250, Math.round(w * 0.65));
 
+    // Truncate labels so they stay inside the viewBox. Hover <title> shows the full label.
+    const maxChars = Math.max(10, Math.floor(w / 120));
+    const truncate = (text: string): string =>
+      text.length > maxChars ? text.slice(0, Math.max(1, maxChars - 1)) + '…' : text;
+
     const accent = cssVar('--color-accent', '#6c5ce7');
     const accent2 = cssVar('--color-accent2', '#e17055');
     const groups = Array.from(new Set(nodes.map((n) => n.group ?? 0)));
@@ -295,9 +300,9 @@
       .attr('y', 4)
       .attr('font-size', '10px')
       .attr('fill', 'var(--color-text1, #111)')
-      .text((n) => n.label ?? n.id);
+      .text((n) => truncate(String(n.label ?? n.id)));
 
-    node.append('title').text((n) => n.label ?? n.id);
+    node.append('title').text((n) => String(n.label ?? n.id));
 
     sim.on('tick', () => {
       link

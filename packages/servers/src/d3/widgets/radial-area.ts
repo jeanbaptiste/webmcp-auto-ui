@@ -27,6 +27,12 @@ export async function render(
 
     const radius = Math.min(width, height) / 2 - 50;
 
+    // Truncate axis labels so they fit within the outer margin (labels sit at radius+14, centered).
+    const labelBudgetPx = Math.max(20, Math.min(width, height) / 2 - radius - 14);
+    const maxChars = Math.max(6, Math.floor((labelBudgetPx * 2) / 6));
+    const truncate = (text: string): string =>
+      text.length > maxChars ? text.slice(0, Math.max(1, maxChars - 1)) + '…' : text;
+
     const n = series[0]?.points?.length ?? 0;
     const angleSlice = (2 * Math.PI) / n;
 
@@ -63,13 +69,15 @@ export async function render(
         .attr('x2', radius * Math.cos(angle))
         .attr('y2', radius * Math.sin(angle))
         .attr('stroke', '#eee');
-      g.append('text')
+      const labelText = String(labels?.[i] ?? `${i}`);
+      const labelEl = g.append('text')
         .attr('x', (radius + 14) * Math.cos(angle))
         .attr('y', (radius + 14) * Math.sin(angle))
         .attr('text-anchor', 'middle')
         .attr('dy', '0.35em')
         .style('font-size', '10px')
-        .text(labels?.[i] ?? `${i}`);
+        .text(truncate(labelText));
+      labelEl.append('title').text(labelText);
     }
 
     // Areas

@@ -37,6 +37,12 @@ export async function render(
     const innerRadius = radius - 80;
     const outerRadius = radius - 40;
 
+    // Truncate labels so they fit within (radius - outerRadius - 8) px outside the arc.
+    const labelBudgetPx = Math.max(20, radius - outerRadius - 8);
+    const maxChars = Math.max(6, Math.floor(labelBudgetPx / 6));
+    const truncate = (text: string): string =>
+      text.length > maxChars ? text.slice(0, Math.max(1, maxChars - 1)) + '…' : text;
+
     const chord = d3.chord().padAngle(0.05).sortSubgroups(d3.descending);
     const chords = chord(matrix);
 
@@ -84,7 +90,9 @@ export async function render(
       )
       .attr('text-anchor', (d) => (d.angle > Math.PI ? 'end' : null))
       .style('font-size', '11px')
-      .text((d) => labels[d.index]);
+      .text((d) => truncate(String(labels[d.index] ?? '')))
+      .append('title')
+      .text((d) => String(labels[d.index] ?? ''));
 
     const ribbons = svg
       .append('g')

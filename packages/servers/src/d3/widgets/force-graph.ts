@@ -41,15 +41,11 @@ export async function render(
     const simNodes = nodes.map((d) => ({ ...d }));
     const simLinks = links.map((d) => ({ ...d }));
 
-    // Dynamic label padding so labels drawn at dx=12 don't clip the viewBox.
-    const CHAR_PX = 6;
-    const maxLabelChars = Math.max(
-      0,
-      ...simNodes.map((n: any) => String(n.label ?? n.id ?? '').length),
-    );
-    const labelPad = Math.min(220, 12 + maxLabelChars * CHAR_PX);
-    const topPad = title ? 28 : 8;
-    const rPad = 12; // node radius margin
+    // Truncate labels so they stay inside the viewBox without clamping node positions.
+    // Hover tooltip shows the full label.
+    const maxChars = Math.max(10, Math.floor(width / 120));
+    const truncate = (text: string): string =>
+      text.length > maxChars ? text.slice(0, Math.max(1, maxChars - 1)) + '…' : text;
 
     const simulation = d3
       .forceSimulation(simNodes)
@@ -127,7 +123,7 @@ export async function render(
       .selectAll('text')
       .data(simNodes)
       .join('text')
-      .text((d) => d.label ?? d.id)
+      .text((d) => truncate(String(d.label ?? d.id ?? '')))
       .attr('font-size', '10px')
       .attr('dx', 12)
       .attr('dy', '0.35em');
@@ -150,11 +146,6 @@ export async function render(
       });
 
     simulation.on('tick', () => {
-      // Clamp node positions so labels (drawn at dx=12) stay inside viewBox.
-      simNodes.forEach((d: any) => {
-        d.x = Math.max(rPad, Math.min(width - labelPad, d.x));
-        d.y = Math.max(topPad, Math.min(height - rPad, d.y));
-      });
       link
         .attr('x1', (d) => d.source.x)
         .attr('y1', (d) => d.source.y)

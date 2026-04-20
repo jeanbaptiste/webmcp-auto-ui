@@ -68,6 +68,14 @@ export async function render(
 
     const bandWidth = radius / (arcData.length + 1);
 
+    // Truncate labels so they fit within the horizontal space right of each arc.
+    // Each label is drawn at x = outer + 4, group is translated to width/2; available space
+    // on the right = width/2 - outer - 4. Account for the percent suffix (" (100%)" ≈ 8 chars).
+    const labelBudgetPx = Math.max(40, width / 2 - radius - 4);
+    const maxChars = Math.max(8, Math.floor(labelBudgetPx / 6) - 8);
+    const truncate = (text: string): string =>
+      text.length > maxChars ? text.slice(0, Math.max(1, maxChars - 1)) + '…' : text;
+
     arcData.forEach((item, i) => {
       const inner = bandWidth * (i + 0.5);
       const outer = bandWidth * (i + 1.3);
@@ -116,12 +124,14 @@ export async function render(
         });
 
       // Label
-      g.append('text')
+      const fullLabel = `${item.label} (${(ratio * 100).toFixed(0)}%)`;
+      const labelEl = g.append('text')
         .attr('x', outer + 4)
         .attr('y', 0)
         .attr('dy', '0.35em')
         .style('font-size', '10px')
-        .text(`${item.label} (${(ratio * 100).toFixed(0)}%)`);
+        .text(truncate(fullLabel));
+      labelEl.append('title').text(fullLabel);
     });
   };
 
