@@ -157,18 +157,18 @@ const ollama = createProvider({ type: 'local', model: 'llama3.2', baseUrl: 'http
 
 ### Composant `<LLMSelector>`
 
-Le selecteur unifie les trois providers dans un seul composant UI Svelte. Il affiche les modeles disponibles et gere le chargement de Gemma via `<GemmaLoader>` :
+Le selecteur unifie les trois providers dans un seul composant UI Svelte. Il affiche les modeles disponibles et gere le chargement de Gemma via `<ModelLoader>` :
 
 ```svelte
 <script>
-  import { LLMSelector, GemmaLoader } from '@webmcp-auto-ui/ui';
+  import { LLMSelector, ModelLoader } from '@webmcp-auto-ui/ui';
 
   let selectedModel = $state('sonnet');
 </script>
 
 <LLMSelector bind:value={selectedModel} />
 {#if selectedModel.startsWith('gemma')}
-  <GemmaLoader model={selectedModel} />
+  <ModelLoader model={selectedModel} />
 {/if}
 ```
 

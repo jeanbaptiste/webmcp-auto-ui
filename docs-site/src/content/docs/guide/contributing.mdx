@@ -55,7 +55,7 @@ Avant d'ecrire du code dans une app (`apps/*`), verifier d'abord si la fonctionn
 | Suivi de tokens | `TokenTracker` | `agent` |
 | Nano-RAG | `ContextRAG` | `agent` |
 | Selecteur LLM | `<LLMSelector>` | `ui` |
-| Chargement Gemma | `<GemmaLoader>` | `ui` |
+| Chargement Gemma | `<ModelLoader>` | `ui` |
 | Statut MCP | `<McpStatus>` | `ui` |
 | Progression agent | `<AgentProgress>` | `ui` |
 | Rendu widgets | `<WidgetRenderer>`, `<BlockRenderer>` | `ui` |
@@ -327,7 +327,7 @@ Utiliser le format [Conventional Commits](https://www.conventionalcommits.org/) 
 
 ```
 feat(agent): add context compaction via Nano-RAG
-fix(ui): prevent effect_update_depth_exceeded in GemmaLoader
+fix(ui): prevent effect_update_depth_exceeded in ModelLoader
 refactor(core): simplify JSON Schema validation
 docs(guide): update architecture diagram
 perf(onnxruntime): load WASM from CDN instead of bundling

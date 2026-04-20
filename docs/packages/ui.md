@@ -93,7 +93,7 @@ Complex visualizations for data-heavy use cases.
 
 | Component | Description |
 |-----------|-------------|
-| `GemmaLoader` | Floating overlay with progress stream; auto-collapses to a pill once the model is loaded |
+| `ModelLoader` | Floating overlay with progress stream; auto-collapses to a pill once the model is loaded |
 | `TokenBubble` | Real-time metrics display: req/min, input tokens/min, output tokens/min, cached tokens |
 | `EphemeralBubble` | Transient notification bubble (moved from app to package for reuse) |
 | `RemoteMCPserversDemo` | MCP server discovery component listing available demo servers from `MCP_DEMO_SERVERS` |

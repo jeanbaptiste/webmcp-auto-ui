@@ -42,7 +42,7 @@ graph TD
         Agent["@webmcp-auto-ui/agent<br/>WEBMCP_RECIPES,<br/>recipeRegistry,<br/>runAgentLoop, providers,<br/>TokenTracker, ContextRAG"]
         Core["@webmcp-auto-ui/core<br/>McpMultiClient"]
         SDK["@webmcp-auto-ui/sdk<br/>MCP_DEMO_SERVERS,<br/>canvas store"]
-        UI["@webmcp-auto-ui/ui<br/>McpStatus, LLMSelector,<br/>GemmaLoader,<br/>RemoteMCPserversDemo,<br/>AgentConsole, THEME_MAP"]
+        UI["@webmcp-auto-ui/ui<br/>McpStatus, LLMSelector,<br/>ModelLoader,<br/>RemoteMCPserversDemo,<br/>AgentConsole, THEME_MAP"]
     end
 
     subgraph Backend
@@ -71,7 +71,7 @@ graph TD
 - `@webmcp-auto-ui/agent`: `WEBMCP_RECIPES`, `recipeRegistry`, `runAgentLoop`, `RemoteLLMProvider`, `WasmProvider`, `buildSystemPrompt`, `fromMcpTools`, `trimConversationHistory`, `TokenTracker`, `autoui`, `buildDiscoveryCache`, `ContextRAG`
 - `@webmcp-auto-ui/core`: `McpMultiClient`
 - `@webmcp-auto-ui/sdk`: `MCP_DEMO_SERVERS`, `canvas`
-- `@webmcp-auto-ui/ui`: `McpStatus`, `LLMSelector`, `GemmaLoader`, `RemoteMCPserversDemo`, `AgentConsole`, `THEME_MAP`
+- `@webmcp-auto-ui/ui`: `McpStatus`, `LLMSelector`, `ModelLoader`, `RemoteMCPserversDemo`, `AgentConsole`, `THEME_MAP`
 
 ## Getting started
 

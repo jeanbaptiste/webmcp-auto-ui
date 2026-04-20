@@ -3744,9 +3744,9 @@
         "signature": "LLMSelector"
       },
       {
-        "name": "GemmaLoader",
+        "name": "ModelLoader",
         "kind": "unknown",
-        "signature": "GemmaLoader"
+        "signature": "ModelLoader"
       },
       {
         "name": "McpStatus",

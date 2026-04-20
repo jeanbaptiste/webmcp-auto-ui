@@ -73,7 +73,7 @@ Tous les composants s'importent depuis `@webmcp-auto-ui/ui` :
   import {
     LLMSelector,    // Selecteur de modele LLM (Claude / Gemma)
     McpStatus,      // Indicateur de connexion MCP
-    GemmaLoader,    // Barre de chargement WASM Gemma
+    ModelLoader,    // Barre de chargement WASM Gemma
     AgentProgress,  // Progression de la boucle agent (tool calls, timer)
     WidgetRenderer, // Rendu d'un widget a partir de son type + props
   } from '@webmcp-auto-ui/ui';

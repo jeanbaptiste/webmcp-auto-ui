@@ -26,7 +26,7 @@ graph TD
         LAYOUTS --> FLEX[FlexLayout]
 
         AGENT_UI[Composants Agent] --> LLM[LLMSelector]
-        AGENT_UI --> GEMMA[GemmaLoader]
+        AGENT_UI --> GEMMA[ModelLoader]
         AGENT_UI --> MCP_S[McpStatus]
         AGENT_UI --> PROG[AgentProgress]
         AGENT_UI --> CHAT[ChatPanel]
@@ -607,12 +607,12 @@ interface Props {
 
 Modeles affiches : `haiku`, `sonnet`, `opus` (LLM distant, e.g. Claude), `gemma-e2b`, `gemma-e4b` (Google Gemma WASM).
 
-### GemmaLoader
+### ModelLoader
 
 Indicateur de chargement pour le modele Gemma WASM. Affiche une barre de progression, la taille telechargee, et le temps ecoule.
 
 ```svelte
-<GemmaLoader
+<ModelLoader
   status="loading"
   progress={45}
   elapsed={12}

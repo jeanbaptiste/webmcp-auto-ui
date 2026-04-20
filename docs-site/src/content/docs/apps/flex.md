@@ -76,7 +76,7 @@ graph TD
 - `@webmcp-auto-ui/agent` : `runAgentLoop`, `RemoteLLMProvider`, `WasmProvider`, `LocalLLMProvider`, `buildSystemPrompt`, `fromMcpTools`, `trimConversationHistory`, `summarizeChat`, `TokenTracker`, `buildToolsFromLayers`, `runDiagnostics`, `buildDiscoveryCache`, `ContextRAG`, `autoui`
 - `@webmcp-auto-ui/core` : `McpMultiClient`
 - `@webmcp-auto-ui/sdk` : `canvas`, `listSkills`, `encodeHyperSkill`
-- `@webmcp-auto-ui/ui` : `McpStatus`, `GemmaLoader`, `AgentProgress`, `EphemeralBubble`, `TokenBubble`, `bus`, `layoutAdapter`
+- `@webmcp-auto-ui/ui` : `McpStatus`, `ModelLoader`, `AgentProgress`, `EphemeralBubble`, `TokenBubble`, `bus`, `layoutAdapter`
 
 ## Lancement
 
@@ -99,7 +99,7 @@ En production, un fichier `.env` contenant `LLM_API_KEY` est requis pour le prox
 ### Multi-provider LLM
 Flex supporte trois familles de providers :
 - **LLM distant** (e.g. Claude, Gemini, ChatGPT, Mistral) via un proxy server-side compatible OpenAI
-- **Gemma WASM** (E2B, E4B) charge directement dans le navigateur via LiteRT. Une barre de progression `GemmaLoader` affiche la progression du telechargement (~33 MB)
+- **Gemma WASM** (E2B, E4B) charge directement dans le navigateur via LiteRT. Une barre de progression `ModelLoader` affiche la progression du telechargement (~33 MB)
 - **Ollama local** via `LocalLLMProvider` pour utiliser des modeles comme Llama 3.2 sur votre machine
 
 Le provider est selectionne via le composant `LLMSelector`. Des smart defaults ajustent automatiquement les options d'optimisation selon le provider choisi (ex: flatten active pour Gemma, sanitize pour Claude).

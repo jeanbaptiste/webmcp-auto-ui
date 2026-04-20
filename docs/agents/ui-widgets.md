@@ -427,7 +427,7 @@ Composants specialises pour les interactions agent, depuis `@webmcp-auto-ui/ui` 
 
 | Composant | Usage |
 |-----------|-------|
-| `GemmaLoader` | Overlay avec barre de progression, auto-collapse en pill |
+| `ModelLoader` | Overlay avec barre de progression, auto-collapse en pill |
 | `TokenBubble` | Metriques temps reel : req/min, tokens input/output |
 | `EphemeralBubble` | Notification ephemere |
 | `RemoteMCPserversDemo` | Decouverte serveurs MCP demo |

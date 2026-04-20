@@ -43,7 +43,7 @@ graph TD
         Agent["@webmcp-auto-ui/agent<br/>runAgentLoop, providers"]
         Core["@webmcp-auto-ui/core<br/>McpMultiClient"]
         SDK["@webmcp-auto-ui/sdk<br/>canvas, MCP_DEMO_SERVERS"]
-        UI["@webmcp-auto-ui/ui<br/>WidgetRenderer, LLMSelector,<br/>GemmaLoader, AgentProgress,<br/>McpStatus"]
+        UI["@webmcp-auto-ui/ui<br/>WidgetRenderer, LLMSelector,<br/>ModelLoader, AgentProgress,<br/>McpStatus"]
     end
 
     subgraph Backend
@@ -75,7 +75,7 @@ graph TD
 - `@webmcp-auto-ui/agent`: `runAgentLoop`, `RemoteLLMProvider`, `WasmProvider`, `buildSystemPrompt`, `fromMcpTools`, `autoui`, `buildDiscoveryCache`, `ContextRAG`
 - `@webmcp-auto-ui/core`: `McpMultiClient`
 - `@webmcp-auto-ui/sdk`: `canvas`, `MCP_DEMO_SERVERS`
-- `@webmcp-auto-ui/ui`: `WidgetRenderer`, `LLMSelector`, `GemmaLoader`, `AgentProgress`, `McpStatus`, `getTheme`
+- `@webmcp-auto-ui/ui`: `WidgetRenderer`, `LLMSelector`, `ModelLoader`, `AgentProgress`, `McpStatus`, `getTheme`
 
 ## Getting started
 
@@ -122,7 +122,7 @@ A "Demo mode" button lets you switch back to static widgets.
 
 ### Gemma WASM in-browser
 
-By selecting Gemma E2B or E4B, the model loads directly in the browser. The `GemmaLoader` component shows download progress with loaded/total MB and elapsed time.
+By selecting Gemma E2B or E4B, the model loads directly in the browser. The `ModelLoader` component shows download progress with loaded/total MB and elapsed time.
 
 ### Experimental Nano-RAG
 
