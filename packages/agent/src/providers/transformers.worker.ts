@@ -129,8 +129,12 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
     total: modelEntry.size,
   });
 
-  // Dynamic import — keeps the worker bundle small when idle.
-  transformersMod = await import('@huggingface/transformers');
+  // Dynamic import — Web Workers don't inherit the document's import-map, so
+  // the bare specifier can't resolve when externalized from the worker bundle.
+  // Hardcode the CDN URL (mirrors the pin in app.html). Keep /* @vite-ignore */
+  // to stop Vite from pre-resolving the runtime string.
+  const TRANSFORMERS_URL = 'https://esm.sh/@huggingface/transformers@4.0.1';
+  transformersMod = await import(/* @vite-ignore */ TRANSFORMERS_URL);
   const {
     AutoProcessor,
     AutoTokenizer,
