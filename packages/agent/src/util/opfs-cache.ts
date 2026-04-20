@@ -57,6 +57,29 @@ async function resolveFileParent(
 }
 
 /**
+ * Removes legacy cache entries: pre-refactor the helper stored model files
+ * directly under `webmcp-models/<filename>`. The new layout nests them under
+ * `webmcp-models/<repo-key>/<filename>`, so the old top-level files are
+ * orphaned and can each weigh several GB.
+ * Runs once per process.
+ */
+let legacyCleanupDone = false;
+async function cleanupLegacyModelFiles(modelsDir: FileSystemDirectoryHandle): Promise<void> {
+  if (legacyCleanupDone) return;
+  legacyCleanupDone = true;
+  try {
+    const dir = modelsDir as unknown as {
+      entries: () => AsyncIterable<[string, FileSystemHandle]>;
+    };
+    for await (const [name, handle] of dir.entries()) {
+      if (handle.kind === 'file') {
+        try { await modelsDir.removeEntry(name); } catch { /* best-effort */ }
+      }
+    }
+  } catch { /* iteration unsupported or blocked — skip silently */ }
+}
+
+/**
  * Load every requested file from the OPFS cache if valid, otherwise stream it
  * from the HuggingFace repo and cache it in the background.
  *
@@ -71,6 +94,7 @@ export async function loadOrDownloadModel(
 ): Promise<Map<string, ReadableStream<Uint8Array>>> {
   const root = await navigator.storage.getDirectory();
   const modelsDir = await root.getDirectoryHandle('webmcp-models', { create: true });
+  await cleanupLegacyModelFiles(modelsDir);
   const repoKey = sanitizeRepoKey(repo);
   const repoDir = await modelsDir.getDirectoryHandle(repoKey, { create: true });
 
