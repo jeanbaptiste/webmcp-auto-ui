@@ -9,7 +9,19 @@
     decodeHyperSkill, encodeHyperSkill, decode,
     getHsParam, type HyperSkill, type HyperSkillMeta,
   } from '@webmcp-auto-ui/sdk';
-  import { parseFrontmatter } from '@webmcp-auto-ui/core';
+  import { parseFrontmatter, type WebMcpServer } from '@webmcp-auto-ui/core';
+  import {
+    canvas2dServer, chartjsServer, cytoscapeServer, d3server,
+    leafletServer, mapboxServer, mermaidServer, pixijsServer,
+    plotlyServer, roughServer, threejsServer,
+  } from '@webmcp-auto-ui/servers';
+  import { autoui } from '@webmcp-auto-ui/agent';
+
+  const allServers: WebMcpServer[] = [
+    autoui, canvas2dServer, chartjsServer, cytoscapeServer, d3server,
+    leafletServer, mapboxServer, mermaidServer, pixijsServer,
+    plotlyServer, roughServer, threejsServer,
+  ];
   import { ExternalLink, Pencil, Plus, Trash2, FlaskConical, GitBranch, Github } from 'lucide-svelte';
 
   interface Block { id: string; type: string; data: Record<string, unknown>; }
@@ -435,7 +447,7 @@
                 </div>
               </div>
             {:else}
-              <WidgetRenderer type={block.type} data={block.data} />
+              <WidgetRenderer type={block.type} data={block.data} servers={allServers} />
             {/if}
           </div>
         {/each}

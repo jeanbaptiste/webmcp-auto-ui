@@ -11,7 +11,10 @@
   },
   "dependencies": {
     "@sveltejs/adapter-node": "^5.5.4",
+    "@webmcp-auto-ui/agent": "file:../../packages/agent",
+    "@webmcp-auto-ui/core": "file:../../packages/core",
     "@webmcp-auto-ui/sdk": "file:../../packages/sdk",
+    "@webmcp-auto-ui/servers": "file:../../packages/servers",
     "@webmcp-auto-ui/ui": "file:../../packages/ui"
   },
   "devDependencies": {
