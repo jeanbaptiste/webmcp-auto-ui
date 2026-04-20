@@ -272,12 +272,15 @@ async function handleGenerate(
 
   // Build model inputs — VLM path goes through processor(prompt, image),
   // text path goes through tokenizer(prompt).
+  // KV reuse is disabled: the agent loop rebuilds the full prompt each turn,
+  // so reusing past_key_values double-prefixes and triggers mask/score shape
+  // mismatches (Where node broadcast error on dim 3).
+  disposePastKeyValues();
   let inputs: any;
   let isVisionTurn = false;
   try {
     if (image && processor && entry.vision) {
       isVisionTurn = true;
-      disposePastKeyValues(); // vision turns always reset the KV cache
       const blob = new Blob([image]);
       const raw: any = await RawImage.read(blob);
       try { raw.resize?.(448, 448); } catch {}
@@ -308,7 +311,7 @@ async function handleGenerate(
   };
   if (typeof options.temperature === 'number') generateArgs.temperature = options.temperature;
   if (typeof options.topK === 'number') generateArgs.top_k = options.topK;
-  if (!isVisionTurn && pastKeyValues) generateArgs.past_key_values = pastKeyValues;
+  // past_key_values deliberately never reused (see comment above).
 
   let result: any;
   try {
@@ -323,13 +326,15 @@ async function handleGenerate(
     }
   }
 
-  // Cache KV for the next text-only turn.
-  try {
-    if (result?.past_key_values && !isVisionTurn) {
-      disposePastKeyValues();
-      pastKeyValues = result.past_key_values;
+  // KV cache intentionally not retained — the agent loop re-sends the full
+  // prompt each turn, so a stale cache would double-prefix and break shapes.
+  try { if (result?.past_key_values) {
+    if (typeof result.past_key_values === 'object') {
+      for (const v of Object.values(result.past_key_values) as any[]) {
+        try { v?.dispose?.(); } catch {}
+      }
     }
-  } catch {}
+  } } catch {}
 
   // Parse thinking: everything before </think> is routed to the `thinking`
   // option on the leading text block, the rest becomes normal content.
