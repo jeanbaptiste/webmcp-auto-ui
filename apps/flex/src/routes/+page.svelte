@@ -951,7 +951,9 @@
 
   onDestroy(() => {
     if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
-    document.removeEventListener('widget:node-dblclick', onTraceNodeDblClick as EventListener);
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('widget:node-dblclick', onTraceNodeDblClick as EventListener);
+    }
   });
 </script>
 
