@@ -19,7 +19,7 @@
     leafletServer, mermaidServer, pixijsServer,
     plotlyServer, roughServer, threejsServer,
   } from '@webmcp-auto-ui/servers';
-  import { McpStatus, GemmaLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
+  import { McpStatus, ModelLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
   import { Menu, Terminal, LayoutGrid } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
@@ -911,7 +911,7 @@
 
   <!-- GEMMA LOADER -->
   {#if gemmaStatus === 'loading' || gemmaStatus === 'error'}
-    <GemmaLoader
+    <ModelLoader
       status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaElapsed}
       loadedMB={gemmaLoadedMB} totalMB={gemmaTotalMB}
       modelName={({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}

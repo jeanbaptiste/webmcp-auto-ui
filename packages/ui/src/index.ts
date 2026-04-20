@@ -86,7 +86,9 @@ export type { BusMessage } from './messaging/bus.svelte.js';
 
 // Agent UI components
 export { default as LLMSelector } from './agent/LLMSelector.svelte';
-export { default as GemmaLoader } from './agent/GemmaLoader.svelte';
+export { default as ModelLoader } from './agent/ModelLoader.svelte';
+/** @deprecated Use ModelLoader instead. Alias maintained for backward compatibility. */
+export { default as GemmaLoader } from './agent/ModelLoader.svelte';
 export { default as McpStatus } from './agent/McpStatus.svelte';
 export { default as AgentProgress } from './agent/AgentProgress.svelte';
 export { default as McpConnector } from './agent/McpConnector.svelte';

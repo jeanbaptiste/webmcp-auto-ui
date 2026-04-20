@@ -5,7 +5,7 @@
   import { onMount, untrack } from 'svelte';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
-  import { WidgetRenderer, getTheme, LLMSelector, GemmaLoader, AgentProgress, McpStatus } from '@webmcp-auto-ui/ui';
+  import { WidgetRenderer, getTheme, LLMSelector, ModelLoader, AgentProgress, McpStatus } from '@webmcp-auto-ui/ui';
   import { PRESETS, type ThemePreset } from '$lib/themes';
   import { SIMPLE_BLOCKS, RICH_BLOCKS } from '$lib/demo-data';
   import { agentStore } from '$lib/agent-store.svelte';
@@ -191,7 +191,7 @@
 
   <!-- Gemma Loader -->
   {#if agentStore.gemmaStatus === 'loading' || agentStore.gemmaStatus === 'error'}
-    <GemmaLoader
+    <ModelLoader
       status={agentStore.gemmaStatus}
       progress={agentStore.gemmaProgress}
       elapsed={agentStore.gemmaElapsed}

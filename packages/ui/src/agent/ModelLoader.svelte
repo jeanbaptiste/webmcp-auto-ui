@@ -19,7 +19,7 @@
     elapsed,
     loadedMB = 0,
     totalMB = 0,
-    modelName = 'Gemma E2B',
+    modelName = 'modèle',
     error = '',
     fromCache = false,
     onunload,

@@ -15,7 +15,7 @@
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, Recipe, McpRecipe, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
   import { autoui } from '@webmcp-auto-ui/agent';
-  import { McpStatus, LLMSelector, GemmaLoader, RemoteMCPserversDemo, AgentConsole, THEME_MAP } from '@webmcp-auto-ui/ui';
+  import { McpStatus, LLMSelector, ModelLoader, RemoteMCPserversDemo, AgentConsole, THEME_MAP } from '@webmcp-auto-ui/ui';
   import RecipeList from '$lib/RecipeList.svelte';
   import RecipeDetail from '$lib/RecipeDetail.svelte';
   import RecipePreview from '$lib/RecipePreview.svelte';
@@ -568,7 +568,7 @@
 
   <!-- GEMMA LOADER -->
   {#if gemmaStatus === 'loading' || gemmaStatus === 'error'}
-    <GemmaLoader
+    <ModelLoader
       status={gemmaStatus}
       progress={gemmaProgress}
       elapsed={gemmaElapsed}
