@@ -357,6 +357,26 @@ describe('parseGemmaArgs — nested & mixed syntax', () => {
     expect(parse('{n:42,f:-1.5,t:true,fa:false,z:null}'))
       .toEqual({ n: 42, f: -1.5, t: true, fa: false, z: null });
   });
+
+  // Bug fix: Gemma recopies `\n` from tool-result JSON into its <|"|>…<|"|>
+  // string args. Without decoding, the backslash+n survive as two chars and
+  // later get re-escaped to `\\n` by JSON.stringify, reaching the sandbox as
+  // literal text instead of real newlines. These tests freeze the decoding
+  // contract: standard escapes (\n \t \r \" \\) become their real characters.
+  it('decodes \\n inside <|"|>…<|"|> to a real newline', () => {
+    const got = parse('{code:<|"|>a\\nb<|"|>}');
+    expect(got.code).toBe('a\nb');
+  });
+
+  it('preserves a literal backslash written as \\\\n', () => {
+    const got = parse('{code:<|"|>a\\\\nb<|"|>}');
+    expect(got.code).toBe('a\\nb');
+  });
+
+  it('decodes \\" inside <|"|>…<|"|> to a real double-quote', () => {
+    const got = parse('{msg:<|"|>say \\"hi\\"<|"|>}');
+    expect(got.msg).toBe('say "hi"');
+  });
 });
 
 describe('stripHallucinatedTokens — spec §9', () => {

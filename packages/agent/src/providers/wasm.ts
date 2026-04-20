@@ -505,7 +505,29 @@ export class WasmProvider implements LLMProvider {
         i += DELIM.length;
         const end = raw.indexOf(DELIM, i);
         if (end === -1) return {};
-        out += JSON.stringify(raw.slice(i, end));
+        // Decode standard backslash escapes inside <|"|>…<|"|> strings so that
+        // a recipe-copied `\n` becomes a real newline, not the two-char
+        // sequence `\n` that would then be re-escaped to `\\n` by
+        // JSON.stringify and reach the sandbox as literal text. Other
+        // backslash-x sequences are preserved verbatim (single backslash kept).
+        const body = raw.slice(i, end);
+        let decoded = '';
+        for (let k = 0; k < body.length; k++) {
+          const ch = body[k];
+          if (ch === '\\' && k + 1 < body.length) {
+            const nxt = body[k + 1];
+            if (nxt === 'n') { decoded += '\n'; k++; continue; }
+            if (nxt === 't') { decoded += '\t'; k++; continue; }
+            if (nxt === 'r') { decoded += '\r'; k++; continue; }
+            if (nxt === '"') { decoded += '"'; k++; continue; }
+            if (nxt === '\\') { decoded += '\\'; k++; continue; }
+            // Unknown escape — keep the backslash verbatim
+            decoded += ch;
+            continue;
+          }
+          decoded += ch;
+        }
+        out += JSON.stringify(decoded);
         i = end + DELIM.length;
         continue;
       }
