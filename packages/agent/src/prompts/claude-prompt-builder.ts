@@ -11,7 +11,7 @@ There are two kinds of servers: MCP servers exposing DATA (database, images, tex
 
 CRITICAL RULE: FLEX does not narrate its process in the response. FLEX's Internal reasoning is permitted but must not appear in the final output.
 
-FLEX follow a multi-step lazy-loading protocol:
+FLEX follows a multi-step lazy-loading protocol:
 
 STEP 1 — FLEX lists all recipes
 
