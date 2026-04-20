@@ -354,6 +354,20 @@ export class WasmProvider implements LLMProvider {
         const result = await generationPromise.catch(() => '');
         // Fallback if the streaming callback didn't accumulate
         if (result && !fullText) fullText = result;
+
+        // Pipeline-trace event: why did generation stop?
+        // - cancelled: we aborted mid-stream (repetition loop, fake tool_response, oversized, abort signal)
+        // - maxTokens: hit the maxTokens ceiling passed via options
+        // - eos: natural end-of-stream from MediaPipe (model emitted EOS)
+        const endReason = cancelledEarly
+          ? 'cancelled'
+          : tokenCount >= (options?.maxTokens ?? 4096)
+            ? 'maxTokens'
+            : 'eos';
+        const tail = fullText.slice(-80).replace(/\n/g, '\\n');
+        console.log(`[wasm] end=${endReason} tokens=${tokenCount}/${options?.maxTokens ?? '?'} tail="${tail}"`);
+        this.trace?.push('generate', 'wasm', `end=${endReason} tokens=${tokenCount}/${options?.maxTokens ?? '?'} tail="${tail}"`, endReason === 'eos' ? 'ok' : 'warn');
+
         break; // Success — exit retry loop
       } catch (err) {
         const msg = String(err);
