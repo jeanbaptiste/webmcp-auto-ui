@@ -37,11 +37,8 @@ import isosurfaceRecipe from './recipes/isosurface.md?raw';
 import scattergeoRecipe from './recipes/scattergeo.md?raw';
 import choroplethRecipe from './recipes/choropleth.md?raw';
 import scattermapRecipe from './recipes/scattermap.md?raw';
-import scattermapboxRecipe from './recipes/scattermapbox.md?raw';
 import choroplethmapRecipe from './recipes/choroplethmap.md?raw';
-import choroplethmapboxRecipe from './recipes/choroplethmapbox.md?raw';
 import densitymapRecipe from './recipes/densitymap.md?raw';
-import densitymapboxRecipe from './recipes/densitymapbox.md?raw';
 import scatterpolarRecipe from './recipes/scatterpolar.md?raw';
 import scatterpolarglRecipe from './recipes/scatterpolargl.md?raw';
 import barpolarRecipe from './recipes/barpolar.md?raw';
@@ -89,11 +86,8 @@ import { render as renderIsosurface } from './widgets/isosurface.js';
 import { render as renderScattergeo } from './widgets/scattergeo.js';
 import { render as renderChoropleth } from './widgets/choropleth.js';
 import { render as renderScattermap } from './widgets/scattermap.js';
-import { render as renderScattermapbox } from './widgets/scattermapbox.js';
 import { render as renderChoroplethmap } from './widgets/choroplethmap.js';
-import { render as renderChoroplethmapbox } from './widgets/choroplethmapbox.js';
 import { render as renderDensitymap } from './widgets/densitymap.js';
-import { render as renderDensitymapbox } from './widgets/densitymapbox.js';
 import { render as renderScatterpolar } from './widgets/scatterpolar.js';
 import { render as renderScatterpolargl } from './widgets/scatterpolargl.js';
 import { render as renderBarpolar } from './widgets/barpolar.js';
@@ -150,11 +144,8 @@ const widgets: Array<[string, unknown]> = [
   [scattergeoRecipe, renderScattergeo],
   [choroplethRecipe, renderChoropleth],
   [scattermapRecipe, renderScattermap],
-  [scattermapboxRecipe, renderScattermapbox],
   [choroplethmapRecipe, renderChoroplethmap],
-  [choroplethmapboxRecipe, renderChoroplethmapbox],
   [densitymapRecipe, renderDensitymap],
-  [densitymapboxRecipe, renderDensitymapbox],
   [scatterpolarRecipe, renderScatterpolar],
   [scatterpolarglRecipe, renderScatterpolargl],
   [barpolarRecipe, renderBarpolar],
