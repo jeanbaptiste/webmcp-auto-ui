@@ -33,6 +33,7 @@ export interface ChatMessage {
 
 export type ContentBlock =
   | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mediaType: string }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; tool_use_id: string; content: string };
 

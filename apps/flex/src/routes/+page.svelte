@@ -11,8 +11,9 @@
     buildToolsFromLayers, runDiagnostics, DiscoveryCache, DISCOVERY_TOOL_NAMES, ContextRAG,
     buildGemmaPrompt,
     createTraceObserver,
+    TRANSFORMERS_MODELS,
   } from '@webmcp-auto-ui/agent';
-  import type { ChatMessage, ToolLayer, McpLayer, BrowsableTool, TraceObserver } from '@webmcp-auto-ui/agent';
+  import type { ChatMessage, ContentBlock, ToolLayer, McpLayer, BrowsableTool, TraceObserver } from '@webmcp-auto-ui/agent';
   import { autoui } from '@webmcp-auto-ui/agent';
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import {
@@ -21,7 +22,7 @@
     plotlyServer, roughServer, threejsServer,
   } from '@webmcp-auto-ui/servers';
   import { McpStatus, ModelLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
-  import { Menu, Terminal, LayoutGrid } from 'lucide-svelte';
+  import { Menu, Terminal, LayoutGrid, Paperclip, X as XIcon } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
   import SettingsDrawer from '$lib/SettingsDrawer.svelte';
@@ -65,6 +66,33 @@
   let toolBrowserOpen = $state(false);
   let toolBrowserFilter = $state('');
   let skills = $state<Skill[]>([]);
+
+  // ── Vision input (image attachment for VLM models) ─────────────────
+  let attachedImage = $state<{ dataUrl: string; mediaType: string; name: string } | null>(null);
+  let fileInputEl: HTMLInputElement | null = $state(null);
+  const isVisionModel = $derived.by(() => {
+    const id = canvas.llm;
+    if (!id || !id.startsWith('transformers-')) return false;
+    const entry = TRANSFORMERS_MODELS[id as keyof typeof TRANSFORMERS_MODELS];
+    return entry?.vision === true;
+  });
+
+  function onImagePicked(ev: Event) {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      attachedImage = {
+        dataUrl: String(reader.result),
+        mediaType: file.type || 'image/png',
+        name: file.name,
+      };
+    };
+    reader.readAsDataURL(file);
+    // reset so the same file can be picked again later
+    input.value = '';
+  }
 
   // ── WebMCP servers (additional visualization packs) ─────────────
   const SERVER_REGISTRY: { id: string; label: string; description: string; server: WebMcpServer }[] = [
@@ -775,8 +803,20 @@
     const currentServerName = canvas.mcpName ?? '';
     let result: Awaited<ReturnType<typeof runAgentLoop>> | null = null;
 
+    // Build user-turn payload — image block (if present) + text.
+    // One-shot: the image is consumed for this turn only and then cleared.
+    const pendingImage = attachedImage;
+    let userTurn: string | ContentBlock[] = msg;
+    if (pendingImage) {
+      userTurn = [
+        { type: 'image', data: pendingImage.dataUrl, mediaType: pendingImage.mediaType },
+        { type: 'text', text: msg },
+      ];
+      attachedImage = null;
+    }
+
     try {
-      result = await runAgentLoop(msg, {
+      result = await runAgentLoop(userTurn, {
         client: multiClient.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
@@ -1087,6 +1127,19 @@
   <!-- INPUT BAR (composer only) -->
   {#if composerMode}
     <div class="flex-shrink-0 px-[50px] py-4 bg-surface border-t border-border">
+      {#if attachedImage}
+        <div class="flex items-center gap-2 mb-2">
+          <div class="relative flex-shrink-0">
+            <img src={attachedImage.dataUrl} alt={attachedImage.name}
+                 class="h-16 w-16 rounded-lg border border-border2 object-cover" />
+            <button class="absolute -top-1.5 -right-1.5 h-5 w-5 flex items-center justify-center rounded-full bg-surface border border-border2 text-text2 hover:text-text1 hover:border-accent transition-colors"
+                    onclick={() => attachedImage = null} aria-label="Remove image">
+              <XIcon size={10} />
+            </button>
+          </div>
+          <span class="font-mono text-[10px] text-text2 truncate">{attachedImage.name}</span>
+        </div>
+      {/if}
       <div class="flex gap-2 items-center">
         <button
           class="relative flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-lg border transition-colors
@@ -1098,6 +1151,18 @@
             <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-teal"></span>
           {/if}
         </button>
+        {#if isVisionModel}
+          <input type="file" accept="image/*" class="hidden"
+                 bind:this={fileInputEl} onchange={onImagePicked} />
+          <button
+            class="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-lg border transition-colors
+                   {attachedImage ? 'border-accent bg-accent/10 text-accent' : 'border-border2 text-text2 hover:text-text1'}"
+            onclick={() => fileInputEl?.click()}
+            disabled={canvas.generating}
+            aria-label="Attach image" title="Attach image">
+            <Paperclip size={14} />
+          </button>
+        {/if}
         <input type="text" bind:value={input} onkeydown={onKeydown}
           placeholder={canvas.mcpConnected ? `Ask for a UI about ${canvas.mcpName}...` : 'Open the menu to connect an MCP server...'}
           disabled={canvas.generating}

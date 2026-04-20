@@ -14,12 +14,15 @@
 export type TransformersFamily = 'gemma4' | 'qwen3' | 'mistral';
 export type ToolCallFormat = 'gemma-native' | 'qwen-json' | 'mistral-toolcalls';
 
+export type DType = 'q4' | 'q4f16' | 'q8' | 'fp16' | 'fp32';
+
 export interface TransformersModelEntry {
   repo: string;
   dtype: {
-    embed_tokens?: 'q4' | 'q8' | 'fp16' | 'fp32';
-    decoder_model_merged?: 'q4' | 'q8' | 'fp16' | 'fp32';
-    vision_encoder?: 'q4' | 'q8' | 'fp16' | 'fp32';
+    embed_tokens?: DType;
+    decoder_model_merged?: DType;
+    vision_encoder?: DType;
+    audio_encoder?: DType;
   };
   family: TransformersFamily;
   toolFormat: ToolCallFormat;
@@ -43,23 +46,35 @@ export type TransformersModelId =
 export const TRANSFORMERS_MODELS: Record<TransformersModelId, TransformersModelEntry> = {
   'transformers-gemma-4-e2b': {
     repo: 'onnx-community/gemma-4-E2B-it-ONNX',
-    dtype: { embed_tokens: 'q4', decoder_model_merged: 'q4' },
+    modelClass: 'Gemma4ForConditionalGeneration',
+    dtype: {
+      audio_encoder: 'q4',
+      vision_encoder: 'q4',
+      embed_tokens: 'q4',
+      decoder_model_merged: 'q4f16',
+    },
     family: 'gemma4',
     toolFormat: 'gemma-native',
     contextLength: 32768,
-    vision: false,
-    size: 1_800_000_000,
-    label: 'Gemma 4 E2B (Transformers)',
+    vision: true,
+    size: 2_000_000_000,
+    label: 'Gemma 4 E2B (Vision)',
   },
   'transformers-gemma-4-e4b': {
     repo: 'onnx-community/gemma-4-E4B-it-ONNX',
-    dtype: { embed_tokens: 'q4', decoder_model_merged: 'q4' },
+    modelClass: 'Gemma4ForConditionalGeneration',
+    dtype: {
+      audio_encoder: 'q4',
+      vision_encoder: 'q4',
+      embed_tokens: 'q4',
+      decoder_model_merged: 'q4f16',
+    },
     family: 'gemma4',
     toolFormat: 'gemma-native',
     contextLength: 32768,
-    vision: false,
-    size: 2_800_000_000,
-    label: 'Gemma 4 E4B (Transformers)',
+    vision: true,
+    size: 3_000_000_000,
+    label: 'Gemma 4 E4B (Vision)',
   },
   'transformers-qwen-3-4b': {
     repo: 'webgpu/Qwen3-4B-ONNX',
@@ -95,13 +110,18 @@ export const TRANSFORMERS_MODELS: Record<TransformersModelId, TransformersModelE
   },
   'transformers-ministral-3-3b': {
     repo: 'mistralai/Ministral-3-3B-Instruct-2512-ONNX',
-    dtype: { embed_tokens: 'q4', decoder_model_merged: 'q4' },
+    modelClass: 'Mistral3ForConditionalGeneration',
+    dtype: {
+      vision_encoder: 'q4',
+      embed_tokens: 'q4',
+      decoder_model_merged: 'q4f16',
+    },
     family: 'mistral',
     toolFormat: 'mistral-toolcalls',
     contextLength: 32768,
-    vision: false,
-    size: 2_000_000_000,
-    label: 'Ministral 3 3B',
+    vision: true,
+    size: 2_200_000_000,
+    label: 'Ministral 3 3B (Vision)',
   },
 };
 

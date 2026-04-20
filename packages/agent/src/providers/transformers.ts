@@ -208,6 +208,27 @@ export class TransformersProvider implements LLMProvider {
     });
   }
 
+  /** Extract a base64 data-URL image from the last user message, if any.
+   *  Vision turns are always one-shot: only the latest user turn's image is used. */
+  private extractImageFromLastUserMessage(messages: ChatMessage[]): Uint8Array | undefined {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role !== 'user') continue;
+      if (typeof m.content === 'string') return undefined;
+      const imgBlock = m.content.find(
+        (b): b is Extract<ContentBlock, { type: 'image' }> => b.type === 'image',
+      );
+      if (!imgBlock) return undefined;
+      const match = imgBlock.data.match(/^data:[^;]+;base64,(.+)$/);
+      if (!match) return undefined;
+      const bin = atob(match[1]);
+      const bytes = new Uint8Array(bin.length);
+      for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+      return bytes;
+    }
+    return undefined;
+  }
+
   private buildPrompt(messages: ChatMessage[], systemPrompt: string | undefined): string {
     switch (this.promptKind) {
       case 'gemma':
@@ -257,6 +278,7 @@ export class TransformersProvider implements LLMProvider {
     const worker = this.ensureWorker();
 
     const prompt = this.buildPrompt(messages, options?.system);
+    const image = this.entry.vision ? this.extractImageFromLastUserMessage(messages) : undefined;
     const requestId = this.nextRequestId();
 
     return new Promise<LLMResponse>((resolve, reject) => {
@@ -277,7 +299,7 @@ export class TransformersProvider implements LLMProvider {
 
       this.pending.set(requestId, pending);
 
-      worker.postMessage({
+      const message: Record<string, unknown> = {
         type: 'generate',
         requestId,
         prompt,
@@ -286,7 +308,9 @@ export class TransformersProvider implements LLMProvider {
           temperature: options?.temperature,
           topK: options?.topK,
         },
-      });
+      };
+      if (image) message.image = image;
+      worker.postMessage(message);
     });
   }
 

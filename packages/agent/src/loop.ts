@@ -123,7 +123,7 @@ export interface AgentLoopOptions {
 }
 
 export async function runAgentLoop(
-  userMessage: string,
+  userMessage: string | ContentBlock[],
   options: AgentLoopOptions
 ): Promise<AgentResult> {
   const {
