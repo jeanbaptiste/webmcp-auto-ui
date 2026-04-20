@@ -400,3 +400,73 @@ describe('stripHallucinatedTokens — spec §9', () => {
     expect(stripHallucinatedTokens(input)).toBe('xz');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// extractToolCalls — noise tolerance between args and <tool_call|>
+// ─────────────────────────────────────────────────────────────────────────────
+// Bug fix: Gemma sometimes hallucinates extra `}` (or trailing whitespace /
+// commas) between the balanced args block and the `<tool_call|>` closing tag.
+// Without tolerance, the strict scanner rejected the call silently — no
+// tool_use was produced and the widget never rendered. extractArgsBlock itself
+// must stay strict on internal brace balancing; only AFTER the balanced block
+// do we skip noise chars (`}`, ` `, `\n`, `\r`, `\t`, `,`).
+describe('extractToolCalls — noise tolerance before <tool_call|>', () => {
+  const scan = (text: string) => WasmProvider.extractToolCalls(text);
+
+  it('accepts a call with one stray `}` before <tool_call|>', () => {
+    const txt =
+      '<|tool_call>call:widget_display' +
+      '{name:<|"|>kv<|"|>,params:{rows:[[<|"|>a<|"|>]]},title:<|"|>foo<|"|>}' +
+      '}<tool_call|>';
+    const calls = scan(txt);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].name).toBe('widget_display');
+    expect(calls[0].argsBlock).toBe(
+      '{name:<|"|>kv<|"|>,params:{rows:[[<|"|>a<|"|>]]},title:<|"|>foo<|"|>}',
+    );
+  });
+
+  it('accepts multiple stray `}` before <tool_call|>', () => {
+    const txt =
+      '<|tool_call>call:widget_display' +
+      '{name:<|"|>kv<|"|>}' +
+      '}}}<tool_call|>';
+    const calls = scan(txt);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].name).toBe('widget_display');
+  });
+
+  it('accepts stray `}` mixed with whitespace before <tool_call|>', () => {
+    const txt =
+      '<|tool_call>call:widget_display' +
+      '{name:<|"|>kv<|"|>}' +
+      '}}\n  <tool_call|>';
+    const calls = scan(txt);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].name).toBe('widget_display');
+  });
+
+  it('clean call (no noise) is parsed as before — no regression', () => {
+    const txt =
+      '<|tool_call>call:widget_display' +
+      '{name:<|"|>kv<|"|>,params:{rows:[[<|"|>a<|"|>]]}}' +
+      '<tool_call|>';
+    const calls = scan(txt);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].name).toBe('widget_display');
+    expect(calls[0].argsBlock).toBe(
+      '{name:<|"|>kv<|"|>,params:{rows:[[<|"|>a<|"|>]]}}',
+    );
+  });
+
+  it('rejects calls with real non-noise content between args and <tool_call|>', () => {
+    // Between the balanced args block and <tool_call|> there is `{"extra":"foo"}`
+    // — that is not noise; the scanner must still reject (no false positive).
+    const txt =
+      '<|tool_call>call:widget_display' +
+      '{name:<|"|>kv<|"|>}' +
+      '{<|"|>extra<|"|>:<|"|>foo<|"|>}<tool_call|>';
+    const calls = scan(txt);
+    expect(calls).toHaveLength(0);
+  });
+});

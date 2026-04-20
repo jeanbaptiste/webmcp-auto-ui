@@ -407,30 +407,16 @@ export class WasmProvider implements LLMProvider {
     } catch {}
 
     const content: ContentBlock[] = [];
-    const START_TAG = '<|tool_call>call:';
-    const END_TAG = '<tool_call|>';
+    const parsed = WasmProvider.extractToolCalls(fullText);
     let foundToolCall = false;
-    let scanIdx = 0;
-    while (true) {
-      const startIdx = fullText.indexOf(START_TAG, scanIdx);
-      if (startIdx === -1) break;
-      const nameStart = startIdx + START_TAG.length;
-      const braceIdx = fullText.indexOf('{', nameStart);
-      if (braceIdx === -1) break;
-      const name = fullText.slice(nameStart, braceIdx);
-      if (!/^\w+$/.test(name)) { scanIdx = nameStart; continue; }
-      const argsBlock = WasmProvider.extractArgsBlock(fullText, braceIdx);
-      if (!argsBlock) break;
-      const afterArgs = braceIdx + argsBlock.length;
-      if (!fullText.startsWith(END_TAG, afterArgs)) { scanIdx = afterArgs; continue; }
+    for (const call of parsed) {
       foundToolCall = true;
       content.push({
         type: 'tool_use',
         id: `tc-${Date.now()}-${content.length}`,
-        name,
-        input: WasmProvider.parseGemmaArgs(argsBlock),
+        name: call.name,
+        input: WasmProvider.parseGemmaArgs(call.argsBlock),
       });
-      scanIdx = afterArgs + END_TAG.length;
     }
 
     if (!foundToolCall) {
@@ -488,6 +474,61 @@ export class WasmProvider implements LLMProvider {
       i++;
     }
     return null;
+  }
+
+  /**
+   * Skip "noise" chars that Gemma sometimes hallucinates between the end of a
+   * balanced args block and the `<tool_call|>` closing tag. Observed in prod:
+   * excess `}` braces, trailing commas, whitespace. Without this tolerance the
+   * strict scanner rejects the whole tool call silently (no tool_use produced),
+   * which breaks widget rendering.
+   *
+   * extractArgsBlock itself stays strict on internal brace balancing — only
+   * AFTER the balanced block do we tolerate noise.
+   */
+  private static skipNoise(text: string, pos: number): number {
+    while (pos < text.length) {
+      const c = text[pos];
+      if (c === '}' || c === ' ' || c === '\n' || c === '\r' || c === '\t' || c === ',') {
+        pos++;
+        continue;
+      }
+      break;
+    }
+    return pos;
+  }
+
+  /**
+   * Scan `fullText` for Gemma native tool calls and return the list of
+   * `{ name, argsBlock }` pairs found. Tolerates hallucinated noise
+   * (excess `}`, whitespace, trailing commas) between the balanced args
+   * block and the `<tool_call|>` closing tag. See `skipNoise`.
+   *
+   * Exposed as a static helper so unit tests can exercise the scanner
+   * without spinning up a full WasmProvider / MediaPipe runtime.
+   */
+  static extractToolCalls(fullText: string): Array<{ name: string; argsBlock: string }> {
+    const START_TAG = '<|tool_call>call:';
+    const END_TAG = '<tool_call|>';
+    const out: Array<{ name: string; argsBlock: string }> = [];
+    let scanIdx = 0;
+    while (true) {
+      const startIdx = fullText.indexOf(START_TAG, scanIdx);
+      if (startIdx === -1) break;
+      const nameStart = startIdx + START_TAG.length;
+      const braceIdx = fullText.indexOf('{', nameStart);
+      if (braceIdx === -1) break;
+      const name = fullText.slice(nameStart, braceIdx);
+      if (!/^\w+$/.test(name)) { scanIdx = nameStart; continue; }
+      const argsBlock = WasmProvider.extractArgsBlock(fullText, braceIdx);
+      if (!argsBlock) break;
+      const afterArgsRaw = braceIdx + argsBlock.length;
+      const afterArgs = WasmProvider.skipNoise(fullText, afterArgsRaw);
+      if (!fullText.startsWith(END_TAG, afterArgs)) { scanIdx = afterArgsRaw; continue; }
+      out.push({ name, argsBlock });
+      scanIdx = afterArgs + END_TAG.length;
+    }
+    return out;
   }
 
   /**
