@@ -31,11 +31,29 @@ export async function render(
   const draw = (width: number, height: number) => {
     d3.select(container).selectAll('svg').remove();
 
-    const margin = { top: title ? 36 : 16, right: 80, bottom: 16, left: 80 };
+    const hierarchy = d3.hierarchy(rawRoot);
+
+    // Dynamic margins — measure longest leaf label so it doesn't get clipped.
+    // Approx width @ 11px sans-serif ≈ 6.5px per char; clamp to avoid absurd margins.
+    const CHAR_PX = 6.5;
+    const leafLabels = hierarchy.leaves().map((n: any) => String(n.data?.name ?? ''));
+    const rootLabels = hierarchy.descendants()
+      .filter((n: any) => n.children)
+      .map((n: any) => String(n.data?.name ?? ''));
+    const maxLeafChars = Math.max(0, ...leafLabels.map((s: string) => s.length));
+    const maxInnerChars = Math.max(0, ...rootLabels.map((s: string) => s.length));
+    const leafPad = Math.min(280, 16 + maxLeafChars * CHAR_PX);
+    const innerPad = Math.min(200, 16 + maxInnerChars * CHAR_PX);
+
+    // For horizontal orientation: leaves on the right (text-anchor start) → right needs room;
+    // root/children on the left (text-anchor end) → left needs room.
+    // For vertical orientation: labels go below nodes, so symmetric padding.
+    const margin =
+      orientation === 'horizontal'
+        ? { top: title ? 36 : 16, right: leafPad, bottom: 16, left: innerPad }
+        : { top: title ? 36 : 16, right: 40, bottom: 40, left: 40 };
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
-
-    const hierarchy = d3.hierarchy(rawRoot);
     const treeLayout = d3.tree().size(
       orientation === 'horizontal' ? [innerH, innerW] : [innerW, innerH],
     );

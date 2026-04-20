@@ -31,16 +31,34 @@ export async function render(
   const draw = (width: number, height: number) => {
     d3.select(container).selectAll('svg').remove();
 
-    const radius = Math.min(width, height) / 2 - 40;
-
     const hierarchy = d3.hierarchy(rawRoot);
+
+    // Dynamic label padding — leaf labels render outside the cluster box.
+    const CHAR_PX_RADIAL = 5;   // 9px sans-serif
+    const CHAR_PX_LINEAR = 6;   // 10px sans-serif
+    const leafLabels = hierarchy.leaves().map((n: any) => String(n.data?.name ?? ''));
+    const maxLeafChars = Math.max(0, ...leafLabels.map((s: string) => s.length));
+    const leafPadRadial = Math.min(260, 20 + maxLeafChars * CHAR_PX_RADIAL);
+    const leafPadLinear = Math.min(280, 20 + maxLeafChars * CHAR_PX_LINEAR);
+
+    // Linear left margin: internal node labels (text-anchor end) need room too.
+    const innerLabels = hierarchy.descendants()
+      .filter((n: any) => n.children)
+      .map((n: any) => String(n.data?.name ?? ''));
+    const maxInnerChars = Math.max(0, ...innerLabels.map((s: string) => s.length));
+    const innerPadLinear = Math.min(200, 20 + maxInnerChars * CHAR_PX_LINEAR);
+
+    const radius = Math.min(width, height) / 2 - leafPadRadial;
+
     let root;
 
     if (radial) {
-      const cluster = d3.cluster().size([2 * Math.PI, radius]);
+      const cluster = d3.cluster().size([2 * Math.PI, Math.max(20, radius)]);
       root = cluster(hierarchy);
     } else {
-      const cluster = d3.cluster().size([height - 80, width - 160]);
+      const cluster = d3
+        .cluster()
+        .size([height - 80, Math.max(50, width - innerPadLinear - leafPadLinear)]);
       root = cluster(hierarchy);
     }
 
@@ -67,7 +85,12 @@ export async function render(
 
     const g = svg
       .append('g')
-      .attr('transform', radial ? `translate(${width / 2},${height / 2})` : 'translate(80,40)');
+      .attr(
+        'transform',
+        radial
+          ? `translate(${width / 2},${height / 2})`
+          : `translate(${innerPadLinear},40)`,
+      );
 
     if (radial) {
       // Radial links

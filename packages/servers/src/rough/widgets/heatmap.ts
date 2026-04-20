@@ -6,8 +6,13 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const cols = (data.cols as string[]) || [];
   const matrix = (data.values as number[][]) || [];
   const title = data.title as string | undefined;
-  const w = 520, h = 420;
-  const margin = { top: title ? 50 : 30, right: 20, bottom: 30, left: 70 };
+  const CHAR_PX = 6; // 10px sans-serif
+  const maxRowChars = Math.max(0, ...rows.map((r) => (r ?? '').length));
+  const maxColChars = Math.max(0, ...cols.map((c) => (c ?? '').length));
+  const leftPad = Math.min(260, 20 + maxRowChars * CHAR_PX);
+  const topPad = (title ? 50 : 30) + Math.min(60, Math.round(maxColChars * CHAR_PX * 0.42));
+  const w = Math.max(520, leftPad + 320), h = Math.max(420, topPad + 280);
+  const margin = { top: topPad, right: 20, bottom: 30, left: leftPad };
   const { svg, rc } = await createRoughSVG(container, w, h);
   const chartW = w - margin.left - margin.right;
   const chartH = h - margin.top - margin.bottom;

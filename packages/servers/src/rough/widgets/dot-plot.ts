@@ -4,8 +4,11 @@ import { createRoughSVG, COLORS, addText } from './shared.js';
 export async function render(container: HTMLElement, data: Record<string, unknown>): Promise<void | (() => void)> {
   const items = (data.items as { label: string; value: number }[]) || [];
   const title = data.title as string | undefined;
-  const w = 500, h = Math.max(300, items.length * 30 + 80);
-  const margin = { top: title ? 50 : 20, right: 30, bottom: 30, left: 120 };
+  const CHAR_PX = 6; // 10px sans-serif
+  const maxLabelChars = Math.max(0, ...items.map((it) => (it.label ?? '').length));
+  const leftPad = Math.min(320, 30 + maxLabelChars * CHAR_PX);
+  const w = Math.max(500, leftPad + 260), h = Math.max(300, items.length * 30 + 80);
+  const margin = { top: title ? 50 : 20, right: 30, bottom: 30, left: leftPad };
   const { svg, rc } = await createRoughSVG(container, w, h);
   const chartW = w - margin.left - margin.right;
 

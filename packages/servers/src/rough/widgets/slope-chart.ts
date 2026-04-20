@@ -6,8 +6,15 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const startLabel = (data.startLabel as string) || 'Before';
   const endLabel = (data.endLabel as string) || 'After';
   const title = data.title as string | undefined;
-  const w = 400, h = 400;
-  const margin = { top: title ? 55 : 35, right: 60, bottom: 20, left: 60 };
+  // Right label = `${item.end} ${item.label}` rendered at ~9px sans-serif (~5.2px/char).
+  const CHAR_PX = 5.2;
+  const maxRightChars = Math.max(
+    0,
+    ...items.map((it) => `${it.end} ${it.label ?? ''}`.length),
+  );
+  const rightPad = Math.min(260, 60 + maxRightChars * CHAR_PX);
+  const w = Math.max(400, 60 + 120 + rightPad), h = 400;
+  const margin = { top: title ? 55 : 35, right: rightPad, bottom: 20, left: 60 };
   const { svg, rc } = await createRoughSVG(container, w, h);
   const chartH = h - margin.top - margin.bottom;
 

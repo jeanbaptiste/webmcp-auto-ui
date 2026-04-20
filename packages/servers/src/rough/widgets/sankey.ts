@@ -5,8 +5,11 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const nodes = (data.nodes as string[]) || [];
   const links = (data.links as { source: number; target: number; value: number }[]) || [];
   const title = data.title as string | undefined;
-  const w = 560, h = 400;
-  const margin = { top: title ? 50 : 20, right: 20, bottom: 20, left: 20 };
+  const CHAR_PX = 6; // 10px sans-serif
+  const maxNodeChars = Math.max(0, ...nodes.map((n) => (n ?? '').length));
+  const sidePad = Math.min(220, 20 + maxNodeChars * CHAR_PX);
+  const w = Math.max(560, 2 * sidePad + 200), h = 400;
+  const margin = { top: title ? 50 : 20, right: sidePad, bottom: 20, left: sidePad };
   const { svg, rc } = await createRoughSVG(container, w, h);
   const chartW = w - margin.left - margin.right;
   const chartH = h - margin.top - margin.bottom;

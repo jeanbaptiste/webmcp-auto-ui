@@ -25,7 +25,23 @@ export async function render(
   const draw = (width: number, height: number) => {
     d3.select(container).selectAll('svg').remove();
 
-    const margin = { top: title ? 36 : 16, right: 20, bottom: 50, left: 50 };
+    // Dynamic margins — category labels can be long.
+    const CHAR_PX = 6;
+    const maxCatChars = Math.max(0, ...categories.map((c: any) => String(c ?? '').length));
+    const margin = horizontal
+      ? {
+          top: title ? 36 : 16,
+          right: 20,
+          bottom: 40,
+          left: Math.min(240, 20 + maxCatChars * CHAR_PX),
+        }
+      : {
+          top: title ? 36 : 16,
+          right: 20,
+          // rotated -25° labels ≈ cos(25°)*len*CHAR_PX + baseline
+          bottom: Math.min(120, 30 + Math.round(maxCatChars * CHAR_PX * 0.42)),
+          left: 50,
+        };
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
 
@@ -65,8 +81,11 @@ export async function render(
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    g.append('g').attr('transform', `translate(0,${innerH})`).call(xAxis)
-      .selectAll('text').style('text-anchor', 'end').attr('transform', 'rotate(-25)');
+    const xAxisG = g.append('g').attr('transform', `translate(0,${innerH})`).call(xAxis);
+    // Only rotate tick labels in vertical mode (x-axis = categories).
+    if (!horizontal) {
+      xAxisG.selectAll('text').style('text-anchor', 'end').attr('transform', 'rotate(-25)');
+    }
     g.append('g').call(yAxis);
 
     // Bars

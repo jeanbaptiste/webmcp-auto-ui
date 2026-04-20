@@ -41,6 +41,16 @@ export async function render(
     const simNodes = nodes.map((d) => ({ ...d }));
     const simLinks = links.map((d) => ({ ...d }));
 
+    // Dynamic label padding so labels drawn at dx=12 don't clip the viewBox.
+    const CHAR_PX = 6;
+    const maxLabelChars = Math.max(
+      0,
+      ...simNodes.map((n: any) => String(n.label ?? n.id ?? '').length),
+    );
+    const labelPad = Math.min(220, 12 + maxLabelChars * CHAR_PX);
+    const topPad = title ? 28 : 8;
+    const rPad = 12; // node radius margin
+
     const simulation = d3
       .forceSimulation(simNodes)
       .force(
@@ -140,6 +150,11 @@ export async function render(
       });
 
     simulation.on('tick', () => {
+      // Clamp node positions so labels (drawn at dx=12) stay inside viewBox.
+      simNodes.forEach((d: any) => {
+        d.x = Math.max(rPad, Math.min(width - labelPad, d.x));
+        d.y = Math.max(topPad, Math.min(height - rPad, d.y));
+      });
       link
         .attr('x1', (d) => d.source.x)
         .attr('y1', (d) => d.source.y)
