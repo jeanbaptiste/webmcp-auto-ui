@@ -1028,9 +1028,10 @@
           This HyperSkill contains your widgets, settings, and conversation summary.
           Share this link so others can reproduce your session.
         </p>
-        <div class="bg-surface2 border border-border2 rounded-lg p-3 break-all">
+        <div class="bg-surface2 border border-border2 rounded-lg p-3 overflow-hidden">
           <a href={exportedUrl} target="_blank" rel="noopener"
-             class="font-mono text-[11px] text-accent hover:underline">{exportedUrl}</a>
+             title={exportedUrl}
+             class="font-mono text-[11px] text-accent hover:underline block truncate">{exportedUrl}</a>
         </div>
         {#if exportedBlockSummary.count > 0}
           <div class="flex items-center gap-2 flex-wrap">
@@ -1040,10 +1041,6 @@
             {/each}
           </div>
         {/if}
-        <!-- Textarea fallback (iOS tap+hold select) -->
-        <textarea readonly value={exportedUrl} rows="4"
-                  class="w-full font-mono text-[10px] bg-surface2 border border-border2 rounded-lg p-2 text-text2 resize-y break-all"
-                  onclick={(e) => (e.currentTarget as HTMLTextAreaElement).select()}></textarea>
         {#if exportError}
           <div class="rounded-lg border border-accent2/40 bg-accent2/10 p-3 font-mono text-[11px] text-accent2 break-words">
             Export error: {exportError}
