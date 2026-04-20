@@ -2,16 +2,64 @@
  * Typed wrapper around the pure-JS `hyperskills` package.
  * This avoids "no declaration file" errors in strict TS
  * without requiring hyperskills to ship its own types.
+ *
+ * `encode` is overridden locally with a chunked base64url implementation
+ * to avoid O(n²) string concat on mobile for large payloads, and to
+ * surface a clear error when CompressionStream is unavailable
+ * (e.g. iOS Safari < 16.4).
  */
 
 // @ts-ignore — hyperskills is intentionally pure JS
 import * as hs from 'hyperskills';
 
-export const encode: (
+// Chunked base64url — avoids char-by-char concat (quadratic on iOS Safari)
+function toBase64urlChunked(bytes: Uint8Array): string {
+  const CHUNK = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(
+      null,
+      Array.from(bytes.subarray(i, i + CHUNK)) as number[],
+    );
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function compressGzip(bytes: Uint8Array): Promise<Uint8Array> {
+  if (!('CompressionStream' in globalThis)) {
+    throw new Error('CompressionStream indisponible (iOS 16.4+ requis)');
+  }
+  // @ts-ignore — CompressionStream is part of the DOM lib but may be missing in older TS targets
+  const cs = new CompressionStream('gzip');
+  const writer = cs.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  return new Uint8Array(await new Response(cs.readable).arrayBuffer());
+}
+
+export async function encode(
   sourceUrl: string,
   content: string,
-  options?: { compress?: 'gz' | 'br' },
-) => Promise<string> = hs.encode;
+  options: { compress?: 'gz' | 'br' | 'none' } = {},
+): Promise<string> {
+  const compress = options.compress ?? 'gz';
+  const bytes = new TextEncoder().encode(content);
+  let param: string;
+
+  if (compress === 'gz') {
+    const compressed = await compressGzip(bytes);
+    param = 'gz.' + toBase64urlChunked(compressed);
+  } else if (compress === 'br') {
+    // Delegate to the upstream JS implementation (Node-only path).
+    return hs.encode(sourceUrl, content, options);
+  } else {
+    param = toBase64urlChunked(bytes);
+  }
+
+  const url = new URL(sourceUrl);
+  url.searchParams.set('hs', param);
+  return url.toString();
+}
 
 export const decode: (
   urlOrParam: string,

@@ -73,7 +73,7 @@
     open = $bindable(false),
     composerMode = $bindable(true),
     layoutMode = $bindable<'float' | 'grid'>('float'),
-    includeSummary = $bindable(true),
+    includeSummary = $bindable(false),
     onexport,
     exportState = 'idle',
     onhistory,

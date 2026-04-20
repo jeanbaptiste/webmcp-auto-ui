@@ -145,7 +145,8 @@
   let exportedUrl = $state('');
   let exportModalOpen = $state(false);
   let exportedBlockSummary = $state<{count: number; types: string[]}>({count: 0, types: []});
-  let includeSummary = $state(true);
+  let includeSummary = $state(false);
+  let exportError = $state<string | null>(null);
   let allToolsUsed = $state<string[]>([]);
 
   // ── Multi-MCP ─────────────────────────────────────────────────────
@@ -495,38 +496,106 @@
   }
 
   // ── HyperSkill export ─────────────────────────────────────────────
+  // Deep-unwrap Svelte 5 $state proxies so JSON.stringify/structured clone doesn't throw
+  // on proxied canvas widget data (which can hold deeply nested reactive objects).
+  function unwrapProxies<T>(value: T): T {
+    try { return JSON.parse(JSON.stringify(value)) as T; }
+    catch { return value; }
+  }
+
   async function exportHsUrl() {
     if (exportState === 'loading') return;
     exportState = 'loading';
+    exportError = null;
     try {
       canvas.setEnabledServers([...enabledServers]);
-      const skill = canvas.buildSkillJSON() as Record<string, unknown>;
-      if (includeSummary && conversationHistory.length > 0) {
-        try {
-          const result = await summarizeChat({
-            messages: conversationHistory, provider: getProvider(),
-            toolsUsed: allToolsUsed, toolCallCount: chatToolCount,
-            mcpServers: multiClient.listServers().map(s => ({ name: s.name, url: s.url })),
-            skillsReferenced: skills.map(s => s.name),
-          });
-          skill.chatSummary = result.chatSummary;
-          skill.provenance = result.provenance;
-        } catch { /* don't block export */ }
-      }
+      const skillRaw = canvas.buildSkillJSON() as Record<string, unknown>;
+      const skill = unwrapProxies(skillRaw);
+
+      // STEP 1 — encode MINIMAL skill (no summary) and copy to clipboard IMMEDIATELY,
+      // BEFORE any other long await, to preserve the user gesture on iOS Safari.
       const url = await encodeHyperSkill(skill as unknown as HyperSkill, window.location.origin + base);
-      await navigator.clipboard.writeText(url);
+      try { await navigator.clipboard.writeText(url); } catch { /* clipboard denied; textarea fallback in modal */ }
       exportedUrl = url;
-      // Build block summary
+
+      // Build block summary + open modal immediately
       const blocks = canvas.blocks;
       const typeSet = new Set(blocks.map(b => b.type));
       exportedBlockSummary = { count: blocks.length, types: [...typeSet] };
       exportState = 'done';
       exportCopied = true;
-      // Open modal
       exportModalOpen = true;
       setTimeout(() => { exportState = 'idle'; exportCopied = false; }, 3000);
-    } catch {
+
+      // STEP 2 — if requested, enrich with chat summary in the background.
+      // The user gesture is gone by now, but the modal already has a working URL
+      // and a textarea fallback. Re-clicks of "Copier le lien" will use the new URL.
+      if (includeSummary && conversationHistory.length > 0) {
+        (async () => {
+          try {
+            const result = await summarizeChat({
+              messages: conversationHistory, provider: getProvider(),
+              toolsUsed: allToolsUsed, toolCallCount: chatToolCount,
+              mcpServers: multiClient.listServers().map(s => ({ name: s.name, url: s.url })),
+              skillsReferenced: skills.map(s => s.name),
+            });
+            const enriched = { ...skill, chatSummary: result.chatSummary, provenance: result.provenance };
+            const newUrl = await encodeHyperSkill(enriched as unknown as HyperSkill, window.location.origin + base);
+            exportedUrl = newUrl;
+          } catch (e) {
+            exportError = e instanceof Error ? e.message : String(e);
+          }
+        })();
+      }
+    } catch (e) {
       exportState = 'idle';
+      exportError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  function downloadSkillMarkdown() {
+    try {
+      const skillRaw = canvas.buildSkillJSON() as Record<string, unknown>;
+      const skill = unwrapProxies(skillRaw) as {
+        name?: string;
+        created?: string;
+        mcp?: string;
+        llm?: string;
+        blocks?: Array<{ type: string; data: unknown }>;
+        meta?: { title?: string; created?: string; mcp?: string; llm?: string };
+      };
+      const blocks = (skill.blocks ?? []) as Array<{ type: string; data: unknown }>;
+      const name = skill.name ?? skill.meta?.title ?? 'HyperSkill';
+      const created = skill.created ?? skill.meta?.created ?? new Date().toISOString();
+      const mcp = skill.mcp ?? skill.meta?.mcp ?? '';
+      const llm = skill.llm ?? skill.meta?.llm ?? '';
+      const lines: string[] = [];
+      lines.push(exportedUrl || '');
+      lines.push('');
+      lines.push(`# ${name}`);
+      lines.push('');
+      lines.push(`Créé: ${created}`);
+      lines.push(`MCP: ${mcp}`);
+      lines.push(`LLM: ${llm}`);
+      lines.push('');
+      lines.push(`## Widgets (${blocks.length})`);
+      lines.push('');
+      blocks.forEach((block, i) => {
+        lines.push(`### ${i + 1}. ${block.type}`);
+        lines.push('```json');
+        lines.push(JSON.stringify(block.data, null, 2));
+        lines.push('```');
+        lines.push('');
+      });
+      const md = lines.join('\n');
+      const blob = new Blob([md], { type: 'text/markdown' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `skill-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.md`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      exportError = e instanceof Error ? e.message : String(e);
     }
   }
 
@@ -972,10 +1041,28 @@
             {/each}
           </div>
         {/if}
-        <button class="font-mono text-xs h-8 px-4 rounded-lg border border-accent text-accent hover:bg-accent/10 transition-colors self-end"
-                onclick={async () => { await navigator.clipboard.writeText(exportedUrl); }}>
-          Copier le lien
-        </button>
+        <!-- Textarea fallback (iOS tap+hold select) -->
+        <textarea readonly value={exportedUrl} rows="4"
+                  class="w-full font-mono text-[10px] bg-surface2 border border-border2 rounded-lg p-2 text-text2 resize-y break-all"
+                  onclick={(e) => (e.currentTarget as HTMLTextAreaElement).select()}></textarea>
+        {#if exportError}
+          <div class="rounded-lg border border-accent2/40 bg-accent2/10 p-3 font-mono text-[11px] text-accent2 break-words">
+            Export error: {exportError}
+          </div>
+        {/if}
+        <div class="flex items-center gap-2 self-end">
+          <button class="font-mono text-xs h-8 px-4 rounded-lg border border-border2 text-text2 hover:text-text1 hover:bg-surface2 transition-colors"
+                  onclick={downloadSkillMarkdown}>
+            Télécharger .md
+          </button>
+          <button class="font-mono text-xs h-8 px-4 rounded-lg border border-accent text-accent hover:bg-accent/10 transition-colors"
+                  onclick={async () => {
+                    try { await navigator.clipboard.writeText(exportedUrl); }
+                    catch (e) { exportError = e instanceof Error ? e.message : String(e); }
+                  }}>
+            Copier le lien
+          </button>
+        </div>
       </div>
     </div>
   </div>
