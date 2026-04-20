@@ -19,7 +19,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const topPad = title ? 26 : 4;
 
   if (title) {
-    const t = new PIXI.Text({ text: title, style: { fontSize: 12, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 2 } } });
+    const t = new PIXI.Text({ text: title, style: { fontSize: 12, fontWeight: 'bold', fill: 0xffffff, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
     t.x = 4;
     t.y = 4;
     app.stage.addChild(t);

@@ -113,10 +113,7 @@ export async function render(
       .attr('y', 14)
       .style('font-size', '10px')
       .style('fill', '#fff')
-      .style('paint-order', 'stroke')
-      .style('stroke', '#000')
-      .style('stroke-width', 2)
-      .style('stroke-opacity', 0.6)
+      .style('text-shadow', '1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000')
       .style('pointer-events', 'none')
       .text((d) => {
         const w = d.x1 - d.x0;
@@ -130,10 +127,7 @@ export async function render(
       .attr('y', 26)
       .style('font-size', '9px')
       .style('fill', 'rgba(255,255,255,0.7)')
-      .style('paint-order', 'stroke')
-      .style('stroke', '#000')
-      .style('stroke-width', 2)
-      .style('stroke-opacity', 0.6)
+      .style('text-shadow', '1px 0 #000, -1px 0 #000, 0 1px #000, 0 -1px #000')
       .style('pointer-events', 'none')
       .text((d) => {
         const w = d.x1 - d.x0;

@@ -29,8 +29,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
           const ty = m.top + (r + 0.5) * cellH;
           const label = v.toFixed(2);
           ctx.save();
-          ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-          ctx.lineWidth = 3;
+          ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+          ctx.lineWidth = 2;
           ctx.strokeText(label, tx, ty);
           ctx.restore();
           ctx.fillStyle = '#fff';

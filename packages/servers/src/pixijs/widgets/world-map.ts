@@ -17,7 +17,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const baseDotColor = parseInt(baseColor.replace('#', ''), 16);
 
   if (title) {
-    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 3 } } });
+    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
     t.x = W / 2 - t.width / 2;
     t.y = 8;
     app.stage.addChild(t);
@@ -69,7 +69,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     const px = toX(h.lon);
     const py = toY(h.lat);
     if (h.label) {
-      const t = new PIXI.Text({ text: h.label, style: { fontSize: 10, fill: 0xffffff, stroke: { color: 0x000000, width: 2 } } });
+      const t = new PIXI.Text({ text: h.label, style: { fontSize: 10, fill: 0xffffff, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
       t.x = px + (h.size || 6) + 4;
       t.y = py - 6;
       labelContainer.addChild(t);

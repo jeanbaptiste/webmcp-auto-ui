@@ -71,8 +71,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.save();
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 2;
     ctx.strokeText(uniqueLabels[i], 128, 32);
     ctx.restore();
     ctx.fillStyle = '#cccccc';

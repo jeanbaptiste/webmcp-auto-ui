@@ -18,7 +18,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const r0 = (baseHex >> 16) & 0xff, g0 = (baseHex >> 8) & 0xff, b0 = baseHex & 0xff;
 
   if (title) {
-    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 3 } } });
+    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
     t.x = W / 2 - t.width / 2;
     t.y = 8;
     app.stage.addChild(t);
@@ -44,7 +44,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   // Draw day labels
   for (let d = 0; d < 7; d++) {
     if (dayLabels[d]) {
-      const t = new PIXI.Text({ text: dayLabels[d], style: { fontSize: 9, fill: 0x888888, stroke: { color: 0x000000, width: 2 } } });
+      const t = new PIXI.Text({ text: dayLabels[d], style: { fontSize: 9, fill: 0x888888, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
       t.x = pad.left - 16;
       t.y = pad.top + d * (cellSize + gap);
       app.stage.addChild(t);

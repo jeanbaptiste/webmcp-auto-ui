@@ -32,8 +32,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
         ctx.font = '11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         const label = slices[i].label;
         ctx.save();
-        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+        ctx.lineWidth = 2;
         ctx.strokeText(label, lx, ly);
         ctx.restore();
         ctx.fillStyle = '#fff';

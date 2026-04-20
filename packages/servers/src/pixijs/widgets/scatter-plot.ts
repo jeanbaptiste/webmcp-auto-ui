@@ -34,19 +34,19 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   app.stage.addChild(axes);
 
   if (title) {
-    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 3 } } });
+    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
     t.x = W / 2 - t.width / 2;
     t.y = 8;
     app.stage.addChild(t);
   }
   if (xLabel) {
-    const t = new PIXI.Text({ text: xLabel, style: { fontSize: 11, fill: 0xaaaaaa, stroke: { color: 0x000000, width: 2 } } });
+    const t = new PIXI.Text({ text: xLabel, style: { fontSize: 11, fill: 0xaaaaaa, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
     t.x = W / 2 - t.width / 2;
     t.y = H - 18;
     app.stage.addChild(t);
   }
   if (yLabel) {
-    const t = new PIXI.Text({ text: yLabel, style: { fontSize: 11, fill: 0xaaaaaa, stroke: { color: 0x000000, width: 2 } } });
+    const t = new PIXI.Text({ text: yLabel, style: { fontSize: 11, fill: 0xaaaaaa, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
     t.x = 4;
     t.y = H / 2 - t.height / 2;
     t.rotation = -Math.PI / 2;

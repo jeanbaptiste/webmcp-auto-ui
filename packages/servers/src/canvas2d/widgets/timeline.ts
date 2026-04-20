@@ -48,8 +48,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
         const tx = x + 4;
         const ty = y + rowH / 2;
         ctx.save();
-        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+        ctx.lineWidth = 2;
         ctx.strokeText(e.label, tx, ty, w - 8);
         ctx.restore();
         ctx.fillStyle = '#fff';

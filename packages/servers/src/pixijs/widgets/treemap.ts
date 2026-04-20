@@ -21,7 +21,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const colors = [0x3b82f6, 0x10b981, 0xf59e0b, 0xef4444, 0x8b5cf6, 0xec4899, 0x06b6d4, 0x84cc16];
 
   if (title) {
-    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 3 } } });
+    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
     t.x = W / 2 - t.width / 2;
     t.y = 8;
     app.stage.addChild(t);
@@ -77,7 +77,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       labelsDrawn = true;
       for (const r of rects) {
         if (r.w > 40 && r.h > 20) {
-          const t = new PIXI.Text({ text: r.item.label || '', style: { fontSize: 11, fill: 0xffffff, fontWeight: 'bold', stroke: { color: 0x000000, width: 2 } } });
+          const t = new PIXI.Text({ text: r.item.label || '', style: { fontSize: 11, fill: 0xffffff, fontWeight: 'bold', dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
           t.x = r.x + 4;
           t.y = r.y + 4;
           labels.addChild(t);

@@ -20,7 +20,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const iH = H - pad.top - pad.bottom;
 
   if (title) {
-    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 3 } } });
+    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
     t.x = W / 2 - t.width / 2;
     t.y = 8;
     app.stage.addChild(t);
@@ -69,7 +69,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
         const y = pad.top + i * stageH + stageH / 2;
         const t = new PIXI.Text({
           text: `${s.label || ''} (${s.value})`,
-          style: { fontSize: 12, fill: 0xffffff, fontWeight: 'bold', stroke: { color: 0x000000, width: 2 } },
+          style: { fontSize: 12, fill: 0xffffff, fontWeight: 'bold', dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } },
         });
         t.x = W / 2 - t.width / 2;
         t.y = y - 8;

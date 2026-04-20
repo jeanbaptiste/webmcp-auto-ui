@@ -21,7 +21,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const targetFrac = Math.max(0, Math.min(1, value / 100));
 
   if (title) {
-    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 3 } } });
+    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
     t.x = W / 2 - t.width / 2;
     t.y = 8;
     app.stage.addChild(t);
@@ -38,13 +38,13 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   app.stage.addChild(arc);
 
   // Percentage text
-  const pctText = new PIXI.Text({ text: '0%', style: { fontSize: 32, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 4 } } });
+  const pctText = new PIXI.Text({ text: '0%', style: { fontSize: 32, fontWeight: 'bold', fill: 0xffffff, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
   pctText.x = cx - pctText.width / 2;
   pctText.y = cy - 20;
   app.stage.addChild(pctText);
 
   if (label) {
-    const lbl = new PIXI.Text({ text: label, style: { fontSize: 13, fill: 0xaaaaaa, stroke: { color: 0x000000, width: 2 } } });
+    const lbl = new PIXI.Text({ text: label, style: { fontSize: 13, fill: 0xaaaaaa, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
     lbl.x = cx - lbl.width / 2;
     lbl.y = cy + 18;
     app.stage.addChild(lbl);

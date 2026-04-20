@@ -23,7 +23,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const targetFrac = Math.max(0, Math.min(1, (value - min) / (max - min || 1)));
 
   if (title) {
-    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 3 } } });
+    const t = new PIXI.Text({ text: title, style: { fontSize: 16, fontWeight: 'bold', fill: 0xffffff, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
     t.x = W / 2 - t.width / 2;
     t.y = 8;
     app.stage.addChild(t);
@@ -44,7 +44,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   app.stage.addChild(needle);
 
   // Value text
-  const valText = new PIXI.Text({ text: '0', style: { fontSize: 28, fontWeight: 'bold', fill: 0xffffff, stroke: { color: 0x000000, width: 4 } } });
+  const valText = new PIXI.Text({ text: '0', style: { fontSize: 28, fontWeight: 'bold', fill: 0xffffff, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
   valText.x = cx - valText.width / 2;
   valText.y = cy + 10;
   app.stage.addChild(valText);
@@ -56,7 +56,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     const v = Math.round(min + frac * (max - min));
     const tx = cx + Math.cos(angle) * (radius + 20);
     const ty = cy + Math.sin(angle) * (radius + 20);
-    const t = new PIXI.Text({ text: String(v), style: { fontSize: 10, fill: 0x888888, stroke: { color: 0x000000, width: 2 } } });
+    const t = new PIXI.Text({ text: String(v), style: { fontSize: 10, fill: 0x888888, dropShadow: { color: 0x000000, blur: 2, distance: 0, alpha: 0.6 } } });
     t.x = tx - t.width / 2;
     t.y = ty - 5;
     app.stage.addChild(t);
