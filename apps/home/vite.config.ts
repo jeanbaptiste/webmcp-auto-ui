@@ -7,6 +7,7 @@ export default defineConfig({
     __GIT_HASH__: JSON.stringify(process.env.GIT_HASH || execSync('git rev-parse --short=8 HEAD').toString().trim()),
   },
   plugins: [sveltekit()],
+  worker: { format: 'es' },
   server: {
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',

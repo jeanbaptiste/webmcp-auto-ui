@@ -11,6 +11,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(JSON.parse(readFileSync('./package.json', 'utf8')).version),
   },
   plugins: [sveltekit()],
+  worker: { format: 'es' },
   build: {
     rollupOptions: {
       external: ['onnxruntime-web'],  // loaded from CDN at runtime (~70MB savings)
