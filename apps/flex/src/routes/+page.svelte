@@ -10,8 +10,9 @@
     fromMcpTools, trimConversationHistory, summarizeChat, TokenTracker,
     buildToolsFromLayers, runDiagnostics, DiscoveryCache, DISCOVERY_TOOL_NAMES, ContextRAG,
     buildGemmaPrompt,
+    createTraceObserver,
   } from '@webmcp-auto-ui/agent';
-  import type { ChatMessage, ToolLayer, McpLayer, BrowsableTool } from '@webmcp-auto-ui/agent';
+  import type { ChatMessage, ToolLayer, McpLayer, BrowsableTool, TraceObserver } from '@webmcp-auto-ui/agent';
   import { autoui } from '@webmcp-auto-ui/agent';
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import {
@@ -134,6 +135,81 @@
   let showTokens = $state(true);
   let showToolJSON = $state(false);
   let showPipelineTrace = $state(false);
+  let visualTrace = $state(false);
+  // Always-on observer: instantiated once, collects events continuously.
+  // Toggle only controls mount/detach of the 3 canvas widgets, so enabling
+  // visualTrace mid-run rebuilds the full trace retroactively from the buffer.
+  const traceObserver: TraceObserver = createTraceObserver({
+    addWidget: (type, data, serverName) => {
+      const widget = flexGrid?.addBlock(type, data, serverName, type);
+      return widget ? { id: widget.id } : undefined;
+    },
+    updateWidget: (id, data) => bus.send('agent', id, 'data-update', data),
+  });
+  let traceMountedIds = $state<{ dagId: string; treeId: string; sankeyId: string } | null>(null);
+  let flexGridReady = $state(false);
+
+  $effect(() => {
+    if (visualTrace && flexGridReady && !traceMountedIds) {
+      // Retry up to 5× @100ms in case flexGrid is momentarily unavailable.
+      let attempts = 0;
+      const tryMount = (): void => {
+        const mounted = traceObserver.mount();
+        if (mounted) { traceMountedIds = mounted; return; }
+        attempts += 1;
+        if (attempts < 5) setTimeout(tryMount, 100);
+        else console.warn('[visual-trace] mount failed after 5 attempts');
+      };
+      tryMount();
+    } else if (!visualTrace && traceMountedIds) {
+      traceObserver.detach();
+      traceMountedIds = null;
+    }
+  });
+
+  // Double-click on a DAG node → spawn a mermaid.sequence block with round-trip detail
+  function buildMermaidSequence(nodeId: string): string | null {
+    const detail = traceObserver.getNodeDetail(nodeId);
+    if (!detail) return null;
+    const lines: string[] = ['sequenceDiagram'];
+    if (detail.kind === 'tool_call' || detail.kind === 'tool_result') {
+      const name = detail.toolName ?? '?';
+      const argsStr = detail.toolArgs
+        ? JSON.stringify(detail.toolArgs).slice(0, 120)
+        : '';
+      lines.push(`  Agent->>Tool: ${name}(${argsStr})`);
+      if (detail.toolError) {
+        lines.push(`  Tool--xAgent: error: ${String(detail.toolError).slice(0, 120)}`);
+      } else if (detail.toolResult !== undefined) {
+        const resStr = detail.toolResult.slice(0, 200);
+        const ms = detail.latencyMs ?? 0;
+        lines.push(`  Tool-->>Agent: ${resStr} (${ms}ms)`);
+      } else {
+        lines.push('  Note over Tool: pending...');
+      }
+    } else if (detail.kind === 'llm_req') {
+      lines.push(`  Agent->>LLM: ${detail.messageCount ?? 0} msgs, ${detail.toolCount ?? 0} tools`);
+    } else if (detail.kind === 'llm_resp') {
+      const latency = detail.latencyMs ?? 0;
+      const out = detail.outputTokens ?? 0;
+      const inT = detail.inputTokens ?? 0;
+      lines.push(`  LLM-->>Agent: ${inT}in / ${out}out tokens, ${latency}ms (${detail.stopReason ?? '?'})`);
+    } else if (detail.kind === 'iteration') {
+      lines.push(`  Note over Agent: ${detail.label}`);
+    } else {
+      lines.push(`  Note over Agent: ${detail.label}`);
+    }
+    return lines.join('\n');
+  }
+
+  function onTraceNodeDblClick(ev: Event): void {
+    const ce = ev as CustomEvent<{ nodeId: string; nodeData: Record<string, unknown> }>;
+    const nodeId = ce.detail?.nodeId;
+    if (!nodeId) return;
+    const code = buildMermaidSequence(nodeId);
+    if (!code) return;
+    flexGrid?.addBlock('sequence', { definition: code }, 'mermaid', 'sequence');
+  }
   let lastLoggedToolCount = $state(0);
   tokenTracker.subscribe(m => { tokenMetrics = m; });
 
@@ -668,7 +744,9 @@
             if (i === 1) {
               // Log the system prompt on first iteration
               agentLogs = [...agentLogs, { ts: Date.now(), type: 'prompt', detail: effectivePrompt ?? '(none)' }];
+              traceObserver.reset();
             }
+            traceObserver?.callbacks.onIterationStart?.(i, max);
           },
           onLLMRequest: (messages, tools) => {
             const ctxChars = messages.reduce((sum, m) => {
@@ -690,20 +768,23 @@
                 agentLogs = [...agentLogs, { ts: Date.now(), type: 'schema', detail: `${tool.name}: {${summary}}` }];
               }
             }
+            traceObserver?.callbacks.onLLMRequest?.(messages, tools);
           },
           onLLMResponse: (response, latencyMs, tokens) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'response', detail: `${tokens?.input ?? '?'}in ${tokens?.output ?? '?'}out, ${Math.round(latencyMs)}ms, ${response.stopReason}`, ctxSize: tokens?.input }];
             if (response.usage) tokenTracker.record(response.usage, latencyMs, canvas.llm?.startsWith('gemma') ?? false);
             else if (response.stats) tokenTracker.recordEstimate(0, response.stats.totalTokens * 4, latencyMs);
+            traceObserver?.callbacks.onLLMResponse?.(response, latencyMs, tokens);
           },
           onWidget: (type, data, serverName) => {
                 // Use serverName from the agent loop (WebMCP server that produced the widget),
                 // fall back to currentServerName (external MCP) if not set.
                 const provServer = serverName || currentServerName || undefined;
                 const widget = flexGrid?.addBlock(type, data, provServer, type);
+                traceObserver?.callbacks.onWidget?.(type, data, provServer);
                 return widget ? { id: widget.id } : undefined;
               },
-          onClear: () => { flexGrid?.clearBlocks(); conversationHistory = []; },
+          onClear: () => { flexGrid?.clearBlocks(); conversationHistory = []; traceObserver?.reset(); },
           onUpdate: (id, data) => bus.send('agent', id, 'data-update', data),
           onMove: (id, x, y) => layoutAdapter.move(id, x, y),
           onResize: (id, w, h) => layoutAdapter.resize(id, w, h),
@@ -712,6 +793,7 @@
             if (showPipelineTrace) {
               agentLogs = [...agentLogs, { ts: Date.now(), type: 'trace', detail: message }];
             }
+            traceObserver?.callbacks.onTrace?.(message);
           },
           onToken: () => {},
           onText: (text) => {
@@ -769,9 +851,11 @@
               pill = `<span style="display:inline-flex;align-items:center;gap:6px;"><span style="font-size:10px;font-weight:700;letter-spacing:0.03em;color:#ec4899;background:rgba(236,72,153,0.12);border-radius:3px;padding:1px 5px;">📄 ${rid}</span><strong>${call.name}</strong></span>`;
             }
             updateEphemeral(assistantId, pill);
+            traceObserver?.callbacks.onToolCall?.(call);
           },
           onDone: (metrics) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'done', detail: `${metrics.iterations} iter, ${metrics.toolCalls} tools, ${metrics.totalTokens} tokens, ${Math.round(metrics.totalLatencyMs)}ms` }];
+            traceObserver?.callbacks.onDone?.(metrics);
           },
         },
       });
@@ -861,10 +945,13 @@
       });
     }
     skills = listSkills();
+    flexGridReady = true;
+    document.addEventListener('widget:node-dblclick', onTraceNodeDblClick as EventListener);
   });
 
   onDestroy(() => {
     if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
+    document.removeEventListener('widget:node-dblclick', onTraceNodeDblClick as EventListener);
   });
 </script>
 
@@ -978,7 +1065,7 @@
   bind:composerMode bind:layoutMode bind:includeSummary
   onexport={exportHsUrl} {exportState} onhistory={() => historyOpen = true} onclear={clearAll}
   bind:mcpToken bind:systemPrompt effectivePrompt={displayedPrompt} bind:maxTokens bind:maxContextTokens bind:maxResultLength
-  bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:showPipelineTrace
+  bind:cacheEnabled bind:temperature bind:topK bind:showTokens bind:showToolJSON bind:showPipelineTrace bind:visualTrace
   bind:schemaFlatten bind:schemaStrict {providerKind} bind:compressHistory bind:compressPreview
   bind:contextRAGEnabled bind:ragResidueSize
   bind:localUrl bind:localModel

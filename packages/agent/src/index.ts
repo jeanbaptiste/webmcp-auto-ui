@@ -74,6 +74,9 @@ export type { RepairResult } from './auto-repair.js';
 // Pipeline trace
 export { PipelineTrace, type TraceEntry } from './pipeline-trace.js';
 
+// Trace observer — live visual trace for runAgentLoop
+export { createTraceObserver, type TraceObserver, type TraceObserverContext, type RoundTripDetail } from './trace-observer.js';
+
 // Nano-RAG — context compaction
 export { ContextRAG, type ContextRAGOptions } from './nano-rag/mod.js';
 

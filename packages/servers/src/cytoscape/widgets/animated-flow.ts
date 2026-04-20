@@ -19,6 +19,15 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     cy.edges().style({ 'line-dash-offset': -offset });
   }, 100);
 
+  // Emit DOM CustomEvent on node double-tap so host apps can open details.
+  cy.on('dbltap', 'node', (evt) => {
+    const target = evt.target;
+    container.dispatchEvent(new CustomEvent('widget:node-dblclick', {
+      detail: { nodeId: target.data('id'), nodeData: target.data() },
+      bubbles: true,
+    }));
+  });
+
   const ro = new ResizeObserver(() => { cy.resize(); cy.fit(); });
   ro.observe(container);
   return () => {

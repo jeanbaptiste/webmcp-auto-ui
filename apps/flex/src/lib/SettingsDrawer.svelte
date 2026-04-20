@@ -42,6 +42,7 @@
     showTokens?: boolean;
     showToolJSON?: boolean;
     showPipelineTrace?: boolean;
+    visualTrace?: boolean;
     schemaFlatten?: boolean;
     schemaStrict?: boolean;
     providerKind?: 'remote' | 'wasm' | 'gemma' | 'local';
@@ -94,6 +95,7 @@
     showTokens = $bindable(true),
     showToolJSON = $bindable(false),
     showPipelineTrace = $bindable(false),
+    visualTrace = $bindable(false),
     schemaFlatten = $bindable(false),
     schemaStrict = $bindable(false),
     providerKind = 'remote',
@@ -256,6 +258,7 @@
         bind:cacheEnabled
         bind:temperature
         bind:topK
+        bind:visualTrace
         modelType={canvas.llm.startsWith('gemma') ? 'wasm' : 'remote'}
         modelId={canvas.llm}
       />

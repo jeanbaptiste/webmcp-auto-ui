@@ -11,6 +11,7 @@
     compressPreview?: number;
     contextRAGEnabled?: boolean;
     ragResidueSize?: number;
+    visualTrace?: boolean;
     cacheEnabled?: boolean;
     temperature?: number;
     topK?: number;
@@ -29,6 +30,7 @@
     compressPreview = $bindable(500),
     contextRAGEnabled = $bindable(false),
     ragResidueSize = $bindable(200),
+    visualTrace = $bindable(false),
     cacheEnabled = $bindable(true),
     temperature = $bindable(0.7),
     topK = $bindable(10),
@@ -228,6 +230,18 @@
         <input type="range" bind:value={ragResidueSize}
                min={0} max={2000} step={50}
                class="w-full accent-accent" />
+      </div>
+    {/if}
+
+    <!-- Visual trace -->
+    <label class="flex items-center gap-2.5 cursor-pointer select-none">
+      <input type="checkbox" bind:checked={visualTrace} class="accent-accent w-3.5 h-3.5" />
+      <span class="text-xs font-mono text-text1">Visual trace</span>
+      <span class="text-[8px] font-mono text-text2/40 ml-auto">experimental</span>
+    </label>
+    {#if visualTrace}
+      <div class="text-[9px] font-mono text-text2/60 pl-5 mb-2">
+        Live DAG of agent execution
       </div>
     {/if}
   </section>
