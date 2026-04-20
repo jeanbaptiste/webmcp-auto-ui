@@ -6,11 +6,22 @@ export type { Recipe, McpRecipe } from './recipes/types.js';
 // Short model IDs for remote (Anthropic-compatible) providers
 export type RemoteModelId = 'haiku' | 'sonnet' | 'opus' | string;
 
-// Model IDs for in-browser WASM providers
+// Model IDs for in-browser WASM providers (MediaPipe/LiteRT)
 export type WasmModelId = 'gemma-e2b' | 'gemma-e4b' | string;
 
+// Model IDs for in-browser transformers.js providers (ONNX + WebGPU)
+// Canonical list in ./providers/transformers-models.ts.
+export type TransformersModelId =
+  | 'transformers-gemma-4-e2b'
+  | 'transformers-gemma-4-e4b'
+  | 'transformers-qwen-3-4b'
+  | 'transformers-qwen-3.5-2b'
+  | 'transformers-qwen-3.5-4b'
+  | 'transformers-ministral-3-3b'
+  | string;
+
 // Union of all LLM IDs used by canvas.llm and LLMSelector
-export type LLMId = RemoteModelId | WasmModelId;
+export type LLMId = RemoteModelId | WasmModelId | TransformersModelId;
 
 // Backward compat alias
 export type ModelId = LLMId;
@@ -50,9 +61,9 @@ export interface LLMProvider {
   readonly model: string;
   /** Hint for system prompt builders: which syntax this provider expects for tool
    *  references. `undefined` → treated as `'generic'`. Providers using a non-standard
-   *  native call syntax (e.g. Gemma) should set this so the agent loop can build
-   *  the prompt with the correct formatting. */
-  readonly promptKind?: 'generic' | 'gemma';
+   *  native call syntax (e.g. Gemma, Qwen ChatML, Mistral [INST]) should set this so
+   *  the agent loop can build the prompt with the correct formatting. */
+  readonly promptKind?: 'generic' | 'gemma' | 'qwen' | 'mistral';
   chat(
     messages: ChatMessage[],
     tools: ProviderTool[],

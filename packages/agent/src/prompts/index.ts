@@ -3,6 +3,8 @@
 import { collectPromptRefs } from './tool-refs.js';
 import { buildClaudePrompt } from './claude-prompt-builder.js';
 import { buildGemma4Prompt } from './gemma4-prompt-builder.js';
+import { buildQwenPrompt } from './qwen-prompt-builder.js';
+import { buildMistralPrompt } from './mistral-prompt-builder.js';
 import { toolAliasMap, type ProviderKind, type ToolLayer } from '../tool-layers.js';
 
 export type { PromptRefs } from './tool-refs.js';
@@ -31,7 +33,13 @@ export function buildSystemPromptWithAliases(
 ): SystemPromptResult {
   const kind = options.providerKind ?? 'generic';
   const refs = collectPromptRefs(layers, kind);
-  const prompt = kind === 'gemma' ? buildGemma4Prompt(refs) : buildClaudePrompt(refs);
+  let prompt: string;
+  switch (kind) {
+    case 'gemma': prompt = buildGemma4Prompt(refs); break;
+    case 'qwen': prompt = buildQwenPrompt(refs); break;
+    case 'mistral': prompt = buildMistralPrompt(refs); break;
+    default: prompt = buildClaudePrompt(refs);
+  }
   return { prompt, aliasMap: refs.aliasMap };
 }
 

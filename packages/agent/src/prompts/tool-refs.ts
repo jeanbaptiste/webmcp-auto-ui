@@ -39,7 +39,7 @@ function fmtToolRef(
   if (kind === 'gemma' && tool) {
     return formatGemmaToolDeclaration({ ...tool, name: prefixedName });
   }
-  if (kind === 'gemma') {
+  if (kind === 'gemma' || kind === 'qwen' || kind === 'mistral') {
     return args.length ? `\`${prefixedName}(${args.join(', ')})\`` : `\`${prefixedName}\``;
   }
   return args.length ? `${prefixedName}(${args.join(', ')})` : `${prefixedName}()`;

@@ -62,8 +62,10 @@ export type ToolLayer = McpLayer | WebMcpLayer;
 
 /** Which provider syntax to emit in the system prompt.
  *  - `generic`: `tool_name()` / `tool_name(arg1, arg2)` — Claude, Ollama, most providers.
- *  - `gemma`:   `<|tool_call>call:tool_name{}<tool_call|>` — Gemma 4 native format. */
-export type ProviderKind = 'generic' | 'gemma';
+ *  - `gemma`:   `<|tool_call>call:tool_name{}<tool_call|>` — Gemma 4 native format.
+ *  - `qwen`:    `<tool_call>\n{"name":...,"arguments":...}\n</tool_call>` — Qwen 3/3.5 ChatML.
+ *  - `mistral`: `[TOOL_CALLS][{"name":...,"arguments":...}]` — Mistral/Ministral. */
+export type ProviderKind = 'generic' | 'gemma' | 'qwen' | 'mistral';
 
 /** Options controlling how tool schemas are transformed before sending to the LLM */
 export interface SchemaTransformOptions {
