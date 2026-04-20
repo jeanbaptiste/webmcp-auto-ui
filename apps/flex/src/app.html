@@ -4,6 +4,14 @@
   <meta charset="utf-8" />
   <link rel="icon" href="%sveltekit.assets%/favicon.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script type="importmap">
+  {
+    "imports": {
+      "@huggingface/transformers": "https://esm.sh/@huggingface/transformers@4.0.1",
+      "onnxruntime-web": "https://esm.sh/onnxruntime-web@1.24.3"
+    }
+  }
+  </script>
   %sveltekit.head%
 </head>
 <body data-sveltekit-preload-data="hover">

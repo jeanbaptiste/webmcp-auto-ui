@@ -136,7 +136,20 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
     AutoTokenizer,
     AutoModelForCausalLM,
     InterruptableStoppingCriteria,
+    env,
   } = transformersMod;
+
+  // Point ONNX Runtime WASM binaries to the jsdelivr CDN so they're not bundled.
+  // esm.sh hosts the JS modules; the native .wasm binaries are served by jsdelivr.
+  try {
+    if (env?.backends?.onnx?.wasm) {
+      env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/';
+    }
+    if (env) {
+      env.allowLocalModels = false;
+      env.useBrowserCache = true;
+    }
+  } catch {}
 
   stoppingCriteria = new InterruptableStoppingCriteria();
 

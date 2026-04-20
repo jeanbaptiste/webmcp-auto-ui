@@ -9,16 +9,24 @@ export default defineConfig({
     __GIT_HASH__: JSON.stringify(process.env.GIT_HASH || execSync('git rev-parse --short=8 HEAD').toString().trim()),
   },
   plugins: [sveltekit()],
-  worker: { format: 'es' },
+  worker: {
+    format: 'es',
+    rollupOptions: {
+      external: ['onnxruntime-web', '@huggingface/transformers'],
+    },
+  },
   build: {
     rollupOptions: {
-      external: ['onnxruntime-web'],
+      external: ['onnxruntime-web', '@huggingface/transformers'],
     },
   },
   resolve: {
     alias: {
       '@webmcp-auto-ui/sdk/canvas': path.resolve('../../packages/sdk/src/canvas.ts'),
     }
+  },
+  ssr: {
+    external: ['@huggingface/transformers', 'onnxruntime-web'],
   },
   server: {
     headers: {

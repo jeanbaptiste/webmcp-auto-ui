@@ -11,10 +11,15 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(JSON.parse(readFileSync('./package.json', 'utf8')).version),
   },
   plugins: [sveltekit()],
-  worker: { format: 'es' },
+  worker: {
+    format: 'es',
+    rollupOptions: {
+      external: ['onnxruntime-web', '@huggingface/transformers'],
+    },
+  },
   build: {
     rollupOptions: {
-      external: ['onnxruntime-web'],  // loaded from CDN at runtime (~70MB savings)
+      external: ['onnxruntime-web', '@huggingface/transformers'],  // loaded from CDN at runtime (~70MB savings)
     },
   },
   resolve: {
@@ -24,6 +29,7 @@ export default defineConfig({
   },
   ssr: {
     noExternal: ['hyperskills', '@webmcp-auto-ui/core', '@webmcp-auto-ui/agent'],
+    external: ['@huggingface/transformers', 'onnxruntime-web'],
   },
   server: {
     headers: {
