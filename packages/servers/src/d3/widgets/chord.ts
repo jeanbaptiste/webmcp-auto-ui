@@ -52,7 +52,7 @@ export async function render(
     const svg = d3
       .select(container)
       .append('svg')
-      .attr('viewBox', `${-radius} ${-radius} ${size} ${size}`)
+      .attr('viewBox', `0 0 ${width} ${height}`)
       .attr('preserveAspectRatio', 'xMidYMid meet')
       .style('width', '100%')
       .style('height', '100%')
@@ -63,13 +63,18 @@ export async function render(
       svg
         .append('text')
         .attr('text-anchor', 'middle')
-        .attr('y', -radius + 16)
+        .attr('x', width / 2)
+        .attr('y', 16)
         .style('font-size', '14px')
         .style('font-weight', 'bold')
         .text(title);
     }
 
-    const group = svg.append('g').selectAll('g').data(chords.groups).join('g');
+    const root = svg
+      .append('g')
+      .attr('transform', `translate(${width / 2},${height / 2})`);
+
+    const group = root.append('g').selectAll('g').data(chords.groups).join('g');
 
     group
       .append('path')
@@ -94,7 +99,7 @@ export async function render(
       .append('title')
       .text((d) => String(labels[d.index] ?? ''));
 
-    const ribbons = svg
+    const ribbons = root
       .append('g')
       .attr('fill-opacity', 0.6)
       .selectAll('path')

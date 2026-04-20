@@ -54,7 +54,7 @@ export async function render(
     const svg = d3
       .select(container)
       .append('svg')
-      .attr('viewBox', `${-radius} ${-radius} ${size} ${size}`)
+      .attr('viewBox', `0 0 ${width} ${height}`)
       .attr('preserveAspectRatio', 'xMidYMid meet')
       .style('width', '100%')
       .style('height', '100%')
@@ -65,13 +65,18 @@ export async function render(
       svg
         .append('text')
         .attr('text-anchor', 'middle')
-        .attr('y', -radius + 16)
+        .attr('x', width / 2)
+        .attr('y', 16)
         .style('font-size', '14px')
         .style('font-weight', 'bold')
         .text(title);
     }
 
-    const cells = svg
+    const rootGroup = svg
+      .append('g')
+      .attr('transform', `translate(${width / 2},${height / 2})`);
+
+    const cells = rootGroup
       .selectAll('path')
       .data(root.descendants().filter((d) => d.depth > 0))
       .join('path')
@@ -103,7 +108,7 @@ export async function render(
         tooltip.style('opacity', '0');
       });
 
-    svg
+    rootGroup
       .selectAll('text.label')
       .data(root.descendants().filter((d) => d.depth > 0 && d.x1 - d.x0 > 0.1))
       .join('text')
