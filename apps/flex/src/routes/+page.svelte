@@ -149,6 +149,22 @@
   let traceMountedIds = $state<{ dagId: string; treeId: string; sankeyId: string } | null>(null);
   let flexGridReady = $state(false);
 
+  // When visual trace is toggled ON, ensure the 4 WebMCP servers needed by the
+  // trace widgets are enabled. We union into enabledServers (never remove), so
+  // any server the user had already enabled stays on. We also don't disable on
+  // OFF — the user may want to keep using these servers for their own widgets.
+  const TRACE_REQUIRED_SERVERS = ['cytoscape', 'd3', 'plotly', 'mermaid'];
+  $effect(() => {
+    if (!visualTrace) return;
+    untrack(() => {
+      const missing = TRACE_REQUIRED_SERVERS.filter(id => !enabledServers.has(id));
+      if (missing.length === 0) return;
+      const next = new Set(enabledServers);
+      for (const id of missing) next.add(id);
+      enabledServers = next;
+    });
+  });
+
   $effect(() => {
     if (visualTrace && flexGridReady && !traceMountedIds) {
       // Retry up to 5× @100ms in case flexGrid is momentarily unavailable.
