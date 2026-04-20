@@ -306,6 +306,10 @@ async function handleGenerate(
     max_new_tokens: options.maxTokens ?? 2048,
     do_sample: true,
     return_dict_in_generate: true,
+    // Disable internal KV cache — Mistral3/Gemma4 SWA layers exhibit
+    // mask-vs-score shape desync (Where broadcast dim 3) in tjs 4.1.0
+    // when the cache is used across iterations with a full-prompt flow.
+    use_cache: false,
     streamer,
     stopping_criteria: stoppingCriteria,
   };
