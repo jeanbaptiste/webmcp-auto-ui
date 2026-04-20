@@ -1,0 +1,175 @@
+---
+title: Configuration systemd
+description: Units systemd recommandees pour les apps Node de WebMCP Auto-UI, avec limite de taille de body relevee
+sidebar:
+  order: 5
+---
+
+Les apps Node de WebMCP Auto-UI (`flex`, `boilerplate`, `viewer`, `recipes`, `showcase`) utilisent l'**adapter Node de SvelteKit**, qui impose par defaut une limite de **512 KB** sur la taille du body des requetes POST. Cette limite est trop basse pour un chat qui accumule historique et resultats d'outils : les requetes vers `/api/chat` peuvent facilement atteindre plusieurs mega-octets.
+
+Ce guide propose une configuration systemd de reference pour faire tourner ces apps en production avec une limite adaptee.
+
+## Limite par defaut et symptomes
+
+Si le body depasse 512 KB, le serveur renvoie un **HTTP 500** avec dans les logs :
+
+```
+Error: Content-length of 3162954 exceeds limit of 524288 bytes.
+    at Object.start (handler.js:...)
+    at get_raw_body (handler.js:...)
+```
+
+Cote client, c'est opaque : juste une reponse 500 sans detail. Impossible a diagnostiquer sans acces aux logs serveur.
+
+## Variable d'environnement
+
+Le node adapter lit `BODY_SIZE_LIMIT` au demarrage (en octets) :
+
+| Valeur | Taille | Usage |
+|--------|--------|-------|
+| `524288` | 512 KB | Defaut — trop bas pour du chat |
+| `10485760` | 10 MB | Minimum raisonnable pour du chat multi-tour |
+| `52428800` | 50 MB | **Recommande** — marge confortable |
+| `104857600` | 100 MB | OK si la RAM serveur le permet |
+| `0` | illimite | Deconseille (risque DoS memoire) |
+
+La valeur recommandee de **50 MB** (`52428800`) donne une marge d'ordre 15x par rapport aux pics observes en usage normal (~3 MB), tout en gardant une protection contre les payloads abusifs.
+
+## Unit systemd complete
+
+Template pour une app Node :
+
+```ini
+# /etc/systemd/system/webmcp-flex.service
+[Unit]
+Description=WebMCP flex (port 3007)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/webmcp-demos/flex
+ExecStart=/usr/bin/node index.js
+Restart=on-failure
+RestartSec=5
+
+Environment=NODE_ENV=production
+Environment=PORT=3007
+Environment=HOST=127.0.0.1
+Environment=BODY_SIZE_LIMIT=52428800
+
+# Optionnel : charger les secrets depuis un fichier .env protege
+EnvironmentFile=-/opt/webmcp-demos/flex/.env
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Points importants :
+
+- **`User=www-data`** — ne jamais lancer en `root`. Creer un utilisateur dedie sans shell si besoin.
+- **`HOST=127.0.0.1`** — le service n'ecoute que sur localhost, nginx fait le reverse proxy.
+- **`EnvironmentFile=-/...env`** — le `-` devant le chemin rend le fichier optionnel (pas d'erreur s'il n'existe pas).
+- **`BODY_SIZE_LIMIT=52428800`** — la cle de ce guide.
+
+## Drop-in pour un service existant
+
+Si une unit systemd existe deja et que tu ne veux pas la modifier, cree un drop-in :
+
+```bash
+sudo mkdir -p /etc/systemd/system/webmcp-flex.service.d
+sudo tee /etc/systemd/system/webmcp-flex.service.d/body-size.conf > /dev/null <<'EOF'
+[Service]
+Environment="BODY_SIZE_LIMIT=52428800"
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl restart webmcp-flex
+```
+
+Verifier que la variable est prise en compte :
+
+```bash
+systemctl show webmcp-flex -p Environment --value | tr ' ' '\n' | grep BODY_SIZE
+# BODY_SIZE_LIMIT=52428800
+```
+
+## Script d'installation pour plusieurs apps
+
+Pour appliquer le drop-in a toutes les apps Node d'un coup :
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+APPS=(flex boilerplate viewer recipes showcase)
+LIMIT=52428800  # 50 MB
+
+for app in "${APPS[@]}"; do
+  service="webmcp-$app"
+  sudo mkdir -p /etc/systemd/system/$service.service.d
+  sudo tee /etc/systemd/system/$service.service.d/body-size.conf > /dev/null <<EOF
+[Service]
+Environment="BODY_SIZE_LIMIT=$LIMIT"
+EOF
+done
+
+sudo systemctl daemon-reload
+for app in "${APPS[@]}"; do
+  sudo systemctl restart webmcp-$app
+done
+
+echo "Applique sur : ${APPS[*]}"
+```
+
+## Configuration nginx correspondante
+
+Si nginx est devant les apps Node, il faut aussi relever `client_max_body_size` au meme niveau (sinon nginx coupe avant d'atteindre le node) :
+
+```nginx
+# /etc/nginx/sites-available/webmcp
+server {
+    listen 443 ssl;
+    server_name demos.example.com;
+
+    client_max_body_size 50M;  # doit matcher BODY_SIZE_LIMIT
+
+    location /flex/ {
+        proxy_pass http://127.0.0.1:3007/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # autres apps...
+}
+```
+
+Puis `sudo nginx -t && sudo systemctl reload nginx`.
+
+## Verification end-to-end
+
+Apres deploiement, envoyer une requete volumineuse pour confirmer que la chaine complete (nginx -> node) accepte un gros body :
+
+```bash
+# Genere ~5 MB de JSON et l'envoie au endpoint chat
+python3 -c "import json; print(json.dumps({'messages': [{'role':'user','content':'x'*5000000}]}))" \
+  | curl -X POST https://demos.example.com/flex/api/chat \
+      -H "Content-Type: application/json" \
+      --data-binary @- \
+      -o /dev/null -w "%{http_code}\n"
+```
+
+Un `200` ou une erreur applicative (pas un `413` ou `500` de taille) indique que la limite est bien relevee.
+
+## Considerations memoire
+
+Chaque requete en cours est **bufferisee en RAM** par le node adapter avant parsing. Avec `BODY_SIZE_LIMIT=52428800` et un pic de 10 requetes concurrentes, tu peux avoir jusqu'a **500 MB** de bodies en vol. Verifie que la VM a au moins **2 GB de RAM libre** avant de relever la limite au-dela de 50 MB.
+
+Si le trafic est eleve ou hostile, envisager :
+
+- Un rate-limit au niveau nginx (`limit_req_zone`)
+- Un reverse-proxy avec buffering disque plutot que memoire
+- Une compaction cote client de l'historique de chat (plutot que d'envoyer toute la conversation)
