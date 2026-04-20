@@ -12,6 +12,8 @@ import {
   formatToolResponse,
   gemmaValue,
 } from '../prompts/gemma4-prompt-builder.js';
+import { parseToolCalls } from '../prompts/tool-call-parsers.js';
+import { loadOrDownloadModel } from '../util/opfs-cache.js';
 
 export type WasmStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -70,7 +72,6 @@ export class WasmProvider implements LLMProvider {
 
     const modelInfo = LITERT_MODELS[this.model] ?? LITERT_MODELS['gemma-e2b'];
     const { repo, file, size: expectedSize } = modelInfo;
-    const url = `https://huggingface.co/${repo}/resolve/main/${file}`;
 
     this.opts.onProgress?.(0, 'downloading', 0, expectedSize);
 
@@ -79,7 +80,15 @@ export class WasmProvider implements LLMProvider {
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai@0.10.27/wasm',
     );
 
-    const modelStream = await this.getModelStream(url, file, expectedSize);
+    const streams = await loadOrDownloadModel(
+      repo,
+      [{ path: file, expectedSize }],
+      (progress) => {
+        this.opts.onProgress?.(progress.totalProgress, progress.status, progress.loaded, progress.total);
+      },
+    );
+    const modelStream = streams.get(file);
+    if (!modelStream) throw new Error(`Model file missing: ${file}`);
 
     this.opts.onProgress?.(1, 'initializing', 0, 0);
 
@@ -98,88 +107,6 @@ export class WasmProvider implements LLMProvider {
     });
 
     this.setStatus('ready');
-  }
-
-  /**
-   * Download model with OPFS caching, returning a ReadableStream.
-   * The stream reader is passed directly to LlmInference as modelAssetBuffer
-   * to avoid buffering multi-GB models entirely in RAM.
-   */
-  private async getModelStream(
-    url: string,
-    filename: string,
-    knownSize: number,
-  ): Promise<ReadableStream<Uint8Array>> {
-    const total = knownSize;
-    const progressCb = (p: number, loaded: number, t: number) => {
-      this.opts.onProgress?.(p, 'downloading', loaded, t);
-    };
-
-    const root = await navigator.storage.getDirectory();
-    const modelsDir = await root.getDirectoryHandle('webmcp-models', { create: true });
-
-    // ── Clean orphan .crswap files (Chrome WritableStream leftovers) ──
-    try { await modelsDir.removeEntry(`${filename}.crswap`); } catch { /* no swap — OK */ }
-
-    // ── OPFS cache hit ───────────────────────────────────────────────
-    try {
-      const cached = await modelsDir.getFileHandle(filename);
-      const file = await cached.getFile();
-      if (file.size > 1000 && (total === 0 || Math.abs(file.size - total) < total * 0.01)) {
-        progressCb(1, file.size, file.size);
-        this.opts.onProgress?.(1, 'cached', file.size, file.size);
-        return file.stream() as ReadableStream<Uint8Array>;
-      }
-      // Corrupt cache (0 bytes or wrong size) — remove and re-download
-      await modelsDir.removeEntry(filename).catch(() => {});
-      try { await modelsDir.removeEntry(`${filename}.crswap`); } catch { /* OK */ }
-    } catch {
-      // Cache miss
-    }
-
-    // ── Network download (retry on 503) ───────────────────────────────
-    let response: Response | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      response = await fetch(url);
-      if (response.ok) break;
-      if (response.status === 503 && attempt < 2) {
-        const wait = (attempt + 1) * 5000;
-        this.opts.onProgress?.(0, `retry in ${wait / 1000}s (503)`, 0, total);
-        await new Promise(r => setTimeout(r, wait));
-        continue;
-      }
-      throw new Error(`Download failed: ${response.status} ${response.statusText}`);
-    }
-    if (!response!.ok) throw new Error('Download failed after retries');
-    if (!response!.body) throw new Error('Response body is null');
-
-    const [streamForConsumer, streamForCache] = response!.body!.tee();
-
-    // Background OPFS cache (fire-and-forget)
-    (async () => {
-      try {
-        const handle = await modelsDir.getFileHandle(filename, { create: true });
-        const writable = await handle.createWritable();
-        await streamForCache.pipeTo(writable);
-      } catch {
-        try { await modelsDir.removeEntry(filename).catch(() => {}); } catch {}
-      }
-    })();
-
-    // Progress stream using known size
-    let loaded = 0;
-    const progressTransform = new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        loaded += chunk.length;
-        progressCb(total > 0 ? loaded / total : 0, loaded, total);
-        controller.enqueue(chunk);
-      },
-      flush() {
-        progressCb(1, total, total);
-      },
-    });
-
-    return streamForConsumer.pipeThrough(progressTransform);
   }
 
   async chat(
@@ -406,23 +333,7 @@ export class WasmProvider implements LLMProvider {
       }
     } catch {}
 
-    const content: ContentBlock[] = [];
-    const parsed = WasmProvider.extractToolCalls(fullText);
-    let foundToolCall = false;
-    for (const call of parsed) {
-      foundToolCall = true;
-      content.push({
-        type: 'tool_use',
-        id: `tc-${Date.now()}-${content.length}`,
-        name: call.name,
-        input: WasmProvider.parseGemmaArgs(call.argsBlock),
-      });
-    }
-
-    if (!foundToolCall) {
-      const cleanText = fullText.replace(/<\|tool_call>.*?<tool_call\|>/g, '').trim();
-      content.push({ type: 'text', text: cleanText || fullText });
-    }
+    const { content, foundToolCall } = parseToolCalls(fullText, 'gemma-native');
 
     return {
       content,
@@ -437,182 +348,6 @@ export class WasmProvider implements LLMProvider {
         output_tokens: realTokenCount,
       },
     };
-  }
-
-  /**
-   * Extract a brace-balanced {...} block starting at text[startIdx].
-   * Ignores { and } that appear inside <|"|>...<|"|> string delimiters.
-   * Returns the full block including outer braces, or null if unbalanced.
-   */
-  private static extractArgsBlock(text: string, startIdx: number): string | null {
-    if (text[startIdx] !== '{') return null;
-    const DELIM = '<|"|>';
-    let depth = 0;
-    let i = startIdx;
-    while (i < text.length) {
-      if (text.startsWith(DELIM, i)) {
-        i += DELIM.length;
-        const end = text.indexOf(DELIM, i);
-        if (end === -1) return null;
-        i = end + DELIM.length;
-        continue;
-      }
-      if (text[i] === '"') {
-        i++;
-        while (i < text.length && text[i] !== '"') {
-          if (text[i] === '\\' && i + 1 < text.length) { i += 2; continue; }
-          i++;
-        }
-        i++;
-        continue;
-      }
-      if (text[i] === '{') depth++;
-      else if (text[i] === '}') {
-        depth--;
-        if (depth === 0) return text.slice(startIdx, i + 1);
-      }
-      i++;
-    }
-    return null;
-  }
-
-  /**
-   * Skip "noise" chars that Gemma sometimes hallucinates between the end of a
-   * balanced args block and the `<tool_call|>` closing tag. Observed in prod:
-   * excess `}` braces, trailing commas, whitespace. Without this tolerance the
-   * strict scanner rejects the whole tool call silently (no tool_use produced),
-   * which breaks widget rendering.
-   *
-   * extractArgsBlock itself stays strict on internal brace balancing — only
-   * AFTER the balanced block do we tolerate noise.
-   */
-  private static skipNoise(text: string, pos: number): number {
-    while (pos < text.length) {
-      const c = text[pos];
-      if (c === '}' || c === ' ' || c === '\n' || c === '\r' || c === '\t' || c === ',') {
-        pos++;
-        continue;
-      }
-      break;
-    }
-    return pos;
-  }
-
-  /**
-   * Scan `fullText` for Gemma native tool calls and return the list of
-   * `{ name, argsBlock }` pairs found. Tolerates hallucinated noise
-   * (excess `}`, whitespace, trailing commas) between the balanced args
-   * block and the `<tool_call|>` closing tag. See `skipNoise`.
-   *
-   * Exposed as a static helper so unit tests can exercise the scanner
-   * without spinning up a full WasmProvider / MediaPipe runtime.
-   */
-  static extractToolCalls(fullText: string): Array<{ name: string; argsBlock: string }> {
-    const START_TAG = '<|tool_call>call:';
-    const END_TAG = '<tool_call|>';
-    const out: Array<{ name: string; argsBlock: string }> = [];
-    let scanIdx = 0;
-    while (true) {
-      const startIdx = fullText.indexOf(START_TAG, scanIdx);
-      if (startIdx === -1) break;
-      const nameStart = startIdx + START_TAG.length;
-      const braceIdx = fullText.indexOf('{', nameStart);
-      if (braceIdx === -1) break;
-      const name = fullText.slice(nameStart, braceIdx);
-      if (!/^\w+$/.test(name)) { scanIdx = nameStart; continue; }
-      const argsBlock = WasmProvider.extractArgsBlock(fullText, braceIdx);
-      if (!argsBlock) break;
-      const afterArgsRaw = braceIdx + argsBlock.length;
-      const afterArgs = WasmProvider.skipNoise(fullText, afterArgsRaw);
-      if (!fullText.startsWith(END_TAG, afterArgs)) { scanIdx = afterArgsRaw; continue; }
-      out.push({ name, argsBlock });
-      scanIdx = afterArgs + END_TAG.length;
-    }
-    return out;
-  }
-
-  /**
-   * Parse Gemma native tool call args by normalizing to strict JSON.
-   * Handles both `<|"|>...<|"|>` (Gemma native) and `"..."` (JSON-style, emitted
-   * when the model copies JS-syntax examples from recipe bodies). Raw newlines
-   * inside JSON strings are escaped. Unquoted keys are quoted.
-   */
-  private static parseGemmaArgs(raw: string): Record<string, unknown> {
-    const DELIM = '<|"|>';
-    let out = '';
-    let i = 0;
-    while (i < raw.length) {
-      if (raw.startsWith(DELIM, i)) {
-        i += DELIM.length;
-        const end = raw.indexOf(DELIM, i);
-        if (end === -1) return {};
-        // Decode standard backslash escapes inside <|"|>…<|"|> strings so that
-        // a recipe-copied `\n` becomes a real newline, not the two-char
-        // sequence `\n` that would then be re-escaped to `\\n` by
-        // JSON.stringify and reach the sandbox as literal text. Other
-        // backslash-x sequences are preserved verbatim (single backslash kept).
-        const body = raw.slice(i, end);
-        let decoded = '';
-        for (let k = 0; k < body.length; k++) {
-          const ch = body[k];
-          if (ch === '\\' && k + 1 < body.length) {
-            const nxt = body[k + 1];
-            if (nxt === 'n') { decoded += '\n'; k++; continue; }
-            if (nxt === 't') { decoded += '\t'; k++; continue; }
-            if (nxt === 'r') { decoded += '\r'; k++; continue; }
-            if (nxt === '"') { decoded += '"'; k++; continue; }
-            if (nxt === '\\') { decoded += '\\'; k++; continue; }
-            // Unknown escape — keep the backslash verbatim
-            decoded += ch;
-            continue;
-          }
-          decoded += ch;
-        }
-        out += JSON.stringify(decoded);
-        i = end + DELIM.length;
-        continue;
-      }
-      const c = raw[i];
-      if (c === '"') {
-        let content = '';
-        i++;
-        while (i < raw.length && raw[i] !== '"') {
-          const ch = raw[i];
-          if (ch === '\\' && i + 1 < raw.length) { content += ch + raw[i + 1]; i += 2; continue; }
-          if (ch === '\n') content += '\\n';
-          else if (ch === '\r') content += '\\r';
-          else if (ch === '\t') content += '\\t';
-          else content += ch;
-          i++;
-        }
-        if (i >= raw.length) return {};
-        out += '"' + content + '"';
-        i++;
-        continue;
-      }
-      if (c === '{' || c === ',') {
-        out += c;
-        i++;
-        while (i < raw.length && /\s/.test(raw[i])) { out += raw[i++]; }
-        const keyStart = i;
-        while (i < raw.length && /[a-zA-Z0-9_$]/.test(raw[i])) i++;
-        if (i > keyStart) {
-          let j = i;
-          while (j < raw.length && /\s/.test(raw[j])) j++;
-          if (raw[j] === ':') out += '"' + raw.slice(keyStart, i) + '"';
-          else out += raw.slice(keyStart, i);
-        }
-        continue;
-      }
-      out += c;
-      i++;
-    }
-    try {
-      const parsed = JSON.parse(out);
-      return (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) ? parsed : {};
-    } catch {
-      return {};
-    }
   }
 
   /** @internal — delegates to `gemmaValue` from prompts/gemma4-prompt-builder. */

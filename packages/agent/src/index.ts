@@ -5,6 +5,14 @@ export { RemoteLLMProvider } from './providers/remote.js';
 export type { RemoteLLMProviderOptions } from './providers/remote.js';
 export { WasmProvider } from './providers/wasm.js';
 export type { WasmProviderOptions, WasmStatus } from './providers/wasm.js';
+export { TransformersProvider } from './providers/transformers.js';
+export type { TransformersProviderOptions, TransformersStatus } from './providers/transformers.js';
+export { TRANSFORMERS_MODELS, getTransformersModel, listTransformersModels } from './providers/transformers-models.js';
+export type { TransformersModelEntry, TransformersFamily, ToolCallFormat } from './providers/transformers-models.js';
+export { parseToolCalls } from './prompts/tool-call-parsers.js';
+export type { ParseResult } from './prompts/tool-call-parsers.js';
+export { loadOrDownloadModel, clearModelCache } from './util/opfs-cache.js';
+export type { ModelFileSpec, CacheProgress } from './util/opfs-cache.js';
 export { buildGemmaPrompt } from './prompts/index.js';
 export type { BuildGemmaPromptInput } from './prompts/index.js';
 export { LocalLLMProvider } from './providers/local.js';
@@ -71,7 +79,7 @@ export { ContextRAG, type ContextRAGOptions } from './nano-rag/mod.js';
 
 // Types
 export type {
-  RemoteModelId, WasmModelId, LLMId, ModelId,
+  RemoteModelId, WasmModelId, TransformersModelId, LLMId, ModelId,
   ChatMessage, ContentBlock, McpToolDef, ProviderTool,
   LLMProvider, LLMResponse, ToolCall, AgentMetrics, AgentResult, AgentCallbacks,
   Recipe, McpRecipe,

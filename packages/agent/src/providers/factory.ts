@@ -2,14 +2,26 @@ import type { LLMProvider, RemoteModelId, WasmModelId } from '../types.js';
 import { RemoteLLMProvider } from './remote.js';
 import { WasmProvider } from './wasm.js';
 import { LocalLLMProvider, type LocalBackend } from './local.js';
+import { TransformersProvider } from './transformers.js';
 
 export type LLMConfig =
-  | { type: 'remote'; model?: RemoteModelId; proxyUrl?: string; apiKey?: string }
-  | { type: 'wasm';   model?: WasmModelId;   onProgress?: (loaded: number, total: number) => void }
-  | { type: 'local';  model: string;         baseUrl: string; backend?: LocalBackend };
+  | { type: 'remote';       model?: RemoteModelId; proxyUrl?: string; apiKey?: string }
+  | { type: 'wasm';         model?: WasmModelId;   onProgress?: (loaded: number, total: number) => void }
+  | { type: 'transformers'; model: string;         onProgress?: (loaded: number, total: number) => void }
+  | { type: 'local';        model: string;         baseUrl: string; backend?: LocalBackend };
 
 export function createProvider(config: LLMConfig): LLMProvider {
   const base = typeof window !== 'undefined' ? (document.querySelector('base') as HTMLBaseElement | null)?.href ?? '' : '';
+
+  // Prefix-based dispatch: a `transformers-*` model routes to TransformersProvider
+  // regardless of the declared type (defensive).
+  if ('model' in config && typeof config.model === 'string' && config.model.startsWith('transformers-')) {
+    const onProgress = (config as { onProgress?: (loaded: number, total: number) => void }).onProgress;
+    return new TransformersProvider({
+      model: config.model,
+      onProgress: onProgress ? (_progress, _status, loaded, total) => onProgress(loaded ?? 0, total ?? 0) : undefined,
+    });
+  }
 
   switch (config.type) {
     case 'remote':
@@ -22,6 +34,11 @@ export function createProvider(config: LLMConfig): LLMProvider {
       return new WasmProvider({
         model: config.model,
         onProgress: config.onProgress ? (progress, _status, loaded, total) => config.onProgress!(loaded ?? 0, total ?? 0) : undefined,
+      });
+    case 'transformers':
+      return new TransformersProvider({
+        model: config.model,
+        onProgress: config.onProgress ? (_progress, _status, loaded, total) => config.onProgress!(loaded ?? 0, total ?? 0) : undefined,
       });
     case 'local':
       return new LocalLLMProvider({
