@@ -249,22 +249,15 @@
 {/if}
 
 <style>
-  .vanilla-container :global(svg) {
+  .vanilla-container > :global(svg),
+  .vanilla-container > :global(canvas),
+  .vanilla-container > :global(img) {
     width: 100%;
     height: auto;
     max-height: 100%;
     display: block;
   }
-  .vanilla-container :global(canvas) {
-    width: 100%;
-    height: auto;
-    max-height: 100%;
-    display: block;
-  }
-  .vanilla-container :global(img) {
-    width: 100%;
-    height: auto;
-    max-height: 100%;
+  .vanilla-container > :global(img) {
     object-fit: contain;
   }
 </style>
