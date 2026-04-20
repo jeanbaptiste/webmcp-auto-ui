@@ -3,8 +3,10 @@
 // Providers
 export { RemoteLLMProvider } from './providers/remote.js';
 export type { RemoteLLMProviderOptions } from './providers/remote.js';
-export { WasmProvider, buildGemmaPrompt } from './providers/wasm.js';
-export type { WasmProviderOptions, WasmStatus, BuildGemmaPromptInput } from './providers/wasm.js';
+export { WasmProvider } from './providers/wasm.js';
+export type { WasmProviderOptions, WasmStatus } from './providers/wasm.js';
+export { buildGemmaPrompt } from './prompts/index.js';
+export type { BuildGemmaPromptInput } from './prompts/index.js';
 export { LocalLLMProvider } from './providers/local.js';
 export type { LocalLLMProviderOptions, LocalBackend } from './providers/local.js';
 export { createProvider } from './providers/factory.js';
@@ -18,15 +20,16 @@ export type { GemmaProviderOptions, GemmaStatus } from './providers/gemma.js';
 
 // Agent loop
 export { runAgentLoop, toProviderTools, fromMcpTools, trimConversationHistory } from './loop.js';
-export { buildSystemPrompt } from './tool-layers.js';
+export { buildSystemPrompt, buildSystemPromptWithAliases } from './prompts/index.js';
+export type { SystemPromptResult } from './prompts/index.js';
 export type { AgentLoopOptions } from './loop.js';
 
 // autoui — built-in WebMCP server
 export { autoui, NATIVE_WIDGET_NAMES } from './autoui-server.js';
 
 // Tool layers
-export { buildToolsFromLayers, buildDiscoveryTools, buildDiscoveryToolsWithAliases, activateServerTools, resolveCanonicalTools, toolAliasMap, buildSystemPromptWithAliases, flattenPathMaps, buildDiscoveryCache } from './tool-layers.js';
-export type { ToolLayer, McpLayer, WebMcpLayer, SystemPromptResult, DiscoveryToolsResult, SchemaTransformOptions, BuildToolsResult, ProviderKind } from './tool-layers.js';
+export { buildToolsFromLayers, buildDiscoveryTools, buildDiscoveryToolsWithAliases, activateServerTools, resolveCanonicalTools, toolAliasMap, flattenPathMaps, buildDiscoveryCache } from './tool-layers.js';
+export type { ToolLayer, McpLayer, WebMcpLayer, DiscoveryToolsResult, SchemaTransformOptions, BuildToolsResult, ProviderKind } from './tool-layers.js';
 
 // Discovery cache
 export { DiscoveryCache, DISCOVERY_TOOL_NAMES } from './discovery-cache.js';

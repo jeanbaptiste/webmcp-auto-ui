@@ -5,7 +5,13 @@
  */
 import type { LLMProvider, LLMResponse, ChatMessage, ProviderTool, WasmModelId, ContentBlock } from '../types.js';
 import type { PipelineTrace } from '../pipeline-trace.js';
-import { formatGemmaToolDeclaration, gemmaValue } from '../tool-layers.js';
+import {
+  buildGemmaPrompt,
+  formatGemmaToolDeclaration,
+  formatToolCall,
+  formatToolResponse,
+  gemmaValue,
+} from '../prompts/gemma4-prompt-builder.js';
 
 export type WasmStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -532,50 +538,24 @@ export class WasmProvider implements LLMProvider {
     }
   }
 
-  /**
-   * Format a value for Gemma 4 native tool syntax.
-   * Backward-compat wrapper — delegates to the module-level `gemmaValue`
-   * exported from `tool-layers.ts` so the logic is shared with the
-   * system-prompt declaration block.
-   * @internal — used by formatToolCall / formatToolResponse
-   */
+  /** @internal — delegates to `gemmaValue` from prompts/gemma4-prompt-builder. */
   static gemmaValue(v: unknown): string {
     return gemmaValue(v);
   }
 
-  /**
-   * Format a tool declaration in Gemma 4 native syntax.
-   * Backward-compat wrapper — delegates to `formatGemmaToolDeclaration`
-   * exported from `tool-layers.ts`.
-   * @internal
-   */
+  /** @internal — delegates to `formatGemmaToolDeclaration` from prompts/gemma4-prompt-builder. */
   static formatToolDeclaration(tool: ProviderTool): string {
     return formatGemmaToolDeclaration(tool);
   }
 
-  /**
-   * Format a tool response in Gemma 4 native syntax.
-   * Spec §7 + §10.x: content is passed through literally. JSON-parseable input
-   * is embedded verbatim; plain strings are wrapped with `<|"|>` delimiters.
-   * @internal — used by buildGemmaPrompt
-   */
+  /** @internal — delegates to `formatToolResponse` from prompts/gemma4-prompt-builder. */
   static formatToolResponse(content: string): string {
-    try {
-      JSON.parse(content);
-      return `<|tool_response>response:${content}<tool_response|>`;
-    } catch {
-      return `<|tool_response>response:<|"|>${content}<|"|><tool_response|>`;
-    }
+    return formatToolResponse(content);
   }
 
-  /**
-   * Format a tool call in Gemma 4 native syntax.
-   * @internal — used by buildGemmaPrompt
-   */
+  /** @internal — delegates to `formatToolCall` from prompts/gemma4-prompt-builder. */
   static formatToolCall(name: string, input: Record<string, unknown>): string {
-    const entries = Object.entries(input ?? {})
-      .map(([k, v]) => `${k}:${gemmaValue(v)}`);
-    return `<|tool_call>call:${name}{${entries.join(',')}}<tool_call|>`;
+    return formatToolCall(name, input);
   }
 
   private buildPrompt(messages: ChatMessage[], _tools: ProviderTool[], systemPrompt?: string): string {
@@ -592,96 +572,7 @@ export class WasmProvider implements LLMProvider {
   }
 }
 
-/**
- * Input for {@link buildGemmaPrompt}.
- *
- * Pass `messages: []` (or omit it) to produce a preview of the system/tool
- * portion of the prompt without any conversation turns — useful for debug
- * panels that want to display the exact transformed prompt Gemma will see.
- */
-export interface BuildGemmaPromptInput {
-  /** System prompt — expected to already be in Gemma native syntax (use
-   *  `buildSystemPromptWithAliases(layers, { providerKind: 'gemma' })`).
-   *  Tool declarations are embedded inline inside this system prompt; this
-   *  function no longer takes a separate `tools` parameter. */
-  systemPrompt?: string;
-  /** Conversation turns. Defaults to `[]` (preview mode — no `<|turn>` user/model blocks).
-   *  Tool-use / tool-result blocks are serialized using the `name` field carried
-   *  by each `tool_use` ContentBlock — no external tool map is required. */
-  messages?: ChatMessage[];
-}
-
-/**
- * Build the final Gemma 4 native prompt string from a system prompt and a
- * conversation history.
- *
- * This is the exact transformation applied by {@link WasmProvider} before
- * calling LlmInference — exported so UI debug panels can display the prompt
- * as it will actually be sent to the model.
- *
- * The system prompt is expected to already be in Gemma native syntax AND to
- * already embed the `<|tool>declaration:...<tool|>` blocks inline — build it
- * with `buildSystemPromptWithAliases(layers, { providerKind: 'gemma' })`.
- *
- * Transformations applied:
- * 1. Wraps the system prompt in `<|turn>system\n...<turn|>`.
- * 2. Serializes messages as `<|turn>user|model\n...<turn|>` with tool_use →
- *    `<|tool_call>` and tool_result → `<|tool_response>`. Each `tool_use`
- *    block already carries its `name`, so no external tool map is required.
- * 3. Terminates with an open `<|turn>model\n` for generation.
- * 4. No explicit `<bos>` — LlmInference adds it via the tokenizer.
- *
- * Thinking mode (`<|think|>`) is not activated here — any stray thought
- * channels Gemma may emit are stripped post-hoc in {@link WasmProvider}.
- */
-export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
-  const { systemPrompt, messages = [] } = input;
-
-  const parts: string[] = [];
-
-  // Gemma 4 native structure: the system prompt already embeds tool
-  // declarations inline at each STEP (built via buildSystemPromptWithAliases
-  // with providerKind: 'gemma').
-  if (systemPrompt) {
-    parts.push(`<|turn>system\n${systemPrompt}\n<turn|>`);
-  }
-
-  for (const msg of messages) {
-    const role: 'model' | 'user' | 'system' =
-      msg.role === 'assistant' ? 'model' : msg.role === 'system' ? 'system' : 'user';
-
-    let segments: string[];
-    let toolResultOnly = false;
-    if (typeof msg.content === 'string') {
-      segments = [msg.content];
-    } else {
-      segments = [];
-      const blocks = msg.content as ContentBlock[];
-      for (const block of blocks) {
-        if (block.type === 'text') {
-          segments.push((block as { type: 'text'; text: string }).text);
-        } else if (block.type === 'tool_use') {
-          const b = block as { type: 'tool_use'; name: string; input: Record<string, unknown> };
-          segments.push(WasmProvider.formatToolCall(b.name, b.input));
-        } else if (block.type === 'tool_result') {
-          const b = block as { type: 'tool_result'; tool_use_id: string; content: string };
-          segments.push(WasmProvider.formatToolResponse(b.content));
-        }
-      }
-      toolResultOnly = blocks.length > 0 && blocks.every(b => b.type === 'tool_result');
-    }
-    if (segments.length === 0) continue;
-
-    // Spec §7 + §10.1: tool_result messages fuse into the preceding model turn,
-    // so <|tool_call> and <|tool_response> share a single turn.
-    const prev = parts[parts.length - 1];
-    if (toolResultOnly && role === 'user' && prev?.startsWith('<|turn>model\n')) {
-      const body = prev.slice(0, -'<turn|>'.length);
-      parts[parts.length - 1] = `${body}${segments.join('')}\n<turn|>`;
-    } else {
-      parts.push(`<|turn>${role}\n${segments.join('\n')}<turn|>`);
-    }
-  }
-  parts.push('<|turn>model\n');
-  return parts.join('\n');
-}
+// BuildGemmaPromptInput and buildGemmaPrompt now live in
+// ../prompts/gemma4-prompt-builder.ts. Re-exported here for backward compat.
+export { buildGemmaPrompt } from '../prompts/gemma4-prompt-builder.js';
+export type { BuildGemmaPromptInput } from '../prompts/gemma4-prompt-builder.js';

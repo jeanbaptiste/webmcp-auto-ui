@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { WasmProvider, buildGemmaPrompt } from '../src/providers/wasm.js';
-import { formatGemmaToolDeclaration, gemmaValue } from '../src/tool-layers.js';
+import { WasmProvider } from '../src/providers/wasm.js';
+import { buildGemmaPrompt, formatGemmaToolDeclaration, gemmaValue } from '../src/prompts/gemma4-prompt-builder.js';
 import type { ProviderTool, ChatMessage, ContentBlock } from '../src/types.js';
 
 // Spec source of truth: docs/GEMMA4-SPEC.md

@@ -9,7 +9,8 @@ import type {
   LLMProvider, ProviderTool, McpToolDef, AgentCallbacks,
 } from './types.js';
 import type { ToolLayer, SchemaTransformOptions } from './tool-layers.js';
-import { buildToolsFromLayers, buildSystemPromptWithAliases, buildDiscoveryToolsWithAliases, buildSystemPrompt, activateServerTools, toProviderTools, sanitizeServerName, flattenPathMaps } from './tool-layers.js';
+import { buildToolsFromLayers, buildDiscoveryToolsWithAliases, activateServerTools, toProviderTools, sanitizeServerName, flattenPathMaps } from './tool-layers.js';
+import { buildSystemPromptWithAliases, buildSystemPrompt } from './prompts/index.js';
 import type { DiscoveryCache } from './discovery-cache.js';
 import { unflattenParams, validateJsonSchema } from '@webmcp-auto-ui/core';
 import type { JsonSchema } from '@webmcp-auto-ui/core';
@@ -17,7 +18,7 @@ import { autoRepairParams } from './auto-repair.js';
 import { PipelineTrace } from './pipeline-trace.js';
 
 // Re-export buildSystemPrompt for backward compat
-export { buildSystemPrompt } from './tool-layers.js';
+export { buildSystemPrompt } from './prompts/index.js';
 
 const MAX_RESULT_LEN = 10_000;
 
