@@ -110,7 +110,10 @@ export const TRANSFORMERS_MODELS: Record<TransformersModelId, TransformersModelE
   },
   'transformers-ministral-3-3b': {
     repo: 'mistralai/Ministral-3-3B-Instruct-2512-ONNX',
-    modelClass: 'Mistral3ForConditionalGeneration',
+    // Mistral3ForConditionalGeneration is registered internally but not
+    // re-exported from transformers.js 4.1.0 — use the Auto wrapper, which
+    // routes via the registered name (this is what the official demo does).
+    modelClass: 'AutoModelForImageTextToText',
     dtype: {
       vision_encoder: 'q4',
       embed_tokens: 'q4',
