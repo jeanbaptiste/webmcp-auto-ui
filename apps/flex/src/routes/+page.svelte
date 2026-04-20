@@ -6,7 +6,7 @@
   import type { Skill, HyperSkill } from '@webmcp-auto-ui/sdk';
   import { McpMultiClient } from '@webmcp-auto-ui/core';
   import {
-    RemoteLLMProvider, WasmProvider, LocalLLMProvider, runAgentLoop, buildSystemPrompt,
+    RemoteLLMProvider, WasmProvider, TransformersProvider, LocalLLMProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, trimConversationHistory, summarizeChat, TokenTracker,
     buildToolsFromLayers, runDiagnostics, DiscoveryCache, DISCOVERY_TOOL_NAMES, ContextRAG,
     buildGemmaPrompt,
@@ -346,6 +346,7 @@
 
   // ── Gemma ──────────────────────────────────────────────────────────
   let gemmaProvider = $state<WasmProvider | null>(null);
+  let transformersProvider = $state<TransformersProvider | null>(null);
   let gemmaStatus = $state<'idle'|'loading'|'ready'|'error'>('idle');
   let gemmaProgress = $state(0);
   let gemmaElapsed = $state(0);
@@ -359,6 +360,32 @@
   function getProvider() {
     if (canvas.llm === 'local') {
       return new LocalLLMProvider({ baseUrl: localUrl, model: localModel || 'llama3.2' });
+    }
+    if (canvas.llm.startsWith('transformers-')) {
+      if (transformersProvider && transformersProvider.model !== canvas.llm) unloadTransformers();
+      if (!transformersProvider) {
+        transformersProvider = new TransformersProvider({
+          model: canvas.llm,
+          onProgress: (p, _s, loaded, total) => {
+            gemmaProgress = p * 100;
+            if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;
+            if (total) gemmaTotalMB = Math.round(total / 1048576 * 100) / 100;
+          },
+          onStatusChange: (s) => {
+            gemmaStatus = s === 'ready' ? 'ready' : s === 'error' ? 'error' : s === 'loading' ? 'loading' : 'idle';
+            if (s === 'loading') {
+              gemmaLoadStart = Date.now();
+              gemmaElapsed = 0;
+              if (gemmaTimerInterval) clearInterval(gemmaTimerInterval);
+              gemmaTimerInterval = setInterval(() => { gemmaElapsed = Math.floor((Date.now() - gemmaLoadStart) / 1000); }, 1000);
+            }
+            if (s === 'ready' || s === 'error') {
+              if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
+            }
+          },
+        });
+      }
+      return transformersProvider;
     }
     if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
       if (gemmaProvider && gemmaProvider.model !== canvas.llm) unloadGemma();
@@ -400,12 +427,24 @@
     if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
   }
 
+  function unloadTransformers() {
+    transformersProvider?.destroy();
+    transformersProvider = null;
+    gemmaStatus = 'idle';
+    gemmaProgress = 0;
+    if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
+  }
+
   $effect(() => {
     const llm = canvas.llm;
     untrack(() => {
       if ((llm === 'gemma-e2b' || llm === 'gemma-e4b') && gemmaStatus === 'idle') {
         const p = getProvider();
         if (p instanceof WasmProvider) p.initialize();
+      }
+      if (llm.startsWith('transformers-') && gemmaStatus === 'idle') {
+        const p = getProvider();
+        if (p instanceof TransformersProvider) p.initialize();
       }
     });
   });
