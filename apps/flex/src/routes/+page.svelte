@@ -16,7 +16,7 @@
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import {
     canvas2dServer, chartjsServer, cytoscapeServer, d3server,
-    leafletServer, mapboxServer, mermaidServer, pixijsServer,
+    leafletServer, mermaidServer, pixijsServer,
     plotlyServer, roughServer, threejsServer,
   } from '@webmcp-auto-ui/servers';
   import { McpStatus, GemmaLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
@@ -73,7 +73,6 @@
     { id: 'cytoscape', label: 'Cytoscape', description: 'Graphes et reseaux (nodes, edges, layouts)', server: cytoscapeServer },
     { id: 'd3', label: 'D3.js', description: 'Visualisations D3.js avancees (treemap, force, chord...)', server: d3server },
     { id: 'leaflet', label: 'Leaflet', description: 'Cartes interactives Leaflet (markers, GeoJSON, heatmap)', server: leafletServer },
-    { id: 'mapbox', label: 'Mapbox GL', description: 'Cartes 3D Mapbox GL (terrain, buildings, satellite)', server: mapboxServer },
     { id: 'mermaid', label: 'Mermaid', description: 'Diagrammes Mermaid (flowchart, sequence, gantt...)', server: mermaidServer },
     { id: 'pixijs', label: 'PixiJS', description: 'Rendus PixiJS haute performance (sprites, particles)', server: pixijsServer },
     { id: 'plotly', label: 'Plotly', description: 'Graphiques scientifiques Plotly (scatter, 3D, contour...)', server: plotlyServer },

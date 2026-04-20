@@ -114,7 +114,6 @@ En plus de `autoui`, le projet inclut 10+ serveurs WebMCP thematiques dans `pack
 | `cytoscape` | Cytoscape.js | force-graph, concentric-rings, spread-layout, physics-simulation |
 | `d3` | D3.js | treemap, force-directed, chord, sunburst |
 | `leaflet` | Leaflet | markers, GeoJSON, heatmap, choropleth |
-| `mapbox` | Mapbox GL | terrain 3D, buildings, satellite |
 | `plotly` | Plotly.js | scatter, 3D surface, contour, histogram |
 | `mermaid` | Mermaid | flowchart, sequence, gantt, class, state |
 | `threejs` | Three.js | mesh, lights, animations |

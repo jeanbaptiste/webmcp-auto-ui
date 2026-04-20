@@ -12,14 +12,14 @@
   import { parseFrontmatter, type WebMcpServer } from '@webmcp-auto-ui/core';
   import {
     canvas2dServer, chartjsServer, cytoscapeServer, d3server,
-    leafletServer, mapboxServer, mermaidServer, pixijsServer,
+    leafletServer, mermaidServer, pixijsServer,
     plotlyServer, roughServer, threejsServer,
   } from '@webmcp-auto-ui/servers';
   import { autoui } from '@webmcp-auto-ui/agent';
 
   const allServers: WebMcpServer[] = [
     autoui, canvas2dServer, chartjsServer, cytoscapeServer, d3server,
-    leafletServer, mapboxServer, mermaidServer, pixijsServer,
+    leafletServer, mermaidServer, pixijsServer,
     plotlyServer, roughServer, threejsServer,
   ];
   import { ExternalLink, Pencil, Plus, Trash2, FlaskConical, GitBranch, Github } from 'lucide-svelte';
