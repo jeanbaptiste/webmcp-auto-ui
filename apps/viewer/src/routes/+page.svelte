@@ -93,7 +93,7 @@
   async function loadFromUrl(url: string) {
     const hs = getHsParam(url);
     if (!hs) {
-      error = 'Aucun parametre ?hs= trouve dans cette URL';
+      error = 'No ?hs= parameter found in this URL';
       return;
     }
     loading = true;
@@ -151,7 +151,7 @@
   }
 
   function createNew() {
-    skill = { meta: { title: 'Nouvelle HyperSkill', version: '1' }, content: { blocks: [] } };
+    skill = { meta: { title: 'New HyperSkill', version: '1' }, content: { blocks: [] } };
     blocks = [];
     error = '';
     loading = false;
@@ -162,7 +162,7 @@
   }
 
   function addBlock() {
-    blocks = [...blocks, { id: uid(), type: 'text', data: { text: 'Nouveau widget' } }];
+    blocks = [...blocks, { id: uid(), type: 'text', data: { text: 'New widget' } }];
     updateSkillContent();
   }
 
@@ -207,7 +207,7 @@
     try {
       const url = await encodeHyperSkill(skill, window.location.href.split('?')[0]);
       await navigator.clipboard.writeText(url);
-      alert('URL copiee dans le presse-papier');
+      alert('URL copied to clipboard');
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
@@ -242,7 +242,7 @@
     </div>
     <div class="w-px h-5 bg-border2"></div>
     {#if skill}
-      <span class="font-mono text-xs text-text2 truncate">{skill.meta?.title ?? 'sans nom'}</span>
+      <span class="font-mono text-xs text-text2 truncate">{skill.meta?.title ?? 'untitled'}</span>
       {#if skill.meta?.description}
         <span class="hidden lg:inline text-xs text-text2 truncate max-w-md">{skill.meta.description}</span>
       {/if}
@@ -255,11 +255,11 @@
       </Button>
       <Button variant="outline" size="sm" class="flex items-center gap-1.5"
         onclick={() => window.location.href = recipesUrl()}>
-        <FlaskConical size={11} /> Tester dans Recipes
+        <FlaskConical size={11} /> Test in Recipes
       </Button>
       <Button variant="outline" size="sm" class="flex items-center gap-1.5"
         onclick={() => window.location.href = editUrl()}>
-        <Pencil size={11} /> Modifier
+        <Pencil size={11} /> Edit
       </Button>
     {/if}
     <a href="https://github.com/jeanbaptiste/webmcp-auto-ui/tree/main/apps/viewer"
@@ -279,18 +279,18 @@
     <form class="flex-1 flex items-center gap-2" onsubmit={(e) => { e.preventDefault(); handlePaste(); }}>
       <Input
         type="text"
-        placeholder="Coller une URL HyperSkill (?hs=...) ou un parametre hs brut..."
+        placeholder="Paste a HyperSkill URL (?hs=...) or a raw hs parameter..."
         class="flex-1 font-mono text-xs h-8"
         bind:value={pasteUrl}
       />
-      <Button variant="outline" size="sm" type="submit">Charger</Button>
+      <Button variant="outline" size="sm" type="submit">Load</Button>
     </form>
     <div class="w-px h-5 bg-border2"></div>
     <Button variant="outline" size="sm" class="flex items-center gap-1.5" onclick={createNew}>
-      <Plus size={11} /> Nouvelle
+      <Plus size={11} /> New
     </Button>
     {#if skill}
-      <Button variant="outline" size="sm" onclick={exportUrl}>Exporter URL</Button>
+      <Button variant="outline" size="sm" onclick={exportUrl}>Export URL</Button>
     {/if}
   </div>
 
@@ -298,7 +298,7 @@
   {#if showDag && dagNodes.length > 0}
     <div class="border-b border-border bg-surface px-6 py-3">
       <div class="font-mono text-xs text-text2 mb-2 flex items-center gap-2">
-        <GitBranch size={12} /> Graphe des versions (DAG)
+        <GitBranch size={12} /> Version graph (DAG)
       </div>
       <div class="flex items-center gap-0 overflow-x-auto py-2">
         {#each dagNodes as node, i (node.hash)}
@@ -323,7 +323,7 @@
         {/each}
       </div>
       {#if dagNodes.length === 1}
-        <div class="font-mono text-xs text-text2 mt-1 opacity-60">Version unique (pas de previousHash)</div>
+        <div class="font-mono text-xs text-text2 mt-1 opacity-60">Single version (no previousHash)</div>
       {/if}
     </div>
   {/if}
@@ -331,7 +331,7 @@
   <main class="flex-1 flex">
     {#if loading}
       <div class="flex-1 flex items-center justify-center">
-        <div class="font-mono text-sm text-text2 animate-pulse">Chargement...</div>
+        <div class="font-mono text-sm text-text2 animate-pulse">Loading...</div>
       </div>
     {:else if error}
       <div class="flex-1 flex items-center justify-center">
@@ -340,14 +340,14 @@
     {:else if !skill}
       <div class="flex-1 flex flex-col items-center justify-center text-center gap-6 p-8">
         <div class="text-5xl opacity-10">&#x2B21;</div>
-        <div class="font-mono text-sm text-text2">Aucun parametre <code class="bg-surface2 px-1 rounded">?hs=</code> dans l'URL</div>
-        <div class="font-mono text-xs text-text2">Collez un lien HyperSkill dans la barre ci-dessus ou creez-en une nouvelle.</div>
+        <div class="font-mono text-sm text-text2">No <code class="bg-surface2 px-1 rounded">?hs=</code> parameter in the URL</div>
+        <div class="font-mono text-xs text-text2">Paste a HyperSkill link in the bar above or create a new one.</div>
       </div>
     {:else}
       <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-4 max-w-5xl mx-auto w-full">
         <!-- Skill meta card -->
         <div class="border border-border rounded-xl p-4 bg-surface">
-          <div class="font-bold text-text1 mb-1">{skill.meta?.title ?? 'sans nom'}</div>
+          <div class="font-bold text-text1 mb-1">{skill.meta?.title ?? 'untitled'}</div>
           {#if skill.meta?.description}
             <div class="text-sm text-text2">{skill.meta.description}</div>
           {/if}
@@ -363,14 +363,14 @@
           <div class="flex flex-col gap-4">
             {#if fmMeta.when}
               <div>
-                <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1">Quand utiliser</div>
+                <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1">When to use</div>
                 <p class="font-mono text-xs text-text1 leading-relaxed">{fmMeta.when}</p>
               </div>
             {/if}
 
             {#if fmMeta.components_used && fmMeta.components_used.length > 0}
               <div>
-                <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Composants</div>
+                <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Components</div>
                 <div class="flex flex-wrap gap-1.5">
                   {#each fmMeta.components_used as comp}
                     <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono border border-accent/40 text-accent bg-accent/5">{comp}</span>
@@ -381,7 +381,7 @@
 
             {#if fmMeta.servers && fmMeta.servers.length > 0}
               <div>
-                <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Serveurs</div>
+                <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Servers</div>
                 <div class="flex flex-wrap gap-1.5">
                   {#each fmMeta.servers as server}
                     <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono border border-teal/40 text-teal bg-teal/5">{server}</span>
@@ -394,7 +394,7 @@
               <div>
                 <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1">Layout</div>
                 <p class="font-mono text-xs text-text1">
-                  {fmMeta.layout.type ?? ''}{#if fmMeta.layout.columns}, {fmMeta.layout.columns} colonnes{/if}{#if fmMeta.layout.arrangement} — {fmMeta.layout.arrangement}{/if}
+                  {fmMeta.layout.type ?? ''}{#if fmMeta.layout.columns}, {fmMeta.layout.columns} columns{/if}{#if fmMeta.layout.arrangement} — {fmMeta.layout.arrangement}{/if}
                 </p>
               </div>
             {/if}
@@ -413,14 +413,14 @@
               <button
                 class="p-1 rounded hover:bg-surface2 text-text2 hover:text-accent transition-colors"
                 onclick={() => startEdit(block)}
-                title="Modifier le widget"
+                title="Edit widget"
               >
                 <Pencil size={12} />
               </button>
               <button
                 class="p-1 rounded hover:bg-surface2 text-text2 hover:text-red-400 transition-colors"
                 onclick={() => deleteBlock(block.id)}
-                title="Supprimer le widget"
+                title="Delete widget"
               >
                 <Trash2 size={12} />
               </button>
@@ -442,8 +442,8 @@
                   bind:value={editJson}
                 ></textarea>
                 <div class="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onclick={() => saveEdit(block)}>Sauvegarder</Button>
-                  <Button variant="ghost" size="sm" onclick={cancelEdit}>Annuler</Button>
+                  <Button variant="outline" size="sm" onclick={() => saveEdit(block)}>Save</Button>
+                  <Button variant="ghost" size="sm" onclick={cancelEdit}>Cancel</Button>
                 </div>
               </div>
             {:else}
@@ -458,13 +458,13 @@
                  text-text2 hover:text-accent hover:border-accent/50 transition-colors font-mono text-xs cursor-pointer"
           onclick={addBlock}
         >
-          <Plus size={14} /> Ajouter un widget
+          <Plus size={14} /> Add a widget
         </button>
 
         {#if blocks.length === 0 && skill}
           <div class="flex flex-col items-center justify-center py-16 gap-4 text-center">
             <div class="text-5xl opacity-20">&#x2B21;</div>
-            <div class="font-mono text-sm text-text2">Skill chargee mais vide -- aucun widget a afficher</div>
+            <div class="font-mono text-sm text-text2">Skill loaded but empty — no widgets to display</div>
           </div>
         {/if}
       </div>
@@ -475,7 +475,7 @@
     <span class="text-[8px] text-text2/40">v1.0.0 · {__GIT_HASH__ ?? ''} · {__BUILD_TIME__?.replace('T', ' ').replace('Z', '').slice(0, 23)}</span>
     <div class="flex items-center gap-3">
       {#if skill}
-        <span class="text-text2">{blocks.length} bloc{blocks.length !== 1 ? 's' : ''}</span>
+        <span class="text-text2">{blocks.length} block{blocks.length !== 1 ? 's' : ''}</span>
         <Button variant="ghost" size="sm" class="text-accent flex items-center gap-1 h-auto px-1"
           onclick={() => window.location.href = recipesUrl()}>
           <FlaskConical size={10} /> Recipes

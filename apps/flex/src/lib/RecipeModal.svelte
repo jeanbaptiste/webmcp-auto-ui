@@ -135,7 +135,7 @@
       >
         <!-- Header -->
         <div class="flex items-center gap-4 px-6 py-4 border-b border-border flex-shrink-0">
-          <span class="font-mono text-sm font-bold text-text1 flex-1 truncate">{recipe.name ?? recipe.id ?? 'Sans nom'}</span>
+          <span class="font-mono text-sm font-bold text-text1 flex-1 truncate">{recipe.name ?? recipe.id ?? 'Untitled'}</span>
           <button class="text-text2 hover:text-text1 font-mono text-base leading-none transition-colors"
                   onclick={close}>x</button>
         </div>
@@ -149,14 +149,14 @@
 
           {#if recipe.when}
             <div>
-              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1">Quand utiliser</div>
+              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1">When to use</div>
               <p class="font-mono text-xs text-text1 leading-relaxed">{recipe.when}</p>
             </div>
           {/if}
 
           {#if recipe.components_used && recipe.components_used.length > 0}
             <div>
-              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Composants</div>
+              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Components</div>
               <div class="flex flex-wrap gap-1.5">
                 {#each recipe.components_used as comp}
                   <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono border border-accent/40 text-accent bg-accent/5">{comp}</span>
@@ -167,7 +167,7 @@
 
           {#if recipe.servers && recipe.servers.length > 0}
             <div>
-              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Serveurs</div>
+              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Servers</div>
               <div class="flex flex-wrap gap-1.5">
                 {#each recipe.servers as server}
                   <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono border border-teal/40 text-teal bg-teal/5">{server}</span>
@@ -180,14 +180,14 @@
             <div>
               <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1">Layout</div>
               <p class="font-mono text-xs text-text1">
-                {recipe.layout.type}{#if recipe.layout.columns}, {recipe.layout.columns} colonnes{/if}{#if recipe.layout.arrangement} — {recipe.layout.arrangement}{/if}
+                {recipe.layout.type}{#if recipe.layout.columns}, {recipe.layout.columns} columns{/if}{#if recipe.layout.arrangement} — {recipe.layout.arrangement}{/if}
               </p>
             </div>
           {/if}
 
           {#if recipe.body}
             <div>
-              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-2">Contenu</div>
+              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-2">Content</div>
               <div class="flex flex-col">
                 {#each segments as seg, i (i)}
                   {#if seg.type === 'markdown'}
@@ -222,7 +222,7 @@
           {#if isMcpRecipe}
             <div class="mt-2 px-3 py-2 rounded border border-accent/20 bg-accent/5">
               <p class="font-mono text-[10px] text-text2 leading-relaxed">
-                Recette MCP distante. Appelle <code class="text-accent">get_recipe('{recipe.name ?? recipe.id ?? ''}')</code> dans le chat pour obtenir les instructions completes.
+                Remote MCP recipe. Call <code class="text-accent">get_recipe('{recipe.name ?? recipe.id ?? ''}')</code> in the chat to get the full instructions.
               </p>
             </div>
           {/if}
@@ -233,7 +233,7 @@
           <button
             class="font-mono text-xs h-7 px-4 rounded border border-border2 text-text2 hover:text-text1 transition-colors"
             onclick={close}>
-            Fermer
+            Close
           </button>
         </div>
       </div>

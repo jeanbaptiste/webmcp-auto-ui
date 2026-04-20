@@ -115,7 +115,7 @@
               <!-- svelte-ignore a11y_consider_explicit_label -->
               <button class="w-4 h-4 text-text2 hover:text-accent text-sm leading-none transition-colors flex-shrink-0"
                       onclick={(e) => { e.stopPropagation(); if (block) exportTarget = { type: block.type, data: block.data, containerEl: widgetContainerRef.el ?? undefined }; }}
-                      title="Exporter">&#x2913;</button>
+                      title="Export">&#x2913;</button>
               <!-- svelte-ignore a11y_consider_explicit_label -->
               <button class="w-4 h-4 text-text2 hover:text-accent2 text-sm leading-none transition-colors flex-shrink-0"
                       onclick={(e) => { e.stopPropagation(); closeBlock(win.id); }}>x</button>
@@ -151,11 +151,11 @@
               <!-- svelte-ignore a11y_consider_explicit_label -->
               <button class="w-4 h-4 text-text2 hover:text-accent text-sm leading-none transition-colors flex-shrink-0"
                       onclick={(e) => { e.stopPropagation(); ctx.onfittocontent(); }}
-                      title="Ajuster a la taille du contenu">&#x2922;</button>
+                      title="Fit to content">&#x2922;</button>
               <!-- svelte-ignore a11y_consider_explicit_label -->
               <button class="w-4 h-4 text-text2 hover:text-accent text-sm leading-none transition-colors flex-shrink-0"
                       onclick={(e) => { e.stopPropagation(); if (block) exportTarget = { type: block.type, data: block.data, containerEl: widgetContainerRef.el ?? undefined }; }}
-                      title="Exporter">&#x2913;</button>
+                      title="Export">&#x2913;</button>
               <!-- svelte-ignore a11y_consider_explicit_label -->
               <button class="w-4 h-4 text-text2 hover:text-accent2 text-sm leading-none transition-colors flex-shrink-0"
                       onclick={(e) => { e.stopPropagation(); closeBlock(win.id); }}>x</button>

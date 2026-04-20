@@ -120,8 +120,8 @@
 
     // Build a descriptive message for the LLM
     const p = payload as Record<string, unknown> | null;
-    const label = p?.name ?? p?.title ?? p?.label ?? p?.item ?? 'un element';
-    const msg = `[Interaction widget] L'utilisateur a clique sur "${label}" dans le widget ${widgetType} (id: ${widgetId}). Action: ${action}. Donnees: ${JSON.stringify(payload)}`;
+    const label = p?.name ?? p?.title ?? p?.label ?? p?.item ?? 'an element';
+    const msg = `[Widget interaction] The user clicked "${label}" in widget ${widgetType} (id: ${widgetId}). Action: ${action}. Data: ${JSON.stringify(payload)}`;
 
     // Inject into conversation and rerun agent loop
     interactionPending = true;
@@ -573,7 +573,7 @@
       lines.push('');
       lines.push(`# ${name}`);
       lines.push('');
-      lines.push(`Créé: ${created}`);
+      lines.push(`Created: ${created}`);
       lines.push(`MCP: ${mcp}`);
       lines.push(`LLM: ${llm}`);
       lines.push('');
@@ -614,8 +614,8 @@
     // Intercept "test" command — chain both canary and hummingbird test flows.
     if (msg.trim().toLowerCase() === 'test') {
       input = '';
-      await sendMessage('affiche le canary');
-      await sendMessage('affiche le hummingbird');
+      await sendMessage('show the canary');
+      await sendMessage('show the hummingbird');
       return;
     }
 
@@ -1049,14 +1049,14 @@
         <div class="flex items-center gap-2 self-end">
           <button class="font-mono text-xs h-8 px-4 rounded-lg border border-border2 text-text2 hover:text-text1 hover:bg-surface2 transition-colors"
                   onclick={downloadSkillMarkdown}>
-            Télécharger .md
+            Download .md
           </button>
           <button class="font-mono text-xs h-8 px-4 rounded-lg border border-accent text-accent hover:bg-accent/10 transition-colors"
                   onclick={async () => {
                     try { await navigator.clipboard.writeText(exportedUrl); }
                     catch (e) { exportError = e instanceof Error ? e.message : String(e); }
                   }}>
-            Copier le lien
+            Copy link
           </button>
         </div>
       </div>

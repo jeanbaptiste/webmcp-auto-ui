@@ -136,14 +136,14 @@
     <!-- Stats -->
     <div class="grid grid-cols-4 gap-3">
       <StatCard spec={{ label: 'Total', value: String(stats.total), variant: 'default' }} />
-      <StatCard spec={{ label: 'Actifs', value: String(stats.active), variant: 'info' }} />
-      <StatCard spec={{ label: 'Faits', value: String(stats.done), variant: 'success' }} />
-      <StatCard spec={{ label: 'Urgents', value: String(stats.high), variant: 'error' }} />
+      <StatCard spec={{ label: 'Active', value: String(stats.active), variant: 'info' }} />
+      <StatCard spec={{ label: 'Done', value: String(stats.done), variant: 'success' }} />
+      <StatCard spec={{ label: 'Urgent', value: String(stats.high), variant: 'error' }} />
     </div>
 
     <!-- Add form -->
     <div class="flex gap-2">
-      <Input class="flex-1 font-mono text-sm" placeholder="Nouvelle tache..."
+      <Input class="flex-1 font-mono text-sm" placeholder="New task..."
         bind:value={input} onkeydown={(e) => { if (e.key === 'Enter') submit(); }} />
       <NativeSelect bind:value={newPriority} class="font-mono text-xs w-24">
         <option value="low">low</option>
@@ -151,20 +151,20 @@
         <option value="high">high</option>
       </NativeSelect>
       <Button class="flex items-center gap-1.5" onclick={submit}>
-        <Plus size={13} /> Ajouter
+        <Plus size={13} /> Add
       </Button>
     </div>
 
     <!-- Filter -->
     <div class="flex gap-1">
-      {#each [['all', 'Tous'], ['active', 'Actifs'], ['done', 'Faits']] as [f, label]}
+      {#each [['all', 'All'], ['active', 'Active'], ['done', 'Done']] as [f, label]}
         <Button variant="outline" size="sm"
           class="font-mono text-xs {filter === f ? 'border-accent bg-accent/10 text-accent' : ''}"
           onclick={() => filter = f as 'all' | 'active' | 'done'}>{label}</Button>
       {/each}
       {#if todos.some(t => t.done)}
         <Button variant="destructive" size="sm" class="ml-auto font-mono text-xs"
-          onclick={clearDone}>Effacer faits</Button>
+          onclick={clearDone}>Clear done</Button>
       {/if}
     </div>
 
@@ -191,7 +191,7 @@
       {/each}
       {#if filtered.length === 0}
         <div class="text-center py-10 text-text2 font-mono text-sm">
-          {filter === 'done' ? 'Aucune tache faite.' : filter === 'active' ? 'Tout est fait !' : 'Liste vide.'}
+          {filter === 'done' ? 'No tasks done.' : filter === 'active' ? 'All done!' : 'List is empty.'}
         </div>
       {/if}
     </div>

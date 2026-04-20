@@ -28,13 +28,13 @@
         class="flex-shrink-0 font-mono text-xs px-3 h-8 rounded border border-accent bg-accent/10 text-accent
                hover:bg-accent/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {testing ? 'en cours...' : 'Tester'}
+        {testing ? 'running...' : 'Test'}
       </button>
     </div>
 
     <!-- When -->
     <div class="flex flex-col gap-1">
-      <span class="text-[9px] font-mono uppercase tracking-wider text-text2">Quand utiliser</span>
+      <span class="text-[9px] font-mono uppercase tracking-wider text-text2">When to use</span>
       <div class="text-xs font-mono text-text1 bg-surface2 rounded px-3 py-2 border border-border2">
         {recipe.when}
       </div>
@@ -43,7 +43,7 @@
     <!-- Components -->
     {#if recipe.components_used?.length}
       <div class="flex flex-col gap-1">
-        <span class="text-[9px] font-mono uppercase tracking-wider text-text2">Composants</span>
+        <span class="text-[9px] font-mono uppercase tracking-wider text-text2">Components</span>
         <div class="flex gap-1 flex-wrap">
           {#each recipe.components_used as comp}
             <span class="font-mono text-[10px] px-2 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">
@@ -57,7 +57,7 @@
     <!-- Servers -->
     {#if recipe.servers?.length}
       <div class="flex flex-col gap-1">
-        <span class="text-[9px] font-mono uppercase tracking-wider text-text2">Serveurs requis</span>
+        <span class="text-[9px] font-mono uppercase tracking-wider text-text2">Required servers</span>
         <div class="flex gap-1 flex-wrap">
           {#each recipe.servers as srv}
             <span class="font-mono text-[10px] px-2 py-0.5 rounded bg-teal/10 text-teal border border-teal/20">
@@ -106,7 +106,7 @@
   <div class="flex flex-col h-full overflow-y-auto p-4 gap-4">
     <div class="flex items-start justify-between gap-3">
       <div>
-        <h2 class="font-mono text-lg font-medium text-text1">{mcpRecipe.name ?? 'Sans nom'}</h2>
+        <h2 class="font-mono text-lg font-medium text-text1">{mcpRecipe.name ?? 'Untitled'}</h2>
         {#if mcpRecipe.description}
           <p class="text-sm text-text2 mt-1">{mcpRecipe.description}</p>
         {/if}
@@ -117,13 +117,13 @@
         class="flex-shrink-0 font-mono text-xs px-3 h-8 rounded border border-accent bg-accent/10 text-accent
                hover:bg-accent/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {testing ? 'en cours...' : 'Tester'}
+        {testing ? 'running...' : 'Test'}
       </button>
     </div>
-    <p class="text-xs text-text2 font-mono">Recette MCP distante. Appelle <code class="text-accent">get_recipe('{mcpRecipe.name ?? ''}')</code> dans le chat pour obtenir les instructions completes.</p>
+    <p class="text-xs text-text2 font-mono">Remote MCP recipe. Call <code class="text-accent">get_recipe('{mcpRecipe.name ?? ''}')</code> in the chat to get the full instructions.</p>
   </div>
 {:else}
   <div class="flex items-center justify-center h-full text-text2 font-mono text-sm">
-    Selectionnez une recette
+    Select a recipe
   </div>
 {/if}

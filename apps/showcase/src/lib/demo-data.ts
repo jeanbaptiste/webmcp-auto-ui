@@ -13,19 +13,19 @@ export const SIMPLE_BLOCKS: DemoBlock[] = [
   {
     type: 'stat',
     label: 'Stat',
-    data: { label: 'Revenus mensuels', value: '42 850 EUR', trend: '+12.4% vs mois dernier', trendDir: 'up' },
+    data: { label: 'Monthly revenue', value: '$42,850', trend: '+12.4% vs last month', trendDir: 'up' },
   },
   {
     type: 'kv',
     label: 'Key-Value',
     data: {
-      title: 'Configuration serveur',
+      title: 'Server configuration',
       rows: [
         ['OS', 'Debian 12 Bookworm'],
         ['CPU', '8 vCPU (Xeon E5)'],
-        ['RAM', '32 Go DDR4'],
-        ['Stockage', '500 Go NVMe'],
-        ['Uptime', '147 jours'],
+        ['RAM', '32 GB DDR4'],
+        ['Storage', '500 GB NVMe'],
+        ['Uptime', '147 days'],
       ],
     },
   },
@@ -33,12 +33,12 @@ export const SIMPLE_BLOCKS: DemoBlock[] = [
     type: 'list',
     label: 'List',
     data: {
-      title: 'Prochaines etapes',
+      title: 'Next steps',
       items: [
-        'Valider les maquettes avec le client',
-        'Deployer en staging pour tests UAT',
-        'Migrer la base PostgreSQL vers v16',
-        'Activer le monitoring Prometheus',
+        'Validate mockups with the client',
+        'Deploy to staging for UAT testing',
+        'Migrate PostgreSQL database to v16',
+        'Enable Prometheus monitoring',
       ],
     },
   },
@@ -46,24 +46,24 @@ export const SIMPLE_BLOCKS: DemoBlock[] = [
     type: 'chart',
     label: 'Chart (bars)',
     data: {
-      title: 'Visiteurs par jour',
-      bars: [['Lun', 420], ['Mar', 580], ['Mer', 310], ['Jeu', 690], ['Ven', 870], ['Sam', 540], ['Dim', 230]],
+      title: 'Visitors per day',
+      bars: [['Mon', 420], ['Tue', 580], ['Wed', 310], ['Thu', 690], ['Fri', 870], ['Sat', 540], ['Sun', 230]],
     },
   },
   {
     type: 'alert',
     label: 'Alert (info)',
-    data: { title: 'Mise a jour disponible', message: 'La version 2.4.1 corrige un bug de rendu sur Safari. Recommandation : mettre a jour avant vendredi.', level: 'info' },
+    data: { title: 'Update available', message: 'Version 2.4.1 fixes a rendering bug on Safari. Recommendation: update before Friday.', level: 'info' },
   },
   {
     type: 'alert',
     label: 'Alert (warn)',
-    data: { title: 'Quota disque a 85%', message: 'Le volume /data atteint 85% de capacite. Planifiez un nettoyage ou une extension.', level: 'warn' },
+    data: { title: 'Disk quota at 85%', message: 'The /data volume is at 85% capacity. Schedule a cleanup or an extension.', level: 'warn' },
   },
   {
     type: 'alert',
     label: 'Alert (error)',
-    data: { title: 'Echec du build CI', message: 'Le pipeline main #347 a echoue a l\'etape de tests e2e. 3 tests en erreur.', level: 'error' },
+    data: { title: 'CI build failed', message: 'Pipeline main #347 failed at the e2e test step. 3 tests in error.', level: 'error' },
   },
   {
     type: 'code',
@@ -82,16 +82,16 @@ for (const widget of widgets) {
   {
     type: 'text',
     label: 'Text',
-    data: { content: 'WebMCP Auto-UI est un framework qui permet a un agent IA de generer des interfaces utilisateur dynamiques en temps reel. Chaque composant peut etre instancie, modifie et supprime par l\'agent via le protocole MCP.' },
+    data: { content: 'WebMCP Auto-UI is a framework that lets an AI agent generate dynamic user interfaces in real time. Every component can be instantiated, modified and removed by the agent through the MCP protocol.' },
   },
   {
     type: 'actions',
     label: 'Actions',
     data: {
       buttons: [
-        { label: 'Deployer', primary: true },
-        { label: 'Annuler' },
-        { label: 'Voir les logs' },
+        { label: 'Deploy', primary: true },
+        { label: 'Cancel' },
+        { label: 'View logs' },
       ],
     },
   },
@@ -116,23 +116,23 @@ export const RICH_BLOCKS: DemoBlock[] = [
   {
     type: 'stat-card',
     label: 'Stat Card',
-    data: { label: 'Utilisateurs actifs', value: '12 847', unit: 'MAU', trend: 'up', delta: '+18%', variant: 'success' },
+    data: { label: 'Active users', value: '12,847', unit: 'MAU', trend: 'up', delta: '+18%', variant: 'success' },
   },
   {
     type: 'data-table',
     label: 'Data Table',
     data: {
-      title: 'Deploiements recents',
+      title: 'Recent deployments',
       columns: [
-        { key: 'env', label: 'Environnement' },
+        { key: 'env', label: 'Environment' },
         { key: 'version', label: 'Version' },
         { key: 'date', label: 'Date', align: 'right' },
-        { key: 'status', label: 'Statut' },
+        { key: 'status', label: 'Status' },
       ],
       rows: [
         { env: 'Production', version: 'v2.4.0', date: '2026-04-09', status: 'OK' },
         { env: 'Staging', version: 'v2.5.0-rc1', date: '2026-04-08', status: 'OK' },
-        { env: 'Preview', version: 'v2.5.0-alpha.3', date: '2026-04-07', status: 'Echec' },
+        { env: 'Preview', version: 'v2.5.0-alpha.3', date: '2026-04-07', status: 'Failed' },
         { env: 'Production', version: 'v2.3.2', date: '2026-04-01', status: 'OK' },
         { env: 'Staging', version: 'v2.4.0-rc2', date: '2026-03-28', status: 'OK' },
       ],
@@ -143,13 +143,13 @@ export const RICH_BLOCKS: DemoBlock[] = [
     type: 'timeline',
     label: 'Timeline',
     data: {
-      title: 'Historique du projet',
+      title: 'Project history',
       events: [
-        { date: '2026-01-15', title: 'Kickoff projet WebMCP', description: 'Definition du scope et de l\'architecture', status: 'done' },
-        { date: '2026-02-20', title: 'Release v1.0', description: 'Premier prototype fonctionnel avec support Gemma', status: 'done' },
-        { date: '2026-03-10', title: 'Integration MCP native', description: 'Support complet du protocole MCP via WebMCP polyfill', status: 'done' },
-        { date: '2026-04-09', title: 'Phase 6 : Showcase dynamique', description: 'App de demonstration multi-themes', status: 'active' },
-        { date: '2026-05-01', title: 'Release v3.0', description: 'Multi-agent, outils collaboratifs', status: 'pending' },
+        { date: '2026-01-15', title: 'WebMCP project kickoff', description: 'Scope and architecture definition', status: 'done' },
+        { date: '2026-02-20', title: 'Release v1.0', description: 'First working prototype with Gemma support', status: 'done' },
+        { date: '2026-03-10', title: 'Native MCP integration', description: 'Full MCP protocol support via WebMCP polyfill', status: 'done' },
+        { date: '2026-04-09', title: 'Phase 6: Dynamic showcase', description: 'Multi-theme demo app', status: 'active' },
+        { date: '2026-05-01', title: 'Release v3.0', description: 'Multi-agent, collaborative tools', status: 'pending' },
       ],
     },
   },
@@ -162,8 +162,8 @@ export const RICH_BLOCKS: DemoBlock[] = [
       badge: { text: 'Admin', variant: 'success' },
       fields: [
         { label: 'Email', value: 'ada@webmcp.dev' },
-        { label: 'Equipe', value: 'Core Platform' },
-        { label: 'Localisation', value: 'Paris, France' },
+        { label: 'Team', value: 'Core Platform' },
+        { label: 'Location', value: 'London, UK' },
       ],
       stats: [
         { label: 'Commits', value: '1,247' },
@@ -171,7 +171,7 @@ export const RICH_BLOCKS: DemoBlock[] = [
         { label: 'Reviews', value: '892' },
       ],
       actions: [
-        { label: 'Voir profil', variant: 'primary' },
+        { label: 'View profile', variant: 'primary' },
         { label: 'Message', variant: 'secondary' },
       ],
     },
@@ -180,11 +180,11 @@ export const RICH_BLOCKS: DemoBlock[] = [
     type: 'trombinoscope',
     label: 'Trombinoscope',
     data: {
-      title: 'Equipe WebMCP',
+      title: 'WebMCP Team',
       columns: 4,
       showBadge: true,
       people: [
-        { name: 'Ada Lovelace', subtitle: 'Architecte', badge: 'Lead' },
+        { name: 'Ada Lovelace', subtitle: 'Architect', badge: 'Lead' },
         { name: 'Alan Turing', subtitle: 'Backend', badge: 'Senior' },
         { name: 'Grace Hopper', subtitle: 'DevOps', badge: 'Senior' },
         { name: 'Linus Torvalds', subtitle: 'Infra', badge: 'Staff' },
@@ -199,7 +199,7 @@ export const RICH_BLOCKS: DemoBlock[] = [
     type: 'json-viewer',
     label: 'JSON Viewer',
     data: {
-      title: 'Reponse API',
+      title: 'API response',
       expanded: true,
       data: {
         status: 'success',
@@ -216,15 +216,15 @@ export const RICH_BLOCKS: DemoBlock[] = [
     type: 'hemicycle',
     label: 'Hemicycle',
     data: {
-      title: 'Assemblee nationale (sim.)',
+      title: 'Parliament (sim.)',
       groups: [
-        { id: 'lfi', label: 'LFI', seats: 75, color: '#c0392b' },
-        { id: 'ps', label: 'PS', seats: 31, color: '#e74c8b' },
-        { id: 'ecolo', label: 'Ecolo', seats: 23, color: '#27ae60' },
-        { id: 'modem', label: 'MoDem', seats: 51, color: '#f39c12' },
-        { id: 'ren', label: 'Renaissance', seats: 170, color: '#3498db' },
-        { id: 'lr', label: 'LR', seats: 62, color: '#2c3e50' },
-        { id: 'rn', label: 'RN', seats: 89, color: '#1a237e' },
+        { id: 'left', label: 'Left', seats: 75, color: '#c0392b' },
+        { id: 'soc', label: 'Social Dem', seats: 31, color: '#e74c8b' },
+        { id: 'green', label: 'Green', seats: 23, color: '#27ae60' },
+        { id: 'lib', label: 'Liberal', seats: 51, color: '#f39c12' },
+        { id: 'centre', label: 'Centre', seats: 170, color: '#3498db' },
+        { id: 'cons', label: 'Conservative', seats: 62, color: '#2c3e50' },
+        { id: 'right', label: 'Right', seats: 89, color: '#1a237e' },
       ],
       rows: 5,
     },
@@ -233,7 +233,7 @@ export const RICH_BLOCKS: DemoBlock[] = [
     type: 'chart-rich',
     label: 'Chart (rich bar)',
     data: {
-      title: 'Temps de reponse API (ms)',
+      title: 'API response time (ms)',
       type: 'bar',
       labels: ['GET /users', 'POST /auth', 'GET /widgets', 'PUT /canvas', 'DELETE /session'],
       data: [
@@ -247,21 +247,21 @@ export const RICH_BLOCKS: DemoBlock[] = [
     type: 'chart-rich',
     label: 'Chart (rich pie)',
     data: {
-      title: 'Repartition du trafic',
+      title: 'Traffic breakdown',
       type: 'donut',
       labels: ['Desktop', 'Mobile', 'Tablet', 'API'],
-      data: [{ label: 'Trafic', values: [45, 38, 12, 5] }],
+      data: [{ label: 'Traffic', values: [45, 38, 12, 5] }],
     },
   },
   {
     type: 'cards',
     label: 'Cards',
     data: {
-      title: 'Packages du monorepo',
+      title: 'Monorepo packages',
       cards: [
-        { title: '@webmcp-auto-ui/core', description: 'Client MCP, groupes d\'outils, polyfill WebMCP', tags: ['core', 'mcp'] },
-        { title: '@webmcp-auto-ui/ui', description: 'Composants Svelte 5, theme system, widgets', tags: ['ui', 'svelte'] },
-        { title: '@webmcp-auto-ui/agent', description: 'Boucle agent, providers LLM, widgets WebMCP', tags: ['agent', 'llm'] },
+        { title: '@webmcp-auto-ui/core', description: 'MCP client, tool groups, WebMCP polyfill', tags: ['core', 'mcp'] },
+        { title: '@webmcp-auto-ui/ui', description: 'Svelte 5 components, theme system, widgets', tags: ['ui', 'svelte'] },
+        { title: '@webmcp-auto-ui/agent', description: 'Agent loop, LLM providers, WebMCP widgets', tags: ['agent', 'llm'] },
         { title: '@webmcp-auto-ui/sdk', description: 'Canvas store, HyperSkill encode/decode', tags: ['sdk', 'canvas'] },
       ],
     },
@@ -270,7 +270,7 @@ export const RICH_BLOCKS: DemoBlock[] = [
     type: 'grid-data',
     label: 'Grid Data',
     data: {
-      title: 'Matrice de compatibilite navigateurs',
+      title: 'Browser compatibility matrix',
       columns: [
         { key: 'feature', label: 'Feature', width: '180px' },
         { key: 'chrome', label: 'Chrome' },
@@ -279,10 +279,10 @@ export const RICH_BLOCKS: DemoBlock[] = [
         { key: 'edge', label: 'Edge' },
       ],
       rows: [
-        ['WebGPU', 'Oui', 'Flag', 'Non', 'Oui'],
-        ['WebMCP', 'Oui', 'Oui', 'Oui', 'Oui'],
-        ['SharedArrayBuffer', 'Oui', 'Oui', 'Oui', 'Oui'],
-        ['WASM SIMD', 'Oui', 'Oui', 'Oui', 'Oui'],
+        ['WebGPU', 'Yes', 'Flag', 'No', 'Yes'],
+        ['WebMCP', 'Yes', 'Yes', 'Yes', 'Yes'],
+        ['SharedArrayBuffer', 'Yes', 'Yes', 'Yes', 'Yes'],
+        ['WASM SIMD', 'Yes', 'Yes', 'Yes', 'Yes'],
       ],
       highlights: [
         { row: 0, col: 2, color: 'rgba(240,160,80,0.2)' },
@@ -294,9 +294,9 @@ export const RICH_BLOCKS: DemoBlock[] = [
     type: 'sankey',
     label: 'Sankey',
     data: {
-      title: 'Flux de donnees agent',
+      title: 'Agent data flow',
       nodes: [
-        { id: 'user', label: 'Utilisateur', color: '#3b82f6' },
+        { id: 'user', label: 'User', color: '#3b82f6' },
         { id: 'agent', label: 'Agent Loop', color: '#7c6dfa' },
         { id: 'gemma', label: 'Gemma (WASM)', color: '#f0a050' },
         { id: 'claude', label: 'Claude API', color: '#3ecfb2' },
@@ -333,13 +333,13 @@ export const RICH_BLOCKS: DemoBlock[] = [
     type: 'carousel',
     label: 'Carousel',
     data: {
-      title: 'Captures d\'ecran',
+      title: 'Screenshots',
       autoPlay: true,
       interval: 4000,
       slides: [
-        { title: 'Dashboard principal', subtitle: 'Vue agent avec canvas et chat', content: 'L\'agent genere des widgets en temps reel via le protocole MCP.' },
-        { title: 'Theme Cyberpunk', subtitle: 'Neon et contrastes forts', content: 'Le systeme de themes permet de changer l\'apparence de toute l\'app en un clic.' },
-        { title: 'Multi-agent', subtitle: 'Collaboration entre agents', content: 'Plusieurs agents peuvent travailler sur le meme canvas simultanement.' },
+        { title: 'Main dashboard', subtitle: 'Agent view with canvas and chat', content: 'The agent generates widgets in real time via the MCP protocol.' },
+        { title: 'Cyberpunk theme', subtitle: 'Neon and strong contrasts', content: 'The theme system lets you change the look of the whole app in one click.' },
+        { title: 'Multi-agent', subtitle: 'Agent collaboration', content: 'Multiple agents can work on the same canvas simultaneously.' },
       ],
     },
   },

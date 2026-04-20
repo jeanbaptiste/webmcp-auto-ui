@@ -37,7 +37,7 @@
       transition:fly={{ y: 24, duration: 240 }}
     >
       <div class="flex items-center gap-4 px-6 py-4 border-b border-border flex-shrink-0">
-        <span class="font-mono text-sm font-bold text-text1">Historique</span>
+        <span class="font-mono text-sm font-bold text-text1">History</span>
         <span class="font-mono text-xs text-text2">{messages.length} message{messages.length !== 1 ? 's' : ''}</span>
         <div class="flex-1"></div>
         <button class="text-text2 hover:text-text1 font-mono text-base leading-none transition-colors"
@@ -47,15 +47,15 @@
       <div class="flex-1 overflow-auto">
         {#if messages.length === 0}
           <div class="flex items-center justify-center h-full text-text2 font-mono text-sm">
-            Aucun message pour l'instant
+            No messages yet
           </div>
         {:else}
           <table class="w-full text-xs font-mono border-collapse">
             <thead class="sticky top-0 bg-surface border-b border-border z-10">
               <tr>
-                <th class="text-left px-5 py-2.5 text-text2 font-medium w-[12%]">Heure</th>
+                <th class="text-left px-5 py-2.5 text-text2 font-medium w-[12%]">Time</th>
                 <th class="text-left px-5 py-2.5 text-text2 font-medium w-[10%]">Role</th>
-                <th class="text-left px-5 py-2.5 text-text2 font-medium">Contenu</th>
+                <th class="text-left px-5 py-2.5 text-text2 font-medium">Content</th>
               </tr>
             </thead>
             <tbody>

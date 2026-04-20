@@ -323,7 +323,7 @@
     'afficher-oeuvres-art-collection-musee': PLACEHOLDER_MAP['metmuseum'],
   };
 
-  const DEFAULT_PLACEHOLDER = 'Posez une question...';
+  const DEFAULT_PLACEHOLDER = 'Ask a question...';
 
   // Contextual prefill: actual input value when a recipe is selected
   const chatPrefill = $derived.by((): string => {
@@ -539,7 +539,7 @@
     <McpStatus
       connecting={canvas.mcpConnecting}
       connected={canvas.mcpConnected}
-      name={canvas.mcpName ?? 'non connecte'}
+      name={canvas.mcpName ?? 'not connected'}
     />
 
     {#if gemmaStatus === 'ready'}
@@ -595,7 +595,7 @@
 
   <!-- MOBILE TABS (< 768px) -->
   <div class="mobile-tabs">
-    <button class="mobile-tab" class:active={mobileTab === 'list'} onclick={() => mobileTab = 'list'}>Recettes</button>
+    <button class="mobile-tab" class:active={mobileTab === 'list'} onclick={() => mobileTab = 'list'}>Recipes</button>
     <button class="mobile-tab" class:active={mobileTab === 'detail'} onclick={() => mobileTab = 'detail'}>Detail</button>
     <button class="mobile-tab" class:active={mobileTab === 'preview'} onclick={() => mobileTab = 'preview'}>Preview</button>
   </div>

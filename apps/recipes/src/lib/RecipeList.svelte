@@ -37,7 +37,7 @@
     <input
       type="text"
       bind:value={filter}
-      placeholder="Filtrer..."
+      placeholder="Filter..."
       class="w-full bg-surface2 border border-border2 rounded px-2 h-7 text-xs font-mono text-text1
              outline-none placeholder:text-text2/40 focus:border-accent/50 transition-colors"
     />
@@ -75,7 +75,7 @@
     {#if filteredMcp.length > 0}
       <div class="px-2 pt-3 pb-1">
         <span class="text-[9px] font-mono uppercase tracking-wider text-text2">
-          MCP Serveur ({filteredMcp.length})
+          MCP Server ({filteredMcp.length})
         </span>
       </div>
       {#each filteredMcp as recipe (recipe.name)}
@@ -94,7 +94,7 @@
 
     {#if filteredLocal.length === 0 && filteredMcp.length === 0}
       <div class="p-4 text-center text-text2 text-xs font-mono">
-        Aucune recette trouvee
+        No recipes found
       </div>
     {/if}
   </div>

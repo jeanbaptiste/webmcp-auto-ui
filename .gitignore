@@ -65,3 +65,5 @@ docs/GEMMA4-BUG-ANALYSIS.md
 
 # Parasitic shell-escape artifact (Gemma tokenizer dump, accidental filename)
 \\|<start_function*
+i18n-audit.md
+i18n-fix-*.md

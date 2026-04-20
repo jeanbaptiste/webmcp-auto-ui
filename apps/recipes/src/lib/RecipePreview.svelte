@@ -59,7 +59,7 @@
         class="font-mono text-[9px] h-5 px-1.5 rounded border border-border2 text-text2 hover:text-text1 hover:border-accent/40 transition-colors"
         onclick={onclear}
         disabled={active}
-      >Effacer</button>
+      >Clear</button>
     {/if}
     {#if active}
       <button
@@ -94,7 +94,7 @@
       </div>
     {:else if !active && !textOutput && !error}
       <div class="flex items-center justify-center h-full text-text2 font-mono text-xs">
-        Cliquez "Tester" sur une recette ou posez une question ci-dessous
+        Click "Test" on a recipe or ask a question below
       </div>
     {/if}
   </div>
@@ -116,7 +116,7 @@
              hover:bg-accent/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       disabled={active || !inputText.trim()}
       onclick={send}
-    >Envoyer</button>
+    >Send</button>
   </div>
 </div>
 
