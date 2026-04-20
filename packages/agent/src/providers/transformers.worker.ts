@@ -133,7 +133,7 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
   // the bare specifier can't resolve when externalized from the worker bundle.
   // Hardcode the CDN URL (mirrors the pin in app.html). Keep /* @vite-ignore */
   // to stop Vite from pre-resolving the runtime string.
-  const TRANSFORMERS_URL = 'https://esm.sh/@huggingface/transformers@4.0.1';
+  const TRANSFORMERS_URL = 'https://esm.sh/@huggingface/transformers@4.1.0';
   transformersMod = await import(/* @vite-ignore */ TRANSFORMERS_URL);
   const {
     AutoProcessor,
@@ -147,7 +147,7 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
   // esm.sh hosts the JS modules; the native .wasm binaries are served by jsdelivr.
   try {
     if (env?.backends?.onnx?.wasm) {
-      env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/';
+      env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0-dev.20260410-5e55544225/dist/';
     }
     if (env) {
       env.allowLocalModels = false;
