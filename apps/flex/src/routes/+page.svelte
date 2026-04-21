@@ -323,10 +323,22 @@
 
       const endsToolWith = (s: string): boolean => name === s || name.endsWith('_' + s);
 
-      // 5a. get_recipe → code (markdown) with recipe body
-      if (endsToolWith('get_recipe') && detail.toolResult) {
-        add('code', { lang: 'markdown', content: extractRecipeBody(detail.toolResult) });
-        return;
+      // 5a. get_recipe → open RecipeModal with the recipe body
+      if (endsToolWith('get_recipe')) {
+        const rArgs = (detail.toolArgs ?? {}) as Record<string, unknown>;
+        const rName = (typeof rArgs.name === 'string' && rArgs.name)
+          || (typeof rArgs.id === 'string' && rArgs.id)
+          || 'recipe';
+        // Prefer toolResult (fresh), fall back to loadedRecipes map
+        let body: string | undefined;
+        if (detail.toolResult) body = extractRecipeBody(detail.toolResult);
+        if (!body) body = traceObserver.getLoadedRecipes().get(rName);
+        if (body) {
+          detailRecipe = { name: rName, description: '', body };
+          detailAnchor = undefined;
+          detailOpen = true;
+          return;
+        }
       }
 
       // 5ab. Origin recipe match — if this sql/script matches a previously loaded

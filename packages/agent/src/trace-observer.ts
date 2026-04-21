@@ -451,12 +451,44 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
     },
 
     onToolCall: (call: ToolCall): void => {
-      const existingTraceId = toolCallIdMap.get(call.id);
-      if (existingTraceId && call.result !== undefined) {
-        // Second invocation — result arrived. Emit tool_result node and enrich original tool_call detail.
+      // agent/loop.ts calls onToolCall ONCE per tool, after call.result is set.
+      // Create the tool_call node (with args) and, if the call has completed
+      // (result or error present), also emit the tool_result node and populate
+      // loadedRecipes in one shot.
+      let traceId = toolCallIdMap.get(call.id);
+      if (!traceId) {
+        const enrichedLabel = enrichToolLabel(call.name, call.args);
+        const node = addNode('tool_call', enrichedLabel, {
+          iterationId: currentIterationId,
+          toolCallId: call.id,
+          args: call.args,
+        });
+        toolCallIdMap.set(call.id, node.id);
+        toolCallStartMs.set(call.id, node.startMs);
+        nodeDetails.set(node.id, {
+          kind: 'tool_call',
+          label: node.label,
+          startMs: node.startMs,
+          toolName: call.name,
+          toolArgs: call.args,
+        });
+        if (currentLlmRespId) {
+          addEdge(currentLlmRespId, node.id);
+          addSankey('llm_resp', 'tool_call');
+        }
+        lastToolCallId = node.id;
+        lastNodeByKind.tool_call = node.id;
+        traceId = node.id;
+      }
+
+      const hasResult = call.result !== undefined || call.error !== undefined;
+      if (hasResult) {
         const startMs = toolCallStartMs.get(call.id) ?? Date.now();
         const elapsed = call.elapsed ?? Date.now() - startMs;
-        const resNode = addNode('tool_result', `${call.name} (${elapsed}ms)`, {
+        const resultStr = call.result === undefined
+          ? ''
+          : (typeof call.result === 'string' ? call.result : JSON.stringify(call.result));
+        const resNode = addNode('tool_result', `${call.name} (${Math.round(elapsed)}ms)`, {
           iterationId: currentIterationId,
           toolCallId: call.id,
           elapsed,
@@ -469,65 +501,38 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
           startMs: resNode.startMs,
           endMs: resNode.endMs,
           toolName: call.name,
-          toolResult: typeof call.result === 'string' ? call.result : JSON.stringify(call.result),
+          toolResult: resultStr,
           toolError: call.error,
           latencyMs: elapsed,
         });
-        // Enrich the originating tool_call detail so getNodeDetail(toolCallId) returns full info.
-        const prior = nodeDetails.get(existingTraceId);
+        const prior = nodeDetails.get(traceId);
         if (prior) {
           prior.endMs = resNode.endMs;
-          prior.toolResult = typeof call.result === 'string' ? call.result : JSON.stringify(call.result);
+          prior.toolResult = resultStr;
           prior.toolError = call.error;
           prior.latencyMs = elapsed;
         }
-        addEdge(existingTraceId, resNode.id, Math.max(1, elapsed));
+        addEdge(traceId, resNode.id, Math.max(1, elapsed));
         addSankey('tool_call', 'tool_result', Math.max(1, elapsed));
         lastNodeByKind.tool_result = resNode.id;
-        // If this is a get_recipe result (no error), extract the recipe body and store it
-        // so dblclick handlers can match tool calls back to their origin recipe.
-        if ((call.name === 'get_recipe' || call.name.endsWith('_get_recipe')) && !call.error && call.result !== undefined) {
+        // Extract & store recipe body for dblclick anchor matching
+        if ((call.name === 'get_recipe' || call.name.endsWith('_get_recipe')) && !call.error && resultStr) {
           try {
-            const rawStr = typeof call.result === 'string' ? call.result : JSON.stringify(call.result);
-            let body = rawStr;
+            let body = resultStr;
             try {
-              const parsed = JSON.parse(rawStr);
+              const parsed = JSON.parse(resultStr);
               if (parsed && typeof parsed === 'object' && typeof (parsed as { content?: unknown }).content === 'string') {
                 body = (parsed as { content: string }).content;
               }
             } catch { /* not JSON — keep raw */ }
             const a = (call.args && typeof call.args === 'object' ? call.args : {}) as Record<string, unknown>;
             const name = (a.name ?? a.id) as unknown;
-            if (typeof name === 'string' && name.length > 0 && typeof body === 'string' && body.length > 0) {
+            if (typeof name === 'string' && name.length > 0 && body.length > 0) {
               loadedRecipes.set(name, body);
             }
-          } catch { /* defensive — never break trace on recipe parse errors */ }
+          } catch { /* defensive */ }
         }
-        scheduleFlush();
-        return;
       }
-      // First invocation — record the call
-      const enrichedLabel = enrichToolLabel(call.name, call.args);
-      const node = addNode('tool_call', enrichedLabel, {
-        iterationId: currentIterationId,
-        toolCallId: call.id,
-        args: call.args,
-      });
-      toolCallIdMap.set(call.id, node.id);
-      toolCallStartMs.set(call.id, node.startMs);
-      nodeDetails.set(node.id, {
-        kind: 'tool_call',
-        label: node.label,
-        startMs: node.startMs,
-        toolName: call.name,
-        toolArgs: call.args,
-      });
-      if (currentLlmRespId) {
-        addEdge(currentLlmRespId, node.id);
-        addSankey('llm_resp', 'tool_call');
-      }
-      lastToolCallId = node.id;
-      lastNodeByKind.tool_call = node.id;
       scheduleFlush();
     },
 
