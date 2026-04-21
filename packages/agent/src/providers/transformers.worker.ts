@@ -203,46 +203,33 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
     });
   });
 
-  let progressCallback = (p: any) => {
-    // transformers.js v4 progress event shape: { status, name, file, progress, loaded, total }
-    const loaded = typeof p?.loaded === 'number' ? p.loaded : 0;
-    const total = typeof p?.total === 'number' && p.total > 0 ? p.total : modelEntry.size;
-    const fp = typeof p?.progress === 'number' ? p.progress / 100 : (total > 0 ? loaded / total : 0);
+  // Aggregated progress callback — sums loaded/total across every file we see,
+  // emitting a monotonic aggregate ratio. Two guards eliminate flicker:
+  //   1. Files with total < 1_000_000 bytes are ignored (configs, tokenizers,
+  //      chat_templates are all <100KB and would jump instantly to 100%,
+  //      momentarily overwriting the big weight-shard progress).
+  //   2. We emit sum(loaded) / sum(total) — so small-file completions cannot
+  //      make the overall ratio regress.
+  const fileStats = new Map<string, { loaded: number; total: number }>();
+  const progressCallback = (p: any) => {
+    if (p?.status !== 'progress' || typeof p?.file !== 'string') return;
+    const loaded = typeof p.loaded === 'number' ? p.loaded : 0;
+    const total = typeof p.total === 'number' && p.total > 0 ? p.total : 0;
+    if (total < 1_000_000) return; // skip tiny files
+    fileStats.set(p.file, { loaded, total });
+    let sumLoaded = 0;
+    let sumTotal = 0;
+    for (const v of fileStats.values()) { sumLoaded += v.loaded; sumTotal += v.total; }
+    const fp = sumTotal > 0 ? sumLoaded / sumTotal : 0;
     post({
       type: 'progress',
       fileProgress: fp,
       totalProgress: fp,
-      status: String(p?.status ?? 'downloading'),
-      loaded,
-      total,
+      status: 'downloading',
+      loaded: sumLoaded,
+      total: sumTotal,
     });
   };
-
-  // Mistral-specific filter: the official demo only surfaces progress for the
-  // three .onnx_data weight shards (embed / vision_encoder / decoder), and
-  // averages their ratios so the bar advances smoothly. Other events (small
-  // tokenizer files, 0→100% spam per sub-ONNX) are ignored.
-  if (modelEntry.family === 'mistral') {
-    const fileRatios = new Map<string, number>();
-    progressCallback = (p: any) => {
-      if (p?.status !== 'progress' || typeof p?.file !== 'string' || !p.file.endsWith('.onnx_data')) return;
-      const loaded = typeof p?.loaded === 'number' ? p.loaded : 0;
-      const total = typeof p?.total === 'number' && p.total > 0 ? p.total : 0;
-      const ratio = total > 0 ? loaded / total : 0;
-      fileRatios.set(p.file, ratio);
-      let sum = 0;
-      for (const r of fileRatios.values()) sum += r;
-      const fileProgress = sum / 3;
-      post({
-        type: 'progress',
-        fileProgress,
-        totalProgress: fileProgress,
-        status: 'downloading',
-        loaded,
-        total,
-      });
-    };
-  }
 
   // No progress_callback: OPFS already pre-downloaded every weight, so
   // from_pretrained reads from browser cache. Wiring progress_callback here
