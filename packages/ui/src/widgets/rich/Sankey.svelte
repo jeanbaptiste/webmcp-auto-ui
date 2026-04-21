@@ -1,5 +1,5 @@
 <script lang="ts">
-  export interface SankeyNode { id: string; label: string; color?: string; }
+  export interface SankeyNode { id: string; label: string; color?: string; summary?: string; }
   export interface SankeyLink { source: string; target: string; value: number; label?: string; }
   export interface SankeySpec { title?: string; nodes?: SankeyNode[]; links?: SankeyLink[]; }
   interface Props { spec: Partial<SankeySpec>; onnodeclick?: (n: SankeyNode) => void; onlinkclick?: (l: SankeyLink) => void; }
@@ -36,6 +36,7 @@
           <span
             class="text-text2 min-w-[80px] truncate font-mono"
             style="color:{sc};"
+            title={src?.summary ?? src?.label ?? link.source}
             ondblclick={(e)=>{e.stopPropagation(); dispatchNodeDblclick(src); onnodeclick?.(src!);}}
           >{src?.label??link.source}</span>
           <div class="flex-1 bg-surface2 rounded-full overflow-hidden" style="height:{barH}px;">
@@ -44,6 +45,7 @@
           <span
             class="text-text2 min-w-[80px] truncate text-right font-mono"
             style="color:{tc};"
+            title={tgt?.summary ?? tgt?.label ?? link.target}
             ondblclick={(e)=>{e.stopPropagation(); dispatchNodeDblclick(tgt); onnodeclick?.(tgt!);}}
           >{tgt?.label??link.target}</span>
           <span class="text-text2 min-w-[40px] text-right font-mono">{link.value}</span>

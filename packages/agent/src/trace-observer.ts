@@ -216,6 +216,38 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
     }, FLUSH_INTERVAL_MS);
   }
 
+  function summaryForNode(node: TraceNode): string {
+    const detail = nodeDetails.get(node.id);
+    if (!detail) return node.label;
+    switch (detail.kind) {
+      case 'iteration': {
+        const i = detail.iteration;
+        return i != null ? `Iteration #${i} — ${detail.label}` : detail.label;
+      }
+      case 'tool_call': {
+        const name = detail.toolName ?? '?';
+        const args = detail.toolArgs !== undefined ? JSON.stringify(detail.toolArgs).slice(0, 60) : '';
+        if (detail.toolError) return `${name} ✗ ${String(detail.toolError).slice(0, 60)}`;
+        if (detail.toolResult !== undefined) {
+          return `${name}(${args}) → ${detail.toolResult.slice(0, 60)} (${detail.latencyMs ?? 0}ms)`;
+        }
+        return `${name}(${args}) — pending...`;
+      }
+      case 'tool_result': {
+        const name = detail.toolName ?? '?';
+        if (detail.toolError) return `${name} ✗ ${String(detail.toolError).slice(0, 60)}`;
+        const res = detail.toolResult ? detail.toolResult.slice(0, 60) : '';
+        return `${name} → ${res} (${detail.latencyMs ?? 0}ms)`;
+      }
+      case 'llm_req':
+        return `→ LLM: ${detail.messageCount ?? 0} msgs, ${detail.toolCount ?? 0} tools`;
+      case 'llm_resp':
+        return `← LLM: ${detail.inputTokens ?? 0}in/${detail.outputTokens ?? 0}out, ${detail.latencyMs ?? 0}ms (${detail.stopReason ?? '?'})`;
+      default:
+        return detail.label ?? node.label;
+    }
+  }
+
   function buildCytoscapeData(): Record<string, unknown> {
     const elements: Array<{ data: Record<string, unknown> }> = [];
     for (const n of nodes) {
@@ -225,6 +257,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
           label: `${n.kind}: ${n.label}`,
           kind: n.kind,
           color: colorForNode(n),
+          summary: summaryForNode(n),
         },
       });
     }
@@ -244,9 +277,10 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
     const root: TreeNode = { name: 'conv', children: [] };
     const iterNodes = nodes.filter((n) => n.kind === 'iteration');
     for (const iter of iterNodes) {
-      const iterChild: TreeNode = {
+      const iterChild: TreeNode & { summary?: string } = {
         name: iter.label,
         nodeId: iter.id,
+        summary: summaryForNode(iter),
         children: [],
       };
       for (const n of nodes) {
@@ -255,7 +289,8 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
           iterChild.children!.push({
             name: `${n.kind}: ${n.label}`,
             nodeId: n.id,
-          });
+            summary: summaryForNode(n),
+          } as TreeNode & { summary: string });
         }
       }
       root.children!.push(iterChild);
@@ -278,6 +313,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
         id: n.id,
         label: `${n.kind}: ${n.label}`,
         color: colorForNode(n),
+        summary: summaryForNode(n),
       }));
     const sankeyLinks = edges.map((e) => {
       const src = nodes.find((n) => n.id === e.from);

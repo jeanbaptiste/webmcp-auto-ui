@@ -2,6 +2,22 @@
 export async function render(container: HTMLElement, data: Record<string, unknown>): Promise<void | (() => void)> {
   const cytoscape = (await import('cytoscape')).default;
   container.style.height = container.style.height || '400px';
+  container.style.position = 'relative';
+
+  const tooltip = document.createElement('div');
+  tooltip.style.position = 'absolute';
+  tooltip.style.pointerEvents = 'none';
+  tooltip.style.background = 'rgba(0,0,0,0.8)';
+  tooltip.style.color = '#fff';
+  tooltip.style.padding = '4px 8px';
+  tooltip.style.borderRadius = '4px';
+  tooltip.style.fontSize = '12px';
+  tooltip.style.opacity = '0';
+  tooltip.style.zIndex = '10';
+  tooltip.style.maxWidth = '360px';
+  tooltip.style.whiteSpace = 'pre-wrap';
+  container.appendChild(tooltip);
+
   const cy = cytoscape({
     container,
     elements: data.elements as any[],
@@ -28,11 +44,30 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     }));
   });
 
+  // Hover tooltip with summary
+  cy.on('mouseover', 'node', (evt) => {
+    const d = evt.target.data();
+    const text = d.summary ?? d.label ?? '';
+    tooltip.textContent = String(text);
+    tooltip.style.opacity = '1';
+  });
+  cy.on('mousemove', 'node', (evt) => {
+    const oe = evt.originalEvent as MouseEvent | undefined;
+    if (!oe) return;
+    const rect = container.getBoundingClientRect();
+    tooltip.style.left = `${oe.clientX - rect.left + 10}px`;
+    tooltip.style.top = `${oe.clientY - rect.top - 10}px`;
+  });
+  cy.on('mouseout', 'node', () => {
+    tooltip.style.opacity = '0';
+  });
+
   const ro = new ResizeObserver(() => { cy.resize(); cy.fit(); });
   ro.observe(container);
   return () => {
     ro.disconnect();
     clearInterval(interval);
     cy.destroy();
+    tooltip.remove();
   };
 }

@@ -27,6 +27,8 @@
   import HistoryModal from '$lib/HistoryModal.svelte';
   import SettingsDrawer from '$lib/SettingsDrawer.svelte';
   import RecipeBrowser from '$lib/RecipeBrowser.svelte';
+  import RecipeModal from '$lib/RecipeModal.svelte';
+  import type { RecipeData } from '@webmcp-auto-ui/sdk';
   import ToolBrowser from '$lib/ToolBrowser.svelte';
   import LogDrawer from '$lib/LogDrawer.svelte';
   import DebugPanel from '$lib/DebugPanel.svelte';
@@ -217,55 +219,54 @@
     }
   });
 
-  // Double-click on a DAG node → spawn a mermaid.sequence block with round-trip detail
-  // Sanitize user text for mermaid message lines: collapse newlines, drop ; # : that can
-  // confuse the parser, and cap length.
-  function mmSafe(s: string, max = 120): string {
-    return s
-      .replace(/[\r\n]+/g, ' ')
-      .replace(/[;#]/g, ' ')
-      .replace(/:/g, '-')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, max);
-  }
-  function buildMermaidSequence(nodeId: string): string | null {
-    const detail = traceObserver.getNodeDetail(nodeId);
-    if (!detail) return null;
-    const lines: string[] = ['sequenceDiagram'];
-    if (detail.kind === 'tool_call' || detail.kind === 'tool_result') {
-      const name = mmSafe(detail.toolName ?? '?', 40);
-      const argsStr = detail.toolArgs ? mmSafe(JSON.stringify(detail.toolArgs), 120) : '';
-      lines.push(`  Agent->>Tool: ${name}(${argsStr})`);
-      if (detail.toolError) {
-        lines.push(`  Tool--xAgent: error- ${mmSafe(String(detail.toolError), 120)}`);
-      } else if (detail.toolResult !== undefined) {
-        const resStr = mmSafe(detail.toolResult, 200);
-        const ms = detail.latencyMs ?? 0;
-        lines.push(`  Tool-->>Agent: ${resStr} (${ms}ms)`);
-      } else {
-        lines.push('  Note over Tool: pending...');
-      }
-    } else if (detail.kind === 'llm_req') {
-      lines.push(`  Agent->>LLM: ${detail.messageCount ?? 0} msgs, ${detail.toolCount ?? 0} tools`);
-    } else if (detail.kind === 'llm_resp') {
-      const latency = detail.latencyMs ?? 0;
-      const out = detail.outputTokens ?? 0;
-      const inT = detail.inputTokens ?? 0;
-      lines.push(`  LLM-->>Agent: ${inT}in / ${out}out tokens, ${latency}ms (${mmSafe(detail.stopReason ?? '?', 40)})`);
-    } else {
-      lines.push(`  Note over Agent: ${mmSafe(detail.label ?? '?', 120)}`);
-    }
-    return lines.join('\n');
-  }
+  // Double-click on a trace node → open RecipeModal (get_recipe) or a JSON code block.
+  let detailRecipe = $state<RecipeData | null>(null);
+  let detailOpen = $state(false);
 
   function onTraceNodeDblClick(ev: Event): void {
     const ce = ev as CustomEvent<{ nodeId: string; nodeData: Record<string, unknown> }>;
     const nodeId = ce.detail?.nodeId;
     if (!nodeId) return;
-    const code = buildMermaidSequence(nodeId);
-    if (!code) return;
-    flexGrid?.addBlock('mermaid-sequence', { definition: code }, 'mermaid', 'mermaid-sequence');
+    const detail = traceObserver.getNodeDetail(nodeId);
+    if (!detail) return;
+
+    const isToolNode = detail.kind === 'tool_call' || detail.kind === 'tool_result';
+    if (isToolNode && detail.toolName === 'get_recipe' && detail.toolResult) {
+      let body = detail.toolResult ?? '';
+      try {
+        const parsed = JSON.parse(body);
+        if (parsed && typeof parsed === 'object' && typeof parsed.content === 'string') {
+          body = parsed.content;
+        }
+      } catch { /* not JSON — keep raw text */ }
+      const args = (detail.toolArgs ?? {}) as Record<string, unknown>;
+      const name = typeof args.name === 'string' ? args.name : 'recipe';
+      detailRecipe = { name, description: '', body };
+      detailOpen = true;
+      return;
+    }
+
+    // Fallback: dump full detail as a JSON code block.
+    const payload: Record<string, unknown> = {
+      kind: detail.kind,
+      label: detail.label,
+    };
+    if (detail.toolName !== undefined) payload.toolName = detail.toolName;
+    if (detail.toolArgs !== undefined) payload.args = detail.toolArgs;
+    if (detail.toolResult !== undefined) payload.result = detail.toolResult;
+    if (detail.toolError !== undefined) payload.error = detail.toolError;
+    if (detail.latencyMs !== undefined) payload.latencyMs = detail.latencyMs;
+    if (detail.inputTokens !== undefined) payload.inputTokens = detail.inputTokens;
+    if (detail.outputTokens !== undefined) payload.outputTokens = detail.outputTokens;
+    if (detail.stopReason !== undefined) payload.stopReason = detail.stopReason;
+    if (detail.messageCount !== undefined) payload.messageCount = detail.messageCount;
+    if (detail.toolCount !== undefined) payload.toolCount = detail.toolCount;
+    flexGrid?.addBlock(
+      'code',
+      { content: JSON.stringify(payload, null, 2), lang: 'json' },
+      'autoui',
+      'code',
+    );
   }
   let lastLoggedToolCount = $state(0);
   tokenTracker.subscribe(m => { tokenMetrics = m; });
@@ -1294,4 +1295,12 @@
 
 <!-- RECIPE BROWSER -->
 <RecipeBrowser bind:open={recipeBrowserOpen} {mcpRecipes} {webmcpRecipes} initialFilter={recipeBrowserFilter} {multiClient} />
+
+<!-- TRACE NODE DETAIL (reuses RecipeModal for get_recipe results) -->
+<RecipeModal
+  bind:open={detailOpen}
+  recipe={detailRecipe}
+  onclose={() => { detailOpen = false; }}
+  {multiClient}
+/>
 <ToolBrowser bind:open={toolBrowserOpen} tools={browsableTools} initialFilter={toolBrowserFilter} />

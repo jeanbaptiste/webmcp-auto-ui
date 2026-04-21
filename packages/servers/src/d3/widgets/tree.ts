@@ -152,8 +152,10 @@ export async function render(
     nodes
       .on('mouseenter', function (event, d) {
         d3.select(this).select('circle').attr('r', 8);
-        const path = d.ancestors().reverse().map((a) => a.data.name).join(' / ');
-        tooltip.style('opacity', '1').html(`<strong>${path}</strong>`);
+        const content = d.data?.summary
+          ? String(d.data.summary).replace(/</g, '&lt;')
+          : d.ancestors().reverse().map((a) => a.data.name).join(' / ');
+        tooltip.style('opacity', '1').html(content);
       })
       .on('mousemove', function (event) {
         const rect = container.getBoundingClientRect();
