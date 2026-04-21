@@ -18,7 +18,7 @@ export type DType = 'q4' | 'q4f16' | 'q8' | 'fp16' | 'fp32';
 
 export interface TransformersModelEntry {
   repo: string;
-  dtype: {
+  dtype: DType | {
     embed_tokens?: DType;
     decoder_model_merged?: DType;
     vision_encoder?: DType;
@@ -77,8 +77,11 @@ export const TRANSFORMERS_MODELS: Record<TransformersModelId, TransformersModelE
     label: 'Gemma 4 E4B (Vision)',
   },
   'transformers-qwen-3-4b': {
-    repo: 'webgpu/Qwen3-4B-ONNX',
-    dtype: { embed_tokens: 'q4', decoder_model_merged: 'q4' },
+    // onnx-community/Qwen3-4B-ONNX ships a monolithic model_q4f16.onnx
+    // (not split into embed_tokens + decoder_model_merged), so transformers.js
+    // expects a scalar dtype string to resolve onnx/model_<dtype>.onnx.
+    repo: 'onnx-community/Qwen3-4B-ONNX',
+    dtype: 'q4f16',
     family: 'qwen3',
     toolFormat: 'qwen-json',
     contextLength: 32768,
