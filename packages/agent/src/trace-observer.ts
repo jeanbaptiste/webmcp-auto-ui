@@ -187,19 +187,21 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
     let emoji = '🔧';
     let kind = toolName;
     let preview: string | undefined;
-    if (toolName === 'query_sql' || /sql/i.test(toolName)) {
+    // Tool names may be namespaced (e.g. "autoui_ui_get_recipe"). Match by suffix.
+    const endsWith = (s: string): boolean => toolName === s || toolName.endsWith('_' + s);
+    if (endsWith('query_sql') || /sql/i.test(toolName)) {
       emoji = '🗃️'; kind = 'sql';
       const sql = (a.sql ?? a.query ?? a.statement) as unknown;
       if (typeof sql === 'string') preview = sql;
-    } else if (toolName === 'run_script') {
+    } else if (endsWith('run_script')) {
       emoji = '⚙️'; kind = 'script';
       const scr = (a.script ?? a.code ?? a.agentTask) as unknown;
       if (typeof scr === 'string') preview = scr;
-    } else if (toolName === 'get_recipe') {
+    } else if (endsWith('get_recipe')) {
       emoji = '📖'; kind = 'recipe';
       const n = (a.name ?? a.id) as unknown;
       if (typeof n === 'string') preview = n;
-    } else if (toolName === 'search_recipes') {
+    } else if (endsWith('search_recipes')) {
       emoji = '🔍'; kind = 'search';
       const n = (a.query ?? a.name) as unknown;
       if (typeof n === 'string') preview = n;
@@ -484,7 +486,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
         lastNodeByKind.tool_result = resNode.id;
         // If this is a get_recipe result (no error), extract the recipe body and store it
         // so dblclick handlers can match tool calls back to their origin recipe.
-        if (call.name === 'get_recipe' && !call.error && call.result !== undefined) {
+        if ((call.name === 'get_recipe' || call.name.endsWith('_get_recipe')) && !call.error && call.result !== undefined) {
           try {
             const rawStr = typeof call.result === 'string' ? call.result : JSON.stringify(call.result);
             let body = rawStr;

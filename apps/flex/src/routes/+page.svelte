@@ -239,10 +239,11 @@
     if (loaded.size === 0) return null;
     const args = asObj(detail.toolArgs);
     const name = detail.toolName ?? '';
+    const ends = (s: string): boolean => name === s || name.endsWith('_' + s);
     let needle: string | undefined;
-    if (name === 'query_sql' || /sql/i.test(name)) {
+    if (ends('query_sql') || /sql/i.test(name)) {
       needle = (args.sql ?? args.query ?? args.statement) as string | undefined;
-    } else if (name === 'run_script') {
+    } else if (ends('run_script')) {
       needle = (args.script ?? args.code) as string | undefined;
     }
     if (!needle || typeof needle !== 'string' || needle.trim().length < 10) return null;
@@ -318,8 +319,10 @@
       const name = detail.toolName ?? '';
       const args = asObj(detail.toolArgs);
 
+      const endsToolWith = (s: string): boolean => name === s || name.endsWith('_' + s);
+
       // 5a. get_recipe → code (markdown) with recipe body
-      if (name === 'get_recipe' && detail.toolResult) {
+      if (endsToolWith('get_recipe') && detail.toolResult) {
         add('code', { lang: 'markdown', content: extractRecipeBody(detail.toolResult) });
         return;
       }
@@ -335,14 +338,14 @@
       }
 
       // 5b. SQL tool → code lang=sql with query
-      if (name === 'query_sql' || /sql/i.test(name)) {
+      if (endsToolWith('query_sql') || /sql/i.test(name)) {
         const sql = (args.sql ?? args.query ?? args.statement ?? '') as string;
         add('code', { lang: 'sql', content: String(sql) });
         return;
       }
 
       // 5c. run_script → code lang=javascript with the script
-      if (name === 'run_script') {
+      if (endsToolWith('run_script')) {
         const script = args.script ?? args.code ?? args.agentTask ?? JSON.stringify(args, null, 2);
         add('code', { lang: 'javascript', content: String(script) });
         return;
