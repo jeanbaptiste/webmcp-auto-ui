@@ -78,3 +78,27 @@ Prefer over `notebook-editorial` when the result is a working session, not a pub
 - After a run, Run becomes the replay button (same green pill, re-click to re-run).
 - Deletions prompt a confirmation modal and are recorded in the history panel; they can be restored from there.
 - `mode: "view"` hides all controls (run, delete, drag, add), making the notebook read-only.
+
+## Integration with connected data servers
+
+If a MCP **data** server is connected (e.g. `tricoteuses`, `metmuseum`), BEFORE seeding cells:
+
+1. Call `{server}_list_recipes()` or `{server}_search_recipes(query)` to find recipes that match the user's intent.
+2. Call `{server}_list_tools()` to see available tables/endpoints.
+3. For each high-signal recipe or table, seed ONE cell that demonstrates it: an SQL `SELECT ... LIMIT 10`, a `run_script` call, or a short markdown note.
+4. Pass the server metadata via the `servers:` param so the UI can render the server menu modal:
+
+   ```ts
+   widget_display({
+     name: 'notebook-compact',
+     params: {
+       title: '...',
+       cells: [...],
+       servers: [{ name: 'tricoteuses', url: 'https://...', kind: 'data' }]
+     }
+   })
+   ```
+
+If NO data server is connected, seed generic markdown-only cells that explain the notebook's purpose and invite the user to connect an MCP server.
+
+**Filter rule**: only include MCP *data* servers (`kind: 'data'`) in `servers:`. Do NOT include WebMCP UI servers like `autoui` — they don't expose queryable data and would clutter the menu.

@@ -74,3 +74,27 @@ Prose cells can contain `<mark>` highlights inline to draw attention to a senten
 - `<mark>` inside markdown renders with an amber tint; use sparingly.
 - The footer shows an "invite · share" link that opens the share modal.
 - Like the other notebook widgets, `mode: "view"` removes all editing and running controls.
+
+## Integration with connected data servers
+
+When a MCP **data** server is connected (for instance `tricoteuses` or `metmuseum`), the document should open on real material rather than empty placeholders. Before seeding cells, the agent takes a short discovery pass:
+
+1. It calls `{server}_list_recipes()` or `{server}_search_recipes(query)` to locate recipes aligned with the user's topic.
+2. It calls `{server}_list_tools()` to learn which tables and endpoints the server exposes.
+3. For each relevant recipe or table, it seeds a single cell that grounds the document — a short SQL `SELECT ... LIMIT 10`, a `run_script` call, or a prose cell that introduces what the data shows. A margin `comment` on a code cell is a natural way to flag an open question for collaborators.
+4. It passes the server metadata through the `servers:` param so the share/connect affordances know what is in play:
+
+   ```ts
+   widget_display({
+     name: 'notebook-document',
+     params: {
+       title: '...',
+       cells: [...],
+       servers: [{ name: 'tricoteuses', url: 'https://...', kind: 'data' }]
+     }
+   })
+   ```
+
+When no data server is connected, seed a prose-only skeleton that frames the discussion and invites the reader (or a colleague) to link an MCP server.
+
+**Filter rule**: only MCP *data* servers (`kind: 'data'`) appear in `servers:`. WebMCP UI servers such as `autoui` are excluded — they carry no queryable data and would clutter the collaborative view.

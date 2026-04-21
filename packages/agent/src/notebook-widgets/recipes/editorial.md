@@ -77,3 +77,28 @@ The distinguishing feature: prose paragraphs and code cells share a single order
 - The footer shows `share · forkId`, which is clickable to open the share modal.
 - Run / Stop controls are at the left of each code cell's header, same as the other notebook layouts.
 - Unlike the other widgets, `notebook-editorial` does not separate prose and code into different flows — they are the same flow in one list.
+
+## Integration with connected data servers
+
+An editorial piece earns its weight when the prose is anchored to real material. If a MCP **data** server is connected (say `tricoteuses` or `metmuseum`), the agent should — before composing the memo — go and see what the server has to offer:
+
+1. Call `{server}_list_recipes()` or `{server}_search_recipes(query)` to find recipes that speak to the subject at hand.
+2. Call `{server}_list_tools()` to survey the available tables and endpoints.
+3. For each recipe or table worth citing, seed one cell that lets the reader touch the evidence — a modest SQL `SELECT ... LIMIT 10`, a `run_script` call, or a prose paragraph that introduces the figure to come. Let prose and code alternate; the editorial flow is built for exactly that.
+4. Pass the server metadata through the `servers:` param so the footer's share affordance and the connect modal reflect the provenance of the piece:
+
+   ```ts
+   widget_display({
+     name: 'notebook-editorial',
+     params: {
+       title: '...',
+       kicker: 'memo',
+       cells: [...],
+       servers: [{ name: 'tricoteuses', url: 'https://...', kind: 'data' }]
+     }
+   })
+   ```
+
+When no data server is connected, seed a prose-first skeleton that stakes out the argument and gently invites the reader to connect an MCP server so the memo can take on flesh.
+
+**Filter rule**: only MCP *data* servers (`kind: 'data'`) belong in `servers:`. WebMCP UI servers like `autoui` are kept out — they hold no queryable material and have no place in the editorial masthead.
