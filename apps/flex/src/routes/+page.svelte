@@ -307,7 +307,7 @@
       add('stat', {
         label: `LLM · ${detail.stopReason ?? '?'}`,
         value: `${detail.inputTokens ?? 0}in / ${detail.outputTokens ?? 0}out`,
-        trend: `${detail.latencyMs ?? 0}ms`,
+        trend: `${Math.round(detail.latencyMs ?? 0)}ms`,
         trendDir: 'neutral',
       });
       return;

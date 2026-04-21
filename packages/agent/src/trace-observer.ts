@@ -254,6 +254,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
   function summaryForNode(node: TraceNode): string {
     const detail = nodeDetails.get(node.id);
     if (!detail) return node.label;
+    const ms = (v: number | undefined): number => Math.round(v ?? 0);
     switch (detail.kind) {
       case 'iteration': {
         const i = detail.iteration;
@@ -264,7 +265,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
         const args = detail.toolArgs !== undefined ? JSON.stringify(detail.toolArgs).slice(0, 60) : '';
         if (detail.toolError) return `${name} ✗ ${String(detail.toolError).slice(0, 60)}`;
         if (detail.toolResult !== undefined) {
-          return `${name}(${args}) → ${detail.toolResult.slice(0, 60)} (${detail.latencyMs ?? 0}ms)`;
+          return `${name}(${args}) → ${detail.toolResult.slice(0, 60)} (${ms(detail.latencyMs)}ms)`;
         }
         return `${name}(${args}) — pending...`;
       }
@@ -272,12 +273,12 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
         const name = detail.toolName ?? '?';
         if (detail.toolError) return `${name} ✗ ${String(detail.toolError).slice(0, 60)}`;
         const res = detail.toolResult ? detail.toolResult.slice(0, 60) : '';
-        return `${name} → ${res} (${detail.latencyMs ?? 0}ms)`;
+        return `${name} → ${res} (${ms(detail.latencyMs)}ms)`;
       }
       case 'llm_req':
         return `→ LLM: ${detail.messageCount ?? 0} msgs, ${detail.toolCount ?? 0} tools`;
       case 'llm_resp':
-        return `← LLM: ${detail.inputTokens ?? 0}in/${detail.outputTokens ?? 0}out, ${detail.latencyMs ?? 0}ms (${detail.stopReason ?? '?'})`;
+        return `← LLM: ${detail.inputTokens ?? 0}in/${detail.outputTokens ?? 0}out, ${ms(detail.latencyMs)}ms (${detail.stopReason ?? '?'})`;
       default:
         return detail.label ?? node.label;
     }
@@ -420,7 +421,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
     ): void => {
       const outTokens = tokens?.output ?? response.usage?.output_tokens ?? 0;
       const inTokens = tokens?.input ?? response.usage?.input_tokens ?? 0;
-      const node = addNode('llm_resp', `resp ${outTokens}tok ${latencyMs}ms`, {
+      const node = addNode('llm_resp', `resp ${outTokens}tok ${Math.round(latencyMs)}ms`, {
         iterationId: currentIterationId,
         latencyMs,
         inputTokens: inTokens,
