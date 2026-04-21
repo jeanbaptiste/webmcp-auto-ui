@@ -192,11 +192,22 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
     });
   };
 
+  // No progress_callback: OPFS already pre-downloaded every weight, so
+  // from_pretrained reads from browser cache. Wiring progress_callback here
+  // made the loader flicker because each sub-ONNX (embed/decoder/vision/audio)
+  // fires its own 0→100% event, overwriting the aggregated OPFS progress.
   const fromPretrainedOpts = {
     dtype: modelEntry.dtype,
     device: 'webgpu' as const,
-    progress_callback: progressCallback,
   };
+  post({
+    type: 'progress',
+    fileProgress: 1,
+    totalProgress: 1,
+    status: 'initializing model weights',
+    loaded: modelEntry.size,
+    total: modelEntry.size,
+  });
 
   // Tokenizer + processor — processor is required for VLMs and harmless otherwise.
   // No progress_callback here: OPFS already downloaded every file, so transformers.js
