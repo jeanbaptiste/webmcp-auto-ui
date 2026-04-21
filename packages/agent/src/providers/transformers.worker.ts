@@ -133,7 +133,12 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
   // the bare specifier can't resolve when externalized from the worker bundle.
   // Hardcode the CDN URL (mirrors the pin in app.html). Keep /* @vite-ignore */
   // to stop Vite from pre-resolving the runtime string.
-  const TRANSFORMERS_URL = 'https://esm.sh/@huggingface/transformers@4.1.0';
+  // Version pinning per family — Mistral3 was only fully wired (name → class
+  // registry) in transformers.js 3.8.1; 4.1.0 regresses that path but adds
+  // Gemma4/Qwen3.5. So route each family to the version that actually works.
+  const TRANSFORMERS_URL = modelEntry.family === 'mistral'
+    ? 'https://esm.sh/@huggingface/transformers@3.8.1'
+    : 'https://esm.sh/@huggingface/transformers@4.1.0';
   const imported: any = await import(/* @vite-ignore */ TRANSFORMERS_URL);
   // Some CDN bundles park named exports under `.default`; flatten so the
   // destructure below finds them either way.
@@ -155,7 +160,11 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
   // esm.sh hosts the JS modules; the native .wasm binaries are served by jsdelivr.
   try {
     if (env?.backends?.onnx?.wasm) {
-      env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0-dev.20260410-5e55544225/dist/';
+      // ORT version is pinned by the transformers.js version we selected above.
+      const ortVersion = modelEntry.family === 'mistral'
+        ? '1.22.0-dev.20250409-89f8206ba4'
+        : '1.26.0-dev.20260410-5e55544225';
+      env.backends.onnx.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ortVersion}/dist/`;
     }
     if (env) {
       env.allowLocalModels = false;
