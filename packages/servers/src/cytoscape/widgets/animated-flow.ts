@@ -30,13 +30,17 @@ export async function render(container: HTMLElement, data: Record<string, unknow
 
   // Animate dashes (marching ants effect)
   let offset = 0;
+  let destroyed = false;
+  const isDead = () => destroyed || !cy || (typeof cy.destroyed === 'function' && cy.destroyed());
   const interval = setInterval(() => {
+    if (isDead()) return;
     offset = (offset + 1) % 9;
-    cy.edges().style({ 'line-dash-offset': -offset });
+    try { cy.edges().style({ 'line-dash-offset': -offset }); } catch { /* post-destroy */ }
   }, 100);
 
   // Emit DOM CustomEvent on node double-tap so host apps can open details.
   cy.on('dbltap', 'node', (evt) => {
+    if (isDead()) return;
     const target = evt.target;
     container.dispatchEvent(new CustomEvent('widget:node-dblclick', {
       detail: { nodeId: target.data('id'), nodeData: target.data() },
@@ -46,12 +50,14 @@ export async function render(container: HTMLElement, data: Record<string, unknow
 
   // Hover tooltip with summary
   cy.on('mouseover', 'node', (evt) => {
+    if (isDead()) return;
     const d = evt.target.data();
     const text = d.summary ?? d.label ?? '';
     tooltip.textContent = String(text);
     tooltip.style.opacity = '1';
   });
   cy.on('mousemove', 'node', (evt) => {
+    if (isDead()) return;
     const oe = evt.originalEvent as MouseEvent | undefined;
     if (!oe) return;
     const rect = container.getBoundingClientRect();
@@ -59,15 +65,30 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     tooltip.style.top = `${oe.clientY - rect.top - 10}px`;
   });
   cy.on('mouseout', 'node', () => {
+    if (isDead()) return;
     tooltip.style.opacity = '0';
   });
 
-  const ro = new ResizeObserver(() => { cy.resize(); cy.fit(); });
+  let rafId: number | null = null;
+  const ro = new ResizeObserver(() => {
+    if (isDead()) return;
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      rafId = null;
+      if (isDead()) return;
+      try {
+        cy.resize();
+        cy.fit();
+      } catch { /* post-destroy */ }
+    });
+  });
   ro.observe(container);
   return () => {
+    destroyed = true;
     ro.disconnect();
+    if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
     clearInterval(interval);
-    cy.destroy();
+    try { cy.destroy(); } catch { /* already gone */ }
     tooltip.remove();
   };
 }
