@@ -184,11 +184,13 @@
   let traceMountedIds = $state<{ dagId: string; treeId: string; sankeyId: string } | null>(null);
   let flexGridReady = $state(false);
 
-  // When visual trace is toggled ON, ensure the 4 WebMCP servers needed by the
+  // When visual trace is toggled ON, ensure the WebMCP servers needed by the
   // trace widgets are enabled. We union into enabledServers (never remove), so
   // any server the user had already enabled stays on. We also don't disable on
   // OFF — the user may want to keep using these servers for their own widgets.
-  const TRACE_REQUIRED_SERVERS = ['cytoscape', 'd3', 'plotly', 'mermaid'];
+  // autoui is required for the sankey widget; cytoscape for animated-flow;
+  // d3 for the tree. mermaid + plotly are no longer needed here.
+  const TRACE_REQUIRED_SERVERS = ['autoui', 'cytoscape', 'd3'];
   $effect(() => {
     if (!visualTrace) return;
     untrack(() => {
