@@ -138,6 +138,12 @@
   const INTERACTION_DEBOUNCE_MS = 500;
 
   function handleWidgetInteraction(widgetId: string, widgetType: string, action: string, payload: unknown) {
+    // Internal bus data-update: apply to canvas store so widget re-renders.
+    // Must be handled BEFORE the INTERACTIVE_ACTIONS filter drops it.
+    if (action === 'bus-update') {
+      canvas.updateBlock(widgetId, payload as Record<string, unknown>);
+      return;
+    }
     // Only allow interactive actions (no update/remove to avoid loops)
     if (!INTERACTIVE_ACTIONS.has(action)) return;
     // Debounce
