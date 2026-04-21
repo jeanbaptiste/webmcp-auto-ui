@@ -41,7 +41,15 @@ let tokenizer: any = null;
 let entry: TransformersModelEntry | null = null;
 let stoppingCriteria: any = null;
 
-/** Cached past_key_values for cross-turn prefix reuse. Reset on image turns. */
+/**
+ * past_key_values slot. Populated transiently during a generate() call and
+ * ALWAYS disposed before and after (see disposePastKeyValues()). The cache is
+ * intra-generate only — `use_cache: true` in generateArgs keeps attention at
+ * O(n) per token inside a single generate() — but it is NEVER retained across
+ * generate() calls. Cross-turn reuse was removed in commit 9bb7d04 (perf:
+ * re-enable intra-generate KV cache) after the earlier fix 98d7d57 that
+ * disabled reuse entirely because of a SWA mask/score shape desync.
+ */
 let pastKeyValues: any = null;
 
 /** Active generation request id — set on 'generate', cleared on 'done'/'error'. */
@@ -60,12 +68,14 @@ async function parseToolCalls(
   toolFormat: string,
 ): Promise<ParsedToolCallBlock[]> {
   try {
-    // TODO: ship ../prompts/tool-call-parsers.ts exporting parseToolCalls(fullText, toolFormat).
+    // Optional fallback import — module is shipped (../prompts/tool-call-parsers.ts);
+    // the try/catch is defensive only, guarding against bundler quirks that
+    // could drop the worker-side import.
     const mod: any = await import('../prompts/tool-call-parsers.js');
     const fn = mod.parseToolCalls ?? mod.default;
     if (typeof fn === 'function') return await fn(fullText, toolFormat);
   } catch {
-    // Module not yet built — fall through to stub.
+    // Import resolution failed — fall through to stub.
   }
   // Stub: ship the raw text as a single text block. Parsing will arrive in a
   // later agent iteration.
@@ -82,15 +92,15 @@ async function loadOrDownloadModel(
   _onProgress: (fileProgress: number, totalProgress: number, status: string, loaded?: number, total?: number) => void,
 ): Promise<void> {
   try {
-    // TODO: ship ../util/opfs-cache.ts exporting loadOrDownloadModel(repo, onProgress)
-    // that pre-populates OPFS with the ONNX weights and wires transformers.js
-    // `env.useBrowserCache` against it.
+    // Optional fallback import — module is shipped (../util/opfs-cache.ts);
+    // the try/catch is defensive only, guarding against bundler quirks or
+    // OPFS being unavailable in the worker (older browsers).
     const mod: any = await import('../util/opfs-cache.js');
     const fn = mod.loadOrDownloadModel ?? mod.default;
     if (typeof fn === 'function') return await fn(_repo, _onProgress);
   } catch {
-    // No cache module yet — transformers.js falls back to its internal HTTP
-    // fetch + `caches` API. Progress will arrive via from_pretrained's
+    // Import/OPFS unavailable — transformers.js falls back to its internal
+    // HTTP fetch + `caches` API. Progress arrives via from_pretrained's
     // progress_callback below.
   }
 }

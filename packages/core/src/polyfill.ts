@@ -4,8 +4,10 @@
  * Implements the 17 MUST HAVE features of the W3C WebMCP Draft CG Report
  * (2026-03-27) plus ecosystem extras.
  *
- * Architecture: module-level state (no class) for tree-shakability.
- * Zero external dependencies.
+ * Architecture: shared module-level state (toolMap, polyfillOptions,
+ * installState) mutated by installPolyfill/uninstallPolyfill. Installs a
+ * single `navigator.modelContext` descriptor at init time; cleanup restores
+ * the previous descriptor. Zero external dependencies.
  *
  * @license AGPL-3.0-or-later
  */

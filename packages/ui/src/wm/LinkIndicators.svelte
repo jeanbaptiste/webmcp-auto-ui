@@ -8,8 +8,10 @@
    * Usage: place inside a title bar div. The component renders inline
    * (flex items) and is invisible when the widget has no links.
    *
-   * Requires the bus to expose hasLinks/getLinks/getGroup (added by another agent).
-   * Gracefully degrades if those methods don't exist yet.
+   * Consumes the FONC bus link API: `bus.hasLinks(busId)` and
+   * `bus.getLinks(busId)` (see packages/ui/src/messaging/bus.svelte.ts).
+   * `getLinks` returns `string[]` of group IDs; the first one drives the
+   * indicator color.
    */
   import { bus } from '../messaging/bus.svelte.js';
   import { groupColor } from './link-utils.js';
@@ -20,22 +22,13 @@
   }
   let { busId }: Props = $props();
 
-  // ── Reactive link state (safe if bus methods don't exist yet) ──────
-  const linked = $derived(
-    typeof (bus as any).hasLinks === 'function' ? (bus as any).hasLinks(busId) : false
-  );
+  // ── Reactive link state ────────────────────────────────────────────
+  const linked = $derived(bus.hasLinks(busId));
 
-  const links = $derived(
-    typeof (bus as any).getLinks === 'function' ? (bus as any).getLinks(busId) : []
-  );
+  const links = $derived(bus.getLinks(busId));
 
   /** First group ID (a widget may belong to multiple groups) */
-  const groupId = $derived.by((): string | null => {
-    if (!Array.isArray(links) || links.length === 0) return null;
-    // Each link has a groupId property
-    const first = links[0];
-    return typeof first === 'object' && first?.groupId ? String(first.groupId) : null;
-  });
+  const groupId = $derived(links.length > 0 ? links[0] : null);
 
   const color = $derived(groupId ? groupColor(groupId) : 'transparent');
 
