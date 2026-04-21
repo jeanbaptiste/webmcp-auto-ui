@@ -179,7 +179,6 @@ export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
       msg.role === 'assistant' ? 'model' : msg.role === 'system' ? 'system' : 'user';
 
     let segments: string[];
-    let toolResultOnly = false;
     if (typeof msg.content === 'string') {
       segments = [msg.content];
     } else {
@@ -196,17 +195,10 @@ export function buildGemmaPrompt(input: BuildGemmaPromptInput): string {
           segments.push(formatToolResponse(b.content));
         }
       }
-      toolResultOnly = blocks.length > 0 && blocks.every(b => b.type === 'tool_result');
     }
     if (segments.length === 0) continue;
 
-    const prev = parts[parts.length - 1];
-    if (toolResultOnly && role === 'user' && prev?.startsWith('<|turn>model\n')) {
-      const body = prev.slice(0, -'<turn|>'.length);
-      parts[parts.length - 1] = `${body}${segments.join('')}\n<turn|>`;
-    } else {
-      parts.push(`<|turn>${role}\n${segments.join('\n')}<turn|>`);
-    }
+    parts.push(`<|turn>${role}\n${segments.join('\n')}<turn|>`);
   }
   parts.push('<|turn>model\n');
   return parts.join('\n');
