@@ -218,20 +218,29 @@
   });
 
   // Double-click on a DAG node → spawn a mermaid.sequence block with round-trip detail
+  // Sanitize user text for mermaid message lines: collapse newlines, drop ; # : that can
+  // confuse the parser, and cap length.
+  function mmSafe(s: string, max = 120): string {
+    return s
+      .replace(/[\r\n]+/g, ' ')
+      .replace(/[;#]/g, ' ')
+      .replace(/:/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, max);
+  }
   function buildMermaidSequence(nodeId: string): string | null {
     const detail = traceObserver.getNodeDetail(nodeId);
     if (!detail) return null;
     const lines: string[] = ['sequenceDiagram'];
     if (detail.kind === 'tool_call' || detail.kind === 'tool_result') {
-      const name = detail.toolName ?? '?';
-      const argsStr = detail.toolArgs
-        ? JSON.stringify(detail.toolArgs).slice(0, 120)
-        : '';
+      const name = mmSafe(detail.toolName ?? '?', 40);
+      const argsStr = detail.toolArgs ? mmSafe(JSON.stringify(detail.toolArgs), 120) : '';
       lines.push(`  Agent->>Tool: ${name}(${argsStr})`);
       if (detail.toolError) {
-        lines.push(`  Tool--xAgent: error: ${String(detail.toolError).slice(0, 120)}`);
+        lines.push(`  Tool--xAgent: error- ${mmSafe(String(detail.toolError), 120)}`);
       } else if (detail.toolResult !== undefined) {
-        const resStr = detail.toolResult.slice(0, 200);
+        const resStr = mmSafe(detail.toolResult, 200);
         const ms = detail.latencyMs ?? 0;
         lines.push(`  Tool-->>Agent: ${resStr} (${ms}ms)`);
       } else {
@@ -243,11 +252,9 @@
       const latency = detail.latencyMs ?? 0;
       const out = detail.outputTokens ?? 0;
       const inT = detail.inputTokens ?? 0;
-      lines.push(`  LLM-->>Agent: ${inT}in / ${out}out tokens, ${latency}ms (${detail.stopReason ?? '?'})`);
-    } else if (detail.kind === 'iteration') {
-      lines.push(`  Note over Agent: ${detail.label}`);
+      lines.push(`  LLM-->>Agent: ${inT}in / ${out}out tokens, ${latency}ms (${mmSafe(detail.stopReason ?? '?', 40)})`);
     } else {
-      lines.push(`  Note over Agent: ${detail.label}`);
+      lines.push(`  Note over Agent: ${mmSafe(detail.label ?? '?', 120)}`);
     }
     return lines.join('\n');
   }
@@ -258,7 +265,7 @@
     if (!nodeId) return;
     const code = buildMermaidSequence(nodeId);
     if (!code) return;
-    flexGrid?.addBlock('sequence', { definition: code }, 'mermaid', 'sequence');
+    flexGrid?.addBlock('mermaid-sequence', { definition: code }, 'mermaid', 'mermaid-sequence');
   }
   let lastLoggedToolCount = $state(0);
   tokenTracker.subscribe(m => { tokenMetrics = m; });

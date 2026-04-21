@@ -27,6 +27,6 @@ function buildDefinition(data: Record<string, unknown>): string {
   return def;
 }
 
-export async function render(container: HTMLElement, data: Record<string, unknown>): Promise<void> {
-  await renderMermaid(container, buildDefinition(data));
+export async function render(container: HTMLElement, data: Record<string, unknown>): Promise<() => void> {
+  return renderMermaid(container, buildDefinition(data));
 }
