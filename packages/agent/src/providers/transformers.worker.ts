@@ -134,7 +134,12 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
   // Hardcode the CDN URL (mirrors the pin in app.html). Keep /* @vite-ignore */
   // to stop Vite from pre-resolving the runtime string.
   const TRANSFORMERS_URL = 'https://esm.sh/@huggingface/transformers@4.1.0';
-  transformersMod = await import(/* @vite-ignore */ TRANSFORMERS_URL);
+  const imported: any = await import(/* @vite-ignore */ TRANSFORMERS_URL);
+  // Some CDN bundles park named exports under `.default`; flatten so the
+  // destructure below finds them either way.
+  transformersMod = imported?.AutoTokenizer ? imported : (imported?.default ?? imported);
+  const topKeys = Object.keys(transformersMod ?? {});
+  post({ type: 'warning', message: `[transformers] module loaded. ${topKeys.length} top-level keys. AutoTokenizer=${typeof transformersMod?.AutoTokenizer}, AutoModelForImageTextToText=${typeof transformersMod?.AutoModelForImageTextToText}, AutoModelForCausalLM=${typeof transformersMod?.AutoModelForCausalLM}` });
   const {
     AutoProcessor,
     AutoTokenizer,
@@ -142,6 +147,9 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
     InterruptableStoppingCriteria,
     env,
   } = transformersMod;
+  if (!AutoTokenizer || !AutoModelForCausalLM) {
+    throw new Error(`[transformers] CDN module missing core exports. Keys seen: ${topKeys.slice(0, 40).join(',')}`);
+  }
 
   // Point ONNX Runtime WASM binaries to the jsdelivr CDN so they're not bundled.
   // esm.sh hosts the JS modules; the native .wasm binaries are served by jsdelivr.
