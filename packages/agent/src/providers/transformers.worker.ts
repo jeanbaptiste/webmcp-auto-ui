@@ -332,11 +332,15 @@ async function handleGenerate(
     // mask-vs-score shape desync (Where broadcast dim 3) in tjs 4.1.0
     // when the cache is used across iterations with a full-prompt flow.
     use_cache: false,
+    // Sampling defaults — without these transformers.js degenerates into
+    // single-token loops ("Salut! Salut! Salut!...") on Qwen3 especially.
+    temperature: typeof options.temperature === 'number' ? options.temperature : 0.7,
+    top_p: 0.9,
+    top_k: typeof options.topK === 'number' ? options.topK : 50,
+    repetition_penalty: 1.1,
     streamer,
     stopping_criteria: stoppingCriteria,
   };
-  if (typeof options.temperature === 'number') generateArgs.temperature = options.temperature;
-  if (typeof options.topK === 'number') generateArgs.top_k = options.topK;
   // past_key_values deliberately never reused (see comment above).
 
   let result: any;
