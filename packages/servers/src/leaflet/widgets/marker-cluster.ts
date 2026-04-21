@@ -18,7 +18,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   document.head.appendChild(mcCss2);
   await loadScript('https://unpkg.com/leaflet.markercluster@1/dist/leaflet.markercluster.js');
 
-  container.style.height = container.style.height || '400px';
+  container.style.height = container.style.height || "100%";
+  container.style.minHeight = container.style.minHeight || "400px";
   const map = L.map(container).setView(center, zoom);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
 

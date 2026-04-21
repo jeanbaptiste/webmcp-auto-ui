@@ -5,7 +5,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     const dagre = (await import('cytoscape-dagre')).default;
     cytoscape.use(dagre);
   } catch { /* fallback to breadthfirst */ }
-  container.style.height = container.style.height || '400px';
+  container.style.height = container.style.height || "100%";
+  container.style.minHeight = container.style.minHeight || "400px";
   const cy = cytoscape({
     container,
     elements: data.elements as any[],

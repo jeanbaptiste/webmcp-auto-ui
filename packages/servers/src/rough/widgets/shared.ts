@@ -1,10 +1,14 @@
 // @ts-nocheck
 export async function createRoughSVG(container: HTMLElement, width = 500, height = 400) {
   const rough = (await import('roughjs')).default;
+  container.style.height = container.style.height || '100%';
+  container.style.minHeight = container.style.minHeight || `${height}px`;
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   svg.style.width = '100%';
-  svg.style.height = 'auto';
+  svg.style.height = '100%';
+  svg.style.display = 'block';
   container.appendChild(svg);
   const rc = rough.svg(svg);
   return { svg, rc, width, height };

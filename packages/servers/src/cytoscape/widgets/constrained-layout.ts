@@ -6,7 +6,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     const cola = (await import('cytoscape-cola')).default;
     cytoscape.use(cola);
   } catch { /* fallback to cose */ }
-  container.style.height = container.style.height || '400px';
+  container.style.height = container.style.height || "100%";
+  container.style.minHeight = container.style.minHeight || "400px";
   const cy = cytoscape({
     container,
     elements: data.elements as any[],

@@ -9,7 +9,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   await loadScript('https://unpkg.com/webgl-heatmap@0.2.7/webgl-heatmap.js', 'createWebGLHeatmap');
   await loadScript('https://unpkg.com/leaflet-webgl-heatmap@0.2.7/leaflet-webgl-heatmap.min.js');
 
-  container.style.height = container.style.height || '400px';
+  container.style.height = container.style.height || "100%";
+  container.style.minHeight = container.style.minHeight || "400px";
   const map = L.map(container).setView(center, zoom);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
 

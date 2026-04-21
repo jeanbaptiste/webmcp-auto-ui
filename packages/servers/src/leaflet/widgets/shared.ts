@@ -28,7 +28,8 @@ export async function loadScript(url: string, globalName?: string): Promise<void
 export async function createMap(container: HTMLElement, options?: any) {
   await ensureLeafletCSS();
   const L = (await import('leaflet')).default ?? await import('leaflet');
-  container.style.height = container.style.height || '400px';
+  container.style.height = container.style.height || "100%";
+  container.style.minHeight = container.style.minHeight || "400px";
   const map = L.map(container, { ...options });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap'
