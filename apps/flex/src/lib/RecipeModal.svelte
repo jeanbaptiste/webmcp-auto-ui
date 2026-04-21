@@ -30,10 +30,15 @@
   // into view, and briefly highlight it with a ring.
   $effect(() => {
     if (!open || !anchorText || segments.length === 0) return;
-    const needle = anchorText.replace(/\s+/g, ' ').trim();
+    const needle = anchorText.replace(/\s+/g, ' ').trim().toLowerCase();
     if (!needle) return;
-    const matchIdx = segments.findIndex((s) => s.content.replace(/\s+/g, ' ').includes(needle));
-    if (matchIdx < 0) return;
+    const matchIdx = segments.findIndex((s) =>
+      s.content.replace(/\s+/g, ' ').toLowerCase().includes(needle)
+    );
+    if (matchIdx < 0) {
+      console.warn('[RecipeModal] anchor not found in segments:', needle.slice(0, 60));
+      return;
+    }
     let cleanup: (() => void) | undefined;
     (async () => {
       await tick();

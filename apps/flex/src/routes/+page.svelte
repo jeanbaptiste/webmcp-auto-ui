@@ -249,14 +249,30 @@
       needle = (args.script ?? args.code) as string | undefined;
     }
     if (!needle || typeof needle !== 'string' || needle.trim().length < 10) return null;
-    const norm = (s: string): string => s.replace(/\s+/g, ' ').trim();
+    // Normalize aggressively: collapse whitespace, lowercase, strip quotes/parens
+    const norm = (s: string): string => s.replace(/\s+/g, ' ').trim().toLowerCase();
     const needleN = norm(needle);
-    const probe = needleN.slice(0, 80);
+    // Try progressively shorter probes so formatting differences (line breaks,
+    // indentation, code fences) don't prevent a match.
+    const probes = [120, 80, 50, 30, 20]
+      .map(n => needleN.slice(0, n))
+      .filter(p => p.length >= 20);
+    if (probes.length === 0) return null;
     for (const [rName, rBody] of loaded) {
-      if (norm(rBody).includes(probe)) {
-        return { name: rName, body: rBody, anchorText: needle.slice(0, 80) };
+      const bodyN = norm(rBody);
+      for (const probe of probes) {
+        if (bodyN.includes(probe)) {
+          // Map normalized probe back to original casing in body to use as DOM anchor
+          const idx = bodyN.indexOf(probe);
+          // Use a shorter slice of the original needle as anchor text (what the
+          // modal will search for verbatim in segment.content).
+          const anchor = needle.trim().split(/\s+/).slice(0, 6).join(' ');
+          console.log('[trace-anchor] match:', rName, '| probe length:', probe.length, '| anchor:', anchor);
+          return { name: rName, body: rBody, anchorText: anchor };
+        }
       }
     }
+    console.log('[trace-anchor] no match. loaded recipes:', [...loaded.keys()], '| needle:', needleN.slice(0, 100));
     return null;
   }
   function extractRecipeBody(raw: string): string {
