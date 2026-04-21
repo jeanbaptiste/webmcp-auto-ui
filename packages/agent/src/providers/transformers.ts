@@ -263,6 +263,21 @@ export class TransformersProvider implements LLMProvider {
     const chatMessages: Array<{ role: string; content: string }> = [];
     if (systemText) chatMessages.push({ role: 'system', content: systemText });
     chatMessages.push(...serializeMessagesForTemplate(messages, this.promptKind));
+    // Mistral Pixtral requires an inline `[IMG]` placeholder in the user turn
+    // that corresponds to the attached image — the chat_template counts these
+    // tokens to allocate the vision embedding slot. Without it, the processor
+    // raises a raw Emscripten exception inside the image_processor.
+    if (this.promptKind === 'mistral' && image && chatMessages.length > 0) {
+      for (let i = chatMessages.length - 1; i >= 0; i--) {
+        if (chatMessages[i].role === 'user') {
+          chatMessages[i] = {
+            ...chatMessages[i],
+            content: '[IMG]' + chatMessages[i].content,
+          };
+          break;
+        }
+      }
+    }
     const requestId = this.nextRequestId();
 
     return new Promise<LLMResponse>((resolve, reject) => {

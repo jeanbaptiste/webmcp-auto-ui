@@ -203,7 +203,7 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
     });
   });
 
-  const progressCallback = (p: any) => {
+  let progressCallback = (p: any) => {
     // transformers.js v4 progress event shape: { status, name, file, progress, loaded, total }
     const loaded = typeof p?.loaded === 'number' ? p.loaded : 0;
     const total = typeof p?.total === 'number' && p.total > 0 ? p.total : modelEntry.size;
@@ -218,6 +218,32 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
     });
   };
 
+  // Mistral-specific filter: the official demo only surfaces progress for the
+  // three .onnx_data weight shards (embed / vision_encoder / decoder), and
+  // averages their ratios so the bar advances smoothly. Other events (small
+  // tokenizer files, 0→100% spam per sub-ONNX) are ignored.
+  if (modelEntry.family === 'mistral') {
+    const fileRatios = new Map<string, number>();
+    progressCallback = (p: any) => {
+      if (p?.status !== 'progress' || typeof p?.file !== 'string' || !p.file.endsWith('.onnx_data')) return;
+      const loaded = typeof p?.loaded === 'number' ? p.loaded : 0;
+      const total = typeof p?.total === 'number' && p.total > 0 ? p.total : 0;
+      const ratio = total > 0 ? loaded / total : 0;
+      fileRatios.set(p.file, ratio);
+      let sum = 0;
+      for (const r of fileRatios.values()) sum += r;
+      const fileProgress = sum / 3;
+      post({
+        type: 'progress',
+        fileProgress,
+        totalProgress: fileProgress,
+        status: 'downloading',
+        loaded,
+        total,
+      });
+    };
+  }
+
   // No progress_callback: OPFS already pre-downloaded every weight, so
   // from_pretrained reads from browser cache. Wiring progress_callback here
   // made the loader flicker because each sub-ONNX (embed/decoder/vision/audio)
@@ -225,6 +251,7 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
   const fromPretrainedOpts = {
     dtype: modelEntry.dtype,
     device: 'webgpu' as const,
+    progress_callback: progressCallback,
   };
   post({
     type: 'progress',
@@ -248,14 +275,14 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
     total: modelEntry.size,
   });
   try {
-    tokenizer = await AutoTokenizer.from_pretrained(modelEntry.repo);
+    tokenizer = await AutoTokenizer.from_pretrained(modelEntry.repo, { progress_callback: progressCallback });
   } catch (err) {
     post({ type: 'warning', message: `tokenizer load: ${String(err)}` });
     tokenizer = null;
   }
 
   try {
-    processor = await AutoProcessor.from_pretrained(modelEntry.repo);
+    processor = await AutoProcessor.from_pretrained(modelEntry.repo, { progress_callback: progressCallback });
   } catch {
     // Some text-only checkpoints ship without an AutoProcessor — that's fine.
     processor = null;
@@ -325,8 +352,16 @@ async function handleGenerate(
   // chat_template (Jinja) now. This is how Qwen3 and Mistral produce correctly
   // tagged prompts (<|im_start|>user … / [INST] …). Falling back to the raw
   // string lets the Gemma path (custom wire format) keep working unchanged.
-  let effectivePrompt: string;
-  if (chatMessages && tokenizer && typeof tokenizer.apply_chat_template === 'function') {
+  let effectivePrompt: string | undefined;
+  if (chatMessages && entry.family === 'mistral' && processor && typeof processor.apply_chat_template === 'function') {
+    try {
+      effectivePrompt = processor.apply_chat_template(chatMessages);
+    } catch (err) {
+      post({ type: 'warning', message: `processor.apply_chat_template failed, falling back to tokenizer: ${String(err)}` });
+      // fall through to tokenizer branch below
+    }
+  }
+  if (!effectivePrompt && chatMessages && tokenizer && typeof tokenizer.apply_chat_template === 'function') {
     try {
       effectivePrompt = tokenizer.apply_chat_template(chatMessages, {
         tokenize: false,
@@ -336,9 +371,11 @@ async function handleGenerate(
       post({ type: 'warning', message: `apply_chat_template failed, falling back to raw concat: ${String(err)}` });
       effectivePrompt = chatMessages.map(m => `${m.role}: ${m.content}`).join('\n\n');
     }
-  } else if (typeof prompt === 'string') {
+  }
+  if (!effectivePrompt && typeof prompt === 'string') {
     effectivePrompt = prompt;
-  } else {
+  }
+  if (!effectivePrompt) {
     post({ type: 'error', requestId, message: 'generate requires either prompt or chatMessages' });
     activeRequestId = null;
     return;
@@ -348,9 +385,10 @@ async function handleGenerate(
   let tokenCount = 0;
   let fullText = '';
 
-  const streamer = new TextStreamer(tokenizer, {
+  const streamerTokenizer = entry.family === 'mistral' ? (processor?.tokenizer ?? tokenizer) : tokenizer;
+  const streamer = new TextStreamer(streamerTokenizer, {
     skip_prompt: true,
-    skip_special_tokens: false,
+    skip_special_tokens: entry.family === 'mistral',
     token_callback_function: () => {
       tokenCount += 1;
     },
@@ -373,8 +411,14 @@ async function handleGenerate(
       isVisionTurn = true;
       const blob = new Blob([image]);
       const raw: any = await RawImage.read(blob);
-      try { raw.resize?.(448, 448); } catch {}
-      inputs = await processor(effectivePrompt, raw);
+      // Mistral/Pixtral: let image_processor drive sizing (longest_edge), do NOT force 448×448.
+      if (entry.family === 'mistral' && processor.image_processor) {
+        try { processor.image_processor.size = { longest_edge: 480 }; } catch {}
+      } else {
+        try { raw.resize?.(448, 448); } catch {}
+      }
+      // processor(images, text, opts) — ARG ORDER MATTERS for Pixtral processor.
+      inputs = await processor(raw, effectivePrompt, { add_special_tokens: false });
     } else if (tokenizer) {
       // Text-only turn — always go through the tokenizer, even on a VLM.
       // VLM processors (Qwen3.5, Mistral3, Gemma4) expect messages-with-content-
@@ -412,6 +456,16 @@ async function handleGenerate(
     stopping_criteria: stoppingCriteria,
   };
   // past_key_values deliberately never reused (see comment above).
+
+  if (entry.family === 'mistral') {
+    generateArgs.do_sample = false;
+    generateArgs.repetition_penalty = 1.2;
+    delete generateArgs.temperature;
+    delete generateArgs.top_p;
+    delete generateArgs.top_k;
+    delete generateArgs.return_dict_in_generate;
+    delete generateArgs.stopping_criteria;
+  }
 
   let result: any;
   try {

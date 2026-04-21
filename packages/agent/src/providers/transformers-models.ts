@@ -118,8 +118,8 @@ export const TRANSFORMERS_MODELS: Record<TransformersModelId, TransformersModelE
     // routes via the registered name (this is what the official demo does).
     modelClass: 'AutoModelForImageTextToText',
     dtype: {
+      embed_tokens: 'fp16',
       vision_encoder: 'q4',
-      embed_tokens: 'q4',
       decoder_model_merged: 'q4f16',
     },
     family: 'mistral',
