@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fade, fly } from 'svelte/transition';
+  import { tick } from 'svelte';
   import { MarkdownView } from '@webmcp-auto-ui/ui';
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import { parseBody, runCode } from '@webmcp-auto-ui/sdk';
@@ -12,9 +13,11 @@
     recipe: RecipeData | null;
     onclose: () => void;
     multiClient?: McpMultiClient;
+    /** If provided and found in a segment's content, scroll to and briefly highlight that segment. */
+    anchorText?: string;
   }
 
-  let { open = $bindable(false), recipe, onclose, multiClient }: Props = $props();
+  let { open = $bindable(false), recipe, onclose, multiClient, anchorText = undefined }: Props = $props();
 
   /** True when the recipe is an MCP recipe (no body/when/layout — only name+description) */
   const isMcpRecipe = $derived(
@@ -22,6 +25,31 @@
   );
 
   const segments = $derived(recipe?.body ? parseBody(recipe.body) : []);
+
+  // When opened with an anchorText, find the first matching segment, scroll it
+  // into view, and briefly highlight it with a ring.
+  $effect(() => {
+    if (!open || !anchorText || segments.length === 0) return;
+    const needle = anchorText.replace(/\s+/g, ' ').trim();
+    if (!needle) return;
+    const matchIdx = segments.findIndex((s) => s.content.replace(/\s+/g, ' ').includes(needle));
+    if (matchIdx < 0) return;
+    let cleanup: (() => void) | undefined;
+    (async () => {
+      await tick();
+      // Extra micro-delay so transitions settle before measuring
+      await new Promise((r) => setTimeout(r, 60));
+      const el = document.querySelector<HTMLElement>(`[data-segment-idx="${matchIdx}"]`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-2', 'ring-accent', 'rounded');
+      const t = setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-accent', 'rounded');
+      }, 2000);
+      cleanup = () => clearTimeout(t);
+    })();
+    return () => { cleanup?.(); };
+  });
 
   // Viewport width tracking for responsive layout
   let viewportW = $state(typeof window !== 'undefined' ? window.innerWidth : 1200);
@@ -190,16 +218,18 @@
               <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-2">Content</div>
               <div class="flex flex-col">
                 {#each segments as seg, i (i)}
-                  {#if seg.type === 'markdown'}
-                    <MarkdownView source={seg.content} />
-                  {:else}
-                    <RecipeCodeBlock
-                      code={seg.content}
-                      lang={seg.lang ?? 'text'}
-                      {multiClient}
-                      onrun={(payload) => handleBlockRun(i, payload)}
-                    />
-                  {/if}
+                  <div data-segment-idx={i} class="transition-shadow">
+                    {#if seg.type === 'markdown'}
+                      <MarkdownView source={seg.content} />
+                    {:else}
+                      <RecipeCodeBlock
+                        code={seg.content}
+                        lang={seg.lang ?? 'text'}
+                        {multiClient}
+                        onrun={(payload) => handleBlockRun(i, payload)}
+                      />
+                    {/if}
+                  </div>
                 {/each}
               </div>
 

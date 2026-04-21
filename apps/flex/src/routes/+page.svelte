@@ -3,7 +3,7 @@
   import { base } from '$app/paths';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { listSkills, encodeHyperSkill } from '@webmcp-auto-ui/sdk';
-  import type { Skill, HyperSkill } from '@webmcp-auto-ui/sdk';
+  import type { Skill, HyperSkill, RecipeData } from '@webmcp-auto-ui/sdk';
   import { McpMultiClient } from '@webmcp-auto-ui/core';
   import {
     RemoteLLMProvider, WasmProvider, TransformersProvider, LocalLLMProvider, runAgentLoop, buildSystemPrompt,
@@ -28,7 +28,6 @@
   import SettingsDrawer from '$lib/SettingsDrawer.svelte';
   import RecipeBrowser from '$lib/RecipeBrowser.svelte';
   import RecipeModal from '$lib/RecipeModal.svelte';
-  import type { RecipeData } from '@webmcp-auto-ui/sdk';
   import ToolBrowser from '$lib/ToolBrowser.svelte';
   import LogDrawer from '$lib/LogDrawer.svelte';
   import DebugPanel from '$lib/DebugPanel.svelte';
@@ -219,10 +218,51 @@
     }
   });
 
-  // Double-click on a trace node → open RecipeModal (get_recipe) or a JSON code block.
+  // Double-click on a trace node → spawn 1-2 detail widgets routed by node kind.
+  // Recipe detail modal, opened from dblclick when a tool call matches a loaded recipe.
   let detailRecipe = $state<RecipeData | null>(null);
   let detailOpen = $state(false);
-
+  let detailAnchor = $state<string | undefined>(undefined);
+  function asObj(v: unknown): Record<string, unknown> {
+    return v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
+  }
+  /**
+   * Look for the origin recipe of a given tool_call/tool_result by substring matching
+   * a piece of the tool args (sql / script) against bodies of recipes loaded during
+   * the run. Returns the first match (recipe name + body + the anchor text to locate).
+   */
+  function findRecipeAnchor(
+    detail: ReturnType<typeof traceObserver.getNodeDetail>,
+  ): { name: string; body: string; anchorText: string } | null {
+    if (!detail) return null;
+    const loaded = traceObserver.getLoadedRecipes();
+    if (loaded.size === 0) return null;
+    const args = asObj(detail.toolArgs);
+    const name = detail.toolName ?? '';
+    let needle: string | undefined;
+    if (name === 'query_sql' || /sql/i.test(name)) {
+      needle = (args.sql ?? args.query ?? args.statement) as string | undefined;
+    } else if (name === 'run_script') {
+      needle = (args.script ?? args.code) as string | undefined;
+    }
+    if (!needle || typeof needle !== 'string' || needle.trim().length < 10) return null;
+    const norm = (s: string): string => s.replace(/\s+/g, ' ').trim();
+    const needleN = norm(needle);
+    const probe = needleN.slice(0, 80);
+    for (const [rName, rBody] of loaded) {
+      if (norm(rBody).includes(probe)) {
+        return { name: rName, body: rBody, anchorText: needle.slice(0, 80) };
+      }
+    }
+    return null;
+  }
+  function extractRecipeBody(raw: string): string {
+    try {
+      const p = JSON.parse(raw);
+      if (p && typeof p === 'object' && typeof (p as any).content === 'string') return (p as any).content;
+    } catch { /* not JSON */ }
+    return raw;
+  }
   function onTraceNodeDblClick(ev: Event): void {
     const ce = ev as CustomEvent<{ nodeId: string; nodeData: Record<string, unknown> }>;
     const nodeId = ce.detail?.nodeId;
@@ -230,43 +270,96 @@
     const detail = traceObserver.getNodeDetail(nodeId);
     if (!detail) return;
 
-    const isToolNode = detail.kind === 'tool_call' || detail.kind === 'tool_result';
-    if (isToolNode && detail.toolName === 'get_recipe' && detail.toolResult) {
-      let body = detail.toolResult ?? '';
-      try {
-        const parsed = JSON.parse(body);
-        if (parsed && typeof parsed === 'object' && typeof parsed.content === 'string') {
-          body = parsed.content;
-        }
-      } catch { /* not JSON — keep raw text */ }
-      const args = (detail.toolArgs ?? {}) as Record<string, unknown>;
-      const name = typeof args.name === 'string' ? args.name : 'recipe';
-      detailRecipe = { name, description: '', body };
-      detailOpen = true;
+    const add = (type: string, data: Record<string, unknown>) =>
+      flexGrid?.addBlock(type, data, 'autoui', type);
+
+    // 1. tool_error (tool_result with toolError) → alert
+    if (detail.kind === 'tool_result' && detail.toolError) {
+      add('alert', {
+        title: `${detail.toolName ?? 'tool'} error`,
+        message: detail.toolError,
+        level: 'error',
+      });
       return;
     }
 
-    // Fallback: dump full detail as a JSON code block.
-    const payload: Record<string, unknown> = {
-      kind: detail.kind,
-      label: detail.label,
-    };
-    if (detail.toolName !== undefined) payload.toolName = detail.toolName;
-    if (detail.toolArgs !== undefined) payload.args = detail.toolArgs;
-    if (detail.toolResult !== undefined) payload.result = detail.toolResult;
-    if (detail.toolError !== undefined) payload.error = detail.toolError;
-    if (detail.latencyMs !== undefined) payload.latencyMs = detail.latencyMs;
-    if (detail.inputTokens !== undefined) payload.inputTokens = detail.inputTokens;
-    if (detail.outputTokens !== undefined) payload.outputTokens = detail.outputTokens;
-    if (detail.stopReason !== undefined) payload.stopReason = detail.stopReason;
-    if (detail.messageCount !== undefined) payload.messageCount = detail.messageCount;
-    if (detail.toolCount !== undefined) payload.toolCount = detail.toolCount;
-    flexGrid?.addBlock(
-      'code',
-      { content: JSON.stringify(payload, null, 2), lang: 'json' },
-      'autoui',
-      'code',
-    );
+    // 2. iteration → text with label
+    if (detail.kind === 'iteration') {
+      add('text', { content: `# ${detail.label ?? 'Iteration'}\n\nStart: ${new Date(detail.startMs).toLocaleTimeString()}` });
+      return;
+    }
+
+    // 3. llm_req → kv (counts) + code (prompt preview if available)
+    if (detail.kind === 'llm_req') {
+      add('kv', {
+        title: 'LLM request',
+        rows: [
+          ['messages', String(detail.messageCount ?? '?')],
+          ['tools', String(detail.toolCount ?? '?')],
+          ['iteration', String(detail.iteration ?? '?')],
+        ],
+      });
+      return;
+    }
+
+    // 4. llm_resp → code (stop reason) + stat (tokens/latency)
+    if (detail.kind === 'llm_resp') {
+      add('stat', {
+        label: `LLM · ${detail.stopReason ?? '?'}`,
+        value: `${detail.inputTokens ?? 0}in / ${detail.outputTokens ?? 0}out`,
+        trend: `${detail.latencyMs ?? 0}ms`,
+        trendDir: 'neutral',
+      });
+      return;
+    }
+
+    // 5. tool_call / tool_result — routed by toolName
+    if (detail.kind === 'tool_call' || detail.kind === 'tool_result') {
+      const name = detail.toolName ?? '';
+      const args = asObj(detail.toolArgs);
+
+      // 5a. get_recipe → code (markdown) with recipe body
+      if (name === 'get_recipe' && detail.toolResult) {
+        add('code', { lang: 'markdown', content: extractRecipeBody(detail.toolResult) });
+        return;
+      }
+
+      // 5ab. Origin recipe match — if this sql/script matches a previously loaded
+      // recipe body, open that recipe with a scroll+highlight to the match.
+      const originMatch = findRecipeAnchor(detail);
+      if (originMatch) {
+        detailRecipe = { name: originMatch.name, description: '', body: originMatch.body };
+        detailAnchor = originMatch.anchorText;
+        detailOpen = true;
+        return;
+      }
+
+      // 5b. SQL tool → code lang=sql with query
+      if (name === 'query_sql' || /sql/i.test(name)) {
+        const sql = (args.sql ?? args.query ?? args.statement ?? '') as string;
+        add('code', { lang: 'sql', content: String(sql) });
+        return;
+      }
+
+      // 5c. run_script → js-sandbox with the script
+      if (name === 'run_script') {
+        const script = (args.script ?? args.code ?? JSON.stringify(args, null, 2)) as string;
+        add('js-sandbox', { title: 'run_script', code: String(script), height: '300px' });
+        return;
+      }
+
+      // 5d. generic tool_call → json-viewer args + json-viewer result
+      add('json-viewer', { title: `${name} · args`, data: args, expanded: true });
+      if (detail.toolResult !== undefined) {
+        let resultValue: unknown = detail.toolResult;
+        try { resultValue = JSON.parse(detail.toolResult); } catch { /* keep string */ }
+        add('json-viewer', { title: `${name} · result`, data: resultValue, expanded: true });
+      }
+      return;
+    }
+
+    // Fallback: text with label
+    add('text', { content: detail.label ?? '(no detail)' });
   }
   let lastLoggedToolCount = $state(0);
   tokenTracker.subscribe(m => { tokenMetrics = m; });
@@ -1296,11 +1389,13 @@
 <!-- RECIPE BROWSER -->
 <RecipeBrowser bind:open={recipeBrowserOpen} {mcpRecipes} {webmcpRecipes} initialFilter={recipeBrowserFilter} {multiClient} />
 
-<!-- TRACE NODE DETAIL (reuses RecipeModal for get_recipe results) -->
+<!-- RECIPE DETAIL (opened from trace dblclick when a tool call matches a loaded recipe) -->
 <RecipeModal
   bind:open={detailOpen}
   recipe={detailRecipe}
-  onclose={() => { detailOpen = false; }}
+  anchorText={detailAnchor}
+  onclose={() => { detailOpen = false; detailAnchor = undefined; }}
   {multiClient}
 />
+
 <ToolBrowser bind:open={toolBrowserOpen} tools={browsableTools} initialFilter={toolBrowserFilter} />

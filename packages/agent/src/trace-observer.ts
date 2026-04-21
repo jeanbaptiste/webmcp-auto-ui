@@ -52,6 +52,8 @@ export interface TraceObserver {
   detach: () => void;
   /** Retrieve enriched detail for a trace node id (for mermaid.sequence rendering). */
   getNodeDetail: (nodeId: string) => RoundTripDetail | undefined;
+  /** Map of recipe name → body (markdown), accumulated from get_recipe tool results during the run. */
+  getLoadedRecipes: () => Map<string, string>;
 }
 
 type NodeKind =
@@ -172,6 +174,31 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
   // Per-node detail store, keyed by trace node id
   const nodeDetails = new Map<string, RoundTripDetail>();
+  // Accumulated recipe bodies loaded via get_recipe during the run (name → markdown body)
+  const loadedRecipes = new Map<string, string>();
+
+  /** Build a short, graph-friendly label for a tool_call node from tool name + args. */
+  function enrichToolLabel(toolName: string, args: unknown): string {
+    const a = (args && typeof args === 'object' ? args : {}) as Record<string, unknown>;
+    const sanitize = (s: string): string =>
+      s.replace(/\s+/g, ' ').replace(/"/g, '').trim();
+    const truncate = (s: string): string => (s.length > 40 ? s.slice(0, 40) + '…' : s);
+    let preview: string | undefined;
+    if (toolName === 'query_sql' || /sql/i.test(toolName)) {
+      const sql = (a.sql ?? a.query ?? a.statement) as unknown;
+      if (typeof sql === 'string') preview = sql;
+    } else if (toolName === 'run_script') {
+      const scr = (a.script ?? a.code ?? a.agentTask) as unknown;
+      if (typeof scr === 'string') preview = scr;
+    } else if (toolName === 'get_recipe' || toolName === 'search_recipes') {
+      const n = (a.name ?? a.query ?? a.id) as unknown;
+      if (typeof n === 'string') preview = n;
+    }
+    if (!preview) return toolName;
+    const clean = truncate(sanitize(preview));
+    if (!clean) return toolName;
+    return `${toolName}: ${clean}`;
+  }
 
   function nextId(kind: NodeKind): string {
     nodeIdCounter += 1;
@@ -446,11 +473,31 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
         addEdge(existingTraceId, resNode.id, Math.max(1, elapsed));
         addSankey('tool_call', 'tool_result', Math.max(1, elapsed));
         lastNodeByKind.tool_result = resNode.id;
+        // If this is a get_recipe result (no error), extract the recipe body and store it
+        // so dblclick handlers can match tool calls back to their origin recipe.
+        if (call.name === 'get_recipe' && !call.error && call.result !== undefined) {
+          try {
+            const rawStr = typeof call.result === 'string' ? call.result : JSON.stringify(call.result);
+            let body = rawStr;
+            try {
+              const parsed = JSON.parse(rawStr);
+              if (parsed && typeof parsed === 'object' && typeof (parsed as { content?: unknown }).content === 'string') {
+                body = (parsed as { content: string }).content;
+              }
+            } catch { /* not JSON — keep raw */ }
+            const a = (call.args && typeof call.args === 'object' ? call.args : {}) as Record<string, unknown>;
+            const name = (a.name ?? a.id) as unknown;
+            if (typeof name === 'string' && name.length > 0 && typeof body === 'string' && body.length > 0) {
+              loadedRecipes.set(name, body);
+            }
+          } catch { /* defensive — never break trace on recipe parse errors */ }
+        }
         scheduleFlush();
         return;
       }
       // First invocation — record the call
-      const node = addNode('tool_call', call.name, {
+      const enrichedLabel = enrichToolLabel(call.name, call.args);
+      const node = addNode('tool_call', enrichedLabel, {
         iterationId: currentIterationId,
         toolCallId: call.id,
         args: call.args,
@@ -544,6 +591,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
       toolCallIdMap.clear();
       toolCallStartMs.clear();
       nodeDetails.clear();
+      loadedRecipes.clear();
       iterationPalette = makeIterationPalette();
       if (flushTimer !== null) {
         clearTimeout(flushTimer);
@@ -575,6 +623,9 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
     },
     getNodeDetail(nodeId: string): RoundTripDetail | undefined {
       return nodeDetails.get(nodeId);
+    },
+    getLoadedRecipes(): Map<string, string> {
+      return loadedRecipes;
     },
   };
 }
