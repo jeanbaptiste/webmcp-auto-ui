@@ -159,12 +159,12 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
   // Point ONNX Runtime WASM binaries to the jsdelivr CDN so they're not bundled.
   // esm.sh hosts the JS modules; the native .wasm binaries are served by jsdelivr.
   try {
-    if (env?.backends?.onnx?.wasm) {
-      // ORT version is pinned by the transformers.js version we selected above.
-      const ortVersion = modelEntry.family === 'mistral'
-        ? '1.22.0-dev.20250409-89f8206ba4'
-        : '1.26.0-dev.20260410-5e55544225';
-      env.backends.onnx.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ortVersion}/dist/`;
+    if (env?.backends?.onnx?.wasm && modelEntry.family !== 'mistral') {
+      // Only override for 4.1.0 / ORT 1.26 (we host the matching .wasm binaries
+      // on jsdelivr). For the 3.8.1 path, ORT 1.22.0-dev is a transformers.js-
+      // internal build not mirrored on jsdelivr — let transformers.js use its
+      // default wasmPaths (which resolve against esm.sh, matching the JS bundle).
+      env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0-dev.20260410-5e55544225/dist/';
     }
     if (env) {
       env.allowLocalModels = false;

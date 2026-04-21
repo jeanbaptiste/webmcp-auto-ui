@@ -64,19 +64,28 @@ type NodeKind =
   | 'trace';
 
 /**
- * Shared palette — each kind of trace event gets a stable color across
- * all three views (cytoscape DAG, d3 tree, plotly sankey). Keep in sync
- * with any future renderer.
+ * Tree is the single source of truth for node color: d3's scaleOrdinal over
+ * schemeTableau10, indexed by the depth-1 ancestor name (= iteration label).
+ * We mirror it here byte-for-byte so cytoscape + sankey visually align with
+ * the tree. d3 ordinal assigns colors in INSERTION ORDER (first unseen key
+ * → palette[0], second → palette[1], …) — reproduce that with a Map.
  */
-const KIND_COLORS: Record<NodeKind, string> = {
-  iteration:   '#6366f1',  // indigo — iteration parents
-  llm_req:     '#3b82f6',  // blue
-  llm_resp:    '#0ea5e9',  // cyan
-  tool_call:   '#f59e0b',  // amber
-  tool_result: '#10b981',  // emerald
-  widget:      '#a855f7',  // purple
-  trace:       '#64748b',  // slate — noise / debug
-};
+const SCHEME_TABLEAU10: readonly string[] = [
+  '#4e79a7', '#f28e2c', '#e15759', '#76b7b2', '#59a14f',
+  '#edc949', '#af7aa1', '#ff9da7', '#9c755f', '#bab0ab',
+];
+const ROOT_COLOR = '#1e293b';
+
+function makeIterationPalette(): (label: string) => string {
+  const seen = new Map<string, string>();
+  return (label: string): string => {
+    const cached = seen.get(label);
+    if (cached) return cached;
+    const color = SCHEME_TABLEAU10[seen.size % SCHEME_TABLEAU10.length]!;
+    seen.set(label, color);
+    return color;
+  };
+}
 
 /** Cytoscape style override — clean typography, smaller arrows, palette by kind. */
 const CYTOSCAPE_STYLE: Array<Record<string, unknown>> = [
@@ -136,6 +145,21 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
   // Aggregated transitions keyed by `${fromKind}→${toKind}`
   let sankeyWeights = new Map<string, number>();
   let nodeIdCounter = 0;
+  let iterationPalette = makeIterationPalette();
+
+  /** Climb up meta.iterationId chain until we find the iteration node. */
+  function iterationAncestor(node: TraceNode): TraceNode | undefined {
+    if (node.kind === 'iteration') return node;
+    const iterId = node.meta.iterationId as string | undefined;
+    if (!iterId) return undefined;
+    return nodes.find((n) => n.id === iterId && n.kind === 'iteration');
+  }
+
+  function colorForNode(node: TraceNode): string {
+    const iter = iterationAncestor(node);
+    if (!iter) return ROOT_COLOR;
+    return iterationPalette(iter.label);
+  }
   let lastNodeByKind: Partial<Record<NodeKind, string>> = {};
   let currentIterationId: string | undefined;
   let currentLlmReqId: string | undefined;
@@ -200,7 +224,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
           id: n.id,
           label: `${n.kind}: ${n.label}`,
           kind: n.kind,
-          color: KIND_COLORS[n.kind],
+          color: colorForNode(n),
         },
       });
     }
@@ -213,24 +237,24 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
   function buildTreeData(): Record<string, unknown> {
     interface TreeNode {
       name: string;
-      color?: string;
+      nodeId?: string;
       children?: TreeNode[];
     }
-    const root: TreeNode = { name: 'conv', color: '#1e293b', children: [] };
+    // No `color` field — tree widget owns its palette (source of truth).
+    const root: TreeNode = { name: 'conv', children: [] };
     const iterNodes = nodes.filter((n) => n.kind === 'iteration');
     for (const iter of iterNodes) {
       const iterChild: TreeNode = {
         name: iter.label,
-        color: KIND_COLORS.iteration,
+        nodeId: iter.id,
         children: [],
       };
-      // Collect children of this iteration: nodes with meta.iterationId === iter.id
       for (const n of nodes) {
         if (n.id === iter.id) continue;
         if (n.meta.iterationId === iter.id) {
           iterChild.children!.push({
             name: `${n.kind}: ${n.label}`,
-            color: KIND_COLORS[n.kind],
+            nodeId: n.id,
           });
         }
       }
@@ -240,33 +264,31 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
   }
 
   function buildSankeyData(): Record<string, unknown> {
-    // Unique kinds appearing in transitions
-    const labelSet = new Set<string>();
-    const transitions: Array<{ from: string; to: string; weight: number }> = [];
-    for (const [key, weight] of sankeyWeights.entries()) {
-      const [from, to] = key.split('→');
-      if (!from || !to) continue;
-      labelSet.add(from);
-      labelSet.add(to);
-      transitions.push({ from, to, weight });
+    // autoui.sankey shape: { nodes: [{id,label,color}], links: [{source,target,value,color}] }
+    // where source/target are node ids (strings), not indexes.
+    // Build per-trace-node sankey where links flow from source trace node to target trace node.
+    const presentIds = new Set<string>();
+    for (const e of edges) {
+      presentIds.add(e.from);
+      presentIds.add(e.to);
     }
-    const labels = Array.from(labelSet);
-    const indexOf = (k: string): number => labels.indexOf(k);
-    const source: number[] = [];
-    const target: number[] = [];
-    const value: number[] = [];
-    const linkColor: string[] = [];
-    for (const t of transitions) {
-      source.push(indexOf(t.from));
-      target.push(indexOf(t.to));
-      value.push(t.weight);
-      linkColor.push(KIND_COLORS[t.from as NodeKind] ?? '#64748b');
-    }
-    const nodeColor = labels.map((k) => KIND_COLORS[k as NodeKind] ?? '#64748b');
-    return {
-      nodes: { label: labels, color: nodeColor },
-      links: { source, target, value, color: linkColor },
-    };
+    const sankeyNodes = nodes
+      .filter((n) => presentIds.has(n.id))
+      .map((n) => ({
+        id: n.id,
+        label: `${n.kind}: ${n.label}`,
+        color: colorForNode(n),
+      }));
+    const sankeyLinks = edges.map((e) => {
+      const src = nodes.find((n) => n.id === e.from);
+      return {
+        source: e.from,
+        target: e.to,
+        value: e.weight,
+        color: src ? colorForNode(src) : ROOT_COLOR,
+      };
+    });
+    return { nodes: sankeyNodes, links: sankeyLinks };
   }
 
   function flush(): void {
@@ -465,7 +487,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
       if (ids !== null) return ids;
       const dag = ctx.addWidget('animated-flow', buildCytoscapeData(), 'cytoscape');
       const tree = ctx.addWidget('tree', buildTreeData(), 'd3');
-      const sankey = ctx.addWidget('plotly-sankey', buildSankeyData(), 'plotly');
+      const sankey = ctx.addWidget('sankey', buildSankeyData(), 'autoui');
       if (!dag || !tree || !sankey) return null;
       ids = { dagId: dag.id, treeId: tree.id, sankeyId: sankey.id };
       // Synchronous immediate flush — guarantees widgets reflect full buffer

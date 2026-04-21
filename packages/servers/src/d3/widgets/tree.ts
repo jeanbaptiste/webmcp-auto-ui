@@ -120,8 +120,9 @@ export async function render(
       .append('circle')
       .attr('r', 5)
       .attr('fill', (d) => {
-        // Honor per-node `color` override (used by the trace-observer palette).
-        if (d.data?.color) return d.data.color;
+        // Tree is the source of truth for color: always color by depth-1 ancestor
+        // (iteration) via the ordinal scale. Other renderers (cytoscape, sankey)
+        // mirror this palette keyed on the iteration label.
         let node = d;
         while (node.depth > 1) node = node.parent;
         return colors(node.data.name);
@@ -136,6 +137,17 @@ export async function render(
       .attr('text-anchor', (d) => (d.children ? 'end' : 'start'))
       .style('font-size', '11px')
       .text((d) => d.data.name);
+
+    nodes.on('dblclick', (event, d) => {
+      event.stopPropagation();
+      container.dispatchEvent(new CustomEvent('widget:node-dblclick', {
+        detail: {
+          nodeId: d.data?.nodeId ?? d.data?.id ?? d.data?.name,
+          nodeData: d.data,
+        },
+        bubbles: true,
+      }));
+    });
 
     nodes
       .on('mouseenter', function (event, d) {

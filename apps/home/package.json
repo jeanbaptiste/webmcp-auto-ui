@@ -12,7 +12,6 @@
   "dependencies": {
     "@webmcp-auto-ui/core": "file:../../packages/core",
     "@webmcp-auto-ui/ui": "file:../../packages/ui",
-    "@webmcp-auto-ui/agent": "file:../../packages/agent",
     "@webmcp-auto-ui/sdk": "file:../../packages/sdk"
   },
   "devDependencies": {
