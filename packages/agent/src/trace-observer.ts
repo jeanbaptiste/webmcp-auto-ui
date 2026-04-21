@@ -39,6 +39,7 @@ export interface RoundTripDetail {
   latencyMs?: number;
   stopReason?: string;
   iteration?: number;
+  originRecipe?: string;
 }
 
 export interface TraceObserver {
@@ -54,6 +55,8 @@ export interface TraceObserver {
   getNodeDetail: (nodeId: string) => RoundTripDetail | undefined;
   /** Map of recipe name → body (markdown), accumulated from get_recipe tool results during the run. */
   getLoadedRecipes: () => Map<string, string>;
+  /** Current recipe context: name of the most recently loaded recipe via get_recipe, or undefined. */
+  getCurrentRecipeContext: () => string | undefined;
 }
 
 type NodeKind =
@@ -176,6 +179,10 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
   const nodeDetails = new Map<string, RoundTripDetail>();
   // Accumulated recipe bodies loaded via get_recipe during the run (name → markdown body)
   const loadedRecipes = new Map<string, string>();
+  // Name of the most recently loaded recipe via get_recipe. Not reset at iteration
+  // boundaries — a recipe loaded in iter N can legitimately guide tool calls in iter N+1
+  // (cascade of scripts). Only updated when another get_recipe succeeds.
+  let currentRecipeContext: string | undefined = undefined;
 
   /** Build a short, graph-friendly label for a tool_call node from tool name + args.
    *  Uses a tool-specific emoji so small graph nodes remain legible. */
@@ -455,6 +462,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
       // Create the tool_call node (with args) and, if the call has completed
       // (result or error present), also emit the tool_result node and populate
       // loadedRecipes in one shot.
+      const isGetRecipe = call.name === 'get_recipe' || call.name.endsWith('_get_recipe');
       let traceId = toolCallIdMap.get(call.id);
       if (!traceId) {
         const enrichedLabel = enrichToolLabel(call.name, call.args);
@@ -465,13 +473,18 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
         });
         toolCallIdMap.set(call.id, node.id);
         toolCallStartMs.set(call.id, node.startMs);
-        nodeDetails.set(node.id, {
+        const callDetail: RoundTripDetail = {
           kind: 'tool_call',
           label: node.label,
           startMs: node.startMs,
           toolName: call.name,
           toolArgs: call.args,
-        });
+        };
+        // Tag origin recipe (except on get_recipe itself — no self-reference)
+        if (!isGetRecipe && currentRecipeContext) {
+          callDetail.originRecipe = currentRecipeContext;
+        }
+        nodeDetails.set(node.id, callDetail);
         if (currentLlmRespId) {
           addEdge(currentLlmRespId, node.id);
           addSankey('llm_resp', 'tool_call');
@@ -495,7 +508,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
           error: call.error,
         });
         resNode.endMs = Date.now();
-        nodeDetails.set(resNode.id, {
+        const resultDetail: RoundTripDetail = {
           kind: 'tool_result',
           label: resNode.label,
           startMs: resNode.startMs,
@@ -504,7 +517,11 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
           toolResult: resultStr,
           toolError: call.error,
           latencyMs: elapsed,
-        });
+        };
+        if (!isGetRecipe && currentRecipeContext) {
+          resultDetail.originRecipe = currentRecipeContext;
+        }
+        nodeDetails.set(resNode.id, resultDetail);
         const prior = nodeDetails.get(traceId);
         if (prior) {
           prior.endMs = resNode.endMs;
@@ -529,6 +546,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
             const name = (a.name ?? a.id) as unknown;
             if (typeof name === 'string' && name.length > 0 && body.length > 0) {
               loadedRecipes.set(name, body);
+              currentRecipeContext = name;
             }
           } catch { /* defensive */ }
         }
@@ -608,6 +626,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
       toolCallStartMs.clear();
       nodeDetails.clear();
       loadedRecipes.clear();
+      currentRecipeContext = undefined;
       iterationPalette = makeIterationPalette();
       if (flushTimer !== null) {
         clearTimeout(flushTimer);
@@ -642,6 +661,9 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
     },
     getLoadedRecipes(): Map<string, string> {
       return loadedRecipes;
+    },
+    getCurrentRecipeContext(): string | undefined {
+      return currentRecipeContext;
     },
   };
 }

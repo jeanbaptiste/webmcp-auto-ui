@@ -239,6 +239,19 @@
     if (!detail) return null;
     const loaded = traceObserver.getLoadedRecipes();
     if (loaded.size === 0) return null;
+    // Preferred: use the explicit origin recipe tagged by the trace observer
+    if (detail.originRecipe) {
+      const body = loaded.get(detail.originRecipe);
+      if (body) {
+        const a = asObj(detail.toolArgs);
+        const sqlOrScript = (a.sql ?? a.query ?? a.statement ?? a.script ?? a.code) as string | undefined;
+        const anchor = typeof sqlOrScript === 'string' && sqlOrScript.trim().length >= 10
+          ? sqlOrScript.trim().split(/\s+/).slice(0, 6).join(' ')
+          : '';
+        console.log('[trace-anchor] using explicit originRecipe:', detail.originRecipe);
+        return { name: detail.originRecipe, body, anchorText: anchor };
+      }
+    }
     const args = asObj(detail.toolArgs);
     const name = detail.toolName ?? '';
     const ends = (s: string): boolean => name === s || name.endsWith('_' + s);
@@ -1057,7 +1070,10 @@
             allToolsUsed = [...allToolsUsed, call.name];
             const argsJson = JSON.stringify(call.args, null, 2);
             const resultFull = call.result ?? call.error ?? '';
-            agentLogs = [...agentLogs, { ts: Date.now(), type: 'tool', detail: `${call.name}(${argsJson}) -> ${resultFull} [${call.elapsed ?? '?'}ms]` }];
+            const isGetRecipeTool = call.name === 'get_recipe' || call.name.endsWith('_get_recipe');
+            const originCtx = traceObserver.getCurrentRecipeContext();
+            const fromSuffix = !isGetRecipeTool && originCtx ? ` [from: ${originCtx}]` : '';
+            agentLogs = [...agentLogs, { ts: Date.now(), type: 'tool', detail: `${call.name}(${argsJson}) -> ${resultFull} [${call.elapsed ?? '?'}ms]${fromSuffix}` }];
             if (/(^|_)get_recipe$/.test(call.name) && !call.error) {
               const a = call.args as Record<string, unknown> | undefined;
               const rid = (typeof a?.id === 'string' && a.id) || (typeof a?.name === 'string' && a.name)
