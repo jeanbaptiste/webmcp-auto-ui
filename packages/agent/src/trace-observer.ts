@@ -185,26 +185,27 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
       s.replace(/\s+/g, ' ').replace(/"/g, '').trim();
     const truncate = (s: string): string => (s.length > 40 ? s.slice(0, 40) + '…' : s);
     let emoji = '🔧';
+    let kind = toolName;
     let preview: string | undefined;
     if (toolName === 'query_sql' || /sql/i.test(toolName)) {
-      emoji = '🗃️';
+      emoji = '🗃️'; kind = 'sql';
       const sql = (a.sql ?? a.query ?? a.statement) as unknown;
       if (typeof sql === 'string') preview = sql;
     } else if (toolName === 'run_script') {
-      emoji = '⚙️';
+      emoji = '⚙️'; kind = 'script';
       const scr = (a.script ?? a.code ?? a.agentTask) as unknown;
       if (typeof scr === 'string') preview = scr;
     } else if (toolName === 'get_recipe') {
-      emoji = '📖';
+      emoji = '📖'; kind = 'recipe';
       const n = (a.name ?? a.id) as unknown;
       if (typeof n === 'string') preview = n;
     } else if (toolName === 'search_recipes') {
-      emoji = '🔍';
+      emoji = '🔍'; kind = 'search';
       const n = (a.query ?? a.name) as unknown;
       if (typeof n === 'string') preview = n;
     }
     const body = preview ? truncate(sanitize(preview)) : '';
-    return body ? `${emoji} ${body}` : `${emoji} ${toolName}`;
+    return body ? `${emoji} ${kind}: ${body}` : `${emoji} ${kind}`;
   }
 
   function nextId(kind: NodeKind): string {
