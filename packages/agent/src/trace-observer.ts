@@ -205,7 +205,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
       if (typeof n === 'string') preview = n;
     }
     const body = preview ? truncate(sanitize(preview)) : '';
-    return body ? `${emoji} ${kind}: ${body}` : `${emoji} ${kind}`;
+    return body ? `${emoji} 【${kind}】 ${body}` : `${emoji} 【${kind}】`;
   }
 
   function nextId(kind: NodeKind): string {
