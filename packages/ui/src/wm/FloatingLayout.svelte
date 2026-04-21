@@ -125,6 +125,7 @@
 
   function resizeStart(id: string, e: MouseEvent) {
     e.stopPropagation();
+    e.preventDefault();
     rdrag = id; rsx = e.clientX; rsy = e.clientY;
     const lw = lmap.get(id); rww = lw?.width ?? defaultWidth; rwh = lw?.height ?? defaultHeight;
     focus(id);
@@ -181,6 +182,7 @@
     <!-- ── Desktop: scrollable floating canvas ─────────────────────────────── -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="absolute inset-0 overflow-auto"
+         class:select-none={drag !== null || rdrag !== null}
          onmousemove={mm} onmouseup={mu} onmouseleave={mu}>
       <div class="relative" style="width:{canvasW}px;height:{canvasH}px;">
         {#each windows as win (win.id)}
