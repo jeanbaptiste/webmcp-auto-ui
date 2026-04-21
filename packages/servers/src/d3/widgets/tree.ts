@@ -120,6 +120,8 @@ export async function render(
       .append('circle')
       .attr('r', 5)
       .attr('fill', (d) => {
+        // Honor per-node `color` override (used by the trace-observer palette).
+        if (d.data?.color) return d.data.color;
         let node = d;
         while (node.depth > 1) node = node.parent;
         return colors(node.data.name);

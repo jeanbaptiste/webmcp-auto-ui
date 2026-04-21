@@ -63,6 +63,56 @@ type NodeKind =
   | 'widget'
   | 'trace';
 
+/**
+ * Shared palette — each kind of trace event gets a stable color across
+ * all three views (cytoscape DAG, d3 tree, plotly sankey). Keep in sync
+ * with any future renderer.
+ */
+const KIND_COLORS: Record<NodeKind, string> = {
+  iteration:   '#6366f1',  // indigo — iteration parents
+  llm_req:     '#3b82f6',  // blue
+  llm_resp:    '#0ea5e9',  // cyan
+  tool_call:   '#f59e0b',  // amber
+  tool_result: '#10b981',  // emerald
+  widget:      '#a855f7',  // purple
+  trace:       '#64748b',  // slate — noise / debug
+};
+
+/** Cytoscape style override — clean typography, smaller arrows, palette by kind. */
+const CYTOSCAPE_STYLE: Array<Record<string, unknown>> = [
+  {
+    selector: 'node',
+    style: {
+      'background-color': 'data(color)',
+      'label': 'data(label)',
+      'color': '#1e293b',
+      'font-size': '11px',
+      'font-family': 'Inter, system-ui, sans-serif',
+      'text-valign': 'center',
+      'text-halign': 'center',
+      'text-outline-width': 0,
+      'text-outline-color': 'transparent',
+      'border-width': 1,
+      'border-color': '#64748b',
+      'width': 28,
+      'height': 28,
+    },
+  },
+  {
+    selector: 'edge',
+    style: {
+      'width': 1.5,
+      'line-color': '#94a3b8',
+      'target-arrow-color': '#94a3b8',
+      'target-arrow-shape': 'triangle',
+      'arrow-scale': 0.6,
+      'curve-style': 'bezier',
+      'line-style': 'dashed',
+      'line-dash-pattern': [6, 3],
+    },
+  },
+];
+
 interface TraceNode {
   id: string;
   kind: NodeKind;
@@ -145,28 +195,43 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
   function buildCytoscapeData(): Record<string, unknown> {
     const elements: Array<{ data: Record<string, unknown> }> = [];
     for (const n of nodes) {
-      elements.push({ data: { id: n.id, label: `${n.kind}: ${n.label}` } });
+      elements.push({
+        data: {
+          id: n.id,
+          label: `${n.kind}: ${n.label}`,
+          kind: n.kind,
+          color: KIND_COLORS[n.kind],
+        },
+      });
     }
     for (const e of edges) {
       elements.push({ data: { source: e.from, target: e.to, flow: e.weight } });
     }
-    return { elements };
+    return { elements, style: CYTOSCAPE_STYLE, layout: { name: 'cose', animate: true } };
   }
 
   function buildTreeData(): Record<string, unknown> {
     interface TreeNode {
       name: string;
+      color?: string;
       children?: TreeNode[];
     }
-    const root: TreeNode = { name: 'conv', children: [] };
+    const root: TreeNode = { name: 'conv', color: '#1e293b', children: [] };
     const iterNodes = nodes.filter((n) => n.kind === 'iteration');
     for (const iter of iterNodes) {
-      const iterChild: TreeNode = { name: iter.label, children: [] };
+      const iterChild: TreeNode = {
+        name: iter.label,
+        color: KIND_COLORS.iteration,
+        children: [],
+      };
       // Collect children of this iteration: nodes with meta.iterationId === iter.id
       for (const n of nodes) {
         if (n.id === iter.id) continue;
         if (n.meta.iterationId === iter.id) {
-          iterChild.children!.push({ name: `${n.kind}: ${n.label}` });
+          iterChild.children!.push({
+            name: `${n.kind}: ${n.label}`,
+            color: KIND_COLORS[n.kind],
+          });
         }
       }
       root.children!.push(iterChild);
@@ -190,14 +255,17 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
     const source: number[] = [];
     const target: number[] = [];
     const value: number[] = [];
+    const linkColor: string[] = [];
     for (const t of transitions) {
       source.push(indexOf(t.from));
       target.push(indexOf(t.to));
       value.push(t.weight);
+      linkColor.push(KIND_COLORS[t.from as NodeKind] ?? '#64748b');
     }
+    const nodeColor = labels.map((k) => KIND_COLORS[k as NodeKind] ?? '#64748b');
     return {
-      nodes: { label: labels },
-      links: { source, target, value },
+      nodes: { label: labels, color: nodeColor },
+      links: { source, target, value, color: linkColor },
     };
   }
 
@@ -423,14 +491,18 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
         flushTimer = null;
       }
       if (ids !== null) {
-        ctx.updateWidget(ids.dagId, { elements: [] });
+        ctx.updateWidget(ids.dagId, {
+          elements: [],
+          style: CYTOSCAPE_STYLE,
+          layout: { name: 'cose', animate: true },
+        });
         ctx.updateWidget(ids.treeId, {
-          root: { name: 'conv', children: [] },
+          root: { name: 'conv', color: '#1e293b', children: [] },
           orientation: 'horizontal',
         });
         ctx.updateWidget(ids.sankeyId, {
-          nodes: { label: [] },
-          links: { source: [], target: [], value: [] },
+          nodes: { label: [], color: [] },
+          links: { source: [], target: [], value: [], color: [] },
         });
       }
     },
