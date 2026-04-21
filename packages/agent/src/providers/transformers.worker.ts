@@ -336,10 +336,11 @@ async function handleGenerate(
     max_new_tokens: options.maxTokens ?? 2048,
     do_sample: true,
     return_dict_in_generate: true,
-    // Disable internal KV cache — Mistral3/Gemma4 SWA layers exhibit
-    // mask-vs-score shape desync (Where broadcast dim 3) in tjs 4.1.0
-    // when the cache is used across iterations with a full-prompt flow.
-    use_cache: false,
+    // Keep the intra-generate KV cache (O(n) per token vs O(n²)). The SWA
+    // desync bug only manifested when past_key_values were reused ACROSS
+    // generate() calls, which we now prevent via disposePastKeyValues()
+    // before each call.
+    use_cache: true,
     // Sampling defaults — without these transformers.js degenerates into
     // single-token loops ("Salut! Salut! Salut!...") on Qwen3 especially.
     temperature: typeof options.temperature === 'number' ? options.temperature : 0.7,
