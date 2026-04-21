@@ -1,5 +1,7 @@
 // Mistral/Ministral prompt builder — FLEX 5-STEP template adapted to Mistral tool-call format.
-// The [INST]/[/INST] tags are added by the worker; this builder returns only system-message TEXT.
+// The [INST]/[/INST] tags are added by tokenizer.apply_chat_template in the
+// worker, using the chat_template baked into Mistral's tokenizer_config.json.
+// This builder returns only the system-message TEXT content.
 
 import type { PromptRefs } from './tool-refs.js';
 

@@ -20,9 +20,12 @@ import {
   type TransformersModelEntry,
   type TransformersFamily,
 } from './transformers-models.js';
-import { buildGemmaPrompt } from '../prompts/gemma4-prompt-builder.js';
-// The qwen / mistral prompt builders are resolved lazily inside buildPrompt so
-// that the bundle only drags the one that matches the active promptKind.
+import { buildGemmaPrompt, formatToolCall, formatToolResponse } from '../prompts/gemma4-prompt-builder.js';
+// Qwen and Mistral no longer need dedicated prompt builders on the main thread:
+// the worker delegates ChatML / [INST] templating to tokenizer.apply_chat_template
+// using the chat_template baked into each model's tokenizer_config.json. We still
+// ship the FLEX system text (produced upstream by buildSystemPromptWithAliases)
+// as the system turn.
 
 export type TransformersStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -229,36 +232,74 @@ export class TransformersProvider implements LLMProvider {
     return undefined;
   }
 
-  private buildPrompt(messages: ChatMessage[], systemPrompt: string | undefined): string {
-    switch (this.promptKind) {
-      case 'gemma':
-        return buildGemmaPrompt({ systemPrompt, messages });
-      case 'qwen': {
-        // Lazy require — the builder may not exist yet at build time.
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const mod = require('../prompts/qwen-prompt-builder.js');
-          const build = mod.buildQwenPrompt ?? mod.default;
-          return build({ systemPrompt, messages });
-        } catch {
-          // Fallback: bare concatenation so the worker still sees the system
-          // prompt text; ChatML tagging happens worker-side.
-          return [systemPrompt, ...messages.map(m => typeof m.content === 'string' ? m.content : '')]
-            .filter(Boolean).join('\n\n');
-        }
+  /**
+   * Flatten a ChatMessage[] into a role/content array suitable for
+   * tokenizer.apply_chat_template in the worker. Tool calls and tool results
+   * are rendered as textual spans using the wire format the model expects:
+   *   - Qwen (ChatML): <tool_call>{json}</tool_call> and
+   *                    <tool_response>{json}</tool_response>
+   *   - Mistral:       [TOOL_CALLS][{json}] and
+   *                    [TOOL_RESULTS] {json} [/TOOL_RESULTS]
+   * The actual role tags (<|im_start|>user\n…<|im_end|>, [INST]…[/INST]) are
+   * added by apply_chat_template from the model's baked-in chat_template.
+   */
+  private serializeMessagesForTemplate(messages: ChatMessage[]): Array<{ role: string; content: string }> {
+    const out: Array<{ role: string; content: string }> = [];
+    const kind = this.promptKind;
+    for (const msg of messages) {
+      const role = msg.role; // 'user' | 'assistant' | 'system'
+      if (typeof msg.content === 'string') {
+        out.push({ role, content: msg.content });
+        continue;
       }
-      case 'mistral': {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          const mod = require('../prompts/mistral-prompt-builder.js');
-          const build = mod.buildMistralPrompt ?? mod.default;
-          return build({ systemPrompt, messages });
-        } catch {
-          return [systemPrompt, ...messages.map(m => typeof m.content === 'string' ? m.content : '')]
-            .filter(Boolean).join('\n\n');
+      const segments: string[] = [];
+      let toolResultBuf: string[] = [];
+      const flushToolResults = () => {
+        if (toolResultBuf.length === 0) return;
+        if (kind === 'qwen') {
+          // Qwen's ChatML tool-response form, embedded in a user turn.
+          for (const tr of toolResultBuf) {
+            segments.push(`<tool_response>\n${tr}\n</tool_response>`);
+          }
+        } else if (kind === 'mistral') {
+          for (const tr of toolResultBuf) {
+            segments.push(`[TOOL_RESULTS] ${tr} [/TOOL_RESULTS]`);
+          }
+        } else {
+          // Gemma path won't use this serializer (we still use buildGemmaPrompt)
+          for (const tr of toolResultBuf) segments.push(formatToolResponse(tr));
         }
+        toolResultBuf = [];
+      };
+      for (const block of msg.content as ContentBlock[]) {
+        if (block.type === 'text') {
+          segments.push(block.text);
+        } else if (block.type === 'tool_use') {
+          if (kind === 'qwen') {
+            segments.push(`<tool_call>\n${JSON.stringify({ name: block.name, arguments: block.input })}\n</tool_call>`);
+          } else if (kind === 'mistral') {
+            segments.push(`[TOOL_CALLS][${JSON.stringify({ name: block.name, arguments: block.input })}]`);
+          } else {
+            segments.push(formatToolCall(block.name, block.input));
+          }
+        } else if (block.type === 'tool_result') {
+          toolResultBuf.push(block.content);
+        }
+        // 'image' blocks are not reachable here: vision turns go through the
+        // legacy `prompt` path in chat().
       }
+      flushToolResults();
+      // Tool results in the protocol travel as a 'tool' role for Qwen, or a
+      // follow-up user turn for Mistral. We keep the producer role for
+      // non-tool assistant turns; for turns that only carry tool_result
+      // blocks we promote them to 'tool' (Qwen) or 'user' (Mistral).
+      const onlyToolResult = (msg.content as ContentBlock[]).every(b => b.type === 'tool_result');
+      const effectiveRole = onlyToolResult && role === 'user'
+        ? (kind === 'qwen' ? 'tool' : 'user')
+        : role;
+      out.push({ role: effectiveRole, content: segments.join('\n') });
     }
+    return out;
   }
 
   async chat(
@@ -277,8 +318,24 @@ export class TransformersProvider implements LLMProvider {
     if (this.status !== 'ready') await this.initialize();
     const worker = this.ensureWorker();
 
-    const prompt = this.buildPrompt(messages, options?.system);
     const image = this.entry.vision ? this.extractImageFromLastUserMessage(messages) : undefined;
+    const systemText = options?.system;
+
+    // Gemma uses its own custom wire format (turns, tool_call, tool_response
+    // tagged with the "<|turn>…<turn|>" family). That format is not a HF
+    // chat_template, so we build the full prompt string on the main thread
+    // and send it via the legacy `prompt` field. Qwen / Mistral go through
+    // tokenizer.apply_chat_template inside the worker (the worker then hands
+    // the templated string to processor(prompt, image) for VLM vision turns).
+    let prompt: string | undefined;
+    let chatMessages: Array<{ role: string; content: string }> | undefined;
+    if (this.promptKind === 'gemma') {
+      prompt = buildGemmaPrompt({ systemPrompt: systemText, messages });
+    } else {
+      chatMessages = [];
+      if (systemText) chatMessages.push({ role: 'system', content: systemText });
+      chatMessages.push(...this.serializeMessagesForTemplate(messages));
+    }
     const requestId = this.nextRequestId();
 
     return new Promise<LLMResponse>((resolve, reject) => {
@@ -302,13 +359,14 @@ export class TransformersProvider implements LLMProvider {
       const message: Record<string, unknown> = {
         type: 'generate',
         requestId,
-        prompt,
         options: {
           maxTokens: options?.maxTokens ?? 2048,
           temperature: options?.temperature,
           topK: options?.topK,
         },
       };
+      if (prompt !== undefined) message.prompt = prompt;
+      if (chatMessages) message.chatMessages = chatMessages;
       if (image) message.image = image;
       worker.postMessage(message);
     });

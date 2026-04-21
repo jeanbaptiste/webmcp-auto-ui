@@ -1,6 +1,8 @@
 // Qwen 3/3.5 prompt builder — FLEX 5-STEP template adapted to ChatML syntax.
-// The ChatML tags (<|im_start|>system\n...\n<|im_end|>) are added by the worker;
-// this builder returns only the system-message TEXT content.
+// The ChatML role tags (<|im_start|>system\n...\n<|im_end|>) are added by
+// tokenizer.apply_chat_template in the worker, using the chat_template baked
+// into Qwen's tokenizer_config.json. This builder returns only the
+// system-message TEXT content.
 
 import type { PromptRefs } from './tool-refs.js';
 

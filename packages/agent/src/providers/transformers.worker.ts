@@ -4,7 +4,14 @@
  *
  * Protocol (see transformers.ts for the main-thread side):
  *   main → worker: { type: 'load', modelId, entry, contextSize }
- *   main → worker: { type: 'generate', requestId, prompt, options, image? }
+ *   main → worker: { type: 'generate', requestId, options,
+ *                    prompt?, chatMessages?, image? }
+ *     - `prompt` is a pre-built string (Gemma wire format). Used as-is.
+ *     - `chatMessages` is a [{role, content}] array that the worker feeds to
+ *       tokenizer.apply_chat_template (Qwen / Mistral native chat_template).
+ *     - For vision turns, `image` is attached; for Qwen/Mistral VLMs the
+ *       worker applies the chat_template first, then passes the string to
+ *       processor(prompt, raw).
  *   main → worker: { type: 'abort', requestId }
  *   main → worker: { type: 'dispose' }
  *
@@ -290,7 +297,8 @@ interface GenerateOptions {
 
 async function handleGenerate(
   requestId: string,
-  prompt: string,
+  prompt: string | undefined,
+  chatMessages: Array<{ role: string; content: string }> | undefined,
   options: GenerateOptions,
   image?: Uint8Array,
 ): Promise<void> {
@@ -302,6 +310,29 @@ async function handleGenerate(
   activeRequestId = requestId;
 
   const { TextStreamer, RawImage } = transformersMod;
+
+  // If the main thread sent chatMessages, apply the tokenizer's native
+  // chat_template (Jinja) now. This is how Qwen3 and Mistral produce correctly
+  // tagged prompts (<|im_start|>user … / [INST] …). Falling back to the raw
+  // string lets the Gemma path (custom wire format) keep working unchanged.
+  let effectivePrompt: string;
+  if (chatMessages && tokenizer && typeof tokenizer.apply_chat_template === 'function') {
+    try {
+      effectivePrompt = tokenizer.apply_chat_template(chatMessages, {
+        tokenize: false,
+        add_generation_prompt: true,
+      });
+    } catch (err) {
+      post({ type: 'warning', message: `apply_chat_template failed, falling back to raw concat: ${String(err)}` });
+      effectivePrompt = chatMessages.map(m => `${m.role}: ${m.content}`).join('\n\n');
+    }
+  } else if (typeof prompt === 'string') {
+    effectivePrompt = prompt;
+  } else {
+    post({ type: 'error', requestId, message: 'generate requires either prompt or chatMessages' });
+    activeRequestId = null;
+    return;
+  }
 
   const t0 = performance.now();
   let tokenCount = 0;
@@ -333,13 +364,13 @@ async function handleGenerate(
       const blob = new Blob([image]);
       const raw: any = await RawImage.read(blob);
       try { raw.resize?.(448, 448); } catch {}
-      inputs = await processor(prompt, raw);
+      inputs = await processor(effectivePrompt, raw);
     } else if (tokenizer) {
       // Text-only turn — always go through the tokenizer, even on a VLM.
       // VLM processors (Qwen3.5, Mistral3, Gemma4) expect messages-with-content-
       // blocks rather than a plain prompt string, so calling processor(prompt)
       // throws "X is not iterable" on the template path.
-      inputs = await tokenizer(prompt, { return_tensors: 'pt' });
+      inputs = await tokenizer(effectivePrompt, { return_tensors: 'pt' });
     } else {
       post({ type: 'error', requestId, message: 'no tokenizer/processor available' });
       activeRequestId = null;
@@ -478,10 +509,12 @@ self.addEventListener('message', async (ev: MessageEvent) => {
       }
       case 'generate': {
         const requestId: string = msg.requestId;
-        const prompt: string = msg.prompt ?? '';
+        const prompt: string | undefined = typeof msg.prompt === 'string' ? msg.prompt : undefined;
+        const chatMessages: Array<{ role: string; content: string }> | undefined =
+          Array.isArray(msg.chatMessages) ? msg.chatMessages : undefined;
         const options: GenerateOptions = msg.options ?? {};
         const image: Uint8Array | undefined = msg.image instanceof Uint8Array ? msg.image : undefined;
-        await handleGenerate(requestId, prompt, options, image);
+        await handleGenerate(requestId, prompt, chatMessages, options, image);
         return;
       }
       case 'abort': {
