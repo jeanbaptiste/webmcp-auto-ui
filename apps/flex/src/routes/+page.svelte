@@ -341,10 +341,10 @@
         return;
       }
 
-      // 5c. run_script → js-sandbox with the script
+      // 5c. run_script → code lang=javascript with the script
       if (name === 'run_script') {
-        const script = (args.script ?? args.code ?? JSON.stringify(args, null, 2)) as string;
-        add('js-sandbox', { title: 'run_script', code: String(script), height: '300px' });
+        const script = args.script ?? args.code ?? args.agentTask ?? JSON.stringify(args, null, 2);
+        add('code', { lang: 'javascript', content: String(script) });
         return;
       }
 

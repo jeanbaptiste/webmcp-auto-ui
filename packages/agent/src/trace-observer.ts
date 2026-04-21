@@ -281,7 +281,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
       elements.push({
         data: {
           id: n.id,
-          label: `${n.kind}: ${n.label}`,
+          label: n.label,
           kind: n.kind,
           color: colorForNode(n),
           summary: summaryForNode(n),
@@ -314,7 +314,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
         if (n.id === iter.id) continue;
         if (n.meta.iterationId === iter.id) {
           iterChild.children!.push({
-            name: `${n.kind}: ${n.label}`,
+            name: n.label,
             nodeId: n.id,
             summary: summaryForNode(n),
           } as TreeNode & { summary: string });
@@ -338,7 +338,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
       .filter((n) => presentIds.has(n.id))
       .map((n) => ({
         id: n.id,
-        label: `${n.kind}: ${n.label}`,
+        label: n.label,
         color: colorForNode(n),
         summary: summaryForNode(n),
       }));
