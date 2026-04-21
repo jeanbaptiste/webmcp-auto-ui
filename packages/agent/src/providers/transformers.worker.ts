@@ -30,6 +30,37 @@ import type { ContentBlock } from '../types.js';
 import type { TransformersModelEntry } from './transformers-models.js';
 
 // --------------------------------------------------------------------------
+// Gemma 4 chat_template override.
+//
+// The chat_template baked into onnx-community/gemma-4-E{2,4}B-it-ONNX is the
+// VLM variant shipped by HF, which iterates `message.content` as a list
+// ({% for part in content %}). Our worker feeds plain strings, which trips
+// the minified Jinja `for` loop inside transformers.js with the opaque error
+// "C is not iterable". We replace the template with a string-safe variant
+// that accepts either a string or a list of {type:'text', text} parts.
+// Mirrors the approach in Chong's TurboQuant-WASM demo
+// (demo/src/draw/prompts/preamble.ts on github.com/teamchong/turboquant-wasm).
+// --------------------------------------------------------------------------
+
+const GEMMA4_CHAT_TEMPLATE = `{{- bos_token -}}
+{%- for message in messages -%}
+{%- set role = message['role'] -%}
+{%- if role == 'assistant' -%}{%- set role = 'model' -%}{%- endif -%}
+<|turn>{{ role }}
+{%- if message['content'] is string %}
+{{ message['content'] | trim }}
+{%- else -%}
+{%- for part in message['content'] -%}
+{%- if part['type'] == 'text' -%}{{ part['text'] | trim }}{%- endif -%}
+{%- endfor -%}
+{%- endif %}
+<turn|>
+{%- endfor -%}
+{%- if add_generation_prompt -%}
+<|turn>model
+{%- endif -%}`;
+
+// --------------------------------------------------------------------------
 // Lazy imports — resolved on first 'load'. Kept as `any` because the v4 API
 // surface isn't fully typed yet.
 // --------------------------------------------------------------------------
@@ -153,9 +184,16 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
   // Version pinning per family — Mistral3 was only fully wired (name → class
   // registry) in transformers.js 3.8.1; 4.1.0 regresses that path but adds
   // Gemma4/Qwen3.5. So route each family to the version that actually works.
+  // Gemma 4 is additionally pinned to 4.0.1 because 4.1.0 shipped Jinja
+  // regressions that combine badly with the VLM chat_template on
+  // onnx-community/gemma-4-*. 4.0.1 is the version Chong validated in
+  // TurboQuant-WASM. Qwen3.5 still needs 4.1.0 (that's where its class
+  // registry landed).
   const TRANSFORMERS_URL = modelEntry.family === 'mistral'
     ? 'https://esm.sh/@huggingface/transformers@3.8.1'
-    : 'https://esm.sh/@huggingface/transformers@4.1.0';
+    : modelEntry.family === 'gemma4'
+      ? 'https://esm.sh/@huggingface/transformers@4.0.1'
+      : 'https://esm.sh/@huggingface/transformers@4.1.0';
   const imported: any = await import(/* @vite-ignore */ TRANSFORMERS_URL);
   // Some CDN bundles park named exports under `.default`; flatten so the
   // destructure below finds them either way.
@@ -268,6 +306,18 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
     tokenizer = null;
   }
 
+  if (modelEntry.family === 'gemma4' && tokenizer) {
+    // Override the VLM chat_template baked into onnx-community/gemma-4-* with a
+    // string-safe variant. The shipped template iterates message.content as a
+    // list ({% for part in content %}); our serializer emits strings, which
+    // triggers "C is not iterable" inside transformers.js's minified Jinja
+    // runtime. Mirrors the approach Chong takes in TurboQuant-WASM
+    // (demo/src/draw/prompts/preamble.ts).
+    try {
+      (tokenizer as any).chat_template = GEMMA4_CHAT_TEMPLATE;
+    } catch { /* best-effort */ }
+  }
+
   try {
     processor = await AutoProcessor.from_pretrained(modelEntry.repo, { progress_callback: progressCallback });
   } catch {
@@ -355,8 +405,20 @@ async function handleGenerate(
         add_generation_prompt: true,
       });
     } catch (err) {
-      post({ type: 'warning', message: `apply_chat_template failed, falling back to raw concat: ${String(err)}` });
-      effectivePrompt = chatMessages.map(m => `${m.role}: ${m.content}`).join('\n\n');
+      post({ type: 'warning', message: `apply_chat_template failed on string content, retrying with structured parts: ${String(err)}` });
+      try {
+        const structured = chatMessages.map(m => ({
+          role: m.role,
+          content: [{ type: 'text', text: m.content }],
+        }));
+        effectivePrompt = tokenizer.apply_chat_template(structured, {
+          tokenize: false,
+          add_generation_prompt: true,
+        });
+      } catch (err2) {
+        post({ type: 'warning', message: `apply_chat_template failed twice, falling back to raw concat: ${String(err2)}` });
+        effectivePrompt = chatMessages.map(m => `${m.role}: ${m.content}`).join('\n\n');
+      }
     }
   }
   if (!effectivePrompt && typeof prompt === 'string') {
