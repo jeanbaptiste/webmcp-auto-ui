@@ -1,0 +1,80 @@
+---
+widget: notebook-compact
+description: Reactive minimalist notebook with a left gutter showing cell types and named outputs. Cells chain via variable names (→ rows, → df) and display fresh/stale status. Minimal chrome, ideal for quick data exploration.
+schema:
+  type: object
+  properties:
+    id:
+      type: string
+      description: Unique notebook identifier (for save/share via hyperskill)
+    title:
+      type: string
+      description: Notebook title
+    mode:
+      type: string
+      enum: [edit, view]
+      description: edit allows run/edit/reorder; view hides all controls for read-only display
+    cells:
+      type: array
+      description: Ordered list of cells (markdown, sql, js)
+      items:
+        type: object
+        required: [type, content]
+        properties:
+          type:
+            type: string
+            enum: [md, sql, js]
+          content:
+            type: string
+            description: Cell source (markdown text or code)
+          name:
+            type: string
+            description: Optional cell name
+          varname:
+            type: string
+            description: Named output variable (code cells only), displayed as → varname
+          hideSource:
+            type: boolean
+          hideResult:
+            type: boolean
+---
+
+## When to use
+
+Use `notebook-compact` when the user wants to explore data quickly with a minimal, reactive interface. Ideal for:
+- Iterative SQL / JS exploration where output variables feed each other
+- Quick prototyping where chrome should fade into the background
+- Hackathon playgrounds where users expect a familiar "type, see, share" flow
+- Situations where the reactive dataflow (fresh/stale status) helps the user reason about stale results
+
+Prefer over `notebook-workspace` when there is no multi-source concern and no publish/dashboard end goal.
+Prefer over `notebook-document` when collaboration and comments are not central.
+Prefer over `notebook-editorial` when the result is a working session, not a publication.
+
+## How to use
+
+1. **Create the widget** with a title and 2–4 seed cells:
+   ```
+   widget_display({name: "notebook-compact", params: {
+     title: "Exploration",
+     cells: [
+       {type: "md", content: "### Quick look\n\nLet's inspect the data."},
+       {type: "sql", content: "select * from source limit 10", varname: "rows"},
+       {type: "js", content: "console.table(rows)"}
+     ]
+   }})
+   ```
+
+2. **Name outputs** (varname) on the SQL/JS cells so the gutter displays `→ varname` and downstream cells can reference them.
+
+3. **Start markdown cells with a heading** (`### Title`) — the first line renders larger and gives the cell an anchor.
+
+4. **Let the user iterate** — they can add cells with `+ md / + sql / + js`, reorder via the drag handle, toggle source/result, and run cells with the green pill button.
+
+## Notes
+
+- The Run button lives at the left of each cell's title row, right after the type label.
+- Stop (red pill) appears while running, with a live elapsed timer.
+- After a run, Run becomes the replay button (same green pill, re-click to re-run).
+- Deletions prompt a confirmation modal and are recorded in the history panel; they can be restored from there.
+- `mode: "view"` hides all controls (run, delete, drag, add), making the notebook read-only.

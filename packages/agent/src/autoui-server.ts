@@ -5,6 +5,22 @@
 import { createWebMcpServer, parseFrontmatter } from '@webmcp-auto-ui/core';
 import { RAW_RECIPES } from './recipes/_generated.js';
 
+// Notebook widget recipes (vanilla renderers)
+// @ts-ignore — Vite raw imports, not resolved by tsc
+import compactRecipe from './notebook-widgets/recipes/compact.md?raw';
+// @ts-ignore
+import workspaceRecipe from './notebook-widgets/recipes/workspace.md?raw';
+// @ts-ignore
+import documentRecipe from './notebook-widgets/recipes/document.md?raw';
+// @ts-ignore
+import editorialRecipe from './notebook-widgets/recipes/editorial.md?raw';
+
+// Notebook widget renderers (vanilla JS)
+import { render as renderCompact } from './notebook-widgets/compact.js';
+import { render as renderWorkspace } from './notebook-widgets/workspace.js';
+import { render as renderDocument } from './notebook-widgets/document.js';
+import { render as renderEditorial } from './notebook-widgets/editorial.js';
+
 // ---------------------------------------------------------------------------
 // Inline recipes (frontmatter + body)
 // ---------------------------------------------------------------------------
@@ -1006,6 +1022,17 @@ const autoui = createWebMcpServer('autoui', {
 // Register all native widgets (renderer = undefined, resolved by NATIVE_MAP in UI)
 for (const recipe of RECIPES) {
   autoui.registerWidget(recipe, undefined);
+}
+
+// Notebook widgets — vanilla renderers (resolved via WidgetRenderer vanilla path)
+const NOTEBOOK_WIDGETS: Array<[string, (container: HTMLElement, data: any) => any]> = [
+  [compactRecipe as string, renderCompact],
+  [workspaceRecipe as string, renderWorkspace],
+  [documentRecipe as string, renderDocument],
+  [editorialRecipe as string, renderEditorial],
+];
+for (const [recipe, renderer] of NOTEBOOK_WIDGETS) {
+  autoui.registerWidget(recipe, renderer as any);
 }
 
 // Register flow recipes (multi-step procedures) from the global recipe registry
