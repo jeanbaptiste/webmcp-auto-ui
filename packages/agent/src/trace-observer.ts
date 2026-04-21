@@ -508,6 +508,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
       toolCallIdMap.clear();
       toolCallStartMs.clear();
       nodeDetails.clear();
+      iterationPalette = makeIterationPalette();
       if (flushTimer !== null) {
         clearTimeout(flushTimer);
         flushTimer = null;
@@ -519,12 +520,12 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
           layout: { name: 'cose', animate: true },
         });
         ctx.updateWidget(ids.treeId, {
-          root: { name: 'conv', color: '#1e293b', children: [] },
+          root: { name: 'conv', children: [] },
           orientation: 'horizontal',
         });
         ctx.updateWidget(ids.sankeyId, {
-          nodes: { label: [], color: [] },
-          links: { source: [], target: [], value: [], color: [] },
+          nodes: [],
+          links: [],
         });
       }
     },
