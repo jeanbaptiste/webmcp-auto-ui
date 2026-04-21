@@ -80,12 +80,12 @@ graph TD
 
 | Environment | Port | Command |
 |-------------|------|---------|
-| Dev | 5178 | `npm -w apps/boilerplate run dev` |
+| Dev | 5179 | `npm -w apps/boilerplate run dev` |
 | Production | 3011 | `node index.js` (via systemd) |
 
 ```bash
 npm -w apps/boilerplate run dev
-# Available at http://localhost:5178
+# Available at http://localhost:5179
 ```
 
 ## Features
