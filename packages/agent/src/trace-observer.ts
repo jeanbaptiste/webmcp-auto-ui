@@ -177,27 +177,34 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
   // Accumulated recipe bodies loaded via get_recipe during the run (name → markdown body)
   const loadedRecipes = new Map<string, string>();
 
-  /** Build a short, graph-friendly label for a tool_call node from tool name + args. */
+  /** Build a short, graph-friendly label for a tool_call node from tool name + args.
+   *  Uses a tool-specific emoji so small graph nodes remain legible. */
   function enrichToolLabel(toolName: string, args: unknown): string {
     const a = (args && typeof args === 'object' ? args : {}) as Record<string, unknown>;
     const sanitize = (s: string): string =>
       s.replace(/\s+/g, ' ').replace(/"/g, '').trim();
     const truncate = (s: string): string => (s.length > 40 ? s.slice(0, 40) + '…' : s);
+    let emoji = '🔧';
     let preview: string | undefined;
     if (toolName === 'query_sql' || /sql/i.test(toolName)) {
+      emoji = '🗃️';
       const sql = (a.sql ?? a.query ?? a.statement) as unknown;
       if (typeof sql === 'string') preview = sql;
     } else if (toolName === 'run_script') {
+      emoji = '⚙️';
       const scr = (a.script ?? a.code ?? a.agentTask) as unknown;
       if (typeof scr === 'string') preview = scr;
-    } else if (toolName === 'get_recipe' || toolName === 'search_recipes') {
-      const n = (a.name ?? a.query ?? a.id) as unknown;
+    } else if (toolName === 'get_recipe') {
+      emoji = '📖';
+      const n = (a.name ?? a.id) as unknown;
+      if (typeof n === 'string') preview = n;
+    } else if (toolName === 'search_recipes') {
+      emoji = '🔍';
+      const n = (a.query ?? a.name) as unknown;
       if (typeof n === 'string') preview = n;
     }
-    if (!preview) return toolName;
-    const clean = truncate(sanitize(preview));
-    if (!clean) return toolName;
-    return `${toolName}: ${clean}`;
+    const body = preview ? truncate(sanitize(preview)) : '';
+    return body ? `${emoji} ${body}` : `${emoji} ${toolName}`;
   }
 
   function nextId(kind: NodeKind): string {

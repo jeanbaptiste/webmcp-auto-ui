@@ -20,7 +20,6 @@ import {
   type TransformersModelEntry,
   type TransformersFamily,
 } from './transformers-models.js';
-import { buildGemmaPrompt } from '../prompts/gemma4-prompt-builder.js';
 import { serializeMessagesForTemplate } from './transformers-serialize.js';
 // Qwen and Mistral no longer need dedicated prompt builders on the main thread:
 // the worker delegates ChatML / [INST] templating to tokenizer.apply_chat_template
@@ -252,21 +251,18 @@ export class TransformersProvider implements LLMProvider {
     const image = this.entry.vision ? this.extractImageFromLastUserMessage(messages) : undefined;
     const systemText = options?.system;
 
-    // Gemma uses its own custom wire format (turns, tool_call, tool_response
-    // tagged with the "<|turn>…<turn|>" family). That format is not a HF
-    // chat_template, so we build the full prompt string on the main thread
-    // and send it via the legacy `prompt` field. Qwen / Mistral go through
-    // tokenizer.apply_chat_template inside the worker (the worker then hands
-    // the templated string to processor(prompt, image) for VLM vision turns).
-    let prompt: string | undefined;
-    let chatMessages: Array<{ role: string; content: string }> | undefined;
-    if (this.promptKind === 'gemma') {
-      prompt = buildGemmaPrompt({ systemPrompt: systemText, messages });
-    } else {
-      chatMessages = [];
-      if (systemText) chatMessages.push({ role: 'system', content: systemText });
-      chatMessages.push(...serializeMessagesForTemplate(messages, this.promptKind));
-    }
+    // All three families (gemma4 / qwen3 / mistral) go through
+    // tokenizer.apply_chat_template inside the worker. Each model's
+    // tokenizer_config.json ships a Jinja chat_template that emits the
+    // correct role tags (<start_of_turn> for Gemma 4, <|im_start|> for Qwen,
+    // [INST] for Mistral). Building a custom "<|turn>…<turn|>" string on the
+    // main thread for Gemma trips the tokenizer on transformers.js 4.1.0
+    // ("type N not iterable"), so we rely on apply_chat_template uniformly.
+    // WasmProvider (MediaPipe) keeps the custom builder because MediaPipe
+    // has no chat_template runtime.
+    const chatMessages: Array<{ role: string; content: string }> = [];
+    if (systemText) chatMessages.push({ role: 'system', content: systemText });
+    chatMessages.push(...serializeMessagesForTemplate(messages, this.promptKind));
     const requestId = this.nextRequestId();
 
     return new Promise<LLMResponse>((resolve, reject) => {
@@ -296,8 +292,7 @@ export class TransformersProvider implements LLMProvider {
           topK: options?.topK,
         },
       };
-      if (prompt !== undefined) message.prompt = prompt;
-      if (chatMessages) message.chatMessages = chatMessages;
+      message.chatMessages = chatMessages;
       if (image) message.image = image;
       worker.postMessage(message);
     });
