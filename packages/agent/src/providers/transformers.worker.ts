@@ -191,15 +191,26 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
   };
 
   // Tokenizer + processor — processor is required for VLMs and harmless otherwise.
+  // No progress_callback here: OPFS already downloaded every file, so transformers.js
+  // just reads from cache. Wiring a progress_callback would flicker the UI between
+  // the big decoder bar and tiny tokenizer/config progress events.
+  post({
+    type: 'progress',
+    fileProgress: 1,
+    totalProgress: 1,
+    status: 'initializing tokenizer',
+    loaded: modelEntry.size,
+    total: modelEntry.size,
+  });
   try {
-    tokenizer = await AutoTokenizer.from_pretrained(modelEntry.repo, { progress_callback: progressCallback });
+    tokenizer = await AutoTokenizer.from_pretrained(modelEntry.repo);
   } catch (err) {
     post({ type: 'warning', message: `tokenizer load: ${String(err)}` });
     tokenizer = null;
   }
 
   try {
-    processor = await AutoProcessor.from_pretrained(modelEntry.repo, { progress_callback: progressCallback });
+    processor = await AutoProcessor.from_pretrained(modelEntry.repo);
   } catch {
     // Some text-only checkpoints ship without an AutoProcessor — that's fine.
     processor = null;
@@ -208,8 +219,18 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
   // Model class — pick a specialized VLM class when the catalog hints at one,
   // otherwise fall back to AutoModelForCausalLM.
   let ModelClass: any = AutoModelForCausalLM;
-  if (modelEntry.modelClass && transformersMod[modelEntry.modelClass]) {
-    ModelClass = transformersMod[modelEntry.modelClass];
+  if (modelEntry.modelClass) {
+    const resolved = transformersMod[modelEntry.modelClass];
+    if (resolved && typeof resolved.from_pretrained === 'function') {
+      ModelClass = resolved;
+      post({ type: 'warning', message: `[transformers] using ModelClass=${modelEntry.modelClass}` });
+    } else {
+      const autoKeys = Object.keys(transformersMod).filter((k) => k.startsWith('AutoModel') || k.includes('ForConditional') || k.includes('ForImageText')).join(',');
+      post({ type: 'warning', message: `[transformers] modelClass '${modelEntry.modelClass}' not found. Available Auto* keys: ${autoKeys}. Falling back to AutoModelForCausalLM.` });
+    }
+  }
+  if (!ModelClass || typeof ModelClass.from_pretrained !== 'function') {
+    throw new Error(`[transformers] No usable model class. AutoModelForCausalLM=${typeof AutoModelForCausalLM}, mod keys sample: ${Object.keys(transformersMod).slice(0, 20).join(',')}`);
   }
 
   try {
@@ -285,10 +306,11 @@ async function handleGenerate(
       const raw: any = await RawImage.read(blob);
       try { raw.resize?.(448, 448); } catch {}
       inputs = await processor(prompt, raw);
-    } else if (processor && entry.vision) {
-      // Text-only turn on a VLM — processor still handles tokenization.
-      inputs = await processor(prompt);
     } else if (tokenizer) {
+      // Text-only turn — always go through the tokenizer, even on a VLM.
+      // VLM processors (Qwen3.5, Mistral3, Gemma4) expect messages-with-content-
+      // blocks rather than a plain prompt string, so calling processor(prompt)
+      // throws "X is not iterable" on the template path.
       inputs = await tokenizer(prompt, { return_tensors: 'pt' });
     } else {
       post({ type: 'error', requestId, message: 'no tokenizer/processor available' });
