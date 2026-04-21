@@ -3,7 +3,7 @@ id: hackathon-assemblee-nationale-mcp-webmcp
 name: Hackathon Assemblée Nationale · MCP & WebMCP starter
 components_used: [notebook-document, notebook-compact]
 when: the user mentions the Assemblée Nationale hackathon, wants to experiment with parliamentary data (Tricoteuses, Legifrance), or asks for a starter notebook to explore deputies, votes, amendments, or legislative texts in a hackathon context. Keywords include "hackathon Assemblée Nationale", "MCP WebMCP hackathon", "tricoteuses playbook", "parlement playground", "hackathon parlementaire".
-servers: [tricoteuses]
+servers: [autoui, tricoteuses]
 layout:
   type: single
 ---

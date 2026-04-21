@@ -3,7 +3,7 @@ id: create-interactive-notebook-playbook
 name: Create an interactive notebook playbook
 components_used: [notebook-compact, notebook-workspace, notebook-document, notebook-editorial]
 when: the user wants to experiment with data, prototype a small analysis, share a reusable scenario, let others fork and try a dataset, or prepare a hackathon-ready playground. Keywords include "playground", "playbook", "experiment", "try", "prototype", "hackathon", "share a notebook", "template", "starter".
-servers: []
+servers: [autoui]
 layout:
   type: single
 ---
