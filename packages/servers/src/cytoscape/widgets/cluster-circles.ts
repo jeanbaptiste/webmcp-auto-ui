@@ -32,6 +32,12 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       { selector: 'edge', style: { 'width': 2, 'line-color': '#ccc', 'target-arrow-color': '#ccc', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier' } },
     ],
   });
+
+  (container as any).__exportPng = async (scale: number) => {
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--color-surface').trim() || '#ffffff';
+    return cy.png({ scale: Math.max(2, scale), full: true, bg, output: 'blob' }) as Promise<Blob>;
+  };
+
   const ro = new ResizeObserver(() => { cy.resize(); cy.fit(); });
   ro.observe(container);
   return () => { ro.disconnect(); cy.destroy(); };

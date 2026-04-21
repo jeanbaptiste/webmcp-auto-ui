@@ -13,6 +13,12 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     ],
   });
 
+  (container as any).__exportPng = async (scale: number) => {
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--color-surface').trim() || '#ffffff';
+    return cy.png({ scale: Math.max(2, scale), full: true, bg, output: 'blob' }) as Promise<Blob>;
+  };
+
+
   // Compute PageRank and scale node sizes
   const pr = cy.elements().pageRank({});
   cy.nodes().forEach((node: any) => {

@@ -13,6 +13,12 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     ],
   });
 
+  (container as any).__exportPng = async (scale: number) => {
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--color-surface').trim() || '#ffffff';
+    return cy.png({ scale: Math.max(2, scale), full: true, bg, output: 'blob' }) as Promise<Blob>;
+  };
+
+
   // Compute betweenness centrality and color nodes
   const bc = cy.elements().betweennessCentrality({});
   let maxCentrality = 0;

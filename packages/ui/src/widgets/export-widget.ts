@@ -5,7 +5,15 @@
 
 import { toPng } from 'html-to-image';
 
-const TARGET_PNG_WIDTH = 2048;
+const TARGET_PNG_WIDTH = 4096;
+
+export type WidgetExportHook = (scale: number) => Promise<Blob>;
+
+declare global {
+  interface HTMLElement {
+    __exportPng?: WidgetExportHook;
+  }
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -94,6 +102,25 @@ async function exportPng(type: string, containerEl: HTMLElement): Promise<void> 
   const scrollW = Math.max(containerEl.scrollWidth, containerEl.clientWidth, 1);
   const scrollH = Math.max(containerEl.scrollHeight, containerEl.clientHeight, 1);
   const pixelRatio = TARGET_PNG_WIDTH / scrollW;
+
+  // Canvas-based widgets (cytoscape, etc.) expose a native exporter via __exportPng.
+  // html-to-image would only recapture the already-rasterised on-screen pixels,
+  // so we route to the widget's own resolution-independent exporter when available.
+  if (typeof containerEl.__exportPng === 'function') {
+    const scale = Math.max(2, Math.ceil(TARGET_PNG_WIDTH / scrollW));
+    try {
+      const blob = await containerEl.__exportPng(scale);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return;
+    } catch (err) {
+      console.error('[exportWidget] native __exportPng failed, falling back to html-to-image', err);
+    }
+  }
 
   const bg = (typeof document !== 'undefined'
     ? getComputedStyle(document.documentElement).getPropertyValue('--color-surface').trim()

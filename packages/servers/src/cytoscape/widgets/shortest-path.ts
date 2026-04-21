@@ -14,6 +14,12 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     ],
   });
 
+  (container as any).__exportPng = async (scale: number) => {
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--color-surface').trim() || '#ffffff';
+    return cy.png({ scale: Math.max(2, scale), full: true, bg, output: 'blob' }) as Promise<Blob>;
+  };
+
+
   // Find shortest path using Dijkstra
   const sourceNode = cy.getElementById(data.source as string);
   const targetNode = cy.getElementById(data.target as string);

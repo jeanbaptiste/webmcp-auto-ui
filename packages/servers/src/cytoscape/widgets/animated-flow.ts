@@ -29,6 +29,12 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     ],
   });
 
+  (container as any).__exportPng = async (scale: number) => {
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--color-surface').trim() || '#ffffff';
+    return cy.png({ scale: Math.max(2, scale), full: true, bg, output: 'blob' }) as Promise<Blob>;
+  };
+
+
   // Animate dashes (marching ants effect)
   let offset = 0;
   let destroyed = false;
