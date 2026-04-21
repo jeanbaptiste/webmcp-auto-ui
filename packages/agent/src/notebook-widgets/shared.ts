@@ -151,6 +151,252 @@ export function tickRunningCell(cell: NotebookCell, elapsedEl: HTMLElement, onDo
 }
 
 // ---------------------------------------------------------------------------
+// Data server descriptors (merged from canvas store + recipe-provided data.servers)
+// ---------------------------------------------------------------------------
+
+export interface DataServerTool {
+  name: string;
+  description?: string;
+}
+
+export interface DataServerRecipe {
+  name: string;
+  description?: string;
+}
+
+export interface DataServerDescriptor {
+  name: string;
+  url?: string;
+  kind?: string;
+  tools?: DataServerTool[];
+  recipes?: DataServerRecipe[];
+}
+
+/** Return true when the server looks like a UI/webmcp server and should be hidden. */
+function isUiServer(name: string, kind?: string): boolean {
+  if (kind === 'ui' || kind === 'webmcp') return true;
+  const n = (name || '').toLowerCase();
+  return n.includes('autoui') || n.includes('webmcp');
+}
+
+/**
+ * Merge data servers from two sources:
+ *  - live canvas store snapshot (single connected MCP server)
+ *  - recipe-provided `data.servers` (richer objects with recipes/tools)
+ * Dedupes by `name`, prioritizing recipe entries for metadata.
+ */
+export function collectDataServers(data: Record<string, unknown>): DataServerDescriptor[] {
+  const out: DataServerDescriptor[] = [];
+  const seen = new Map<string, number>();
+
+  const push = (srv: DataServerDescriptor) => {
+    if (!srv || !srv.name) return;
+    if (isUiServer(srv.name, srv.kind)) return;
+    const idx = seen.get(srv.name);
+    if (idx == null) {
+      seen.set(srv.name, out.length);
+      out.push(srv);
+    } else {
+      // merge metadata (existing has precedence, but fill missing from new)
+      const existing = out[idx];
+      if (!existing.url && srv.url) existing.url = srv.url;
+      if (!existing.kind && srv.kind) existing.kind = srv.kind;
+      if ((!existing.tools || !existing.tools.length) && srv.tools) existing.tools = srv.tools;
+      if ((!existing.recipes || !existing.recipes.length) && srv.recipes) existing.recipes = srv.recipes;
+    }
+  };
+
+  // 1. recipe-provided servers (priority)
+  const raw = Array.isArray(data?.servers) ? (data.servers as any[]) : [];
+  raw.forEach((s) => {
+    if (!s || typeof s !== 'object') return;
+    push({
+      name: String(s.name ?? ''),
+      url: s.url ? String(s.url) : undefined,
+      kind: s.kind ? String(s.kind) : undefined,
+      tools: Array.isArray(s.tools) ? s.tools.map((t: any) => typeof t === 'string' ? { name: t } : { name: String(t?.name ?? ''), description: t?.description }) : undefined,
+      recipes: Array.isArray(s.recipes) ? s.recipes.map((r: any) => typeof r === 'string' ? { name: r } : { name: String(r?.name ?? ''), description: r?.description }) : undefined,
+    });
+  });
+
+  // 2. live canvas store (single connected server)
+  try {
+    // Dynamic import fallback: access via global if available; we don't want to hard-bind
+    // to a specific store import path here to keep shared.ts framework-agnostic.
+    // The SDK's canvasVanilla is a singleton; apps that inject it expose it as window.__canvasVanilla.
+    const canvasAny: any = (globalThis as any).__canvasVanilla || (globalThis as any).canvasVanilla;
+    const snap = canvasAny?.getSnapshot?.();
+    if (snap && snap.mcpConnected && snap.mcpName) {
+      push({
+        name: String(snap.mcpName),
+        url: snap.mcpUrl ? String(snap.mcpUrl) : undefined,
+        tools: Array.isArray(snap.mcpTools)
+          ? snap.mcpTools.map((t: any) => ({ name: String(t?.name ?? ''), description: t?.description }))
+          : undefined,
+      });
+    }
+  } catch { /* ignore */ }
+
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// "Data servers" modal — lists servers, recipes, tools; inserts cells on click
+// ---------------------------------------------------------------------------
+
+let serversOverlay: HTMLElement | null = null;
+
+function ensureServersOverlay(): HTMLElement {
+  if (serversOverlay && document.body.contains(serversOverlay)) return serversOverlay;
+  serversOverlay = document.createElement('div');
+  serversOverlay.className = 'nbs-overlay';
+  serversOverlay.innerHTML = `
+    <div class="nbs-modal">
+      <div class="nbs-header">
+        <div class="nbs-title">Data servers</div>
+        <button class="nbs-close" title="close">×</button>
+      </div>
+      <div class="nbs-body"></div>
+    </div>`;
+  document.body.appendChild(serversOverlay);
+  serversOverlay.addEventListener('click', (e) => {
+    if (e.target === serversOverlay) serversOverlay!.classList.remove('open');
+  });
+  (serversOverlay.querySelector('.nbs-close') as HTMLElement).addEventListener('click', () => {
+    serversOverlay!.classList.remove('open');
+  });
+  return serversOverlay;
+}
+
+function looksLikeSqlTool(name: string): boolean {
+  const n = name.toLowerCase();
+  return n === 'query_sql' || n === 'list_tables' || n === 'describe_table'
+      || n.endsWith('_query_sql') || n.endsWith('_list_tables') || n.endsWith('_describe_table')
+      || n.includes('query_sql') || n.includes('list_tables') || n.includes('describe_table');
+}
+
+function openServersModal(
+  servers: DataServerDescriptor[],
+  onInsertCell: (type: CellType, content: string) => void
+): void {
+  const overlay = ensureServersOverlay();
+  (overlay.querySelector('.nbs-title') as HTMLElement).textContent = `Data servers (${servers.length})`;
+  const body = overlay.querySelector('.nbs-body') as HTMLElement;
+
+  if (servers.length === 0) {
+    body.innerHTML = '<div class="nbs-empty">No data MCP server connected.</div>';
+  } else {
+    body.innerHTML = servers.map((srv, sidx) => {
+      const recipes = srv.recipes || [];
+      const tools = srv.tools || [];
+      const recipesHtml = recipes.length > 0
+        ? recipes.map((r, ri) => `
+          <div class="nbs-item" data-kind="recipe" data-srv="${sidx}" data-i="${ri}">
+            <span class="nbs-item-icon">📜</span>
+            <span class="nbs-item-name">${escapeHtml(r.name)}</span>
+            ${r.description ? `<span class="nbs-item-desc">${escapeHtml(r.description)}</span>` : ''}
+          </div>`).join('')
+        : '<div class="nbs-empty-sub">Recipes unavailable</div>';
+      const toolsHtml = tools.length > 0
+        ? tools.map((t, ti) => `
+          <div class="nbs-item" data-kind="tool" data-srv="${sidx}" data-i="${ti}">
+            <span class="nbs-item-icon">${looksLikeSqlTool(t.name) ? '⛁' : '⚙'}</span>
+            <span class="nbs-item-name">${escapeHtml(t.name)}</span>
+            ${t.description ? `<span class="nbs-item-desc">${escapeHtml(t.description)}</span>` : ''}
+          </div>`).join('')
+        : '<div class="nbs-empty-sub">No tools reported</div>';
+      return `
+        <div class="nbs-server">
+          <div class="nbs-server-head">
+            <span class="nbs-plug">🔌</span>
+            <span class="nbs-server-name">${escapeHtml(srv.name)}</span>
+            ${srv.url ? `<span class="nbs-server-url">${escapeHtml(srv.url)}</span>` : ''}
+          </div>
+          <div class="nbs-section">Recipes (${recipes.length})</div>
+          <div class="nbs-list">${recipesHtml}</div>
+          <div class="nbs-section">Tools / Tables (${tools.length})</div>
+          <div class="nbs-list">${toolsHtml}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // Bind click handlers for items
+  body.querySelectorAll<HTMLElement>('.nbs-item').forEach((el) => {
+    el.addEventListener('click', () => {
+      const sidx = parseInt(el.dataset.srv!, 10);
+      const i = parseInt(el.dataset.i!, 10);
+      const srv = servers[sidx];
+      if (!srv) return;
+      if (el.dataset.kind === 'recipe') {
+        const r = (srv.recipes || [])[i];
+        if (!r) return;
+        const content = `# Using recipe: ${r.name}\n\nCall \`${srv.name}_get_recipe('${r.name}')\` to load, then follow its instructions.`;
+        onInsertCell('md', content);
+      } else {
+        const t = (srv.tools || [])[i];
+        if (!t) return;
+        if (looksLikeSqlTool(t.name)) {
+          onInsertCell('sql', `-- TODO: write your query\nSELECT * FROM <table> LIMIT 10;`);
+        } else {
+          onInsertCell('js', `// TODO: call ${t.name}\n// Arguments: see tool schema`);
+        }
+      }
+      overlay.classList.remove('open');
+    });
+  });
+
+  overlay.classList.add('open');
+}
+
+/**
+ * Build a "data servers" button and attach it to `container`.
+ * The button is rendered as a small pill with a 🔌 icon and a (N) badge.
+ * Clicking it opens the shared modal; clicking a recipe/tool inserts a cell into `state`.
+ */
+export function buildServersButton(
+  state: NotebookState,
+  container: HTMLElement,
+  data: Record<string, unknown>,
+  rerender: () => void
+): HTMLElement {
+  const btn = document.createElement('button');
+  btn.className = 'nb-btn nbs-trigger';
+  btn.type = 'button';
+  btn.title = 'Data servers';
+
+  const refresh = () => {
+    const servers = collectDataServers(data);
+    const count = servers.length;
+    btn.innerHTML = `🔌 <span class="nbs-badge">${count}</span>`;
+    btn.classList.toggle('nbs-empty-btn', count === 0);
+    btn.disabled = count === 0;
+  };
+  refresh();
+
+  btn.addEventListener('click', () => {
+    const servers = collectDataServers(data);
+    if (!servers.length) return;
+    openServersModal(servers, (type, content) => {
+      addCell(state, type, { content, status: 'stale' });
+      rerender();
+    });
+  });
+
+  // Subscribe to canvas changes so the badge updates when the MCP connects
+  try {
+    const canvasAny: any = (globalThis as any).__canvasVanilla || (globalThis as any).canvasVanilla;
+    if (canvasAny?.subscribe) {
+      const unsub = canvasAny.subscribe(() => refresh());
+      // store unsub on the button for potential cleanup
+      (btn as any).__nbsUnsub = unsub;
+    }
+  } catch { /* ignore */ }
+
+  container.appendChild(btn);
+  return btn;
+}
+
+// ---------------------------------------------------------------------------
 // Modals (shared singletons, created on demand)
 // ---------------------------------------------------------------------------
 
@@ -521,6 +767,117 @@ textarea.nb-md-edit {
 }
 .nb-kw { color: var(--color-accent); }
 .nb-str { color: var(--color-teal); }
+
+/* Data servers button + modal */
+.nbs-trigger {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+}
+.nbs-trigger .nbs-badge {
+  display: inline-block;
+  font-size: 9.5px; padding: 1px 6px; border-radius: 999px;
+  background: var(--color-surface2); color: var(--color-text2);
+  font-variant-numeric: tabular-nums;
+}
+.nbs-trigger:not(:disabled):hover .nbs-badge {
+  background: var(--color-accent); color: #fff;
+}
+.nbs-trigger.nbs-empty-btn {
+  opacity: 0.45; cursor: not-allowed;
+}
+
+.nbs-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: none; align-items: center; justify-content: center;
+  z-index: 1002; padding: 24px;
+}
+.nbs-overlay.open { display: flex; }
+.nbs-modal {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  width: 100%; max-width: 720px; max-height: 80vh;
+  display: flex; flex-direction: column;
+  font-family: var(--font-sans, 'Syne', sans-serif);
+  overflow: hidden;
+}
+.nbs-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--color-border);
+}
+.nbs-title { font-size: 16px; font-weight: 600; color: var(--color-text1); }
+.nbs-close {
+  background: transparent; border: none; cursor: pointer;
+  color: var(--color-text2); font-size: 22px; line-height: 1;
+  width: 30px; height: 30px; border-radius: 50%;
+}
+.nbs-close:hover { color: var(--color-text1); background: var(--color-surface2); }
+
+.nbs-body {
+  padding: 16px 22px; overflow-y: auto; flex: 1;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.nbs-empty {
+  color: var(--color-text2); font-size: 13px;
+  padding: 30px 0; text-align: center; font-style: italic;
+}
+.nbs-empty-sub {
+  color: var(--color-text2); font-size: 11px;
+  padding: 6px 4px; font-style: italic;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+}
+.nbs-server {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg);
+  overflow: hidden;
+}
+.nbs-server-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  background: var(--color-surface2);
+  border-bottom: 1px solid var(--color-border);
+}
+.nbs-plug { font-size: 14px; }
+.nbs-server-name {
+  font-size: 13px; color: var(--color-text1); font-weight: 500;
+}
+.nbs-server-url {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10.5px; color: var(--color-text2);
+  margin-left: auto;
+}
+.nbs-section {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--color-text2);
+  padding: 10px 14px 4px;
+}
+.nbs-list {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 0 8px 10px;
+}
+.nbs-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; border-radius: 6px;
+  cursor: pointer; font-size: 12.5px;
+  color: var(--color-text1);
+  transition: background 0.12s;
+}
+.nbs-item:hover { background: var(--color-surface2); }
+.nbs-item-icon { font-size: 12px; width: 16px; text-align: center; flex-shrink: 0; }
+.nbs-item-name {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 12px; color: var(--color-accent);
+  flex-shrink: 0;
+}
+.nbs-item-desc {
+  font-size: 11px; color: var(--color-text2);
+  margin-left: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 `;
 
 // ---------------------------------------------------------------------------

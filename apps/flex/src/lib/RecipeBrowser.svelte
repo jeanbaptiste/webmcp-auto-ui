@@ -25,9 +25,10 @@
     webmcpRecipes: RecipeItem[];
     initialFilter?: string;
     multiClient?: McpMultiClient;
+    onOpenInNotebook?: (type: string, data: Record<string, unknown>) => void;
   }
 
-  let { open = $bindable(false), mcpRecipes = [], webmcpRecipes = [], initialFilter = '', multiClient }: Props = $props();
+  let { open = $bindable(false), mcpRecipes = [], webmcpRecipes = [], initialFilter = '', multiClient, onOpenInNotebook }: Props = $props();
 
   let query = $state('');
   let selected = $state<RecipeItem | null>(null);
@@ -97,6 +98,56 @@
     }
     selected = recipe;
     recipeModalOpen = true;
+  }
+
+  async function ensureBody(recipe: RecipeItem) {
+    if (recipe.body || !recipe.serverUrl || !multiClient) return;
+    try {
+      const identifier = recipe.originalName ?? recipe.name;
+      const res = await multiClient.callToolOn(recipe.serverUrl, 'get_recipe', {
+        name: identifier,
+        id: (recipe as any).id ?? identifier,
+      });
+      const text = res.content?.find((c: { type: string }) => c.type === 'text') as { text?: string } | undefined;
+      if (text?.text) {
+        let body = text.text;
+        try {
+          const parsed = JSON.parse(body);
+          if (parsed && typeof parsed === 'object' && typeof parsed.content === 'string') {
+            body = parsed.content;
+          }
+        } catch { /* not JSON — keep raw text */ }
+        recipe.body = body;
+      }
+    } catch (err) {
+      console.warn('[RecipeBrowser] get_recipe failed:', err);
+    }
+  }
+
+  async function openInNotebook(recipe: RecipeItem) {
+    await ensureBody(recipe);
+    const body = recipe.body ?? '';
+    const hasSelect = /\bSELECT\b/i.test(body);
+    const hasFrom = /\bFROM\b/i.test(body);
+    const inferredType: 'sql' | 'js' = (hasSelect && hasFrom) ? 'sql' : 'js';
+
+    const firstServer = Array.isArray(recipe.servers) && recipe.servers.length > 0
+      ? recipe.servers[0]
+      : undefined;
+
+    const data: Record<string, unknown> = {
+      title: recipe.name,
+      cells: [
+        { type: 'md', content: `# ${recipe.name}\n\n${recipe.description ?? ''}` },
+        { type: 'md', content: '## Recipe reference\n\n' + body },
+        { type: inferredType, content: inferredType === 'sql' ? '-- Your query here\n\n' : '// Your script here\n\n' },
+      ],
+      mode: 'edit',
+      servers: firstServer ? [{ name: firstServer, kind: 'data' }] : [],
+    };
+
+    onOpenInNotebook?.('notebook-compact', data);
+    close();
   }
 
   async function copyHyperSkillUrl(recipe: RecipeItem) {
@@ -184,6 +235,11 @@
                           onclick={(e) => { e.stopPropagation(); downloadRecipe(recipe); }}
                         >.md</button>
                         <button
+                          title="Open in notebook"
+                          class="font-mono text-[10px] h-6 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-colors"
+                          onclick={(e) => { e.stopPropagation(); openInNotebook(recipe); }}
+                        >nb</button>
+                        <button
                           title="Copy HyperSkill URL"
                           class="font-mono text-[10px] h-6 px-2 rounded border transition-colors {copyState === 'copied' ? 'border-teal/40 text-teal' : 'border-accent/40 text-accent hover:bg-accent/10'}"
                           onclick={(e) => { e.stopPropagation(); copyHyperSkillUrl(recipe); }}
@@ -224,6 +280,11 @@
                           class="font-mono text-[10px] h-6 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-colors"
                           onclick={(e) => { e.stopPropagation(); downloadRecipe(recipe); }}
                         >.md</button>
+                        <button
+                          title="Open in notebook"
+                          class="font-mono text-[10px] h-6 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-colors"
+                          onclick={(e) => { e.stopPropagation(); openInNotebook(recipe); }}
+                        >nb</button>
                         <button
                           title="Copy HyperSkill URL"
                           class="font-mono text-[10px] h-6 px-2 rounded border transition-colors {copyState === 'copied' ? 'border-teal/40 text-teal' : 'border-accent/40 text-accent hover:bg-accent/10'}"

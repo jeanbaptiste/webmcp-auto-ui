@@ -1436,7 +1436,14 @@
 <DebugPanel prompt={effectivePrompt} {layers} />
 
 <!-- RECIPE BROWSER -->
-<RecipeBrowser bind:open={recipeBrowserOpen} {mcpRecipes} {webmcpRecipes} initialFilter={recipeBrowserFilter} {multiClient} />
+<RecipeBrowser
+  bind:open={recipeBrowserOpen}
+  {mcpRecipes}
+  {webmcpRecipes}
+  initialFilter={recipeBrowserFilter}
+  {multiClient}
+  onOpenInNotebook={(type, data) => { flexGrid?.addBlock(type, data, undefined, type); }}
+/>
 
 <!-- RECIPE DETAIL (opened from trace dblclick when a tool call matches a loaded recipe) -->
 <RecipeModal

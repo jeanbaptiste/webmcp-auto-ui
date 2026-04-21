@@ -8,6 +8,7 @@ import {
   createState, injectStyles, mountRunControls, mountHistoryPanel,
   setupDnD, deleteCellWithConfirm, restoreCellFromSnapshot, addCell,
   autosize, openShareModal, registerHistoryObserver,
+  buildServersButton,
   type NotebookState, type NotebookCell,
 } from './shared.js';
 
@@ -39,6 +40,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
           <button class="nb-mode-view">view</button>
         </div>
         <button class="nb-btn nbd-history-btn">⟲ history</button>
+        <span class="nbd-servers-slot"></span>
       </div>
       <input class="nbd-title nb-doc-title" value="${escapeAttr(state.title)}">
       <div class="nbd-meta">edited just now · saved ✓</div>
@@ -96,6 +98,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     container.classList.add('nb-view-mode');
     viewBtn.classList.add('nb-on'); editBtn.classList.remove('nb-on');
   });
+
+  buildServersButton(state, shell.querySelector('.nbd-servers-slot') as HTMLElement, data, rerender);
 
   setupDnD(cellsEl, state, rerender);
   const unsubHistory = registerHistoryObserver(() => mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); }));
