@@ -8,9 +8,15 @@ import {
   createState, injectStyles, mountRunControls, mountHistoryPanel,
   setupDnD, deleteCellWithConfirm, restoreCellFromSnapshot, addCell,
   autosize, openShareModal, registerHistoryObserver,
-  buildServersButton,
-  type NotebookState, type NotebookCell,
+  buildServersButton, registerExecutor, addImportedCells,
+  collectDataServers, startRun,
+  type NotebookState, type NotebookCell, type CellResult,
 } from './shared.js';
+import { dispatchShare, shareAsHyperskill } from './share-handlers.js';
+import { openAddMdModal, openAddRecipeModal } from './import-modals.js';
+import { extractCellsFromRecipe, extractCellFromMarkdown } from './resource-extractor.js';
+import { mountLeftPane } from './left-pane.js';
+import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
 
 export async function render(container: HTMLElement, data: Record<string, unknown>): Promise<() => void> {
   injectStyles();
@@ -22,42 +28,119 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     mode: (data.mode as any) ?? 'edit',
     cells: data.cells as any,
   });
+  (state as any).published = false;
+
+  // Restore persisted title
+  try {
+    const saved = localStorage.getItem((state.id || 'nb') + ':title');
+    if (saved) state.title = saved;
+  } catch {}
+
+  // ---- Register executors (JS + SQL) ---------------------------------------
+  registerExecutor(state, 'js', async (ctx) => {
+    const started = Date.now();
+    try {
+      const scope = ctx.scope || {};
+      const keys = Object.keys(scope);
+      const vals = keys.map((k) => scope[k]);
+      // eslint-disable-next-line no-new-func
+      const fn = new Function(...keys, `"use strict";\nreturn (async () => { ${ctx.cell.content} })();`);
+      const out = await fn(...vals);
+      const durationMs = Date.now() - started;
+      if (out == null) return { ok: true, kind: 'empty', durationMs };
+      if (Array.isArray(out) && out.length && typeof out[0] === 'object') {
+        const columns = Array.from(new Set(out.flatMap((r: any) => Object.keys(r || {}))));
+        return { ok: true, kind: 'table', rows: out, columns, rowCount: out.length, durationMs };
+      }
+      return { ok: true, kind: 'value', value: out, durationMs };
+    } catch (err: any) {
+      return { ok: false, error: String(err?.message ?? err), errorKind: 'runtime', durationMs: Date.now() - started };
+    }
+  });
+
+  registerExecutor(state, 'sql', async (ctx) => {
+    const started = Date.now();
+    try {
+      const servers = collectDataServers(data);
+      let toolName: string | null = null;
+      for (const s of servers) {
+        const tools = s.tools || [];
+        let found = tools.find((t: any) => /.*query_sql$/i.test(t.name || ''));
+        if (!found) found = tools.find((t: any) => /^(query|run|execute)(_sql)?$/i.test(t.name || ''));
+        if (found) { toolName = found.name; break; }
+      }
+      if (!toolName) {
+        return { ok: false, error: 'No SQL tool found on connected servers', errorKind: 'schema', durationMs: Date.now() - started };
+      }
+      const res: any = await callToolViaPostMessage(toolName, { sql: ctx.cell.content });
+      const durationMs = Date.now() - started;
+      // Try to parse a result
+      let payload = res;
+      if (res && Array.isArray(res.content)) {
+        const textBlock = res.content.find((b: any) => b?.type === 'text');
+        if (textBlock?.text) {
+          try { payload = JSON.parse(textBlock.text); } catch { payload = textBlock.text; }
+        }
+      }
+      let rows: any[] = [];
+      if (Array.isArray(payload)) rows = payload;
+      else if (payload && Array.isArray(payload.rows)) rows = payload.rows;
+      else if (payload && Array.isArray(payload.results)) rows = payload.results;
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return { ok: true, kind: 'empty', durationMs };
+      }
+      const columns = Array.from(new Set(rows.flatMap((r: any) => Object.keys(r || {}))));
+      return { ok: true, kind: 'table', rows, columns, rowCount: rows.length, durationMs };
+    } catch (err: any) {
+      return { ok: false, error: String(err?.message ?? err), errorKind: 'runtime', durationMs: Date.now() - started };
+    }
+  });
+
   let activeCellId: string | null = state.cells.find((c) => c.type !== 'md')?.id ?? state.cells[0]?.id ?? null;
+  const activeCellIdx = () => {
+    const i = state.cells.findIndex((c) => c.id === activeCellId);
+    return i < 0 ? state.cells.length : i + 1;
+  };
 
   container.classList.add('nb-root');
   container.classList.toggle('nb-view-mode', state.mode === 'view');
+
+  const firstServer = collectDataServers(data)[0];
+  const sourceLabel = firstServer?.name ?? 'no source connected';
 
   container.innerHTML = `
     <div class="nbw-shell">
       <div class="nbw-header">
         <div class="nbw-logo"></div>
         <input class="nbw-title-edit nb-title-edit" value="${escapeAttr(state.title)}">
-        <span class="nbw-tag">draft</span>
+        <span class="nbw-tag">${(state as any).published ? 'published' : 'draft'}</span>
         <div class="nbw-ctx">
-          <span class="nbw-source">no source connected</span>
+          <span class="nbw-source">${escapeAttr(sourceLabel)}</span>
           <div class="nb-mode-switch">
             <button class="nb-mode-edit nb-on">edit</button>
             <button class="nb-mode-view">view</button>
           </div>
           <button class="nb-btn nbw-history-btn">⟲ history</button>
           <span class="nbw-servers-slot"></span>
-          <button class="nb-btn">run all</button>
+          <button class="nb-btn nbw-runall-btn">run all</button>
           <button class="nb-btn nbw-share-btn">share</button>
-          <button class="nb-btn nb-btn-primary">publish</button>
+          <button class="nb-btn nb-btn-primary nbw-publish-btn">publish</button>
         </div>
       </div>
       <div class="nb-history-panel nbw-history-panel"></div>
+      <div class="nbw-toast-slot"></div>
       <div class="nbw-body">
         <aside class="nbw-sidebar">
           <div class="nbw-section">sources</div>
-          <div class="nbw-item">◉ no source</div>
-          <div class="nbw-item nbw-indent nbw-dim">connect via mcp…</div>
+          <div class="nbw-sources-list"></div>
           <div class="nbw-section">cells</div>
           <div class="nbw-cells-nav"></div>
           <div class="nbw-add">
             <button class="nb-btn nb-add-cell" data-add="md">+ md</button>
             <button class="nb-btn nb-add-cell" data-add="sql">+ sql</button>
             <button class="nb-btn nb-add-cell" data-add="js">+ js</button>
+            <button class="nb-btn nbw-import-md">+md</button>
+            <button class="nb-btn nbw-import-recipe">+recipe</button>
           </div>
         </aside>
         <div class="nbw-cells"></div>
@@ -68,6 +151,52 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const cellsEl = shell.querySelector('.nbw-cells') as HTMLElement;
   const navEl = shell.querySelector('.nbw-cells-nav') as HTMLElement;
   const historyPanel = shell.querySelector('.nbw-history-panel') as HTMLElement;
+  const sourcesListEl = shell.querySelector('.nbw-sources-list') as HTMLElement;
+  const toastSlot = shell.querySelector('.nbw-toast-slot') as HTMLElement;
+  const tagEl = shell.querySelector('.nbw-tag') as HTMLElement;
+  const sourceEl = shell.querySelector('.nbw-source') as HTMLElement;
+
+  function renderSources() {
+    const servers = collectDataServers(data);
+    sourcesListEl.innerHTML = '';
+    if (servers.length === 0) {
+      const none = document.createElement('div');
+      none.className = 'nbw-item nbw-dim';
+      none.textContent = '◯ no source';
+      sourcesListEl.appendChild(none);
+    } else {
+      servers.forEach((srv) => {
+        const it = document.createElement('div');
+        it.className = 'nbw-item';
+        it.textContent = '◉ ' + srv.name;
+        sourcesListEl.appendChild(it);
+      });
+    }
+    const connectBtn = document.createElement('button');
+    connectBtn.className = 'nbw-item nbw-indent nbw-dim nbw-connect-btn';
+    connectBtn.textContent = 'connect via mcp…';
+    connectBtn.addEventListener('click', () => {
+      const serversBtn = shell.querySelector('.nbw-servers-slot button') as HTMLElement | null;
+      if (serversBtn) serversBtn.click();
+      else openAddRecipeModal({
+        mcpServers: (Array.isArray(data?.servers) ? (data.servers as any[]) : []).map((s: any) => ({ name: s.name, url: s.url })),
+        onPick: (recipe: any) => {
+          addImportedCells(state, extractCellsFromRecipe(recipe.body ?? '', { title: recipe.name, description: recipe.description }), activeCellIdx());
+          rerender();
+        },
+      });
+    });
+    sourcesListEl.appendChild(connectBtn);
+  }
+
+  function scrollToActive() {
+    if (!activeCellId) return;
+    const node = cellsEl.querySelector(`.nbw-cell[data-id="${activeCellId}"]`) as HTMLElement | null;
+    if (!node) return;
+    try { node.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {}
+    const ta = node.querySelector('textarea') as HTMLTextAreaElement | null;
+    if (ta) setTimeout(() => { try { ta.focus(); } catch {} }, 250);
+  }
 
   function renderCells() {
     cellsEl.innerHTML = '';
@@ -76,7 +205,11 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       const navItem = document.createElement('div');
       navItem.className = 'nbw-item' + (cell.id === activeCellId ? ' nbw-active' : '');
       navItem.textContent = `${idx + 1} · ${cell.name || cell.type}`;
-      navItem.addEventListener('click', () => { activeCellId = cell.id; rerender(); });
+      navItem.addEventListener('click', () => {
+        activeCellId = cell.id;
+        rerender();
+        scrollToActive();
+      });
       navEl.appendChild(navItem);
 
       cellsEl.appendChild(renderCell(cell, idx, state, rerender));
@@ -86,8 +219,30 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   function rerender() {
     mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); });
     renderCells();
+    renderSources();
+    // Update header tag
+    tagEl.textContent = (state as any).published ? 'published' : 'draft';
+    tagEl.classList.toggle('nbw-tag-published', !!(state as any).published);
+    // Update source label
+    const first = collectDataServers(data)[0];
+    sourceEl.textContent = first?.name ?? 'no source connected';
   }
 
+  // Toast helper
+  function showToast(msg: string, href?: string): void {
+    const t = document.createElement('div');
+    t.className = 'nbw-toast';
+    if (href) {
+      t.innerHTML = `${escapeAttr(msg)} — <a href="${escapeAttr(href)}" target="_blank" rel="noopener">${escapeAttr(href)}</a>`;
+    } else {
+      t.textContent = msg;
+    }
+    toastSlot.appendChild(t);
+    setTimeout(() => { t.classList.add('nbw-toast-out'); }, 3500);
+    setTimeout(() => { try { t.remove(); } catch {} }, 4200);
+  }
+
+  // ---- Add-cell buttons -----------------------------------------------------
   shell.querySelectorAll<HTMLElement>('[data-add]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const type = btn.dataset.add as any;
@@ -97,15 +252,100 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       rerender();
     });
   });
+
+  // ---- Import buttons (md / recipe) ----------------------------------------
+  (shell.querySelector('.nbw-import-md') as HTMLElement).addEventListener('click', () => {
+    openAddMdModal((content: string) => {
+      addImportedCells(state, [extractCellFromMarkdown(content)], activeCellIdx());
+      rerender();
+    });
+  });
+  (shell.querySelector('.nbw-import-recipe') as HTMLElement).addEventListener('click', () => {
+    openAddRecipeModal({
+      mcpServers: (Array.isArray(data?.servers) ? (data.servers as any[]) : []).map((s: any) => ({ name: s.name, url: s.url })),
+      onPick: (recipe: any) => {
+        addImportedCells(state, extractCellsFromRecipe(recipe.body ?? '', { title: recipe.name, description: recipe.description }), activeCellIdx());
+        rerender();
+      },
+    });
+  });
+
+  // ---- History panel toggle ------------------------------------------------
   (shell.querySelector('.nbw-history-btn') as HTMLElement).addEventListener('click', () => {
     historyPanel.classList.toggle('nb-open');
   });
+
+  // ---- Share button --------------------------------------------------------
   (shell.querySelector('.nbw-share-btn') as HTMLElement).addEventListener('click', () => {
-    openShareModal(state, (fmt) => console.log('[notebook-workspace] share as', fmt, state));
+    openShareModal(state, async (fmt) => {
+      try {
+        await dispatchShare(fmt, state, {
+          container,
+          onResult: (result: any) => {
+            if (result?.shortUrl) showToast('shared', result.shortUrl);
+            else if (result?.fullUrl) showToast('shared', result.fullUrl);
+            else showToast('exported as ' + fmt);
+          },
+        });
+      } catch (err: any) {
+        showToast('share failed: ' + String(err?.message ?? err));
+      }
+    });
   });
-  (shell.querySelector('.nbw-title-edit') as HTMLInputElement).addEventListener('input', (e) => {
-    state.title = (e.target as HTMLInputElement).value;
+
+  // ---- Run All -------------------------------------------------------------
+  (shell.querySelector('.nbw-runall-btn') as HTMLElement).addEventListener('click', async () => {
+    const runnable = state.cells.filter((c) => c.type !== 'md');
+    for (const cell of runnable) {
+      startRun(cell, state, rerender);
+      await waitForCell(cell);
+    }
   });
+
+  function waitForCell(cell: NotebookCell): Promise<void> {
+    return new Promise((resolve) => {
+      const iv = setInterval(() => {
+        if (cell.runState !== 'running') {
+          clearInterval(iv);
+          resolve();
+        }
+      }, 100);
+      // Safety timeout (60s)
+      setTimeout(() => { clearInterval(iv); resolve(); }, 60000);
+    });
+  }
+
+  // ---- Publish button ------------------------------------------------------
+  (shell.querySelector('.nbw-publish-btn') as HTMLElement).addEventListener('click', async () => {
+    state.mode = 'view';
+    (state as any).published = true;
+    container.classList.add('nb-view-mode');
+    editBtn.classList.remove('nb-on');
+    viewBtn.classList.add('nb-on');
+    rerender();
+    try {
+      const res = await shareAsHyperskill(state);
+      const url = res?.shortUrl || res?.fullUrl;
+      if (url) showToast('published', url);
+      else showToast('published');
+    } catch (err: any) {
+      showToast('publish failed: ' + String(err?.message ?? err));
+    }
+  });
+
+  // ---- Title edit (persisted with debounce) --------------------------------
+  const titleInput = shell.querySelector('.nbw-title-edit') as HTMLInputElement;
+  let titleTimer: any = null;
+  titleInput.addEventListener('input', (e) => {
+    const v = (e.target as HTMLInputElement).value;
+    state.title = v;
+    if (titleTimer) clearTimeout(titleTimer);
+    titleTimer = setTimeout(() => {
+      try { localStorage.setItem((state.id || 'nb') + ':title', v); } catch {}
+    }, 300);
+  });
+
+  // ---- Mode switch ---------------------------------------------------------
   const editBtn = shell.querySelector('.nb-mode-edit') as HTMLElement;
   const viewBtn = shell.querySelector('.nb-mode-view') as HTMLElement;
   editBtn.addEventListener('click', () => {
@@ -119,13 +359,32 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     viewBtn.classList.add('nb-on'); editBtn.classList.remove('nb-on');
   });
 
+  // ---- Servers modal button ------------------------------------------------
   buildServersButton(state, shell.querySelector('.nbw-servers-slot') as HTMLElement, data, rerender);
 
+  // ---- Left pane (collapsed by default) ------------------------------------
+  let leftPaneHandle: any = null;
+  try {
+    leftPaneHandle = mountLeftPane(shell, state, collectDataServers(data), {
+      onInjectCells: (cells: NotebookCell[]) => {
+        addImportedCells(state, cells, activeCellIdx());
+        rerender();
+      },
+    });
+  } catch (err) {
+    // Left pane mount is non-critical; log and continue
+    console.warn('[notebook-workspace] left pane mount failed', err);
+  }
+
+  // ---- DnD + history observer ---------------------------------------------
   setupDnD(cellsEl, state, rerender);
   const unsubHistory = registerHistoryObserver(() => mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); }));
 
   rerender();
-  return () => { unsubHistory(); };
+  return () => {
+    unsubHistory();
+    try { leftPaneHandle?.destroy?.(); } catch {}
+  };
 }
 
 function renderCell(cell: NotebookCell, idx: number, state: NotebookState, rerender: () => void): HTMLElement {
@@ -139,13 +398,17 @@ function renderCell(cell: NotebookCell, idx: number, state: NotebookState, reren
   const head = document.createElement('div');
   head.className = 'nbw-cell-head';
   const isCode = cell.type !== 'md';
+
+  // Compute meta info from lastResult
+  const metaInfo = computeMetaInfo(cell);
+
   head.innerHTML = `
     <span class="nb-drag-handle" draggable="true" title="drag">⋮⋮</span>
     ${isCode ? '<span class="nbw-run-controls"></span>' : ''}
     <span class="nbw-type nbw-type-${cell.type}">${cell.type}</span>
     <input class="nbw-cell-name-edit" value="${idx + 1} · ${escapeAttr(cell.name || '')}">
     <div class="nbw-meta">
-      ${isCode ? `<span class="nbw-meta-info">${cell.lastMs != null ? cell.lastMs + 'ms' : '—'} · 4 rows</span>` : ''}
+      ${isCode ? `<span class="nbw-meta-info">${escapeAttr(metaInfo)}</span>` : ''}
       <button class="nb-icon-btn nb-toggle-src">${cell.hideSource ? '▸ src' : '◂ src'}</button>
       ${isCode ? `<button class="nb-icon-btn nb-toggle-res">${cell.hideResult ? '▸ res' : '◂ res'}</button>` : ''}
       <button class="nb-icon-btn nb-danger nbw-del">✕</button>
@@ -168,28 +431,9 @@ function renderCell(cell: NotebookCell, idx: number, state: NotebookState, reren
   inner.appendChild(body);
   setTimeout(() => autosize(ta), 0);
 
-  if (cell.type === 'sql' && !cell.hideResult) {
-    const resWrap = document.createElement('div');
-    resWrap.innerHTML = `
-      <table class="nbw-result-table">
-        <thead><tr><th>col_a</th><th>col_b</th><th>share</th></tr></thead>
-        <tbody>
-          <tr><td>row_1</td><td>42</td><td><div class="nbw-share-bar" style="width:100%"></div></td></tr>
-          <tr><td>row_2</td><td>29</td><td><div class="nbw-share-bar" style="width:69%"></div></td></tr>
-          <tr><td>row_3</td><td>22</td><td><div class="nbw-share-bar" style="width:52%"></div></td></tr>
-          <tr><td>row_4</td><td>9</td><td><div class="nbw-share-bar" style="width:22%"></div></td></tr>
-        </tbody>
-      </table>`;
-    inner.appendChild(resWrap);
-  } else if (cell.type === 'js' && !cell.hideResult) {
-    const chart = document.createElement('div');
-    chart.className = 'nbw-chart';
-    chart.innerHTML = `
-      <div class="nbw-bar" style="height:100%"></div>
-      <div class="nbw-bar" style="height:68%"></div>
-      <div class="nbw-bar" style="height:52%"></div>
-      <div class="nbw-bar" style="height:22%"></div>`;
-    inner.appendChild(chart);
+  // ---- Result rendering (from cell.lastResult) ----
+  if (isCode && !cell.hideResult && cell.lastResult) {
+    inner.appendChild(renderResult(cell.lastResult));
   }
 
   (head.querySelector('.nb-toggle-src') as HTMLElement).addEventListener('click', () => { cell.hideSource = !cell.hideSource; rerender(); });
@@ -208,6 +452,64 @@ function renderCell(cell: NotebookCell, idx: number, state: NotebookState, reren
   return wrap;
 }
 
+function computeMetaInfo(cell: NotebookCell): string {
+  const ms = cell.lastMs != null ? cell.lastMs + 'ms' : '—';
+  const r = cell.lastResult;
+  if (!r) return ms + ' · (not run yet)';
+  if (!r.ok) return ms + ' · error';
+  if (r.kind === 'table') return ms + ' · ' + r.rowCount + ' rows';
+  if (r.kind === 'value') return ms + ' · value';
+  if (r.kind === 'chart') return ms + ' · chart';
+  return ms + ' · empty';
+}
+
+function renderResult(res: CellResult): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'nbw-result';
+  if (!res.ok) {
+    wrap.innerHTML = `<div class="nbw-error">⚠ ${escapeHtml(res.error)}</div>`;
+    return wrap;
+  }
+  if (res.kind === 'empty') {
+    wrap.innerHTML = `<div class="nbw-empty">(empty result)</div>`;
+    return wrap;
+  }
+  if (res.kind === 'value') {
+    const txt = typeof res.value === 'object' ? JSON.stringify(res.value, null, 2) : String(res.value);
+    wrap.innerHTML = `<pre class="nbw-value">${escapeHtml(txt)}</pre>`;
+    return wrap;
+  }
+  if (res.kind === 'chart') {
+    wrap.innerHTML = `<pre class="nbw-value">${escapeHtml(JSON.stringify(res.spec, null, 2))}</pre>`;
+    return wrap;
+  }
+  // table
+  const cols = res.columns;
+  const rows = res.rows.slice(0, 100);
+  const thead = cols.map((c) => `<th>${escapeHtml(c)}</th>`).join('');
+  const tbody = rows.map((r) => {
+    return '<tr>' + cols.map((c) => `<td>${escapeHtml(formatCell((r as any)[c]))}</td>`).join('') + '</tr>';
+  }).join('');
+  wrap.innerHTML = `<table class="nbw-result-table"><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table>`;
+  if (res.rows.length > rows.length) {
+    const note = document.createElement('div');
+    note.className = 'nbw-empty';
+    note.textContent = `… ${res.rows.length - rows.length} more rows`;
+    wrap.appendChild(note);
+  }
+  return wrap;
+}
+
+function formatCell(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+function escapeHtml(s: string): string {
+  return (s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as any)[c]);
+}
+
 function escapeAttr(s: string): string {
   return (s ?? '').replace(/"/g, '&quot;');
 }
@@ -219,7 +521,7 @@ function injectLayoutStyles(): void {
   style.textContent = `
 .nbw-shell {
   background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: 12px; overflow: hidden;
+  border-radius: 12px; overflow: hidden; position: relative;
 }
 .nbw-header {
   display: flex; align-items: center; padding: 10px 14px; gap: 12px;
@@ -239,6 +541,7 @@ function injectLayoutStyles(): void {
   background: var(--color-bg); padding: 2px 7px; border-radius: 3px;
   border: 1px solid var(--color-border);
 }
+.nbw-tag-published { color: var(--color-teal, #3ecfb2); border-color: var(--color-teal, #3ecfb2); }
 .nbw-ctx {
   font-family: var(--font-mono, 'IBM Plex Mono', monospace);
   font-size: 11px; color: var(--color-text2);
@@ -261,6 +564,8 @@ function injectLayoutStyles(): void {
   padding: 4px 6px; color: var(--color-text2);
   border-radius: 4px; cursor: pointer;
   display: flex; align-items: center; gap: 6px;
+  background: transparent; border: none;
+  font: inherit; text-align: left; width: 100%;
 }
 .nbw-item:hover { background: var(--color-surface); color: var(--color-text1); }
 .nbw-item.nbw-indent { padding-left: 18px; }
@@ -269,8 +574,10 @@ function injectLayoutStyles(): void {
   background: var(--color-surface); color: var(--color-text1);
   border-left: 2px solid var(--color-accent); border-radius: 0 4px 4px 0;
 }
+.nbw-connect-btn { cursor: pointer; }
+.nbw-connect-btn:hover { opacity: 1; }
 .nbw-add { margin-top: 10px; display: flex; gap: 4px; flex-wrap: wrap; }
-.nbw-add .nb-btn { flex: 1; font-size: 10px; padding: 3px 4px; }
+.nbw-add .nb-btn { flex: 1 1 auto; font-size: 10px; padding: 3px 4px; }
 
 .nbw-cells { display: flex; flex-direction: column; }
 .nbw-cell .nb-cell { border-bottom: 1px solid var(--color-border); position: relative; }
@@ -304,6 +611,7 @@ function injectLayoutStyles(): void {
 }
 .nbw-hidden { display: none !important; }
 
+.nbw-result { border-top: 1px dashed var(--color-border); }
 .nbw-result-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .nbw-result-table thead tr { background: var(--color-surface2); }
 .nbw-result-table th {
@@ -321,8 +629,38 @@ function injectLayoutStyles(): void {
 .nbw-result-table td:first-child { color: var(--color-text1); font-variant-numeric: normal; }
 .nbw-share-bar { height: 8px; background: var(--color-accent); border-radius: 2px; }
 
-.nbw-chart { padding: 16px; display: flex; align-items: flex-end; gap: 10px; height: 110px; }
-.nbw-bar { flex: 1; background: var(--color-accent); border-radius: 2px 2px 0 0; }
+.nbw-value {
+  margin: 0; padding: 12px 16px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 12px; color: var(--color-text1);
+  background: var(--color-bg); white-space: pre-wrap; word-break: break-word;
+}
+.nbw-empty {
+  padding: 12px 16px; color: var(--color-text2);
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace); font-size: 11px;
+  font-style: italic;
+}
+.nbw-error {
+  padding: 10px 16px; color: #d66; background: rgba(220,80,80,0.08);
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace); font-size: 12px;
+  border-top: 1px solid rgba(220,80,80,0.3);
+}
+
+.nbw-toast-slot {
+  position: absolute; bottom: 14px; right: 14px; z-index: 50;
+  display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+}
+.nbw-toast {
+  background: var(--color-surface2); color: var(--color-text1);
+  border: 1px solid var(--color-border); border-radius: 6px;
+  padding: 8px 12px; font-size: 11.5px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  pointer-events: auto; max-width: 420px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  transition: opacity 0.4s, transform 0.4s;
+}
+.nbw-toast a { color: var(--color-accent); text-decoration: underline; }
+.nbw-toast-out { opacity: 0; transform: translateY(6px); }
 `;
   document.head.appendChild(style);
 }

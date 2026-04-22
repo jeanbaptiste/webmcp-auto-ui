@@ -1,0 +1,4 @@
+# Ignore all runtime-generated content in this storage dir, but keep the folder tracked.
+*
+!.gitkeep
+!.gitignore

@@ -1,0 +1,2 @@
+# Storage directory for published notebooks.
+# Contents are runtime-generated (published/<hash>.json) and ignored by the local .gitignore.

@@ -8,10 +8,17 @@
 import {
   createState, injectStyles, mountRunControls, mountHistoryPanel,
   setupDnD, deleteCellWithConfirm, restoreCellFromSnapshot, addCell,
+  addImportedCells, registerExecutor, collectDataServers,
   autosize, openShareModal, registerHistoryObserver,
   buildServersButton,
-  type NotebookState, type NotebookCell,
+  type NotebookState, type NotebookCell, type CellResult, type CellExecContext,
 } from './shared.js';
+import { dispatchShare, shareAsHyperskill } from './share-handlers.js';
+import { renderProse } from './prose.js';
+import { openAddMdModal, openAddRecipeModal } from './import-modals.js';
+import { extractCellsFromRecipe, extractCellFromMarkdown } from './resource-extractor.js';
+import { mountLeftPane } from './left-pane.js';
+import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
 
 export async function render(container: HTMLElement, data: Record<string, unknown>): Promise<() => void> {
   injectStyles();
@@ -22,42 +29,67 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     title: data.title as string ?? 'Untitled notebook',
     mode: (data.mode as any) ?? 'edit',
     cells: data.cells as any,
+    kicker: (data.kicker as string) ?? undefined,
   });
-  const kicker: string = (data.kicker as string) ?? 'untitled';
+  if (!state.kicker) state.kicker = (data.kicker as string) ?? 'untitled';
+
+  // --- register executors -------------------------------------------------
+  registerExecutor(state, 'js', jsExecutor);
+  registerExecutor(state, 'sql', makeSqlExecutor(data));
+
   const forkId: string = (data.forkId as string) ?? (state.id.slice(0, 4) + '·' + state.id.slice(4, 8));
 
   container.classList.add('nb-root');
   container.classList.toggle('nb-view-mode', state.mode === 'view');
 
   container.innerHTML = `
-    <div class="nbe-shell">
-      <div class="nbe-kicker">
-        <span class="nbe-kicker-label">${escapeHtml(kicker)}</span>
-        <div class="nb-mode-switch" style="margin-left:auto;">
-          <button class="nb-mode-edit nb-on">edit</button>
-          <button class="nb-mode-view">view</button>
+    <div class="nbe-outer">
+      <div class="nbe-leftpane-slot"></div>
+      <div class="nbe-shell">
+        <div class="nbe-kicker">
+          <input class="nbe-kicker-input" value="${escapeAttr(state.kicker || '')}" placeholder="kicker…">
+          <div class="nb-mode-switch" style="margin-left:auto;">
+            <button class="nb-mode-edit nb-on">edit</button>
+            <button class="nb-mode-view">view</button>
+          </div>
+          <button class="nb-btn nbe-history-btn">⟲ history</button>
+          <span class="nbe-servers-slot"></span>
         </div>
-        <button class="nb-btn nbe-history-btn">⟲ history</button>
-        <span class="nbe-servers-slot"></span>
-      </div>
-      <input class="nbe-title nb-ed-title" value="${escapeAttr(state.title)}">
-      <div class="nb-history-panel nbe-history-panel"></div>
-      <div class="nbe-cells"></div>
-      <div class="nbe-footer">
-        <button class="nb-btn nb-add-cell" data-add="md">+ prose</button>
-        <button class="nb-btn nb-add-cell" data-add="sql">+ sql</button>
-        <button class="nb-btn nb-add-cell" data-add="js">+ chart</button>
-        <span class="nbe-fork nbe-share-btn">share · ${escapeHtml(forkId)}</span>
+        <input class="nbe-title nb-ed-title" value="${escapeAttr(state.title)}">
+        <div class="nb-history-panel nbe-history-panel"></div>
+        <div class="nbe-cells"></div>
+        <div class="nbe-footer">
+          <button class="nb-btn nb-add-cell" data-add="md">+ prose</button>
+          <button class="nb-btn nb-add-cell" data-add="sql">+ sql</button>
+          <button class="nb-btn nb-add-cell" data-add="js">+ chart</button>
+          <button class="nb-btn nb-add-cell" data-add-modal="md">+ md</button>
+          <button class="nb-btn nb-add-cell" data-add-modal="recipe">+ recipe</button>
+          <span class="nbe-fork nbe-share-btn" title="Share">share · ${escapeHtml(forkId)}</span>
+          <button class="nb-btn nbe-fork-btn" title="Fork this notebook">⑂ fork</button>
+        </div>
       </div>
     </div>`;
 
   const shell = container.querySelector('.nbe-shell') as HTMLElement;
+  const leftPaneHost = container.querySelector('.nbe-leftpane-slot') as HTMLElement;
   const cellsEl = shell.querySelector('.nbe-cells') as HTMLElement;
   const historyPanel = shell.querySelector('.nbe-history-panel') as HTMLElement;
 
+  let lastActiveIdx: number | null = null;
+  function activeCellIdx(): number | null {
+    if (lastActiveIdx != null && lastActiveIdx >= 0 && lastActiveIdx < state.cells.length) {
+      return lastActiveIdx;
+    }
+    return null;
+  }
+
   function renderCells() {
     cellsEl.innerHTML = '';
-    state.cells.forEach((cell) => cellsEl.appendChild(renderCell(cell, state, rerender)));
+    state.cells.forEach((cell, idx) => {
+      const node = renderCell(cell, state, rerender);
+      node.addEventListener('focusin', () => { lastActiveIdx = idx; });
+      cellsEl.appendChild(node);
+    });
   }
 
   function rerender() {
@@ -65,6 +97,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     renderCells();
   }
 
+  // Toolbar: direct add (prose/sql/js)
   shell.querySelectorAll<HTMLElement>('[data-add]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const type = btn.dataset.add as any;
@@ -72,14 +105,56 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       rerender();
     });
   });
+
+  // Toolbar: modal add (md / recipe)
+  shell.querySelectorAll<HTMLElement>('[data-add-modal]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const which = btn.dataset.addModal;
+      if (which === 'md') {
+        openAddMdModal((content) => {
+          const cell = extractCellFromMarkdown(content);
+          addImportedCells(state, [cell], activeCellIdx());
+          rerender();
+        });
+      } else if (which === 'recipe') {
+        const mcpServers = (Array.isArray((data as any)?.servers) ? (data as any).servers : [])
+          .map((s: any) => ({ name: String(s?.name ?? ''), url: s?.url ? String(s.url) : undefined }))
+          .filter((s: any) => s.name);
+        openAddRecipeModal({
+          mcpServers,
+          onPick: (recipe) => {
+            const cells = extractCellsFromRecipe(recipe.body ?? '', {
+              title: recipe.name, description: recipe.description,
+            });
+            addImportedCells(state, cells, activeCellIdx());
+            rerender();
+          },
+        });
+      }
+    });
+  });
+
   (shell.querySelector('.nbe-history-btn') as HTMLElement).addEventListener('click', () => {
     historyPanel.classList.toggle('nb-open');
   });
   (shell.querySelector('.nbe-share-btn') as HTMLElement).addEventListener('click', () => {
-    openShareModal(state, (fmt) => console.log('[notebook-editorial] share as', fmt, state));
+    openShareModal(state, (fmt) => {
+      dispatchShare(fmt, state, {
+        container,
+        onResult: (info) => toast(container, formatShareToast(info)),
+      });
+    });
+  });
+  (shell.querySelector('.nbe-fork-btn') as HTMLElement).addEventListener('click', () => {
+    void forkNotebook();
+  });
+  (shell.querySelector('.nbe-kicker-input') as HTMLInputElement).addEventListener('input', (e) => {
+    state.kicker = (e.target as HTMLInputElement).value;
+    state.lastEditAt = Date.now();
   });
   (shell.querySelector('.nbe-title') as HTMLInputElement).addEventListener('input', (e) => {
     state.title = (e.target as HTMLInputElement).value;
+    state.lastEditAt = Date.now();
   });
   const editBtn = shell.querySelector('.nb-mode-edit') as HTMLElement;
   const viewBtn = shell.querySelector('.nb-mode-view') as HTMLElement;
@@ -87,23 +162,165 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     state.mode = 'edit';
     container.classList.remove('nb-view-mode');
     editBtn.classList.add('nb-on'); viewBtn.classList.remove('nb-on');
+    rerender();
   });
   viewBtn.addEventListener('click', () => {
     state.mode = 'view';
     container.classList.add('nb-view-mode');
     viewBtn.classList.add('nb-on'); editBtn.classList.remove('nb-on');
+    rerender();
   });
 
   buildServersButton(state, shell.querySelector('.nbe-servers-slot') as HTMLElement, data, rerender);
 
+  // Left pane (collapsed by default)
+  const pane = mountLeftPane(leftPaneHost, state, collectDataServers(data), {
+    onInjectCells: (cells) => {
+      addImportedCells(state, cells, activeCellIdx());
+      rerender();
+    },
+  });
+
+  // Keep pane servers in sync with canvas changes
+  let canvasUnsub: (() => void) | null = null;
+  try {
+    const canvasAny: any = (globalThis as any).__canvasVanilla || (globalThis as any).canvasVanilla;
+    if (canvasAny?.subscribe) {
+      canvasUnsub = canvasAny.subscribe(() => pane.setServers(collectDataServers(data)));
+    }
+  } catch { /* ignore */ }
+
   setupDnD(cellsEl, state, rerender);
   const unsubHistory = registerHistoryObserver(() => mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); }));
 
+  // --- fork: deep-clone state, generate a fresh hyperskill URL -----------
+  async function forkNotebook(): Promise<void> {
+    try {
+      const forked: NotebookState = JSON.parse(JSON.stringify({
+        id: 'editorial_' + Math.random().toString(36).slice(2, 10),
+        title: state.title ? state.title + ' (fork)' : 'Untitled fork',
+        mode: state.mode,
+        cells: state.cells,
+        history: [],
+        scope: {},
+        executors: {},
+        lastEditAt: Date.now(),
+        kicker: state.kicker,
+      }));
+      const { fullUrl, shortUrl } = await shareAsHyperskill(forked);
+      try {
+        history.pushState({ forkFrom: state.id, forkId: forked.id }, '', `?fork=${forked.id}`);
+      } catch { /* browser may restrict pushState in some contexts */ }
+      try {
+        await navigator.clipboard?.writeText?.(shortUrl || fullUrl);
+        toast(container, `fork created · link copied (${(shortUrl || fullUrl).slice(0, 48)}…)`);
+      } catch {
+        toast(container, `fork created · ${(shortUrl || fullUrl).slice(0, 56)}…`);
+      }
+    } catch (err: any) {
+      toast(container, `fork failed · ${String(err?.message ?? err)}`, true);
+    }
+  }
+
   rerender();
-  return () => { unsubHistory(); };
+
+  return () => {
+    unsubHistory();
+    canvasUnsub?.();
+    pane.destroy();
+  };
 }
 
-// Unified cell rendering: prose (md) and code (sql/js) both live in the same flow.
+// ---------------------------------------------------------------------------
+// Executors (same pattern as compact/workspace/document agents)
+// ---------------------------------------------------------------------------
+
+async function jsExecutor(ctx: CellExecContext): Promise<CellResult> {
+  const start = Date.now();
+  const { cell, scope } = ctx;
+  try {
+    const keys = Object.keys(scope);
+    const values = keys.map((k) => scope[k]);
+    const src = cell.content.trim();
+    const body = /^\s*(return|var|let|const|function|class|if|for|while|\/\/|\/\*)/.test(src)
+      ? src
+      : `return (async () => { return (${src}); })();`;
+    // eslint-disable-next-line no-new-func
+    const fn = new Function(...keys, body);
+    let result = fn(...values);
+    if (result && typeof result.then === 'function') result = await result;
+    const durationMs = Date.now() - start;
+
+    if (result === undefined || result === null) return { ok: true, kind: 'empty', durationMs };
+    if (Array.isArray(result)) {
+      const rows = result.filter((r) => r && typeof r === 'object') as Record<string, unknown>[];
+      const columns = rows.length ? Array.from(new Set(rows.flatMap((r) => Object.keys(r)))) : [];
+      return { ok: true, kind: 'table', rows, columns, rowCount: rows.length, durationMs };
+    }
+    if (result && typeof result === 'object') {
+      const r: any = result;
+      if (r.data || r.marks || r.mark || r.$schema) {
+        return { ok: true, kind: 'chart', spec: result, durationMs };
+      }
+    }
+    return { ok: true, kind: 'value', value: result, durationMs };
+  } catch (err: any) {
+    return { ok: false, error: String(err?.message ?? err), errorKind: 'runtime', durationMs: Date.now() - start };
+  }
+}
+
+function makeSqlExecutor(data: Record<string, unknown>) {
+  return async function sqlExecutor(ctx: CellExecContext): Promise<CellResult> {
+    const start = Date.now();
+    const sql = ctx.cell.content;
+    const servers = collectDataServers(data);
+    const candidates: string[] = [];
+    for (const srv of servers) {
+      for (const t of srv.tools ?? []) candidates.push(t.name);
+    }
+    const precise = candidates.find((n) => /^.*query_sql$/i.test(n));
+    const loose = precise ?? candidates.find((n) => /^(query|run|execute)(_sql)?$/i.test(n));
+    const toolName = precise ?? loose;
+    if (!toolName) {
+      return {
+        ok: false,
+        error: 'No SQL tool available on connected servers (looked for *query_sql or query/run/execute).',
+        errorKind: 'schema',
+        durationMs: Date.now() - start,
+      };
+    }
+    try {
+      const res: any = await callToolViaPostMessage(toolName, { sql });
+      const text = res?.content?.find?.((c: any) => c.type === 'text')?.text ?? '';
+      const durationMs = Date.now() - start;
+      let parsed: any = null;
+      try { parsed = JSON.parse(text); } catch { /* not JSON */ }
+      if (parsed) {
+        const rows: any[] = Array.isArray(parsed) ? parsed
+          : Array.isArray(parsed?.rows) ? parsed.rows
+          : Array.isArray(parsed?.data) ? parsed.data
+          : Array.isArray(parsed?.results) ? parsed.results
+          : [];
+        if (rows.length && rows.every((r) => r && typeof r === 'object')) {
+          const columns = Array.isArray(parsed?.columns)
+            ? parsed.columns.map(String)
+            : Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
+          return { ok: true, kind: 'table', rows, columns, rowCount: rows.length, durationMs };
+        }
+        return { ok: true, kind: 'value', value: parsed, durationMs };
+      }
+      if (!text) return { ok: true, kind: 'empty', durationMs };
+      return { ok: true, kind: 'value', value: text, durationMs };
+    } catch (err: any) {
+      return { ok: false, error: String(err?.message ?? err), errorKind: 'runtime', durationMs: Date.now() - start };
+    }
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Cell rendering — prose + code share the unified flow, same DnD handle
+// ---------------------------------------------------------------------------
+
 function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => void): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'nb-cell-wrapper nbe-cell';
@@ -124,12 +341,31 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
   wrap.appendChild(del);
 
   if (cell.type === 'md') {
-    const p = document.createElement('div');
-    p.className = 'nbe-prose';
-    p.contentEditable = 'true';
-    p.innerHTML = cell.content;
-    p.addEventListener('input', () => { cell.content = p.innerHTML; });
-    wrap.appendChild(p);
+    if (state.mode === 'view') {
+      const rendered = document.createElement('div');
+      rendered.className = 'nbe-prose nbe-prose-render';
+      rendered.innerHTML = renderProse(cell.content || '');
+      wrap.appendChild(rendered);
+    } else {
+      // Editor: plain textarea (markdown source) + rendered preview below
+      const editor = document.createElement('textarea');
+      editor.className = 'nbe-prose-edit';
+      editor.value = cell.content || '';
+      editor.rows = 2;
+      editor.placeholder = 'write prose (markdown)…';
+      editor.spellcheck = true;
+      editor.addEventListener('input', () => {
+        cell.content = editor.value;
+        autosize(editor);
+        preview.innerHTML = renderProse(cell.content || '');
+      });
+      const preview = document.createElement('div');
+      preview.className = 'nbe-prose nbe-prose-render';
+      preview.innerHTML = renderProse(cell.content || '');
+      wrap.appendChild(editor);
+      wrap.appendChild(preview);
+      setTimeout(() => autosize(editor), 0);
+    }
     return wrap;
   }
 
@@ -142,7 +378,7 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
   head.innerHTML = `
     <span class="nbe-run-controls"></span>
     <span class="nbe-type-${cell.type}">${cell.type}</span>
-    <span class="nbe-meta-info">${cell.lastMs != null ? cell.lastMs + 'ms' : ''}</span>
+    <span class="nbe-meta-info">${escapeHtml(metaInfoFor(cell))}</span>
     <div class="nbe-actions">
       <button class="nb-icon-btn nb-toggle-src">${cell.hideSource ? '▸ src' : '◂ src'}</button>
       <button class="nb-icon-btn nb-toggle-res">${cell.hideResult ? '▸ res' : '◂ res'}</button>
@@ -162,29 +398,10 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
   codeCell.appendChild(body);
   setTimeout(() => autosize(ta), 0);
 
-  if (cell.type === 'js' && !cell.hideResult) {
-    const chart = document.createElement('div');
-    chart.className = 'nbe-chart';
-    chart.innerHTML = `
-      <div class="nbe-col"><span class="nbe-val">42</span><div class="nbe-bar" style="height:100%"></div></div>
-      <div class="nbe-col"><span class="nbe-val">29</span><div class="nbe-bar" style="height:69%;opacity:.84"></div></div>
-      <div class="nbe-col"><span class="nbe-val">22</span><div class="nbe-bar" style="height:53%;opacity:.7"></div></div>
-      <div class="nbe-col"><span class="nbe-val">9</span><div class="nbe-bar" style="height:22%;opacity:.56"></div></div>`;
-    codeCell.appendChild(chart);
-    const axis = document.createElement('div');
-    axis.className = 'nbe-chart-axis';
-    axis.innerHTML = '<span>A</span><span>B</span><span>C</span><span>D</span>';
-    codeCell.appendChild(axis);
-  } else if (cell.type === 'sql' && !cell.hideResult) {
+  if (!cell.hideResult) {
     const res = document.createElement('div');
-    res.className = 'nbe-sql-result';
-    res.innerHTML = `
-      <table>
-        <tr><td>row_1</td><td>42</td></tr>
-        <tr><td>row_2</td><td>29</td></tr>
-        <tr><td>row_3</td><td>22</td></tr>
-        <tr><td>row_4</td><td>9</td></tr>
-      </table>`;
+    res.className = 'nbe-result';
+    renderResultInto(res, cell);
     codeCell.appendChild(res);
   }
 
@@ -196,11 +413,114 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
   return wrap;
 }
 
+// ---------------------------------------------------------------------------
+// Result rendering — editorial flavour (serif headers, mono cells, discreet)
+// ---------------------------------------------------------------------------
+
+function metaInfoFor(cell: NotebookCell): string {
+  const r = cell.lastResult;
+  if (!r) {
+    if (cell.lastMs != null) return formatMs(cell.lastMs);
+    return cell.status === 'stale' ? 'stale' : '';
+  }
+  const parts: string[] = [];
+  if (!r.ok) parts.push('error');
+  else if (r.kind === 'table') parts.push(`${r.rowCount} row${r.rowCount === 1 ? '' : 's'}`);
+  else if (r.kind === 'value') parts.push(typeof r.value === 'object' && r.value !== null ? 'object' : typeof r.value);
+  else if (r.kind === 'chart') parts.push('chart');
+  else parts.push('empty');
+  if (r.durationMs != null) parts.push(formatMs(r.durationMs));
+  return parts.join(' · ');
+}
+
+function formatMs(ms: number): string {
+  if (ms < 1000) return ms + 'ms';
+  return (ms / 1000).toFixed(2) + 's';
+}
+
+function renderResultInto(el: HTMLElement, cell: NotebookCell): void {
+  const r = cell.lastResult;
+  el.innerHTML = '';
+  if (!r) {
+    el.innerHTML = `<div class="nbe-result-empty">press ▶ to run</div>`;
+    return;
+  }
+  if (!r.ok) {
+    el.innerHTML = `<div class="nbe-result-error">${escapeHtml(r.error || 'error')}</div>`;
+    return;
+  }
+  if (r.kind === 'empty') {
+    el.innerHTML = `<div class="nbe-result-empty">(no output)</div>`;
+    return;
+  }
+  if (r.kind === 'value') {
+    el.innerHTML = `<pre class="nbe-result-pre">${escapeHtml(safeJson(r.value))}</pre>`;
+    return;
+  }
+  if (r.kind === 'chart') {
+    el.innerHTML = `<div class="nbe-result-label">chart spec</div><pre class="nbe-result-pre">${escapeHtml(safeJson(r.spec))}</pre>`;
+    return;
+  }
+  // table — editorial style: serif header row, mono cells, minimal chrome.
+  const cols = r.columns && r.columns.length ? r.columns
+    : (r.rows[0] ? Object.keys(r.rows[0]) : []);
+  const maxRows = 40;
+  const shown = r.rows.slice(0, maxRows);
+  const thead = `<tr>${cols.map((c) => `<th>${escapeHtml(String(c))}</th>`).join('')}</tr>`;
+  const tbody = shown.map((row) => {
+    return `<tr>${cols.map((c) => {
+      const v = (row as any)[c];
+      const cellStr = v == null ? '' : typeof v === 'object' ? safeJson(v) : String(v);
+      return `<td>${escapeHtml(cellStr)}</td>`;
+    }).join('')}</tr>`;
+  }).join('');
+  const trunc = r.rows.length > maxRows
+    ? `<div class="nbe-result-trunc">showing ${maxRows} of ${r.rowCount}</div>`
+    : '';
+  el.innerHTML = `<div class="nbe-result-table-wrap"><table class="nbe-result-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>${trunc}`;
+}
+
+function safeJson(v: unknown): string {
+  try { return JSON.stringify(v, null, 2); } catch { return String(v); }
+}
+
+// ---------------------------------------------------------------------------
+// Toast
+// ---------------------------------------------------------------------------
+
+function toast(container: HTMLElement, msg: string, isError = false): void {
+  const t = document.createElement('div');
+  t.className = 'nbe-toast' + (isError ? ' nbe-toast-error' : '');
+  t.textContent = msg;
+  container.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('nbe-toast-in'));
+  setTimeout(() => {
+    t.classList.remove('nbe-toast-in');
+    setTimeout(() => t.remove(), 250);
+  }, 3200);
+}
+
+function formatShareToast(info: any): string {
+  if (!info) return 'share ready';
+  if (info.kind === 'hyperskill') {
+    const url = info.shortUrl || info.fullUrl || '';
+    return url ? `hyperskill link copied · ${url.slice(0, 48)}…` : 'hyperskill link ready';
+  }
+  if (info.kind === 'md') return 'markdown downloaded';
+  if (info.kind === 'json') return 'json downloaded';
+  if (info.kind === 'png') return 'png downloaded';
+  return 'shared';
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function escapeHtml(s: string): string {
-  return (s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]!));
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]!));
 }
 function escapeAttr(s: string): string {
-  return (s ?? '').replace(/"/g, '&quot;');
+  return String(s ?? '').replace(/"/g, '&quot;');
 }
 
 function injectLayoutStyles(): void {
@@ -208,7 +528,12 @@ function injectLayoutStyles(): void {
   const style = document.createElement('style');
   style.id = 'nbe-styles';
   style.textContent = `
+.nbe-outer {
+  display: flex; align-items: flex-start; gap: 8px;
+}
+.nbe-leftpane-slot { flex-shrink: 0; }
 .nbe-shell {
+  flex: 1; min-width: 0;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 12px;
@@ -221,7 +546,16 @@ function injectLayoutStyles(): void {
   letter-spacing: 0.1em; text-transform: uppercase;
   margin-bottom: 14px;
 }
-.nbe-kicker-label { flex: 0 0 auto; }
+.nbe-kicker-input {
+  flex: 0 0 auto; min-width: 120px;
+  background: transparent; border: 1px dashed transparent;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px; color: var(--color-text2);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 2px 4px; border-radius: 3px; outline: none;
+}
+.nbe-kicker-input:focus { border-color: var(--color-border); background: var(--color-bg); color: var(--color-text1); }
+.nb-root.nb-view-mode .nbe-kicker-input { pointer-events: none; }
 .nbe-title {
   font-family: 'EB Garamond', Georgia, serif;
   font-size: 30px; font-weight: 500;
@@ -249,24 +583,48 @@ function injectLayoutStyles(): void {
   font-size: 17px; line-height: 1.7;
   color: var(--color-text1);
   max-width: 620px;
-  outline: none;
   padding: 2px 4px;
   border-radius: 3px;
-  border: 1px dashed transparent;
 }
-.nbe-prose:focus { border-color: var(--color-border); background: var(--color-bg); }
-.nbe-prose code {
+.nbe-prose-render h1, .nbe-prose-render h2, .nbe-prose-render h3,
+.nbe-prose-render h4, .nbe-prose-render h5, .nbe-prose-render h6 {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-weight: 600; letter-spacing: -0.01em;
+  margin: 0.6em 0 0.3em;
+}
+.nbe-prose-render h1 { font-size: 1.4em; }
+.nbe-prose-render h2 { font-size: 1.25em; }
+.nbe-prose-render h3 { font-size: 1.12em; }
+.nbe-prose-render p { margin: 0.5em 0; }
+.nbe-prose-render ul, .nbe-prose-render ol { margin: 0.5em 0; padding-left: 1.4em; }
+.nbe-prose-render blockquote {
+  border-left: 3px solid var(--color-border);
+  padding-left: 12px; margin: 0.6em 0;
+  color: var(--color-text2); font-style: italic;
+}
+.nbe-prose-render code {
   font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-  font-size: 14px;
+  font-size: 0.82em;
   background: var(--color-surface2);
   padding: 1px 6px; border-radius: 3px;
   color: var(--color-accent);
 }
-.nbe-prose mark {
+.nbe-prose-render mark {
   background: rgba(240,160,80,0.18);
   color: var(--color-amber);
   padding: 0 4px; border-radius: 2px;
 }
+.nbe-prose-edit {
+  display: block; width: 100%; max-width: 620px;
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border); border-radius: 4px;
+  padding: 8px 10px; margin-bottom: 6px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 12.5px; line-height: 1.6;
+  color: var(--color-text1);
+  outline: none; resize: none; overflow: hidden;
+}
+.nbe-prose-edit:focus { border-color: var(--color-border2); border-style: solid; }
 
 .nbe-code-cell {
   background: var(--color-surface2);
@@ -284,54 +642,66 @@ function injectLayoutStyles(): void {
 }
 .nbe-type-sql { color: var(--color-accent); text-transform: uppercase; letter-spacing: 0.08em; }
 .nbe-type-js { color: var(--color-teal); text-transform: uppercase; letter-spacing: 0.08em; }
-.nbe-meta-info { margin-right: auto; }
+.nbe-meta-info { margin-right: auto; color: var(--color-text2); }
 .nbe-actions { display: flex; gap: 4px; }
 .nbe-code-body { padding: 14px 16px; }
 .nbe-hidden { display: none !important; }
 
-.nbe-sql-result {
+.nbe-result {
   background: var(--color-bg);
-  padding: 10px 16px;
   border-top: 1px solid var(--color-border);
+  padding: 12px 16px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 12px; color: var(--color-text1);
 }
-.nbe-sql-result table {
+.nbe-result-empty {
+  color: var(--color-text2); font-style: italic; font-size: 11.5px;
+}
+.nbe-result-error {
+  color: var(--color-accent2); white-space: pre-wrap; font-size: 12px;
+}
+.nbe-result-label {
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--color-text2); margin-bottom: 6px;
+}
+.nbe-result-pre {
+  margin: 0; padding: 8px 10px;
+  background: var(--color-surface2); border-radius: 4px;
+  font-size: 11.5px; overflow: auto; max-height: 260px;
+  color: var(--color-text1);
+}
+.nbe-result-table-wrap { overflow: auto; max-height: 320px; }
+.nbe-result-table {
   width: 100%; border-collapse: collapse;
-  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-  font-size: 12px; font-variant-numeric: tabular-nums;
-}
-.nbe-sql-result table td { padding: 3px 0; color: var(--color-text1); }
-.nbe-sql-result table td:first-child { color: var(--color-text2); }
-.nbe-sql-result table td:last-child { text-align: right; }
-
-.nbe-chart {
-  display: flex; align-items: flex-end; gap: 14px;
-  height: 180px;
-  padding: 16px;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-bg);
-}
-.nbe-col {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;
-  height: 100%; justify-content: flex-end;
-}
-.nbe-val {
-  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-  font-size: 11px; color: var(--color-text2);
   font-variant-numeric: tabular-nums;
 }
-.nbe-bar { width: 100%; background: var(--color-accent); border-radius: 2px 2px 0 0; }
-.nbe-chart-axis {
-  display: flex; gap: 14px;
-  padding: 6px 16px 10px;
-  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-  font-size: 11px; color: var(--color-text2);
-  text-transform: uppercase; letter-spacing: 0.08em;
-  background: var(--color-bg);
+.nbe-result-table thead th {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 12.5px; font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text2);
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  position: sticky; top: 0;
 }
-.nbe-chart-axis span { flex: 1; text-align: center; }
+.nbe-result-table tbody td {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11.5px;
+  color: var(--color-text1);
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis;
+}
+.nbe-result-table tbody tr:last-child td { border-bottom: none; }
+.nbe-result-trunc {
+  margin-top: 6px; padding: 4px 2px;
+  color: var(--color-text2); font-size: 10.5px; font-style: italic;
+}
 
 .nbe-footer {
-  display: flex; gap: 8px;
+  display: flex; gap: 8px; flex-wrap: wrap;
   padding-top: 16px; margin-top: 24px;
   border-top: 1px solid var(--color-border);
   align-items: center;
@@ -341,8 +711,30 @@ function injectLayoutStyles(): void {
   font-family: var(--font-mono, 'IBM Plex Mono', monospace);
   font-size: 11px; color: var(--color-text2);
   cursor: pointer;
+  padding: 5px 10px;
 }
 .nbe-fork:hover { color: var(--color-accent); }
+.nbe-fork-btn {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px;
+}
+
+/* Toast */
+.nbe-toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: var(--color-surface2); color: var(--color-text1);
+  border: 1px solid var(--color-border); border-radius: 8px;
+  padding: 8px 14px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11.5px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  opacity: 0; transition: opacity 0.25s, transform 0.25s;
+  z-index: 1005; pointer-events: none;
+  max-width: 480px;
+}
+.nbe-toast.nbe-toast-in { opacity: 1; transform: translateX(-50%) translateY(0); }
+.nbe-toast.nbe-toast-error { color: var(--color-accent2); border-color: var(--color-accent2); }
 `;
   document.head.appendChild(style);
 }

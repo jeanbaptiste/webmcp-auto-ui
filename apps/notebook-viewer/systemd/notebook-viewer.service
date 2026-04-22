@@ -1,0 +1,46 @@
+# systemd unit for notebook-viewer (nb.hyperskills.net)
+#
+# Install (phase 3, on bot):
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin notebook-viewer
+#   sudo mkdir -p /opt/webmcp-demos/notebook-viewer/storage
+#   sudo chown -R notebook-viewer:notebook-viewer /opt/webmcp-demos/notebook-viewer/storage
+#   scp apps/notebook-viewer/systemd/notebook-viewer.service bot:/tmp/
+#   ssh bot 'sudo mv /tmp/notebook-viewer.service /etc/systemd/system/'
+#   ssh bot 'sudo systemctl daemon-reload && sudo systemctl enable --now notebook-viewer'
+#   ssh bot 'sudo systemctl status notebook-viewer'
+#
+# Logs:
+#   journalctl -u notebook-viewer -f
+
+[Unit]
+Description=Notebook viewer (nb.hyperskills.net)
+After=network.target
+
+[Service]
+Type=simple
+User=notebook-viewer
+Group=notebook-viewer
+WorkingDirectory=/opt/webmcp-demos/notebook-viewer
+ExecStart=/usr/bin/node /opt/webmcp-demos/notebook-viewer/server.js
+Restart=on-failure
+RestartSec=3
+Environment=NODE_ENV=production
+Environment=PORT=3011
+Environment=NOTEBOOK_STORAGE=/opt/webmcp-demos/notebook-viewer/storage
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/webmcp-demos/notebook-viewer/storage
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+
+[Install]
+WantedBy=multi-user.target

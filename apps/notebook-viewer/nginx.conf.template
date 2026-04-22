@@ -1,0 +1,53 @@
+# nginx vhost for nb.hyperskills.net
+#
+# Install (phase 3, on bot):
+#   scp apps/notebook-viewer/nginx.conf.template bot:/tmp/nb.hyperskills.net.conf
+#   ssh bot 'sudo mv /tmp/nb.hyperskills.net.conf /etc/nginx/sites-available/nb.hyperskills.net'
+#   ssh bot 'sudo ln -sf /etc/nginx/sites-available/nb.hyperskills.net /etc/nginx/sites-enabled/nb.hyperskills.net'
+#   ssh bot 'sudo nginx -t && sudo systemctl reload nginx'
+#
+# Provision TLS (Let's Encrypt):
+#   ssh bot 'sudo certbot --nginx -d nb.hyperskills.net'
+#   certbot will uncomment and fill the ssl_certificate lines below.
+#
+# Backend:
+#   systemd unit: notebook-viewer.service (listens on 127.0.0.1:3011)
+
+server {
+  listen 80;
+  listen [::]:80;
+  server_name nb.hyperskills.net;
+  return 301 https://$server_name$request_uri;
+}
+
+server {
+  listen 443 ssl http2;
+  listen [::]:443 ssl http2;
+  server_name nb.hyperskills.net;
+
+  # ssl_certificate     /etc/letsencrypt/live/nb.hyperskills.net/fullchain.pem;  # certbot adds
+  # ssl_certificate_key /etc/letsencrypt/live/nb.hyperskills.net/privkey.pem;    # certbot adds
+  # include /etc/letsencrypt/options-ssl-nginx.conf;                             # certbot adds
+  # ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;                               # certbot adds
+
+  access_log /var/log/nginx/nb.hyperskills.net.access.log;
+  error_log  /var/log/nginx/nb.hyperskills.net.error.log;
+
+  client_max_body_size 2M;
+
+  # Gzip for JSON / JS / CSS
+  gzip on;
+  gzip_types application/json application/javascript text/css text/html image/svg+xml;
+  gzip_min_length 1024;
+
+  location / {
+    proxy_pass http://127.0.0.1:3011;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 30s;
+    proxy_connect_timeout 5s;
+  }
+}

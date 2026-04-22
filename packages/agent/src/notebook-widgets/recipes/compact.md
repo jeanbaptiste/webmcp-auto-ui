@@ -65,7 +65,7 @@ Prefer over `notebook-editorial` when the result is a working session, not a pub
    }})
    ```
 
-2. **Name outputs** (varname) on the SQL/JS cells so the gutter displays `→ varname` and downstream cells can reference them.
+2. **Name outputs** (`varname`) on the SQL/JS cells so the gutter displays `→ varname` and downstream cells can reference them. Named outputs are injected into the scope of every JS cell executed after them; if a downstream cell's code mentions `varname` (word-boundary match), it is flagged **stale** whenever the upstream cell re-runs, so the user sees what needs replaying.
 
 3. **Start markdown cells with a heading** (`### Title`) — the first line renders larger and gives the cell an anchor.
 
@@ -76,8 +76,28 @@ Prefer over `notebook-editorial` when the result is a working session, not a pub
 - The Run button lives at the left of each cell's title row, right after the type label.
 - Stop (red pill) appears while running, with a live elapsed timer.
 - After a run, Run becomes the replay button (same green pill, re-click to re-run).
+- **SQL cells** are dispatched to the first matching `*_query_sql` tool on the connected MCP data server (auto-detected).
+- **JS cells** execute inside an isolated Web Worker with upstream named outputs injected as scope — `console.log` / `console.table` results are captured and rendered inline.
 - Deletions prompt a confirmation modal and are recorded in the history panel; they can be restored from there.
 - `mode: "view"` hides all controls (run, delete, drag, add), making the notebook read-only.
+
+## Left pane — connected data servers
+
+When one or more MCP data servers are connected, a collapsible **left pane** (bookmark-bar styling, collapsed by default) lists their recipes and tools. Clicking any recipe opens it in a viewer modal; each fenced code block inside the recipe has a `↳ inject` button that drops the snippet into the notebook as a new cell.
+
+Two toolbar buttons flank this pane:
+
+- **`+ md`** — 3-tab modal (New / File / URL) to create a markdown cell from scratch, a local `.md` file, or a remote URL.
+- **`+ recipe`** — 3-tab modal (Browser / File / URL) to import a recipe from a connected server, a local `.recipe.md` file, or a URL.
+
+## Share & publish
+
+The `share` button offers **four formats**:
+
+- **Hyperskill link** — copies both the canonical Hyperskill URL and a short domain-scoped URL (`?n=<token>`). Opens at `nb.hyperskills.net` (read-only public viewer) when mode is `view`.
+- **Markdown** — downloads a `.md` file with the notebook content.
+- **PNG** — snapshots the rendered notebook to an image.
+- **JSON** — exports the full widget state for programmatic reuse.
 
 ## Integration with connected data servers
 
@@ -86,7 +106,7 @@ If a MCP **data** server is connected (e.g. `tricoteuses`, `metmuseum`), BEFORE 
 1. Call `{server}_list_recipes()` or `{server}_search_recipes(query)` to find recipes that match the user's intent.
 2. Call `{server}_list_tools()` to see available tables/endpoints.
 3. For each high-signal recipe or table, seed ONE cell that demonstrates it: an SQL `SELECT ... LIMIT 10`, a `run_script` call, or a short markdown note.
-4. Pass the server metadata via the `servers:` param so the UI can render the server menu modal:
+4. Pass the server metadata via the `servers:` param so the UI can render the server menu modal and populate the left pane:
 
    ```ts
    widget_display({

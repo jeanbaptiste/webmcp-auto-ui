@@ -13,7 +13,7 @@ schema:
       enum: [edit, view]
     kicker:
       type: string
-      description: Small uppercase label above the title (e.g. "analysis", "memo", "brief"). Defaults to "untitled".
+      description: Small uppercase label above the title (e.g. "analysis", "memo", "brief"). Editable inline. Defaults to "untitled".
     forkId:
       type: string
       description: Short identifier shown in the footer next to "share" (e.g. "4c7a·9f21"). Defaults to a slice of the notebook id.
@@ -27,7 +27,7 @@ schema:
           type:
             type: string
             enum: [md, sql, js]
-            description: md = prose paragraph, sql = query cell with table output, js = code cell with chart output
+            description: md = prose paragraph (markdown rendered + sanitized), sql = query cell with table output, js = code cell with chart output
           content:
             type: string
           hideSource:
@@ -65,18 +65,39 @@ The distinguishing feature: prose paragraphs and code cells share a single order
 2. **Use prose paragraphs as transitions** between code blocks. The layout emphasizes reading flow.
 
 3. **Code cells render their result in the editorial style**:
-   - SQL cells show a minimal mono-spaced table
-   - JS cells show a chart area with labeled bars
+   - SQL cells show a minimal mono-spaced table (live data from the connected MCP server's `*_query_sql` tool).
+   - JS cells run in an isolated Web Worker with upstream named outputs in scope.
 
 4. **Reorder cells freely** — the user can drag a prose paragraph from the bottom to the top, or swap a chart and its introduction, all via the same handle.
 
 ## Notes
 
 - The serif font (EB Garamond, with Georgia fallback) applies only to prose content inside this widget — it signals "publication" the moment the user sees it.
-- The kicker above the title ("analysis", "memo", "internal") is editorial shorthand; keep it short.
-- The footer shows `share · forkId`, which is clickable to open the share modal.
+- The **kicker** above the title ("analysis", "memo", "internal") is editable inline — click to rename. Keep it short.
+- Prose cells are rendered via an HTML-sanitizing markdown pipeline: markdown syntax is resolved, unsafe tags are stripped (XSS closed), `<mark>` and other editorial tags are preserved.
+- The footer shows `share · forkId`. The **fork** affordance performs a real deep clone of the current state: it mints a new `editorial_*` id, a fresh Hyperskill URL, and opens the forked copy for the user to diverge from the original without touching it.
 - Run / Stop controls are at the left of each code cell's header, same as the other notebook layouts.
 - Unlike the other widgets, `notebook-editorial` does not separate prose and code into different flows — they are the same flow in one list.
+
+## Left pane — resources from connected servers
+
+A collapsible **left pane** (bookmark-bar styling, collapsed by default) lists recipes and tools exposed by connected MCP data servers. Clicking any recipe opens a viewer modal; fenced code blocks expose a `↳ inject` button that drops the snippet into the article flow as a new cell.
+
+Two toolbar buttons flank this pane:
+
+- **`+ md`** — 3-tab modal (New / File / URL) to insert a prose paragraph from scratch, a local `.md` file, or a URL.
+- **`+ recipe`** — 3-tab modal (Browser / File / URL) to import a recipe from a connected server, a local `.recipe.md` file, or a URL.
+
+## Share & fork
+
+The `share` button in the footer offers **four formats**:
+
+- **Hyperskill link** — copies both the canonical Hyperskill URL and a short domain-scoped URL (`?n=<token>`). The read-only public viewer lives at `nb.hyperskills.net`.
+- **Markdown** — downloads a `.md` file.
+- **PNG** — snapshots the rendered article.
+- **JSON** — exports full widget state.
+
+**Fork** (via the `forkId` label next to share) deep-clones the notebook into a new editorial piece — the reader becomes an author without overwriting the original.
 
 ## Integration with connected data servers
 
@@ -85,7 +106,7 @@ An editorial piece earns its weight when the prose is anchored to real material.
 1. Call `{server}_list_recipes()` or `{server}_search_recipes(query)` to find recipes that speak to the subject at hand.
 2. Call `{server}_list_tools()` to survey the available tables and endpoints.
 3. For each recipe or table worth citing, seed one cell that lets the reader touch the evidence — a modest SQL `SELECT ... LIMIT 10`, a `run_script` call, or a prose paragraph that introduces the figure to come. Let prose and code alternate; the editorial flow is built for exactly that.
-4. Pass the server metadata through the `servers:` param so the footer's share affordance and the connect modal reflect the provenance of the piece:
+4. Pass the server metadata through the `servers:` param so the footer's share affordance, the left pane, and the connect modal reflect the provenance of the piece:
 
    ```ts
    widget_display({

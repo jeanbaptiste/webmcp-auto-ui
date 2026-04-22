@@ -1,0 +1,87 @@
+/* nb.hyperskills.net — Public notebook viewer */
+
+:root {
+  color-scheme: light dark;
+  --nb-bg: #ffffff;
+  --nb-fg: #1a1a1a;
+  --nb-muted: #6b7280;
+  --nb-border: #e5e7eb;
+  --nb-accent: #2563eb;
+  --nb-error-bg: #fef2f2;
+  --nb-error-fg: #991b1b;
+  --nb-error-border: #fecaca;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --nb-bg: #0b0d10;
+    --nb-fg: #e5e7eb;
+    --nb-muted: #9ca3af;
+    --nb-border: #1f2937;
+    --nb-accent: #60a5fa;
+    --nb-error-bg: #2a0f10;
+    --nb-error-fg: #fca5a5;
+    --nb-error-border: #7f1d1d;
+  }
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--nb-bg);
+  color: var(--nb-fg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a { color: var(--nb-accent); }
+
+.nb-viewer-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.nb-viewer-host {
+  flex: 1;
+  padding: 16px;
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.nb-viewer-landing,
+.nb-viewer-error,
+.nb-viewer-loading {
+  max-width: 680px;
+  margin: 12vh auto 0;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.nb-viewer-error {
+  border: 1px solid var(--nb-error-border);
+  background: var(--nb-error-bg);
+  color: var(--nb-error-fg);
+  border-radius: 8px;
+}
+
+.nb-viewer-landing h1 { font-size: 28px; margin: 0 0 12px; }
+.nb-viewer-landing p { color: var(--nb-muted); margin: 8px 0; }
+
+.nb-viewer-landing code {
+  background: var(--nb-border);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.nb-viewer-footer {
+  padding: 16px;
+  text-align: center;
+  color: var(--nb-muted);
+  font-size: 12px;
+  border-top: 1px solid var(--nb-border);
+}

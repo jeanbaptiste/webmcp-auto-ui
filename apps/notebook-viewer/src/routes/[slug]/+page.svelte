@@ -1,16 +1,13 @@
 <script lang="ts">
-  // nb.hyperskills.net — entry point.
-  // Decodes ?hs=... or ?n=... from the URL, mounts the correct notebook
-  // widget (forcing mode:'view'). Falls back to a landing page when no
-  // param is present.
+  // Permanent published notebook: /:slug.
+  // Fetches /api/p/:slug (provided by Agent H) and mounts the widget.
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import { browser } from '$app/environment';
   import { mountWidget } from '@webmcp-auto-ui/core';
   import { autoui } from '@webmcp-auto-ui/agent';
   import {
-    detectIntent,
-    loadFromHsParam,
-    loadFromShortToken,
+    loadFromSlug,
     extractMeta,
     NotebookLoadError,
     type NotebookPayload,
@@ -18,51 +15,35 @@
   } from '$lib/notebook-loader';
 
   type View =
-    | { status: 'landing' }
     | { status: 'loading' }
     | { status: 'ready'; payload: NotebookPayload; meta: NotebookMeta }
-    | { status: 'error'; message: string };
+    | { status: 'error'; code: 'not_found' | 'other'; message: string };
 
   let view = $state<View>({ status: 'loading' });
   let host = $state<HTMLDivElement | null>(null);
   let cleanup: (() => void) | null = null;
 
-  async function boot() {
-    const intent = detectIntent(window.location.href);
-    if (intent.kind === 'none') {
-      view = { status: 'landing' };
-      return;
-    }
+  async function boot(slug: string) {
     view = { status: 'loading' };
     try {
-      const payload = intent.kind === 'hs'
-        ? await loadFromHsParam(window.location.href)
-        : await loadFromShortToken(intent.value);
+      const payload = await loadFromSlug(slug);
       const meta = extractMeta(payload);
       view = { status: 'ready', payload, meta };
     } catch (err) {
-      const message = err instanceof NotebookLoadError
-        ? messageFor(err)
-        : 'Something went wrong while loading this notebook.';
-      view = { status: 'error', message };
+      if (err instanceof NotebookLoadError && err.code === 'not_found') {
+        view = { status: 'error', code: 'not_found', message: 'Notebook not found.' };
+      } else {
+        const msg = err instanceof NotebookLoadError
+          ? err.message
+          : 'Could not load this notebook.';
+        view = { status: 'error', code: 'other', message: msg };
+      }
     }
   }
 
-  function messageFor(err: NotebookLoadError): string {
-    switch (err.code) {
-      case 'unsupported': return 'Only notebook widgets are supported here.';
-      case 'not_found':   return 'This notebook link could not be found.';
-      case 'network':     return 'Network error — please try again.';
-      case 'invalid':
-      default:            return 'This notebook link is invalid or expired.';
-    }
-  }
-
-  // Mount the widget whenever the view becomes `ready` and the host is bound.
   $effect(() => {
     if (!browser) return;
     if (view.status !== 'ready' || !host) return;
-    // Tear down any previous mount.
     if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
     host.innerHTML = '';
     const result = mountWidget(host, view.payload.kind, view.payload.data, [autoui]);
@@ -73,20 +54,21 @@
   });
 
   onMount(() => {
-    boot();
+    const slug = $page.params.slug;
+    if (slug) boot(slug);
+    else view = { status: 'error', code: 'not_found', message: 'Missing slug.' };
     return () => {
       if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
     };
   });
 
-  // Derived OG fields — reactive with view state.
   const ogTitle = $derived(
-    view.status === 'ready' ? `${view.meta.title} — nb.hyperskills.net` : 'nb.hyperskills.net',
+    view.status === 'ready' ? `${view.meta.title} — nb.hyperskills.net` : 'Notebook — nb.hyperskills.net',
   );
   const ogDesc = $derived(
     view.status === 'ready'
       ? view.meta.description
-      : 'Public notebooks shared via HyperSkill links.',
+      : 'A notebook published on nb.hyperskills.net',
   );
 </script>
 
@@ -101,19 +83,13 @@
   <meta name="twitter:description" content={ogDesc} />
 </svelte:head>
 
-{#if view.status === 'landing'}
-  <main class="nb-viewer-landing">
-    <h1>Public notebooks</h1>
-    <p>
-      This site displays notebooks shared via a HyperSkill link.
-      Paste a link that ends with <code>?hs=...</code> or <code>?n=...</code>
-      into the address bar to view its contents.
-    </p>
-    <p>Links are decoded in your browser — no account required.</p>
-  </main>
-{:else if view.status === 'loading'}
-  <main class="nb-viewer-loading">
-    <p>Loading notebook…</p>
+{#if view.status === 'loading'}
+  <main class="nb-viewer-loading"><p>Loading notebook…</p></main>
+{:else if view.status === 'error' && view.code === 'not_found'}
+  <main class="nb-viewer-error">
+    <h1>404 — Notebook not found</h1>
+    <p>{view.message}</p>
+    <p><a href="/">Back to home</a></p>
   </main>
 {:else if view.status === 'error'}
   <main class="nb-viewer-error">

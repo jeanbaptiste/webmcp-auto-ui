@@ -55,16 +55,41 @@ This layout is more enterprise-flavoured than `notebook-compact`. Prefer it when
    }})
    ```
 
-2. **The sidebar shows** data sources (when connected) and the numbered list of cells. Clicking a cell item in the sidebar focuses that cell.
+2. **The sidebar shows** data sources (when connected) and the numbered list of cells. Clicking a cell item scrolls to it and focuses its textarea for immediate editing.
 
-3. **The header has** run all / share / publish buttons. Publish is the primary (accent-coloured) CTA — it represents the transition from draft to read-only app view.
+3. **The header has** `run all` / `share` / `publish` buttons.
+   - **`run all`** sequentially executes every non-markdown cell from top to bottom.
+   - **`publish`** is the primary (accent-coloured) CTA — it flips the notebook to `mode: 'view'`, tags it `published` (from `draft`), and emits a Hyperskill share link automatically.
+   - The **title** is editable inline in the header and persists across reloads via localStorage.
 
 ## Notes
 
 - Cells are added via buttons in the sidebar (not in the header).
 - Run controls (green/red pill) sit at the left of each cell's header, right after the drag handle.
 - Each cell head can be renamed inline in the sidebar (click the "N · name" item).
-- The sidebar under "sources" shows a placeholder when no MCP source is connected — a gentle nudge toward the connect flow.
+- The sidebar under "sources" shows a placeholder when no MCP source is connected. Each source row is clickable: a `connect via mcp…` entry opens the servers modal so the user can hook one up without leaving the notebook.
+- **SQL cells** dispatch to the connected MCP server's `*_query_sql` tool (auto-detected).
+- **JS cells** execute in an isolated Web Worker with upstream named outputs injected as scope.
+
+## Left pane — resources from connected servers
+
+A collapsible **left pane** (bookmark-bar styling, collapsed by default) lists recipes and tools exposed by connected MCP data servers. Clicking any recipe opens a viewer modal; each fenced code block inside exposes a `↳ inject` button that drops the snippet into the notebook as a new cell.
+
+Two toolbar buttons flank this pane:
+
+- **`+ md`** — 3-tab modal (New / File / URL) to create a markdown cell from scratch, from a local `.md` file, or from a URL.
+- **`+ recipe`** — 3-tab modal (Browser / File / URL) to import a recipe from a connected server, a local `.recipe.md` file, or a URL.
+
+## Share & publish
+
+The `share` button offers **four formats**:
+
+- **Hyperskill link** — copies both the canonical Hyperskill URL and a short domain-scoped URL (`?n=<token>`). The published view is served read-only at `nb.hyperskills.net`.
+- **Markdown** — downloads a `.md` file with the notebook content.
+- **PNG** — snapshots the rendered notebook.
+- **JSON** — exports full widget state.
+
+`publish` wraps these: it sets `mode: 'view'`, tags the notebook `published`, and copies the Hyperskill link in one gesture — the canonical way to hand off a finished analysis.
 
 ## Integration with connected data servers
 
@@ -76,7 +101,7 @@ If a MCP **data** server is currently connected (the user has linked one, e.g. `
    - an SQL `SELECT ... LIMIT 10` with a meaningful cell name (e.g. `fetch_amendments`)
    - a `run_script` invocation for recipes requiring code
    - a short markdown cell describing the recipe and its parameters
-4. Pass the server metadata via the `servers:` param so the sidebar "sources" section and server menu modal render correctly:
+4. Pass the server metadata via the `servers:` param so the sidebar "sources" section, the left pane, and the server menu modal render correctly:
 
    ```ts
    widget_display({
