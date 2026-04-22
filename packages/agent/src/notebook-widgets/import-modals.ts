@@ -137,6 +137,8 @@ export function openAddMdModal(onPick: (content: string) => void): void {
 export interface AddRecipeModalOptions {
   /** Connected MCP data servers; if any, their recipes are merged in the Browser tab. */
   mcpServers?: Array<{ name: string; url?: string }>;
+  /** If 'data', hide built-in WEBMCP_RECIPES and list only MCP data servers recipes. Default 'all'. */
+  scope?: 'data' | 'all';
   onPick: (recipe: ImportedRecipe) => void;
 }
 
@@ -175,15 +177,23 @@ export function openAddRecipeModal(opts: AddRecipeModalOptions): void {
   const search = ov.querySelector('.nb-imp-search') as HTMLInputElement;
 
   // Load built-in recipes immediately + MCP recipes lazily (list_recipes)
-  const builtin = WEBMCP_RECIPES.map((r) => ({
-    name: r.name,
-    description: r.description,
-    body: r.body,
-    serverName: 'webmcp',
-  }));
+  const includeBuiltin = opts.scope !== 'data';
+  const builtin = includeBuiltin
+    ? WEBMCP_RECIPES.map((r) => ({
+        name: r.name,
+        description: r.description,
+        body: r.body,
+        serverName: 'webmcp',
+      }))
+    : [];
 
   let all: ImportedRecipe[] = [...builtin];
-  renderList(list, all, onPickRecipe);
+  const hasServers = !!(opts.mcpServers && opts.mcpServers.length > 0);
+  if (!includeBuiltin && !hasServers) {
+    list.innerHTML = '<div class="nb-imp-empty">No data servers connected. Connect one to see recipes.</div>';
+  } else {
+    renderList(list, all, onPickRecipe);
+  }
 
   // Fetch MCP server recipes in parallel
   if (opts.mcpServers && opts.mcpServers.length > 0) {

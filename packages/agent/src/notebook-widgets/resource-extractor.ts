@@ -35,6 +35,27 @@ export function extractCellFromFence(lang: string, content: string): NotebookCel
   if (cellType) {
     return { id: uid(), type: cellType, content: content.trim(), hideSource: false, hideResult: false };
   }
+  // Detect pseudo-code MCP tool calls like: query_sql({sql: "..."})
+  // Only attempted when the fence language is unknown/text (cellType === null).
+  const trimmed = content.trim();
+  const callMatch = trimmed.match(/^([A-Za-z_][\w]*)\s*\(\s*(\{[\s\S]*\})\s*\)\s*;?\s*$/);
+  if (callMatch) {
+    const name = callMatch[1];
+    const argsRaw = callMatch[2];
+    if (name === 'query_sql') {
+      const sql = extractSqlFromLooseObject(argsRaw);
+      if (sql != null) {
+        return { id: uid(), type: 'sql', content: sql.trim(), hideSource: false, hideResult: false };
+      }
+    }
+    return {
+      id: uid(),
+      type: 'js',
+      content: `// MCP tool call: ${name}\nawait callTool('${name}', ${argsRaw});`,
+      hideSource: false,
+      hideResult: false,
+    };
+  }
   // Preserve the original fence in markdown so users see it verbatim
   return {
     id: uid(),
@@ -43,6 +64,29 @@ export function extractCellFromFence(lang: string, content: string): NotebookCel
     hideSource: false,
     hideResult: false,
   };
+}
+
+/**
+ * Best-effort extraction of the `sql` property value from a loose JS-object literal
+ * (unquoted keys, possibly single-quoted strings). Returns null if no sql key found.
+ */
+function extractSqlFromLooseObject(argsRaw: string): string | null {
+  // Essai 1: JSON.parse direct (cheap, rarely works for loose objects)
+  try {
+    const parsed = JSON.parse(argsRaw);
+    if (parsed && typeof parsed === 'object' && typeof parsed.sql === 'string') {
+      return parsed.sql;
+    }
+  } catch {
+    /* fallthrough */
+  }
+  // Essai 2: regex extract sql: "..." (double-quoted)
+  const dq = argsRaw.match(/sql\s*:\s*"([\s\S]*?)"/);
+  if (dq) return dq[1];
+  // Essai 3: regex extract sql: '...' (single-quoted)
+  const sq = argsRaw.match(/sql\s*:\s*'([\s\S]*?)'/);
+  if (sq) return sq[1];
+  return null;
 }
 
 /**

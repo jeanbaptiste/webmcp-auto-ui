@@ -66,7 +66,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
           <button class="nb-btn nb-add-cell" data-add-modal="md">+ md</button>
           <button class="nb-btn nb-add-cell" data-add-modal="recipe">+ recipe</button>
           <span class="nbe-fork nbe-share-btn" title="Share">share · ${escapeHtml(forkId)}</span>
-          <button class="nb-btn nbe-fork-btn" title="Fork this notebook">⑂ fork</button>
+          <button class="nb-btn nbe-publish-btn" title="Publish to nb.hyperskills.net">📤 publish</button>
         </div>
       </div>
     </div>`;
@@ -123,6 +123,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
           .filter((s: any) => s.name);
         openAddRecipeModal({
           mcpServers,
+          scope: 'data',
           onPick: (recipe) => {
             const cells = extractCellsFromRecipe(recipe.body ?? '', {
               title: recipe.name, description: recipe.description,
@@ -146,8 +147,10 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       });
     });
   });
-  (shell.querySelector('.nbe-fork-btn') as HTMLElement).addEventListener('click', () => {
-    void forkNotebook();
+  const publishBtn = shell.querySelector('.nbe-publish-btn') as HTMLButtonElement;
+  updatePublishBtnLabel(publishBtn, state);
+  publishBtn.addEventListener('click', () => {
+    void publishNotebook(publishBtn);
   });
   (shell.querySelector('.nbe-kicker-input') as HTMLInputElement).addEventListener('input', (e) => {
     state.kicker = (e.target as HTMLInputElement).value;
@@ -182,6 +185,27 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     },
   });
 
+  // Auto-connect data servers declared in the recipe frontmatter (data.servers)
+  try {
+    const declared = Array.isArray((data as any)?.servers) ? (data as any).servers : [];
+    if (declared.length > 0) {
+      const canvasAutoAny: any = (globalThis as any).__canvasVanilla || (globalThis as any).canvasVanilla;
+      if (canvasAutoAny?.update) {
+        canvasAutoAny.update((st: any) => {
+          if (!Array.isArray(st.dataServers)) st.dataServers = [];
+          const existing = new Set(st.dataServers.map((s: any) => s?.name));
+          for (const srv of declared) {
+            const name = srv?.name;
+            if (name && !existing.has(name)) {
+              st.dataServers.push({ name, url: srv.url, kind: 'data' });
+            }
+          }
+        });
+      }
+      pane.setServers(collectDataServers(data));
+    }
+  } catch { /* ignore */ }
+
   // Keep pane servers in sync with canvas changes
   let canvasUnsub: (() => void) | null = null;
   try {
@@ -194,32 +218,56 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   setupDnD(cellsEl, state, rerender);
   const unsubHistory = registerHistoryObserver(() => mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); }));
 
-  // --- fork: deep-clone state, generate a fresh hyperskill URL -----------
-  async function forkNotebook(): Promise<void> {
+  // --- publish: POST state to nb.hyperskills.net, store slug+token for updates ---
+  async function publishNotebook(btn: HTMLButtonElement): Promise<void> {
+    const prevLabel = btn.textContent ?? '';
+    btn.disabled = true;
+    btn.textContent = state.publishedSlug ? '… updating' : '… publishing';
     try {
-      const forked: NotebookState = JSON.parse(JSON.stringify({
-        id: 'editorial_' + Math.random().toString(36).slice(2, 10),
-        title: state.title ? state.title + ' (fork)' : 'Untitled fork',
+      const minimal = {
+        id: state.id,
+        title: state.title,
+        kicker: state.kicker,
         mode: state.mode,
         cells: state.cells,
-        history: [],
-        scope: {},
-        executors: {},
-        lastEditAt: Date.now(),
-        kicker: state.kicker,
-      }));
-      const { fullUrl, shortUrl } = await shareAsHyperskill(forked);
-      try {
-        history.pushState({ forkFrom: state.id, forkId: forked.id }, '', `?fork=${forked.id}`);
-      } catch { /* browser may restrict pushState in some contexts */ }
-      try {
-        await navigator.clipboard?.writeText?.(shortUrl || fullUrl);
-        toast(container, `fork created · link copied (${(shortUrl || fullUrl).slice(0, 48)}…)`);
-      } catch {
-        toast(container, `fork created · ${(shortUrl || fullUrl).slice(0, 56)}…`);
-      }
+      };
+      const res = await fetch('https://nb.hyperskills.net/api/publish', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          state: minimal,
+          slug: state.publishedSlug,
+          token: state.publishedToken,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const reply: any = await res.json();
+      state.publishedSlug = reply.slug;
+      state.publishedToken = reply.token;
+      state.lastEditAt = Date.now();
+      const url = reply.url ?? `https://nb.hyperskills.net/p/${reply.slug}`;
+      try { await navigator.clipboard?.writeText?.(url); } catch { /* ignore */ }
+      toast(container, reply.updated
+        ? `updated · ${url.replace(/^https?:\/\//, '')} (copied)`
+        : `published · ${url.replace(/^https?:\/\//, '')} (copied)`);
     } catch (err: any) {
-      toast(container, `fork failed · ${String(err?.message ?? err)}`, true);
+      toast(container, `publish failed · ${String(err?.message ?? err)}`, true);
+      btn.textContent = prevLabel;
+    } finally {
+      btn.disabled = false;
+      updatePublishBtnLabel(btn, state);
+    }
+  }
+
+  function updatePublishBtnLabel(btn: HTMLButtonElement, st: NotebookState): void {
+    if (st.publishedSlug) {
+      btn.textContent = '🔄 update';
+      btn.dataset.state = 'published';
+      btn.title = `Update https://nb.hyperskills.net/p/${st.publishedSlug}`;
+    } else {
+      btn.textContent = '📤 publish';
+      btn.dataset.state = 'draft';
+      btn.title = 'Publish to nb.hyperskills.net';
     }
   }
 
@@ -365,7 +413,7 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
       preview.innerHTML = renderProse(cell.content || '');
       wrap.appendChild(editor);
       wrap.appendChild(preview);
-      setTimeout(() => autosize(editor), 0);
+      requestAnimationFrame(() => requestAnimationFrame(() => autosize(editor)));
     }
     return wrap;
   }
@@ -397,7 +445,7 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
   ta.addEventListener('input', () => { cell.content = ta.value; autosize(ta); cell.status = 'stale'; });
   body.appendChild(ta);
   codeCell.appendChild(body);
-  setTimeout(() => autosize(ta), 0);
+  requestAnimationFrame(() => requestAnimationFrame(() => autosize(ta)));
 
   if (!cell.hideResult) {
     const res = document.createElement('div');
@@ -733,10 +781,11 @@ function injectLayoutStyles(): void {
   padding: 5px 10px;
 }
 .nbe-fork:hover { color: var(--color-accent); }
-.nbe-fork-btn {
+.nbe-publish-btn {
   font-family: var(--font-mono, 'IBM Plex Mono', monospace);
   font-size: 11px;
 }
+.nbe-publish-btn[data-state="published"] { color: var(--color-accent); }
 
 /* Toast */
 .nbe-toast {

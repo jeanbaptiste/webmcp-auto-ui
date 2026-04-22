@@ -53,6 +53,8 @@ export interface NotebookState {
   executors: CellExecutors;
   lastEditAt: number;
   kicker?: string;
+  publishedSlug?: string;
+  publishedToken?: string;
 }
 
 export interface HistoryEntry {
@@ -412,16 +414,21 @@ function looksLikeSqlTool(name: string): boolean {
 
 function openServersModal(
   servers: DataServerDescriptor[],
-  onInsertCell: (type: CellType, content: string) => void
+  onInsertCell: (type: CellType, content: string) => void,
+  onConnectNew?: () => void
 ): void {
   const overlay = ensureServersOverlay();
   (overlay.querySelector('.nbs-title') as HTMLElement).textContent = `Data servers (${servers.length})`;
   const body = overlay.querySelector('.nbs-body') as HTMLElement;
 
+  const connectBtnHtml = onConnectNew
+    ? `<button class="nb-btn nbs-connect-trigger" type="button">+ Connect new server</button>`
+    : '';
+
   if (servers.length === 0) {
-    body.innerHTML = '<div class="nbs-empty">No data MCP server connected.</div>';
+    body.innerHTML = `${connectBtnHtml}<div class="nbs-empty">No data MCP server connected.</div>`;
   } else {
-    body.innerHTML = servers.map((srv, sidx) => {
+    body.innerHTML = connectBtnHtml + servers.map((srv, sidx) => {
       const recipes = srv.recipes || [];
       const tools = srv.tools || [];
       const recipesHtml = recipes.length > 0
@@ -480,7 +487,108 @@ function openServersModal(
     });
   });
 
+  // Bind "+ Connect new server" trigger
+  if (onConnectNew) {
+    const connectBtn = body.querySelector('.nbs-connect-trigger') as HTMLElement | null;
+    if (connectBtn) {
+      connectBtn.addEventListener('click', () => {
+        overlay.classList.remove('open');
+        onConnectNew();
+      });
+    }
+  }
+
   overlay.classList.add('open');
+}
+
+// ---------------------------------------------------------------------------
+// "Connect MCP data server" modal — prompts the user for name + url
+// ---------------------------------------------------------------------------
+
+let connectOverlay: HTMLElement | null = null;
+
+function ensureConnectOverlay(): HTMLElement {
+  if (connectOverlay && document.body.contains(connectOverlay)) return connectOverlay;
+  connectOverlay = document.createElement('div');
+  connectOverlay.className = 'nbs-connect-overlay';
+  connectOverlay.innerHTML = `
+    <div class="nbs-connect-modal">
+      <div class="nbs-connect-header">
+        <div class="nbs-connect-title">Connect MCP data server</div>
+        <button class="nbs-close nbs-connect-close" title="close">×</button>
+      </div>
+      <div class="nbs-connect-body">
+        <label class="nbs-connect-field">
+          <span class="nbs-connect-label">Name</span>
+          <input type="text" class="nbs-connect-input nbs-connect-name" placeholder="e.g. tricoteuses" required />
+        </label>
+        <label class="nbs-connect-field">
+          <span class="nbs-connect-label">URL</span>
+          <input type="url" class="nbs-connect-input nbs-connect-url" placeholder="https://api.example.com/mcp" required />
+        </label>
+        <div class="nbs-connect-error" hidden></div>
+      </div>
+      <div class="nbs-connect-actions">
+        <button class="nb-btn nbs-connect-cancel" type="button">cancel</button>
+        <button class="nb-btn nb-btn-primary nbs-connect-submit" type="button">Connect</button>
+      </div>
+    </div>`;
+  document.body.appendChild(connectOverlay);
+  return connectOverlay;
+}
+
+export function openConnectServerModal(onConnect: (desc: { name: string; url: string }) => void): void {
+  const overlay = ensureConnectOverlay();
+  const nameInput = overlay.querySelector('.nbs-connect-name') as HTMLInputElement;
+  const urlInput = overlay.querySelector('.nbs-connect-url') as HTMLInputElement;
+  const errorEl = overlay.querySelector('.nbs-connect-error') as HTMLElement;
+  const submitBtn = overlay.querySelector('.nbs-connect-submit') as HTMLElement;
+  const cancelBtn = overlay.querySelector('.nbs-connect-cancel') as HTMLElement;
+  const closeBtn = overlay.querySelector('.nbs-connect-close') as HTMLElement;
+
+  nameInput.value = '';
+  urlInput.value = '';
+  errorEl.hidden = true;
+  errorEl.textContent = '';
+
+  const cleanup = () => {
+    overlay.classList.remove('open');
+    submitBtn.removeEventListener('click', onSubmit);
+    cancelBtn.removeEventListener('click', onCancel);
+    closeBtn.removeEventListener('click', onCancel);
+    overlay.removeEventListener('click', onBackdrop);
+    nameInput.removeEventListener('keydown', onKey);
+    urlInput.removeEventListener('keydown', onKey);
+  };
+  const showError = (msg: string) => {
+    errorEl.textContent = msg;
+    errorEl.hidden = false;
+  };
+  const onSubmit = () => {
+    const name = nameInput.value.trim();
+    const url = urlInput.value.trim();
+    if (!name) { showError('Name is required.'); return; }
+    if (!url) { showError('URL is required.'); return; }
+    try { new URL(url); } catch { showError('Invalid URL.'); return; }
+    cleanup();
+    onConnect({ name, url });
+  };
+  const onCancel = () => { cleanup(); };
+  const onBackdrop = (e: Event) => { if (e.target === overlay) cleanup(); };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === 'Enter') { e.preventDefault(); onSubmit(); }
+    else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+  };
+
+  submitBtn.addEventListener('click', onSubmit);
+  cancelBtn.addEventListener('click', onCancel);
+  closeBtn.addEventListener('click', onCancel);
+  overlay.addEventListener('click', onBackdrop);
+  nameInput.addEventListener('keydown', onKey);
+  urlInput.addEventListener('keydown', onKey);
+
+  overlay.classList.add('open');
+  setTimeout(() => nameInput.focus(), 0);
 }
 
 /**
@@ -504,17 +612,47 @@ export function buildServersButton(
     const count = servers.length;
     btn.innerHTML = `🔌 <span class="nbs-badge">${count}</span>`;
     btn.classList.toggle('nbs-empty-btn', count === 0);
-    btn.disabled = count === 0;
   };
   refresh();
 
+  function connectMcpServer(desc: { name: string; url: string }) {
+    // 1. Push into data.servers if data is an object
+    if (data && typeof data === 'object') {
+      const servers = Array.isArray((data as any).servers) ? (data as any).servers : [];
+      servers.push({ name: desc.name, url: desc.url, kind: 'data' });
+      (data as any).servers = servers;
+    }
+    // 2. Push into the vanilla canvas store if available
+    try {
+      const canvasAny: any = (globalThis as any).__canvasVanilla || (globalThis as any).canvasVanilla;
+      if (canvasAny?.update) {
+        canvasAny.update((st: any) => {
+          if (!Array.isArray(st.dataServers)) st.dataServers = [];
+          st.dataServers.push({ name: desc.name, url: desc.url, kind: 'data' });
+        });
+      }
+    } catch { /* ignore */ }
+    // 3. refresh + rerender
+    refresh();
+    rerender();
+  }
+
   btn.addEventListener('click', () => {
     const servers = collectDataServers(data);
-    if (!servers.length) return;
-    openServersModal(servers, (type, content) => {
-      addCell(state, type, { content, status: 'stale' });
-      rerender();
-    });
+    if (servers.length === 0) {
+      openConnectServerModal((desc) => connectMcpServer(desc));
+      return;
+    }
+    openServersModal(
+      servers,
+      (type, content) => {
+        addCell(state, type, { content, status: 'stale' });
+        rerender();
+      },
+      () => {
+        openConnectServerModal((desc) => connectMcpServer(desc));
+      }
+    );
   });
 
   // Subscribe to canvas changes so the badge updates when the MCP connects
@@ -1017,6 +1155,72 @@ textarea.nb-md-edit {
   font-size: 11px; color: var(--color-text2);
   margin-left: 4px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* "+ Connect new server" trigger inside servers modal */
+.nbs-connect-trigger {
+  align-self: flex-start;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px;
+}
+
+/* Connect MCP data server modal */
+.nbs-connect-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: none; align-items: center; justify-content: center;
+  z-index: 1003; padding: 24px;
+}
+.nbs-connect-overlay.open { display: flex; }
+.nbs-connect-modal {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  width: 100%; max-width: 480px;
+  display: flex; flex-direction: column;
+  font-family: var(--font-sans, 'Syne', sans-serif);
+  overflow: hidden;
+}
+.nbs-connect-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--color-border);
+}
+.nbs-connect-title { font-size: 16px; font-weight: 600; color: var(--color-text1); }
+.nbs-connect-body {
+  padding: 18px 22px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.nbs-connect-field {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.nbs-connect-label {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--color-text2);
+}
+.nbs-connect-input {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 12.5px;
+  color: var(--color-text1);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.nbs-connect-input:focus { border-color: var(--color-accent); }
+.nbs-connect-error {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px;
+  color: var(--color-accent2, #fa6d7c);
+  padding: 2px 0;
+}
+.nbs-connect-actions {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 14px 22px 18px;
+  border-top: 1px solid var(--color-border);
 }
 
 /* Chart rendering (Vega-Lite via vega-embed) — shared across all 4 widgets */

@@ -206,6 +206,7 @@ function injectLeftPaneStyles() {
     .nb-lp-handle:hover { background: var(--color-surface3, #eeeef0); }
     .nb-lp-handle-icon { font-size: 10px; }
     .nb-lp.nb-lp-open .nb-lp-handle { display: none; }
+    .nb-lp-body[hidden] { display: none !important; }
     .nb-lp-body {
       width: 260px; border-right: 1px solid var(--color-border, #e4e4e7);
       background: var(--color-surface, #fff);
