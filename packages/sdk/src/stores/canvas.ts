@@ -46,6 +46,17 @@ export interface McpToolInfo {
   inputSchema?: Record<string, unknown>;
 }
 
+export interface DataServer {
+  name: string;         // unique identifier (user-chosen label)
+  url: string;
+  kind: 'data';
+  enabled: boolean;     // user intent; bridge only connects to enabled servers
+  connected: boolean;   // flipped by the bridge after handshake
+  tools?: McpToolInfo[];
+  recipes?: { name: string; description?: string; body?: string }[];
+  error?: string;       // handshake error message, if any
+}
+
 export interface CanvasSnapshot {
   blocks: Widget[];
   mode: Mode;
@@ -61,6 +72,7 @@ export interface CanvasSnapshot {
   statusColor: string;
   themeOverrides: Record<string, string>;
   enabledServerIds: string[];
+  dataServers: DataServer[];
   blockCount: number;
   isEmpty: boolean;
 }
@@ -96,6 +108,50 @@ function createCanvasVanilla() {
   let _statusColor = 'text-zinc-600';
   let _themeOverrides: Record<string, string> = {};
   let _enabledServerIds: string[] = ['autoui'];
+  let _dataServers: DataServer[] = [];
+
+  // ── Data servers (multi-MCP) ───────────────────────────────────────────
+  function addDataServer(desc: { name: string; url: string }): DataServer {
+    const existing = _dataServers.find((s) => s.name === desc.name);
+    if (existing) return existing;
+    const srv: DataServer = { name: desc.name, url: desc.url, kind: 'data', enabled: true, connected: false };
+    _dataServers = [..._dataServers, srv];
+    notify();
+    return srv;
+  }
+
+  function removeDataServer(name: string): boolean {
+    const before = _dataServers.length;
+    _dataServers = _dataServers.filter((s) => s.name !== name);
+    if (_dataServers.length !== before) { notify(); return true; }
+    return false;
+  }
+
+  function getDataServer(name: string): DataServer | undefined {
+    return _dataServers.find((s) => s.name === name);
+  }
+
+  function setDataServerMeta(name: string, patch: Partial<Omit<DataServer, 'name' | 'url' | 'kind'>>): void {
+    const idx = _dataServers.findIndex((s) => s.name === name);
+    if (idx < 0) return;
+    _dataServers = _dataServers.map((s, i) => i === idx ? { ...s, ...patch } : s);
+    notify();
+  }
+
+  function setDataServerEnabled(name: string, enabled: boolean): boolean {
+    const s = _dataServers.find((x) => x.name === name);
+    if (!s) return false;
+    if (s.enabled === enabled) return true;
+    _dataServers = _dataServers.map((x) => x.name === name ? { ...x, enabled } : x);
+    notify();
+    return true;
+  }
+
+  function toggleDataServer(name: string): boolean {
+    const s = _dataServers.find((x) => x.name === name);
+    if (!s) return false;
+    return setDataServerEnabled(name, !s.enabled);
+  }
 
   // ── Widget actions ─────────────────────────────────────────────────────
   function addWidget(type: WidgetType, data: Record<string, unknown> = {}): Widget {
@@ -296,6 +352,7 @@ function createCanvasVanilla() {
       statusColor: _statusColor,
       themeOverrides: _themeOverrides,
       enabledServerIds: _enabledServerIds,
+      dataServers: _dataServers,
       blockCount: _blocks.length,
       isEmpty: _blocks.length === 0,
     };
@@ -357,6 +414,16 @@ function createCanvasVanilla() {
     // Enabled servers
     get enabledServerIds() { return _enabledServerIds; },
     setEnabledServers,
+
+    // Data servers (multi-MCP) — additive, coexists with mcp* primary fields
+    get dataServers() { return _dataServers; },
+    set dataServers(v: DataServer[]) { _dataServers = Array.isArray(v) ? v : []; notify(); },
+    addDataServer,
+    removeDataServer,
+    getDataServer,
+    setDataServerMeta,
+    setDataServerEnabled,
+    toggleDataServer,
 
     // HyperSkill
     buildSkillJSON, buildHyperskillParam, loadFromParam, loadFromUrl,

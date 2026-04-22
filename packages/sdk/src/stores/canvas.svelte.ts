@@ -7,10 +7,10 @@
  */
 
 import { canvasVanilla } from './canvas.js';
-import type { Widget, WidgetType, Mode, LLMId, ChatMsg, McpToolInfo } from './canvas.js';
+import type { Widget, WidgetType, Mode, LLMId, ChatMsg, McpToolInfo, DataServer } from './canvas.js';
 
 // Re-export types (including deprecated aliases)
-export type { Widget, WidgetType, Mode, LLMId, ChatMsg, McpToolInfo };
+export type { Widget, WidgetType, Mode, LLMId, ChatMsg, McpToolInfo, DataServer };
 export type { Block, BlockType, CanvasSnapshot } from './canvas.js';
 
 function createCanvas() {
@@ -29,6 +29,7 @@ function createCanvas() {
   let statusColor = $state(canvasVanilla.statusColor);
   let themeOverrides = $state<Record<string, string>>(canvasVanilla.themeOverrides);
   let enabledServerIds = $state<string[]>(canvasVanilla.enabledServerIds);
+  let dataServers = $state<DataServer[]>(canvasVanilla.dataServers);
 
   // ── Derived ─────────────────────────────────────────────────────────────
   const blockCount = $derived(blocks.length);
@@ -51,6 +52,7 @@ function createCanvas() {
     statusColor = s.statusColor;
     themeOverrides = s.themeOverrides;
     enabledServerIds = canvasVanilla.enabledServerIds;
+    dataServers = canvasVanilla.dataServers;
   });
 
   // ── Return public API ───────────────────────────────────────────────────
@@ -111,6 +113,16 @@ function createCanvas() {
     // Enabled servers
     get enabledServerIds() { return enabledServerIds; },
     setEnabledServers: canvasVanilla.setEnabledServers.bind(canvasVanilla),
+
+    // Data servers (multi-MCP) — additive, coexists with mcp* primary fields
+    get dataServers() { return dataServers; },
+    set dataServers(v: DataServer[]) { canvasVanilla.dataServers = v; },
+    addDataServer: canvasVanilla.addDataServer.bind(canvasVanilla),
+    removeDataServer: canvasVanilla.removeDataServer.bind(canvasVanilla),
+    getDataServer: canvasVanilla.getDataServer.bind(canvasVanilla),
+    setDataServerMeta: canvasVanilla.setDataServerMeta.bind(canvasVanilla),
+    setDataServerEnabled: canvasVanilla.setDataServerEnabled.bind(canvasVanilla),
+    toggleDataServer: canvasVanilla.toggleDataServer.bind(canvasVanilla),
 
     // HyperSkill
     buildSkillJSON: canvasVanilla.buildSkillJSON.bind(canvasVanilla),
