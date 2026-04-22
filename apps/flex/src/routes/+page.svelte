@@ -4,7 +4,8 @@
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { listSkills, encodeHyperSkill } from '@webmcp-auto-ui/sdk';
   import type { Skill, HyperSkill, RecipeData } from '@webmcp-auto-ui/sdk';
-  import { McpMultiClient } from '@webmcp-auto-ui/core';
+  import { McpMultiClient, installMultiMcpBridge, MultiMcpBridge } from '@webmcp-auto-ui/core';
+  import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
   import {
     RemoteLLMProvider, WasmProvider, TransformersProvider, LocalLLMProvider, HawkProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, trimConversationHistory, summarizeChat, TokenTracker,
@@ -1184,7 +1185,18 @@
     });
   }
 
+  // Multi-MCP bridge: reconciles canvas.dataServers with real connections.
+  // Exposed via globalThis.__canvasVanilla so the bridge (and any other helper)
+  // can access the framework-agnostic store.
+  let multiMcpBridge: MultiMcpBridge | null = null;
+
   onMount(() => {
+    (globalThis as any).__canvasVanilla = canvasVanilla;
+    multiMcpBridge = installMultiMcpBridge({
+      getCanvas: () => (globalThis as any).__canvasVanilla ?? canvasVanilla,
+      log: (msg: string, data?: unknown) => { try { console.log(msg, data ?? ''); } catch {} },
+    });
+
     const param = new URLSearchParams(window.location.search).get('hs');
     if (param) {
       canvas.loadFromParam(param).then((ok) => {
@@ -1208,6 +1220,7 @@
     if (typeof document !== 'undefined') {
       document.removeEventListener('widget:node-dblclick', onTraceNodeDblClick as EventListener);
     }
+    if (multiMcpBridge) { try { multiMcpBridge.stop(); } catch {} multiMcpBridge = null; }
   });
 </script>
 
