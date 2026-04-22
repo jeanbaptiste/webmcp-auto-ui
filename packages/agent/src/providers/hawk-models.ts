@@ -14,7 +14,7 @@ export const HAWK_MODELS: HawkModelEntry[] = [
   { id: 'qwen35-4b',       label: 'Qwen 3.5 4B — 23 tok/s',       tokps: 23 },
   { id: 'qwen36-35b-a3b',  label: 'Qwen 3.6 35B MoE — 22 tok/s',  tokps: 22 },
   { id: 'gemma4-26b-a4b',  label: 'Gemma 4 26B MoE — 20 tok/s',   tokps: 20 },
-  { id: 'ministral-8b',    label: 'Ministral 8B',                 tokps: undefined },
+  { id: 'ministral-8b',    label: 'Ministral 8B — 16 tok/s',      tokps: 16 },
 ];
 
 export function listHawkModels(): HawkModelEntry[] {
