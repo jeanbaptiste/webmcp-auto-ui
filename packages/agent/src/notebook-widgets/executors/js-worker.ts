@@ -106,7 +106,7 @@ function buildWorkerBlobUrl(): string {
       try {
         const keys = Object.keys(scope);
         const values = keys.map(function (k) { return scope[k]; });
-        const fn = new Function.apply(null, keys.concat(['return (async () => {\\n' + code + '\\n})();']));
+        const fn = new Function(...keys, 'return (async () => {\\n' + code + '\\n})();');
         const result = await fn.apply(null, values);
         self.postMessage({ ok: true, result: result, logs: logs });
       } catch (err) {

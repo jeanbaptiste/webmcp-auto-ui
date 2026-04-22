@@ -16,7 +16,7 @@ schema:
       description: Small uppercase label above the title (e.g. "analysis", "memo", "brief"). Editable inline. Defaults to "untitled".
     forkId:
       type: string
-      description: Short identifier shown in the footer next to "share" (e.g. "4c7a·9f21"). Defaults to a slice of the notebook id.
+      description: Short identifier shown in the footer next to "share" (e.g. "4c7a·9f21"). Purely cosmetic — no fork/clone semantics implemented. Defaults to a slice of the notebook id.
     cells:
       type: array
       description: Mixed flow of prose and code cells. All share the same ordering and can be reordered together.
@@ -75,7 +75,7 @@ The distinguishing feature: prose paragraphs and code cells share a single order
 - The serif font (EB Garamond, with Georgia fallback) applies only to prose content inside this widget — it signals "publication" the moment the user sees it.
 - The **kicker** above the title ("analysis", "memo", "internal") is editable inline — click to rename. Keep it short.
 - Prose cells are rendered via an HTML-sanitizing markdown pipeline: markdown syntax is resolved, unsafe tags are stripped (XSS closed), `<mark>` and other editorial tags are preserved.
-- The footer shows `share · forkId`. The **fork** affordance performs a real deep clone of the current state: it mints a new `editorial_*` id, a fresh Hyperskill URL, and opens the forked copy for the user to diverge from the original without touching it.
+- The footer shows `share · forkId`. `forkId` is a purely cosmetic identifier next to the share button — it does not clone or duplicate the notebook (fork semantics are not implemented).
 - Run / Stop controls are at the left of each code cell's header, same as the other notebook layouts.
 - Unlike the other widgets, `notebook-editorial` does not separate prose and code into different flows — they are the same flow in one list.
 
@@ -88,7 +88,7 @@ Two toolbar buttons flank this pane:
 - **`+ md`** — 3-tab modal (New / File / URL) to insert a prose paragraph from scratch, a local `.md` file, or a URL.
 - **`+ recipe`** — 3-tab modal (Browser / File / URL) to import a recipe from a connected server, a local `.recipe.md` file, or a URL.
 
-## Share & fork
+## Share
 
 The `share` button in the footer offers **four formats**:
 
@@ -96,8 +96,6 @@ The `share` button in the footer offers **four formats**:
 - **Markdown** — downloads a `.md` file.
 - **PNG** — snapshots the rendered article.
 - **JSON** — exports full widget state.
-
-**Fork** (via the `forkId` label next to share) deep-clones the notebook into a new editorial piece — the reader becomes an author without overwriting the original.
 
 ## Integration with connected data servers
 

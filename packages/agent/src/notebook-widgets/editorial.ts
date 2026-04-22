@@ -15,7 +15,7 @@ import {
   type NotebookState, type NotebookCell, type CellResult, type CellExecContext,
 } from './shared.js';
 import { renderChart } from './chart-renderer.js';
-import { dispatchShare, shareAsHyperskill } from './share-handlers.js';
+import { dispatchShare } from './share-handlers.js';
 import { renderProse } from './prose.js';
 import { openAddMdModal, openAddRecipeModal } from './import-modals.js';
 import { extractCellsFromRecipe, extractCellFromMarkdown } from './resource-extractor.js';
@@ -504,7 +504,7 @@ function formatShareToast(info: any): string {
     const url = info.shortUrl || info.fullUrl || '';
     return url ? `hyperskill link copied · ${url.slice(0, 48)}…` : 'hyperskill link ready';
   }
-  if (info.kind === 'md') return 'markdown downloaded';
+  if (info.kind === 'markdown' || info.kind === 'md') return 'markdown downloaded';
   if (info.kind === 'json') return 'json downloaded';
   if (info.kind === 'png') return 'png downloaded';
   return 'shared';

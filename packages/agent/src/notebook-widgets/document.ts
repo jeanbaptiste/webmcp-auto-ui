@@ -94,21 +94,32 @@ function registerDocExecutors(state: NotebookState, data: Record<string, unknown
     try {
       const res: any = await callToolViaPostMessage(hit.tool, { sql: ctx.cell.content });
       const dur = Date.now() - t0;
-      // Heuristic: unwrap { rows, columns } or { result } shape
-      const payload = res?.result ?? res;
-      if (payload && Array.isArray(payload.rows)) {
-        const rows = payload.rows as Record<string, unknown>[];
-        const columns = Array.isArray(payload.columns) && payload.columns.length
-          ? payload.columns
-          : (rows.length ? Object.keys(rows[0]) : []);
-        return { ok: true, kind: 'table', rows, columns, rowCount: rows.length, truncated: !!payload.truncated, durationMs: dur };
+      // Unwrap MCP content array → text → JSON (aligned with executors/sql.ts)
+      const text = res?.content?.find?.((c: any) => c && c.type === 'text')?.text ?? '';
+      let parsed: any = null;
+      if (text) {
+        try { parsed = JSON.parse(text); } catch { parsed = null; }
       }
-      if (Array.isArray(payload) && payload.length && typeof payload[0] === 'object') {
-        const rows = payload as Record<string, unknown>[];
+      // Error shape inside tool result
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'error' in parsed && parsed.error) {
+        return { ok: false, error: String(parsed.error), errorKind: 'runtime', durationMs: dur };
+      }
+      // { rows, columns } shape
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.rows)) {
+        const rows = parsed.rows as Record<string, unknown>[];
+        const columns = Array.isArray(parsed.columns) && parsed.columns.length
+          ? parsed.columns
+          : (rows.length && typeof rows[0] === 'object' ? Object.keys(rows[0]) : []);
+        return { ok: true, kind: 'table', rows, columns, rowCount: rows.length, truncated: !!parsed.truncated, durationMs: dur };
+      }
+      // Array of row objects
+      if (Array.isArray(parsed) && parsed.length && typeof parsed[0] === 'object') {
+        const rows = parsed as Record<string, unknown>[];
         return { ok: true, kind: 'table', rows, columns: Object.keys(rows[0]), rowCount: rows.length, durationMs: dur };
       }
-      if (payload == null) return { ok: true, kind: 'empty', durationMs: dur };
-      return { ok: true, kind: 'value', value: payload, durationMs: dur };
+      if (parsed != null) return { ok: true, kind: 'value', value: parsed, durationMs: dur };
+      if (!text) return { ok: true, kind: 'empty', durationMs: dur };
+      return { ok: true, kind: 'value', value: text, durationMs: dur };
     } catch (err: any) {
       return { ok: false, error: String(err?.message ?? err), errorKind: 'runtime', durationMs: Date.now() - t0 };
     }
@@ -266,7 +277,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     openShareModal(state, (fmt) => {
       dispatchShare(fmt, state, {
         container,
-        onResult: (msg: string) => toast(msg),
+        onResult: (info: any) => toast(info?.message ?? 'shared'),
       });
     });
   });

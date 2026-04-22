@@ -32,7 +32,7 @@ Choose one of the four `notebook-*` widgets based on the user's implicit intent:
 | `notebook-compact` | Quick data exploration, reactive dataflow with named outputs, minimal chrome. **Default for most "playground" and "hackathon" requests.** |
 | `notebook-workspace` | The user expects a multi-cell analyst workspace with sources, cell navigation, `run all`, and a `publish` step. Use when they mention "dashboard", "app", "workspace", "publish". |
 | `notebook-document` | The user plans to share and discuss with a team. Use when "collaborate", "review", "comment", "reply" appear. |
-| `notebook-editorial` | The user wants a polished, article-like final deliverable mixing prose and code, with fork-to-remix semantics. Use for "memo", "report", "writeup", "blog-style", "fork". |
+| `notebook-editorial` | The user wants a polished, article-like final deliverable mixing prose and code. Use for "memo", "report", "writeup", "blog-style". |
 
 When in doubt, pick `notebook-compact`.
 
@@ -43,7 +43,7 @@ Never create an empty notebook. Always seed with 3–5 cells that give the user 
 1. **First cell: markdown** — title + one-sentence context of what the notebook is for
 2. **Second cell: markdown or code** — if an MCP data source is connected, a starter query that returns something visible (e.g. `SELECT * FROM {table} LIMIT 10`). Otherwise a markdown cell describing the next step
 3. **Third cell: code** — a transformation or a visualization that uses the output of step 2. Use `varname` on the SQL cell (`varname: "rows"`) and reference it in the JS cell — this activates the **reactive dataflow** (the downstream JS cell is flagged stale automatically when its upstream re-runs)
-4. **Last cell: markdown** — a short "to you to play" note inviting the user to add cells, edit, or fork
+4. **Last cell: markdown** — a short "to you to play" note inviting the user to add cells or edit
 
 Example seed for a generic data playground:
 
@@ -83,7 +83,7 @@ All four notebook layouts share the same `share` button in the toolbar, offering
 
 **Layout-specific share affordances:**
 - `notebook-workspace` has a dedicated `publish` button (primary, accent-coloured) that flips `mode: 'view'`, tags the notebook `published` (from `draft`), and copies the Hyperskill link in one gesture. Use this when the user wants a clean hand-off.
-- `notebook-editorial` has a **fork** affordance in the footer (next to `share · forkId`) that deep-clones the piece into a new editorial id with a fresh Hyperskill URL — the reader becomes an author without overwriting the original.
+- `notebook-editorial` shows a `forkId` identifier in the footer next to `share` — it is purely cosmetic (no fork/clone semantics implemented).
 - `notebook-document` shows a single `share` link (live invite/collaboration is not available in this build; presence avatars only render when the `presence` param is explicitly provided).
 
 ### Step 5 — Working with connected data servers
@@ -119,7 +119,6 @@ After creating the notebook, mention to the user that they can:
 - **Share in four formats** via the toolbar `share` button (Hyperskill / Markdown / PNG / JSON)
 - **Switch to `view` mode** (read-only) when presenting
 - Use **`run all`** (workspace) or **`publish`** (workspace) for one-shot execution and publication
-- **Fork** an editorial piece to remix it without touching the original
 - **Reply** to margin comments in a document layout (`+ reply` under each comment)
 - Access the `⟲ history` panel to see the edit trace and restore deleted cells
 - **Import recipes** from connected MCP servers via the left pane or the `+ recipe` modal
@@ -168,9 +167,9 @@ widget_display({name: "notebook-document", params: {
 }})
 ```
 
-### Final memo with fork
+### Final memo
 ```
-// user: "Prepare a short memo of my findings that others can fork"
+// user: "Prepare a short memo of my findings"
 widget_display({name: "notebook-editorial", params: {
   title: "Findings memo",
   kicker: "memo",
@@ -183,7 +182,6 @@ widget_display({name: "notebook-editorial", params: {
     {type: "md", content: "We conclude that..."}
   ]
 }})
-// Tell the user: readers can click the forkId in the footer to deep-clone this memo and diverge from it.
 ```
 
 ## Common mistakes
@@ -192,6 +190,6 @@ widget_display({name: "notebook-editorial", params: {
 - **Wrong layout for the intent**: do not use `notebook-editorial` for quick exploration — it signals "finished article" and intimidates. Use `notebook-compact` unless the user explicitly asks for a publication feel.
 - **Heavy initial queries**: always `LIMIT 10` or `LIMIT 20` in seed SQL cells. Users will expand later if needed.
 - **Missing `varname` on SQL cells** (in compact layout): the named output is what the compact layout showcases, and it drives the stale-flag dataflow. Without it, the notebook loses half its reactive story.
-- **Inventing UUIDs or fork IDs**: leave `id` and `forkId` unset — the widget generates sensible defaults. Only pass `id` when restoring an existing notebook.
+- **Inventing UUIDs**: leave `id` and `forkId` unset — the widget generates sensible defaults. Only pass `id` when restoring an existing notebook.
 - **Faking presence**: do not pass a `presence` array to `notebook-document` unless there are real editors to show. Presence is opt-in by design — empty `presence` hides the avatar row entirely.
 - **Including `autoui` in `servers:`**: only MCP *data* servers (`kind: 'data'`) belong there. UI servers like `autoui` would pollute the left pane.

@@ -135,7 +135,7 @@ export function mountLeftPane(
     }
     if (!imported.body) {
       try {
-        const res: any = await callToolViaPostMessage('get_recipe', { name: r.name, id: r.name });
+        const res: any = await callToolViaPostMessage(`${srv.name}_get_recipe`, { name: r.name, id: r.name });
         const text = res?.content?.find?.((c: any) => c.type === 'text')?.text;
         if (text) {
           let body = text;

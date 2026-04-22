@@ -128,9 +128,20 @@ async function domToPngBlob(el: HTMLElement): Promise<Blob> {
 // Dispatcher used by shared.ts::openShareModal callback
 // ---------------------------------------------------------------------------
 
+export type ShareKind = 'hyperskill' | 'json' | 'markdown' | 'png';
+
+export interface ShareResultInfo {
+  fmt: string;
+  kind: ShareKind | string;
+  message: string;
+  url?: string;
+  shortUrl?: string;
+  fullUrl?: string;
+}
+
 export interface ShareDispatchOptions {
   container?: HTMLElement;
-  onResult?: (info: { fmt: string; message?: string; url?: string }) => void;
+  onResult?: (info: ShareResultInfo) => void;
 }
 
 export async function dispatchShare(
@@ -141,22 +152,29 @@ export async function dispatchShare(
   try {
     if (fmt === 'json') {
       await shareAsJson(state);
-      opts.onResult?.({ fmt, message: 'JSON downloaded' });
+      opts.onResult?.({ fmt, kind: 'json', message: 'JSON downloaded' });
     } else if (fmt === 'md' || fmt === 'markdown') {
       await shareAsMarkdown(state);
-      opts.onResult?.({ fmt, message: 'Markdown downloaded' });
+      opts.onResult?.({ fmt, kind: 'markdown', message: 'Markdown downloaded' });
     } else if (fmt === 'hyperskill' || fmt === 'hs') {
       const { fullUrl, shortUrl } = await shareAsHyperskill(state);
-      opts.onResult?.({ fmt, message: 'URL copied', url: shortUrl || fullUrl });
+      opts.onResult?.({
+        fmt,
+        kind: 'hyperskill',
+        message: 'URL copied',
+        url: shortUrl || fullUrl,
+        shortUrl,
+        fullUrl,
+      });
     } else if (fmt === 'png') {
       if (!opts.container) throw new Error('png export requires container');
       await shareAsPng(state, opts.container);
-      opts.onResult?.({ fmt, message: 'PNG downloaded' });
+      opts.onResult?.({ fmt, kind: 'png', message: 'PNG downloaded' });
     } else {
       throw new Error(`Unknown share format: ${fmt}`);
     }
-  } catch (err) {
-    opts.onResult?.({ fmt, message: 'Error: ' + String(err?.message ?? err) });
+  } catch (err: any) {
+    opts.onResult?.({ fmt, kind: fmt, message: 'Error: ' + String(err?.message ?? err) });
     throw err;
   }
 }

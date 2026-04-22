@@ -20,6 +20,48 @@ import { render as renderCompact } from './notebook-widgets/compact.js';
 import { render as renderWorkspace } from './notebook-widgets/workspace.js';
 import { render as renderDocument } from './notebook-widgets/document.js';
 import { render as renderEditorial } from './notebook-widgets/editorial.js';
+import { render as renderRecipeBrowser } from './notebook-widgets/recipe-browser.js';
+
+// Inline recipe for recipe-browser (real vanilla widget)
+const recipeBrowserRecipe = `---
+widget: recipe-browser
+description: Interactive recipe browser with search, kind/tag filters, preview and pick. Use when the user wants to browse, search, or select recipes from connected servers.
+group: rich
+schema:
+  type: object
+  required:
+    - recipes
+  properties:
+    recipes:
+      type: array
+      description: List of Recipe objects (id, name, description, body, servers, ...).
+      items:
+        type: object
+    filters:
+      type: object
+      description: Initial filters
+      properties:
+        q:
+          type: string
+        kind:
+          type: string
+          enum: [all, webmcp, mcp]
+        tags:
+          type: array
+          items:
+            type: string
+    layout:
+      type: string
+      enum: [list, grid]
+      description: Default layout (default list)
+---
+
+## When to use
+When the user wants to browse, search, or pick a recipe — for example "show me the available recipes" or "let me choose a recipe".
+
+## How to use
+Call widget_display({name: "recipe-browser", params: {recipes: [...], layout: "list"}}). The widget emits a bubbling 'widget:interact' CustomEvent with detail={action:"pick", payload: recipe} when the user clicks Pick.
+`;
 
 // ---------------------------------------------------------------------------
 // Inline recipes (frontmatter + body)
@@ -936,77 +978,21 @@ Pour des visualisations custom, animations, ou prototypes interactifs en JS pur.
 Call widget_display({name: "js-sandbox", params: {code: "document.getElementById('root').innerHTML = '<h1>Hello</h1>'"}}).
 `,
 
-  // ── recipe-browser ──────────────────────────────────────────────────────
-  `---
-widget: recipe-browser
-description: Displays available recipes as interactive cards and allows browsing each recipe's details.
-group: rich
-schema:
-  type: object
-  required:
-    - cards
-  properties:
-    title:
-      type: string
-    cards:
-      type: array
-      items:
-        type: object
-        required:
-          - title
-        properties:
-          title:
-            type: string
-          description:
-            type: string
-          tags:
-            type: array
-            items:
-              type: string
-          meta:
-            type: object
-            properties:
-              recipe_name:
-                type: string
-              server:
-                type: string
-    interactive:
-      type: boolean
----
-
-## When to use
-Quand l'utilisateur veut voir les recettes disponibles, explorer les possibilites du serveur, ou comprendre comment utiliser un widget specifique.
-
-## Comment
-
-### Etape 1 — Lister les recettes
-Appelle search_recipes() sur chaque serveur connecte (MCP et WebMCP) pour obtenir la liste des recettes.
-
-### Etape 2 — Afficher en cartes interactives
-Utilise widget_display({name: "cards", params: {...}}) avec le parametre interactive: true pour rendre les cartes cliquables :
-widget_display({name: "cards", params: {title: "Recettes disponibles", cards: [{title: "Nom", description: "Description", tags: ["serveur"], meta: {recipe_name: "nom_technique", server: "nom_serveur"}}], interactive: true}})
-
-Le champ meta est important : il sera renvoye dans l'evenement d'interaction quand l'utilisateur clique sur la carte.
-
-### Etape 3 — Reagir au clic
-Quand l'utilisateur clique sur une carte, tu recevras un message d'interaction contenant les donnees de meta. Utilise meta.recipe_name et meta.server pour :
-1. Appeler get_recipe(meta.recipe_name) sur le bon serveur
-2. Afficher le contenu dans un widget code avec lang: 'markdown'
-3. Lier les deux widgets : reutiliser le widget detail existant via canvas('update', ...) au lieu d'en creer un nouveau a chaque clic.
-
-## Common mistakes
-- Ne pas oublier interactive: true dans les cartes — sans ca, les clics ne remontent pas
-- Ne pas creer un nouveau widget detail a chaque clic — reutiliser l'existant via canvas('update', ...)
-- Les recettes MCP et WebMCP ont des noms de serveur differents — utiliser le bon prefixe pour get_recipe()
-`,
 ];
 
 // ---------------------------------------------------------------------------
 // Native widget names — derived from RECIPES frontmatter
 // ---------------------------------------------------------------------------
 
-/** Derived from RECIPES frontmatter — always in sync with registered widgets */
-export const NATIVE_WIDGET_NAMES = RECIPES.map(r => {
+/** Derived from RECIPES + notebook widget recipes — always in sync with registered widgets */
+const _NOTEBOOK_RECIPE_SOURCES: string[] = [
+  compactRecipe as string,
+  workspaceRecipe as string,
+  documentRecipe as string,
+  editorialRecipe as string,
+  recipeBrowserRecipe,
+];
+export const NATIVE_WIDGET_NAMES = [...RECIPES, ..._NOTEBOOK_RECIPE_SOURCES].map(r => {
   const match = r.match(/widget:\s*(\S+)/);
   return match ? match[1] : '';
 }).filter(Boolean) as string[];
@@ -1030,6 +1016,7 @@ const NOTEBOOK_WIDGETS: Array<[string, (container: HTMLElement, data: any) => an
   [workspaceRecipe as string, renderWorkspace],
   [documentRecipe as string, renderDocument],
   [editorialRecipe as string, renderEditorial],
+  [recipeBrowserRecipe, renderRecipeBrowser],
 ];
 for (const [recipe, renderer] of NOTEBOOK_WIDGETS) {
   autoui.registerWidget(recipe, renderer as any);

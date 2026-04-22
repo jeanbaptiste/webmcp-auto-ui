@@ -77,7 +77,7 @@ Prefer over `notebook-editorial` when the result is a working session, not a pub
 - Stop (red pill) appears while running, with a live elapsed timer.
 - After a run, Run becomes the replay button (same green pill, re-click to re-run).
 - **SQL cells** are dispatched to the first matching `*_query_sql` tool on the connected MCP data server (auto-detected).
-- **JS cells** execute inside an isolated Web Worker with upstream named outputs injected as scope — `console.log` / `console.table` results are captured and rendered inline.
+- **JS cells** execute on the main thread via `new Function(...)` with upstream named outputs injected as scope — `console.log` / `console.table` results are captured and rendered inline. Note: there is no worker isolation yet, so a `while (true)` loop or other synchronous blocker will freeze the UI thread.
 - Deletions prompt a confirmation modal and are recorded in the history panel; they can be restored from there.
 - `mode: "view"` hides all controls (run, delete, drag, add), making the notebook read-only.
 

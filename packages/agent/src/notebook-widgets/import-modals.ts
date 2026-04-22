@@ -212,7 +212,7 @@ export function openAddRecipeModal(opts: AddRecipeModalOptions): void {
   // Fetch MCP server recipes in parallel
   if (opts.mcpServers && opts.mcpServers.length > 0) {
     for (const srv of opts.mcpServers) {
-      callToolViaPostMessage('list_recipes', {}).then((res: any) => {
+      callToolViaPostMessage(`${srv.name}_list_recipes`, {}).then((res: any) => {
         const items = extractRecipeItems(res, srv);
         if (items.length) {
           all = all.concat(items);
@@ -227,7 +227,7 @@ export function openAddRecipeModal(opts: AddRecipeModalOptions): void {
   async function onPickRecipe(r: ImportedRecipe) {
     if (!r.body && r.serverName && r.serverName !== 'webmcp') {
       try {
-        const res: any = await callToolViaPostMessage('get_recipe', { name: r.originalName ?? r.name, id: r.id ?? r.name });
+        const res: any = await callToolViaPostMessage(`${r.serverName}_get_recipe`, { name: r.originalName ?? r.name, id: r.id ?? r.name });
         r.body = extractRecipeBody(res) ?? '';
       } catch { /* keep empty body */ }
     }

@@ -101,9 +101,9 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   });
 
   let activeCellId: string | null = state.cells.find((c) => c.type !== 'md')?.id ?? state.cells[0]?.id ?? null;
-  const activeCellIdx = () => {
+  const activeCellIdx = (): number | null => {
     const i = state.cells.findIndex((c) => c.id === activeCellId);
-    return i < 0 ? state.cells.length : i + 1;
+    return i < 0 ? null : i;
   };
 
   container.classList.add('nb-root');
@@ -181,9 +181,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
         const recipesN = Array.isArray(srv.recipes) ? srv.recipes.length : 0;
         const toolsN = Array.isArray(srv.tools) ? srv.tools.length : 0;
         meta.textContent = `(${recipesN} recipes, ${toolsN} tools)`;
-        name.addEventListener('click', () => {
-          // Data server management is handled in the flex sidebar now.
-        });
         row.appendChild(dot);
         row.appendChild(name);
         row.appendChild(meta);
@@ -195,9 +192,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     hint.textContent = 'manage data servers in the sidebar';
     sourcesListEl.appendChild(hint);
   }
-
-  // Back-compat alias — rerender() still calls renderSources
-  const renderSources = rerenderSources;
 
   function scrollToActive() {
     if (!activeCellId) return;
@@ -229,7 +223,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   function rerender() {
     mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); });
     renderCells();
-    renderSources();
+    rerenderSources();
     // Update source label
     const first = collectDataServers(data)[0];
     sourceEl.textContent = first?.name ?? 'no source connected';
@@ -591,8 +585,7 @@ function injectLayoutStyles(): void {
 .nbw-connect-btn:hover { opacity: 1; }
 .nbw-sources-srv { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; }
 .nbw-sources-srv-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); }
-.nbw-sources-srv-name { font-weight: 600; color: var(--color-text1); cursor: pointer; }
-.nbw-sources-srv-name:hover { color: var(--color-accent); }
+.nbw-sources-srv-name { font-weight: 600; color: var(--color-text1); }
 .nbw-sources-srv-meta { color: var(--color-text2); font-family: var(--font-mono, monospace); font-size: 10.5px; margin-left: auto; }
 .nbw-add { margin-top: 10px; display: flex; gap: 4px; flex-wrap: wrap; }
 .nbw-add .nb-btn { flex: 1 1 auto; font-size: 10px; padding: 3px 4px; }
