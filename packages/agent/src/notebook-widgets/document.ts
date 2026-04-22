@@ -11,8 +11,10 @@ import {
   autosize, openShareModal, registerHistoryObserver,
   buildServersButton, collectDataServers,
   registerExecutor, logHistory, addImportedCells, fmtRelTime, uid,
+  renderCellLogs,
   type NotebookState, type NotebookCell, type CellResult,
 } from './shared.js';
+import { renderChart } from './chart-renderer.js';
 import { dispatchShare } from './share-handlers.js';
 import { renderProse } from './prose.js';
 import {
@@ -269,11 +271,13 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     state.mode = 'edit';
     container.classList.remove('nb-view-mode');
     editBtn.classList.add('nb-on'); viewBtn.classList.remove('nb-on');
+    rerender();
   });
   viewBtn.addEventListener('click', () => {
     state.mode = 'view';
     container.classList.add('nb-view-mode');
     viewBtn.classList.add('nb-on'); editBtn.classList.remove('nb-on');
+    rerender();
   });
 
   buildServersButton(state, shell.querySelector('.nbd-servers-slot') as HTMLElement, data, rerender);
@@ -316,20 +320,39 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
     handle.textContent = '⋮⋮';
     wrap.appendChild(handle);
 
-    const p = document.createElement('div');
-    p.className = 'nbd-prose';
-    p.contentEditable = 'true';
-    p.innerHTML = renderProse(cell.content);
-    let proseDebounce: any = null;
-    p.addEventListener('input', () => {
-      // We store raw edited HTML as the content source.
-      // A full MD roundtrip would need an HTML→MD converter; for v1 we preserve
-      // the edited HTML as-is since renderProse is idempotent on safe HTML.
-      cell.content = p.innerText;
-      if (proseDebounce) clearTimeout(proseDebounce);
-      proseDebounce = setTimeout(() => logHistory(state, 'edit', 'edited prose'), 400);
-    });
-    wrap.appendChild(p);
+    if (state.mode === 'view') {
+      // View mode: render MD source as HTML (read-only).
+      const p = document.createElement('div');
+      p.className = 'nbd-prose nbd-prose-view';
+      p.innerHTML = renderProse(cell.content || '');
+      wrap.appendChild(p);
+    } else {
+      // Edit mode: split panel — MD source textarea (top) + live preview (bottom).
+      // We keep `cell.content` as canonical markdown source so the roundtrip
+      // is lossless (re-opening the notebook shows the same `###` the user typed).
+      const edit = document.createElement('textarea');
+      edit.className = 'nbd-prose-edit';
+      edit.value = cell.content || '';
+      edit.rows = 2;
+      edit.placeholder = 'write prose (markdown)…';
+      edit.spellcheck = true;
+
+      const preview = document.createElement('div');
+      preview.className = 'nbd-prose nbd-prose-view';
+      preview.innerHTML = renderProse(cell.content || '');
+
+      let proseDebounce: any = null;
+      edit.addEventListener('input', () => {
+        cell.content = edit.value;
+        autosize(edit);
+        preview.innerHTML = renderProse(cell.content || '');
+        if (proseDebounce) clearTimeout(proseDebounce);
+        proseDebounce = setTimeout(() => logHistory(state, 'edit', 'edited prose'), 400);
+      });
+      wrap.appendChild(edit);
+      wrap.appendChild(preview);
+      setTimeout(() => autosize(edit), 0);
+    }
 
     const del = document.createElement('button');
     del.className = 'nb-icon-btn nb-danger nbd-del-abs';
@@ -416,14 +439,23 @@ function renderResult(cell: NotebookCell): HTMLElement | null {
   const wrap = document.createElement('div');
   wrap.className = 'nbd-result-inline';
 
+  // Logs panel — prepended, shared across all widgets
+  const logsEl = renderCellLogs(res);
+  if (logsEl) wrap.appendChild(logsEl);
+
   if (!res.ok) {
     wrap.classList.add('nbd-result-error');
-    wrap.innerHTML = `<div class="nbd-err-kind">${escapeHtml(res.errorKind ?? 'error')}</div><pre class="nbd-err-msg">${escapeHtml(res.error)}</pre>`;
+    const errHost = document.createElement('div');
+    errHost.innerHTML = `<div class="nbd-err-kind">${escapeHtml(res.errorKind ?? 'error')}</div><pre class="nbd-err-msg">${escapeHtml(res.error)}</pre>`;
+    while (errHost.firstChild) wrap.appendChild(errHost.firstChild);
     return wrap;
   }
 
   if (res.kind === 'empty') {
-    wrap.innerHTML = `<div class="nbd-empty-res">— no output —</div>`;
+    const empty = document.createElement('div');
+    empty.className = 'nbd-empty-res';
+    empty.textContent = '— no output —';
+    wrap.appendChild(empty);
     return wrap;
   }
 
@@ -432,14 +464,18 @@ function renderResult(cell: NotebookCell): HTMLElement | null {
     const pretty = typeof val === 'string' ? val : (() => {
       try { return JSON.stringify(val, null, 2); } catch { return String(val); }
     })();
-    wrap.innerHTML = `<pre class="nbd-value-res">${escapeHtml(pretty)}</pre>`;
+    const pre = document.createElement('pre');
+    pre.className = 'nbd-value-res';
+    pre.textContent = pretty;
+    wrap.appendChild(pre);
     return wrap;
   }
 
   if (res.kind === 'chart') {
-    // No ASCII bar chart — just a serif-discrete placeholder with spec preview
-    const preview = (() => { try { return JSON.stringify(res.spec, null, 2); } catch { return String(res.spec); } })();
-    wrap.innerHTML = `<div class="nbd-chart-note">chart · ${escapeHtml(preview.slice(0, 80))}${preview.length > 80 ? '…' : ''}</div>`;
+    const chart = document.createElement('div');
+    chart.className = 'nb-chart';
+    wrap.appendChild(chart);
+    renderChart(chart, res.spec).catch(() => { /* fallback handled internally */ });
     return wrap;
   }
 
@@ -609,6 +645,20 @@ function injectLayoutStyles(): void {
   text-align: justify;
 }
 .nbd-prose:focus { border-color: var(--color-border); background: var(--color-bg); }
+.nbd-prose-edit {
+  display: block; width: 100%;
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border); border-radius: 4px;
+  padding: 8px 10px; margin-bottom: 6px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 13px; line-height: 1.6;
+  color: var(--color-text1);
+  outline: none; resize: none; overflow: hidden;
+}
+.nbd-prose-edit:focus { border-color: var(--color-border2); border-style: solid; }
+.nbd-prose-view {
+  margin-top: 2px;
+}
 .nbd-prose mark {
   background: rgba(240,160,80,0.18);
   color: var(--color-amber);

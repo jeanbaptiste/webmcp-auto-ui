@@ -9,7 +9,7 @@ import {
   setupDnD, deleteCellWithConfirm, restoreCellFromSnapshot, addCell,
   addImportedCells, registerExecutor, collectDataServers,
   autosize, openShareModal, registerHistoryObserver,
-  buildServersButton,
+  buildServersButton, renderCellLogs,
   type NotebookState, type NotebookCell, type CellResult, type CellExecContext,
 } from './shared.js';
 import { dispatchShare } from './share-handlers.js';
@@ -20,6 +20,7 @@ import {
 } from './resource-extractor.js';
 import { mountLeftPane } from './left-pane.js';
 import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
+import { renderChart } from './chart-renderer.js';
 
 export async function render(container: HTMLElement, data: Record<string, unknown>): Promise<() => void> {
   injectStyles();
@@ -418,6 +419,13 @@ function renderResultInto(el: HTMLElement, cell: NotebookCell): void {
     el.innerHTML = `<div class="nbc-result-empty">click ▶ to run</div>`;
     return;
   }
+  renderResultBody(el, r);
+  // Logs panel — shared across all widgets, prepended above the main result
+  const logsEl = renderCellLogs(r);
+  if (logsEl) el.insertBefore(logsEl, el.firstChild);
+}
+
+function renderResultBody(el: HTMLElement, r: CellResult): void {
   if (!r.ok) {
     el.innerHTML = `<div class="nbc-result-error">${escapeHtml(r.error || 'error')}</div>`;
     return;
@@ -432,8 +440,11 @@ function renderResultInto(el: HTMLElement, cell: NotebookCell): void {
     return;
   }
   if (r.kind === 'chart') {
-    const s = safeJson(r.spec);
-    el.innerHTML = `<div class="nbc-result-chart-hint">chart spec</div><pre class="nbc-result-pre">${escapeHtml(s)}</pre>`;
+    el.innerHTML = '';
+    const mount = document.createElement('div');
+    mount.className = 'nb-chart';
+    el.appendChild(mount);
+    renderChart(mount, r.spec).catch(() => { /* fallback handled inside renderChart */ });
     return;
   }
   // table

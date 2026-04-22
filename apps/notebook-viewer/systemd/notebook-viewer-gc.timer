@@ -1,0 +1,13 @@
+# systemd timer — weekly GC for notebook-viewer published notebooks
+# See notebook-viewer-gc.service for install instructions.
+
+[Unit]
+Description=Run notebook-viewer GC weekly
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+RandomizedDelaySec=1h
+
+[Install]
+WantedBy=timers.target

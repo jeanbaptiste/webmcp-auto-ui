@@ -79,6 +79,11 @@ function jsonResponse(res: http.ServerResponse, status: number, body: unknown, e
     ...corsHeaders(),
     ...(extra || {}),
   });
+  // For HEAD requests, send headers (including Content-Length) but no body.
+  if ((res.req?.method || '').toUpperCase() === 'HEAD') {
+    res.end();
+    return;
+  }
   res.end(buf);
 }
 
@@ -89,6 +94,8 @@ async function readBody(req: http.IncomingMessage): Promise<Buffer> {
     req.on('data', (chunk: Buffer) => {
       total += chunk.byteLength;
       if (total > MAX_BODY) {
+        // eslint-disable-next-line no-console
+        console.warn(`[nb-viewer] body cap exceeded (${total} > ${MAX_BODY} bytes) on ${req.method} ${req.url || ''} from ${req.socket?.remoteAddress || '?'}`);
         reject(Object.assign(new Error('body too large'), { status: 413 }));
         req.destroy();
         return;
@@ -202,10 +209,16 @@ async function serveStatic(req: http.IncomingMessage, res: http.ServerResponse, 
   }
   const ext = path.extname(fullPath).toLowerCase();
   const type = MIME[ext] || 'application/octet-stream';
+  const stat = await fsp.stat(fullPath);
   res.writeHead(200, {
     'Content-Type': type,
+    'Content-Length': String(stat.size),
     'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600',
   });
+  if ((req.method || '').toUpperCase() === 'HEAD') {
+    res.end();
+    return 200;
+  }
   const stream = fs.createReadStream(fullPath);
   stream.pipe(res);
   return 200;
@@ -213,12 +226,14 @@ async function serveStatic(req: http.IncomingMessage, res: http.ServerResponse, 
 
 const server = http.createServer(async (req, res) => {
   const started = Date.now();
-  const method = req.method || 'GET';
+  const rawMethod = req.method || 'GET';
+  // Treat HEAD like GET for routing — jsonResponse + serveStatic drop the body.
+  const method = rawMethod === 'HEAD' ? 'GET' : rawMethod;
   const reqUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
   const urlPath = reqUrl.pathname;
 
   // CORS preflight for /api/*
-  if (method === 'OPTIONS' && urlPath.startsWith('/api/')) {
+  if (rawMethod === 'OPTIONS' && urlPath.startsWith('/api/')) {
     res.writeHead(204, corsHeaders());
     res.end();
     log(method, urlPath, 204, Date.now() - started);

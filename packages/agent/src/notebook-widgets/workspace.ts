@@ -9,9 +9,10 @@ import {
   setupDnD, deleteCellWithConfirm, restoreCellFromSnapshot, addCell,
   autosize, openShareModal, registerHistoryObserver,
   buildServersButton, registerExecutor, addImportedCells,
-  collectDataServers, startRun,
+  collectDataServers, startRun, renderCellLogs,
   type NotebookState, type NotebookCell, type CellResult,
 } from './shared.js';
+import { renderChart } from './chart-renderer.js';
 import { dispatchShare, shareAsHyperskill } from './share-handlers.js';
 import { openAddMdModal, openAddRecipeModal } from './import-modals.js';
 import { extractCellsFromRecipe, extractCellFromMarkdown } from './resource-extractor.js';
@@ -466,31 +467,47 @@ function computeMetaInfo(cell: NotebookCell): string {
 function renderResult(res: CellResult): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'nbw-result';
+  const logsEl = renderCellLogs(res);
+  if (logsEl) wrap.appendChild(logsEl);
   if (!res.ok) {
-    wrap.innerHTML = `<div class="nbw-error">⚠ ${escapeHtml(res.error)}</div>`;
+    const err = document.createElement('div');
+    err.className = 'nbw-error';
+    err.textContent = '⚠ ' + (res.error || 'error');
+    wrap.appendChild(err);
     return wrap;
   }
   if (res.kind === 'empty') {
-    wrap.innerHTML = `<div class="nbw-empty">(empty result)</div>`;
+    const empty = document.createElement('div');
+    empty.className = 'nbw-empty';
+    empty.textContent = '(empty result)';
+    wrap.appendChild(empty);
     return wrap;
   }
   if (res.kind === 'value') {
     const txt = typeof res.value === 'object' ? JSON.stringify(res.value, null, 2) : String(res.value);
-    wrap.innerHTML = `<pre class="nbw-value">${escapeHtml(txt)}</pre>`;
+    const pre = document.createElement('pre');
+    pre.className = 'nbw-value';
+    pre.textContent = txt;
+    wrap.appendChild(pre);
     return wrap;
   }
   if (res.kind === 'chart') {
-    wrap.innerHTML = `<pre class="nbw-value">${escapeHtml(JSON.stringify(res.spec, null, 2))}</pre>`;
+    const chart = document.createElement('div');
+    chart.className = 'nb-chart';
+    wrap.appendChild(chart);
+    renderChart(chart, res.spec).catch(() => { /* fallback handled internally */ });
     return wrap;
   }
-  // table
+  // table — use appendChild so we don't wipe the logs panel
   const cols = res.columns;
   const rows = res.rows.slice(0, 100);
   const thead = cols.map((c) => `<th>${escapeHtml(c)}</th>`).join('');
   const tbody = rows.map((r) => {
     return '<tr>' + cols.map((c) => `<td>${escapeHtml(formatCell((r as any)[c]))}</td>`).join('') + '</tr>';
   }).join('');
-  wrap.innerHTML = `<table class="nbw-result-table"><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table>`;
+  const tableHost = document.createElement('div');
+  tableHost.innerHTML = `<table class="nbw-result-table"><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table>`;
+  wrap.appendChild(tableHost.firstElementChild!);
   if (res.rows.length > rows.length) {
     const note = document.createElement('div');
     note.className = 'nbw-empty';

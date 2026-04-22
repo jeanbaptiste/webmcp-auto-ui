@@ -1,0 +1,25 @@
+# systemd oneshot unit — GC old published notebooks for nb.hyperskills.net
+#
+# Install (on bot):
+#   scp apps/notebook-viewer/systemd/notebook-viewer-gc.service bot:/tmp/
+#   scp apps/notebook-viewer/systemd/notebook-viewer-gc.timer   bot:/tmp/
+#   ssh bot 'sudo mv /tmp/notebook-viewer-gc.service /etc/systemd/system/'
+#   ssh bot 'sudo mv /tmp/notebook-viewer-gc.timer   /etc/systemd/system/'
+#   ssh bot 'sudo systemctl daemon-reload'
+#   ssh bot 'sudo systemctl enable --now notebook-viewer-gc.timer'
+#   ssh bot 'systemctl list-timers | grep notebook-viewer-gc'
+#
+# Run once manually:
+#   ssh bot 'sudo systemctl start notebook-viewer-gc.service'
+#   journalctl -u notebook-viewer-gc --since "5 min ago"
+
+[Unit]
+Description=GC old notebook-viewer published notebooks
+After=network.target
+
+[Service]
+Type=oneshot
+User=notebook-viewer
+Group=notebook-viewer
+Environment=NOTEBOOK_STORAGE=/opt/webmcp-demos/notebook-viewer/storage
+ExecStart=/bin/bash /opt/webmcp-demos/notebook-viewer/scripts/gc.sh

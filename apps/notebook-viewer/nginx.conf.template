@@ -12,6 +12,15 @@
 #
 # Backend:
 #   systemd unit: notebook-viewer.service (listens on 127.0.0.1:3011)
+#
+# Rate-limiting:
+#   NOTE: add these limit_req_zone directives to /etc/nginx/nginx.conf
+#   inside the top-level http {} block (they cannot live in a server {} block):
+#
+#     limit_req_zone $binary_remote_addr zone=nb_publish:10m rate=10r/m;
+#     limit_req_zone $binary_remote_addr zone=nb_api:10m rate=60r/m;
+#
+#   Once added, reload nginx: `sudo nginx -t && sudo systemctl reload nginx`.
 
 server {
   listen 80;
@@ -39,6 +48,32 @@ server {
   gzip on;
   gzip_types application/json application/javascript text/css text/html image/svg+xml;
   gzip_min_length 1024;
+
+  # /api/publish — strict rate limit (10 req/min + burst of 3)
+  location = /api/publish {
+    limit_req zone=nb_publish burst=3 nodelay;
+    proxy_pass http://127.0.0.1:3011;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 30s;
+    proxy_connect_timeout 5s;
+  }
+
+  # /api/* — looser rate limit (60 req/min + burst of 20) for reads
+  location /api/ {
+    limit_req zone=nb_api burst=20 nodelay;
+    proxy_pass http://127.0.0.1:3011;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 30s;
+    proxy_connect_timeout 5s;
+  }
 
   location / {
     proxy_pass http://127.0.0.1:3011;

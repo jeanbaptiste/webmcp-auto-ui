@@ -29,6 +29,31 @@ function isChartSpec(v: any): boolean {
   return false;
 }
 
+/**
+ * Convert the worker's raw log entries ({level, args}) into a flat string[]
+ * suitable for CellResult.logs. Each entry becomes one line, with
+ * `[warn]` / `[error]` prefixes for non-log levels (used for color coding).
+ */
+function normalizeLogs(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const out: string[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const level = (entry as any).level as string | undefined;
+    const args = (entry as any).args as unknown[] | undefined;
+    const body = Array.isArray(args)
+      ? args.map((a) => {
+          if (a == null) return String(a);
+          if (typeof a === 'object') { try { return JSON.stringify(a); } catch { return String(a); } }
+          return String(a);
+        }).join(' ')
+      : '';
+    const prefix = level === 'warn' ? '[warn] ' : level === 'error' ? '[error] ' : '';
+    out.push(prefix + body);
+  }
+  return out.length ? out : undefined;
+}
+
 function toResult(value: unknown, durationMs: number): CellResult {
   if (value === undefined || value === null) {
     return { ok: true, kind: 'empty', durationMs };
@@ -193,14 +218,17 @@ export function createJsExecutor(opts?: JsExecutorOptions): CellExecutor {
           finish({ ok: false, error: 'Invalid worker response', errorKind: 'runtime', durationMs });
           return;
         }
+        const logs = normalizeLogs((msg as any).logs);
         if (msg.ok) {
-          finish(toResult((msg as any).result, durationMs));
+          const base = toResult((msg as any).result, durationMs);
+          finish(logs ? { ...base, logs } as CellResult : base);
         } else {
           finish({
             ok: false,
             error: (msg as any).error || 'Unknown error',
             errorKind: (msg as any).errorKind === 'syntax' ? 'syntax' : 'runtime',
             durationMs,
+            logs,
           });
         }
       });

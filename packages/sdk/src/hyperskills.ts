@@ -32,7 +32,10 @@ async function compressGzip(bytes: Uint8Array): Promise<Uint8Array> {
   // @ts-ignore — CompressionStream is part of the DOM lib but may be missing in older TS targets
   const cs = new CompressionStream('gzip');
   const writer = cs.writable.getWriter();
-  writer.write(bytes);
+  // Copy into a fresh Uint8Array to guarantee the underlying buffer is a plain
+  // ArrayBuffer (not SharedArrayBuffer/ArrayBufferLike) — required by
+  // WritableStreamDefaultWriter<BufferSource> under TS 5.x strict lib.
+  writer.write(new Uint8Array(bytes));
   writer.close();
   return new Uint8Array(await new Response(cs.readable).arrayBuffer());
 }

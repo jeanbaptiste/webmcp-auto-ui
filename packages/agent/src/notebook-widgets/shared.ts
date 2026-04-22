@@ -12,11 +12,11 @@ export type NotebookMode = 'edit' | 'view';
 // Cell result — tagged union consumed by all 4 widgets
 // ---------------------------------------------------------------------------
 export type CellResult =
-  | { ok: true; kind: 'table'; rows: Record<string, unknown>[]; columns: string[]; rowCount: number; truncated?: boolean; durationMs: number }
-  | { ok: true; kind: 'value'; value: unknown; durationMs: number }
-  | { ok: true; kind: 'chart'; spec: unknown; durationMs: number }
-  | { ok: true; kind: 'empty'; durationMs: number }
-  | { ok: false; error: string; errorKind?: 'syntax' | 'runtime' | 'timeout' | 'schema'; durationMs: number };
+  | { ok: true; kind: 'table'; rows: Record<string, unknown>[]; columns: string[]; rowCount: number; truncated?: boolean; durationMs: number; logs?: string[] }
+  | { ok: true; kind: 'value'; value: unknown; durationMs: number; logs?: string[] }
+  | { ok: true; kind: 'chart'; spec: unknown; durationMs: number; logs?: string[] }
+  | { ok: true; kind: 'empty'; durationMs: number; logs?: string[] }
+  | { ok: false; error: string; errorKind?: 'syntax' | 'runtime' | 'timeout' | 'schema'; durationMs: number; logs?: string[] };
 
 export interface CellExecContext {
   cell: NotebookCell;
@@ -1018,6 +1018,59 @@ textarea.nb-md-edit {
   margin-left: 4px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* Chart rendering (Vega-Lite via vega-embed) — shared across all 4 widgets */
+.nb-chart {
+  width: 100%; max-width: 100%;
+  min-height: 180px;
+  background: var(--color-bg);
+  border-radius: 4px;
+  padding: 8px;
+  box-sizing: border-box;
+  overflow: auto;
+}
+.nb-chart canvas, .nb-chart svg { max-width: 100%; height: auto; display: block; }
+.nb-chart-fallback {
+  margin: 0;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px; line-height: 1.5;
+  color: var(--color-text1);
+  background: var(--color-surface2);
+  padding: 8px 10px; border-radius: 4px;
+  max-height: 240px; overflow: auto;
+  white-space: pre-wrap;
+}
+.nb-chart-fallback-note {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10px; color: var(--color-text2);
+  margin-bottom: 4px; font-style: italic;
+}
+
+/* Cell execution logs — shared across all 4 widgets */
+.nb-logs {
+  background: rgba(160,160,184,0.06);
+  border-left: 2px solid var(--color-text2);
+  border-radius: 0 4px 4px 0;
+  margin: 4px 0 6px;
+  padding: 6px 10px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.nb-logs-label {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 9.5px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--color-text2);
+  margin-bottom: 4px;
+}
+.nb-logs pre {
+  margin: 0;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px; line-height: 1.5;
+  color: var(--color-text1);
+  white-space: pre-wrap; word-break: break-word;
+}
+.nb-logs .nb-log-warn { color: var(--color-amber, #f0a050); }
+.nb-logs .nb-log-error { color: var(--color-accent2, #fa6d7c); }
 `;
 
 // ---------------------------------------------------------------------------
@@ -1190,6 +1243,30 @@ export function addCell(state: NotebookState, type: CellType, opts?: Partial<Not
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]!));
+}
+
+/**
+ * Build a `.nb-logs` panel for a CellResult, or return null if there are no logs.
+ * Each log is rendered on its own line; the panel is scrollable when long.
+ * Prefixes like "[warn]" / "[error]" get color-coded.
+ */
+export function renderCellLogs(result: CellResult | undefined | null): HTMLElement | null {
+  if (!result || !result.logs || result.logs.length === 0) return null;
+  const box = document.createElement('div');
+  box.className = 'nb-logs';
+  const label = document.createElement('div');
+  label.className = 'nb-logs-label';
+  label.textContent = `console · ${result.logs.length} line${result.logs.length === 1 ? '' : 's'}`;
+  box.appendChild(label);
+  const pre = document.createElement('pre');
+  pre.innerHTML = result.logs.map((line) => {
+    const esc = escapeHtml(String(line ?? ''));
+    if (/^\[warn\]/i.test(line)) return `<span class="nb-log-warn">${esc}</span>`;
+    if (/^\[error\]/i.test(line)) return `<span class="nb-log-error">${esc}</span>`;
+    return esc;
+  }).join('\n');
+  box.appendChild(pre);
+  return box;
 }
 
 // ---------------------------------------------------------------------------

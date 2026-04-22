@@ -10,9 +10,10 @@ import {
   setupDnD, deleteCellWithConfirm, restoreCellFromSnapshot, addCell,
   addImportedCells, registerExecutor, collectDataServers,
   autosize, openShareModal, registerHistoryObserver,
-  buildServersButton,
+  buildServersButton, renderCellLogs,
   type NotebookState, type NotebookCell, type CellResult, type CellExecContext,
 } from './shared.js';
+import { renderChart } from './chart-renderer.js';
 import { dispatchShare, shareAsHyperskill } from './share-handlers.js';
 import { renderProse } from './prose.js';
 import { openAddMdModal, openAddRecipeModal } from './import-modals.js';
@@ -445,20 +446,35 @@ function renderResultInto(el: HTMLElement, cell: NotebookCell): void {
     el.innerHTML = `<div class="nbe-result-empty">press ▶ to run</div>`;
     return;
   }
+  // Logs panel (shared across all widgets), prepended above the main result
+  const logsEl = renderCellLogs(r);
+  if (logsEl) el.appendChild(logsEl);
   if (!r.ok) {
-    el.innerHTML = `<div class="nbe-result-error">${escapeHtml(r.error || 'error')}</div>`;
+    const err = document.createElement('div');
+    err.className = 'nbe-result-error';
+    err.textContent = r.error || 'error';
+    el.appendChild(err);
     return;
   }
   if (r.kind === 'empty') {
-    el.innerHTML = `<div class="nbe-result-empty">(no output)</div>`;
+    const empty = document.createElement('div');
+    empty.className = 'nbe-result-empty';
+    empty.textContent = '(no output)';
+    el.appendChild(empty);
     return;
   }
   if (r.kind === 'value') {
-    el.innerHTML = `<pre class="nbe-result-pre">${escapeHtml(safeJson(r.value))}</pre>`;
+    const pre = document.createElement('pre');
+    pre.className = 'nbe-result-pre';
+    pre.textContent = safeJson(r.value);
+    el.appendChild(pre);
     return;
   }
   if (r.kind === 'chart') {
-    el.innerHTML = `<div class="nbe-result-label">chart spec</div><pre class="nbe-result-pre">${escapeHtml(safeJson(r.spec))}</pre>`;
+    const chart = document.createElement('div');
+    chart.className = 'nb-chart';
+    el.appendChild(chart);
+    renderChart(chart, r.spec).catch(() => { /* fallback handled internally */ });
     return;
   }
   // table — editorial style: serif header row, mono cells, minimal chrome.
@@ -477,7 +493,10 @@ function renderResultInto(el: HTMLElement, cell: NotebookCell): void {
   const trunc = r.rows.length > maxRows
     ? `<div class="nbe-result-trunc">showing ${maxRows} of ${r.rowCount}</div>`
     : '';
-  el.innerHTML = `<div class="nbe-result-table-wrap"><table class="nbe-result-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>${trunc}`;
+  // appendChild so we don't overwrite the logs panel prepended above
+  const host = document.createElement('div');
+  host.innerHTML = `<div class="nbe-result-table-wrap"><table class="nbe-result-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>${trunc}`;
+  while (host.firstChild) el.appendChild(host.firstChild);
 }
 
 function safeJson(v: unknown): string {
