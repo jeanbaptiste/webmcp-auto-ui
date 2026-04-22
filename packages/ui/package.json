@@ -30,7 +30,13 @@
   "peerDependencies": {
     "d3": "^7.9.0",
     "leaflet": ">=1.9.0",
-    "svelte": "^5.0.0"
+    "svelte": "^5.0.0",
+    "vega-embed": "^6.24.0"
+  },
+  "peerDependenciesMeta": {
+    "vega-embed": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@sveltejs/package": "^2.3.0",
