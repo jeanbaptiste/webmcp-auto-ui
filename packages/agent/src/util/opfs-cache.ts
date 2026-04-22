@@ -288,7 +288,7 @@ export interface CachedModelInfo {
  * Recursively sum file sizes under a directory handle, tracking count and
  * max lastModified. Ignores entries that fail to enumerate.
  */
-async function walkDirStats(
+export async function walkDirectoryStats(
   dir: FileSystemDirectoryHandle,
 ): Promise<{ size: number; fileCount: number; lastModified: number }> {
   let size = 0;
@@ -305,7 +305,7 @@ async function walkDirStats(
           if (f.lastModified > lastModified) lastModified = f.lastModified;
         } catch { /* skip */ }
       } else if (handle.kind === 'directory') {
-        const sub = await walkDirStats(handle as FileSystemDirectoryHandle);
+        const sub = await walkDirectoryStats(handle as FileSystemDirectoryHandle);
         size += sub.size;
         fileCount += sub.fileCount;
         if (sub.lastModified > lastModified) lastModified = sub.lastModified;
@@ -335,7 +335,12 @@ export async function listCachedModels(): Promise<CachedModelInfo[]> {
     try {
       for await (const [name, handle] of iter.entries()) {
         if (handle.kind !== 'directory') continue;
-        const stats = await walkDirStats(handle as FileSystemDirectoryHandle);
+        const stats = await walkDirectoryStats(handle as FileSystemDirectoryHandle);
+        if (stats.size === 0 || stats.fileCount === 0) {
+          // Orphan directory (e.g. worker bug that created an empty repo key).
+          try { await modelsDir.removeEntry(name, { recursive: true }); } catch { /* best-effort */ }
+          continue;
+        }
         out.push({ repo: name, size: stats.size, fileCount: stats.fileCount, lastModified: stats.lastModified });
       }
     } catch { /* iteration unsupported */ }

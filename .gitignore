@@ -67,3 +67,6 @@ docs/GEMMA4-BUG-ANALYSIS.md
 \\|<start_function*
 i18n-audit.md
 i18n-fix-*.md
+
+# RETEX / audits internes
+docs/retex/

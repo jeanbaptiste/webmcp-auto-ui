@@ -114,27 +114,12 @@ async function parseToolCalls(
 }
 
 // --------------------------------------------------------------------------
-// OPFS cache — loaded lazily with a best-effort fallback that defers entirely
-// to transformers.js's built-in HF cache (no OPFS intervention on our side).
+// Cache note: transformers.js manages its own cache via Cache Storage API
+// (enabled by `env.useBrowserCache = true` below). No OPFS pre-download from
+// this worker — the generic OPFS helper requires an explicit file list that
+// transformers.js doesn't expose. Progress is surfaced via `progress_callback`
+// in `fromPretrainedOpts`.
 // --------------------------------------------------------------------------
-
-async function loadOrDownloadModel(
-  _repo: string,
-  _onProgress: (fileProgress: number, totalProgress: number, status: string, loaded?: number, total?: number) => void,
-): Promise<void> {
-  try {
-    // Optional fallback import — module is shipped (../util/opfs-cache.ts);
-    // the try/catch is defensive only, guarding against bundler quirks or
-    // OPFS being unavailable in the worker (older browsers).
-    const mod: any = await import('../util/opfs-cache.js');
-    const fn = mod.loadOrDownloadModel ?? mod.default;
-    if (typeof fn === 'function') return await fn(_repo, _onProgress);
-  } catch {
-    // Import/OPFS unavailable — transformers.js falls back to its internal
-    // HTTP fetch + `caches` API. Progress arrives via from_pretrained's
-    // progress_callback below.
-  }
-}
 
 // --------------------------------------------------------------------------
 // Helpers
@@ -228,18 +213,6 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
   } catch {}
 
   stoppingCriteria = new InterruptableStoppingCriteria();
-
-  // Pre-download (OPFS-aware when the cache module is available).
-  await loadOrDownloadModel(modelEntry.repo, (fp, tp, status, loaded, total) => {
-    post({
-      type: 'progress',
-      fileProgress: fp,
-      totalProgress: tp,
-      status,
-      loaded: loaded ?? 0,
-      total: total ?? modelEntry.size,
-    });
-  });
 
   // Aggregated progress callback — sums loaded/total across every file we see,
   // emitting a monotonic aggregate ratio. Two guards eliminate flicker:

@@ -241,7 +241,6 @@
 
     <!-- Model cache -->
     <section class="flex flex-col gap-2">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Model cache (OPFS)</div>
       <ModelCacheManager />
     </section>
 
