@@ -1,0 +1,9 @@
+# Build artifact compiled from server.ts
+server.js
+
+# SvelteKit build output
+build/
+.svelte-kit/
+
+# Local node_modules (should be hoisted by workspace)
+node_modules/
