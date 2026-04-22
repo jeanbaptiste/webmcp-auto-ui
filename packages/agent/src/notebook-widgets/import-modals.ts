@@ -82,8 +82,12 @@ export function openAddMdModal(onPick: (content: string) => void): void {
     </nav>
     <section class="nb-imp-body" data-active="new">
       <div class="nb-imp-panel" data-panel="new">
-        <p class="nb-imp-hint">Creates an empty markdown cell you can edit in place.</p>
-        <button type="button" class="nb-imp-btn nb-imp-primary" data-act="new">Create empty</button>
+        <p class="nb-imp-hint">Paste markdown below, or leave empty to create a blank cell you can edit in place.</p>
+        <textarea class="nb-imp-md-textarea" placeholder="### Heading\n\nParagraph text…"
+                  rows="10" spellcheck="true"></textarea>
+        <div class="nb-imp-md-actions">
+          <button type="button" class="nb-imp-btn nb-imp-primary" data-act="insert-md">Insert</button>
+        </div>
       </div>
       <div class="nb-imp-panel" data-panel="file" hidden>
         <p class="nb-imp-hint">Pick a .md file from your computer.</p>
@@ -100,9 +104,19 @@ export function openAddMdModal(onPick: (content: string) => void): void {
 
   bindCloseAndTabs(ov);
 
-  ov.querySelector('[data-act="new"]')!.addEventListener('click', () => {
-    onPick('### new section\n\nwrite here…');
+  const mdTextarea = ov.querySelector('.nb-imp-md-textarea') as HTMLTextAreaElement | null;
+  const insertMd = () => {
+    const val = mdTextarea?.value ?? '';
+    const content = val.trim() === '' ? '### new section\n\nwrite here…' : val;
+    onPick(content);
     closeImportModal();
+  };
+  ov.querySelector('[data-act="insert-md"]')!.addEventListener('click', insertMd);
+  mdTextarea?.addEventListener('keydown', (e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      insertMd();
+    }
   });
 
   (ov.querySelector('.nb-imp-file') as HTMLInputElement).addEventListener('change', async (e) => {
@@ -458,6 +472,21 @@ function injectImportStyles() {
       background: var(--color-surface, #fff); color: var(--color-text1, #111);
     }
     .nb-imp-file { font-size: 12px; }
+    .nb-imp-md-textarea {
+      width: 100%; min-height: 180px;
+      font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+      font-size: 13px; line-height: 1.5;
+      padding: 10px 12px;
+      border: 1px solid var(--color-border, #e4e4e7);
+      border-radius: 6px;
+      background: var(--color-bg, #fff);
+      color: var(--color-text1, #111);
+      resize: vertical;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .nb-imp-md-textarea:focus { border-color: var(--color-accent, #6a55ff); }
+    .nb-imp-md-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
     .nb-imp-recipes { display: flex; flex-direction: column; gap: 6px; max-height: 46vh; overflow-y: auto; }
     .nb-imp-recipe {
       padding: 10px 12px; border-radius: 8px; cursor: pointer;
