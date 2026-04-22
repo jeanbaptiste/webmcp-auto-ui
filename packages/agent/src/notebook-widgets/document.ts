@@ -9,7 +9,8 @@ import {
   createState, injectStyles, mountRunControls, mountHistoryPanel,
   setupDnD, deleteCellWithConfirm, restoreCellFromSnapshot, addCell,
   autosize, openShareModal, registerHistoryObserver,
-  buildServersButton, collectDataServers,
+  collectDataServers,
+  createPublishControls, autoConnectFrontmatterServers,
   registerExecutor, logHistory, addImportedCells, fmtRelTime, uid,
   renderCellLogs,
   type NotebookState, type NotebookCell, type CellResult,
@@ -151,6 +152,11 @@ export async function render(container: HTMLElement, data: Record<string, unknow
 
   registerDocExecutors(state, data);
 
+  // Forward-ref wrapper so helpers called before `rerender` is defined still work.
+  let rerenderImpl: (() => void) | null = null;
+  const rerenderSafe = () => { rerenderImpl?.(); };
+  autoConnectFrontmatterServers(data, rerenderSafe);
+
   container.classList.add('nb-root');
   container.classList.toggle('nb-view-mode', state.mode === 'view');
 
@@ -174,7 +180,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
           <button class="nb-mode-view">view</button>
         </div>
         <button class="nb-btn nbd-history-btn">⟲ history</button>
-        <span class="nbd-servers-slot"></span>
+        <span class="nbd-publish-badge-slot"></span>
       </div>
       <input class="nbd-title nb-doc-title" value="${escapeAttr(state.title)}">
       <div class="nbd-meta">edited <span class="nbd-edited-rel">${fmtRelTime(state.lastEditAt)}</span> ago</div>
@@ -187,9 +193,11 @@ export async function render(container: HTMLElement, data: Record<string, unknow
         <button class="nb-btn nbd-add-md-btn">+ md</button>
         <button class="nb-btn nbd-add-recipe-btn">+ recipe</button>
         <div class="nbd-spacer">
+          <span class="nbd-publish-slot"></span>
           <span class="nbd-share-link nbd-share-btn">share</span>
         </div>
       </div>
+      <div class="nbd-publish-footer-slot"></div>
     </div>`;
 
   const shell = container.querySelector('.nbd-shell') as HTMLElement;
@@ -219,6 +227,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     renderCells();
     updateMeta();
   }
+  rerenderImpl = rerender;
 
   shell.querySelectorAll<HTMLElement>('[data-add]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -237,6 +246,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
 
   (shell.querySelector('.nbd-add-recipe-btn') as HTMLElement).addEventListener('click', () => {
     openAddRecipeModal({
+      scope: 'data',
       mcpServers: (data?.servers as any[] | undefined)?.map((s: any) => ({ name: s.name, url: s.url })) ?? [],
       onPick: (recipe) => {
         addImportedCells(
@@ -280,7 +290,12 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     rerender();
   });
 
-  buildServersButton(state, shell.querySelector('.nbd-servers-slot') as HTMLElement, data, rerender);
+  const publishCleanup = createPublishControls(state, {
+    buttonSlot: shell.querySelector('.nbd-publish-slot') as HTMLElement,
+    badgeSlot: shell.querySelector('.nbd-publish-badge-slot') as HTMLElement,
+    footerSlot: shell.querySelector('.nbd-publish-footer-slot') as HTMLElement,
+    onPublished: () => rerender(),
+  });
 
   // Left pane — collapsed bookmarks-style panel (mounted into outer container,
   // not into shell, so it sits to the left of the document body)
@@ -301,6 +316,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   return () => {
     unsubHistory();
     try { leftHandle.destroy(); } catch { /* ignore */ }
+    try { publishCleanup?.(); } catch { /* ignore */ }
   };
 }
 
@@ -830,6 +846,9 @@ function injectLayoutStyles(): void {
   border-radius: 6px;
 }
 .nbd-share-link:hover { color: var(--color-text1); border-color: var(--color-border2); }
+.nbd-publish-slot { display: inline-flex; }
+.nbd-publish-badge-slot { margin-left: 8px; }
+.nbd-publish-footer-slot { margin-top: 12px; padding: 0 16px; }
 `;
   document.head.appendChild(style);
 }

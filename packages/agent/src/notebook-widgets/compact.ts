@@ -9,7 +9,8 @@ import {
   setupDnD, deleteCellWithConfirm, restoreCellFromSnapshot, addCell,
   addImportedCells, registerExecutor, collectDataServers,
   autosize, openShareModal, registerHistoryObserver,
-  buildServersButton, renderCellLogs,
+  renderCellLogs,
+  createPublishControls, autoConnectFrontmatterServers,
   type NotebookState, type NotebookCell, type CellResult, type CellExecContext,
 } from './shared.js';
 import { dispatchShare } from './share-handlers.js';
@@ -37,6 +38,9 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   registerExecutor(state, 'js', jsExecutor);
   registerExecutor(state, 'sql', makeSqlExecutor(data));
 
+  // Auto-connect any servers declared in frontmatter to the canvas store.
+  autoConnectFrontmatterServers(data, rerender);
+
   container.classList.add('nb-root');
   container.classList.toggle('nb-view-mode', state.mode === 'view');
 
@@ -59,12 +63,14 @@ export async function render(container: HTMLElement, data: Record<string, unknow
             <button class="nb-btn nb-add-cell" data-add-modal="md">+ md</button>
             <button class="nb-btn nb-add-cell" data-add-modal="recipe">+ recipe</button>
             <button class="nb-btn nbc-history-btn">⟲ history</button>
-            <span class="nbc-servers-slot"></span>
+            <span class="nbc-publish-slot"></span>
             <button class="nb-btn nbc-share-btn">share</button>
+            <span class="nbc-publish-badge-slot"></span>
           </div>
         </div>
         <div class="nb-history-panel nbc-history-panel"></div>
         <div class="nbc-cells"></div>
+        <div class="nbc-publish-footer-slot"></div>
       </div>
     </div>`;
 
@@ -131,6 +137,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
           .filter((s: any) => s.name);
         openAddRecipeModal({
           mcpServers,
+          scope: 'data',
           onPick: (recipe) => {
             const cells = extractCellsFromRecipe(recipe.body ?? '', {
               title: recipe.name, description: recipe.description,
@@ -169,7 +176,12 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     rerender();
   });
 
-  buildServersButton(state, shell.querySelector('.nbc-servers-slot') as HTMLElement, data, rerender);
+  const publishCleanup = createPublishControls(state, {
+    buttonSlot: shell.querySelector('.nbc-publish-slot') as HTMLElement,
+    badgeSlot: shell.querySelector('.nbc-publish-badge-slot') as HTMLElement,
+    footerSlot: shell.querySelector('.nbc-publish-footer-slot') as HTMLElement,
+    onPublished: () => rerender(),
+  });
 
   // Left pane (collapsed by default)
   const pane = mountLeftPane(leftPaneHost, state, collectDataServers(data), {
@@ -197,6 +209,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     unsubHistory();
     canvasUnsub?.();
     pane.destroy();
+    publishCleanup();
   };
 }
 
@@ -599,6 +612,9 @@ function injectLayoutStyles(): void {
 .nbc-result-trunc {
   padding: 4px 2px; color: var(--color-text2); font-size: 10.5px; font-style: italic;
 }
+.nbc-publish-slot { display: inline-flex; }
+.nbc-publish-badge-slot { margin-left: 8px; }
+.nbc-publish-footer-slot { margin-top: 12px; padding: 0 16px; }
 `;
   document.head.appendChild(style);
 }

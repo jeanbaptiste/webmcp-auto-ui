@@ -8,12 +8,13 @@ import {
   createState, injectStyles, mountRunControls, mountHistoryPanel,
   setupDnD, deleteCellWithConfirm, restoreCellFromSnapshot, addCell,
   autosize, openShareModal, registerHistoryObserver,
-  buildServersButton, registerExecutor, addImportedCells,
+  registerExecutor, addImportedCells,
   collectDataServers, startRun, renderCellLogs,
+  createPublishControls, autoConnectFrontmatterServers,
   type NotebookState, type NotebookCell, type CellResult,
 } from './shared.js';
 import { renderChart } from './chart-renderer.js';
-import { dispatchShare, shareAsHyperskill } from './share-handlers.js';
+import { dispatchShare } from './share-handlers.js';
 import { openAddMdModal, openAddRecipeModal } from './import-modals.js';
 import { extractCellsFromRecipe, extractCellFromMarkdown } from './resource-extractor.js';
 import { mountLeftPane } from './left-pane.js';
@@ -29,7 +30,9 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     mode: (data.mode as any) ?? 'edit',
     cells: data.cells as any,
   });
-  (state as any).published = false;
+
+  // Auto-connect frontmatter servers
+  autoConnectFrontmatterServers(data, () => rerender());
 
   // Restore persisted title
   try {
@@ -114,7 +117,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       <div class="nbw-header">
         <div class="nbw-logo"></div>
         <input class="nbw-title-edit nb-title-edit" value="${escapeAttr(state.title)}">
-        <span class="nbw-tag">${(state as any).published ? 'published' : 'draft'}</span>
+        <span class="nbw-publish-badge-slot"></span>
         <div class="nbw-ctx">
           <span class="nbw-source">${escapeAttr(sourceLabel)}</span>
           <div class="nb-mode-switch">
@@ -122,10 +125,9 @@ export async function render(container: HTMLElement, data: Record<string, unknow
             <button class="nb-mode-view">view</button>
           </div>
           <button class="nb-btn nbw-history-btn">⟲ history</button>
-          <span class="nbw-servers-slot"></span>
           <button class="nb-btn nbw-runall-btn">run all</button>
           <button class="nb-btn nbw-share-btn">share</button>
-          <button class="nb-btn nb-btn-primary nbw-publish-btn">publish</button>
+          <span class="nbw-publish-btn-slot"></span>
         </div>
       </div>
       <div class="nb-history-panel nbw-history-panel"></div>
@@ -146,6 +148,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
         </aside>
         <div class="nbw-cells"></div>
       </div>
+      <div class="nbw-publish-footer-slot"></div>
     </div>`;
 
   const shell = container.querySelector('.nbw-shell') as HTMLElement;
@@ -154,10 +157,9 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const historyPanel = shell.querySelector('.nbw-history-panel') as HTMLElement;
   const sourcesListEl = shell.querySelector('.nbw-sources-list') as HTMLElement;
   const toastSlot = shell.querySelector('.nbw-toast-slot') as HTMLElement;
-  const tagEl = shell.querySelector('.nbw-tag') as HTMLElement;
   const sourceEl = shell.querySelector('.nbw-source') as HTMLElement;
 
-  function renderSources() {
+  function rerenderSources() {
     const servers = collectDataServers(data);
     sourcesListEl.innerHTML = '';
     if (servers.length === 0) {
@@ -166,29 +168,36 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       none.textContent = '◯ no source';
       sourcesListEl.appendChild(none);
     } else {
-      servers.forEach((srv) => {
-        const it = document.createElement('div');
-        it.className = 'nbw-item';
-        it.textContent = '◉ ' + srv.name;
-        sourcesListEl.appendChild(it);
+      servers.forEach((srv: any) => {
+        const row = document.createElement('div');
+        row.className = 'nbw-sources-srv';
+        const dot = document.createElement('span');
+        dot.className = 'nbw-sources-srv-dot';
+        const name = document.createElement('span');
+        name.className = 'nbw-sources-srv-name';
+        name.textContent = srv.name;
+        const meta = document.createElement('span');
+        meta.className = 'nbw-sources-srv-meta';
+        const recipesN = Array.isArray(srv.recipes) ? srv.recipes.length : 0;
+        const toolsN = Array.isArray(srv.tools) ? srv.tools.length : 0;
+        meta.textContent = `(${recipesN} recipes, ${toolsN} tools)`;
+        name.addEventListener('click', () => {
+          // Data server management is handled in the flex sidebar now.
+        });
+        row.appendChild(dot);
+        row.appendChild(name);
+        row.appendChild(meta);
+        sourcesListEl.appendChild(row);
       });
     }
-    const connectBtn = document.createElement('button');
-    connectBtn.className = 'nbw-item nbw-indent nbw-dim nbw-connect-btn';
-    connectBtn.textContent = 'connect via mcp…';
-    connectBtn.addEventListener('click', () => {
-      const serversBtn = shell.querySelector('.nbw-servers-slot button') as HTMLElement | null;
-      if (serversBtn) serversBtn.click();
-      else openAddRecipeModal({
-        mcpServers: (Array.isArray(data?.servers) ? (data.servers as any[]) : []).map((s: any) => ({ name: s.name, url: s.url })),
-        onPick: (recipe: any) => {
-          addImportedCells(state, extractCellsFromRecipe(recipe.body ?? '', { title: recipe.name, description: recipe.description }), activeCellIdx());
-          rerender();
-        },
-      });
-    });
-    sourcesListEl.appendChild(connectBtn);
+    const hint = document.createElement('div');
+    hint.className = 'nbw-item nbw-indent nbw-dim';
+    hint.textContent = 'manage data servers in the sidebar';
+    sourcesListEl.appendChild(hint);
   }
+
+  // Back-compat alias — rerender() still calls renderSources
+  const renderSources = rerenderSources;
 
   function scrollToActive() {
     if (!activeCellId) return;
@@ -221,9 +230,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); });
     renderCells();
     renderSources();
-    // Update header tag
-    tagEl.textContent = (state as any).published ? 'published' : 'draft';
-    tagEl.classList.toggle('nbw-tag-published', !!(state as any).published);
     // Update source label
     const first = collectDataServers(data)[0];
     sourceEl.textContent = first?.name ?? 'no source connected';
@@ -263,6 +269,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   });
   (shell.querySelector('.nbw-import-recipe') as HTMLElement).addEventListener('click', () => {
     openAddRecipeModal({
+      scope: 'data',
       mcpServers: (Array.isArray(data?.servers) ? (data.servers as any[]) : []).map((s: any) => ({ name: s.name, url: s.url })),
       onPick: (recipe: any) => {
         addImportedCells(state, extractCellsFromRecipe(recipe.body ?? '', { title: recipe.name, description: recipe.description }), activeCellIdx());
@@ -316,22 +323,12 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     });
   }
 
-  // ---- Publish button ------------------------------------------------------
-  (shell.querySelector('.nbw-publish-btn') as HTMLElement).addEventListener('click', async () => {
-    state.mode = 'view';
-    (state as any).published = true;
-    container.classList.add('nb-view-mode');
-    editBtn.classList.remove('nb-on');
-    viewBtn.classList.add('nb-on');
-    rerender();
-    try {
-      const res = await shareAsHyperskill(state);
-      const url = res?.shortUrl || res?.fullUrl;
-      if (url) showToast('published', url);
-      else showToast('published');
-    } catch (err: any) {
-      showToast('publish failed: ' + String(err?.message ?? err));
-    }
+  // ---- Publish controls (shared nb.hyperskills.net) ------------------------
+  const destroyPublish = createPublishControls(state, {
+    buttonSlot: shell.querySelector('.nbw-publish-btn-slot') as HTMLElement,
+    badgeSlot: shell.querySelector('.nbw-publish-badge-slot') as HTMLElement,
+    footerSlot: shell.querySelector('.nbw-publish-footer-slot') as HTMLElement,
+    toast: (msg: string) => showToast(msg),
   });
 
   // ---- Title edit (persisted with debounce) --------------------------------
@@ -360,9 +357,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     viewBtn.classList.add('nb-on'); editBtn.classList.remove('nb-on');
   });
 
-  // ---- Servers modal button ------------------------------------------------
-  buildServersButton(state, shell.querySelector('.nbw-servers-slot') as HTMLElement, data, rerender);
-
   // ---- Left pane (collapsed by default) ------------------------------------
   let leftPaneHandle: any = null;
   try {
@@ -381,10 +375,19 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   setupDnD(cellsEl, state, rerender);
   const unsubHistory = registerHistoryObserver(() => mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); }));
 
+  // ---- Canvas subscribe for sources sidebar live updates -------------------
+  let canvasUnsub: (() => void) | null = null;
+  try {
+    const canvasAny: any = (globalThis as any).__canvasVanilla || (globalThis as any).canvasVanilla;
+    if (canvasAny?.subscribe) canvasUnsub = canvasAny.subscribe(() => rerenderSources());
+  } catch {}
+
   rerender();
   return () => {
     unsubHistory();
     try { leftPaneHandle?.destroy?.(); } catch {}
+    try { canvasUnsub?.(); } catch {}
+    try { destroyPublish(); } catch {}
   };
 }
 
@@ -552,13 +555,6 @@ function injectLayoutStyles(): void {
   width: 260px; padding: 2px 4px; border-radius: 3px;
 }
 .nbw-title-edit:focus { background: var(--color-bg); }
-.nbw-tag {
-  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-  font-size: 10px; color: var(--color-text2);
-  background: var(--color-bg); padding: 2px 7px; border-radius: 3px;
-  border: 1px solid var(--color-border);
-}
-.nbw-tag-published { color: var(--color-teal, #3ecfb2); border-color: var(--color-teal, #3ecfb2); }
 .nbw-ctx {
   font-family: var(--font-mono, 'IBM Plex Mono', monospace);
   font-size: 11px; color: var(--color-text2);
@@ -593,6 +589,11 @@ function injectLayoutStyles(): void {
 }
 .nbw-connect-btn { cursor: pointer; }
 .nbw-connect-btn:hover { opacity: 1; }
+.nbw-sources-srv { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; }
+.nbw-sources-srv-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); }
+.nbw-sources-srv-name { font-weight: 600; color: var(--color-text1); cursor: pointer; }
+.nbw-sources-srv-name:hover { color: var(--color-accent); }
+.nbw-sources-srv-meta { color: var(--color-text2); font-family: var(--font-mono, monospace); font-size: 10.5px; margin-left: auto; }
 .nbw-add { margin-top: 10px; display: flex; gap: 4px; flex-wrap: wrap; }
 .nbw-add .nb-btn { flex: 1 1 auto; font-size: 10px; padding: 3px 4px; }
 
