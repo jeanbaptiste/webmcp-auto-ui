@@ -8,6 +8,26 @@ export type CellType = 'md' | 'sql' | 'js';
 export type RunState = 'idle' | 'running' | 'done' | 'stopped';
 export type NotebookMode = 'edit' | 'view';
 
+// ---------------------------------------------------------------------------
+// Cell result — tagged union consumed by all 4 widgets
+// ---------------------------------------------------------------------------
+export type CellResult =
+  | { ok: true; kind: 'table'; rows: Record<string, unknown>[]; columns: string[]; rowCount: number; truncated?: boolean; durationMs: number }
+  | { ok: true; kind: 'value'; value: unknown; durationMs: number }
+  | { ok: true; kind: 'chart'; spec: unknown; durationMs: number }
+  | { ok: true; kind: 'empty'; durationMs: number }
+  | { ok: false; error: string; errorKind?: 'syntax' | 'runtime' | 'timeout' | 'schema'; durationMs: number };
+
+export interface CellExecContext {
+  cell: NotebookCell;
+  state: NotebookState;
+  scope: Record<string, unknown>;
+  signal: AbortSignal;
+}
+
+export type CellExecutor = (ctx: CellExecContext) => Promise<CellResult>;
+export type CellExecutors = Partial<Record<CellType, CellExecutor>>;
+
 export interface NotebookCell {
   id: string;
   type: CellType;
@@ -20,6 +40,7 @@ export interface NotebookCell {
   lastMs?: number;
   status?: 'fresh' | 'stale';
   comment?: { who: string; when: string; body: string } | null;
+  lastResult?: CellResult;
 }
 
 export interface NotebookState {
@@ -28,6 +49,10 @@ export interface NotebookState {
   mode: NotebookMode;
   cells: NotebookCell[];
   history: HistoryEntry[];
+  scope: Record<string, unknown>;
+  executors: CellExecutors;
+  lastEditAt: number;
+  kicker?: string;
 }
 
 export interface HistoryEntry {
@@ -84,12 +109,51 @@ export function createState(initial?: Partial<NotebookState>): NotebookState {
       { id: uid(), type: 'js', content: 'console.log(rows)', hideSource: false, hideResult: false, status: 'stale' },
     ],
     history: initial?.history ?? [],
+    scope: initial?.scope ?? {},
+    executors: initial?.executors ?? {},
+    lastEditAt: initial?.lastEditAt ?? Date.now(),
+    kicker: initial?.kicker,
   };
+}
+
+export function registerExecutor(state: NotebookState, type: CellType, fn: CellExecutor): void {
+  state.executors[type] = fn;
+}
+
+/**
+ * Insert imported cells into the notebook at a given position.
+ * - position undefined/null → end of notebook
+ * - position index → inserted just after that index
+ * Adds history entries and updates lastEditAt.
+ */
+export function addImportedCells(state: NotebookState, cells: NotebookCell[], position?: number | null): void {
+  if (!cells?.length) return;
+  const insertAt = (typeof position === 'number' && position >= -1)
+    ? Math.min(Math.max(position + 1, 0), state.cells.length)
+    : state.cells.length;
+  state.cells.splice(insertAt, 0, ...cells);
+  for (const c of cells) {
+    logHistory(state, 'add', `added ${c.type} cell (import)`);
+  }
+}
+
+/**
+ * Mark downstream cells stale when a varname is updated.
+ * Simple lexical match: any cell whose content references \bvarname\b is marked stale.
+ */
+export function propagateStale(state: NotebookState, varname: string): void {
+  if (!varname) return;
+  const re = new RegExp('\\b' + varname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b');
+  for (const c of state.cells) {
+    if (c.type === 'md') continue;
+    if (re.test(c.content)) c.status = 'stale';
+  }
 }
 
 export function logHistory(state: NotebookState, kind: HistoryEntry['kind'], summary: string, snapshot?: HistoryEntry['snapshot']): void {
   state.history.unshift({ ts: Date.now(), kind, summary, snapshot: snapshot ? JSON.parse(JSON.stringify(snapshot)) : undefined });
   if (state.history.length > 100) state.history.pop();
+  state.lastEditAt = Date.now();
 }
 
 export function moveCell(state: NotebookState, fromIdx: number, toIdx: number): void {
@@ -100,17 +164,67 @@ export function moveCell(state: NotebookState, fromIdx: number, toIdx: number): 
 }
 
 // ---------------------------------------------------------------------------
-// Run / Stop live timers
+// Run / Stop — dispatcher with pluggable executors, timer-mock fallback
 // ---------------------------------------------------------------------------
 
 const runningTimers = new Map<string, { intervalId: any; timeoutId: any }>();
+const runningAborts = new Map<string, AbortController>();
 
-export function startRun(cell: NotebookCell, onUpdate: () => void): void {
+/**
+ * Start running a cell. If state has a registered executor for cell.type,
+ * run it and store CellResult on the cell. Otherwise fall back to the legacy
+ * mock timer (keeps the UI alive while phase 1 wires real executors).
+ */
+export function startRun(cell: NotebookCell, state: NotebookState | null, onUpdate: () => void): void {
   cell.runState = 'running';
   cell.status = 'stale';
   (cell as any).startedAt = Date.now();
-  (cell as any).simulatedDuration = 1500 + Math.floor(Math.random() * 1500);
   onUpdate();
+
+  const exec = state?.executors?.[cell.type];
+  if (exec) {
+    const ac = new AbortController();
+    runningAborts.set(cell.id, ac);
+    const ctx: CellExecContext = { cell, state: state!, scope: state!.scope, signal: ac.signal };
+    const startedAt = (cell as any).startedAt as number;
+    exec(ctx).then((res) => {
+      if (cell.runState !== 'running') return;
+      cell.lastResult = res;
+      cell.lastMs = res.durationMs ?? (Date.now() - startedAt);
+      cell.runState = 'done';
+      cell.status = res.ok ? 'fresh' : 'stale';
+      runningAborts.delete(cell.id);
+      if (res.ok && cell.varname && state) {
+        state.scope[cell.varname] = pickScopeValue(res);
+        propagateStale(state, cell.varname);
+        // Current cell is fresh (just ran), keep it fresh
+        cell.status = 'fresh';
+      }
+      delete (cell as any).startedAt;
+      onUpdate();
+    }).catch((err) => {
+      if (cell.runState !== 'running') return;
+      cell.lastResult = { ok: false, error: String(err?.message ?? err), errorKind: 'runtime', durationMs: Date.now() - startedAt };
+      cell.lastMs = Date.now() - startedAt;
+      cell.runState = 'done';
+      cell.status = 'stale';
+      runningAborts.delete(cell.id);
+      delete (cell as any).startedAt;
+      onUpdate();
+    });
+    return;
+  }
+
+  // Legacy mock timer — kept so widgets still animate before exec engines are wired
+  (cell as any).simulatedDuration = 1500 + Math.floor(Math.random() * 1500);
+}
+
+function pickScopeValue(res: CellResult): unknown {
+  if (!res.ok) return undefined;
+  if (res.kind === 'table') return res.rows;
+  if (res.kind === 'value') return res.value;
+  if (res.kind === 'chart') return res.spec;
+  return undefined;
 }
 
 export function stopRun(cell: NotebookCell, onUpdate: () => void): void {
@@ -119,6 +233,11 @@ export function stopRun(cell: NotebookCell, onUpdate: () => void): void {
     clearInterval(handles.intervalId);
     clearTimeout(handles.timeoutId);
     runningTimers.delete(cell.id);
+  }
+  const ac = runningAborts.get(cell.id);
+  if (ac) {
+    ac.abort();
+    runningAborts.delete(cell.id);
   }
   cell.lastMs = Date.now() - ((cell as any).startedAt || Date.now());
   cell.runState = 'stopped';
@@ -134,20 +253,36 @@ export function tickRunningCell(cell: NotebookCell, elapsedEl: HTMLElement, onDo
   const tick = () => { elapsedEl.textContent = formatDuration(Date.now() - startedAt); };
   tick();
   const intervalId = setInterval(tick, 50);
-  const simulatedDuration = (cell as any).simulatedDuration || 2000;
-  const remaining = simulatedDuration - (Date.now() - startedAt);
-  const timeoutId = setTimeout(() => {
-    if (cell.runState !== 'running') return;
-    clearInterval(intervalId);
-    cell.lastMs = Date.now() - startedAt;
-    cell.runState = 'done';
-    cell.status = 'fresh';
-    delete (cell as any).startedAt;
-    delete (cell as any).simulatedDuration;
-    runningTimers.delete(cell.id);
-    onDone();
-  }, Math.max(0, remaining));
-  runningTimers.set(cell.id, { intervalId, timeoutId });
+  // If an executor is running, we don't use the mock timeout — the promise resolve drives onDone.
+  // Only set a timeout for the legacy mock path.
+  const simulatedDuration = (cell as any).simulatedDuration;
+  if (simulatedDuration) {
+    const remaining = simulatedDuration - (Date.now() - startedAt);
+    const timeoutId = setTimeout(() => {
+      if (cell.runState !== 'running') return;
+      clearInterval(intervalId);
+      cell.lastMs = Date.now() - startedAt;
+      cell.runState = 'done';
+      cell.status = 'fresh';
+      delete (cell as any).startedAt;
+      delete (cell as any).simulatedDuration;
+      runningTimers.delete(cell.id);
+      onDone();
+    }, Math.max(0, remaining));
+    runningTimers.set(cell.id, { intervalId, timeoutId });
+  } else {
+    // Real executor path: only keep the interval for elapsed display;
+    // clear it when the cell transitions out of 'running'.
+    runningTimers.set(cell.id, { intervalId, timeoutId: null as any });
+    const pollOut = setInterval(() => {
+      if (cell.runState !== 'running') {
+        clearInterval(intervalId);
+        clearInterval(pollOut);
+        runningTimers.delete(cell.id);
+        onDone();
+      }
+    }, 100);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -498,6 +633,11 @@ function ensureShareOverlay(): HTMLElement {
   return shareOverlay;
 }
 
+/**
+ * Phase 1 agents: pass `dispatchShare` from ./share-handlers.js as onFormat,
+ * wrapped with container ref. Example:
+ *   openShareModal(state, (fmt) => dispatchShare(fmt, state, { container, onResult: toast }));
+ */
 export function openShareModal(state: NotebookState, onFormat: (fmt: string) => void): void {
   const overlay = ensureShareOverlay();
   // Rebind option clicks for the current callback
@@ -884,7 +1024,7 @@ textarea.nb-md-edit {
 // Shared UI parts: Run/Stop control, history panel, drag-drop
 // ---------------------------------------------------------------------------
 
-export function mountRunControls(container: HTMLElement, cell: NotebookCell, cellWrap: HTMLElement, rerender: () => void): void {
+export function mountRunControls(container: HTMLElement, cell: NotebookCell, cellWrap: HTMLElement, notebookState: NotebookState | null, rerender: () => void): void {
   container.innerHTML = '';
   const state = cell.runState || 'idle';
 
@@ -918,7 +1058,7 @@ export function mountRunControls(container: HTMLElement, cell: NotebookCell, cel
   const run = document.createElement('button');
   run.className = 'nb-ctl-pill nb-run';
   run.title = state === 'done' ? 'replay' : state === 'stopped' ? 'stopped · run again' : 'run';
-  run.addEventListener('click', () => startRun(cell, rerender));
+  run.addEventListener('click', () => startRun(cell, notebookState, rerender));
   container.appendChild(run);
 
   if (cell.lastMs != null && state !== 'idle') {

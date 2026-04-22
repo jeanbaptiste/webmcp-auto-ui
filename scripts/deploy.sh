@@ -231,8 +231,9 @@ deploy_app() {
     todo)                deploy_static "todo" ;;
     boilerplate)         deploy_node_root "boilerplate" ;;
     showcase)            deploy_node_root "showcase" ;;
+    notebook-viewer)     deploy_static "notebook-viewer" ;;
     *)
-      echo "  [$app] ✗ unknown app (valid: home, flex, viewer, showcase, todo, recipes, boilerplate)"
+      echo "  [$app] ✗ unknown app (valid: home, flex, viewer, showcase, todo, recipes, boilerplate, notebook-viewer)"
       return 1
       ;;
   esac
@@ -244,7 +245,7 @@ echo "webmcp-auto-ui deploy"
 echo ""
 
 if [ $# -eq 0 ]; then
-  APPS="home flex viewer showcase todo recipes boilerplate"
+  APPS="home flex viewer showcase todo recipes boilerplate notebook-viewer"
 else
   APPS="$*"
 fi

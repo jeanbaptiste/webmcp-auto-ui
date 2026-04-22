@@ -148,7 +148,7 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
       <button class="nb-icon-btn nb-toggle-res">${cell.hideResult ? '▸ res' : '◂ res'}</button>
     </div>`;
   codeCell.appendChild(head);
-  mountRunControls(head.querySelector('.nbe-run-controls') as HTMLElement, cell, wrap, rerender);
+  mountRunControls(head.querySelector('.nbe-run-controls') as HTMLElement, cell, wrap, state, rerender);
 
   const body = document.createElement('div');
   body.className = 'nbe-code-body' + (cell.hideSource ? ' nbe-hidden' : '');

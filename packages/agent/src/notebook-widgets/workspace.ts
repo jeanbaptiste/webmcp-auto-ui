@@ -153,7 +153,7 @@ function renderCell(cell: NotebookCell, idx: number, state: NotebookState, reren
   inner.appendChild(head);
 
   if (isCode) {
-    mountRunControls(head.querySelector('.nbw-run-controls') as HTMLElement, cell, wrap, rerender);
+    mountRunControls(head.querySelector('.nbw-run-controls') as HTMLElement, cell, wrap, state, rerender);
   }
 
   const body = document.createElement('div');

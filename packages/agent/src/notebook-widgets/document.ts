@@ -156,7 +156,7 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
       <button class="nb-icon-btn nb-danger nbd-del">✕</button>
     </div>`;
   codeCell.appendChild(head);
-  mountRunControls(head.querySelector('.nbd-run-controls') as HTMLElement, cell, wrap, rerender);
+  mountRunControls(head.querySelector('.nbd-run-controls') as HTMLElement, cell, wrap, state, rerender);
 
   const body = document.createElement('div');
   body.className = 'nbd-code-body' + (cell.hideSource ? ' nbd-hidden' : '');

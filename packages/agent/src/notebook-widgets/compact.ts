@@ -172,7 +172,7 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
       <button class="nb-icon-btn nb-danger nbc-code-del">✕</button>
     `;
     codeCell.appendChild(titleRow);
-    mountRunControls(titleRow.querySelector('.nbc-run-controls') as HTMLElement, cell, wrap, rerender);
+    mountRunControls(titleRow.querySelector('.nbc-run-controls') as HTMLElement, cell, wrap, state, rerender);
 
     const codeBody = document.createElement('div');
     codeBody.className = 'nbc-code-body' + (cell.hideSource ? ' nbc-hidden' : '');
