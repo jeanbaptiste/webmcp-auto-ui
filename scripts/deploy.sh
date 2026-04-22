@@ -221,6 +221,28 @@ deploy_astro_node() {
   echo "  [$app] ✓ deployed v$app_version (astro node)"
 }
 
+deploy_notebook_viewer() {
+  local app="notebook-viewer"
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "  [$app] DRY RUN: would build + compile server.ts + deploy (build/ + server.js + package.json) → $REMOTE_BASE/$app/"
+    return
+  fi
+  backup_app "$app"
+  echo "  [$app] cleaning local build dir..."
+  rm -rf "$LOCAL_ROOT/apps/$app/build"
+  echo "  [$app] building static SPA..."
+  (cd "$LOCAL_ROOT/apps/$app" && npm run build > /dev/null 2>&1)
+  echo "  [$app] compiling server.ts..."
+  (cd "$LOCAL_ROOT/apps/$app" && npx tsc server.ts --module nodenext --moduleResolution nodenext --target es2022 --outDir . --skipLibCheck > /dev/null 2>&1)
+  echo "  [$app] syncing build/ (rsync)..."
+  rsync -az --delete "$LOCAL_ROOT/apps/$app/build/" "$SSH_HOST:$REMOTE_BASE/$app/build/"
+  echo "  [$app] syncing server.js + package.json..."
+  rsync -az "$LOCAL_ROOT/apps/$app/server.js" "$LOCAL_ROOT/apps/$app/package.json" "$SSH_HOST:$REMOTE_BASE/$app/"
+  echo "  [$app] restarting systemd unit..."
+  ssh "$SSH_HOST" "systemctl restart notebook-viewer"
+  echo "  [$app] ✓ deployed (node+static hybrid)"
+}
+
 deploy_app() {
   local app=$1
   case "$app" in
@@ -231,7 +253,7 @@ deploy_app() {
     todo)                deploy_static "todo" ;;
     boilerplate)         deploy_node_root "boilerplate" ;;
     showcase)            deploy_node_root "showcase" ;;
-    notebook-viewer)     deploy_static "notebook-viewer" ;;
+    notebook-viewer)     deploy_notebook_viewer ;;
     *)
       echo "  [$app] ✗ unknown app (valid: home, flex, viewer, showcase, todo, recipes, boilerplate, notebook-viewer)"
       return 1
@@ -280,6 +302,11 @@ for app in $APPS; do
     flex|viewer|recipes|showcase|boilerplate)
       status=$(ssh "$SSH_HOST" "systemctl is-active webmcp-$app 2>/dev/null" || echo "inactive")
       echo "  $app: $status"
+      ;;
+    notebook-viewer)
+      status=$(ssh "$SSH_HOST" "systemctl is-active notebook-viewer 2>/dev/null" || echo "inactive")
+      code=$(curl -s -o /dev/null -w "%{http_code}" -L "https://nb.hyperskills.net/api/health" 2>/dev/null || echo "???")
+      echo "  $app: $status · HTTP $code (https://nb.hyperskills.net)"
       ;;
     *)
       code=$(curl -s -o /dev/null -w "%{http_code}" -L "https://demos.hyperskills.net/$app/" 2>/dev/null || echo "???")
