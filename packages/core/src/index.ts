@@ -93,6 +93,10 @@ export {
 export { McpMultiClient } from './multi-client.js';
 export type { ConnectedServer } from './multi-client.js';
 
+// Multi-MCP bridge (canvas store <-> McpMultiClient reconciler)
+export { MultiMcpBridge, installMultiMcpBridge, parseRecipesFromToolResponse } from './multi-mcp-bridge.js';
+export type { MultiMcpBridgeOptions } from './multi-mcp-bridge.js';
+
 // WebMCP Server
 export { createWebMcpServer, parseFrontmatter, mountWidget } from './webmcp-server.js';
 export type { WebMcpServer, WebMcpServerOptions, WebMcpToolDef, WidgetEntry, WidgetRenderer, McpRecipeSummary } from './webmcp-server.js';
