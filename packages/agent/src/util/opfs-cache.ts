@@ -252,13 +252,107 @@ export async function loadOrDownloadModel(
 /**
  * Remove every cached file for a given repo. Silently no-ops if the repo
  * directory does not exist.
+ *
+ * Accepts either the original `owner/name` form OR the sanitized key form
+ * (`owner__name`). Both are tried so UIs that list cached repos via
+ * `listCachedModels()` (which only knows the sanitized key) can delete.
  */
 export async function clearModelCache(repo: string): Promise<void> {
   try {
     const root = await navigator.storage.getDirectory();
     const modelsDir = await root.getDirectoryHandle('webmcp-models', { create: false });
-    const repoKey = sanitizeRepoKey(repo);
-    await modelsDir.removeEntry(repoKey, { recursive: true });
+    const candidates = new Set<string>([repo, sanitizeRepoKey(repo)]);
+    for (const key of candidates) {
+      try { await modelsDir.removeEntry(key, { recursive: true }); } catch { /* not present */ }
+    }
+  } catch {
+    // Nothing to clear
+  }
+}
+
+/**
+ * Info about a single cached model repo in OPFS.
+ *
+ * Note: `repo` is the sanitized folder name as it appears on disk
+ * (e.g. `google__gemma-3n-E2B-it-litert-preview`). The original `owner/name`
+ * is not recoverable after sanitization.
+ */
+export interface CachedModelInfo {
+  repo: string;
+  size: number;
+  fileCount: number;
+  lastModified: number;
+}
+
+/**
+ * Recursively sum file sizes under a directory handle, tracking count and
+ * max lastModified. Ignores entries that fail to enumerate.
+ */
+async function walkDirStats(
+  dir: FileSystemDirectoryHandle,
+): Promise<{ size: number; fileCount: number; lastModified: number }> {
+  let size = 0;
+  let fileCount = 0;
+  let lastModified = 0;
+  try {
+    const iter = dir as unknown as { entries: () => AsyncIterable<[string, FileSystemHandle]> };
+    for await (const [, handle] of iter.entries()) {
+      if (handle.kind === 'file') {
+        try {
+          const f = await (handle as FileSystemFileHandle).getFile();
+          size += f.size;
+          fileCount += 1;
+          if (f.lastModified > lastModified) lastModified = f.lastModified;
+        } catch { /* skip */ }
+      } else if (handle.kind === 'directory') {
+        const sub = await walkDirStats(handle as FileSystemDirectoryHandle);
+        size += sub.size;
+        fileCount += sub.fileCount;
+        if (sub.lastModified > lastModified) lastModified = sub.lastModified;
+      }
+    }
+  } catch { /* iteration unsupported */ }
+  return { size, fileCount, lastModified };
+}
+
+/**
+ * List every cached model repo in OPFS with cumulative size, file count and
+ * last-modified timestamp. Returns `[]` if `webmcp-models` does not exist
+ * or if OPFS itself is unavailable.
+ */
+export async function listCachedModels(): Promise<CachedModelInfo[]> {
+  try {
+    if (!navigator.storage?.getDirectory) return [];
+    const root = await navigator.storage.getDirectory();
+    let modelsDir: FileSystemDirectoryHandle;
+    try {
+      modelsDir = await root.getDirectoryHandle('webmcp-models', { create: false });
+    } catch {
+      return [];
+    }
+    const out: CachedModelInfo[] = [];
+    const iter = modelsDir as unknown as { entries: () => AsyncIterable<[string, FileSystemHandle]> };
+    try {
+      for await (const [name, handle] of iter.entries()) {
+        if (handle.kind !== 'directory') continue;
+        const stats = await walkDirStats(handle as FileSystemDirectoryHandle);
+        out.push({ repo: name, size: stats.size, fileCount: stats.fileCount, lastModified: stats.lastModified });
+      }
+    } catch { /* iteration unsupported */ }
+    out.sort((a, b) => b.size - a.size);
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Nuke the whole `webmcp-models` directory. No-op if it does not exist.
+ */
+export async function clearAllModelCaches(): Promise<void> {
+  try {
+    const root = await navigator.storage.getDirectory();
+    await root.removeEntry('webmcp-models', { recursive: true });
   } catch {
     // Nothing to clear
   }

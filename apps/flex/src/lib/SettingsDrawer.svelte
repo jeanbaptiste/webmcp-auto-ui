@@ -7,7 +7,7 @@
 <script lang="ts">
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
-  import { McpConnector, LLMSelector, SettingsPanel, RemoteMCPserversDemo, WebMCPserversList, DiagnosticModal, DiagnosticIcon } from '@webmcp-auto-ui/ui';
+  import { McpConnector, LLMSelector, SettingsPanel, RemoteMCPserversDemo, WebMCPserversList, DiagnosticModal, DiagnosticIcon, ModelCacheManager } from '@webmcp-auto-ui/ui';
 
   const buildStamp = typeof __BUILD_TIME__ === 'string'
     ? __BUILD_TIME__.replace('T', ' ').replace('Z', '').slice(0, 23) : '';
@@ -238,6 +238,12 @@
       </div>
     </section>
     {/if}
+
+    <!-- Model cache -->
+    <section class="flex flex-col gap-2">
+      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Model cache (OPFS)</div>
+      <ModelCacheManager />
+    </section>
 
     <!-- Agent settings -->
     <section class="flex flex-col gap-2">

@@ -11,8 +11,8 @@ export { TRANSFORMERS_MODELS, getTransformersModel, listTransformersModels } fro
 export type { TransformersModelEntry, TransformersFamily, ToolCallFormat } from './providers/transformers-models.js';
 export { parseToolCalls } from './prompts/tool-call-parsers.js';
 export type { ParseResult } from './prompts/tool-call-parsers.js';
-export { loadOrDownloadModel, clearModelCache } from './util/opfs-cache.js';
-export type { ModelFileSpec, CacheProgress } from './util/opfs-cache.js';
+export { loadOrDownloadModel, clearModelCache, listCachedModels, clearAllModelCaches } from './util/opfs-cache.js';
+export type { ModelFileSpec, CacheProgress, CachedModelInfo } from './util/opfs-cache.js';
 export { buildGemmaPrompt } from './prompts/index.js';
 export type { BuildGemmaPromptInput } from './prompts/index.js';
 export { LocalLLMProvider } from './providers/local.js';

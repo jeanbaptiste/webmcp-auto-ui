@@ -90,6 +90,7 @@ export { default as ModelLoader } from './agent/ModelLoader.svelte';
 /** @deprecated Use ModelLoader instead. Alias maintained for backward compatibility. */
 export { default as GemmaLoader } from './agent/ModelLoader.svelte';
 export { default as McpStatus } from './agent/McpStatus.svelte';
+export { default as ModelCacheManager } from './agent/ModelCacheManager.svelte';
 export { default as AgentProgress } from './agent/AgentProgress.svelte';
 export { default as McpConnector } from './agent/McpConnector.svelte';
 export { default as ChatPanel } from './agent/ChatPanel.svelte';
