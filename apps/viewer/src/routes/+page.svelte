@@ -161,6 +161,78 @@
     window.history.pushState({}, '', newUrl.toString());
   }
 
+  const NOTEBOOK_SAMPLES: { type: string; label: string; desc: string; data: Record<string, unknown> }[] = [
+    {
+      type: 'notebook-compact',
+      label: 'Compact',
+      desc: 'Reactive minimalist notebook with a left gutter',
+      data: {
+        title: 'Quick exploration',
+        mode: 'edit',
+        cells: [
+          { type: 'md', content: '# Exploration\nTry editing a cell — outputs chain by name.' },
+          { type: 'sql', varname: 'rows', content: 'select * from sales limit 100' },
+          { type: 'js', varname: 'total', content: 'rows.reduce((s, r) => s + r.amount, 0)' },
+        ],
+      },
+    },
+    {
+      type: 'notebook-workspace',
+      label: 'Workspace',
+      desc: 'Dense analyst workspace with sidebar navigation',
+      data: {
+        title: 'Sales analysis',
+        mode: 'edit',
+        cells: [
+          { type: 'md', name: 'intro', content: 'Q3 sales review.' },
+          { type: 'sql', name: 'fetch_rows', content: 'select * from sales where quarter = 3' },
+          { type: 'js', name: 'visualize', content: '// chart the rows' },
+        ],
+      },
+    },
+    {
+      type: 'notebook-document',
+      label: 'Document',
+      desc: 'Collaborative notebook styled as a shared document',
+      data: {
+        title: 'Weekly review',
+        mode: 'edit',
+        cells: [
+          { type: 'md', content: 'This week we shipped three features. <mark>Conversion is up 8%.</mark> Details below.' },
+          { type: 'sql', content: 'select * from conversions', comment: { who: 'alice', when: '2m', body: 'Can we filter by cohort?' } },
+          { type: 'md', content: 'Next week we focus on retention.' },
+        ],
+      },
+    },
+    {
+      type: 'notebook-editorial',
+      label: 'Editorial',
+      desc: 'Publication-ready notebook with serif prose and inline cells',
+      data: {
+        title: 'Q3 observations',
+        kicker: 'memo',
+        mode: 'edit',
+        cells: [
+          { type: 'md', content: 'This memo covers the highlights of last quarter.' },
+          { type: 'sql', content: 'select * from revenue limit 10' },
+          { type: 'md', content: 'The table above suggests a shift in our core segment.' },
+          { type: 'js', content: '// render a chart' },
+        ],
+      },
+    },
+  ];
+
+  function loadSample(sample: typeof NOTEBOOK_SAMPLES[number]) {
+    skill = { meta: { title: sample.label + ' notebook', version: '1' }, content: { blocks: [] } };
+    blocks = [{ id: uid(), type: sample.type, data: sample.data }];
+    updateSkillContent();
+    error = '';
+    loading = false;
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.delete('hs');
+    window.history.pushState({}, '', newUrl.toString());
+  }
+
   function addBlock() {
     blocks = [...blocks, { id: uid(), type: 'text', data: { text: 'New widget' } }];
     updateSkillContent();
@@ -341,7 +413,19 @@
       <div class="flex-1 flex flex-col items-center justify-center text-center gap-6 p-8">
         <div class="text-5xl opacity-10">&#x2B21;</div>
         <div class="font-mono text-sm text-text2">No <code class="bg-surface2 px-1 rounded">?hs=</code> parameter in the URL</div>
-        <div class="font-mono text-xs text-text2">Paste a HyperSkill link in the bar above or create a new one.</div>
+        <div class="font-mono text-xs text-text2">Paste a HyperSkill link above, create a new one, or try a notebook sample:</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl w-full mt-2">
+          {#each NOTEBOOK_SAMPLES as sample (sample.type)}
+            <button
+              class="text-left rounded-lg border border-border bg-surface hover:border-accent/50 hover:bg-surface2 transition-colors p-3 cursor-pointer"
+              onclick={() => loadSample(sample)}
+            >
+              <div class="font-mono text-xs font-bold text-text1">{sample.label}</div>
+              <div class="font-mono text-[10px] text-text2 mt-1 leading-relaxed">{sample.desc}</div>
+              <div class="font-mono text-[9px] text-accent/70 mt-1.5">{sample.type}</div>
+            </button>
+          {/each}
+        </div>
       </div>
     {:else}
       <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-4 max-w-5xl mx-auto w-full">
