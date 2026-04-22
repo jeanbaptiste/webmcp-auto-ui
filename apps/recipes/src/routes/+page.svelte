@@ -8,7 +8,7 @@
   import { McpMultiClient } from '@webmcp-auto-ui/core';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
   import {
-    RemoteLLMProvider, WasmProvider, runAgentLoop, buildSystemPrompt,
+    RemoteLLMProvider, HawkProvider, WasmProvider, runAgentLoop, buildSystemPrompt,
     WEBMCP_RECIPES, recipeRegistry,
     fromMcpTools, trimConversationHistory, TokenTracker,
     buildDiscoveryCache, ContextRAG,
@@ -145,6 +145,7 @@
 
   // Provider
   const remoteProvider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
+  let hawkProvider: HawkProvider | null = null;
   const tokenTracker = new TokenTracker();
 
   // Gemma WASM state
@@ -158,6 +159,13 @@
   let gemmaTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
 
   function getProvider() {
+    if (canvas.llm.startsWith('hawk-')) {
+      const model = canvas.llm.slice(5);
+      if (!hawkProvider || hawkProvider.model !== model) {
+        hawkProvider = new HawkProvider({ proxyUrl: `${base}/api/hawk`, model });
+      }
+      return hawkProvider;
+    }
     if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
       if (gemmaProvider && gemmaProvider.model !== canvas.llm) {
         unloadGemma();

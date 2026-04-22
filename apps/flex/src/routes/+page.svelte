@@ -6,7 +6,7 @@
   import type { Skill, HyperSkill, RecipeData } from '@webmcp-auto-ui/sdk';
   import { McpMultiClient } from '@webmcp-auto-ui/core';
   import {
-    RemoteLLMProvider, WasmProvider, TransformersProvider, LocalLLMProvider, runAgentLoop, buildSystemPrompt,
+    RemoteLLMProvider, WasmProvider, TransformersProvider, LocalLLMProvider, HawkProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, trimConversationHistory, summarizeChat, TokenTracker,
     buildToolsFromLayers, runDiagnostics, DiscoveryCache, DISCOVERY_TOOL_NAMES, ContextRAG,
     buildGemmaPrompt,
@@ -555,6 +555,9 @@
   const anthropicProvider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
 
   function getProvider() {
+    if (canvas.llm.startsWith('hawk-')) {
+      return new HawkProvider({ proxyUrl: `${base}/api/hawk`, model: canvas.llm.slice(5) });
+    }
     if (canvas.llm === 'local') {
       return new LocalLLMProvider({ baseUrl: localUrl, model: localModel || 'llama3.2' });
     }

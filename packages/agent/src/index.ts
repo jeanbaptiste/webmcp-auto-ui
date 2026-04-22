@@ -19,6 +19,9 @@ export { buildGemmaPrompt } from './prompts/index.js';
 export type { BuildGemmaPromptInput } from './prompts/index.js';
 export { LocalLLMProvider } from './providers/local.js';
 export type { LocalLLMProviderOptions, LocalBackend } from './providers/local.js';
+export { HawkProvider } from './providers/hawk.js';
+export type { HawkLLMProviderOptions } from './providers/hawk.js';
+export { HAWK_MODELS, listHawkModels, type HawkModelEntry } from './providers/hawk-models.js';
 export { createProvider } from './providers/factory.js';
 export type { LLMConfig } from './providers/factory.js';
 

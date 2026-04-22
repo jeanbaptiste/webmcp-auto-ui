@@ -11,7 +11,7 @@
       "import": "./src/index.ts"
     },
     "./server": {
-      "import": "./src/server/llmProxy.ts"
+      "import": "./src/server/index.ts"
     }
   },
   "scripts": {

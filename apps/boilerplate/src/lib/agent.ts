@@ -1,6 +1,6 @@
 import { McpMultiClient } from '@webmcp-auto-ui/core';
 import {
-  RemoteLLMProvider, runAgentLoop, buildSystemPrompt,
+  RemoteLLMProvider, HawkProvider, runAgentLoop, buildSystemPrompt,
   fromMcpTools, autoui,
 } from '@webmcp-auto-ui/agent';
 import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
@@ -11,7 +11,12 @@ import { tricoteusesServer } from './widgets/register';
 export const multiClient = new McpMultiClient();
 
 // ── Anthropic provider via local proxy ────────────────────────────────
-export function createProvider(proxyUrl: string) {
+export function createProvider(proxyUrl: string, model?: string) {
+  if (model?.startsWith('hawk-')) {
+    // proxyUrl is assumed to be `${base}/api/chat`; swap suffix for hawk route
+    const hawkUrl = proxyUrl.replace(/\/api\/chat$/, '/api/hawk');
+    return new HawkProvider({ proxyUrl: hawkUrl, model: model.slice(5) });
+  }
   return new RemoteLLMProvider({ proxyUrl });
 }
 

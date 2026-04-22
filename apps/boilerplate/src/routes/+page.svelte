@@ -8,7 +8,7 @@
   import { McpMultiClient } from '@webmcp-auto-ui/core';
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import {
-    RemoteLLMProvider, runAgentLoop, buildSystemPrompt,
+    RemoteLLMProvider, HawkProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, autoui,
     buildDiscoveryCache, ContextRAG,
   } from '@webmcp-auto-ui/agent';
@@ -50,10 +50,22 @@
   let mcpName = $state('');
 
   // ── Provider ──────────────────────────────────────────────────────────
-  const provider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
+  const remoteProvider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
+  let hawkProvider: HawkProvider | null = null;
+
+  function getProvider() {
+    if (canvas.llm?.startsWith('hawk-')) {
+      const model = canvas.llm.slice(5);
+      if (!hawkProvider || hawkProvider.model !== model) {
+        hawkProvider = new HawkProvider({ proxyUrl: `${base}/api/hawk`, model });
+      }
+      return hawkProvider;
+    }
+    return remoteProvider;
+  }
 
   $effect(() => {
-    provider.setModel(canvas.llm as any);
+    remoteProvider.setModel(canvas.llm as any);
   });
 
   // ── Layers ────────────────────────────────────────────────────────────
@@ -159,7 +171,7 @@
     try {
       const result = await runAgentLoop(msg, {
         client: multiClient.hasConnections ? multiClient as any : undefined,
-        provider,
+        provider: getProvider(),
         systemPrompt: systemPrompt || undefined,
         maxIterations: 10,
         maxTokens: 4096,

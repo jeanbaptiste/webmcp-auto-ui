@@ -7,6 +7,7 @@ import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 import { McpMultiClient } from '@webmcp-auto-ui/core';
 import {
   RemoteLLMProvider,
+  HawkProvider,
   WasmProvider,
   runAgentLoop,
   buildSystemPrompt,
@@ -106,6 +107,7 @@ tokenTracker.subscribe(m => { tokenMetrics = m; });
 
 // Provider singleton
 const anthropicProvider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
+let hawkProvider: HawkProvider | null = null;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 let blockCounter = 0;
@@ -115,6 +117,13 @@ function uid() {
 
 function getProvider() {
   const llm = canvas.llm;
+  if (llm.startsWith('hawk-')) {
+    const model = llm.slice(5);
+    if (!hawkProvider || hawkProvider.model !== model) {
+      hawkProvider = new HawkProvider({ proxyUrl: `${base}/api/hawk`, model });
+    }
+    return hawkProvider;
+  }
   if (llm === 'gemma-e2b' || llm === 'gemma-e4b') {
     if (gemmaProvider && gemmaProvider.model !== llm) {
       unloadGemma();
