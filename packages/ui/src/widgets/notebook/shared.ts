@@ -174,16 +174,16 @@ export function moveCell(state: NotebookState, fromIdx: number, toIdx: number): 
 }
 
 // ---------------------------------------------------------------------------
-// Run / Stop — dispatcher with pluggable executors, timer-mock fallback
+// Run / Stop — dispatcher with pluggable executors
 // ---------------------------------------------------------------------------
 
 const runningTimers = new Map<string, { intervalId: any; timeoutId: any }>();
 const runningAborts = new Map<string, AbortController>();
 
 /**
- * Start running a cell. If state has a registered executor for cell.type,
- * run it and store CellResult on the cell. Otherwise fall back to the legacy
- * mock timer (keeps the UI alive while phase 1 wires real executors).
+ * Start running a cell using the executor registered on state for cell.type.
+ * If no executor is registered, the cell transitions to 'done' with a clear
+ * error result.
  */
 export function startRun(cell: NotebookCell, state: NotebookState | null, onUpdate: () => void): void {
   cell.runState = 'running';
@@ -192,41 +192,50 @@ export function startRun(cell: NotebookCell, state: NotebookState | null, onUpda
   onUpdate();
 
   const exec = state?.executors?.[cell.type];
-  if (exec) {
-    const ac = new AbortController();
-    runningAborts.set(cell.id, ac);
-    const ctx: CellExecContext = { cell, state: state!, scope: state!.scope, signal: ac.signal };
-    const startedAt = (cell as any).startedAt as number;
-    exec(ctx).then((res) => {
-      if (cell.runState !== 'running') return;
-      cell.lastResult = res;
-      cell.lastMs = res.durationMs ?? (Date.now() - startedAt);
-      cell.runState = 'done';
-      cell.status = res.ok ? 'fresh' : 'stale';
-      runningAborts.delete(cell.id);
-      if (res.ok && cell.varname && state) {
-        state.scope[cell.varname] = pickScopeValue(res);
-        propagateStale(state, cell.varname);
-        // Current cell is fresh (just ran), keep it fresh
-        cell.status = 'fresh';
-      }
-      delete (cell as any).startedAt;
-      onUpdate();
-    }).catch((err) => {
-      if (cell.runState !== 'running') return;
-      cell.lastResult = { ok: false, error: String(err?.message ?? err), errorKind: 'runtime', durationMs: Date.now() - startedAt };
-      cell.lastMs = Date.now() - startedAt;
-      cell.runState = 'done';
-      cell.status = 'stale';
-      runningAborts.delete(cell.id);
-      delete (cell as any).startedAt;
-      onUpdate();
-    });
+  if (!exec) {
+    cell.lastResult = {
+      ok: false,
+      error: `No executor registered for cell type '${cell.type}'`,
+      errorKind: 'runtime',
+      durationMs: 0,
+    };
+    cell.lastMs = 0;
+    cell.runState = 'done';
+    cell.status = 'stale';
+    delete (cell as any).startedAt;
+    onUpdate();
     return;
   }
 
-  // Legacy mock timer — kept so widgets still animate before exec engines are wired
-  (cell as any).simulatedDuration = 1500 + Math.floor(Math.random() * 1500);
+  const ac = new AbortController();
+  runningAborts.set(cell.id, ac);
+  const ctx: CellExecContext = { cell, state: state!, scope: state!.scope, signal: ac.signal };
+  const startedAt = (cell as any).startedAt as number;
+  exec(ctx).then((res) => {
+    if (cell.runState !== 'running') return;
+    cell.lastResult = res;
+    cell.lastMs = res.durationMs ?? (Date.now() - startedAt);
+    cell.runState = 'done';
+    cell.status = res.ok ? 'fresh' : 'stale';
+    runningAborts.delete(cell.id);
+    if (res.ok && cell.varname && state) {
+      state.scope[cell.varname] = pickScopeValue(res);
+      propagateStale(state, cell.varname);
+      // Current cell is fresh (just ran), keep it fresh
+      cell.status = 'fresh';
+    }
+    delete (cell as any).startedAt;
+    onUpdate();
+  }).catch((err) => {
+    if (cell.runState !== 'running') return;
+    cell.lastResult = { ok: false, error: String(err?.message ?? err), errorKind: 'runtime', durationMs: Date.now() - startedAt };
+    cell.lastMs = Date.now() - startedAt;
+    cell.runState = 'done';
+    cell.status = 'stale';
+    runningAborts.delete(cell.id);
+    delete (cell as any).startedAt;
+    onUpdate();
+  });
 }
 
 function pickScopeValue(res: CellResult): unknown {
@@ -253,7 +262,6 @@ export function stopRun(cell: NotebookCell, onUpdate: () => void): void {
   cell.runState = 'stopped';
   cell.status = 'stale';
   delete (cell as any).startedAt;
-  delete (cell as any).simulatedDuration;
   onUpdate();
 }
 
@@ -263,36 +271,17 @@ export function tickRunningCell(cell: NotebookCell, elapsedEl: HTMLElement, onDo
   const tick = () => { elapsedEl.textContent = formatDuration(Date.now() - startedAt); };
   tick();
   const intervalId = setInterval(tick, 50);
-  // If an executor is running, we don't use the mock timeout — the promise resolve drives onDone.
-  // Only set a timeout for the legacy mock path.
-  const simulatedDuration = (cell as any).simulatedDuration;
-  if (simulatedDuration) {
-    const remaining = simulatedDuration - (Date.now() - startedAt);
-    const timeoutId = setTimeout(() => {
-      if (cell.runState !== 'running') return;
+  // Executor path: interval drives elapsed display;
+  // clear it when the cell transitions out of 'running'.
+  runningTimers.set(cell.id, { intervalId, timeoutId: null as any });
+  const pollOut = setInterval(() => {
+    if (cell.runState !== 'running') {
       clearInterval(intervalId);
-      cell.lastMs = Date.now() - startedAt;
-      cell.runState = 'done';
-      cell.status = 'fresh';
-      delete (cell as any).startedAt;
-      delete (cell as any).simulatedDuration;
+      clearInterval(pollOut);
       runningTimers.delete(cell.id);
       onDone();
-    }, Math.max(0, remaining));
-    runningTimers.set(cell.id, { intervalId, timeoutId });
-  } else {
-    // Real executor path: only keep the interval for elapsed display;
-    // clear it when the cell transitions out of 'running'.
-    runningTimers.set(cell.id, { intervalId, timeoutId: null as any });
-    const pollOut = setInterval(() => {
-      if (cell.runState !== 'running') {
-        clearInterval(intervalId);
-        clearInterval(pollOut);
-        runningTimers.delete(cell.id);
-        onDone();
-      }
-    }, 100);
-  }
+    }
+  }, 100);
 }
 
 // ---------------------------------------------------------------------------
@@ -317,11 +306,14 @@ export interface DataServerDescriptor {
   recipes?: DataServerRecipe[];
 }
 
-/** Return true when the server looks like a UI/webmcp server and should be hidden. */
+/** Return true when the server looks like a UI/webmcp server and should be hidden.
+ * Primary discriminator is the explicit `kind` field; the name fallback is an
+ * exact (case-insensitive) match so we don't accidentally filter custom servers
+ * like "autoui-data" or "my-webmcp-server". */
 function isUiServer(name: string, kind?: string): boolean {
   if (kind === 'ui' || kind === 'webmcp') return true;
   const n = (name || '').toLowerCase();
-  return n.includes('autoui') || n.includes('webmcp');
+  return n === 'autoui' || n === 'webmcp';
 }
 
 /**
@@ -554,6 +546,9 @@ export function autoConnectFrontmatterServers(
 
 // ---------------------------------------------------------------------------
 // Modals (shared singletons, created on demand)
+// NOTE: These overlays are page-level singletons — only one confirm/share modal
+// can be open at a time per page, even if multiple notebook widgets are mounted.
+// Acceptable trade-off given modals are transient and user-driven.
 // ---------------------------------------------------------------------------
 
 let confirmOverlay: HTMLElement | null = null;
@@ -1284,8 +1279,25 @@ export function renderCellLogs(result: CellResult | undefined | null): HTMLEleme
 // ---------------------------------------------------------------------------
 
 const historyObservers = new Set<() => void>();
+let historyTickerId: any = null;
+
+function startHistoryTicker(): void {
+  if (historyTickerId != null) return;
+  if (typeof setInterval === 'undefined') return;
+  historyTickerId = setInterval(() => { historyObservers.forEach((fn) => fn()); }, 15000);
+}
+
+function stopHistoryTicker(): void {
+  if (historyTickerId == null) return;
+  clearInterval(historyTickerId);
+  historyTickerId = null;
+}
+
 export function registerHistoryObserver(fn: () => void): () => void {
   historyObservers.add(fn);
-  return () => historyObservers.delete(fn);
+  if (historyObservers.size === 1) startHistoryTicker();
+  return () => {
+    historyObservers.delete(fn);
+    if (historyObservers.size === 0) stopHistoryTicker();
+  };
 }
-setInterval(() => { historyObservers.forEach((fn) => fn()); }, 15000);

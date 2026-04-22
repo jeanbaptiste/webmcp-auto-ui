@@ -5,22 +5,24 @@
 import { createWebMcpServer, parseFrontmatter } from '@webmcp-auto-ui/core';
 import { RAW_RECIPES } from './recipes/_generated.js';
 
-// Notebook widget recipes (vanilla renderers)
+// Notebook widget recipes (vanilla renderers) — moved to @webmcp-auto-ui/ui
 // @ts-ignore — Vite raw imports, not resolved by tsc
-import compactRecipe from './notebook-widgets/recipes/compact.md?raw';
+import compactRecipe from '@webmcp-auto-ui/ui/widgets/notebook/recipes/compact.md?raw';
 // @ts-ignore
-import workspaceRecipe from './notebook-widgets/recipes/workspace.md?raw';
+import workspaceRecipe from '@webmcp-auto-ui/ui/widgets/notebook/recipes/workspace.md?raw';
 // @ts-ignore
-import documentRecipe from './notebook-widgets/recipes/document.md?raw';
+import documentRecipe from '@webmcp-auto-ui/ui/widgets/notebook/recipes/document.md?raw';
 // @ts-ignore
-import editorialRecipe from './notebook-widgets/recipes/editorial.md?raw';
+import editorialRecipe from '@webmcp-auto-ui/ui/widgets/notebook/recipes/editorial.md?raw';
 
-// Notebook widget renderers (vanilla JS)
-import { render as renderCompact } from './notebook-widgets/compact.js';
-import { render as renderWorkspace } from './notebook-widgets/workspace.js';
-import { render as renderDocument } from './notebook-widgets/document.js';
-import { render as renderEditorial } from './notebook-widgets/editorial.js';
-import { render as renderRecipeBrowser } from './notebook-widgets/recipe-browser.js';
+// Notebook widget renderers (vanilla JS) — now live in @webmcp-auto-ui/ui
+import {
+  renderCompact,
+  renderWorkspace,
+  renderDocument,
+  renderEditorial,
+  renderRecipeBrowserWidget as renderRecipeBrowser,
+} from '@webmcp-auto-ui/ui';
 
 // Inline recipe for recipe-browser (real vanilla widget)
 const recipeBrowserRecipe = `---

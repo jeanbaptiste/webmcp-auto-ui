@@ -16,6 +16,34 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+/**
+ * Scan and wrap `*italic*` segments. Avoids the lookbehind regex (Safari < 16.4)
+ * and avoids consuming the preceding char (the previous regex did, which broke
+ * `*a* *b*` since the space between them was eaten by the first match).
+ * A `*` is treated as an italic delimiter only when it is NOT part of a `**`
+ * sequence (bold has already been replaced, so any remaining `**` is leftover).
+ */
+function scanItalic(s: string): string {
+  let out = '';
+  let i = 0;
+  while (i < s.length) {
+    const ch = s[i];
+    if (ch === '*' && s[i + 1] !== '*' && (i === 0 || s[i - 1] !== '*')) {
+      // Look for closing `*` on the same line, with non-empty content
+      let j = i + 1;
+      while (j < s.length && s[j] !== '*' && s[j] !== '\n') j++;
+      if (j < s.length && s[j] === '*' && j > i + 1 && s[j + 1] !== '*') {
+        out += `<em>${s.slice(i + 1, j)}</em>`;
+        i = j + 1;
+        continue;
+      }
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
 function renderInline(s: string): string {
   // Escape first, then re-apply allowed inline constructs
   let out = escapeHtml(s);
@@ -23,8 +51,9 @@ function renderInline(s: string): string {
   out = out.replace(/`([^`\n]+)`/g, (_m, g1) => `<code>${g1}</code>`);
   // bold **...**
   out = out.replace(/\*\*([^\*\n]+)\*\*/g, (_m, g1) => `<strong>${g1}</strong>`);
-  // italic *...*
-  out = out.replace(/(^|[^\*])\*([^\*\n]+)\*(?!\*)/g, (_m, pre, g2) => `${pre}<em>${g2}</em>`);
+  // italic *...* — manual scan avoids consuming the leading char (which broke
+  // patterns like `*a* *b*` when the previous regex used [^\*] as a guard).
+  out = scanItalic(out);
   // links [text](href)
   out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, text, href) => {
     const safeHref = /^https?:\/\//i.test(href) ? href : (href.startsWith('/') || href.startsWith('#') ? href : '#');
@@ -121,7 +150,7 @@ export function renderProse(content: string): string {
 
     // Paragraph: gather contiguous non-empty lines
     const para: string[] = [];
-    while (i < lines.length && !/^\s*$/.test(lines[i]) && !/^(#{1,6}\s|```|[-*+]\s|\d+\.\s|>\s|---+\s*$)/.test(lines[i])) {
+    while (i < lines.length && !/^\s*$/.test(lines[i]) && !/^(#{1,6}\s|```|[-*+]\s|\d+\.\s|>\s?|---+\s*$)/.test(lines[i])) {
       para.push(lines[i]);
       i++;
     }

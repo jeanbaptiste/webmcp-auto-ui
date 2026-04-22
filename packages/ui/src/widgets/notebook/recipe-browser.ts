@@ -4,8 +4,11 @@
 // Interactive browser: search, filter by kind/tags, layout toggle, preview, pick/download.
 // ---------------------------------------------------------------------------
 
-import { filterRecipes, sortRecipes, recipeToDownloadBlob, recipeToMarkdown } from '../recipe-browser.js';
-import type { Recipe } from '../recipes/types.js';
+// NOTE: this widget lives in @webmcp-auto-ui/ui but imports runtime helpers from
+// @webmcp-auto-ui/agent, creating an ESM cycle ui <-> agent. The cycle is safe
+// because these imports are only used inside functions (no top-level eval).
+import { filterRecipes, sortRecipes, recipeToDownloadBlob, recipeToMarkdown } from '@webmcp-auto-ui/agent';
+import type { Recipe } from '@webmcp-auto-ui/agent';
 
 export interface RecipeBrowserData {
   recipes: Recipe[];

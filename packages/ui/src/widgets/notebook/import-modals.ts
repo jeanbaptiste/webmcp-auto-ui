@@ -8,8 +8,10 @@
 // ---------------------------------------------------------------------------
 
 import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
-import { filterRecipes, sortRecipes } from '../recipe-browser.js';
-import { WEBMCP_RECIPES } from '../recipes/index.js';
+// NOTE: imports from @webmcp-auto-ui/agent create an ESM cycle ui <-> agent.
+// Safe: agent's autoui-server imports from ui/widgets/notebook for renderers,
+// while these recipe helpers are only invoked inside functions (no top-level eval).
+import { filterRecipes, sortRecipes, WEBMCP_RECIPES } from '@webmcp-auto-ui/agent';
 import { renderMarkdownWithInjectButtons } from './prose.js';
 import { extractCellsFromRecipe, extractCellsFromTool, extractCellFromMarkdown, extractCellFromFence } from './resource-extractor.js';
 import type { NotebookCell } from './shared.js';
@@ -205,20 +207,33 @@ export function openAddRecipeModal(opts: AddRecipeModalOptions): void {
   const hasServers = !!(opts.mcpServers && opts.mcpServers.length > 0);
   if (!includeBuiltin && !hasServers) {
     list.innerHTML = '<div class="nb-imp-empty">No data servers connected. Connect one to see recipes.</div>';
+  } else if (!includeBuiltin && hasServers) {
+    // No built-ins to show yet → display a transient loading state while we
+    // wait for list_recipes to resolve. Avoids a flash of empty UI.
+    list.innerHTML = '<div class="nb-imp-empty">Loading recipes…</div>';
   } else {
     renderList(list, all, onPickRecipe);
   }
 
   // Fetch MCP server recipes in parallel
   if (opts.mcpServers && opts.mcpServers.length > 0) {
+    let pending = opts.mcpServers.length;
     for (const srv of opts.mcpServers) {
       callToolViaPostMessage(`${srv.name}_list_recipes`, {}).then((res: any) => {
         const items = extractRecipeItems(res, srv);
         if (items.length) {
           all = all.concat(items);
-          renderList(list, filterRecipes(all, search.value), onPickRecipe);
         }
-      }).catch(() => { /* ignore: some servers may not expose list_recipes */ });
+      }).catch(() => { /* ignore: some servers may not expose list_recipes */ })
+        .finally(() => {
+          pending--;
+          // Re-render now (showing whatever we have so far) and once more on
+          // the final settle so the loading state is replaced even if no
+          // server returned any recipes.
+          if (all.length > 0 || pending === 0) {
+            renderList(list, filterRecipes(all, search.value), onPickRecipe);
+          }
+        });
     }
   }
 

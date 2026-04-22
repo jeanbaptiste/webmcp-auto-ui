@@ -21,8 +21,20 @@ const LANG_TO_TYPE: Record<string, CellType> = {
   node: 'js',
 };
 
+/** Languages that map to 'js' but use a syntax superset that will fail at
+ *  runtime (interfaces, type annotations, `as` casts, etc.). We log a warning
+ *  whenever such a fence is mapped so the user gets a hint. */
+const TS_LIKE_LANGS = new Set(['ts', 'typescript']);
+
 export function fenceLangToCellType(lang: string): CellType | null {
   const key = (lang || '').toLowerCase().trim();
+  if (TS_LIKE_LANGS.has(key)) {
+    try {
+      console.warn(
+        `[notebook] Fence language "${key}" mapped to JS — TS-specific syntax (interfaces, type annotations, "as" casts) will fail at runtime.`
+      );
+    } catch { /* ignore */ }
+  }
   return LANG_TO_TYPE[key] ?? null;
 }
 

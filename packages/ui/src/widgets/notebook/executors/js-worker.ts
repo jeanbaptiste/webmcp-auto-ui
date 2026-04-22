@@ -122,11 +122,23 @@ function buildWorkerBlobUrl(): string {
 
 // Cache the blob URL across executor calls — workers themselves are disposable
 // but recreating the blob on each run wastes object URLs.
+// Trade-off: we never auto-revoke since the cached URL stays useful for the
+// lifetime of the page. `disposeJsWorkerCache()` is exposed for explicit
+// cleanup (HMR, teardown) when a caller wants to release the object URL.
 let cachedWorkerUrl: string | null = null;
 function getWorkerUrl(): string {
   if (cachedWorkerUrl) return cachedWorkerUrl;
   cachedWorkerUrl = buildWorkerBlobUrl();
   return cachedWorkerUrl;
+}
+
+/** Revoke the cached worker blob URL. Safe to call multiple times.
+ *  The next executor call will create a fresh blob URL on demand. */
+export function disposeJsWorkerCache(): void {
+  if (cachedWorkerUrl) {
+    try { URL.revokeObjectURL(cachedWorkerUrl); } catch { /* ignore */ }
+    cachedWorkerUrl = null;
+  }
 }
 
 /**

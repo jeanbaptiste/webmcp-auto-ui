@@ -2,7 +2,7 @@
 id: create-interactive-notebook-playbook
 name: Create an interactive notebook playbook
 components_used: [notebook-compact, notebook-workspace, notebook-document, notebook-editorial]
-when: the user wants to experiment with data, prototype a small analysis, share a reusable scenario, let others fork and try a dataset, or prepare a hackathon-ready playground. Keywords include "playground", "playbook", "experiment", "try", "prototype", "hackathon", "share a notebook", "template", "starter", "publish", "fork", "memo".
+when: the user wants to experiment with data, prototype a small analysis, share a reusable scenario, or prepare a hackathon-ready playground. Keywords include "playground", "playbook", "experiment", "try", "prototype", "hackathon", "share a notebook", "template", "starter", "publish".
 servers: [autoui]
 layout:
   type: single
@@ -17,7 +17,6 @@ The user asks for a **notebook-like interactive playground** that combines text,
 - "Set up a hackathon starter"
 - "Make a reusable template for exploring CSVs / this API / these tables"
 - "Publish this analysis as a short memo"
-- "Let me fork that notebook"
 
 This recipe applies across domains (parliamentary data, biodiversity, news, business datasets, etc.) — it only prescribes the **shape** of the answer, not its content.
 
@@ -83,7 +82,6 @@ All four notebook layouts share the same `share` button in the toolbar, offering
 
 **Layout-specific share affordances:**
 - `notebook-workspace` has a dedicated `publish` button (primary, accent-coloured) that flips `mode: 'view'`, tags the notebook `published` (from `draft`), and copies the Hyperskill link in one gesture. Use this when the user wants a clean hand-off.
-- `notebook-editorial` shows a `forkId` identifier in the footer next to `share` — it is purely cosmetic (no fork/clone semantics implemented).
 - `notebook-document` shows a single `share` link (live invite/collaboration is not available in this build; presence avatars only render when the `presence` param is explicitly provided).
 
 ### Step 5 — Working with connected data servers
@@ -190,6 +188,6 @@ widget_display({name: "notebook-editorial", params: {
 - **Wrong layout for the intent**: do not use `notebook-editorial` for quick exploration — it signals "finished article" and intimidates. Use `notebook-compact` unless the user explicitly asks for a publication feel.
 - **Heavy initial queries**: always `LIMIT 10` or `LIMIT 20` in seed SQL cells. Users will expand later if needed.
 - **Missing `varname` on SQL cells** (in compact layout): the named output is what the compact layout showcases, and it drives the stale-flag dataflow. Without it, the notebook loses half its reactive story.
-- **Inventing UUIDs**: leave `id` and `forkId` unset — the widget generates sensible defaults. Only pass `id` when restoring an existing notebook.
+- **Inventing UUIDs**: leave `id` unset — the widget generates a sensible default. Only pass `id` when restoring an existing notebook.
 - **Faking presence**: do not pass a `presence` array to `notebook-document` unless there are real editors to show. Presence is opt-in by design — empty `presence` hides the avatar row entirely.
 - **Including `autoui` in `servers:`**: only MCP *data* servers (`kind: 'data'`) belong there. UI servers like `autoui` would pollute the left pane.

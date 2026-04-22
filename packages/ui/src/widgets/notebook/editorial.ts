@@ -39,8 +39,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   registerExecutor(state, 'js', jsExecutor);
   registerExecutor(state, 'sql', makeSqlExecutor(data));
 
-  const forkId: string = (data.forkId as string) ?? (state.id.slice(0, 4) + '·' + state.id.slice(4, 8));
-
   container.classList.add('nb-root');
   container.classList.toggle('nb-view-mode', state.mode === 'view');
 
@@ -66,7 +64,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
           <button class="nb-btn nb-add-cell" data-add="js">+ chart</button>
           <button class="nb-btn nb-add-cell" data-add-modal="md">+ md</button>
           <button class="nb-btn nb-add-cell" data-add-modal="recipe">+ recipe</button>
-          <span class="nbe-fork nbe-share-btn" title="Share">share · ${escapeHtml(forkId)}</span>
+          <span class="nbe-share-btn" title="Share">share</span>
           <span class="nbe-publish-slot"></span>
         </div>
         <div class="nbe-publish-footer-slot"></div>
@@ -704,14 +702,14 @@ function injectLayoutStyles(): void {
   border-top: 1px solid var(--color-border);
   align-items: center;
 }
-.nbe-fork {
+.nbe-share-btn {
   margin-left: auto;
   font-family: var(--font-mono, 'IBM Plex Mono', monospace);
   font-size: 11px; color: var(--color-text2);
   cursor: pointer;
   padding: 5px 10px;
 }
-.nbe-fork:hover { color: var(--color-accent); }
+.nbe-share-btn:hover { color: var(--color-accent); }
 .nbe-publish-btn {
   font-family: var(--font-mono, 'IBM Plex Mono', monospace);
   font-size: 11px;
