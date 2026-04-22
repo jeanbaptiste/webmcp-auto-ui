@@ -4,6 +4,14 @@
 // Used by the four notebook layout renderers (compact/workspace/document/editorial)
 // ---------------------------------------------------------------------------
 
+export const NB_PUBLISH_HOST: string = (() => {
+  try {
+    const override = (import.meta as any)?.env?.PUBLIC_NB_HOST;
+    if (override && typeof override === 'string') return String(override);
+  } catch { /* ignore */ }
+  return 'https://nb.hyperskills.net';
+})();
+
 export type CellType = 'md' | 'sql' | 'js';
 export type RunState = 'idle' | 'running' | 'done' | 'stopped';
 export type NotebookMode = 'edit' | 'view';
@@ -670,6 +678,200 @@ export function buildServersButton(
 }
 
 // ---------------------------------------------------------------------------
+// Publish controls (button + optional badge + optional footer)
+// Shared across all 4 notebook layouts so publish/update behaves identically.
+// ---------------------------------------------------------------------------
+
+export interface PublishControlsOptions {
+  /** DOM element where to append the publish button (required). */
+  buttonSlot: HTMLElement;
+  /** DOM element where to append the published badge (top-right). If absent, badge is not rendered. */
+  badgeSlot?: HTMLElement;
+  /** DOM element where to append the published footer (URL + open link). If absent, footer is not rendered. */
+  footerSlot?: HTMLElement;
+  /** Called after a successful publish/update so the caller can rerender. */
+  onPublished?: (info: { slug: string; url: string; updated: boolean }) => void;
+  /** Optional toast function — falls back to internal toast helper if absent. */
+  toast?: (message: string, isError?: boolean) => void;
+  /** Minimal projection of the state sent to the server. If absent, sends { id, title, kicker, mode, cells }. */
+  serializeState?: (state: NotebookState) => Record<string, unknown>;
+}
+
+interface PublishControlsHandles {
+  btn: HTMLButtonElement;
+  badge: HTMLAnchorElement | null;
+  footer: HTMLElement | null;
+}
+
+function publishUrlFor(slug: string): string {
+  return `${NB_PUBLISH_HOST}/p/${slug}`;
+}
+
+function publishBtnLabel(state: NotebookState): string {
+  return state.publishedSlug ? '🔄 update' : '📤 publish';
+}
+
+function refreshPublishControls(state: NotebookState, controls: PublishControlsHandles): void {
+  const { btn, badge, footer } = controls;
+  btn.textContent = publishBtnLabel(state);
+  btn.dataset.state = state.publishedSlug ? 'published' : 'draft';
+  if (state.publishedSlug) {
+    btn.title = `Update ${publishUrlFor(state.publishedSlug)}`;
+  } else {
+    btn.title = 'Publish this notebook';
+  }
+  if (badge) {
+    if (state.publishedSlug) {
+      const url = publishUrlFor(state.publishedSlug);
+      badge.href = url;
+      badge.textContent = `📤 ${state.publishedSlug}`;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  if (footer) {
+    if (state.publishedSlug) {
+      const url = publishUrlFor(state.publishedSlug);
+      footer.innerHTML = `Published at <a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>`;
+      footer.style.display = '';
+    } else {
+      footer.innerHTML = '';
+      footer.style.display = 'none';
+    }
+  }
+}
+
+function fallbackPublishToast(message: string, isError?: boolean): void {
+  // Reuse undo-toast styling as a generic ephemeral indicator.
+  const toast = document.createElement('div');
+  toast.className = 'nb-undo-toast' + (isError ? ' nb-undo-toast-error' : '');
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('nb-show'));
+  setTimeout(() => {
+    toast.classList.remove('nb-show');
+    setTimeout(() => toast.parentNode?.removeChild(toast), 220);
+  }, 3200);
+}
+
+/**
+ * Create publish controls (button + optional badge + optional footer) wired
+ * against the shared `nb.hyperskills.net` endpoint. Returns a `destroy()`
+ * callback for cleanup.
+ */
+export function createPublishControls(state: NotebookState, opts: PublishControlsOptions): () => void {
+  const btn = document.createElement('button');
+  btn.className = 'nb-btn nb-publish-btn';
+  btn.type = 'button';
+  opts.buttonSlot.appendChild(btn);
+
+  let badge: HTMLAnchorElement | null = null;
+  if (opts.badgeSlot) {
+    badge = document.createElement('a');
+    badge.className = 'nb-published-badge';
+    badge.target = '_blank';
+    badge.rel = 'noopener';
+    opts.badgeSlot.appendChild(badge);
+  }
+
+  let footer: HTMLElement | null = null;
+  if (opts.footerSlot) {
+    footer = document.createElement('div');
+    footer.className = 'nb-published-footer';
+    opts.footerSlot.appendChild(footer);
+  }
+
+  const controls: PublishControlsHandles = { btn, badge, footer };
+  refreshPublishControls(state, controls);
+
+  const toast = opts.toast ?? fallbackPublishToast;
+
+  const onClick = async () => {
+    const prevLabel = btn.textContent ?? '';
+    btn.disabled = true;
+    btn.textContent = state.publishedSlug ? '… updating' : '… publishing';
+    try {
+      const minimal = opts.serializeState
+        ? opts.serializeState(state)
+        : {
+            id: state.id,
+            title: state.title,
+            kicker: state.kicker,
+            mode: state.mode,
+            cells: state.cells,
+          };
+      const res = await fetch(`${NB_PUBLISH_HOST}/api/publish`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          state: minimal,
+          slug: state.publishedSlug,
+          token: state.publishedToken,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const reply: any = await res.json();
+      state.publishedSlug = reply.slug;
+      state.publishedToken = reply.token;
+      state.lastEditAt = Date.now();
+      const url: string = reply.url ?? publishUrlFor(String(reply.slug));
+      try { await navigator.clipboard?.writeText?.(url); } catch { /* ignore */ }
+      const updated = Boolean(reply.updated);
+      toast(
+        updated
+          ? `updated · ${url.replace(/^https?:\/\//, '')} (copied)`
+          : `published · ${url.replace(/^https?:\/\//, '')} (copied)`
+      );
+      opts.onPublished?.({ slug: String(reply.slug), url, updated });
+    } catch (err: any) {
+      toast(`publish failed · ${String(err?.message ?? err)}`, true);
+      btn.textContent = prevLabel;
+    } finally {
+      btn.disabled = false;
+      refreshPublishControls(state, controls);
+    }
+  };
+
+  btn.addEventListener('click', onClick);
+
+  return () => {
+    btn.removeEventListener('click', onClick);
+    btn.parentNode?.removeChild(btn);
+    badge?.parentNode?.removeChild(badge);
+    footer?.parentNode?.removeChild(footer);
+  };
+}
+
+/**
+ * Auto-connect any data servers declared in recipe frontmatter (`data.servers`)
+ * to the shared canvas store. No-op / no-throw if the canvas store is absent.
+ * Calls `refresh()` (if provided) once merging is done.
+ */
+export function autoConnectFrontmatterServers(
+  data: Record<string, unknown>,
+  refresh?: () => void
+): void {
+  try {
+    const declared = Array.isArray((data as any)?.servers) ? (data as any).servers : [];
+    if (declared.length === 0) return;
+    const canvasAny: any = (globalThis as any).__canvasVanilla || (globalThis as any).canvasVanilla;
+    if (!canvasAny?.update) return;
+    canvasAny.update((st: any) => {
+      if (!Array.isArray(st.dataServers)) st.dataServers = [];
+      const existing = new Set(st.dataServers.map((s: any) => s?.name));
+      for (const srv of declared) {
+        const name = srv?.name;
+        if (name && !existing.has(name)) {
+          st.dataServers.push({ name, url: srv.url, kind: 'data' });
+        }
+      }
+    });
+    refresh?.();
+  } catch { /* ignore */ }
+}
+
+// ---------------------------------------------------------------------------
 // Modals (shared singletons, created on demand)
 // ---------------------------------------------------------------------------
 
@@ -1275,6 +1477,50 @@ textarea.nb-md-edit {
 }
 .nb-logs .nb-log-warn { color: var(--color-amber, #f0a050); }
 .nb-logs .nb-log-error { color: var(--color-accent2, #fa6d7c); }
+
+/* Publish controls (button + published badge + footer) */
+.nb-publish-btn {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px;
+}
+.nb-publish-btn[data-state="published"] { color: var(--color-accent); }
+.nb-published-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: var(--color-accent); color: #fff;
+  border-radius: 999px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px; font-weight: 600;
+  text-decoration: none; cursor: pointer;
+}
+.nb-published-badge:hover { filter: brightness(1.1); }
+.nb-published-footer {
+  padding: 8px 0; border-top: 1px dashed var(--color-border);
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px; color: var(--color-text2);
+}
+.nb-published-footer a { color: var(--color-accent); text-decoration: none; }
+.nb-published-footer a:hover { text-decoration: underline; }
+
+/* Undo toast (used by deleteCellWithConfirm + generic publish toast fallback) */
+.nb-undo-toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--color-surface2, #1a1a1f); color: var(--color-text1, #fff);
+  border: 1px solid var(--color-border, #333); border-radius: 8px;
+  padding: 10px 16px; font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 12px; line-height: 1.4;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  z-index: 1010; display: inline-flex; align-items: center; gap: 10px;
+  max-width: 480px; opacity: 0; transition: opacity 0.2s;
+}
+.nb-undo-toast.nb-show { opacity: 1; }
+.nb-undo-toast-error { border-color: var(--color-accent2, #fa6d7c); color: var(--color-accent2, #fa6d7c); }
+.nb-undo-toast-undo {
+  font-family: inherit; font-size: inherit; font-weight: 600;
+  color: var(--color-accent, #6a55ff); cursor: pointer;
+  background: none; border: none; padding: 0; text-decoration: underline;
+}
+.nb-undo-toast-undo:hover { filter: brightness(1.15); }
 `;
 
 // ---------------------------------------------------------------------------
@@ -1404,24 +1650,79 @@ export function setupDnD(container: HTMLElement, state: NotebookState, rerender:
 // Helpers for action handlers
 // ---------------------------------------------------------------------------
 
-export async function deleteCellWithConfirm(
+/**
+ * Delete a cell and show an ephemeral "Undo" toast.
+ * (Signature preserved for compatibility with the 4 widgets; the old
+ * modal-confirm flow has been replaced by an undo toast pattern.)
+ */
+export function deleteCellWithConfirm(
   state: NotebookState,
   cell: NotebookCell,
-  describe: (c: NotebookCell) => string,
+  labelFor: (c: NotebookCell) => string,
   rerender: () => void
-): Promise<void> {
-  const targetName = describe(cell);
-  const ok = await askConfirm(
-    'Delete cell?',
-    'Remove {target} from the notebook? You can restore it later from the history panel.',
-    targetName
-  );
-  if (!ok) return;
+): void {
   const idx = state.cells.findIndex((c) => c.id === cell.id);
   if (idx < 0) return;
-  const removed = state.cells.splice(idx, 1)[0];
-  logHistory(state, 'del', `removed ${targetName}`, { cell: removed, idx });
+  const label = labelFor(cell);
+  const snapshotCell: NotebookCell = typeof (globalThis as any).structuredClone === 'function'
+    ? (globalThis as any).structuredClone(cell)
+    : JSON.parse(JSON.stringify(cell));
+  // Manually push a history entry so we have a direct reference to remove on undo.
+  const entry: HistoryEntry = {
+    ts: Date.now(),
+    kind: 'del',
+    summary: `removed ${label}`,
+    snapshot: { cell: snapshotCell, idx },
+  };
+  state.history.unshift(entry);
+  if (state.history.length > 100) state.history.pop();
+  state.cells.splice(idx, 1);
+  state.lastEditAt = Date.now();
   rerender();
+  showUndoToast(`${label} removed · restorable from history`, () => {
+    const i = state.history.indexOf(entry);
+    if (i >= 0) state.history.splice(i, 1);
+    const insertAt = Math.min(idx, state.cells.length);
+    state.cells.splice(insertAt, 0, snapshotCell);
+    state.lastEditAt = Date.now();
+    rerender();
+  });
+}
+
+/**
+ * Internal: show a small "X removed · restorable from history" toast with an
+ * Undo link. The toast auto-dismisses after ~5s. Clicking Undo invokes the
+ * callback and dismisses the toast early.
+ */
+function showUndoToast(message: string, onUndo: () => void): void {
+  const toast = document.createElement('div');
+  toast.className = 'nb-undo-toast';
+  const msgEl = document.createElement('span');
+  msgEl.className = 'nb-undo-toast-msg';
+  msgEl.textContent = message;
+  const undoBtn = document.createElement('button');
+  undoBtn.className = 'nb-undo-toast-undo';
+  undoBtn.type = 'button';
+  undoBtn.textContent = 'Undo';
+  toast.appendChild(msgEl);
+  toast.appendChild(undoBtn);
+  document.body.appendChild(toast);
+  // Next tick: trigger fade-in.
+  requestAnimationFrame(() => toast.classList.add('nb-show'));
+
+  let dismissed = false;
+  const dismiss = () => {
+    if (dismissed) return;
+    dismissed = true;
+    toast.classList.remove('nb-show');
+    setTimeout(() => { toast.parentNode?.removeChild(toast); }, 220);
+  };
+  const timeoutId = setTimeout(dismiss, 5000);
+  undoBtn.addEventListener('click', () => {
+    clearTimeout(timeoutId);
+    try { onUndo(); } catch { /* ignore */ }
+    dismiss();
+  });
 }
 
 export function restoreCellFromSnapshot(state: NotebookState, snapshot: { cell: NotebookCell; idx: number }): void {
