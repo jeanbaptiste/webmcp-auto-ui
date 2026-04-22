@@ -16,38 +16,39 @@ export { default as MarkdownView } from './primitives/MarkdownView.svelte';
 export { default as CodeView } from './primitives/CodeView.svelte';
 export { renderMarkdown, highlightCode, createMarkdownRenderer } from './primitives/markdown-renderer.js';
 
-// Simple widgets (PJ blocks)
-export { default as StatBlock } from './widgets/simple/StatBlock.svelte';
-export { default as KVBlock } from './widgets/simple/KVBlock.svelte';
-export { default as ListBlock } from './widgets/simple/ListBlock.svelte';
-export { default as ChartBlock } from './widgets/simple/ChartBlock.svelte';
-export { default as AlertBlock } from './widgets/simple/AlertBlock.svelte';
-export { default as CodeBlock } from './widgets/simple/CodeBlock.svelte';
-export { default as TextBlock } from './widgets/simple/TextBlock.svelte';
-export { default as ActionsBlock } from './widgets/simple/ActionsBlock.svelte';
-export { default as TagsBlock } from './widgets/simple/TagsBlock.svelte';
+// Simple widgets (vanilla renderers) — contract: render(container, data): () => void
+export { render as renderStat }    from './widgets/simple/stat.js';
+export { render as renderKv }      from './widgets/simple/kv.js';
+export { render as renderList }    from './widgets/simple/list.js';
+export { render as renderChart }   from './widgets/simple/chart.js';
+export { render as renderAlert }   from './widgets/simple/alert.js';
+export { render as renderCode }    from './widgets/simple/code.js';
+export { render as renderText }    from './widgets/simple/text.js';
+export { render as renderActions } from './widgets/simple/actions.js';
+export { render as renderTags }    from './widgets/simple/tags.js';
 
-// Rich widgets (Archive)
-export { default as StatCard } from './widgets/rich/StatCard.svelte';
-export { default as DataTable } from './widgets/rich/DataTable.svelte';
-export { default as Timeline } from './widgets/rich/Timeline.svelte';
-export { default as ProfileCard } from './widgets/rich/ProfileCard.svelte';
-export { default as Trombinoscope } from './widgets/rich/Trombinoscope.svelte';
-export { default as JsonViewer } from './widgets/rich/JsonViewer.svelte';
-export { default as Hemicycle } from './widgets/rich/Hemicycle.svelte';
-export { default as Chart } from './widgets/rich/Chart.svelte';
-export { default as Cards } from './widgets/rich/Cards.svelte';
-export { default as GridData } from './widgets/rich/GridData.svelte';
-export { default as Sankey } from './widgets/rich/Sankey.svelte';
-export { default as MapView } from './widgets/rich/MapView.svelte';
-export { default as D3Widget } from './widgets/rich/D3Widget.svelte';
-export { default as JsSandbox } from './widgets/rich/JsSandbox.svelte';
-export { default as LogViewer } from './widgets/rich/LogViewer.svelte';
-export { default as Gallery } from './widgets/rich/Gallery.svelte';
-export { default as Carousel } from './widgets/rich/Carousel.svelte';
+// Rich widgets (vanilla renderers)
+export { render as renderStatCard }      from './widgets/rich/stat-card.js';
+export { render as renderDataTable }     from './widgets/rich/data-table.js';
+export { render as renderTimeline }      from './widgets/rich/timeline.js';
+export { render as renderProfile }       from './widgets/rich/profile.js';
+export { render as renderTrombinoscope } from './widgets/rich/trombinoscope.js';
+export { render as renderJsonViewer }    from './widgets/rich/json-viewer.js';
+export { render as renderHemicycle }     from './widgets/rich/hemicycle.js';
+export { render as renderChartRich }     from './widgets/rich/chart-rich.js';
+export { render as renderCards }         from './widgets/rich/cards.js';
+export { render as renderGridData }      from './widgets/rich/grid-data.js';
+export { render as renderSankey }        from './widgets/rich/sankey.js';
+export { render as renderMap }           from './widgets/rich/map.js';
+export { render as renderD3 }            from './widgets/rich/d3.js';
+export { render as renderJsSandbox }     from './widgets/rich/js-sandbox.js';
+export { render as renderLog }           from './widgets/rich/log.js';
+export { render as renderGallery }       from './widgets/rich/gallery.js';
+export { render as renderCarousel }      from './widgets/rich/carousel.js';
 
-// Safe image (URL validation + error fallback)
-export { default as SafeImage } from './widgets/SafeImage.svelte';
+// Safe image helper (URL validation + error fallback)
+export { createSafeImage } from './widgets/helpers/safe-image.js';
+export type { SafeImageOptions } from './widgets/helpers/safe-image.js';
 
 // Widget export utility
 export { exportWidget, getExportFormats, exportWidgetAs } from './widgets/export-widget.js';
