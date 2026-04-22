@@ -6,6 +6,9 @@ dist/
 build/
 .svelte-kit/
 
+# Deploy fingerprint state (skip rebuild when sources unchanged)
+.deploy-state/
+
 # Environment
 .env
 .env.*

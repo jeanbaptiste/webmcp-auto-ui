@@ -22,15 +22,54 @@ LOCAL_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # Parse flags
 DRY_RUN=0
 WITH_DOCS=false
+FORCE=0
 REAL_ARGS=()
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
     --with-docs) WITH_DOCS=true ;;
+    --force) FORCE=1 ;;
     *) REAL_ARGS+=("$arg") ;;
   esac
 done
 set -- "${REAL_ARGS[@]+"${REAL_ARGS[@]}"}"
+
+# ── Fingerprint-based skip (rebuild only when sources changed) ───────────────
+STATE_DIR="$LOCAL_ROOT/.deploy-state"
+
+compute_fingerprint() {
+  local app=$1
+  {
+    find "$LOCAL_ROOT/apps/$app" -type f \
+      \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.svelte' \
+         -o -name '*.css' -o -name '*.json' -o -name '*.html' -o -name '*.md' \
+         -o -name '*.astro' -o -name '*.svg' -o -name '*.conf' -o -name '*.template' \) \
+      -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/dist/*' \
+      -not -path '*/.svelte-kit/*' 2>/dev/null
+    find "$LOCAL_ROOT"/packages -maxdepth 3 \
+      \( -path '*/src/*' -o -name 'package.json' \) -type f \
+      -not -path '*/node_modules/*' -not -path '*/dist/*' 2>/dev/null
+  } | LC_ALL=C sort | xargs shasum -a 256 2>/dev/null | shasum -a 256 | cut -c1-16
+}
+
+should_skip() {
+  local app=$1
+  [ "$FORCE" = "1" ] && return 1
+  [ "$DRY_RUN" = "1" ] && return 1
+  local f="$STATE_DIR/$app.sha"
+  [ ! -f "$f" ] && return 1
+  local stored current
+  stored=$(cat "$f" 2>/dev/null)
+  current=$(compute_fingerprint "$app")
+  [ -n "$stored" ] && [ "$stored" = "$current" ]
+}
+
+record_fingerprint() {
+  local app=$1
+  [ "$DRY_RUN" = "1" ] && return 0
+  mkdir -p "$STATE_DIR"
+  compute_fingerprint "$app" > "$STATE_DIR/$app.sha"
+}
 
 # Local package version
 LOCAL_VERSION=$(node -e "console.log(require('$LOCAL_ROOT/package.json').version)" 2>/dev/null || echo "?")
@@ -243,7 +282,7 @@ deploy_notebook_viewer() {
   echo "  [$app] ✓ deployed (node+static hybrid)"
 }
 
-deploy_app() {
+_dispatch_deploy() {
   local app=$1
   case "$app" in
     flex)                deploy_node_root "flex" ;;
@@ -259,6 +298,19 @@ deploy_app() {
       return 1
       ;;
   esac
+}
+
+deploy_app() {
+  local app=$1
+  if should_skip "$app"; then
+    echo "  [$app] unchanged — skipping (use --force to redeploy)"
+    return 0
+  fi
+  if _dispatch_deploy "$app"; then
+    record_fingerprint "$app"
+    return 0
+  fi
+  return 1
 }
 
 # ── Main ─────────────────────────────────────────────────────────────────────
