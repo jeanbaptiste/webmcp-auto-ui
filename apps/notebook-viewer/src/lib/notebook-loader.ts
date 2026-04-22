@@ -77,6 +77,14 @@ export function normalizePayload(parsed: unknown): NotebookPayload {
     return { kind, data };
   }
 
+  // Published envelope: { state: {...}, publishedAt, updatedAt? }
+  if (obj.state && typeof obj.state === 'object' && Array.isArray((obj.state as Record<string, unknown>).cells)) {
+    const inner = obj.state as Record<string, unknown>;
+    const kind = coerceKind((inner as { widget?: unknown }).widget);
+    const data = { ...inner, mode: 'view' };
+    return { kind, data };
+  }
+
   throw new NotebookLoadError('invalid', 'Notebook payload has no recognizable shape');
 }
 
