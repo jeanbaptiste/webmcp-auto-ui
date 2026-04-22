@@ -510,7 +510,13 @@ function injectLayoutStyles(): void {
 .nbc-cell { margin-bottom: 14px; position: relative; }
 .nbc-cell:last-child { margin-bottom: 0; }
 .nbc-row {
-  display: grid; grid-template-columns: 20px 48px 1fr; gap: 6px;
+  display: grid; grid-template-columns: 20px 48px minmax(0, 1fr); gap: 6px;
+}
+/* View mode: drag handle is hidden via shared.ts (display:none), which removes it
+   from the grid auto-placement and caused the body to land in the 48px column.
+   Collapse to a 2-column grid so the body keeps its full width. */
+.nb-root.nb-view-mode .nbc-row {
+  grid-template-columns: 48px minmax(0, 1fr);
 }
 .nbc-gutter {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
