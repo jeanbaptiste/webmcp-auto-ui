@@ -4,7 +4,8 @@
 
   import { onMount } from 'svelte';
   import { jsonResult } from '@webmcp-auto-ui/core';
-  import { Button, Input, Badge, NativeSelect, StatCard } from '@webmcp-auto-ui/ui';
+  import { Button, Input, Badge, NativeSelect } from '@webmcp-auto-ui/ui';
+  import StatCard from '$lib/StatCard.svelte';
   import { Check, Trash2, Plus, Circle } from 'lucide-svelte';
 
   // ── Types ───────────────────────────────────────────────────────────────

@@ -15,14 +15,13 @@ import documentRecipe from '@webmcp-auto-ui/ui/widgets/notebook/recipes/document
 // @ts-ignore
 import editorialRecipe from '@webmcp-auto-ui/ui/widgets/notebook/recipes/editorial.md?raw';
 
-// Notebook widget renderers (vanilla JS) — now live in @webmcp-auto-ui/ui
-import {
-  renderCompact,
-  renderWorkspace,
-  renderDocument,
-  renderEditorial,
-  renderRecipeBrowserWidget as renderRecipeBrowser,
-} from '@webmcp-auto-ui/ui';
+// Notebook widget renderers (vanilla JS) — import via subpath to avoid pulling
+// the .svelte exports of the ui package root through tsc.
+import { render as renderCompact } from '@webmcp-auto-ui/ui/widgets/notebook/compact.js';
+import { render as renderWorkspace } from '@webmcp-auto-ui/ui/widgets/notebook/workspace.js';
+import { render as renderDocument } from '@webmcp-auto-ui/ui/widgets/notebook/document.js';
+import { render as renderEditorial } from '@webmcp-auto-ui/ui/widgets/notebook/editorial.js';
+import { render as renderRecipeBrowser } from '@webmcp-auto-ui/ui/widgets/notebook/recipe-browser.js';
 
 // Inline recipe for recipe-browser (real vanilla widget)
 const recipeBrowserRecipe = `---
