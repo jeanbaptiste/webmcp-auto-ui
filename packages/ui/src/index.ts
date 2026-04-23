@@ -48,14 +48,13 @@ export { render as renderLog }           from './widgets/rich/log.js';
 export { render as renderGallery }       from './widgets/rich/gallery.js';
 export { render as renderCarousel }      from './widgets/rich/carousel.js';
 
-// Notebook widget renderers (vanilla)
-export { render as renderCompact }              from './widgets/notebook/compact.js';
-export { render as renderWorkspace }            from './widgets/notebook/workspace.js';
-export { render as renderDocument }             from './widgets/notebook/document.js';
-export { render as renderEditorial }            from './widgets/notebook/editorial.js';
+// Notebook widget renderer (vanilla)
+export { render as renderNotebook }             from './widgets/notebook/notebook.js';
 export { render as renderRecipeBrowserWidget } from './widgets/notebook/recipe-browser.js';
 // Notebook types (optional public API)
 export type { NotebookState, NotebookCell } from './widgets/notebook/shared.js';
+// Notebook cell extractors (for hosts that build notebooks from recipes/tools)
+export { extractCellsFromRecipe, extractCellsFromTool, extractCellFromMarkdown, extractCellFromFence } from './widgets/notebook/resource-extractor.js';
 
 // Safe image helper (URL validation + error fallback)
 export { createSafeImage } from './widgets/helpers/safe-image.js';

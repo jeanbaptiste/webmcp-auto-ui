@@ -2,6 +2,7 @@
   import { fade, fly } from 'svelte/transition';
   import { filterRecipes, sortRecipes, recipeToMarkdown, recipeToDownloadBlob } from '@webmcp-auto-ui/agent';
   import { encode } from '@webmcp-auto-ui/sdk';
+  import { extractCellsFromRecipe } from '@webmcp-auto-ui/ui';
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import RecipeModal from './RecipeModal.svelte';
   import type { RecipeData } from '@webmcp-auto-ui/sdk';
@@ -127,23 +128,27 @@
   async function openInNotebook(recipe: RecipeItem) {
     await ensureBody(recipe);
     const body = recipe.body ?? '';
-    const hasSelect = /\bSELECT\b/i.test(body);
-    const hasFrom = /\bFROM\b/i.test(body);
-    const inferredType: 'sql' | 'js' = (hasSelect && hasFrom) ? 'sql' : 'js';
 
-    const firstServer = Array.isArray(recipe.servers) && recipe.servers.length > 0
-      ? recipe.servers[0]
-      : undefined;
+    const cells = extractCellsFromRecipe(body, {
+      title: recipe.name,
+      description: recipe.description,
+    });
+
+    const connected = multiClient?.listServers() ?? [];
+    const serverNames = Array.isArray(recipe.servers) ? recipe.servers : [];
+    const servers = serverNames
+      .map((name) => {
+        const hit = connected.find((s) => s.name === name);
+        const url = hit?.url ?? (typeof recipe.serverUrl === 'string' ? recipe.serverUrl : undefined);
+        return url ? { name, url, kind: 'data' as const } : null;
+      })
+      .filter((s): s is { name: string; url: string; kind: 'data' } => s !== null);
 
     const data: Record<string, unknown> = {
       title: recipe.name,
-      cells: [
-        { type: 'md', content: `# ${recipe.name}\n\n${recipe.description ?? ''}` },
-        { type: 'md', content: '## Recipe reference\n\n' + body },
-        { type: inferredType, content: inferredType === 'sql' ? '-- Your query here\n\n' : '// Your script here\n\n' },
-      ],
+      cells,
       mode: 'edit',
-      servers: firstServer ? [{ name: firstServer, kind: 'data' }] : [],
+      servers,
     };
 
     onOpenInNotebook?.('notebook-compact', data);
