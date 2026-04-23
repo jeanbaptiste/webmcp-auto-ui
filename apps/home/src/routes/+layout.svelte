@@ -2,7 +2,7 @@
   import '../app.css';
   import { PUBLIC_BASE_URL } from '$env/static/public';
   import { onMount, onDestroy } from 'svelte';
-  import ThemeProvider from '../../../../packages/ui/src/theme/ThemeProvider.svelte';
+  import { ThemeProvider } from '@webmcp-auto-ui/ui';
 
   const base = PUBLIC_BASE_URL ?? '';
   import {

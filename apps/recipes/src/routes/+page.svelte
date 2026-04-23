@@ -247,7 +247,7 @@
       // Load recipes if server has list_recipes
       if (tools.some(t => t.name === 'list_recipes')) {
         try {
-          const r = await multiClient.callTool('list_recipes', {});
+          const r = await multiClient.callToolOn(url.trim(), 'list_recipes', {});
           const text = r.content?.find((c: any) => c.type === 'text') as any;
           if (text?.text) {
             const parsed = JSON.parse(text.text);

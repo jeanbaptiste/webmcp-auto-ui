@@ -188,9 +188,15 @@ export class McpClient {
     // Auto-reconnect on 404 (session expired)
     if (response.status === 404 && this.options.autoReconnect) {
       if (this.isReconnecting) {
-        // Another call already triggered reconnect — wait for it then retry
+        // Another call already triggered reconnect — wait for it then retry.
+        // Increment attempt to enforce the maxReconnectAttempts cap on this
+        // concurrent path as well; otherwise we could loop forever if the
+        // session keeps expiring.
         await this.reconnectPromise;
-        return this.rpc<T>(method, params, attempt);
+        if (attempt >= this.options.maxReconnectAttempts) {
+          throw new Error(`MCP session expired and reconnect failed after ${attempt} attempts`);
+        }
+        return this.rpc<T>(method, params, attempt + 1);
       }
       if (attempt < this.options.maxReconnectAttempts) {
         this.isReconnecting = true;

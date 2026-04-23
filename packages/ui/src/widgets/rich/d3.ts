@@ -403,7 +403,12 @@ async function exportPng(container: HTMLElement, scale = 2): Promise<Blob> {
 // ── Main render dispatcher ───────────────────────────────────────────────────
 export function render(container: HTMLElement, data: D3Spec): () => void {
   const spec = data;
-  const slot = buildChrome(container, spec?.title);
+  if (!spec || !spec.preset) {
+    const slot = buildChrome(container, spec?.title);
+    slot.innerHTML = '<div class="widget-empty" style="padding:1em;opacity:.6">No data</div>';
+    return () => { container.innerHTML = ''; };
+  }
+  const slot = buildChrome(container, spec.title);
   showLoading(slot);
 
   let cancelled = false;

@@ -283,7 +283,7 @@ async function handleDelete(req: http.IncomingMessage, res: http.ServerResponse,
 }
 
 async function findByToken(token: string): Promise<string | null> {
-  if (!/^[a-f0-9]{4,64}$/.test(token)) return null;
+  if (!/^[A-Za-z0-9_-]{4,64}$/.test(token)) return null;
   const entries = await fsp.readdir(PUBLISHED_DIR).catch(() => [] as string[]);
   const match = entries.find((e) => e.startsWith(token) && e.endsWith('.json'));
   return match ? path.join(PUBLISHED_DIR, match) : null;

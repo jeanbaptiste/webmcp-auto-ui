@@ -2,73 +2,118 @@
   import { type Component, onMount, onDestroy } from 'svelte';
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import { bus } from '../messaging/bus.svelte.js';
-
-  // ── Native vanilla renderers ─────────────────────────────────────────────
   // Simple widgets
-  import { render as renderStat }    from './simple/stat.js';
-  import { render as renderKv }      from './simple/kv.js';
-  import { render as renderList }    from './simple/list.js';
-  import { render as renderChart }   from './simple/chart.js';
-  import { render as renderAlert }   from './simple/alert.js';
-  import { render as renderCode }    from './simple/code.js';
-  import { render as renderText }    from './simple/text.js';
-  import { render as renderActions } from './simple/actions.js';
-  import { render as renderTags }    from './simple/tags.js';
+  import StatBlock from './simple/StatBlock.svelte';
+  import KVBlock from './simple/KVBlock.svelte';
+  import ListBlock from './simple/ListBlock.svelte';
+  import ChartBlock from './simple/ChartBlock.svelte';
+  import AlertBlock from './simple/AlertBlock.svelte';
+  import CodeBlock from './simple/CodeBlock.svelte';
+  import TextBlock from './simple/TextBlock.svelte';
+  import ActionsBlock from './simple/ActionsBlock.svelte';
+  import TagsBlock from './simple/TagsBlock.svelte';
   // Rich widgets
-  import { render as renderStatCard }      from './rich/stat-card.js';
-  import { render as renderProfile }       from './rich/profile.js';
-  import { render as renderJsonViewer }    from './rich/json-viewer.js';
-  import { render as renderChartRich }     from './rich/chart-rich.js';
-  import { render as renderSankey }        from './rich/sankey.js';
-  import { render as renderHemicycle }     from './rich/hemicycle.js';
-  import { render as renderDataTable }     from './rich/data-table.js';
-  import { render as renderTimeline }      from './rich/timeline.js';
-  import { render as renderTrombinoscope } from './rich/trombinoscope.js';
-  import { render as renderCards }         from './rich/cards.js';
-  import { render as renderGridData }      from './rich/grid-data.js';
-  import { render as renderMap }           from './rich/map.js';
-  import { render as renderD3 }            from './rich/d3.js';
-  import { render as renderJsSandbox }    from './rich/js-sandbox.js';
-  import { render as renderLog }           from './rich/log.js';
-  import { render as renderGallery }       from './rich/gallery.js';
-  import { render as renderCarousel }      from './rich/carousel.js';
+  import StatCard from './rich/StatCard.svelte';
+  import DataTable from './rich/DataTable.svelte';
+  import Timeline from './rich/Timeline.svelte';
+  import ProfileCard from './rich/ProfileCard.svelte';
+  import Trombinoscope from './rich/Trombinoscope.svelte';
+  import JsonViewer from './rich/JsonViewer.svelte';
+  import Hemicycle from './rich/Hemicycle.svelte';
+  import Chart from './rich/Chart.svelte';
+  import Cards from './rich/Cards.svelte';
+  import GridData from './rich/GridData.svelte';
+  import Sankey from './rich/Sankey.svelte';
+  import MapView from './rich/MapView.svelte';
+  import D3Widget from './rich/D3Widget.svelte';
+  import JsSandbox from './rich/JsSandbox.svelte';
+  import LogViewer from './rich/LogViewer.svelte';
+  import Gallery from './rich/Gallery.svelte';
+  import Carousel from './rich/Carousel.svelte';
 
-  /** A vanilla renderer: returns cleanup or Promise thereof. */
-  type VanillaRenderer = (
-    container: HTMLElement,
-    data: Record<string, unknown>,
-  ) => void | (() => void) | Promise<void | (() => void)>;
+  type Emit = (action: string, payload: unknown) => void;
 
-  /** Static map of all native widget types → vanilla renderer */
-  const NATIVE_VANILLA_MAP: Record<string, VanillaRenderer> = {
-    // Simple
-    'stat':           renderStat,
-    'kv':             renderKv,
-    'list':           renderList,
-    'chart':          renderChart,
-    'alert':          renderAlert,
-    'code':           renderCode,
-    'text':           renderText,
-    'actions':        renderActions,
-    'tags':           renderTags,
-    // Rich
-    'stat-card':      renderStatCard,
-    'profile':        renderProfile,
-    'json-viewer':    renderJsonViewer,
-    'chart-rich':     renderChartRich,
-    'sankey':         renderSankey,
-    'hemicycle':      renderHemicycle,
-    'data-table':     renderDataTable,
-    'timeline':       renderTimeline,
-    'trombinoscope':  renderTrombinoscope,
-    'cards':          renderCards,
-    'grid-data':      renderGridData,
-    'map':            renderMap,
-    'd3':             renderD3,
-    'js-sandbox':     renderJsSandbox,
-    'log':            renderLog,
-    'gallery':        renderGallery,
-    'carousel':       renderCarousel,
+  // Module-level monotonic counter: guards against busId collisions when
+  // Date.now() returns the same value (rapid remount within a single ms).
+  let busIdCounter = 0;
+  function makeBusId(widgetType: string): string {
+    const g = globalThis as unknown as { crypto?: { randomUUID?: () => string } };
+    if (typeof g.crypto?.randomUUID === 'function') {
+      return `block_${widgetType}_${g.crypto.randomUUID()}`;
+    }
+    return `block_${widgetType}_${Date.now().toString(36)}-${++busIdCounter}`;
+  }
+
+  /** Safe clone — strips Svelte $state proxies without crashing on BigInt/
+   *  circular refs/undefined values (unlike JSON.parse(JSON.stringify(x))). */
+  function safeClone<T>(value: T): T {
+    if (value === null || typeof value !== 'object') return value;
+    try {
+      return structuredClone(value);
+    } catch (err) {
+      console.warn('[WidgetRenderer] structuredClone failed, falling back to shallow clone:', err);
+      return { ...(value as object) } as T;
+    }
+  }
+
+  /** Native widget entry: component + prop builder */
+  type NativeEntry = {
+    component: Component<any>;
+    props: (data: Record<string, unknown>, emit: Emit) => Record<string, unknown>;
+  };
+
+  /** Simple helper: passes { data } */
+  const d = (c: Component<any>): NativeEntry => ({
+    component: c,
+    props: (data) => ({ data }),
+  });
+
+  /** Spec helper: passes { spec } */
+  const s = (c: Component<any>): NativeEntry => ({
+    component: c,
+    props: (data) => ({ spec: data }),
+  });
+
+  /** Spec + events helper */
+  const se = (
+    c: Component<any>,
+    events: (emit: Emit) => Record<string, unknown>,
+  ): NativeEntry => ({
+    component: c,
+    props: (data, emit) => ({ spec: data, ...events(emit) }),
+  });
+
+  /** Static map of all native widget types → component + props */
+  const NATIVE_MAP: Record<string, NativeEntry> = {
+    // Simple widgets (data prop)
+    'stat':           d(StatBlock),
+    'kv':             d(KVBlock),
+    'list':           { component: ListBlock, props: (data, emit) => ({ data, onitemclick: (item: unknown, index: unknown) => emit('itemclick', { item, index }) }) },
+    'chart':          d(ChartBlock),
+    'alert':          d(AlertBlock),
+    'code':           d(CodeBlock),
+    'text':           d(TextBlock),
+    'actions':        d(ActionsBlock),
+    'tags':           d(TagsBlock),
+    // Rich widgets (spec prop)
+    'stat-card':      s(StatCard),
+    'profile':        s(ProfileCard),
+    'json-viewer':    s(JsonViewer),
+    'chart-rich':     s(Chart),
+    'sankey':         s(Sankey),
+    'map':            s(MapView),
+    'd3':             s(D3Widget),
+    'js-sandbox':     s(JsSandbox),
+    'log':            s(LogViewer),
+    // Rich widgets (spec prop + event callbacks)
+    'data-table':     se(DataTable,     (emit) => ({ onrowclick: (row: unknown) => emit('rowclick', row) })),
+    'timeline':       se(Timeline,      (emit) => ({ oneventclick: (e: unknown) => emit('eventclick', e) })),
+    'trombinoscope':  se(Trombinoscope, (emit) => ({ onpersonclick: (p: unknown) => emit('personclick', p) })),
+    'hemicycle':      se(Hemicycle,     (emit) => ({ ongroupclick: (g: unknown) => emit('groupclick', g) })),
+    'cards':          se(Cards,         (emit) => ({ oncardclick: (c: unknown) => emit('cardclick', c) })),
+    'grid-data':      se(GridData,      (emit) => ({ oncellclick: (r: unknown, c: unknown, v: unknown) => emit('cellclick', { row: r, col: c, value: v }) })),
+    'gallery':        se(Gallery,       (emit) => ({ onimageclick: (img: unknown, i: unknown) => emit('imageclick', { image: img, index: i }) })),
+    'carousel':       se(Carousel,      (emit) => ({ onslidechange: (slide: unknown, i: unknown) => emit('slidechange', { slide, index: i }) })),
   };
 
   interface Props {
@@ -81,7 +126,9 @@
   let { id, type, data, servers, oninteract }: Props = $props();
 
   // Auto-register on the FONC message bus
-  const busId = id ?? `block_${type}_${Date.now().toString(36)}`;
+  // Use crypto.randomUUID() when available, otherwise Date.now() + monotonic counter
+  // to avoid busId collisions when a widget remounts within the same ms.
+  const busId = id ?? makeBusId(type);
   const unregisterBus = bus.register(busId, type, ['data-update', 'interact', '*'], (msg) => {
     if (msg.channel === 'data-update' && msg.payload && typeof msg.payload === 'object') {
       oninteract?.(type, 'bus-update', msg.payload);
@@ -94,7 +141,7 @@
     bus.broadcast(busId, 'interact', { type, action, payload });
   }
 
-  // ── Renderer resolution: servers > native vanilla > fallback ────────────
+  // ── Renderer resolution: servers > native > fallback ────────────
 
   // Look up a custom widget entry from connected WebMCP servers
   const customWidgetEntry = $derived.by(() => {
@@ -107,48 +154,36 @@
   });
 
   const customRenderer = $derived(customWidgetEntry?.renderer ?? null);
-  const isCustomVanilla = $derived(customWidgetEntry?.vanilla === true);
 
-  const nativeVanillaRenderer = $derived<VanillaRenderer | undefined>(
-    customRenderer ? undefined : NATIVE_VANILLA_MAP[type],
+  /** True when the custom renderer is a vanilla function (not a Svelte component) */
+  const isVanillaRenderer = $derived(customWidgetEntry?.vanilla === true);
+
+  const nativeEntry: NativeEntry | undefined = $derived(
+    customRenderer ? undefined : NATIVE_MAP[type],
   );
 
-  /** True when a vanilla renderer (custom or native) should be used */
-  const useVanilla = $derived(isCustomVanilla || !!nativeVanillaRenderer);
-
-  /** The effective vanilla renderer to invoke */
-  const vanillaRenderer = $derived<VanillaRenderer | null>(
-    isCustomVanilla
-      ? (customRenderer as VanillaRenderer)
-      : (nativeVanillaRenderer ?? null),
-  );
-
-  // Deep-clone data to strip Svelte 5 $state proxies — vanilla renderers + third-party
-  // libs (D3, Leaflet, etc.) rely on Object.defineProperty which conflicts with proxies.
-  const plainData: Record<string, unknown> = $derived(JSON.parse(JSON.stringify(data)));
+  // Deep-clone data to strip Svelte 5 $state proxies — only needed for vanilla
+  // renderers whose third-party libs (Cytoscape, Plotly, etc.) use
+  // Object.defineProperty which conflicts with Svelte 5 proxies.
+  // Native Svelte components handle proxied data fine and benefit from
+  // fine-grained reactivity, so they receive raw `data` directly.
+  const plainData: Record<string, unknown> = $derived(safeClone(data));
 
   // ── Vanilla renderer container + lifecycle ────────────
   let vanillaContainer: HTMLElement | undefined = $state(undefined);
 
   $effect(() => {
-    if (!useVanilla || !vanillaRenderer || !vanillaContainer) return;
-    const container = vanillaContainer;
+    if (!isVanillaRenderer || !vanillaContainer) return;
     // Clear previous content
-    container.innerHTML = '';
-
-    // Listen for the standard vanilla event contract: CustomEvent('widget:interact')
-    const onInteract = (ev: Event) => {
-      const ce = ev as CustomEvent<{ action?: string; payload?: unknown }>;
-      const action = ce.detail?.action ?? 'interact';
-      emit(action, ce.detail?.payload);
-    };
-    container.addEventListener('widget:interact', onInteract);
+    vanillaContainer.innerHTML = '';
 
     let cleanup: (() => void) | void;
     let cancelled = false;
 
     try {
-      const result = vanillaRenderer(container, plainData);
+      const result = (customRenderer as (container: HTMLElement, data: Record<string, unknown>) => void | (() => void) | Promise<void | (() => void)>)(
+        vanillaContainer, plainData,
+      );
       if (result && typeof (result as Promise<unknown>).then === 'function') {
         (result as Promise<void | (() => void)>).then(
           (c) => { if (!cancelled) cleanup = c ?? undefined; },
@@ -162,7 +197,6 @@
 
     return () => {
       cancelled = true;
-      container.removeEventListener('widget:interact', onInteract);
       if (typeof cleanup === 'function') {
         try { cleanup(); } catch (err) { console.error('[WidgetRenderer] cleanup failed:', err); }
       }
@@ -229,10 +263,12 @@
   });
 </script>
 
-{#if useVanilla}
+{#if isVanillaRenderer}
   <div bind:this={vanillaContainer} class="vanilla-container w-full h-full overflow-auto p-2"></div>
 {:else if customRenderer}
   <svelte:component this={customRenderer as Component<any>} {data} {id} />
+{:else if nativeEntry}
+  <svelte:component this={nativeEntry.component} {...nativeEntry.props(data, emit)} />
 {:else}
   <div class="p-3 font-mono text-xs text-text2">[{type}]</div>
 {/if}

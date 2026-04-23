@@ -586,12 +586,20 @@ export function createWebMcpServer(
       const allTools = [...customTools];
 
       if (builtinTools) {
-        // Rebuild widget_display description with current widget names
+        // Rebuild widget_display description with current widget names.
+        // Clone the tool descriptor rather than mutating builtinTools in place,
+        // so multiple servers / repeated layer() calls don't stomp on each
+        // other's description (the function refs are preserved).
         const names = [...widgets.keys()];
-        const displayTool = builtinTools.find(t => t.name === 'widget_display')!;
-        displayTool.description = `Render a widget on the user's canvas with the specified type and parameters. Use this tool whenever you need to display data visually — charts, tables, statistics, timelines, maps, galleries, etc. The widget type must match one of the available widget names (use search_recipes or get_recipe first to learn the exact schema). Returns the widget's unique ID for later updates via the canvas tool. Do NOT use this tool for plain text responses. Available widgets: ${names.join(', ')}.`;
+        const dynamicDescription = `Render a widget on the user's canvas with the specified type and parameters. Use this tool whenever you need to display data visually — charts, tables, statistics, timelines, maps, galleries, etc. The widget type must match one of the available widget names (use search_recipes or get_recipe first to learn the exact schema). Returns the widget's unique ID for later updates via the canvas tool. Do NOT use this tool for plain text responses. Available widgets: ${names.join(', ')}.`;
 
-        allTools.push(...builtinTools);
+        for (const tool of builtinTools) {
+          if (tool.name === 'widget_display') {
+            allTools.push({ ...tool, description: dynamicDescription });
+          } else {
+            allTools.push({ ...tool });
+          }
+        }
       }
 
       // Merge flow recipes into the layer's recipe list so the UI can browse them

@@ -168,6 +168,9 @@ export async function runAgentLoop(
   // Use local alias maps (parallel-safe — no global singleton)
   const activatedServers = new Set<string>();
   const localAliasMap = new Map<string, string>();
+  // Snapshot pathMaps locally (parallel-safe). Reading the global flattenPathMaps
+  // singleton at dispatch-time races when two loops run concurrently.
+  const localPathMaps = new Map<string, Record<string, string[]>>(flattenPathMaps);
   const trace = new PipelineTrace();
 
   const disc = buildDiscoveryToolsWithAliases(options.layers ?? [], schemaOptions, trace);
@@ -228,17 +231,24 @@ export async function runAgentLoop(
     // After 5+ iterations without render, inject a nudge message (once)
     // Merge into existing user message if the last message is already role=user (to avoid consecutive user messages)
     if (iterationsWithoutRender >= 5 && !hasRendered && !nudgedOnce) {
-      nudgedOnce = true;
       const nudgeText = 'STOP exploration. Use the data you already collected. Call widget_display() NOW to display results.';
       const lastMsg = messages[messages.length - 1];
-      if (lastMsg && lastMsg.role === 'user') {
-        if (typeof lastMsg.content === 'string') {
-          lastMsg.content = [{ type: 'text', text: lastMsg.content }, { type: 'text', text: nudgeText }];
-        } else if (Array.isArray(lastMsg.content)) {
-          (lastMsg.content as ContentBlock[]).push({ type: 'text', text: nudgeText });
+      // Skip if last turn carries tool_result blocks — mixing raw text with tool_response
+      // in one turn violates Gemma spec §7 (the serializer would emit text + <|tool_response|>
+      // together). Defer the nudge to a later iteration where the turn is pure-user.
+      const lastHasToolResult = lastMsg && Array.isArray(lastMsg.content)
+        && (lastMsg.content as ContentBlock[]).some(b => b.type === 'tool_result');
+      if (!lastHasToolResult) {
+        nudgedOnce = true;
+        if (lastMsg && lastMsg.role === 'user') {
+          if (typeof lastMsg.content === 'string') {
+            lastMsg.content = [{ type: 'text', text: lastMsg.content }, { type: 'text', text: nudgeText }];
+          } else if (Array.isArray(lastMsg.content)) {
+            (lastMsg.content as ContentBlock[]).push({ type: 'text', text: nudgeText });
+          }
+        } else {
+          messages.push({ role: 'user', content: nudgeText });
         }
-      } else {
-        messages.push({ role: 'user', content: nudgeText });
       }
     }
 
@@ -401,8 +411,11 @@ export async function runAgentLoop(
           const protocol = tokenToProtocol(token);
 
           // Auto-repair + validate params before dispatch
+          // Resolve from the full activeTools (not iterationTools, which may be filtered
+          // to strip discovery tools after 4 iterations — would make toolDef undefined
+          // and silently skip auto-repair + schema validation).
           let toolInput = block.input as Record<string, unknown>;
-          const toolDef = iterationTools.find(t => t.name === block.name);
+          const toolDef = activeTools.find(t => t.name === block.name);
           if (toolDef?.input_schema) {
             const repair = autoRepairParams(toolInput, toolDef.input_schema, realToolName);
             if (repair.fixes.length > 0) {
@@ -451,8 +464,9 @@ export async function runAgentLoop(
                 result = `Error: no WebMCP server "${serverName}" found.`;
               } else {
                 // Unflatten params if schema was flattened
+                // Use the local snapshot (parallel-safe) rather than the global singleton.
                 if (schemaOptions?.flatten) {
-                  const pathMap = flattenPathMaps.get(block.name);
+                  const pathMap = localPathMaps.get(block.name);
                   if (pathMap) {
                     toolInput = unflattenParams(toolInput, pathMap);
                   }
@@ -638,18 +652,31 @@ export function trimConversationHistory(history: ChatMessage[], maxTokens: numbe
     total -= removed.reduce((s, m) => s + JSON.stringify(m).length, 0);
   }
 
-  // Remove orphaned tool_result messages at the start — these reference
-  // a tool_use in a message that was trimmed away, causing API errors.
-  while (trimmed.length > 0) {
-    const first = trimmed[0];
-    if (first.role === 'system') break; // preserve system messages at the front
-    const blocks = Array.isArray(first.content) ? first.content : [];
-    const hasToolResult = blocks.some((b: any) => b.type === 'tool_result');
-    if (hasToolResult) {
-      trimmed.shift();
-    } else {
-      break;
+  // Remove orphaned tool_result blocks anywhere in history — strict providers
+  // (Anthropic, etc.) reject tool_result blocks whose tool_use_id does not
+  // correspond to an earlier assistant tool_use. Head-only pruning misses
+  // internal orphans caused by mid-history trims.
+  const validToolUseIds = new Set<string>();
+  for (let i = 0; i < trimmed.length; i++) {
+    const msg = trimmed[i];
+    // Collect tool_use ids from assistant messages seen so far
+    if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+      for (const b of msg.content as any[]) {
+        if (b?.type === 'tool_use' && typeof b.id === 'string') validToolUseIds.add(b.id);
+      }
     }
+    // Filter out orphan tool_result blocks in user messages
+    if (msg.role === 'user' && Array.isArray(msg.content)) {
+      msg.content = (msg.content as any[]).filter(b => {
+        if (b?.type !== 'tool_result') return true;
+        return typeof b.tool_use_id === 'string' && validToolUseIds.has(b.tool_use_id);
+      }) as any;
+    }
+  }
+  // Drop user messages that became empty after orphan-pruning
+  for (let i = trimmed.length - 1; i >= 0; i--) {
+    const c = trimmed[i].content;
+    if (Array.isArray(c) && c.length === 0) trimmed.splice(i, 1);
   }
 
   // Ensure the first non-system message is role=user (API requirement)

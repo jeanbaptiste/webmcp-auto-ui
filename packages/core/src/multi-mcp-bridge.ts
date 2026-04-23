@@ -112,14 +112,18 @@ export class MultiMcpBridge {
 
   start(): void {
     if (this.started) return;
-    this.started = true;
     const canvas = this.options.getCanvas();
     if (canvas && typeof canvas.subscribe === 'function') {
+      this.started = true;
       this.unsub = canvas.subscribe(() => {
         void this.reconcile();
       });
+      void this.reconcile();
+      return;
     }
-    void this.reconcile();
+    // Canvas not ready yet — retry shortly. Without this the bridge would
+    // stay dead forever because no subscription was ever established.
+    setTimeout(() => this.start(), 50);
   }
 
   stop(): void {

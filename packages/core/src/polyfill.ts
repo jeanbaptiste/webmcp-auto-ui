@@ -41,6 +41,14 @@ import { validateJsonSchema } from './validate.js';
 /** Install state for save/restore of previous descriptors (Fix 7) */
 interface InstallState {
   installed: boolean;
+  /**
+   * True only when we actually overrode navigator.modelContext. When native
+   * WebMCP is present and forcePolyfill is false we short-circuit installation
+   * and MUST NOT touch navigator on cleanup — otherwise we would delete the
+   * native implementation.
+   */
+  didOverride: boolean;
+  didOverrideTesting: boolean;
   previousModelContextDescriptor?: PropertyDescriptor;
   previousModelContextTestingDescriptor?: PropertyDescriptor;
 }
@@ -62,7 +70,7 @@ let toolsChangedCallback: ToolsChangedCallback | null = null;
 let polyfillOptions: WebMCPPolyfillOptions = {};
 
 /** Install state — tracks whether we installed and the previous descriptors */
-const installState: InstallState = { installed: false };
+const installState: InstallState = { installed: false, didOverride: false, didOverrideTesting: false };
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -755,6 +763,8 @@ export function initializeWebMCPPolyfill(
   // forcePolyfill is checked BEFORE the native skip so it takes precedence
   if (hasNativeWebMCP() && !polyfillOptions.forcePolyfill) {
     installState.installed = true;
+    installState.didOverride = false;
+    installState.didOverrideTesting = false;
     return;
   }
 
@@ -783,6 +793,7 @@ export function initializeWebMCPPolyfill(
       writable: false,
       enumerable: true,
     });
+    installState.didOverride = true;
 
     // Fix 14 — installTestingShim option
     const shimOption = polyfillOptions.installTestingShim ?? 'if-missing';
@@ -796,6 +807,7 @@ export function initializeWebMCPPolyfill(
         writable: false,
         enumerable: true,
       });
+      installState.didOverrideTesting = true;
     }
   }
 
@@ -820,32 +832,39 @@ export function cleanupWebMCPPolyfill(): void {
   // Clear callback slot
   toolsChangedCallback = null;
 
-  // Fix 7 — Restore previous descriptors instead of deleting
+  // Fix 7 — Restore previous descriptors instead of deleting.
+  // Guard with didOverride/didOverrideTesting: when native WebMCP was present
+  // and we short-circuited install, we never defined properties on navigator
+  // and must NOT delete or overwrite them here (that would remove the native).
   if (typeof navigator !== 'undefined') {
     try {
-      if (installState.previousModelContextDescriptor) {
-        Object.defineProperty(
-          navigator,
-          'modelContext',
-          installState.previousModelContextDescriptor,
-        );
-      } else {
-        delete (navigator as Navigator & Record<string, unknown>).modelContext;
+      if (installState.didOverride) {
+        if (installState.previousModelContextDescriptor) {
+          Object.defineProperty(
+            navigator,
+            'modelContext',
+            installState.previousModelContextDescriptor,
+          );
+        } else {
+          delete (navigator as Navigator & Record<string, unknown>).modelContext;
+        }
       }
 
-      if (installState.previousModelContextTestingDescriptor) {
-        Object.defineProperty(
-          navigator,
-          'modelContextTesting',
-          installState.previousModelContextTestingDescriptor,
-        );
-      } else {
-        const testingDesc = Object.getOwnPropertyDescriptor(
-          navigator,
-          'modelContextTesting',
-        );
-        if (testingDesc?.configurable) {
-          delete (navigator as Navigator & Record<string, unknown>).modelContextTesting;
+      if (installState.didOverrideTesting) {
+        if (installState.previousModelContextTestingDescriptor) {
+          Object.defineProperty(
+            navigator,
+            'modelContextTesting',
+            installState.previousModelContextTestingDescriptor,
+          );
+        } else {
+          const testingDesc = Object.getOwnPropertyDescriptor(
+            navigator,
+            'modelContextTesting',
+          );
+          if (testingDesc?.configurable) {
+            delete (navigator as Navigator & Record<string, unknown>).modelContextTesting;
+          }
         }
       }
     } catch (e) {
@@ -856,6 +875,8 @@ export function cleanupWebMCPPolyfill(): void {
   // Reset options and install state
   polyfillOptions = {};
   installState.installed = false;
+  installState.didOverride = false;
+  installState.didOverrideTesting = false;
   installState.previousModelContextDescriptor = undefined;
   installState.previousModelContextTestingDescriptor = undefined;
 }

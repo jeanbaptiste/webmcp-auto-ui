@@ -229,12 +229,16 @@ function createCanvasVanilla() {
     tools?: McpToolInfo[]
   ) {
     _mcpConnected = connected;
-    if (name) _mcpName = name;
-    if (tools) _mcpTools = tools;
     if (connected) {
+      if (name) _mcpName = name;
+      if (tools) _mcpTools = tools;
       _statusText = `● ${name} · ${tools?.length ?? 0} tools`;
       _statusColor = 'text-teal-400';
     } else {
+      // Reset stale connection state on disconnect so the UI doesn't keep
+      // advertising the previous server name / tool list.
+      _mcpName = '';
+      _mcpTools = [];
       _statusText = '● no MCP connected';
       _statusColor = 'text-zinc-600';
     }
@@ -278,8 +282,7 @@ function createCanvasVanilla() {
 
   async function buildHyperskillParam(): Promise<string> {
     const json = JSON.stringify(buildSkillJSON());
-    const compress = json.length > 6144 ? 'gz' as const : undefined;
-    const url = await encode('https://x.local', json, compress ? { compress } : {});
+    const url = await encode('https://x.local', json, { compress: 'gz' });
     return new URL(url).searchParams.get('hs')!;
   }
 
@@ -323,10 +326,19 @@ function createCanvasVanilla() {
   async function loadFromUrl(url: string): Promise<boolean> {
     try {
       const { content: raw } = await decode(url);
-      const decoded = JSON.parse(raw) as { meta?: Record<string, unknown>; content?: { blocks?: { type: WidgetType; data: Record<string, unknown> }[] } };
+      const decoded = JSON.parse(raw) as {
+        meta?: Record<string, unknown>;
+        content?: { blocks?: { type: WidgetType; data: Record<string, unknown> }[] };
+        servers?: string[];
+      };
       if (decoded.meta?.mcp) _mcpUrl = decoded.meta.mcp as string;
       if (decoded.meta?.llm) _llm = decoded.meta.llm as LLMId;
       if (decoded.meta?.theme) _themeOverrides = decoded.meta.theme as Record<string, string>;
+      // Align with loadFromParam: restore enabledServerIds when `servers` is
+      // present. buildSkillJSON emits it at the root, but tolerate it under
+      // `meta` as well for forward/back compatibility.
+      const servers = (decoded.servers ?? (decoded.meta?.servers as string[] | undefined));
+      if (Array.isArray(servers)) _enabledServerIds = servers;
       if (decoded.content?.blocks) _blocks = decoded.content.blocks.map((b) => ({ id: uuid(), type: b.type, data: b.data }));
       notify();
       return true;

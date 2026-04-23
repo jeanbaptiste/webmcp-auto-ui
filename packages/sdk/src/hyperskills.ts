@@ -90,6 +90,7 @@ export function getHsParam(url?: string): string | null {
       return null;
     }
   }
+  if (typeof window === 'undefined') return null;
   return hs.getHsParam();
 }
 

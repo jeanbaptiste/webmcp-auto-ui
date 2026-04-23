@@ -2,7 +2,7 @@
   declare const __BUILD_TIME__: string;
   declare const __GIT_HASH__: string;
   import { PUBLIC_BASE_URL } from '$env/static/public';
-  import { getTheme } from '../../../../packages/ui/src/theme/ThemeProvider.svelte';
+  import { getTheme } from '@webmcp-auto-ui/ui';
 
   const theme = getTheme();
 

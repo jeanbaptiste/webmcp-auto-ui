@@ -41,7 +41,12 @@ function renderMarkdown(src: string): string {
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+      // Whitelist URL protocols to block javascript:/data:/vbscript: XSS via markdown links.
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) =>
+        /^(https?:|\/|#|mailto:)/i.test(href)
+          ? `<a href="${href}" target="_blank" rel="noopener">${label}</a>`
+          : label,
+      );
   };
 
   for (const line of lines) {
