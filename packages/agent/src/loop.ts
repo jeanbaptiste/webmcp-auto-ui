@@ -9,7 +9,7 @@ import type {
   LLMProvider, ProviderTool, McpToolDef, AgentCallbacks,
 } from './types.js';
 import type { ToolLayer, SchemaTransformOptions } from './tool-layers.js';
-import { buildToolsFromLayers, buildDiscoveryToolsWithAliases, activateServerTools, toProviderTools, sanitizeServerName, flattenPathMaps } from './tool-layers.js';
+import { buildToolsFromLayers, buildDiscoveryToolsWithAliases, activateServerTools, toProviderTools, sanitizeServerName } from './tool-layers.js';
 import { buildSystemPromptWithAliases, buildSystemPrompt } from './prompts/index.js';
 import type { DiscoveryCache } from './discovery-cache.js';
 import { unflattenParams, validateJsonSchema } from '@webmcp-auto-ui/core';
@@ -168,9 +168,9 @@ export async function runAgentLoop(
   // Use local alias maps (parallel-safe — no global singleton)
   const activatedServers = new Set<string>();
   const localAliasMap = new Map<string, string>();
-  // Snapshot pathMaps locally (parallel-safe). Reading the global flattenPathMaps
-  // singleton at dispatch-time races when two loops run concurrently.
-  const localPathMaps = new Map<string, Record<string, string[]>>(flattenPathMaps);
+  // Local pathMaps for flattened schemas — populated as servers are lazily activated
+  // (see activateServerTools call below). Parallel-safe: scoped to this loop run.
+  const localPathMaps = new Map<string, Record<string, string[]>>();
   const trace = new PipelineTrace();
 
   const disc = buildDiscoveryToolsWithAliases(options.layers ?? [], schemaOptions, trace);
@@ -398,7 +398,10 @@ export async function runAgentLoop(
               activatedServers.add(serverKey);
               const layer = (options.layers ?? []).find(l => sanitizeServerName(l.serverName) === serverName && l.protocol === protocol);
               if (layer) {
-                activeTools = activateServerTools(activeTools, layer, schemaOptions, trace);
+                const act = activateServerTools(activeTools, layer, schemaOptions, trace);
+                activeTools = act.tools;
+                // Merge new pathMaps so unflattenParams works for lazily-activated tools.
+                for (const [k, v] of act.pathMaps) localPathMaps.set(k, v);
               }
             }
           }

@@ -456,19 +456,31 @@ export function buildDiscoveryTools(layers: ToolLayer[]): ProviderTool[] {
   return tools;
 }
 
+/** Result of activateServerTools — extended tool set + per-call path maps for newly activated tools */
+export interface ActivateServerToolsResult {
+  tools: ProviderTool[];
+  /** Path maps for flattened schemas of newly added tools (empty if flatten is off). */
+  pathMaps: Map<string, Record<string, string[]>>;
+}
+
 /**
  * Add all tools from a specific server layer to the active tool set.
  * Called when a server is "touched" for the first time.
+ *
+ * Returns `{ tools, pathMaps }` — `pathMaps` is non-empty when `schemaOptions.flatten`
+ * is on, and must be merged into the loop-local pathMaps so `unflattenParams` works
+ * for lazily-activated tools. Backward-compat: if you only need `tools`, read `.tools`.
  */
 export function activateServerTools(
   currentTools: ProviderTool[],
   layer: ToolLayer,
   schemaOptions?: SchemaTransformOptions,
   trace?: PipelineTrace,
-): ProviderTool[] {
+): ActivateServerToolsResult {
   const prefix = `${sanitizeServerName(layer.serverName)}_${protocolToken(layer.protocol)}_`;
   const existing = new Set(currentTools.map(t => t.name));
   const newTools = [...currentTools];
+  const pathMaps = new Map<string, Record<string, string[]>>();
 
   const layerTools = layer.protocol === 'mcp'
     ? toProviderTools(layer.tools, schemaOptions, trace)
@@ -476,12 +488,22 @@ export function activateServerTools(
 
   for (const tool of layerTools) {
     const prefixed = `${prefix}${tool.name}`;
-    if (!existing.has(prefixed)) {
-      newTools.push({ ...tool, name: prefixed });
+    if (existing.has(prefixed)) continue;
+
+    let finalTool = { ...tool, name: prefixed };
+
+    if (schemaOptions?.flatten) {
+      const { schema: flatSchema, pathMap } = flattenSchema(finalTool.input_schema as import('@webmcp-auto-ui/core').JsonSchema);
+      if (Object.keys(pathMap).length > 0) {
+        finalTool.input_schema = flatSchema as Record<string, unknown>;
+        pathMaps.set(prefixed, pathMap);
+      }
     }
+
+    newTools.push(finalTool);
   }
 
-  return newTools;
+  return { tools: newTools, pathMaps };
 }
 
 /**

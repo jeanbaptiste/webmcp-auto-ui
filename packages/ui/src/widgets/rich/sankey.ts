@@ -7,7 +7,7 @@
  * Emits on `container`:
  *   - CustomEvent 'widget:interact' { detail: { action: 'nodeclick', payload: node }, bubbles: true }
  *   - CustomEvent 'widget:interact' { detail: { action: 'linkclick', payload: link }, bubbles: true }
- *   - CustomEvent 'widget:node-dblclick' { detail: { nodeId, nodeData }, bubbles: true }
+ *   - CustomEvent 'widget:interact' { detail: { action: 'node-dblclick', payload: node }, bubbles: true }
  *
  * Not a real d3-sankey layout — horizontal "bar" visualization sorted by value,
  * matching the historical Svelte widget (Sankey.svelte).
@@ -37,7 +37,7 @@ type Cleanup = () => void;
 
 function emitInteract(
   container: HTMLElement,
-  action: 'nodeclick' | 'linkclick',
+  action: 'nodeclick' | 'linkclick' | 'node-dblclick',
   payload: unknown,
 ): void {
   container.dispatchEvent(
@@ -49,12 +49,7 @@ function emitInteract(
 }
 
 function emitNodeDblclick(container: HTMLElement, node: SankeyNode): void {
-  container.dispatchEvent(
-    new CustomEvent('widget:node-dblclick', {
-      detail: { nodeId: node.id, nodeData: node },
-      bubbles: true,
-    }),
-  );
+  emitInteract(container, 'node-dblclick', node);
 }
 
 export function render(container: HTMLElement, data: unknown): Cleanup {

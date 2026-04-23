@@ -356,7 +356,8 @@ function createCanvasVanilla() {
 
   async function buildHyperskillParam(): Promise<string> {
     const json = JSON.stringify(buildSkillJSON());
-    const url = await encode('https://x.local', json, { compress: 'gz' });
+    // Skip gzip for small payloads — overhead exceeds savings under ~1KB.
+    const url = await encode('https://x.local', json, { compress: json.length < 1024 ? 'none' : 'gz' });
     return new URL(url).searchParams.get('hs')!;
   }
 

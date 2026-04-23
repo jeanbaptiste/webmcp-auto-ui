@@ -44,7 +44,8 @@ import { encode, decode, hash, diff } from './hyperskills.js';
 export async function encodeHyperSkill(skill: HyperSkill, sourceUrl?: string): Promise<string> {
   const base = sourceUrl ?? (typeof window !== 'undefined' ? window.location.href.split('?')[0] : 'https://example.com');
   const json = JSON.stringify(skill);
-  return encode(base, json, { compress: 'gz' });
+  // Skip gzip for small payloads — overhead exceeds savings under ~1KB.
+  return encode(base, json, { compress: json.length < 1024 ? 'none' : 'gz' });
 }
 
 export async function decodeHyperSkill(urlOrParam: string): Promise<HyperSkill> {
