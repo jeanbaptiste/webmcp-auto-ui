@@ -89,7 +89,11 @@ export function render(container: HTMLElement, data: JsSandboxData | JsSandboxSp
   if (spec && (spec.code || spec.html || spec.css)) {
     iframe.srcdoc = buildSrcdoc(spec);
   } else {
-    iframe.srcdoc = buildSrcdoc({ code: '', html: '', css: '' });
+    iframe.srcdoc = buildSrcdoc({
+      code: '',
+      html: '<div style="opacity:.7;font-family:system-ui;font-size:13px;padding:12px">⚠ js-sandbox: no code/html/css provided.</div>',
+      css: 'body{background:#f5f5f7;color:#333}',
+    });
   }
 
   wrapper.appendChild(iframe);

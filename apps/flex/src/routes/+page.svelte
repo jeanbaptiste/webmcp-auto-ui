@@ -1269,7 +1269,7 @@
     <button class="font-mono text-xs h-7 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
             onclick={toggleTheme} aria-label="Toggle theme">*</button>
     <button class="font-mono text-[11px] h-7 w-8 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
-            class:bg-accent={uiScaled} class:!text-bg={uiScaled} class:border-accent={uiScaled}
+            class:bg-accent={uiScaled} class:!text-white={uiScaled} class:border-accent={uiScaled}
             onclick={toggleScale} aria-label="Toggle UI scale" title={uiScaled ? 'Reset UI scale' : 'Scale UI up (2×)'}>
       {uiScaled ? '1×' : '2×'}
     </button>

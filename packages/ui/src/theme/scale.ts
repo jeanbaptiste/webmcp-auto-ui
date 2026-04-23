@@ -25,18 +25,20 @@ function injectStyle(): void {
   //    physical viewport regardless of zoom, so a `h-screen` container rendered
   //    at 1.5× would overflow by 50%). Force these containers to the logical
   //    equivalent so they fit after scaling.
-  //  - allow html/body to scroll as a safety net for any overflow we missed.
+  //  - keep html/body overflow:hidden (matches the unscaled baseline) so
+  //    floating bars with flex-shrink-0 stay pinned to the viewport edge
+  //    instead of drifting mid-screen when the body scrolls.
   style.textContent = `
 html { zoom: var(--ui-scale, 1); }
 html[data-ui-scale="x2"] {
   width: calc(100vw / 1.5);
   height: calc(100vh / 1.5);
-  overflow: auto;
+  overflow: hidden;
 }
 html[data-ui-scale="x2"] body {
   width: 100%;
-  min-height: 100%;
-  overflow: auto;
+  height: 100%;
+  overflow: hidden;
 }
 html[data-ui-scale="x2"] .h-screen,
 html[data-ui-scale="x2"] [class*="h-screen"] {
