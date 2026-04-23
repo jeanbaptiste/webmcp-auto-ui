@@ -452,11 +452,11 @@
     });
   });
 
-  const webmcpRecipes = $derived.by(() => {
+  const webmcpRecipes: Array<{ name: string; description?: string; body?: string; when?: string; components_used?: string[]; servers?: string[]; layout?: { type: string; columns?: number; arrangement?: string }; serverName: string; [key: string]: unknown }> = $derived.by(() => {
     return layers.filter(l => l.protocol === 'webmcp').flatMap((l) => {
-      const webmcpLayer = l as { serverName: string; recipes?: unknown[] };
+      const webmcpLayer = l as { serverName: string; recipes?: Array<{ name: string; [k: string]: unknown }> };
       return (webmcpLayer.recipes ?? []).map((r) => ({
-        ...(r as Record<string, unknown>),
+        ...r,
         serverName: webmcpLayer.serverName,
       }));
     });
