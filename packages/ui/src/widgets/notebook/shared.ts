@@ -128,8 +128,19 @@ export function preserveScrollAround(anchor: HTMLElement): () => void {
   }
   const winY = window.scrollY;
   const saved = scrollParents.map((el) => el.scrollTop);
+  // Only capture the active cell if the user was actually editing
+  // (textarea or contentEditable). Clicking a button or label should
+  // NOT trigger a post-rerender refocus, which would scroll the page
+  // to that cell's input.
   const activeEl = document.activeElement as HTMLElement | null;
-  const activeCellId = activeEl?.closest<HTMLElement>('[data-cell-id]')?.dataset.cellId ?? null;
+  const isEditing = !!activeEl && (
+    activeEl.tagName === 'TEXTAREA' ||
+    activeEl.tagName === 'INPUT' ||
+    activeEl.isContentEditable
+  );
+  const activeCellId = isEditing
+    ? activeEl?.closest<HTMLElement>('[data-cell-id]')?.dataset.cellId ?? null
+    : null;
 
   return () => {
     requestAnimationFrame(() => {
@@ -842,6 +853,35 @@ export function createPublishControls(state: NotebookState, opts: PublishControl
     badge?.parentNode?.removeChild(badge);
     footer?.parentNode?.removeChild(footer);
   };
+}
+
+/**
+ * Start a persistent MCP bridge that connects declared data servers and keeps
+ * their tool/recipe metadata populated on the canvas store. Independent of
+ * live-refresh — this runs even in edit mode, so the sql executor can discover
+ * `*_query_sql` tools as soon as the bridge is connected.
+ *
+ * Returns a cleanup function. Caller is expected to start this once at mount
+ * and call cleanup on unmount.
+ */
+export function bootstrapMcpBridge(opts: {
+  data: Record<string, unknown>;
+  MultiMcpBridgeCtor: new (opts: { getCanvas: () => unknown }) => {
+    start(): void;
+    stop(): void;
+  };
+}): () => void {
+  try {
+    autoConnectFrontmatterServers(opts.data);
+    const canvas: unknown = (globalThis as { __canvasVanilla?: unknown; canvasVanilla?: unknown })
+      .__canvasVanilla ?? (globalThis as { canvasVanilla?: unknown }).canvasVanilla;
+    if (!canvas) return () => { /* no-op */ };
+    const bridge = new opts.MultiMcpBridgeCtor({ getCanvas: () => canvas });
+    bridge.start();
+    return () => { try { bridge.stop(); } catch { /* ignore */ } };
+  } catch {
+    return () => { /* no-op */ };
+  }
 }
 
 /**

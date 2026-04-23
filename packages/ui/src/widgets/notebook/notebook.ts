@@ -11,7 +11,7 @@ import {
   addImportedCells, registerExecutor, collectDataServers,
   autosize, openShareModal, registerHistoryObserver,
   renderCellLogs,
-  createPublishControls, autoConnectFrontmatterServers,
+  createPublishControls, autoConnectFrontmatterServers, bootstrapMcpBridge,
   createRuntimeOverlay, effectiveResult, cellRuntimeStatus,
   lastRefreshedAt, bootstrapLiveRefresh, fmtRelTime, preserveScrollAround,
   type NotebookState, type NotebookCell, type CellResult, type CellExecContext,
@@ -289,6 +289,10 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   // Auto-connect data servers declared in the recipe frontmatter (data.servers)
   autoConnectFrontmatterServers(data, () => pane.setServers(collectDataServers(data)));
 
+  // Start a persistent MCP bridge so the sql executor can find tools in edit mode
+  // too (not just when live-refresh is running in view mode).
+  const mcpBridgeCleanup = bootstrapMcpBridge({ data, MultiMcpBridgeCtor: MultiMcpBridge as any });
+
   // Keep pane servers in sync with canvas changes
   let canvasUnsub: (() => void) | null = null;
   try {
@@ -315,6 +319,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     pane.destroy();
     publishCleanup();
     liveCleanup?.();
+    mcpBridgeCleanup();
   };
 }
 
