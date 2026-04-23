@@ -489,7 +489,7 @@
   </main>
 
   <footer class="border-t border-border bg-surface px-6 py-2 flex items-center justify-between text-xs font-mono text-text2">
-    <span class="text-[8px] text-text2/40">v1.0.0 · {__GIT_HASH__ ?? ''} · {__BUILD_TIME__?.replace('T', ' ').replace('Z', '').slice(0, 23)}</span>
+    <span class="text-[8px] text-text2/40">v{__APP_VERSION__} · {__GIT_HASH__ ?? ''} · {__BUILD_TIME__?.replace('T', ' ').replace('Z', '').slice(0, 23)}</span>
     <div class="flex items-center gap-3">
       {#if skill}
         <span class="text-text2">{blocks.length} block{blocks.length !== 1 ? 's' : ''}</span>

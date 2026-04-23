@@ -694,7 +694,7 @@
 
     <AgentConsole logs={agentLogs} onclear={() => agentLogs = []} />
     <div class="px-3 py-1 text-right flex-shrink-0">
-      <span class="font-mono text-[8px] text-text2/40">v1.0.0 · {__GIT_HASH__ ?? ''} · {__BUILD_TIME__?.replace('T', ' ').replace('Z', '').slice(0, 23)}</span>
+      <span class="font-mono text-[8px] text-text2/40">v{__APP_VERSION__} · {__GIT_HASH__ ?? ''} · {__BUILD_TIME__?.replace('T', ' ').replace('Z', '').slice(0, 23)}</span>
     </div>
   </div>
 </div>

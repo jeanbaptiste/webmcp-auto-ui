@@ -318,7 +318,7 @@
           WebMCP Auto-UI — {SIMPLE_BLOCKS.length + RICH_BLOCKS.length} components — 3 themes
         {/if}
       </p>
-      <span class="font-mono text-[8px] text-text2/40">v1.0.0 · {__GIT_HASH__ ?? ''} · {__BUILD_TIME__?.replace('T', ' ').replace('Z', '').slice(0, 23)}</span>
+      <span class="font-mono text-[8px] text-text2/40">v{__APP_VERSION__} · {__GIT_HASH__ ?? ''} · {__BUILD_TIME__?.replace('T', ' ').replace('Z', '').slice(0, 23)}</span>
     </div>
   </footer>
 </div>

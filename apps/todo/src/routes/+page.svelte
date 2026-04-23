@@ -199,7 +199,7 @@
   </main>
 
   <footer class="border-t border-border px-6 py-3 flex items-center justify-between">
-    <span class="font-mono text-[8px] text-text2/40">v1.0.0 · {__GIT_HASH__ ?? ''} · {__BUILD_TIME__?.replace('T', ' ').replace('Z', '').slice(0, 23)}</span>
+    <span class="font-mono text-[8px] text-text2/40">v{__APP_VERSION__} · {__GIT_HASH__ ?? ''} · {__BUILD_TIME__?.replace('T', ' ').replace('Z', '').slice(0, 23)}</span>
     <a href="https://github.com/jeanbaptiste/webmcp-auto-ui/tree/main/apps/todo"
        target="_blank" rel="noopener"
        class="font-mono text-[8px] text-text2/40 hover:text-text2 transition-colors">GitHub</a>
