@@ -7,6 +7,7 @@ export { DARK_TOKENS, LIGHT_TOKENS, THEME_MAP } from './theme/tokens.js';
 export type { ThemeMode, ThemeOverrides, ThemeTokens } from './theme/tokens.js';
 export { getUIScale, setUIScale, toggleUIScale, initUIScale, isUIScaled } from './theme/scale.js';
 export type { UIScale, UIScaleKey } from './theme/scale.js';
+export { default as HeaderControls } from './components/HeaderControls.svelte';
 
 // Primitives
 export { default as Card } from './primitives/Card.svelte';

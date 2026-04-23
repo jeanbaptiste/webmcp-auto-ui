@@ -75,7 +75,6 @@ function createSvelteCanvas() {
     // Setters
     setMode: canvasVanilla.setMode.bind(canvasVanilla),
     setLlm: canvasVanilla.setLlm.bind(canvasVanilla),
-    setMcpUrl: canvasVanilla.setMcpUrl.bind(canvasVanilla),
     setGenerating: canvasVanilla.setGenerating.bind(canvasVanilla),
 
     // Block actions

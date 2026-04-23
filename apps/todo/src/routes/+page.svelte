@@ -4,7 +4,7 @@
 
   import { onMount } from 'svelte';
   import { jsonResult } from '@webmcp-auto-ui/core';
-  import { Button, Input, Badge, NativeSelect } from '@webmcp-auto-ui/ui';
+  import { Button, Input, Badge, NativeSelect, HeaderControls } from '@webmcp-auto-ui/ui';
   import StatCard from '$lib/StatCard.svelte';
   import { Check, Trash2, Plus, Circle } from 'lucide-svelte';
 
@@ -131,6 +131,7 @@
       <div class="w-1.5 h-1.5 rounded-full bg-teal animate-pulse"></div>
       6 tools
     </div>
+    <HeaderControls />
   </header>
 
   <main class="max-w-2xl mx-auto px-6 py-8 flex flex-col gap-6">

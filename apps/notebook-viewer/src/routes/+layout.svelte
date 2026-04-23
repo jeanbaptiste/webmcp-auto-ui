@@ -1,25 +1,11 @@
 <script lang="ts">
   import '../app.css';
-  import { onMount } from 'svelte';
   import { page } from '$app/stores';
+  import { HeaderControls } from '@webmcp-auto-ui/ui';
   let { children } = $props();
 
   // Only show the "back to index" chip on notebook pages (i.e. /:slug, not /).
   const isNotebookPage = $derived($page.url?.pathname && $page.url.pathname !== '/');
-
-  let theme = $state<'light' | 'dark'>('light');
-
-  onMount(() => {
-    const stored = localStorage.getItem('nb-theme');
-    theme = stored === 'dark' ? 'dark' : 'light';
-    document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : '';
-  });
-
-  function toggleTheme() {
-    theme = theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : '';
-    try { localStorage.setItem('nb-theme', theme); } catch {}
-  }
 </script>
 
 <div class="nb-viewer-root">
@@ -34,9 +20,7 @@
     <span class="nb-nav-spacer"></span>
     <a class="nb-nav-link" href="https://blog.hyperskills.net" target="_blank" rel="noopener noreferrer">blog</a>
     <a class="nb-nav-link" href="https://github.com/jeanbaptiste/webmcp-auto-ui" target="_blank" rel="noopener noreferrer">github</a>
-    <button type="button" class="nb-nav-theme-toggle" onclick={toggleTheme} aria-label="Toggle theme">
-      {theme === 'dark' ? '☀' : '☾'}
-    </button>
+    <HeaderControls compact />
   </nav>
 
   <div class="nb-main">

@@ -402,8 +402,6 @@ function createCanvasVanilla() {
 
     setMode(m: Mode) { _mode = m; notify(); },
     setLlm(l: LLMId) { _llm = l; notify(); },
-    /** @deprecated alias for addMcpServer — kept for SettingsDrawer back-compat */
-    setMcpUrl(v: string) { addMcpServer(v); },
     setGenerating(g: boolean) { _generating = g; notify(); },
 
     addWidget, addBlock,

@@ -14,9 +14,8 @@
     buildDiscoveryCache, ContextRAG,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
-  import { LLMSelector, McpStatus, AgentProgress, WidgetRenderer, getTheme, toggleUIScale, isUIScaled, initUIScale } from '@webmcp-auto-ui/ui';
+  import { LLMSelector, McpStatus, AgentProgress, WidgetRenderer, HeaderControls } from '@webmcp-auto-ui/ui';
   import { tricoteusesServer } from '$lib/widgets/register';
-  import { Sun, Moon } from 'lucide-svelte';
 
   // ── State ─────────────────────────────────────────────────────────────
   let input = $state('');
@@ -40,9 +39,6 @@
     { server: tricoteusesServer, label: 'Tricoteuses', enabled: true },
     { server: autoui, label: 'AutoUI', enabled: false },
   ]);
-
-  // ── Theme ─────────────────────────────────────────────────────────────
-  const theme = getTheme();
 
   // ── Multi-MCP ─────────────────────────────────────────────────────────
   let multiMcpBridge: MultiMcpBridge | null = null;
@@ -223,12 +219,7 @@
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
   }
 
-  let uiScaled = $state(false);
-  function toggleScale() { toggleUIScale(); uiScaled = isUIScaled(); }
-
   onMount(() => {
-    initUIScale();
-    uiScaled = isUIScaled();
     (globalThis as any).__canvasVanilla = canvasVanilla;
     multiMcpBridge = installMultiMcpBridge({
       getCanvas: () => (globalThis as any).__canvasVanilla ?? canvasVanilla,
@@ -263,19 +254,7 @@
       Nano-RAG <span class="text-[8px] text-text2/40">(exp.)</span>
     </label>
     <LLMSelector />
-    <button class="h-7 w-7 flex items-center justify-center rounded border border-border2 text-text2 hover:text-text1 transition-colors flex-shrink-0"
-            onclick={theme.toggle} aria-label="Toggle theme">
-      {#if theme.mode === 'dark'}
-        <Sun size={14} />
-      {:else}
-        <Moon size={14} />
-      {/if}
-    </button>
-    <button class="h-7 w-8 flex items-center justify-center rounded border border-border2 text-[11px] font-mono text-text2 hover:text-text1 transition-colors flex-shrink-0"
-            class:bg-accent={uiScaled} class:!text-bg={uiScaled} class:border-accent={uiScaled}
-            onclick={toggleScale} aria-label="Toggle UI scale" title={uiScaled ? 'Reset UI scale' : 'Scale UI up (2×)'}>
-      {uiScaled ? '1×' : '2×'}
-    </button>
+    <HeaderControls />
   </header>
 
   <!-- MAIN -->

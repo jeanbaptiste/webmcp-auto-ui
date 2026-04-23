@@ -2,9 +2,7 @@
   declare const __BUILD_TIME__: string;
   declare const __GIT_HASH__: string;
   import { PUBLIC_BASE_URL } from '$env/static/public';
-  import { getTheme } from '@webmcp-auto-ui/ui';
-
-  const theme = getTheme();
+  import { HeaderControls } from '@webmcp-auto-ui/ui';
 
   const base = PUBLIC_BASE_URL ?? '';
 
@@ -77,7 +75,7 @@
       <div class="flex gap-4 mt-4">
         <a href="https://hyperskills.net" target="_blank" class="text-xs font-mono text-accent hover:underline">hyperskills.net</a>
         <a href="https://github.com/jeanbaptiste/webmcp-auto-ui" target="_blank" class="text-xs font-mono text-text2 hover:text-accent">GitHub</a>
-        <button onclick={theme.toggle} class="text-xs font-mono text-text2 hover:text-accent cursor-pointer" title="Toggle dark/light mode">{theme.mode === 'dark' ? '☀' : '☾'}</button>
+        <HeaderControls compact />
       </div>
     </header>
 

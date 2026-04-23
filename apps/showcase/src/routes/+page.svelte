@@ -5,7 +5,7 @@
   import { onMount, untrack } from 'svelte';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
-  import { WidgetRenderer, getTheme, LLMSelector, ModelLoader, AgentProgress, McpStatus } from '@webmcp-auto-ui/ui';
+  import { WidgetRenderer, getTheme, LLMSelector, ModelLoader, AgentProgress, McpStatus, HeaderControls } from '@webmcp-auto-ui/ui';
   import { PRESETS, type ThemePreset } from '$lib/themes';
   import { SIMPLE_BLOCKS, RICH_BLOCKS } from '$lib/demo-data';
   import { agentStore } from '$lib/agent-store.svelte';
@@ -99,9 +99,12 @@
         {/each}
       </div>
 
-      <a href="https://github.com/jeanbaptiste/webmcp-auto-ui/tree/main/apps/showcase"
-         target="_blank" rel="noopener"
-         class="text-xs font-mono text-text2 hover:text-text1 transition-colors">GitHub</a>
+      <div class="flex items-center gap-2">
+        <a href="https://github.com/jeanbaptiste/webmcp-auto-ui/tree/main/apps/showcase"
+           target="_blank" rel="noopener"
+           class="text-xs font-mono text-text2 hover:text-text1 transition-colors">GitHub</a>
+        <HeaderControls />
+      </div>
     </div>
   </header>
 

@@ -23,7 +23,7 @@
     leafletServer, mermaidServer, pixijsServer,
     plotlyServer, roughServer, threejsServer,
   } from '@webmcp-auto-ui/servers';
-  import { McpStatus, ModelLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter, toggleUIScale, isUIScaled, initUIScale } from '@webmcp-auto-ui/ui';
+  import { McpStatus, ModelLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter, HeaderControls } from '@webmcp-auto-ui/ui';
   import { Menu, Terminal, LayoutGrid, Paperclip, X as XIcon } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
@@ -1184,28 +1184,12 @@
     }
   }
 
-  let uiScaled = $state(false);
-  function toggleScale() { toggleUIScale(); uiScaled = isUIScaled(); }
-
-  function toggleTheme() {
-    const root = document.documentElement;
-    const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
-    root.dataset.theme = next;
-    try { localStorage.setItem('webmcp-theme', next); } catch {}
-    import('@webmcp-auto-ui/ui').then(({ THEME_MAP }) => {
-      const tokens = THEME_MAP[next as 'light'|'dark'];
-      if (tokens) for (const [k, v] of Object.entries(tokens)) root.style.setProperty(`--${k}`, v);
-    });
-  }
-
   // Multi-MCP bridge: reconciles canvas.dataServers with real connections.
   // Exposed via globalThis.__canvasVanilla so the bridge (and any other helper)
   // can access the framework-agnostic store.
   let multiMcpBridge: MultiMcpBridge | null = null;
 
   onMount(() => {
-    initUIScale();
-    uiScaled = isUIScaled();
     (globalThis as any).__canvasVanilla = canvasVanilla;
     multiMcpBridge = installMultiMcpBridge({
       getCanvas: () => (globalThis as any).__canvasVanilla ?? canvasVanilla,
@@ -1277,13 +1261,7 @@
         {({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}
       </span>
     {/if}
-    <button class="font-mono text-xs h-7 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
-            onclick={toggleTheme} aria-label="Toggle theme">*</button>
-    <button class="font-mono text-[11px] h-7 w-8 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
-            class:bg-accent={uiScaled} class:!text-white={uiScaled} class:border-accent={uiScaled}
-            onclick={toggleScale} aria-label="Toggle UI scale" title={uiScaled ? 'Reset UI scale' : 'Scale UI up (2×)'}>
-      {uiScaled ? '1×' : '2×'}
-    </button>
+    <HeaderControls />
   </header>
 
   <!-- GEMMA LOADER -->
@@ -1374,7 +1352,6 @@
 </div>
 
 <!-- SETTINGS DRAWER -->
-<!-- onconnect closure: safe because setMcpUrl is synchronous, so canvas.mcpUrl is always current -->
 <SettingsDrawer
   bind:open={settingsOpen}
   bind:composerMode bind:layoutMode bind:includeSummary

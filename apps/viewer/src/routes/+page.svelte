@@ -4,7 +4,7 @@
 
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
-  import { WidgetRenderer, Button, Input, MarkdownView } from '@webmcp-auto-ui/ui';
+  import { WidgetRenderer, Button, Input, MarkdownView, HeaderControls } from '@webmcp-auto-ui/ui';
   import {
     decodeHyperSkill, encodeHyperSkill, decode,
     getHsParam, type HyperSkill, type HyperSkillMeta,
@@ -289,6 +289,7 @@
        class="font-mono text-xs text-accent hover:underline hidden xl:inline flex items-center gap-1">
       <ExternalLink size={10} /> hyperskills.net
     </a>
+    <HeaderControls />
   </header>
 
   <!-- Paste URI bar -->

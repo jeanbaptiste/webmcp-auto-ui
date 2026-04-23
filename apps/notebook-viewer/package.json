@@ -12,7 +12,8 @@
   "dependencies": {
     "@webmcp-auto-ui/agent": "file:../../packages/agent",
     "@webmcp-auto-ui/core": "file:../../packages/core",
-    "@webmcp-auto-ui/sdk": "file:../../packages/sdk"
+    "@webmcp-auto-ui/sdk": "file:../../packages/sdk",
+    "@webmcp-auto-ui/ui": "file:../../packages/ui"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.0",

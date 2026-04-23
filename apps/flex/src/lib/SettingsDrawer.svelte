@@ -166,7 +166,7 @@
       </div>
       <McpConnector
         url={canvas.mcpUrl}
-        onurlchange={(v) => canvas.setMcpUrl(v)}
+        onurlchange={(v) => canvas.addMcpServer(v)}
         bind:token={mcpToken}
         bind:showToken={mcpShowToken}
         connecting={canvas.mcpConnecting}

@@ -80,7 +80,6 @@ function createCanvas() {
     // Setters (kept for backward compat)
     setMode(m: Mode) { canvasVanilla.setMode(m); },
     setLlm(l: LLMId) { canvasVanilla.setLlm(l); },
-    setMcpUrl(u: string) { canvasVanilla.setMcpUrl(u); },
     setGenerating(g: boolean) { canvasVanilla.setGenerating(g); },
 
     // Widget actions (primary name)
