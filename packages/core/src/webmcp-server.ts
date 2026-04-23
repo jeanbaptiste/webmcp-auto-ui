@@ -101,13 +101,18 @@ export function parseFrontmatter(markdown: string): ParsedFrontmatter {
     return { frontmatter: {}, body: markdown };
   }
 
-  const endIdx = trimmed.indexOf('\n---', 3);
-  if (endIdx === -1) {
+  // Match only a proper closing delimiter: `\n---` followed by EOL or EOF.
+  // Previous indexOf-based logic cut on any `\n---foo` inside a YAML value.
+  const endRe = /\n---(\r?\n|$)/;
+  const endMatch = endRe.exec(trimmed);
+  if (!endMatch) {
     return { frontmatter: {}, body: markdown };
   }
+  const endIdx = endMatch.index;
+  const closingLen = 4 + endMatch[1].length; // `\n---` + (`\r\n` | `\n` | '')
 
   const yamlBlock = trimmed.slice(4, endIdx); // skip opening "---\n"
-  const body = trimmed.slice(endIdx + 4).replace(/^\r?\n/, ''); // skip closing "---\n" or "---\r\n"
+  const body = trimmed.slice(endIdx + closingLen);
 
   const frontmatter = parseYaml(yamlBlock);
   return { frontmatter, body };
@@ -280,9 +285,9 @@ function parseScalar(value: string): unknown {
     return inner.split(',').map(s => parseScalar(s.trim()));
   }
 
-  // Number
+  // Number — reject whitespace-only inputs (Number(' ') === 0).
   const num = Number(value);
-  if (!isNaN(num) && value !== '') return num;
+  if (!isNaN(num) && value.trim() !== '') return num;
 
   return value;
 }
@@ -333,7 +338,17 @@ export function mountWidget(
         const result = (widget.renderer as (container: HTMLElement, data: Record<string, unknown>) => void | (() => void) | Promise<void | (() => void)>)(container, plainData);
         if (result && typeof (result as Promise<unknown>).then === 'function') {
           (result as Promise<void | (() => void)>).then(
-            (c) => { if (!cancelled) cleanup = c ?? undefined; },
+            (c) => {
+              if (cancelled) {
+                // Container was unmounted before the async render resolved —
+                // run the late cleanup immediately instead of losing it.
+                if (typeof c === 'function') {
+                  try { c(); } catch (err) { console.error('[mountWidget] late cleanup failed:', err); }
+                }
+              } else {
+                cleanup = c ?? undefined;
+              }
+            },
           ).catch((err) => { console.error('[mountWidget] async render failed:', err); });
         } else {
           cleanup = result as (() => void) | void;

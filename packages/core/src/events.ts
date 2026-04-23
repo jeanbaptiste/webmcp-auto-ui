@@ -16,8 +16,9 @@ import type {
 // Callback type — will be wired to polyfill.executeToolInternal
 type ToolExecutor = (name: string, args: Record<string, unknown>) => Promise<ToolExecuteResult>;
 
-// Tracks last registered listener for backward-compat stopListening()
-let messageListener: ((event: MessageEvent) => void) | null = null;
+// Tracks all registered listeners — set-based to avoid clobbering when
+// multiple listenForAgentCalls() calls coexist (SSR, tests, multi-iframe).
+const messageListeners = new Set<(event: MessageEvent) => void>();
 
 export function listenForAgentCalls(
   executor: ToolExecutor,
@@ -64,23 +65,24 @@ export function listenForAgentCalls(
     window.addEventListener('message', listener);
   }
 
-  // Track for backward-compat stopListening()
-  messageListener = listener;
+  messageListeners.add(listener);
 
   return () => {
     if (typeof window !== 'undefined') {
       window.removeEventListener('message', listener);
     }
-    if (messageListener === listener) messageListener = null;
+    messageListeners.delete(listener);
   };
 }
 
 /** @deprecated Use the stop function returned by listenForAgentCalls() instead. */
 export function stopListening(): void {
-  if (messageListener && typeof window !== 'undefined') {
-    window.removeEventListener('message', messageListener);
-    messageListener = null;
+  if (typeof window !== 'undefined') {
+    for (const listener of messageListeners) {
+      window.removeEventListener('message', listener);
+    }
   }
+  messageListeners.clear();
 }
 
 /**

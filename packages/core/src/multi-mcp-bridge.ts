@@ -214,6 +214,10 @@ export class MultiMcpBridge {
       seenNames.add(srv.name);
       const key = srv.name;
       if (srv.enabled && !this.connected.has(key) && !this.connecting.has(key)) {
+        // Mark as connecting synchronously before the async handshake runs,
+        // so a concurrent reconcile() can't slip past the guard and spawn
+        // a second handshake for the same server.
+        this.connecting.add(key);
         void this.handshake(srv);
       } else if (!srv.enabled && this.connected.has(key)) {
         void this.disconnect(srv);
@@ -230,7 +234,7 @@ export class MultiMcpBridge {
 
   private async handshake(srv: DataServerLike): Promise<void> {
     const canvas = this.options.getCanvas();
-    this.connecting.add(srv.name);
+    // connecting.add is performed by reconcile() synchronously; don't re-add here.
     this.options.log?.(`[bridge] handshake start: ${srv.name}`, { url: srv.url });
     try {
       const { name: actualName, tools } = await this.client.addServer(srv.url);

@@ -36,6 +36,7 @@ export class McpClient {
   private rpcIdCounter = 0;
   private isReconnecting = false;
   private reconnectPromise: Promise<void> | null = null;
+  private closing = false;
 
   constructor(url: string, options?: McpClientOptions) {
     this.url = url;
@@ -47,6 +48,7 @@ export class McpClient {
   // ---------------------------------------------------------------------------
 
   async connect(): Promise<McpInitializeResult> {
+    this.closing = false;
     const result = await this.rpc<McpInitializeResult>('initialize', {
       protocolVersion: '2024-11-05',
       capabilities: { roots: { listChanged: true } },
@@ -54,7 +56,7 @@ export class McpClient {
         name: this.options.clientName,
         version: this.options.clientVersion,
       },
-    });
+    }, 0, AbortSignal.timeout(10_000));
 
     this.serverInfo = result.serverInfo;
     this.capabilities = result.capabilities;
@@ -80,13 +82,16 @@ export class McpClient {
   }
 
   async disconnect(): Promise<void> {
+    this.closing = true;
     if (this.sessionId) {
-      // Best-effort DELETE — ignore errors
+      // Best-effort DELETE — log warning if it fails
       const headers: Record<string, string> = {
         'Mcp-Session-Id': this.sessionId,
         ...this.options.headers,
       };
-      fetch(this.url, { method: 'DELETE', headers }).catch(() => undefined);
+      fetch(this.url, { method: 'DELETE', headers }).catch((err) =>
+        console.warn('[mcp] DELETE failed', err)
+      );
     }
     this.sessionId = null;
     this.tools = [];
@@ -136,7 +141,12 @@ export class McpClient {
     await fetch(this.url, { method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal }).catch((e) => console.warn('[McpClient] notification failed:', e)).finally(() => clearTimeout(timer));
   }
 
-  private async rpc<T>(method: string, params?: Record<string, unknown>, attempt = 0): Promise<T> {
+  private async rpc<T>(
+    method: string,
+    params?: Record<string, unknown>,
+    attempt = 0,
+    externalSignal?: AbortSignal,
+  ): Promise<T> {
     const id = ++this.rpcIdCounter;
 
     const body: JsonRpcRequest = {
@@ -158,6 +168,11 @@ export class McpClient {
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.options.timeout);
+    const onExternalAbort = () => controller.abort();
+    if (externalSignal) {
+      if (externalSignal.aborted) controller.abort();
+      else externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+    }
 
     let response: Response;
     try {
@@ -175,6 +190,7 @@ export class McpClient {
       throw err;
     } finally {
       clearTimeout(timer);
+      if (externalSignal) externalSignal.removeEventListener('abort', onExternalAbort);
     }
 
     // Capture session id (case-insensitive header search)
@@ -205,12 +221,14 @@ export class McpClient {
         const backoffMs = 500 * (attempt + 1);
         this.reconnectPromise = (async () => {
           await new Promise(resolve => setTimeout(resolve, backoffMs));
+          if (this.closing) return;
           await this.connect();
         })().finally(() => {
           this.isReconnecting = false;
           this.reconnectPromise = null;
         });
         await this.reconnectPromise;
+        if (this.closing) throw new Error('MCP client was closed during reconnect');
         return this.rpc<T>(method, params, attempt + 1);
       }
       throw new Error(`MCP session expired and reconnect failed after ${attempt} attempts`);
