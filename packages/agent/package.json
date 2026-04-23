@@ -1,6 +1,6 @@
 {
   "name": "@webmcp-auto-ui/agent",
-  "version": "2.5.27",
+  "version": "2.5.28",
   "description": "LLM agent loop + remote/WASM/local providers + MCP wrapper",
   "license": "AGPL-3.0-or-later",
   "type": "module",
