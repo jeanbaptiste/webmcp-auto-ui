@@ -19,7 +19,7 @@ import {
 } from './shared.js';
 import { renderChart } from './chart-renderer.js';
 import { dispatchShare } from './share-handlers.js';
-import { renderProse } from './prose.js';
+import { renderProse, mountEditableProse } from './prose.js';
 import { openAddMdModal, openAddRecipeModal } from './import-modals.js';
 import { extractCellsFromRecipe, extractCellFromMarkdown } from './resource-extractor.js';
 import { mountLeftPane } from './left-pane.js';
@@ -106,8 +106,11 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     });
   }
 
+  const hideLiveToggle = (data as any).hideLiveToggle === true;
+
   function renderLiveToggle() {
     const slot = shell.querySelector('.nbe-live-toggle-slot') as HTMLElement;
+    if (hideLiveToggle) { slot.innerHTML = ''; return; }
     if (state.mode === 'edit') {
       const checked = state.autoRun === true ? 'checked' : '';
       slot.innerHTML = `<label class="nbe-live-toggle" title="Re-execute SQL cells against connected servers when this notebook is opened in view mode."><input type="checkbox" ${checked} />Live data</label>`;
@@ -431,24 +434,13 @@ function renderCell(cell: NotebookCell, state: NotebookState, overlay: RuntimeOv
       rendered.innerHTML = renderProse(cell.content || '');
       wrap.appendChild(rendered);
     } else {
-      // Editor: plain textarea (markdown source) + rendered preview below
-      const editor = document.createElement('textarea');
-      editor.className = 'nbe-prose-edit';
-      editor.value = cell.content || '';
-      editor.rows = 2;
-      editor.placeholder = 'write prose (markdown)…';
-      editor.spellcheck = true;
-      editor.addEventListener('input', () => {
-        cell.content = editor.value;
-        autosize(editor);
-        preview.innerHTML = renderProse(cell.content || '');
+      // Inline WYSIWYG — single contenteditable zone, floating toolbar on select.
+      const editor = mountEditableProse({
+        getContent: () => cell.content || '',
+        setContent: (md) => { cell.content = md; },
+        onChange: () => { state.lastEditAt = Date.now(); },
       });
-      const preview = document.createElement('div');
-      preview.className = 'nbe-prose nbe-prose-render';
-      preview.innerHTML = renderProse(cell.content || '');
-      wrap.appendChild(editor);
-      wrap.appendChild(preview);
-      requestAnimationFrame(() => requestAnimationFrame(() => autosize(editor)));
+      wrap.appendChild(editor.el);
     }
     return wrap;
   }

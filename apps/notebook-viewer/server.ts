@@ -13,6 +13,9 @@
  *   DELETE /api/p/:slug            → requires X-Publish-Token header matching stored token.
  *                                    404 if absent, 403 if mismatch, 200 { deleted:true } otherwise.
  *   GET    /api/resolve?n=<token>  → returns the stored state JSON, 404 if not found (legacy hash lookup).
+ *   GET    /api/p                  → list of published notebooks (max 200),
+ *                                    sorted by publishedAt DESC. Items:
+ *                                    { slug, title, description, publishedAt, updatedAt? }.
  *   GET    /api/p/:slug            → returns { state, publishedAt, updatedAt } — token stripped out.
  *   GET    /api/health             → { ok, uptime }
  *   GET    /*                      → static files from ./build (SvelteKit static adapter),
@@ -303,6 +306,94 @@ async function handleResolve(res: http.ServerResponse, token: string | null) {
   }
 }
 
+// -----------------------------------------------------------------------------
+// GET /api/p — list published notebooks (index page).
+// Returns up to 200 entries sorted by publishedAt DESC, shape:
+//   [{ slug, title, description, publishedAt, updatedAt? }, ...]
+// -----------------------------------------------------------------------------
+
+function stripMarkdownInline(text: string): string {
+  return String(text ?? '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/[*_~>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractIndexMeta(state: any): { title: string; description: string } {
+  let title = (typeof state?.title === 'string' && state.title.trim()) ? state.title.trim() : '';
+  let description = '';
+  const cells = Array.isArray(state?.cells) ? state.cells : [];
+  for (const c of cells) {
+    if (!c || typeof c !== 'object') continue;
+    const type = (c as any).type;
+    const content = (c as any).content;
+    if (type !== 'md' || typeof content !== 'string') continue;
+    const lines = content.split('\n').map((l: string) => l.trim()).filter(Boolean);
+    if (!title) {
+      const h1 = lines.find((l: string) => /^#\s+/.test(l));
+      if (h1) title = stripMarkdownInline(h1);
+    }
+    if (!description) {
+      const prose = lines.find((l: string) => !/^#{1,6}\s/.test(l) && !/^[-*]\s/.test(l));
+      if (prose) description = stripMarkdownInline(prose).slice(0, 200);
+    }
+    if (title && description) break;
+  }
+  return {
+    title: title || 'Untitled notebook',
+    description: description || '',
+  };
+}
+
+async function handleListIndex(res: http.ServerResponse) {
+  let entries: string[];
+  try {
+    entries = await fsp.readdir(PUBLISHED_DIR);
+  } catch {
+    return jsonResponse(res, 200, []);
+  }
+  const items: Array<{
+    slug: string;
+    title: string;
+    description: string;
+    publishedAt: number;
+    updatedAt?: number;
+  }> = [];
+
+  for (const entry of entries) {
+    if (!entry.endsWith('.json')) continue;
+    const slug = entry.slice(0, -'.json'.length);
+    if (!isValidSlug(slug)) continue;
+    const file = path.join(PUBLISHED_DIR, entry);
+    try {
+      const raw = await fsp.readFile(file, 'utf8');
+      const parsed = JSON.parse(raw);
+      const state = parsed?.state;
+      const meta = extractIndexMeta(state);
+      const publishedAt = Number(parsed?.publishedAt) || 0;
+      const updatedAt = parsed?.updatedAt != null ? Number(parsed.updatedAt) : undefined;
+      items.push({
+        slug,
+        title: meta.title,
+        description: meta.description,
+        publishedAt,
+        ...(updatedAt ? { updatedAt } : {}),
+      });
+    } catch {
+      // skip unreadable/corrupt entries silently
+    }
+  }
+
+  items.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+  return jsonResponse(res, 200, items.slice(0, 200));
+}
+
 async function handleBySlug(res: http.ServerResponse, slug: string) {
   if (!isValidSlug(slug)) return jsonResponse(res, 400, { error: 'invalid slug' });
   // Prefer direct slug lookup (new format). Fall back to legacy hash-prefix scan
@@ -407,6 +498,12 @@ const server = http.createServer(async (req, res) => {
     if (urlPath === '/api/resolve' && method === 'GET') {
       const token = reqUrl.searchParams.get('n');
       await handleResolve(res, token);
+      log(method, urlPath, res.statusCode, Date.now() - started);
+      return;
+    }
+
+    if ((urlPath === '/api/p' || urlPath === '/api/p/') && method === 'GET') {
+      await handleListIndex(res);
       log(method, urlPath, res.statusCode, Date.now() - started);
       return;
     }

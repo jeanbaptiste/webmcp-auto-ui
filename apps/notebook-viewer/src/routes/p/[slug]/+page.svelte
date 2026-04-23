@@ -46,7 +46,9 @@
     if (view.status !== 'ready' || !host) return;
     if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
     host.innerHTML = '';
-    const result = mountWidget(host, view.payload.kind, view.payload.data, [autoui]);
+    // nb.hyperskills.net is always live data — hide the toggle, force live on.
+    const data = { ...view.payload.data, liveData: true, hideLiveToggle: true };
+    const result = mountWidget(host, view.payload.kind, data, [autoui]);
     if (typeof result === 'function') cleanup = result;
     return () => {
       if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
@@ -84,18 +86,18 @@
 </svelte:head>
 
 {#if view.status === 'loading'}
-  <main class="nb-viewer-loading"><p>Loading notebook…</p></main>
+  <main class="nb-page nb-loading"><p>Loading notebook…</p></main>
 {:else if view.status === 'error' && view.code === 'not_found'}
-  <main class="nb-viewer-error">
+  <main class="nb-page nb-error">
     <h1>404 — Notebook not found</h1>
     <p>{view.message}</p>
-    <p><a href="/">Back to home</a></p>
+    <p><a href="/">← Back to index</a></p>
   </main>
 {:else if view.status === 'error'}
-  <main class="nb-viewer-error">
+  <main class="nb-page nb-error">
     <h1>Unable to display notebook</h1>
     <p>{view.message}</p>
-    <p><a href="/">Back to home</a></p>
+    <p><a href="/">← Back to index</a></p>
   </main>
 {:else}
   <div class="nb-viewer-host" bind:this={host}></div>

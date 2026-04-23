@@ -202,6 +202,341 @@ function walk(node: Node): void {
 }
 
 // ---------------------------------------------------------------------------
+// Inline WYSIWYG editor — single contenteditable zone, no dual-view.
+// Markdown remains the source of truth: rendered on mount/blur, converted back
+// via turndown on input (debounced) and at blur.
+// ---------------------------------------------------------------------------
+
+// @ts-ignore — turndown ships its own types but we stay ts-nocheck here
+import TurndownService from 'turndown';
+
+let _td: any = null;
+function td(): any {
+  if (_td) return _td;
+  _td = new TurndownService({
+    headingStyle: 'atx',
+    hr: '---',
+    bulletListMarker: '-',
+    codeBlockStyle: 'fenced',
+    emDelimiter: '*',
+    strongDelimiter: '**',
+    linkStyle: 'inlined',
+  });
+  // Preserve <mark> as ==...== (matches our renderer)
+  _td.addRule('mark', {
+    filter: 'mark',
+    replacement: (content: string) => `==${content}==`,
+  });
+  return _td;
+}
+
+function htmlToMd(html: string): string {
+  try { return td().turndown(html || ''); } catch { return ''; }
+}
+
+function ensureToolbarStyles(): void {
+  if (document.getElementById('nbe-wysiwyg-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'nbe-wysiwyg-styles';
+  style.textContent = `
+.nbe-prose-wysiwyg {
+  display: block;
+  min-height: 1.6em;
+  max-width: 620px;
+  padding: 4px 6px;
+  margin-bottom: 4px;
+  border: 1px dashed transparent;
+  border-radius: 4px;
+  outline: none;
+  cursor: text;
+}
+.nbe-prose-wysiwyg:hover { border-color: var(--color-border); }
+.nbe-prose-wysiwyg:focus,
+.nbe-prose-wysiwyg.nbe-focus {
+  border-color: var(--color-border2);
+  border-style: solid;
+  background: var(--color-bg);
+}
+.nbe-prose-wysiwyg[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  color: var(--color-text2);
+  font-style: italic;
+  pointer-events: none;
+}
+.nbe-wysiwyg-toolbar {
+  position: fixed;
+  z-index: 1010;
+  display: inline-flex;
+  gap: 2px;
+  padding: 4px;
+  background: var(--color-surface2);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.nbe-wysiwyg-toolbar.nbe-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.nbe-wysiwyg-toolbar button {
+  background: transparent;
+  color: var(--color-text1);
+  border: none;
+  border-radius: 3px;
+  padding: 4px 7px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  min-width: 22px;
+}
+.nbe-wysiwyg-toolbar button:hover { background: var(--color-surface); }
+.nbe-wysiwyg-toolbar button.nbe-wy-strong { font-weight: 700; }
+.nbe-wysiwyg-toolbar button.nbe-wy-em { font-style: italic; }
+`;
+  document.head.appendChild(style);
+}
+
+let _toolbarEl: HTMLElement | null = null;
+let _activeEditor: HTMLElement | null = null;
+let _toolbarCallback: ((cmd: string) => void) | null = null;
+
+function ensureToolbar(): HTMLElement {
+  if (_toolbarEl) return _toolbarEl;
+  const bar = document.createElement('div');
+  bar.className = 'nbe-wysiwyg-toolbar';
+  bar.setAttribute('role', 'toolbar');
+  const btns: Array<[string, string, string]> = [
+    ['bold', 'B', 'nbe-wy-strong'],
+    ['italic', 'I', 'nbe-wy-em'],
+    ['h2', 'H2', ''],
+    ['h3', 'H3', ''],
+    ['ul', '• list', ''],
+    ['link', 'link', ''],
+    ['code', '<>', ''],
+  ];
+  for (const [cmd, label, cls] of btns) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.dataset.cmd = cmd;
+    if (cls) b.classList.add(cls);
+    // mousedown before focus is lost
+    b.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      _toolbarCallback?.(cmd);
+    });
+    bar.appendChild(b);
+  }
+  document.body.appendChild(bar);
+  _toolbarEl = bar;
+  return bar;
+}
+
+function positionToolbar(): void {
+  if (!_toolbarEl || !_activeEditor) return;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+    _toolbarEl.classList.remove('nbe-visible');
+    return;
+  }
+  // Only show if selection is within active editor
+  const range = sel.getRangeAt(0);
+  if (!_activeEditor.contains(range.commonAncestorContainer)) {
+    _toolbarEl.classList.remove('nbe-visible');
+    return;
+  }
+  const rect = range.getBoundingClientRect();
+  if (rect.width === 0 && rect.height === 0) {
+    _toolbarEl.classList.remove('nbe-visible');
+    return;
+  }
+  const bar = _toolbarEl;
+  bar.classList.add('nbe-visible');
+  const barRect = bar.getBoundingClientRect();
+  let top = rect.bottom + 6;
+  if (top + barRect.height > window.innerHeight) top = rect.top - barRect.height - 6;
+  let left = rect.left + rect.width / 2 - barRect.width / 2;
+  left = Math.max(6, Math.min(window.innerWidth - barRect.width - 6, left));
+  bar.style.top = `${top}px`;
+  bar.style.left = `${left}px`;
+}
+
+function hideToolbar(): void {
+  _toolbarEl?.classList.remove('nbe-visible');
+}
+
+function execCmd(cmd: string, editor: HTMLElement): void {
+  editor.focus();
+  switch (cmd) {
+    case 'bold': document.execCommand('bold'); break;
+    case 'italic': document.execCommand('italic'); break;
+    case 'h2': document.execCommand('formatBlock', false, 'H2'); break;
+    case 'h3': document.execCommand('formatBlock', false, 'H3'); break;
+    case 'ul': document.execCommand('insertUnorderedList'); break;
+    case 'code': {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+      if (range.collapsed) return;
+      const text = range.toString();
+      const codeEl = document.createElement('code');
+      codeEl.textContent = text;
+      range.deleteContents();
+      range.insertNode(codeEl);
+      sel.removeAllRanges();
+      const r2 = document.createRange();
+      r2.setStartAfter(codeEl);
+      r2.collapse(true);
+      sel.addRange(r2);
+      break;
+    }
+    case 'link': {
+      const url = window.prompt('Link URL:');
+      if (!url) return;
+      document.execCommand('createLink', false, url);
+      break;
+    }
+  }
+  // Fire an input event to trigger debounced MD conversion
+  editor.dispatchEvent(new InputEvent('input', { bubbles: true }));
+  requestAnimationFrame(() => positionToolbar());
+}
+
+/**
+ * Mount a WYSIWYG editor in place of the traditional textarea+preview split.
+ * - Single contenteditable zone rendering live markdown.
+ * - Floating toolbar (B/I/H2/H3/ul/link/code) shown on text selection.
+ * - Paste handler converts HTML → markdown (strips inline styles from Notion/GDocs).
+ * - On input (debounced) + on blur, HTML is converted to markdown into `get`/`set`.
+ *
+ * Returns the host element and a cleanup function.
+ */
+export function mountEditableProse(opts: {
+  getContent: () => string;
+  setContent: (md: string) => void;
+  onChange?: () => void;
+  placeholder?: string;
+}): { el: HTMLElement; destroy: () => void } {
+  ensureToolbarStyles();
+  ensureToolbar();
+
+  const host = document.createElement('div');
+  host.className = 'nbe-prose nbe-prose-render nbe-prose-wysiwyg';
+  host.contentEditable = 'true';
+  host.spellcheck = true;
+  host.dataset.placeholder = opts.placeholder ?? 'write prose (markdown, WYSIWYG)…';
+  host.innerHTML = renderProse(opts.getContent() || '');
+  updateEmptyState(host);
+
+  let debounceId: any = null;
+  const scheduleSync = () => {
+    if (debounceId) clearTimeout(debounceId);
+    debounceId = setTimeout(() => {
+      flushToMd();
+    }, 400);
+  };
+  const flushToMd = () => {
+    const html = host.innerHTML;
+    const md = htmlToMd(html);
+    opts.setContent(md);
+    opts.onChange?.();
+    updateEmptyState(host);
+  };
+
+  const onInput = () => {
+    updateEmptyState(host);
+    scheduleSync();
+    positionToolbar();
+  };
+  const onFocus = () => {
+    host.classList.add('nbe-focus');
+    _activeEditor = host;
+    _toolbarCallback = (cmd: string) => execCmd(cmd, host);
+  };
+  const onBlur = () => {
+    host.classList.remove('nbe-focus');
+    // If focus moves to the toolbar we skip — use a deferred check
+    setTimeout(() => {
+      if (document.activeElement === host) return;
+      if (_toolbarEl && _toolbarEl.contains(document.activeElement)) return;
+      if (_activeEditor === host) {
+        _activeEditor = null;
+        _toolbarCallback = null;
+        hideToolbar();
+      }
+      flushToMd();
+    }, 10);
+  };
+  const onSelectionChange = () => {
+    if (_activeEditor === host) positionToolbar();
+  };
+  const onKeyDown = (e: KeyboardEvent) => {
+    const meta = e.metaKey || e.ctrlKey;
+    if (meta && e.key.toLowerCase() === 'b') { e.preventDefault(); execCmd('bold', host); }
+    else if (meta && e.key.toLowerCase() === 'i') { e.preventDefault(); execCmd('italic', host); }
+    else if (meta && e.key.toLowerCase() === 'k') { e.preventDefault(); execCmd('link', host); }
+  };
+  const onPaste = (e: ClipboardEvent) => {
+    const cd = e.clipboardData;
+    if (!cd) return;
+    const html = cd.getData('text/html');
+    const text = cd.getData('text/plain');
+    if (html) {
+      e.preventDefault();
+      // Strip inline styles by routing via turndown → re-render via our MD pipeline
+      const md = htmlToMd(html);
+      const cleanHtml = renderProse(md);
+      document.execCommand('insertHTML', false, cleanHtml);
+      scheduleSync();
+    } else if (text) {
+      // Plain text paste — default behaviour fine, but still trigger sync
+      scheduleSync();
+    }
+  };
+
+  host.addEventListener('input', onInput);
+  host.addEventListener('focus', onFocus);
+  host.addEventListener('blur', onBlur);
+  host.addEventListener('keydown', onKeyDown);
+  host.addEventListener('paste', onPaste);
+  document.addEventListener('selectionchange', onSelectionChange);
+
+  return {
+    el: host,
+    destroy: () => {
+      if (debounceId) clearTimeout(debounceId);
+      host.removeEventListener('input', onInput);
+      host.removeEventListener('focus', onFocus);
+      host.removeEventListener('blur', onBlur);
+      host.removeEventListener('keydown', onKeyDown);
+      host.removeEventListener('paste', onPaste);
+      document.removeEventListener('selectionchange', onSelectionChange);
+      if (_activeEditor === host) {
+        _activeEditor = null;
+        _toolbarCallback = null;
+        hideToolbar();
+      }
+    },
+  };
+}
+
+function updateEmptyState(host: HTMLElement): void {
+  const txt = (host.textContent || '').trim();
+  if (!txt && host.children.length <= 1) {
+    host.dataset.empty = 'true';
+  } else {
+    host.dataset.empty = 'false';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Renderer with inject buttons — used by recipe viewer modal.
 // Each fenced code block gets an "↳ inject" button next to it.
 // ---------------------------------------------------------------------------

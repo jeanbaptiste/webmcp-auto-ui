@@ -14,6 +14,10 @@ schema:
     kicker:
       type: string
       description: Small uppercase label above the title (e.g. "analysis", "memo", "brief"). Editable inline. Defaults to "untitled".
+    hideLiveToggle:
+      type: boolean
+      default: false
+      description: When true, hides the "Live data" toggle in the header (useful for embedded/host-controlled contexts where the autoRun flag is managed externally).
     cells:
       type: array
       description: Mixed flow of prose and code cells. All share the same ordering and can be reordered together.

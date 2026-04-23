@@ -1102,10 +1102,11 @@ const NOTEBOOK_STYLES = `
 
 .nb-root.nb-view-mode .nb-drag-handle,
 .nb-root.nb-view-mode .nb-icon-btn.nb-danger,
-.nb-root.nb-view-mode .nb-ctl-pill,
 .nb-root.nb-view-mode .nb-toggle-src,
 .nb-root.nb-view-mode .nb-toggle-res,
 .nb-root.nb-view-mode .nb-add-cell { display: none !important; }
+/* Run controls (.nb-ctl-pill) remain active in view mode — users can execute cells
+ * even when the notebook is read-only; only editing the source is locked. */
 .nb-root.nb-view-mode textarea,
 .nb-root.nb-view-mode [contenteditable] { pointer-events: none; }
 .nb-root.nb-view-mode input.nb-title-edit,

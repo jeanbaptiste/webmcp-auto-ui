@@ -1,12 +1,40 @@
-/* nb.hyperskills.net — Public notebook viewer */
+/* nb.hyperskills.net — chrome/layout CSS.
+ * Visual family: sibling of blog.hyperskills.net.
+ *   - Serif display: Cormorant Garamond (hero titles)
+ *   - Sans body:     Outfit
+ *   - Mono chrome:   JetBrains Mono (nav, footer, meta)
+ *   - Palette:       sage / cream / ink (warm paper)
+ *
+ * IMPORTANT — this file styles ONLY the viewer chrome (nav, footer, index page,
+ * loading/error states). The notebook widget itself ships its own CSS from
+ * @webmcp-auto-ui/ui and MUST NOT be overridden here.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Outfit:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
   color-scheme: light dark;
-  --nb-bg: #ffffff;
-  --nb-fg: #1a1a1a;
-  --nb-muted: #6b7280;
-  --nb-border: #e5e7eb;
-  --nb-accent: #2563eb;
+
+  /* sibling palette of blog.hyperskills.net */
+  --nb-sage:           #B8CCAA;
+  --nb-sage-light:     #EDF3E7;
+  --nb-sage-mid:       #96B083;
+  --nb-sage-dark:      #4A6B38;
+  --nb-cream:          #FAF8F3;
+  --nb-cream-2:        #F3F0E8;
+  --nb-ink:            #26231E;
+  --nb-ink-mid:        #5E5A54;
+  --nb-ink-light:      #9B9690;
+  --nb-white:          #FFFFFF;
+  --nb-border:         rgba(38, 35, 30, 0.09);
+  --nb-border-mid:     rgba(38, 35, 30, 0.16);
+  --nb-nav-bg:         rgba(250, 248, 243, 0.92);
+
+  /* backwards-compat tokens (kept in case local styles still refer to them) */
+  --nb-bg: var(--nb-cream);
+  --nb-fg: var(--nb-ink);
+  --nb-muted: var(--nb-ink-light);
+  --nb-accent: var(--nb-sage-dark);
   --nb-error-bg: #fef2f2;
   --nb-error-fg: #991b1b;
   --nb-error-border: #fecaca;
@@ -14,28 +42,47 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --nb-bg: #0b0d10;
-    --nb-fg: #e5e7eb;
-    --nb-muted: #9ca3af;
-    --nb-border: #1f2937;
-    --nb-accent: #60a5fa;
+    --nb-cream:          #161410;
+    --nb-cream-2:        #1E1C18;
+    --nb-ink:            #EDE8E0;
+    --nb-ink-mid:        #A09890;
+    --nb-ink-light:      #68625C;
+    --nb-white:          #1E1C18;
+    --nb-border:         rgba(237, 232, 224, 0.08);
+    --nb-border-mid:     rgba(237, 232, 224, 0.14);
+    --nb-nav-bg:         rgba(22, 20, 16, 0.94);
+    --nb-sage-light:     rgba(150, 176, 131, 0.14);
+    --nb-sage-dark:      #A3BB8E;
+
+    --nb-bg: var(--nb-cream);
+    --nb-fg: var(--nb-ink);
+    --nb-muted: var(--nb-ink-light);
+    --nb-accent: var(--nb-sage-dark);
     --nb-error-bg: #2a0f10;
     --nb-error-fg: #fca5a5;
     --nb-error-border: #7f1d1d;
   }
 }
 
+*, *::before, *::after { box-sizing: border-box; }
+
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--nb-bg);
-  color: var(--nb-fg);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  font-size: 15px;
-  line-height: 1.5;
+  background: var(--nb-cream);
+  color: var(--nb-ink);
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 300;
+  font-size: 16px;
+  line-height: 1.65;
 }
 
-a { color: var(--nb-accent); }
+html { scroll-behavior: smooth; }
+
+a { color: var(--nb-sage-dark); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ─── Root layout ─── */
 
 .nb-viewer-root {
   min-height: 100vh;
@@ -43,45 +90,284 @@ a { color: var(--nb-accent); }
   flex-direction: column;
 }
 
+.nb-main {
+  flex: 1;
+}
+
+/* ─── Nav ─── */
+
+.nb-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--nb-nav-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 0.5px solid var(--nb-border);
+  padding: 0 clamp(1.5rem, 5vw, 5rem);
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  height: 50px;
+}
+
+.nb-nav-logo {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--nb-ink);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.nb-nav-logo:hover { text-decoration: none; color: var(--nb-ink); }
+
+.nb-nav-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--nb-sage-mid);
+  display: inline-block;
+}
+
+.nb-nav-sep {
+  width: 0.5px;
+  height: 14px;
+  background: var(--nb-border-mid);
+  flex-shrink: 0;
+}
+
+.nb-nav-spacer { flex: 1; }
+
+.nb-nav-link {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--nb-ink-light);
+  text-decoration: none;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+.nb-nav-link:hover { color: var(--nb-ink); text-decoration: none; }
+
+/* ─── Page wrapper (index, loading, error) ─── */
+
+.nb-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 clamp(1.5rem, 5vw, 5rem);
+}
+
+/* ─── Hero ─── */
+
+.nb-hero {
+  padding: clamp(4rem, 9vw, 7rem) 0 clamp(2.5rem, 5vw, 4rem);
+}
+
+.nb-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--nb-ink-light);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 1.5rem;
+}
+.nb-eyebrow::before {
+  content: '';
+  width: 24px;
+  height: 0.5px;
+  background: var(--nb-ink-light);
+}
+
+.nb-hero-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: clamp(2.4rem, 5.5vw, 4rem);
+  font-weight: 300;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: var(--nb-ink);
+  margin: 0 0 1.25rem;
+}
+.nb-hero-title em {
+  font-style: italic;
+  color: var(--nb-sage-dark);
+}
+
+.nb-hero-desc {
+  font-size: 1.05rem;
+  font-weight: 300;
+  color: var(--nb-ink-mid);
+  max-width: 560px;
+  line-height: 1.75;
+  margin: 0;
+}
+
+/* ─── Index list ─── */
+
+.nb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 3rem;
+}
+
+.nb-card {
+  display: block;
+  padding: 18px 22px;
+  background: var(--nb-white);
+  border: 0.5px solid var(--nb-border);
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--nb-ink);
+  transition: border-color 0.2s, transform 0.2s;
+}
+.nb-card:hover {
+  border-color: var(--nb-sage-mid);
+  text-decoration: none;
+  transform: translateX(4px);
+}
+
+.nb-card-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.6rem;
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--nb-ink);
+  margin: 0 0 6px;
+}
+
+.nb-card-desc {
+  font-size: 0.95rem;
+  color: var(--nb-ink-mid);
+  line-height: 1.6;
+  margin: 0 0 10px;
+}
+
+.nb-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--nb-ink-light);
+}
+.nb-card-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--nb-border-mid);
+}
+.nb-card-slug { color: var(--nb-ink-light); }
+
+.nb-empty {
+  padding: 2rem 0 4rem;
+  color: var(--nb-ink-mid);
+  font-style: italic;
+}
+
+/* ─── Loading / error states ─── */
+
+.nb-loading,
+.nb-error {
+  max-width: 680px;
+  margin: 8vh auto 0;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.nb-error h1 {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 300;
+  font-size: 2rem;
+  margin: 0 0 12px;
+  color: var(--nb-ink);
+}
+.nb-error p { color: var(--nb-ink-mid); }
+
+/* ─── Notebook host (widget mount point) ─── */
+
 .nb-viewer-host {
   flex: 1;
-  padding: 16px;
+  padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 3rem);
   max-width: 1280px;
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
 }
 
-.nb-viewer-landing,
-.nb-viewer-error,
-.nb-viewer-loading {
-  max-width: 680px;
-  margin: 12vh auto 0;
-  padding: 32px 24px;
-  text-align: center;
+/* ─── Footer ─── */
+
+.nb-footer {
+  padding: 2rem clamp(1.5rem, 5vw, 5rem) 3rem;
+  border-top: 0.5px solid var(--nb-border);
+  margin-top: 3rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  max-width: 1280px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.nb-viewer-error {
-  border: 1px solid var(--nb-error-border);
-  background: var(--nb-error-bg);
-  color: var(--nb-error-fg);
-  border-radius: 8px;
+.nb-footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.nb-viewer-landing h1 { font-size: 28px; margin: 0 0 12px; }
-.nb-viewer-landing p { color: var(--nb-muted); margin: 8px 0; }
-
-.nb-viewer-landing code {
-  background: var(--nb-border);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 13px;
-}
-
-.nb-viewer-footer {
-  padding: 16px;
-  text-align: center;
-  color: var(--nb-muted);
+.nb-footer-logo {
+  font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  border-top: 1px solid var(--nb-border);
+  color: var(--nb-ink-light);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.nb-footer-note {
+  font-size: 12px;
+  color: var(--nb-ink-light);
+  font-weight: 300;
+}
+
+.nb-footer-links {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.nb-footer-links a {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--nb-ink-light);
+  text-decoration: none;
+  border-bottom: 0.5px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+.nb-footer-links a:hover {
+  color: var(--nb-sage-dark);
+  border-bottom-color: var(--nb-sage-mid);
+  text-decoration: none;
+}
+
+.nb-footer-license {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--nb-ink-light);
+}
+
+/* ─── Mobile ─── */
+
+@media (max-width: 600px) {
+  .nb-nav { gap: 0.75rem; padding: 0 1rem; }
+  .nb-nav-link { font-size: 11px; }
+  .nb-footer { flex-direction: column; }
 }
