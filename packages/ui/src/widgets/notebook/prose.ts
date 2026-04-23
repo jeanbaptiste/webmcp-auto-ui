@@ -207,12 +207,15 @@ function walk(node: Node): void {
 // via turndown on input (debounced) and at blur.
 // ---------------------------------------------------------------------------
 
-// @ts-ignore — turndown ships its own types but we stay ts-nocheck here
-import TurndownService from 'turndown';
-
+// turndown is loaded lazily (browser-only). Top-level import breaks SSR because
+// turndown's CJS internals use require() which throws in ESM scope.
 let _td: any = null;
-function td(): any {
+async function ensureTd(): Promise<any> {
   if (_td) return _td;
+  if (typeof window === 'undefined') return null;
+  // @ts-ignore — turndown ships its own types but we stay ts-nocheck here
+  const mod = await import('turndown');
+  const TurndownService = mod.default || mod;
   _td = new TurndownService({
     headingStyle: 'atx',
     hr: '---',
@@ -230,8 +233,11 @@ function td(): any {
   return _td;
 }
 
-function htmlToMd(html: string): string {
-  try { return td().turndown(html || ''); } catch { return ''; }
+async function htmlToMd(html: string): Promise<string> {
+  try {
+    const t = await ensureTd();
+    return t ? t.turndown(html || '') : '';
+  } catch { return ''; }
 }
 
 function ensureToolbarStyles(): void {
@@ -442,9 +448,9 @@ export function mountEditableProse(opts: {
       flushToMd();
     }, 400);
   };
-  const flushToMd = () => {
+  const flushToMd = async () => {
     const html = host.innerHTML;
-    const md = htmlToMd(html);
+    const md = await htmlToMd(html);
     opts.setContent(md);
     opts.onChange?.();
     updateEmptyState(host);
@@ -491,10 +497,11 @@ export function mountEditableProse(opts: {
     if (html) {
       e.preventDefault();
       // Strip inline styles by routing via turndown → re-render via our MD pipeline
-      const md = htmlToMd(html);
-      const cleanHtml = renderProse(md);
-      document.execCommand('insertHTML', false, cleanHtml);
-      scheduleSync();
+      htmlToMd(html).then((md) => {
+        const cleanHtml = renderProse(md);
+        document.execCommand('insertHTML', false, cleanHtml);
+        scheduleSync();
+      });
     } else if (text) {
       // Plain text paste — default behaviour fine, but still trigger sync
       scheduleSync();
