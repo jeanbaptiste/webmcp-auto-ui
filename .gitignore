@@ -74,3 +74,8 @@ i18n-fix-*.md
 # RETEX / audits internes
 docs/retex/
 .bug-reports/
+
+# Local dev scripts (untracked)
+scripts/audit-widget-schemas.mjs
+scripts/smoke-test-widgets.mjs
+scripts/vm-monitoring/
