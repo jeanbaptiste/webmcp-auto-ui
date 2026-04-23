@@ -13,7 +13,7 @@
     buildDiscoveryCache, ContextRAG,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
-  import { LLMSelector, McpStatus, AgentProgress, WidgetRenderer, getTheme } from '@webmcp-auto-ui/ui';
+  import { LLMSelector, McpStatus, AgentProgress, WidgetRenderer, getTheme, toggleUIScale, isUIScaled, initUIScale } from '@webmcp-auto-ui/ui';
   import { tricoteusesServer } from '$lib/widgets/register';
   import { Sun, Moon } from 'lucide-svelte';
 
@@ -212,8 +212,12 @@
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
   }
 
+  let uiScaled = $state(false);
+  function toggleScale() { toggleUIScale(); uiScaled = isUIScaled(); }
+
   onMount(() => {
-    // Auto-connect MCP on mount
+    initUIScale();
+    uiScaled = isUIScaled();
     if (mcpUrl) connectMcp();
   });
 </script>
@@ -246,6 +250,11 @@
       {:else}
         <Moon size={14} />
       {/if}
+    </button>
+    <button class="h-7 w-8 flex items-center justify-center rounded border border-border2 text-[11px] font-mono text-text2 hover:text-text1 transition-colors flex-shrink-0"
+            class:bg-accent={uiScaled} class:text-bg={uiScaled} class:border-accent={uiScaled}
+            onclick={toggleScale} aria-label="Toggle UI scale" title={uiScaled ? 'Reset UI scale' : 'Scale UI up (2×)'}>
+      {uiScaled ? '1×' : '2×'}
     </button>
   </header>
 

@@ -5,6 +5,8 @@ export { default as ThemeProvider, getTheme } from './theme/ThemeProvider.svelte
 export type { ThemeJSON } from './theme/ThemeProvider.svelte';
 export { DARK_TOKENS, LIGHT_TOKENS, THEME_MAP } from './theme/tokens.js';
 export type { ThemeMode, ThemeOverrides, ThemeTokens } from './theme/tokens.js';
+export { getUIScale, setUIScale, toggleUIScale, initUIScale, isUIScaled } from './theme/scale.js';
+export type { UIScale, UIScaleKey } from './theme/scale.js';
 
 // Primitives
 export { default as Card } from './primitives/Card.svelte';

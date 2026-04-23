@@ -15,7 +15,7 @@
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, Recipe, McpRecipe, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
   import { autoui } from '@webmcp-auto-ui/agent';
-  import { McpStatus, LLMSelector, ModelLoader, RemoteMCPserversDemo, AgentConsole, THEME_MAP } from '@webmcp-auto-ui/ui';
+  import { McpStatus, LLMSelector, ModelLoader, RemoteMCPserversDemo, AgentConsole, THEME_MAP, toggleUIScale, isUIScaled, initUIScale } from '@webmcp-auto-ui/ui';
   import RecipeList from '$lib/RecipeList.svelte';
   import RecipeDetail from '$lib/RecipeDetail.svelte';
   import RecipePreview from '$lib/RecipePreview.svelte';
@@ -504,7 +504,12 @@
   });
 
   onMount(() => {
+    initUIScale();
+    uiScaled = isUIScaled();
   });
+
+  let uiScaled = $state(false);
+  function toggleScale() { toggleUIScale(); uiScaled = isUIScaled(); }
 
   function toggleTheme() {
     const root = document.documentElement;
@@ -571,6 +576,13 @@
       onclick={toggleTheme} aria-label="Toggle theme"
     >
       &#9788;
+    </button>
+    <button
+      class="font-mono text-[11px] h-7 w-8 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
+      class:bg-accent={uiScaled} class:text-bg={uiScaled} class:border-accent={uiScaled}
+      onclick={toggleScale} aria-label="Toggle UI scale" title={uiScaled ? 'Reset UI scale' : 'Scale UI up (2×)'}
+    >
+      {uiScaled ? '1×' : '2×'}
     </button>
   </header>
 

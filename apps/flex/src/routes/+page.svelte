@@ -22,7 +22,7 @@
     leafletServer, mermaidServer, pixijsServer,
     plotlyServer, roughServer, threejsServer,
   } from '@webmcp-auto-ui/servers';
-  import { McpStatus, ModelLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter } from '@webmcp-auto-ui/ui';
+  import { McpStatus, ModelLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter, toggleUIScale, isUIScaled, initUIScale } from '@webmcp-auto-ui/ui';
   import { Menu, Terminal, LayoutGrid, Paperclip, X as XIcon } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
@@ -1174,6 +1174,9 @@
     }
   }
 
+  let uiScaled = $state(false);
+  function toggleScale() { toggleUIScale(); uiScaled = isUIScaled(); }
+
   function toggleTheme() {
     const root = document.documentElement;
     const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
@@ -1191,6 +1194,8 @@
   let multiMcpBridge: MultiMcpBridge | null = null;
 
   onMount(() => {
+    initUIScale();
+    uiScaled = isUIScaled();
     (globalThis as any).__canvasVanilla = canvasVanilla;
     multiMcpBridge = installMultiMcpBridge({
       getCanvas: () => (globalThis as any).__canvasVanilla ?? canvasVanilla,
@@ -1263,6 +1268,11 @@
     {/if}
     <button class="font-mono text-xs h-7 px-2 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
             onclick={toggleTheme} aria-label="Toggle theme">*</button>
+    <button class="font-mono text-[11px] h-7 w-8 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
+            class:bg-accent={uiScaled} class:text-bg={uiScaled} class:border-accent={uiScaled}
+            onclick={toggleScale} aria-label="Toggle UI scale" title={uiScaled ? 'Reset UI scale' : 'Scale UI up (2×)'}>
+      {uiScaled ? '1×' : '2×'}
+    </button>
   </header>
 
   <!-- GEMMA LOADER -->
