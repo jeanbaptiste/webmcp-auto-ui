@@ -7,7 +7,7 @@
 <script lang="ts">
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
-  import { McpConnector, LLMSelector, SettingsPanel, RemoteMCPserversDemo, WebMCPserversList, DiagnosticModal, DiagnosticIcon, ModelCacheManager, DataServersPanel } from '@webmcp-auto-ui/ui';
+  import { McpConnector, LLMSelector, SettingsPanel, RemoteMCPserversDemo, WebMCPserversList, DiagnosticModal, DiagnosticIcon, ModelCacheManager } from '@webmcp-auto-ui/ui';
 
   const buildStamp = typeof __BUILD_TIME__ === 'string'
     ? __BUILD_TIME__.replace('T', ' ').replace('Z', '').slice(0, 23) : '';
@@ -175,9 +175,6 @@
         onconnect={onconnect}
       />
     </section>
-
-    <!-- Data servers (multi-MCP, bridge-managed) -->
-    <DataServersPanel />
 
     <!-- MCP demo servers -->
     <section class="flex flex-col gap-2">
