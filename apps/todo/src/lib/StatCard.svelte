@@ -2,7 +2,7 @@
   import { renderStatCard } from '@webmcp-auto-ui/ui';
 
   let { spec }: { spec: Record<string, unknown> } = $props();
-  let host: HTMLDivElement;
+  let host: HTMLDivElement | undefined = $state(undefined);
 
   $effect(() => {
     if (!host) return;

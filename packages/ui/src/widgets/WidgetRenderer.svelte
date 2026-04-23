@@ -13,14 +13,29 @@
   }
 
   // Safe clone for data passed to vanilla renderers — strips Svelte 5 $state
-  // proxies without crashing on BigInt / circular refs / undefined values.
+  // proxies, then falls back to a JSON pass that drops non-serializable values.
   function safeClone<T>(value: T): T {
     if (value === null || typeof value !== 'object') return value;
     try {
       return structuredClone(value);
-    } catch (err) {
-      console.warn('[WidgetRenderer] structuredClone failed, falling back to shallow copy', err);
-      return { ...(value as Record<string, unknown>) } as T;
+    } catch {
+      try {
+        const seen = new WeakSet<object>();
+        return JSON.parse(JSON.stringify(value, (_k, v) => {
+          if (v === null || v === undefined) return v;
+          const t = typeof v;
+          if (t === 'function' || t === 'symbol' || t === 'bigint') return undefined;
+          if (t !== 'object') return v;
+          if (typeof Node !== 'undefined' && v instanceof Node) return undefined;
+          if (typeof Window !== 'undefined' && v instanceof Window) return undefined;
+          if (typeof Event !== 'undefined' && v instanceof Event) return undefined;
+          if (seen.has(v)) return undefined;
+          seen.add(v);
+          return v;
+        })) as T;
+      } catch {
+        return value;
+      }
     }
   }
 
