@@ -125,6 +125,7 @@
 
   let diagModalOpen = $state(false);
   let mcpShowToken = $state(false);
+  let manualUrl = $state('');
 
   function toggleServer(id: string) {
     const next = new Set(enabledServers);
@@ -165,17 +166,15 @@
         </button>
       </div>
       <McpConnector
-        url={canvas.mcpUrl}
-        onurlchange={(v) => canvas.addMcpServer(v)}
+        url={manualUrl}
+        onurlchange={(v) => { manualUrl = v; canvas.addMcpServer(v); }}
         bind:token={mcpToken}
         bind:showToken={mcpShowToken}
-        connecting={canvas.mcpConnecting}
-        connected={canvas.mcpConnected}
-        serverName={canvas.dataServers.filter((s) => s.connected).length > 1
-          ? `multi-server (${canvas.dataServers.filter((s) => s.connected).length})`
-          : canvas.mcpName ?? ''}
+        connecting={!!manualUrl && canvas.dataServers.some((s) => s.url === manualUrl && !s.connected)}
+        connected={!!manualUrl && canvas.dataServers.some((s) => s.url === manualUrl && s.connected)}
+        serverName={manualUrl ? (canvas.dataServers.find((s) => s.url === manualUrl)?.name ?? '') : ''}
         onconnect={onconnect}
-        ondisconnect={() => canvas.dataServers.filter((s) => s.connected).forEach((s) => onremoveserver?.(s.url))}
+        ondisconnect={() => { if (manualUrl) onremoveserver?.(manualUrl); manualUrl = ''; }}
       />
     </section>
 
