@@ -12,12 +12,11 @@
     open: boolean;
     recipe: RecipeData | null;
     onclose: () => void;
-    multiClient?: McpMultiClient;
     /** If provided and found in a segment's content, scroll to and briefly highlight that segment. */
     anchorText?: string;
   }
 
-  let { open = $bindable(false), recipe, onclose, multiClient, anchorText = undefined }: Props = $props();
+  let { open = $bindable(false), recipe, onclose, anchorText = undefined }: Props = $props();
 
   /** True when the recipe is an MCP recipe (no body/when/layout — only name+description) */
   const isMcpRecipe = $derived(
@@ -116,7 +115,8 @@
       result: { status: 'running', logs: [], startedAt: performance.now() },
     };
     runs = [...runs];
-    const result = await runCode(tab.code, tab.lang, multiClient);
+    const multi = (globalThis as unknown as { __multiMcp?: { multiClient: McpMultiClient } }).__multiMcp?.multiClient;
+    const result = await runCode(tab.code, tab.lang, multi);
     runs[idx] = { ...tab, result };
     runs = [...runs];
   }
@@ -230,7 +230,6 @@
                       <RecipeCodeBlock
                         code={seg.content}
                         lang={seg.lang ?? 'text'}
-                        {multiClient}
                         onrun={(payload) => handleBlockRun(i, payload)}
                       />
                     {/if}

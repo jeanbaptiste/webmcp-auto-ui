@@ -4,7 +4,8 @@
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { listSkills, encodeHyperSkill } from '@webmcp-auto-ui/sdk';
   import type { Skill, HyperSkill, RecipeData } from '@webmcp-auto-ui/sdk';
-  import { McpMultiClient, installMultiMcpBridge, MultiMcpBridge } from '@webmcp-auto-ui/core';
+  import { installMultiMcpBridge, MultiMcpBridge } from '@webmcp-auto-ui/core';
+  import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
   import {
     RemoteLLMProvider, WasmProvider, TransformersProvider, LocalLLMProvider, HawkProvider, runAgentLoop, buildSystemPrompt,
@@ -422,7 +423,11 @@
   let allToolsUsed = $state<string[]>([]);
 
   // ── Multi-MCP ─────────────────────────────────────────────────────
-  let multiClient = $state<McpMultiClient>(new McpMultiClient());
+  // The real McpMultiClient is owned by the singleton bridge at
+  // globalThis.__multiMcp (installed in onMount below). We keep a local
+  // nullable reference, assigned once the bridge is ready, so downstream
+  // $derived / template code can read it directly.
+  let multiClient = $state<McpMultiClient | null>(null);
   let connectedUrls = $state<string[]>([]);
   let loadingUrls = $state<string[]>([]);
   /** Single discovery cache shared between UI and agent loop */
@@ -432,9 +437,9 @@
   /** Merged recipes from discovery cache, with duplicate-name prefixing and serverUrl mapping */
   const mcpRecipes = $derived.by(() => {
     cacheVersion; // reactivity trigger
-    const mcpServerNames = new Set(multiClient.listServers().map(s => s.name));
+    const mcpServerNames = new Set((multiClient?.listServers() ?? []).map(s => s.name));
     const all = discoveryCache.allRecipes().filter(r => r.server && mcpServerNames.has(r.server));
-    const servers = multiClient.listServers();
+    const servers = multiClient?.listServers() ?? [];
     const nameToUrl = new Map(servers.map(s => [s.name, s.url]));
     const nameCounts = new Map<string, number>();
     for (const r of all) nameCounts.set(r.name, (nameCounts.get(r.name) ?? 0) + 1);
@@ -474,17 +479,25 @@
   async function addMcpServer(url: string) {
     if (!url.trim()) return;
     loadingUrls = [...loadingUrls, url];
-    canvas.setMcpConnecting(true);
+    // Provisional canvas entry so UI can show "connecting". The app owns the
+    // real MCP client (multiClient); keep enabled=false so the singleton bridge
+    // does not try a parallel handshake on the same URL.
+    const provisionalName = canvas.addMcpServer(url.trim());
+    canvas.setDataServerEnabled(provisionalName, false);
+    canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
     try {
       const opts = mcpToken.trim() ? { headers: { Authorization: `Bearer ${mcpToken.trim()}` } } : undefined;
-      const { tools } = await multiClient.addServer(url.trim(), opts);
+      if (!multiClient) throw new Error('MCP bridge not ready');
+      const { name: serverName, tools } = await multiClient.addServer(url.trim(), opts);
       connectedUrls = [...connectedUrls, url];
-      const allTools = multiClient.listAllTools();
-      canvas.setMcpConnected(true, multiClient.listServers().map(s => s.name).join(', '), allTools as Parameters<typeof canvas.setMcpConnected>[2]);
+      canvas.setDataServerMeta(provisionalName, {
+        connected: true, connecting: false,
+        tools: tools as any,
+        error: undefined,
+      });
 
       // Register server tools + recipes in the discovery cache
       const server = multiClient.listServers().find(s => s.url === url.trim());
-      const serverName = server?.name ?? url.trim();
       const cacheTools = (server?.tools ?? []).map((t: any) => ({
         name: t.name,
         description: t.description,
@@ -510,14 +523,17 @@
       discoveryCache.register(serverName, { recipes: cacheRecipes, tools: cacheTools });
       cacheVersion++;
     } catch(e) {
-      canvas.setMcpError(e instanceof Error ? e.message : String(e));
+      canvas.setDataServerMeta(provisionalName, {
+        connected: false, connecting: false,
+        error: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       loadingUrls = loadingUrls.filter(u => u !== url);
-      canvas.setMcpConnecting(false);
     }
   }
 
   async function removeMcpServer(url: string) {
+    if (!multiClient) return;
     const server = multiClient.listServers().find(s => s.url === url);
     await multiClient.removeServer(url);
     connectedUrls = connectedUrls.filter(u => u !== url);
@@ -525,12 +541,7 @@
     if (server) {
       discoveryCache.register(server.name, { recipes: [], tools: [] });
       cacheVersion++;
-    }
-    if (multiClient.serverCount === 0) {
-      canvas.setMcpConnected(false, '', []);
-    } else {
-      const allTools = multiClient.listAllTools();
-      canvas.setMcpConnected(true, multiClient.listServers().map(s => s.name).join(', '), allTools as Parameters<typeof canvas.setMcpConnected>[2]);
+      canvas.removeDataServer(server.name);
     }
   }
 
@@ -686,7 +697,7 @@
     cacheVersion; // reactivity trigger for discoveryCache changes
     const result: ToolLayer[] = [];
     if (canvas.mcpConnected) {
-      for (const server of multiClient.listServers()) {
+      for (const server of (multiClient?.listServers() ?? [])) {
         const serverRecipes = discoveryCache.recipesFor(server.name);
         result.push({
           protocol: 'mcp',
@@ -744,13 +755,13 @@
   const toolCountByServer = $derived.by(() => {
     cacheVersion; // reactivity trigger
     return Object.fromEntries(
-      multiClient.listServers().map(s => [s.url, discoveryCache.browsableToolCount(s.name)])
+      (multiClient?.listServers() ?? []).map(s => [s.url, discoveryCache.browsableToolCount(s.name)])
     );
   });
   const recipeCountByServer = $derived.by(() => {
     cacheVersion; // reactivity trigger
     return Object.fromEntries(
-      multiClient.listServers().map(s => [s.url, discoveryCache.recipeCount(s.name)])
+      (multiClient?.listServers() ?? []).map(s => [s.url, discoveryCache.recipeCount(s.name)])
     );
   });
   // Same as above, but for WebMCP servers. Keyed by srv.id (which matches
@@ -850,7 +861,7 @@
             const result = await summarizeChat({
               messages: conversationHistory, provider: getProvider(),
               toolsUsed: allToolsUsed, toolCallCount: chatToolCount,
-              mcpServers: multiClient.listServers().map(s => ({ name: s.name, url: s.url })),
+              mcpServers: (multiClient?.listServers() ?? []).map(s => ({ name: s.name, url: s.url })),
               skillsReferenced: skills.map(s => s.name),
             });
             const enriched = { ...skill, chatSummary: result.chatSummary, provenance: result.provenance };
@@ -973,7 +984,7 @@
 
     try {
       result = await runAgentLoop(userTurn, {
-        client: multiClient.hasConnections ? multiClient as any : undefined,
+        client: multiClient?.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: effectivePrompt || undefined,
         maxIterations: 15, maxTokens, maxResultLength: maxResultLength >= 50000 ? Infinity : maxResultLength, temperature, topK, cacheEnabled,
@@ -1200,6 +1211,7 @@
       getCanvas: () => (globalThis as any).__canvasVanilla ?? canvasVanilla,
       log: (msg: string, data?: unknown) => { try { console.log(msg, data ?? ''); } catch {} },
     });
+    multiClient = multiMcpBridge.multiClient;
 
     const param = new URLSearchParams(window.location.search).get('hs');
     if (param) {
@@ -1256,7 +1268,7 @@
       connecting={canvas.mcpConnecting}
       connected={canvas.mcpConnected}
       name={canvas.mcpName ?? 'not connected'}
-      servers={multiClient.listServers().map(s => ({ url: s.url, name: s.name, toolCount: s.tools.length }))}
+      servers={(multiClient?.listServers() ?? []).map(s => ({ url: s.url, name: s.name, toolCount: s.tools.length }))}
       onclick={() => { recipeBrowserOpen = true; recipeBrowserFilter = ''; }}
     />
     {#if gemmaStatus === 'ready'}
@@ -1379,9 +1391,9 @@
   {webmcpRecipes}
   onbrowserecipes={() => { settingsOpen = false; recipeBrowserOpen = true; recipeBrowserFilter = ''; }}
   {recipeCountByServer}
-  onrecipeclick={(url) => { settingsOpen = false; recipeBrowserOpen = true; recipeBrowserFilter = multiClient.listServers().find(s => s.url === url)?.name ?? ''; }}
+  onrecipeclick={(url) => { settingsOpen = false; recipeBrowserOpen = true; recipeBrowserFilter = (multiClient?.listServers() ?? []).find(s => s.url === url)?.name ?? ''; }}
   {toolCountByServer}
-  ontoolclick={(url) => { settingsOpen = false; toolBrowserOpen = true; const srv = multiClient.listServers().find(s => s.url === url); toolBrowserFilter = srv?.name ?? ''; }}
+  ontoolclick={(url) => { settingsOpen = false; toolBrowserOpen = true; const srv = (multiClient?.listServers() ?? []).find(s => s.url === url); toolBrowserFilter = srv?.name ?? ''; }}
   {webmcpRecipeCountByServer}
   {webmcpToolCountByServer}
   onwebmcprecipeclick={(id) => {
@@ -1466,7 +1478,6 @@
   {mcpRecipes}
   {webmcpRecipes}
   initialFilter={recipeBrowserFilter}
-  {multiClient}
   onOpenInNotebook={(type, data) => { flexGrid?.addBlock(type, data, undefined, type); }}
 />
 
@@ -1476,7 +1487,6 @@
   recipe={detailRecipe}
   anchorText={detailAnchor}
   onclose={() => { detailOpen = false; detailAnchor = undefined; }}
-  {multiClient}
 />
 
 <ToolBrowser bind:open={toolBrowserOpen} tools={browsableTools} initialFilter={toolBrowserFilter} />

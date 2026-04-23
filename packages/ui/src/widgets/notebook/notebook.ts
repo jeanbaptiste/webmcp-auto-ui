@@ -11,7 +11,7 @@ import {
   addImportedCells, registerExecutor, collectDataServers,
   autosize, openShareModal, registerHistoryObserver,
   renderCellLogs,
-  createPublishControls, autoConnectFrontmatterServers, bootstrapMcpBridge,
+  createPublishControls, autoConnectFrontmatterServers,
   createRuntimeOverlay, effectiveResult, cellRuntimeStatus,
   lastRefreshedAt, bootstrapLiveRefresh, fmtRelTime, preserveScrollAround,
   type NotebookState, type NotebookCell, type CellResult, type CellExecContext,
@@ -174,12 +174,19 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       MultiMcpBridgeCtor: MultiMcpBridge as any,
       onCellChange: (cellId) => {
         const node = cellsEl.querySelector(`[data-id="${cellId}"]`) as HTMLElement | null;
-        if (!node) { renderCells(); return; }
+        if (!node) {
+          const restore = preserveScrollAround(cellsEl);
+          renderCells();
+          restore();
+          return;
+        }
         const idx = state.cells.findIndex((c) => c.id === cellId);
         if (idx < 0) return;
+        const restore = preserveScrollAround(cellsEl);
         const fresh = renderCell(state.cells[idx], state, overlay, rerender);
         fresh.addEventListener('focusin', () => { lastActiveIdx = idx; });
         node.replaceWith(fresh);
+        restore();
       },
       onTick: () => {
         renderLiveBadge();
@@ -287,12 +294,9 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     },
   });
 
-  // Auto-connect data servers declared in the recipe frontmatter (data.servers)
+  // Auto-connect data servers declared in the recipe frontmatter (data.servers).
+  // The notebook reads MCP state passively from globalThis.__multiMcp (singleton).
   autoConnectFrontmatterServers(data, () => pane.setServers(collectDataServers(data)));
-
-  // Start a persistent MCP bridge so the sql executor can find tools in edit mode
-  // too (not just when live-refresh is running in view mode).
-  const mcpBridgeCleanup = bootstrapMcpBridge({ data, MultiMcpBridgeCtor: MultiMcpBridge as any });
 
   // Keep pane servers in sync with canvas changes
   let canvasUnsub: (() => void) | null = null;
@@ -320,7 +324,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     pane.destroy();
     publishCleanup();
     liveCleanup?.();
-    mcpBridgeCleanup();
   };
 }
 

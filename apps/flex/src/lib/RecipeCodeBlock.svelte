@@ -8,7 +8,6 @@
   interface Props {
     code: string;
     lang?: string;
-    multiClient?: McpMultiClient;
     /** Called when user clicks Run; receives the final RunResult + context. */
     onrun?: (payload: { code: string; lang: string; result: RunResult }) => void;
   }
@@ -16,7 +15,6 @@
   let {
     code = '',
     lang = 'text',
-    multiClient,
     onrun,
   }: Props = $props();
 
@@ -77,7 +75,8 @@
     const t0 = performance.now();
     startTimer(t0);
 
-    const result = await runCode(editable, lang, multiClient);
+    const multi = (globalThis as unknown as { __multiMcp?: { multiClient: McpMultiClient } }).__multiMcp?.multiClient;
+    const result = await runCode(editable, lang, multi);
 
     stopTimer();
     lastDuration = result.durationMs;

@@ -1,4 +1,3 @@
-import { McpMultiClient } from '@webmcp-auto-ui/core';
 import {
   RemoteLLMProvider, HawkProvider, runAgentLoop, buildSystemPrompt,
   fromMcpTools, autoui,
@@ -6,9 +5,6 @@ import {
 import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
 import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 import { tricoteusesServer } from './widgets/register';
-
-// ── Multi-MCP client ──────────────────────────────────────────────────
-export const multiClient = new McpMultiClient();
 
 // ── Anthropic provider via local proxy ────────────────────────────────
 export function createProvider(proxyUrl: string, model?: string) {
@@ -21,11 +17,14 @@ export function createProvider(proxyUrl: string, model?: string) {
 }
 
 // ── Build tool layers from connected MCP servers + local WebMCP ───────
+// Reads MCP server tools from the canvas store (populated by the singleton
+// bridge at globalThis.__multiMcp) instead of owning a local McpMultiClient.
 export function buildLayers(): ToolLayer[] {
   const result: ToolLayer[] = [];
 
-  // MCP servers (remote)
-  for (const server of multiClient.listServers()) {
+  // MCP servers (remote) — read from canvas.dataServers (bridge-managed)
+  for (const server of canvas.dataServers) {
+    if (!server.connected || !Array.isArray(server.tools)) continue;
     const mcpLayer: McpLayer = {
       protocol: 'mcp',
       serverName: server.name,

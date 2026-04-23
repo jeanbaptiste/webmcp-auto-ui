@@ -4,7 +4,9 @@
  * Generated blocks are stored here for the page to render.
  */
 import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-import { McpMultiClient } from '@webmcp-auto-ui/core';
+import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
+import { installMultiMcpBridge, MultiMcpBridge } from '@webmcp-auto-ui/core';
+import type { McpMultiClient } from '@webmcp-auto-ui/core';
 import {
   RemoteLLMProvider,
   HawkProvider,
@@ -29,7 +31,23 @@ export interface GeneratedBlock {
 }
 
 // ── Singleton state ────────────────────────────────────────────────────────
-let multiClient = $state(new McpMultiClient());
+// The McpMultiClient is owned by the global bridge at globalThis.__multiMcp.
+// It is installed lazily on first access (ensureBridge) — this store module
+// may load before the first component mount.
+let multiMcpBridge: MultiMcpBridge | null = null;
+function ensureBridge(): MultiMcpBridge {
+  if (multiMcpBridge) return multiMcpBridge;
+  if (typeof globalThis !== 'undefined') {
+    (globalThis as any).__canvasVanilla = canvasVanilla;
+  }
+  multiMcpBridge = installMultiMcpBridge({
+    getCanvas: () => (globalThis as any).__canvasVanilla ?? canvasVanilla,
+  });
+  return multiMcpBridge;
+}
+function getMultiClient(): McpMultiClient {
+  return ensureBridge().multiClient;
+}
 let connectedUrl = $state('');
 let connecting = $state(false);
 let connectError = $state('');
@@ -186,7 +204,7 @@ export const agentStore = {
   get gemmaElapsed() { return gemmaElapsed; },
   get gemmaLoadedMB() { return gemmaLoadedMB; },
   get gemmaTotalMB() { return gemmaTotalMB; },
-  get multiClient() { return multiClient; },
+  get multiClient() { return getMultiClient(); },
   get contextRAGEnabled() { return contextRAGEnabled; },
   set contextRAGEnabled(v: boolean) { setContextRAGEnabled(v); },
 
@@ -214,26 +232,35 @@ export const agentStore = {
     }
     connecting = true;
     connectError = '';
-    canvas.setMcpConnecting(true);
+    const provisionalName = canvas.addMcpServer(url.trim());
+    canvas.setDataServerEnabled(provisionalName, false);
+    canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
     try {
-      const { name, tools } = await multiClient.addServer(url.trim());
+      const { tools } = await getMultiClient().addServer(url.trim());
       connectedUrl = url;
-      canvas.setMcpConnected(true, name, tools as Parameters<typeof canvas.setMcpConnected>[2]);
+      canvas.setDataServerMeta(provisionalName, {
+        connected: true, connecting: false,
+        tools: tools as any,
+        error: undefined,
+      });
     } catch (e) {
       connectError = e instanceof Error ? e.message : String(e);
-      canvas.setMcpError(connectError);
+      canvas.setDataServerMeta(provisionalName, {
+        connected: false, connecting: false,
+        error: connectError,
+      });
     } finally {
       connecting = false;
-      canvas.setMcpConnecting(false);
     }
   },
 
   /** Disconnect from MCP server */
   async disconnect() {
     if (connectedUrl) {
-      await multiClient.removeServer(connectedUrl);
+      const entry = canvas.dataServers.find(s => s.url === connectedUrl);
+      await getMultiClient().removeServer(connectedUrl);
       connectedUrl = '';
-      canvas.setMcpConnected(false, '', []);
+      if (entry) canvas.removeDataServer(entry.name);
     }
   },
 
@@ -270,7 +297,7 @@ export const agentStore = {
     const layers: ToolLayer[] = [];
 
     if (canvas.mcpConnected) {
-      for (const server of multiClient.listServers()) {
+      for (const server of getMultiClient().listServers()) {
         const mcpLayer: McpLayer = {
           protocol: 'mcp',
           serverName: server.name,
@@ -291,7 +318,7 @@ export const agentStore = {
       const result = await runAgentLoop(
         `Explore the MCP server "${canvas.mcpName}" and create a demo page with at least 6 varied UI components using real data. Use stat, chart, data-table, list, kv, timeline, cards, etc.`,
         {
-          client: multiClient as Parameters<typeof runAgentLoop>[1]['client'],
+          client: getMultiClient() as Parameters<typeof runAgentLoop>[1]['client'],
           provider: getProvider(),
           systemPrompt,
           maxIterations: 15,

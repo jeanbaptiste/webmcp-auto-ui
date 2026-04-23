@@ -25,11 +25,14 @@
     mcpRecipes: RecipeItem[];
     webmcpRecipes: RecipeItem[];
     initialFilter?: string;
-    multiClient?: McpMultiClient;
     onOpenInNotebook?: (type: string, data: Record<string, unknown>) => void;
   }
 
-  let { open = $bindable(false), mcpRecipes = [], webmcpRecipes = [], initialFilter = '', multiClient, onOpenInNotebook }: Props = $props();
+  let { open = $bindable(false), mcpRecipes = [], webmcpRecipes = [], initialFilter = '', onOpenInNotebook }: Props = $props();
+
+  function getMultiClient(): McpMultiClient | undefined {
+    return (globalThis as unknown as { __multiMcp?: { multiClient: McpMultiClient } }).__multiMcp?.multiClient;
+  }
 
   let query = $state('');
   let selected = $state<RecipeItem | null>(null);
@@ -75,6 +78,7 @@
   }
 
   async function openRecipe(recipe: RecipeItem) {
+    const multiClient = getMultiClient();
     if (!recipe.body && recipe.serverUrl && multiClient) {
       try {
         const identifier = recipe.originalName ?? recipe.name;
@@ -102,6 +106,7 @@
   }
 
   async function ensureBody(recipe: RecipeItem) {
+    const multiClient = getMultiClient();
     if (recipe.body || !recipe.serverUrl || !multiClient) return;
     try {
       const identifier = recipe.originalName ?? recipe.name;
@@ -134,7 +139,7 @@
       description: recipe.description,
     });
 
-    const connected = multiClient?.listServers() ?? [];
+    const connected = getMultiClient()?.listServers() ?? [];
     const serverNames = Array.isArray(recipe.servers) ? recipe.servers : [];
     const servers = serverNames
       .map((name) => {
@@ -311,6 +316,5 @@
 <RecipeModal
   bind:open={recipeModalOpen}
   recipe={selected as RecipeData | null}
-  {multiClient}
   onclose={() => { recipeModalOpen = false; selected = null; }}
 />

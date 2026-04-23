@@ -5,7 +5,9 @@
   import { onMount, onDestroy, untrack } from 'svelte';
   import { base } from '$app/paths';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-  import { McpMultiClient } from '@webmcp-auto-ui/core';
+  import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
+  import { installMultiMcpBridge, MultiMcpBridge } from '@webmcp-auto-ui/core';
+  import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
   import {
     RemoteLLMProvider, HawkProvider, WasmProvider, runAgentLoop, buildSystemPrompt,
@@ -24,8 +26,9 @@
   let selectedId = $state<string | null>(null);
   let selectedSource = $state<'local' | 'mcp'>('local');
 
-  // MCP
-  let multiClient = $state<McpMultiClient>(new McpMultiClient());
+  // MCP — singleton McpMultiClient owned by the global bridge.
+  let multiMcpBridge: MultiMcpBridge | null = null;
+  let multiClient = $state<McpMultiClient | null>(null);
   let connectedUrls = $state<string[]>([]);
   let loadingUrls = $state<string[]>([]);
   let mcpRecipes = $state<McpRecipe[]>([]);
@@ -236,18 +239,24 @@
   async function addMcpServer(url: string) {
     if (!url.trim()) return;
     loadingUrls = [...loadingUrls, url];
-    canvas.setMcpConnecting(true);
+    const provisionalName = canvas.addMcpServer(url.trim());
+    canvas.setDataServerEnabled(provisionalName, false);
+    canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
     try {
       const opts = mcpToken.trim() ? { headers: { Authorization: `Bearer ${mcpToken.trim()}` } } : undefined;
+      if (!multiClient) throw new Error('MCP bridge not ready');
       const { tools } = await multiClient.addServer(url.trim(), opts);
       connectedUrls = [...connectedUrls, url];
-      const allTools = multiClient.listAllTools();
-      canvas.setMcpConnected(true, multiClient.listServers().map(s => s.name).join(', '), allTools as Parameters<typeof canvas.setMcpConnected>[2]);
+      canvas.setDataServerMeta(provisionalName, {
+        connected: true, connecting: false,
+        tools: tools as any,
+        error: undefined,
+      });
 
       // Load recipes if server has list_recipes
       if (tools.some(t => t.name === 'list_recipes')) {
         try {
-          const r = await multiClient.callToolOn(url.trim(), 'list_recipes', {});
+          const r = await multiClient!.callToolOn(url.trim(), 'list_recipes', {});
           const text = r.content?.find((c: any) => c.type === 'text') as any;
           if (text?.text) {
             const parsed = JSON.parse(text.text);
@@ -258,23 +267,27 @@
         } catch { /* no recipes */ }
       }
     } catch (e) {
-      canvas.setMcpError(e instanceof Error ? e.message : String(e));
+      canvas.setDataServerMeta(provisionalName, {
+        connected: false, connecting: false,
+        error: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       loadingUrls = loadingUrls.filter(u => u !== url);
-      canvas.setMcpConnecting(false);
     }
   }
 
   async function removeMcpServer(url: string) {
+    if (!multiClient) return;
+    const server = multiClient.listServers().find(s => s.url === url);
     await multiClient.removeServer(url);
     connectedUrls = connectedUrls.filter(u => u !== url);
     if (multiClient.serverCount === 0) {
-      canvas.setMcpConnected(false, '', []);
       mcpRecipes = []; // TODO: track recipes per-server like flex (mcpRecipesByServer Map)
-    } else {
-      const allTools = multiClient.listAllTools();
-      canvas.setMcpConnected(true, multiClient.listServers().map(s => s.name).join(', '), allTools as Parameters<typeof canvas.setMcpConnected>[2]);
     }
+    // Locate canvas entry by URL (provisional name was URL-host based)
+    const entry = canvas.dataServers.find(s => s.url === url);
+    if (entry) canvas.removeDataServer(entry.name);
+    void server;
   }
 
   async function addAllServers() {
@@ -290,7 +303,7 @@
     const result: ToolLayer[] = [];
     if (canvas.mcpConnected) {
       let recipesAttached = false;
-      for (const server of multiClient.listServers()) {
+      for (const server of (multiClient?.listServers() ?? [])) {
         const mcpLayer: McpLayer = {
           protocol: 'mcp',
           serverName: server.name,
@@ -379,7 +392,7 @@
       const systemPrompt = buildSystemPrompt(layers, { providerKind });
 
       const result = await runAgentLoop(prompt, {
-        client: multiClient.hasConnections ? multiClient as any : undefined,
+        client: multiClient?.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: systemPrompt || undefined,
         maxIterations: 15,
@@ -501,11 +514,17 @@
       clearInterval(gemmaTimerInterval);
       gemmaTimerInterval = null;
     }
+    if (multiMcpBridge) { try { multiMcpBridge.stop(); } catch {} multiMcpBridge = null; }
   });
 
   onMount(() => {
     initUIScale();
     uiScaled = isUIScaled();
+    (globalThis as any).__canvasVanilla = canvasVanilla;
+    multiMcpBridge = installMultiMcpBridge({
+      getCanvas: () => (globalThis as any).__canvasVanilla ?? canvasVanilla,
+    });
+    multiClient = multiMcpBridge.multiClient;
   });
 
   let uiScaled = $state(false);

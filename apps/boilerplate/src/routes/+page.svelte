@@ -2,11 +2,12 @@
   declare const __BUILD_TIME__: string;
   declare const __GIT_HASH__: string;
 
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { base } from '$app/paths';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-  import { McpMultiClient } from '@webmcp-auto-ui/core';
-  import type { WebMcpServer } from '@webmcp-auto-ui/core';
+  import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
+  import { installMultiMcpBridge, MultiMcpBridge } from '@webmcp-auto-ui/core';
+  import type { McpMultiClient, WebMcpServer } from '@webmcp-auto-ui/core';
   import {
     RemoteLLMProvider, HawkProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, autoui,
@@ -44,7 +45,8 @@
   const theme = getTheme();
 
   // ── Multi-MCP ─────────────────────────────────────────────────────────
-  let multiClient = $state<McpMultiClient>(new McpMultiClient());
+  let multiMcpBridge: MultiMcpBridge | null = null;
+  let multiClient = $state<McpMultiClient | null>(null);
   let connected = $state(false);
   let connecting = $state(false);
   let mcpName = $state('');
@@ -72,7 +74,7 @@
   const layers = $derived.by((): ToolLayer[] => {
     const result: ToolLayer[] = [];
     if (connected) {
-      for (const server of multiClient.listServers()) {
+      for (const server of (multiClient?.listServers() ?? [])) {
         const mcpLayer: McpLayer = {
           protocol: 'mcp',
           serverName: server.name,
@@ -145,17 +147,26 @@
   async function connectMcp() {
     if (!mcpUrl.trim() || connecting) return;
     connecting = true;
-    canvas.setMcpConnecting(true);
+    const provisionalName = canvas.addMcpServer(mcpUrl.trim());
+    canvas.setDataServerEnabled(provisionalName, false);
+    canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
     try {
+      if (!multiClient) throw new Error('MCP bridge not ready');
       const { tools } = await multiClient.addServer(mcpUrl.trim());
       connected = true;
       mcpName = multiClient.listServers().map(s => s.name).join(', ');
-      canvas.setMcpConnected(true, mcpName, tools as Parameters<typeof canvas.setMcpConnected>[2]);
+      canvas.setDataServerMeta(provisionalName, {
+        connected: true, connecting: false,
+        tools: tools as any,
+        error: undefined,
+      });
     } catch (e) {
-      canvas.setMcpError(e instanceof Error ? e.message : String(e));
+      canvas.setDataServerMeta(provisionalName, {
+        connected: false, connecting: false,
+        error: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       connecting = false;
-      canvas.setMcpConnecting(false);
     }
   }
 
@@ -170,7 +181,7 @@
 
     try {
       const result = await runAgentLoop(msg, {
-        client: multiClient.hasConnections ? multiClient as any : undefined,
+        client: multiClient?.hasConnections ? multiClient as any : undefined,
         provider: getProvider(),
         systemPrompt: systemPrompt || undefined,
         maxIterations: 10,
@@ -218,7 +229,16 @@
   onMount(() => {
     initUIScale();
     uiScaled = isUIScaled();
+    (globalThis as any).__canvasVanilla = canvasVanilla;
+    multiMcpBridge = installMultiMcpBridge({
+      getCanvas: () => (globalThis as any).__canvasVanilla ?? canvasVanilla,
+    });
+    multiClient = multiMcpBridge.multiClient;
     if (mcpUrl) connectMcp();
+  });
+
+  onDestroy(() => {
+    if (multiMcpBridge) { try { multiMcpBridge.stop(); } catch {} multiMcpBridge = null; }
   });
 </script>
 
@@ -236,7 +256,7 @@
       connecting={canvas.mcpConnecting}
       connected={canvas.mcpConnected}
       name={mcpName || 'non connecte'}
-      servers={multiClient.listServers().map(s => ({ url: s.url, name: s.name, toolCount: s.tools.length }))}
+      servers={(multiClient?.listServers() ?? []).map(s => ({ url: s.url, name: s.name, toolCount: s.tools.length }))}
     />
     <label class="flex items-center gap-1.5 font-mono text-xs text-text2 cursor-pointer flex-shrink-0">
       <input type="checkbox" bind:checked={contextRAGEnabled} class="accent-accent w-3.5 h-3.5" />

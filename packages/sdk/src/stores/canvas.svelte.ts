@@ -101,11 +101,6 @@ function createCanvas() {
     updateMsg: canvasVanilla.updateMsg.bind(canvasVanilla),
     clearMessages: canvasVanilla.clearMessages.bind(canvasVanilla),
 
-    // MCP
-    setMcpConnecting: canvasVanilla.setMcpConnecting.bind(canvasVanilla),
-    setMcpConnected: canvasVanilla.setMcpConnected.bind(canvasVanilla),
-    setMcpError: canvasVanilla.setMcpError.bind(canvasVanilla),
-
     // Theme
     get themeOverrides() { return themeOverrides; },
     setThemeOverrides: canvasVanilla.setThemeOverrides.bind(canvasVanilla),
@@ -118,6 +113,7 @@ function createCanvas() {
     get dataServers() { return dataServers; },
     set dataServers(v: DataServer[]) { canvasVanilla.dataServers = v; },
     addDataServer: canvasVanilla.addDataServer.bind(canvasVanilla),
+    addMcpServer: canvasVanilla.addMcpServer.bind(canvasVanilla),
     removeDataServer: canvasVanilla.removeDataServer.bind(canvasVanilla),
     getDataServer: canvasVanilla.getDataServer.bind(canvasVanilla),
     setDataServerMeta: canvasVanilla.setDataServerMeta.bind(canvasVanilla),

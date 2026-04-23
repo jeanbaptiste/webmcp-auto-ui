@@ -10,17 +10,15 @@
  *
  * Historically this store had TWO parallel surfaces for MCP servers:
  *   - `mcpUrl` / `mcpName` / `mcpConnected` / `mcpConnecting` / `mcpTools`
- *     (flat, single-server or comma-joined multi)
+ *     (flat, single-server or comma-joined multi) driven by legacy
+ *     `setMcpConnected`/`setMcpConnecting`/`setMcpError` setters.
  *   - `dataServers: DataServer[]` (list, managed by MultiMcpBridge)
  *
- * They were actually the same concept. This file now stores a single list
- * (`_servers`) and derives the flat `mcp*` fields from it. All writes (via
- * `setMcpConnected`, `addDataServer`, etc.) mutate the same underlying list,
- * so tools populated by the agent-MCP path are visible to the notebook / data
- * server consumers and vice-versa.
- *
- * The public API shape is preserved (both `mcp*` and `dataServers` / `addDataServer`)
- * so existing apps keep working without modification.
+ * They were the same concept. The legacy setters and the `primary` flag have
+ * been removed; writes go through `addDataServer` / `setDataServerMeta` /
+ * `setDataServerEnabled` / `addMcpServer` (url shorthand) exclusively. Flat
+ * getters (`mcpConnected`, `mcpName`, `mcpUrl`, `mcpConnecting`, `mcpTools`)
+ * remain as read-only derivations over the server list for UI back-compat.
  */
 
 import { encode, decode } from '../hyperskills.js';
@@ -62,9 +60,8 @@ export interface McpToolInfo {
 
 /**
  * Single MCP server entry — the one true shape.
- * `primary: true` marks the "agent MCP" (used by the chat/tool-call path) —
- * at most one server may be primary. Additional servers (data-only) are
- * non-primary but otherwise identical.
+ * All servers are equal; there is no "primary" concept. The MultiMcpBridge
+ * singleton reconciles connection state across all entries.
  */
 export interface DataServer {
   name: string;         // user-chosen label
@@ -73,7 +70,6 @@ export interface DataServer {
   enabled: boolean;     // user intent
   connected: boolean;   // handshake completed
   connecting?: boolean;
-  primary?: boolean;    // agent MCP when true
   tools?: McpToolInfo[];
   recipes?: { name: string; description?: string; body?: string }[];
   error?: string;
@@ -124,9 +120,6 @@ function createCanvasVanilla() {
   let _servers: DataServer[] = [];
 
   // ── Helpers over _servers ──────────────────────────────────────────────
-  function primaryServer(): DataServer | undefined {
-    return _servers.find((s) => s.primary);
-  }
   function connectedServers(): DataServer[] {
     return _servers.filter((s) => s.connected);
   }
@@ -162,31 +155,33 @@ function createCanvasVanilla() {
   }
 
   // ── Server list actions (public, stable) ───────────────────────────────
-  function addDataServer(desc: { name: string; url: string; primary?: boolean }): DataServer {
+  function addDataServer(desc: { name: string; url: string }): DataServer {
     const existing = _servers.find((s) => s.name === desc.name);
-    if (existing) {
-      if (desc.primary && !existing.primary) {
-        // Promote: there's only one primary. Demote others.
-        _servers = _servers.map((s) => ({ ...s, primary: s.name === desc.name }));
-        notify();
-      }
-      return existing;
-    }
+    if (existing) return existing;
     const srv: DataServer = {
       name: desc.name,
       url: desc.url,
       kind: 'data',
       enabled: true,
       connected: false,
-      primary: !!desc.primary,
     };
-    if (srv.primary) {
-      // Demote any existing primary before inserting.
-      _servers = _servers.map((s) => ({ ...s, primary: false }));
-    }
     _servers = [..._servers, srv];
     notify();
     return srv;
+  }
+
+  /**
+   * Add a server by URL alone (derives name from the URL host). Returns the
+   * canvas name so callers can reference it later.
+   */
+  function addMcpServer(url: string): string {
+    if (!url) return '';
+    let name: string;
+    try { name = new URL(url, 'http://local').host || url; }
+    catch { name = url; }
+    addDataServer({ name, url });
+    setDataServerEnabled(name, true);
+    return name;
   }
 
   function removeDataServer(name: string): boolean {
@@ -220,74 +215,6 @@ function createCanvasVanilla() {
     const s = _servers.find((x) => x.name === name);
     if (!s) return false;
     return setDataServerEnabled(name, !s.enabled);
-  }
-
-  // ── Agent-MCP compatibility layer ──────────────────────────────────────
-  // All these mutate the SAME _servers list; `mcpUrl` targets the primary
-  // entry, creating one if none exists. Apps can equivalently call
-  // addDataServer({primary: true}) + setDataServerMeta(name, ...) directly.
-  function ensurePrimary(url?: string): DataServer | undefined {
-    let p = primaryServer();
-    if (p) {
-      if (url && p.url !== url) {
-        _servers = _servers.map((s) => s.name === p!.name ? { ...s, url } : s);
-      }
-      return _servers.find((s) => s.primary)!;
-    }
-    // Refuse to create a placeholder primary without a real URL — empty-URL
-    // ghosts caused MultiMcpBridge to POST to the current page origin, yielding
-    // a 405 storm (SvelteKit treats POST / as a form action).
-    if (!url) return undefined;
-    const nm = new URL(url, 'http://local').host || url;
-    _servers = [..._servers, {
-      name: nm, url, kind: 'data', enabled: true, connected: false, primary: true,
-    }];
-    return _servers[_servers.length - 1]!;
-  }
-
-  function setMcpUrl(u: string): void {
-    // Update the primary server's URL (create one if none).
-    ensurePrimary(u);
-    notify();
-  }
-
-  function setMcpConnecting(connecting: boolean): void {
-    const p = ensurePrimary();
-    if (!p) return;
-    _servers = _servers.map((s) => s.name === p.name ? { ...s, connecting } : s);
-    notify();
-  }
-
-  function setMcpConnected(connected: boolean, name?: string, tools?: McpToolInfo[]): void {
-    if (!connected) {
-      // Disconnect all — agent-level disconnect affects the primary and
-      // traditionally cleared the flat tools. Mirror that by disconnecting
-      // all primary-flagged servers.
-      const p = primaryServer();
-      if (p) {
-        _servers = _servers.map((s) => s.primary
-          ? { ...s, connected: false, connecting: false, tools: [], error: undefined }
-          : s);
-      }
-      notify();
-      return;
-    }
-    const p = ensurePrimary();
-    if (!p) return;
-    const newName = name && name.length > 0 ? name : p.name;
-    _servers = _servers.map((s) => s.name === p.name
-      ? { ...s, name: newName, connected: true, connecting: false, tools: tools ?? s.tools ?? [], error: undefined }
-      : s);
-    notify();
-  }
-
-  function setMcpError(err: string): void {
-    const p = ensurePrimary();
-    if (!p) return;
-    _servers = _servers.map((s) => s.name === p.name
-      ? { ...s, connected: false, connecting: false, error: err }
-      : s);
-    notify();
   }
 
   // ── Widget actions ─────────────────────────────────────────────────────
@@ -346,12 +273,12 @@ function createCanvasVanilla() {
 
   // ── HyperSkill ─────────────────────────────────────────────────────────
   function buildSkillJSON() {
-    const p = primaryServer();
+    const first = connectedServers()[0] ?? _servers[0];
     const skill: Record<string, unknown> = {
       version: '1.0',
       name: 'skill-' + Date.now(),
       created: new Date().toISOString(),
-      mcp: p?.url ?? '',
+      mcp: first?.url ?? '',
       llm: _llm,
       blocks: _blocks.map((b) => ({ type: b.type, data: JSON.parse(JSON.stringify(b.data)) })),
     };
@@ -374,7 +301,7 @@ function createCanvasVanilla() {
       servers?: string[];
       blocks?: { type: WidgetType; data: Record<string, unknown> }[];
     }) {
-      if (skill.mcp) ensurePrimary(skill.mcp);
+      if (skill.mcp) addMcpServer(skill.mcp);
       if (skill.llm) _llm = skill.llm;
       if (skill.theme) _themeOverrides = skill.theme;
       if (skill.servers) _enabledServerIds = skill.servers;
@@ -407,7 +334,7 @@ function createCanvasVanilla() {
         content?: { blocks?: { type: WidgetType; data: Record<string, unknown> }[] };
         servers?: string[];
       };
-      if (decoded.meta?.mcp) ensurePrimary(decoded.meta.mcp as string);
+      if (decoded.meta?.mcp) addMcpServer(decoded.meta.mcp as string);
       if (decoded.meta?.llm) _llm = decoded.meta.llm as LLMId;
       if (decoded.meta?.theme) _themeOverrides = decoded.meta.theme as Record<string, string>;
       const servers = (decoded.servers ?? (decoded.meta?.servers as string[] | undefined));
@@ -422,13 +349,13 @@ function createCanvasVanilla() {
 
   // ── Snapshot (fields kept for API stability) ───────────────────────────
   function getSnapshot(): CanvasSnapshot {
-    const p = primaryServer();
+    const first = connectedServers()[0] ?? _servers[0];
     return {
       blocks: _blocks,
       mode: _mode,
       llm: _llm,
-      mcpUrl: p?.url ?? '',
-      mcpConnected: p?.connected ?? false,
+      mcpUrl: first?.url ?? '',
+      mcpConnected: _servers.some((s) => s.connected),
       mcpConnecting: anyConnecting(),
       mcpName: displayName(),
       mcpTools: unionTools(),
@@ -456,11 +383,14 @@ function createCanvasVanilla() {
     set mode(v: Mode) { _mode = v; notify(); },
     get llm() { return _llm; },
     set llm(v: LLMId) { _llm = v; notify(); },
-    get mcpUrl() { return primaryServer()?.url ?? ''; },
-    set mcpUrl(v: string) { setMcpUrl(v); },
+    get mcpUrl() { return (connectedServers()[0] ?? _servers[0])?.url ?? ''; },
+    set mcpUrl(v: string) { addMcpServer(v); },
     get mcpConnected() { return _servers.some((s) => s.connected); },
     get mcpConnecting() { return anyConnecting(); },
-    get mcpName() { return displayName(); },
+    get mcpName() {
+      const s = connectedServers()[0];
+      return s ? aliasName(s.name) : '';
+    },
     get mcpTools() { return unionTools(); },
     get messages() { return _messages; },
     get generating() { return _generating; },
@@ -472,14 +402,13 @@ function createCanvasVanilla() {
 
     setMode(m: Mode) { _mode = m; notify(); },
     setLlm(l: LLMId) { _llm = l; notify(); },
-    setMcpUrl,
+    /** @deprecated alias for addMcpServer — kept for SettingsDrawer back-compat */
+    setMcpUrl(v: string) { addMcpServer(v); },
     setGenerating(g: boolean) { _generating = g; notify(); },
 
     addWidget, addBlock,
     removeBlock, updateBlock, moveBlock, clearBlocks, setBlocks,
     addMsg, updateMsg, clearMessages,
-
-    setMcpConnecting, setMcpConnected, setMcpError,
 
     get themeOverrides() { return _themeOverrides; },
     setThemeOverrides,
@@ -492,6 +421,7 @@ function createCanvasVanilla() {
     get dataServers() { return _servers; },
     set dataServers(v: DataServer[]) { _servers = Array.isArray(v) ? v : []; notify(); },
     addDataServer,
+    addMcpServer,
     removeDataServer,
     getDataServer,
     setDataServerMeta,

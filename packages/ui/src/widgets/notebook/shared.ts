@@ -856,35 +856,6 @@ export function createPublishControls(state: NotebookState, opts: PublishControl
 }
 
 /**
- * Start a persistent MCP bridge that connects declared data servers and keeps
- * their tool/recipe metadata populated on the canvas store. Independent of
- * live-refresh — this runs even in edit mode, so the sql executor can discover
- * `*_query_sql` tools as soon as the bridge is connected.
- *
- * Returns a cleanup function. Caller is expected to start this once at mount
- * and call cleanup on unmount.
- */
-export function bootstrapMcpBridge(opts: {
-  data: Record<string, unknown>;
-  MultiMcpBridgeCtor: new (opts: { getCanvas: () => unknown }) => {
-    start(): void;
-    stop(): void;
-  };
-}): () => void {
-  try {
-    autoConnectFrontmatterServers(opts.data);
-    const canvas: unknown = (globalThis as { __canvasVanilla?: unknown; canvasVanilla?: unknown })
-      .__canvasVanilla ?? (globalThis as { canvasVanilla?: unknown }).canvasVanilla;
-    if (!canvas) return () => { /* no-op */ };
-    const bridge = new opts.MultiMcpBridgeCtor({ getCanvas: () => canvas });
-    bridge.start();
-    return () => { try { bridge.stop(); } catch { /* ignore */ } };
-  } catch {
-    return () => { /* no-op */ };
-  }
-}
-
-/**
  * Auto-connect any data servers declared in recipe frontmatter (`data.servers`)
  * to the shared canvas store. No-op / no-throw if the canvas store is absent.
  * Calls `refresh()` (if provided) once merging is done.
@@ -1559,9 +1530,19 @@ export function deleteCellWithConfirm(
   const idx = state.cells.findIndex((c) => c.id === cell.id);
   if (idx < 0) return;
   const label = labelFor(cell);
-  const snapshotCell: NotebookCell = typeof (globalThis as any).structuredClone === 'function'
-    ? (globalThis as any).structuredClone(cell)
-    : JSON.parse(JSON.stringify(cell));
+  let snapshotCell: NotebookCell;
+  try { snapshotCell = structuredClone(cell); }
+  catch {
+    snapshotCell = JSON.parse(JSON.stringify(cell, (_k, v) => {
+      if (v === null || v === undefined) return v;
+      const t = typeof v;
+      if (t === 'function' || t === 'symbol' || t === 'bigint') return undefined;
+      if (t !== 'object') return v;
+      if (typeof Node !== 'undefined' && v instanceof Node) return undefined;
+      if (typeof Window !== 'undefined' && v instanceof Window) return undefined;
+      return v;
+    }));
+  }
   // Manually push a history entry so we have a direct reference to remove on undo.
   const entry: HistoryEntry = {
     ts: Date.now(),

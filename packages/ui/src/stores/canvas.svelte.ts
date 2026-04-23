@@ -91,11 +91,6 @@ function createSvelteCanvas() {
     updateMsg: canvasVanilla.updateMsg.bind(canvasVanilla),
     clearMessages: canvasVanilla.clearMessages.bind(canvasVanilla),
 
-    // MCP
-    setMcpConnecting: canvasVanilla.setMcpConnecting.bind(canvasVanilla),
-    setMcpConnected: canvasVanilla.setMcpConnected.bind(canvasVanilla),
-    setMcpError: canvasVanilla.setMcpError.bind(canvasVanilla),
-
     // Theme
     get themeOverrides() { return themeOverrides; },
     setThemeOverrides: canvasVanilla.setThemeOverrides.bind(canvasVanilla),
