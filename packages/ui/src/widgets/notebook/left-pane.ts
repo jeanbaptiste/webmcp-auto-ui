@@ -141,8 +141,15 @@ export function mountLeftPane(
           let body = text;
           try {
             const parsed = JSON.parse(text);
-            if (parsed && typeof parsed === 'object' && typeof parsed.content === 'string') body = parsed.content;
-          } catch { /* not JSON */ }
+            // Recipe servers return either { content: "..." } (legacy) or
+            // { name, description, body, ... } (autoui-style). Pick whichever
+            // string field carries the markdown body, in priority order.
+            if (parsed && typeof parsed === 'object') {
+              if (typeof parsed.body === 'string') body = parsed.body;
+              else if (typeof parsed.content === 'string') body = parsed.content;
+              else if (typeof parsed.markdown === 'string') body = parsed.markdown;
+            }
+          } catch { /* not JSON, use raw text */ }
           imported.body = body;
           recipeBodyCache.set(key, body);
         }

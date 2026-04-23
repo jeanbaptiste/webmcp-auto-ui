@@ -46,8 +46,15 @@ document.getElementById('root').innerHTML='<pre style="color:red;white-space:pre
 </html>`;
 }
 
-export function render(container: HTMLElement, data: JsSandboxData): () => void {
-  const spec: JsSandboxSpec = (data && data.spec) || ({ code: '' } as JsSandboxSpec);
+export function render(container: HTMLElement, data: JsSandboxData | JsSandboxSpec | undefined): () => void {
+  // Tolerate three shapes from callers:
+  //   { spec: { code, html, css, ... } }   — explicit spec wrapper
+  //   { code, html, css, ... }             — bare spec (widget_display params)
+  //   undefined / {}                       — empty placeholder
+  const raw = data ?? {};
+  const spec: JsSandboxSpec = ('spec' in raw && raw.spec)
+    ? (raw as JsSandboxData).spec
+    : (raw as JsSandboxSpec);
 
   // Outer wrapper mirrors the Svelte markup classes.
   const wrapper = document.createElement('div');
