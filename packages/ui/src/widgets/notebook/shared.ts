@@ -1391,6 +1391,31 @@ textarea.nb-md-edit {
   background: none; border: none; padding: 0; text-decoration: underline;
 }
 .nb-undo-toast-undo:hover { filter: brightness(1.15); }
+
+/* ─── Syntax highlighting (highlight.js tokens, app-palette-driven) ─── */
+pre.hljs-pre {
+  background: var(--color-surface2);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 0;
+  overflow-x: auto;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+pre.hljs-pre code.hljs { background: transparent; padding: 0; color: var(--color-text1); display: block; }
+.nb-code-view { margin: 0; }
+.hljs-comment, .hljs-quote { color: var(--color-text2); font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-meta-keyword { color: var(--color-accent); font-weight: 500; }
+.hljs-string, .hljs-regexp, .hljs-addition, .hljs-attribute, .hljs-meta-string { color: var(--color-teal); }
+.hljs-number, .hljs-symbol, .hljs-bullet, .hljs-link { color: var(--color-amber); }
+.hljs-title, .hljs-section, .hljs-name, .hljs-selector-id, .hljs-selector-class { color: var(--color-accent2, var(--color-accent)); font-weight: 500; }
+.hljs-variable, .hljs-template-variable, .hljs-attr, .hljs-built_in, .hljs-builtin-name { color: var(--color-accent); }
+.hljs-tag, .hljs-type, .hljs-params { color: var(--color-text1); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
+.hljs-deletion { color: var(--color-accent2, #fa6d7c); }
 `;
 
 // ---------------------------------------------------------------------------

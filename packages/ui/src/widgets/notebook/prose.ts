@@ -5,6 +5,8 @@
 // No external dependencies.
 // ---------------------------------------------------------------------------
 
+import { highlightCode } from '../../primitives/markdown-renderer.js';
+
 const BLOCK_TAGS = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'hr', 'br']);
 const INLINE_TAGS = new Set(['strong', 'em', 'code', 'a', 'mark', 's', 'u']);
 const ALLOWED_TAGS = new Set([...BLOCK_TAGS, ...INLINE_TAGS]);
@@ -88,8 +90,9 @@ export function renderProse(content: string): string {
         i++;
       }
       i++; // skip closing fence
-      const cls = lang ? ` class="language-${escapeHtml(lang)}"` : '';
-      out.push(`<pre><code${cls}>${escapeHtml(code.join('\n'))}</code></pre>`);
+      const langKey = (lang || 'plaintext').toLowerCase();
+      const highlighted = highlightCode(code.join('\n'), langKey);
+      out.push(`<pre class="hljs-pre"><code class="hljs language-${escapeHtml(langKey)}">${highlighted}</code></pre>`);
       continue;
     }
 
@@ -601,7 +604,7 @@ export function renderMarkdownWithInjectButtons(
           <span class="nb-md-fence-lang">${escapeHtml(lang)}</span>
           <button type="button" class="nb-md-fence-inject">↳ inject</button>
         </div>
-        <pre><code class="language-${escapeHtml(lang)}">${escapeHtml(content)}</code></pre>
+        <pre class="hljs-pre"><code class="hljs language-${escapeHtml(lang)}">${highlightCode(content, lang)}</code></pre>
       `;
       const btn = block.querySelector('.nb-md-fence-inject') as HTMLButtonElement;
       const handler = () => onInject({ lang, content });

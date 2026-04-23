@@ -23,6 +23,7 @@ import { renderProse, mountEditableProse } from './prose.js';
 import { openAddMdModal, openAddRecipeModal } from './import-modals.js';
 import { extractCellsFromRecipe, extractCellFromMarkdown } from './resource-extractor.js';
 import { mountLeftPane } from './left-pane.js';
+import { highlightCode } from '../../primitives/markdown-renderer.js';
 import { callToolViaPostMessage, MultiMcpBridge } from '@webmcp-auto-ui/core';
 
 export async function render(container: HTMLElement, data: Record<string, unknown>): Promise<() => void> {
@@ -482,15 +483,23 @@ function renderCell(cell: NotebookCell, state: NotebookState, overlay: RuntimeOv
 
   const body = document.createElement('div');
   body.className = 'nbe-code-body' + (cell.hideSource ? ' nbe-hidden' : '');
-  const ta = document.createElement('textarea');
-  ta.className = 'nb-code-edit';
-  ta.value = cell.content;
-  ta.rows = 1;
-  ta.spellcheck = false;
-  ta.addEventListener('input', () => { cell.content = ta.value; autosize(ta); cell.status = 'stale'; });
-  body.appendChild(ta);
+  if (state.mode === 'view') {
+    const lang = cell.type === 'js' ? 'javascript' : cell.type;
+    const pre = document.createElement('pre');
+    pre.className = 'hljs-pre nb-code-view';
+    pre.innerHTML = `<code class="hljs language-${lang}">${highlightCode(cell.content, lang)}</code>`;
+    body.appendChild(pre);
+  } else {
+    const ta = document.createElement('textarea');
+    ta.className = 'nb-code-edit';
+    ta.value = cell.content;
+    ta.rows = 1;
+    ta.spellcheck = false;
+    ta.addEventListener('input', () => { cell.content = ta.value; autosize(ta); cell.status = 'stale'; });
+    body.appendChild(ta);
+    requestAnimationFrame(() => requestAnimationFrame(() => autosize(ta)));
+  }
   codeCell.appendChild(body);
-  requestAnimationFrame(() => requestAnimationFrame(() => autosize(ta)));
 
   if (!cell.hideResult) {
     const res = document.createElement('div');
