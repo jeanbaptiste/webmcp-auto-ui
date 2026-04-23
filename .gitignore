@@ -73,3 +73,4 @@ i18n-fix-*.md
 
 # RETEX / audits internes
 docs/retex/
+.bug-reports/
