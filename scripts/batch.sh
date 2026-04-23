@@ -258,10 +258,10 @@ else
   step_start "deploy"
 
   if [ "$DRY_RUN" = "1" ]; then
-    skip "would run ./scripts/deploy.sh --dry-run"
-    "$LOCAL_ROOT/scripts/deploy.sh" --dry-run
+    skip "would run ./scripts/deploy.sh --force --dry-run"
+    "$LOCAL_ROOT/scripts/deploy.sh" --force --dry-run
   else
-    "$LOCAL_ROOT/scripts/deploy.sh"
+    "$LOCAL_ROOT/scripts/deploy.sh" --force
   fi
 
   step_end "deploy"
