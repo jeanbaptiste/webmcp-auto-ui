@@ -172,7 +172,7 @@
         bind:showToken={mcpShowToken}
         connecting={!!manualUrl && canvas.dataServers.some((s) => s.url === manualUrl && !s.connected)}
         connected={!!manualUrl && canvas.dataServers.some((s) => s.url === manualUrl && s.connected)}
-        serverName={manualUrl ? (canvas.dataServers.find((s) => s.url === manualUrl)?.name ?? '') : ''}
+        serverName={manualUrl ? (() => { const e = canvas.dataServers.find((s) => s.url === manualUrl); return e?.serverName ?? e?.name ?? ''; })() : ''}
         onconnect={onconnect}
         ondisconnect={() => { if (manualUrl) onremoveserver?.(manualUrl); manualUrl = ''; }}
       />

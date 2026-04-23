@@ -73,6 +73,9 @@ export interface DataServer {
   tools?: McpToolInfo[];
   recipes?: { name: string; description?: string; body?: string }[];
   error?: string;
+  /** Real server name from MCP handshake (initResult.serverInfo.name, aliased).
+   * Canvas `.name` is URL-host; `.serverName` is what to display. */
+  serverName?: string;
 }
 
 export interface CanvasSnapshot {
@@ -357,7 +360,7 @@ function createCanvasVanilla() {
       mcpUrl: first?.url ?? '',
       mcpConnected: _servers.some((s) => s.connected),
       mcpConnecting: anyConnecting(),
-      mcpName: first && first.connected ? aliasName(first.name) : '',
+      mcpName: first && first.connected ? aliasName(first.serverName ?? first.name) : '',
       mcpTools: unionTools(),
       messages: _messages,
       generating: _generating,
@@ -389,7 +392,7 @@ function createCanvasVanilla() {
     get mcpConnecting() { return anyConnecting(); },
     get mcpName() {
       const s = connectedServers()[0];
-      return s ? aliasName(s.name) : '';
+      return s ? aliasName(s.serverName ?? s.name) : '';
     },
     get mcpTools() { return unionTools(); },
     get messages() { return _messages; },

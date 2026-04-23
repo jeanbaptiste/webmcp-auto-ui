@@ -479,67 +479,124 @@
   async function addMcpServer(url: string) {
     if (!url.trim()) return;
     loadingUrls = [...loadingUrls, url];
-    const provisionalName = canvas.addMcpServer(url.trim());
-    canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
-    try {
-      const opts = mcpToken.trim() ? { headers: { Authorization: `Bearer ${mcpToken.trim()}` } } : undefined;
-      if (!multiClient) throw new Error('MCP bridge not ready');
-      const { name: serverName, tools } = await multiClient.addServer(url.trim(), opts);
-      connectedUrls = [...connectedUrls, url];
-      canvas.setDataServerMeta(provisionalName, {
-        connected: true, connecting: false,
-        tools: tools as any,
-        error: undefined,
-      });
+    const trimmed = url.trim();
 
-      // Register server tools + recipes in the discovery cache
-      const server = multiClient.listServers().find(s => s.url === url.trim());
-      const cacheTools = (server?.tools ?? []).map((t: any) => ({
-        name: t.name,
-        description: t.description,
-        inputSchema: t.inputSchema ?? t.input_schema,
-      }));
-
-      let cacheRecipes: any[] = [];
-      if (tools.some(t => t.name === 'list_recipes')) {
-        try {
-          const r = await multiClient.callToolOn(url.trim(), 'list_recipes', {});
-          const text = r.content?.find((c: any) => c.type === 'text') as any;
-          if (text?.text) {
-            const parsed = JSON.parse(text.text);
-            const rawRecipes: any[] = Array.isArray(parsed) ? parsed : (parsed?.recipes ?? []);
-            cacheRecipes = rawRecipes.map((r) => ({
-              ...r,
-              name: r.name ?? r.id ?? r.recipe_id ?? '(unnamed)',
-              id: r.id ?? r.name,
-            }));
-          }
-        } catch { /* no recipes */ }
+    // Per-server auth header path: the MultiMcpBridge does not currently support
+    // `opts.headers` on a per-server basis. When a bearer token is set, we must
+    // fall back to a direct `multiClient.addServer(url, opts)` call so the
+    // Authorization header is wired into the underlying McpClient. The canvas
+    // store is still updated so the rest of the UI observes a consistent state.
+    // TODO: extend MultiMcpBridge to accept per-server headers so this branch
+    // can be removed.
+    if (mcpToken.trim()) {
+      // Add the entry to the store as DISABLED first so the bridge skips the
+      // reconciliation handshake. We then perform the authed connection
+      // ourselves via multiClient. Once the direct handshake succeeds, we
+      // populate meta (tools/recipes) manually — leaving `enabled: false`
+      // keeps the bridge out of the way permanently for this server.
+      let provisionalName: string;
+      try {
+        provisionalName = new URL(trimmed, 'http://local').host || trimmed;
+      } catch { provisionalName = trimmed; }
+      canvas.addDataServer({ name: provisionalName, url: trimmed });
+      canvas.setDataServerEnabled(provisionalName, false);
+      canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
+      try {
+        const opts = { headers: { Authorization: `Bearer ${mcpToken.trim()}` } };
+        if (!multiClient) throw new Error('MCP bridge not ready');
+        const { tools } = await multiClient.addServer(trimmed, opts);
+        connectedUrls = [...connectedUrls, url];
+        let recipes: any[] = [];
+        if (tools.some(t => t.name === 'list_recipes')) {
+          try {
+            const r = await multiClient.callToolOn(trimmed, 'list_recipes', {});
+            const text = r.content?.find((c: any) => c.type === 'text') as any;
+            if (text?.text) {
+              const parsed = JSON.parse(text.text);
+              const rawRecipes: any[] = Array.isArray(parsed) ? parsed : (parsed?.recipes ?? []);
+              recipes = rawRecipes.map((rr) => ({
+                ...rr,
+                name: rr.name ?? rr.id ?? rr.recipe_id ?? '(unnamed)',
+                id: rr.id ?? rr.name,
+              }));
+            }
+          } catch { /* no recipes */ }
+        }
+        canvas.setDataServerMeta(provisionalName, {
+          connected: true, connecting: false,
+          tools: tools as any,
+          recipes,
+          error: undefined,
+        });
+      } catch (e) {
+        canvas.setDataServerMeta(provisionalName, {
+          connected: false, connecting: false,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      } finally {
+        loadingUrls = loadingUrls.filter(u => u !== url);
       }
-      discoveryCache.register(serverName, { recipes: cacheRecipes, tools: cacheTools });
-      cacheVersion++;
-    } catch(e) {
-      canvas.setDataServerMeta(provisionalName, {
-        connected: false, connecting: false,
-        error: e instanceof Error ? e.message : String(e),
-      });
-    } finally {
-      loadingUrls = loadingUrls.filter(u => u !== url);
+      return;
     }
+
+    // Default path: route through the canvas store. The global MultiMcpBridge
+    // observes the store, performs the handshake, and populates `tools` /
+    // `recipes` on the data-server entry. The `$effect` below picks up
+    // newly-connected servers and registers them into the discovery cache.
+    canvas.addMcpServer(trimmed);
+    if (!connectedUrls.includes(url)) connectedUrls = [...connectedUrls, url];
+    loadingUrls = loadingUrls.filter(u => u !== url);
   }
 
   async function removeMcpServer(url: string) {
-    if (!multiClient) return;
-    const server = multiClient.listServers().find(s => s.url === url);
-    await multiClient.removeServer(url);
+    const entry = canvas.dataServers.find(s => s.url === url);
     connectedUrls = connectedUrls.filter(u => u !== url);
-    // Clear recipes/tools for the disconnected server
-    if (server) {
-      discoveryCache.register(server.name, { recipes: [], tools: [] });
+    if (entry) {
+      // The bridge observes removal and performs the underlying disconnect.
+      canvas.removeDataServer(entry.name);
+      // Clear cache entry immediately so browsable tools / recipes update.
+      discoveryCache.register(entry.name, { recipes: [], tools: [] });
       cacheVersion++;
-      canvas.removeDataServer(server.name);
     }
   }
+
+  // Reconcile the discovery cache with the canvas data-servers whenever the
+  // bridge reports a successful handshake. We track which server names have
+  // been registered to avoid redundant cache writes (the cache itself is
+  // idempotent but we still want to bump `cacheVersion` only on real change).
+  const registeredServerNames = new Set<string>();
+  $effect(() => {
+    const servers = canvas.dataServers;
+    let mutated = false;
+    const liveNames = new Set<string>();
+    for (const s of servers) {
+      liveNames.add(s.name);
+      if (s.connected && !registeredServerNames.has(s.name)) {
+        const cacheTools = (s.tools ?? []).map((t: any) => ({
+          name: t.name,
+          description: t.description,
+          inputSchema: t.inputSchema ?? t.input_schema,
+        }));
+        const cacheRecipes = (s.recipes ?? []).map((r: any) => ({
+          ...r,
+          name: r.name ?? r.id ?? r.recipe_id ?? '(unnamed)',
+          id: r.id ?? r.name,
+        }));
+        discoveryCache.register(s.name, { recipes: cacheRecipes, tools: cacheTools });
+        registeredServerNames.add(s.name);
+        mutated = true;
+      }
+    }
+    // Prune cache entries for servers that are gone from the store.
+    for (const name of Array.from(registeredServerNames)) {
+      if (!liveNames.has(name)) {
+        discoveryCache.register(name, { recipes: [], tools: [] });
+        registeredServerNames.delete(name);
+        mutated = true;
+      }
+    }
+    if (mutated) cacheVersion++;
+  });
 
   async function addAllServers() {
     const { MCP_DEMO_SERVERS } = await import('@webmcp-auto-ui/sdk');
@@ -1248,7 +1305,7 @@
       connecting={canvas.mcpConnecting}
       connected={canvas.mcpConnected}
       name={canvas.mcpName ?? 'not connected'}
-      servers={canvas.dataServers.filter((s) => s.connected).map((s) => ({ url: s.url, name: s.name, toolCount: (s.tools ?? []).length }))}
+      servers={canvas.dataServers.filter((s) => s.connected).map((s) => ({ url: s.url, name: s.serverName ?? s.name, toolCount: (s.tools ?? []).length }))}
       onclick={() => { recipeBrowserOpen = true; recipeBrowserFilter = ''; }}
     />
     {#if gemmaStatus === 'ready'}
