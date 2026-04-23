@@ -43,7 +43,7 @@ export interface DataTableSpec {
   emptyMessage?: string;
 }
 
-interface DataTableProps {
+interface DataTableProps extends Partial<DataTableSpec> {
   spec?: Partial<DataTableSpec>;
   data?: unknown;
   onrowclick?: (row: Record<string, unknown>) => void;
@@ -61,13 +61,15 @@ function dv(v: unknown): string {
 function resolveRows(props: DataTableProps): Record<string, unknown>[] {
   const specRows = props.spec?.rows;
   if (Array.isArray(specRows) && specRows.length) return specRows as Record<string, unknown>[];
+  if (Array.isArray(props.rows) && props.rows.length) return props.rows as Record<string, unknown>[];
   if (Array.isArray(props.data)) return props.data as Record<string, unknown>[];
   return [];
 }
 
-function resolveColumns(spec: Partial<DataTableSpec> | undefined, rows: Record<string, unknown>[]): DataTableColumn[] {
+function resolveColumns(spec: Partial<DataTableSpec> | undefined, flatCols: DataTableColumn[] | undefined, rows: Record<string, unknown>[]): DataTableColumn[] {
   const specCols = spec?.columns;
   if (Array.isArray(specCols) && specCols.length) return specCols as DataTableColumn[];
+  if (Array.isArray(flatCols) && flatCols.length) return flatCols as DataTableColumn[];
   if (rows.length > 0) return Object.keys(rows[0] as object).map((k) => ({ key: k, label: k }));
   return [];
 }
@@ -92,12 +94,17 @@ function alignClass(align?: 'left' | 'center' | 'right'): string {
 
 export function render(container: HTMLElement, data: unknown): () => void {
   const props = (data ?? {}) as DataTableProps;
-  const spec: Partial<DataTableSpec> = props.spec ?? {};
+  const spec: Partial<DataTableSpec> = {
+    title: props.spec?.title ?? props.title,
+    compact: props.spec?.compact ?? props.compact,
+    striped: props.spec?.striped ?? props.striped,
+    emptyMessage: props.spec?.emptyMessage ?? props.emptyMessage,
+  };
   const onrowclick = typeof props.onrowclick === 'function' ? props.onrowclick : undefined;
   const fmt = new Intl.NumberFormat('fr-FR');
 
   const rows = resolveRows(props);
-  const columns = resolveColumns(spec, rows);
+  const columns = resolveColumns(props.spec, props.columns, rows);
   const compact = spec.compact === true;
   const striped = spec.striped !== false;
 
