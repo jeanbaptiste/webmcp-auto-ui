@@ -12,7 +12,7 @@ import {
   collectDataServers, startRun, renderCellLogs,
   createPublishControls, autoConnectFrontmatterServers,
   createRuntimeOverlay, bootstrapLiveRefresh, effectiveResult,
-  cellRuntimeStatus, lastRefreshedAt, fmtRelTime,
+  cellRuntimeStatus, lastRefreshedAt, fmtRelTime, preserveScrollAround,
   type NotebookState, type NotebookCell, type CellResult, type RuntimeOverlay,
 } from './shared.js';
 import { renderChart } from './chart-renderer.js';
@@ -305,6 +305,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   }
 
   function rerender() {
+    const restore = preserveScrollAround(cellsEl);
     mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); });
     renderCells();
     rerenderSources();
@@ -313,6 +314,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     // Update source label
     const first = collectDataServers(data)[0];
     sourceEl.textContent = first?.name ?? 'no source connected';
+    restore();
   }
 
   // Toast helper

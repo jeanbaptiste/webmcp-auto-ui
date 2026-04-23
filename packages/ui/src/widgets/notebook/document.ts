@@ -14,7 +14,7 @@ import {
   registerExecutor, logHistory, addImportedCells, fmtRelTime, uid,
   renderCellLogs,
   createRuntimeOverlay, bootstrapLiveRefresh, effectiveResult,
-  cellRuntimeStatus, isReRunnable, lastRefreshedAt,
+  cellRuntimeStatus, isReRunnable, lastRefreshedAt, preserveScrollAround,
   type NotebookState, type NotebookCell, type CellResult, type RuntimeOverlay,
 } from './shared.js';
 import { renderChart } from './chart-renderer.js';
@@ -321,12 +321,14 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   }
 
   function rerender() {
+    const restore = preserveScrollAround(cellsEl);
     mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); });
     renderCells();
     updateMeta();
     renderLiveBadge();
     renderEmptyState();
     updateLiveToggleVisibility();
+    restore();
   }
   rerenderImpl = rerender;
 

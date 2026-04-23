@@ -19,8 +19,36 @@ function injectStyle(): void {
   if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = STYLE_ID;
-  // Scoped to <html>; falls back to 1 when the variable is unset.
-  style.textContent = `html { zoom: var(--ui-scale, 1); }`;
+  // When scaled:
+  //  - zoom the root so everything grows uniformly
+  //  - compensate layouts sized in 100vh/100vw (viewport units stay tied to the
+  //    physical viewport regardless of zoom, so a `h-screen` container rendered
+  //    at 1.5× would overflow by 50%). Force these containers to the logical
+  //    equivalent so they fit after scaling.
+  //  - allow html/body to scroll as a safety net for any overflow we missed.
+  style.textContent = `
+html { zoom: var(--ui-scale, 1); }
+html[data-ui-scale="x2"] {
+  width: calc(100vw / 1.5);
+  height: calc(100vh / 1.5);
+  overflow: auto;
+}
+html[data-ui-scale="x2"] body {
+  width: 100%;
+  min-height: 100%;
+  overflow: auto;
+}
+html[data-ui-scale="x2"] .h-screen,
+html[data-ui-scale="x2"] [class*="h-screen"] {
+  height: calc(100vh / 1.5);
+  max-height: calc(100vh / 1.5);
+}
+html[data-ui-scale="x2"] .w-screen,
+html[data-ui-scale="x2"] [class*="w-screen"] {
+  width: calc(100vw / 1.5);
+  max-width: calc(100vw / 1.5);
+}
+`;
   document.head.appendChild(style);
 }
 
@@ -32,6 +60,18 @@ function applyScale(scale: UIScale): void {
   root.dataset.uiScale = scale === 1 ? 'x1' : 'x2';
   try {
     window.dispatchEvent(new CustomEvent('webmcp:ui-scale-change', { detail: { scale } }));
+  } catch { /* ignore */ }
+  // Canvas-based widgets (cytoscape, d3, vega-embed, leaflet, custom SVG) size
+  // their rendering surface at mount via getBoundingClientRect and don't react
+  // to CSS-only zoom changes. Fire a resize event after the browser has applied
+  // the zoom (next RAF) so those libs redraw against the new container size.
+  // A second tick after ~200ms catches widgets that listen via debounced
+  // ResizeObserver + widgets that rebuild on a longer cycle.
+  try {
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('resize'));
+      setTimeout(() => window.dispatchEvent(new Event('resize')), 200);
+    });
   } catch { /* ignore */ }
 }
 

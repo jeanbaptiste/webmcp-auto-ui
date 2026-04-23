@@ -13,7 +13,7 @@ import {
   renderCellLogs,
   createPublishControls, autoConnectFrontmatterServers,
   createRuntimeOverlay, effectiveResult, cellRuntimeStatus,
-  lastRefreshedAt, bootstrapLiveRefresh, fmtRelTime,
+  lastRefreshedAt, bootstrapLiveRefresh, fmtRelTime, preserveScrollAround,
   type NotebookState, type NotebookCell, type CellResult, type CellExecContext,
   type RuntimeOverlay,
 } from './shared.js';
@@ -185,11 +185,13 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   }
 
   function rerender() {
+    const restore = preserveScrollAround(cellsEl);
     mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); });
     renderLiveToggle();
     renderLiveBadge();
     renderEmptyState();
     renderCells();
+    restore();
   }
 
   // Toolbar: direct add (prose/sql/js)

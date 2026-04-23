@@ -1,6 +1,6 @@
 {
   "name": "@webmcp-auto-ui/notebook-viewer",
-  "version": "2.5.27",
+  "version": "2.5.28",
   "private": true,
   "type": "module",
   "scripts": {

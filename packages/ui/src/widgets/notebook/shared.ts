@@ -104,6 +104,46 @@ export function autosize(ta: HTMLTextAreaElement): void {
   ta.style.height = ta.scrollHeight + 'px';
 }
 
+/**
+ * Scroll-preservation helper for rerender paths that wipe-and-rebuild a cells
+ * container. Call BEFORE the rebuild; invoke the returned fn AFTER.
+ *
+ * Walks up from `anchor` collecting scrollable ancestors, snapshots their
+ * scrollTop + window.scrollY + active-cell id, and restores them on the next
+ * animation frame. Without this, clicking a cell's run button scrolls the
+ * page back to the top because the cells container briefly collapses.
+ */
+export function preserveScrollAround(anchor: HTMLElement): () => void {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return () => { /* no-op in SSR */ };
+  }
+  const scrollParents: HTMLElement[] = [];
+  let node: HTMLElement | null = anchor;
+  while (node) {
+    const oy = getComputedStyle(node).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) {
+      scrollParents.push(node);
+    }
+    node = node.parentElement;
+  }
+  const winY = window.scrollY;
+  const saved = scrollParents.map((el) => el.scrollTop);
+  const activeEl = document.activeElement as HTMLElement | null;
+  const activeCellId = activeEl?.closest<HTMLElement>('[data-cell-id]')?.dataset.cellId ?? null;
+
+  return () => {
+    requestAnimationFrame(() => {
+      scrollParents.forEach((el, i) => { el.scrollTop = saved[i]!; });
+      try { window.scrollTo({ top: winY, behavior: 'instant' as ScrollBehavior }); }
+      catch { window.scrollTo(0, winY); }
+      if (activeCellId) {
+        const host = anchor.querySelector<HTMLElement>(`[data-cell-id="${activeCellId}"] textarea`);
+        host?.focus?.();
+      }
+    });
+  };
+}
+
 export function defaultCellContent(type: CellType): string {
   if (type === 'md') return '### new section\n\nwrite here…';
   if (type === 'sql') return 'select *\nfrom source\nlimit 10';
