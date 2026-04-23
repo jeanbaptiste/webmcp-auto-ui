@@ -21,13 +21,18 @@ function buildSrcdoc(spec: JsSandboxSpec): string {
   const css = spec.css ?? '';
   const html = spec.html ?? '';
   const code = spec.code ?? '';
+  // Neutral base: just reset box-sizing and remove body margin. NO default
+  // colours — sandboxed iframes can't inherit the host's CSS custom properties,
+  // so forcing a dark palette here would clash with user-provided `css` that
+  // assumes the browser default (white bg, black text).
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <style>
 *,*::before,*::after{box-sizing:border-box}
-body{margin:0;padding:8px;font-family:system-ui,sans-serif;font-size:13px;background:var(--bg,#1a1a2e);color:var(--fg,#e2e2e8)}
+html,body{margin:0;padding:0}
+body{padding:8px;font-family:system-ui,sans-serif;font-size:13px}
 ${css}
 </style>
 </head>
@@ -38,7 +43,7 @@ ${css}
 try{
 ${code}
 }catch(e){
-document.getElementById('root').innerHTML='<pre style="color:red;white-space:pre-wrap">'+e+'</pre>';
+document.getElementById('root').innerHTML='<pre style="color:red;white-space:pre-wrap;padding:8px;margin:0">'+e+'</pre>';
 }
 })();
 <\/script>
