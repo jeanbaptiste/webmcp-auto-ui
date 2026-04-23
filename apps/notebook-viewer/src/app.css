@@ -38,6 +38,25 @@
   --nb-error-bg: #fef2f2;
   --nb-error-fg: #991b1b;
   --nb-error-border: #fecaca;
+
+  /* ── Bridge to @webmcp-auto-ui/ui notebook widget tokens ──
+   * The widget consumes var(--color-*) / var(--font-*). We remap those
+   * to the nb-* design system so the notebook inherits the sage/cream/
+   * editorial look of the viewer chrome. Single source of truth. */
+  --font-sans:  'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-mono:  'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --color-bg:       var(--nb-cream);
+  --color-surface:  var(--nb-white);
+  --color-surface2: var(--nb-cream-2);
+  --color-text1:    var(--nb-ink);
+  --color-text2:    var(--nb-ink-mid);
+  --color-border:   var(--nb-border);
+  --color-border2:  var(--nb-border-mid);
+  --color-accent:   var(--nb-sage-dark);
+  --color-accent2:  var(--nb-sage-mid);
+  --color-amber:    #B8823A;
+  --color-teal:     #3E8F8A;
 }
 
 :root[data-theme="dark"] {
@@ -60,6 +79,19 @@
     --nb-error-bg: #2a0f10;
     --nb-error-fg: #fca5a5;
     --nb-error-border: #7f1d1d;
+
+    /* Widget bridge — dark tones on warm-paper palette */
+    --color-bg:       var(--nb-cream);
+    --color-surface:  var(--nb-white);
+    --color-surface2: var(--nb-cream-2);
+    --color-text1:    var(--nb-ink);
+    --color-text2:    var(--nb-ink-mid);
+    --color-border:   var(--nb-border);
+    --color-border2:  var(--nb-border-mid);
+    --color-accent:   var(--nb-sage-dark);
+    --color-accent2:  var(--nb-sage-mid);
+    --color-amber:    #D4A574;
+    --color-teal:     #6FB8B3;
 }
 
 *, *::before, *::after { box-sizing: border-box; }

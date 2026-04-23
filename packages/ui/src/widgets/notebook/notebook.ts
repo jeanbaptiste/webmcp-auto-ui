@@ -669,7 +669,7 @@ function injectLayoutStyles(): void {
 .nbe-kicker-input:focus { border-color: var(--color-border); background: var(--color-bg); color: var(--color-text1); }
 .nb-root.nb-view-mode .nbe-kicker-input { pointer-events: none; }
 .nbe-title {
-  font-family: 'EB Garamond', Georgia, serif;
+  font-family: var(--font-serif, 'EB Garamond', Georgia, serif);
   font-size: 30px; font-weight: 500;
   margin: 0 0 12px;
   letter-spacing: -0.01em; line-height: 1.2;
@@ -691,7 +691,7 @@ function injectLayoutStyles(): void {
 .nbe-del-abs:hover { opacity: 1 !important; }
 
 .nbe-prose {
-  font-family: 'EB Garamond', Georgia, serif;
+  font-family: var(--font-serif, 'EB Garamond', Georgia, serif);
   font-size: 17px; line-height: 1.7;
   color: var(--color-text1);
   max-width: 620px;
@@ -700,7 +700,7 @@ function injectLayoutStyles(): void {
 }
 .nbe-prose-render h1, .nbe-prose-render h2, .nbe-prose-render h3,
 .nbe-prose-render h4, .nbe-prose-render h5, .nbe-prose-render h6 {
-  font-family: 'EB Garamond', Georgia, serif;
+  font-family: var(--font-serif, 'EB Garamond', Georgia, serif);
   font-weight: 600; letter-spacing: -0.01em;
   margin: 0.6em 0 0.3em;
 }
@@ -788,7 +788,7 @@ function injectLayoutStyles(): void {
   font-variant-numeric: tabular-nums;
 }
 .nbe-result-table thead th {
-  font-family: 'EB Garamond', Georgia, serif;
+  font-family: var(--font-serif, 'EB Garamond', Georgia, serif);
   font-size: 12.5px; font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--color-text2);
@@ -921,7 +921,7 @@ function injectLayoutStyles(): void {
 .nb-empty-icon { font-size: 22px; line-height: 1; }
 .nb-empty-body { flex: 1; min-width: 0; }
 .nb-empty-title {
-  font-family: 'EB Garamond', Georgia, serif;
+  font-family: var(--font-serif, 'EB Garamond', Georgia, serif);
   font-weight: 600; font-size: 14px; color: var(--color-text1);
 }
 .nb-empty-desc {
