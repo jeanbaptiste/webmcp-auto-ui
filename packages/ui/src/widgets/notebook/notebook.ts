@@ -24,7 +24,7 @@ import { openAddMdModal, openAddRecipeModal } from './import-modals.js';
 import { extractCellsFromRecipe, extractCellFromMarkdown } from './resource-extractor.js';
 import { mountLeftPane } from './left-pane.js';
 import { highlightCode } from '../../primitives/markdown-renderer.js';
-import { callToolViaPostMessage, MultiMcpBridge } from '@webmcp-auto-ui/core';
+import { createSqlExecutor } from './executors/sql.js';
 
 export async function render(container: HTMLElement, data: Record<string, unknown>): Promise<() => void> {
   injectStyles();
@@ -46,7 +46,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
 
   // --- register executors -------------------------------------------------
   registerExecutor(state, 'js', jsExecutor);
-  registerExecutor(state, 'sql', makeSqlExecutor(data));
+  registerExecutor(state, 'sql', createSqlExecutor(() => collectDataServers(data)));
 
   container.classList.add('nb-root');
   container.classList.toggle('nb-view-mode', state.mode === 'view');
@@ -171,7 +171,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       state,
       data,
       overlay,
-      MultiMcpBridgeCtor: MultiMcpBridge as any,
       onCellChange: (cellId) => {
         const node = cellsEl.querySelector(`[data-id="${cellId}"]`) as HTMLElement | null;
         if (!node) {
@@ -365,54 +364,6 @@ async function jsExecutor(ctx: CellExecContext): Promise<CellResult> {
   }
 }
 
-function makeSqlExecutor(data: Record<string, unknown>) {
-  return async function sqlExecutor(ctx: CellExecContext): Promise<CellResult> {
-    const start = Date.now();
-    const sql = ctx.cell.content;
-    const servers = collectDataServers(data);
-    const candidates: string[] = [];
-    for (const srv of servers) {
-      for (const t of srv.tools ?? []) candidates.push(t.name);
-    }
-    const precise = candidates.find((n) => /^.*query_sql$/i.test(n));
-    const loose = precise ?? candidates.find((n) => /^(query|run|execute)(_sql)?$/i.test(n));
-    const toolName = precise ?? loose;
-    if (!toolName) {
-      return {
-        ok: false,
-        error: 'No SQL tool available on connected servers (looked for *query_sql or query/run/execute).',
-        errorKind: 'schema',
-        durationMs: Date.now() - start,
-      };
-    }
-    try {
-      const res: any = await callToolViaPostMessage(toolName, { sql });
-      const text = res?.content?.find?.((c: any) => c.type === 'text')?.text ?? '';
-      const durationMs = Date.now() - start;
-      let parsed: any = null;
-      try { parsed = JSON.parse(text); } catch { /* not JSON */ }
-      if (parsed) {
-        const rows: any[] = Array.isArray(parsed) ? parsed
-          : Array.isArray(parsed?.rows) ? parsed.rows
-          : Array.isArray(parsed?.data) ? parsed.data
-          : Array.isArray(parsed?.results) ? parsed.results
-          : [];
-        if (rows.length && rows.every((r) => r && typeof r === 'object')) {
-          const columns = Array.isArray(parsed?.columns)
-            ? parsed.columns.map(String)
-            : Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
-          return { ok: true, kind: 'table', rows, columns, rowCount: rows.length, durationMs };
-        }
-        return { ok: true, kind: 'value', value: parsed, durationMs };
-      }
-      if (!text) return { ok: true, kind: 'empty', durationMs };
-      return { ok: true, kind: 'value', value: text, durationMs };
-    } catch (err: any) {
-      return { ok: false, error: String(err?.message ?? err), errorKind: 'runtime', durationMs: Date.now() - start };
-    }
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Cell rendering — prose + code share the unified flow, same DnD handle
 // ---------------------------------------------------------------------------
@@ -501,6 +452,8 @@ function renderCell(cell: NotebookCell, state: NotebookState, overlay: RuntimeOv
     ta.addEventListener('input', () => { cell.content = ta.value; autosize(ta); cell.status = 'stale'; });
     body.appendChild(ta);
     requestAnimationFrame(() => requestAnimationFrame(() => autosize(ta)));
+    const ro = new ResizeObserver(() => autosize(ta));
+    ro.observe(ta);
   }
   codeCell.appendChild(body);
 
