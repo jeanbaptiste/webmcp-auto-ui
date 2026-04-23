@@ -805,16 +805,24 @@
     cacheVersion; // reactivity trigger
     return discoveryCache.allTools().filter(t => !DISCOVERY_TOOL_NAMES.has(t.name));
   });
+  // Counters read from the discovery cache using the canvas name (hostname)
+  // that the `$effect` above used to register. Using multiClient.listServers()
+  // would query by the aliased MCP serverInfo name (e.g. "Tricoteuses"),
+  // which never matches the registered hostname key → counters stuck at 0.
   const toolCountByServer = $derived.by(() => {
     cacheVersion; // reactivity trigger
     return Object.fromEntries(
-      (multiClient?.listServers() ?? []).map(s => [s.url, discoveryCache.browsableToolCount(s.name)])
+      canvas.dataServers
+        .filter(s => s.connected)
+        .map(s => [s.url, discoveryCache.browsableToolCount(s.name)])
     );
   });
   const recipeCountByServer = $derived.by(() => {
     cacheVersion; // reactivity trigger
     return Object.fromEntries(
-      (multiClient?.listServers() ?? []).map(s => [s.url, discoveryCache.recipeCount(s.name)])
+      canvas.dataServers
+        .filter(s => s.connected)
+        .map(s => [s.url, discoveryCache.recipeCount(s.name)])
     );
   });
   // Same as above, but for WebMCP servers. Keyed by srv.id (which matches
