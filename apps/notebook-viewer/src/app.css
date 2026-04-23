@@ -40,8 +40,7 @@
   --nb-error-border: #fecaca;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+:root[data-theme="dark"] {
     --nb-cream:          #161410;
     --nb-cream-2:        #1E1C18;
     --nb-ink:            #EDE8E0;
@@ -61,7 +60,6 @@
     --nb-error-bg: #2a0f10;
     --nb-error-fg: #fca5a5;
     --nb-error-border: #7f1d1d;
-  }
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -151,6 +149,20 @@ a:hover { text-decoration: underline; }
   white-space: nowrap;
 }
 .nb-nav-link:hover { color: var(--nb-ink); text-decoration: none; }
+
+.nb-nav-theme-toggle {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--nb-ink-light);
+  background: transparent;
+  border: 1px solid var(--nb-border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.nb-nav-theme-toggle:hover { color: var(--nb-ink); border-color: var(--nb-border-mid); }
 
 /* ─── Page wrapper (index, loading, error) ─── */
 
