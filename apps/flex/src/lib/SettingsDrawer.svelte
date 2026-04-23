@@ -173,6 +173,7 @@
         connected={canvas.mcpConnected}
         serverName={connectedUrls.length > 1 ? `multi-server (${connectedUrls.length})` : canvas.mcpName ?? ''}
         onconnect={onconnect}
+        ondisconnect={() => connectedUrls.forEach((u) => onremoveserver?.(u))}
       />
     </section>
 

@@ -357,7 +357,7 @@ function createCanvasVanilla() {
       mcpUrl: first?.url ?? '',
       mcpConnected: _servers.some((s) => s.connected),
       mcpConnecting: anyConnecting(),
-      mcpName: displayName(),
+      mcpName: first && first.connected ? aliasName(first.name) : '',
       mcpTools: unionTools(),
       messages: _messages,
       generating: _generating,
