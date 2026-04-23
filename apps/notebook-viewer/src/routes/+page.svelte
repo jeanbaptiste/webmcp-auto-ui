@@ -173,7 +173,7 @@
     {:else}
       <section class="nb-list">
         {#each view.items as item (item.slug)}
-          <a class="nb-card" href={`/${item.slug}`}>
+          <a class="nb-card" href={`/p/${item.slug}`}>
             <h2 class="nb-card-title">{item.title}</h2>
             {#if item.description}
               <p class="nb-card-desc">{item.description}</p>
