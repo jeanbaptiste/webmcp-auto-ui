@@ -12,7 +12,10 @@ import {
   autosize, openShareModal, registerHistoryObserver,
   renderCellLogs,
   createPublishControls, autoConnectFrontmatterServers,
+  createRuntimeOverlay, effectiveResult, cellRuntimeStatus,
+  lastRefreshedAt, bootstrapLiveRefresh, fmtRelTime,
   type NotebookState, type NotebookCell, type CellResult, type CellExecContext,
+  type RuntimeOverlay,
 } from './shared.js';
 import { renderChart } from './chart-renderer.js';
 import { dispatchShare } from './share-handlers.js';
@@ -20,7 +23,7 @@ import { renderProse } from './prose.js';
 import { openAddMdModal, openAddRecipeModal } from './import-modals.js';
 import { extractCellsFromRecipe, extractCellFromMarkdown } from './resource-extractor.js';
 import { mountLeftPane } from './left-pane.js';
-import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
+import { callToolViaPostMessage, MultiMcpBridge } from '@webmcp-auto-ui/core';
 
 export async function render(container: HTMLElement, data: Record<string, unknown>): Promise<() => void> {
   injectStyles();
@@ -32,8 +35,13 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     mode: (data.mode as any) ?? 'edit',
     cells: data.cells as any,
     kicker: (data.kicker as string) ?? undefined,
+    autoRun: (data as any).autoRun === true,
   });
   if (!state.kicker) state.kicker = (data.kicker as string) ?? 'untitled';
+
+  // Live mode runtime overlay (created lazily). Never mutates state.
+  let overlay: RuntimeOverlay | null = null;
+  let liveCleanup: (() => void) | null = null;
 
   // --- register executors -------------------------------------------------
   registerExecutor(state, 'js', jsExecutor);
@@ -48,6 +56,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       <div class="nbe-shell">
         <div class="nbe-kicker">
           <input class="nbe-kicker-input" value="${escapeAttr(state.kicker || '')}" placeholder="kicker…">
+          <span class="nbe-live-toggle-slot"></span>
           <div class="nb-mode-switch" style="margin-left:auto;">
             <button class="nb-mode-edit nb-on">edit</button>
             <button class="nb-mode-view">view</button>
@@ -55,7 +64,11 @@ export async function render(container: HTMLElement, data: Record<string, unknow
           <button class="nb-btn nbe-history-btn">⟲ history</button>
           <span class="nbe-publish-badge-slot"></span>
         </div>
-        <input class="nbe-title nb-ed-title" value="${escapeAttr(state.title)}">
+        <div class="nbe-title-row">
+          <input class="nbe-title nb-ed-title" value="${escapeAttr(state.title)}">
+          <span class="nbe-live-badge-slot"></span>
+        </div>
+        <div class="nbe-empty-state-slot"></div>
         <div class="nb-history-panel nbe-history-panel"></div>
         <div class="nbe-cells"></div>
         <div class="nbe-footer">
@@ -87,14 +100,95 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   function renderCells() {
     cellsEl.innerHTML = '';
     state.cells.forEach((cell, idx) => {
-      const node = renderCell(cell, state, rerender);
+      const node = renderCell(cell, state, overlay, rerender);
       node.addEventListener('focusin', () => { lastActiveIdx = idx; });
       cellsEl.appendChild(node);
     });
   }
 
+  function renderLiveToggle() {
+    const slot = shell.querySelector('.nbe-live-toggle-slot') as HTMLElement;
+    if (state.mode === 'edit') {
+      const checked = state.autoRun === true ? 'checked' : '';
+      slot.innerHTML = `<label class="nbe-live-toggle" title="Re-execute SQL cells against connected servers when this notebook is opened in view mode."><input type="checkbox" ${checked} />Live data</label>`;
+      const cb = slot.querySelector('input[type=checkbox]') as HTMLInputElement;
+      cb.addEventListener('change', () => {
+        state.autoRun = cb.checked;
+        rerender();
+      });
+    } else {
+      slot.innerHTML = '';
+    }
+  }
+
+  function renderLiveBadge() {
+    const slot = shell.querySelector('.nbe-live-badge-slot') as HTMLElement;
+    if (state.mode === 'view' && state.autoRun === true) {
+      const refreshedAt = lastRefreshedAt(overlay);
+      const refreshedTxt = refreshedAt
+        ? `Refreshed ${escapeHtml(fmtRelTime(refreshedAt))} ago`
+        : (overlay?.startedAt && !overlay?.finishedAt ? 'Refreshing…' : '');
+      slot.innerHTML = `<span class="nb-live-badge">● Live</span>${refreshedTxt ? `<span class="nbe-refreshed-at">${refreshedTxt}</span>` : ''}`;
+    } else {
+      slot.innerHTML = '';
+    }
+  }
+
+  function renderEmptyState() {
+    const slot = shell.querySelector('.nbe-empty-state-slot') as HTMLElement;
+    const showBanner = state.autoRun === true && state.mode === 'view' && overlay
+      && (overlay.error || (overlay.finishedAt !== null && overlay.outputs.size === 0));
+    if (!showBanner) {
+      slot.innerHTML = '';
+      return;
+    }
+    const snapTs = state.lastEditAt ? fmtRelTime(state.lastEditAt) : '—';
+    slot.innerHTML = `
+      <div class="nb-empty-state">
+        <div class="nb-empty-icon">📡</div>
+        <div class="nb-empty-body">
+          <div class="nb-empty-title">Live mode active, but no data server is reachable.</div>
+          <div class="nb-empty-desc">Showing snapshots from <time>${escapeHtml(snapTs)} ago</time>.</div>
+        </div>
+        <button class="nb-btn nb-empty-retry">retry connection</button>
+      </div>
+    `;
+    (slot.querySelector('.nb-empty-retry') as HTMLElement).addEventListener('click', () => {
+      bootstrapLive();
+      rerender();
+    });
+  }
+
+  function bootstrapLive() {
+    liveCleanup?.();
+    liveCleanup = null;
+    overlay = createRuntimeOverlay();
+    liveCleanup = bootstrapLiveRefresh({
+      state,
+      data,
+      overlay,
+      MultiMcpBridgeCtor: MultiMcpBridge as any,
+      onCellChange: (cellId) => {
+        const node = cellsEl.querySelector(`[data-id="${cellId}"]`) as HTMLElement | null;
+        if (!node) { renderCells(); return; }
+        const idx = state.cells.findIndex((c) => c.id === cellId);
+        if (idx < 0) return;
+        const fresh = renderCell(state.cells[idx], state, overlay, rerender);
+        fresh.addEventListener('focusin', () => { lastActiveIdx = idx; });
+        node.replaceWith(fresh);
+      },
+      onTick: () => {
+        renderLiveBadge();
+        renderEmptyState();
+      },
+    });
+  }
+
   function rerender() {
     mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); });
+    renderLiveToggle();
+    renderLiveBadge();
+    renderEmptyState();
     renderCells();
   }
 
@@ -167,12 +261,15 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     state.mode = 'edit';
     container.classList.remove('nb-view-mode');
     editBtn.classList.add('nb-on'); viewBtn.classList.remove('nb-on');
+    // Leaving view: stop live refresh and clear overlay so frozen snapshots show.
+    liveCleanup?.(); liveCleanup = null; overlay = null;
     rerender();
   });
   viewBtn.addEventListener('click', () => {
     state.mode = 'view';
     container.classList.add('nb-view-mode');
     viewBtn.classList.add('nb-on'); editBtn.classList.remove('nb-on');
+    if (state.autoRun === true) bootstrapLive();
     rerender();
   });
 
@@ -201,11 +298,18 @@ export async function render(container: HTMLElement, data: Record<string, unknow
 
   rerender();
 
+  // Mount-time bootstrap: view + autoRun → start live refresh.
+  if (state.autoRun === true && state.mode === 'view') {
+    bootstrapLive();
+    rerender();
+  }
+
   return () => {
     unsubHistory();
     canvasUnsub?.();
     pane.destroy();
     publishCleanup();
+    liveCleanup?.();
   };
 }
 
@@ -299,7 +403,7 @@ function makeSqlExecutor(data: Record<string, unknown>) {
 // Cell rendering — prose + code share the unified flow, same DnD handle
 // ---------------------------------------------------------------------------
 
-function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => void): HTMLElement {
+function renderCell(cell: NotebookCell, state: NotebookState, overlay: RuntimeOverlay | null, rerender: () => void): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'nb-cell-wrapper nbe-cell';
   wrap.dataset.id = cell.id;
@@ -353,10 +457,23 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
 
   const head = document.createElement('div');
   head.className = 'nbe-cell-head';
+  const rtStatus = cellRuntimeStatus(cell, overlay);
+  const showLive = state.autoRun === true && state.mode === 'view';
+  let liveBadge = '';
+  if (showLive) {
+    if (rtStatus === 'running') {
+      liveBadge = `<span class="nbe-cell-badge nbe-cell-running" title="re-executing"><span class="nbe-spinner"></span>running</span>`;
+    } else if (rtStatus === 'stale') {
+      liveBadge = `<span class="nbe-cell-badge nbe-cell-stale" title="last live refresh failed">stale</span>`;
+    } else if (rtStatus === 'frozen') {
+      liveBadge = `<span class="nbe-cell-badge nbe-cell-frozen" title="JS cells are not re-executed in live mode">frozen</span>`;
+    }
+  }
   head.innerHTML = `
     <span class="nbe-run-controls"></span>
     <span class="nbe-type-${cell.type}">${cell.type}</span>
-    <span class="nbe-meta-info">${escapeHtml(metaInfoFor(cell))}</span>
+    <span class="nbe-meta-info">${escapeHtml(metaInfoFor(cell, overlay))}</span>
+    ${liveBadge}
     <div class="nbe-actions">
       <button class="nb-icon-btn nb-toggle-src">${cell.hideSource ? '▸ src' : '◂ src'}</button>
       <button class="nb-icon-btn nb-toggle-res">${cell.hideResult ? '▸ res' : '◂ res'}</button>
@@ -379,7 +496,7 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
   if (!cell.hideResult) {
     const res = document.createElement('div');
     res.className = 'nbe-result';
-    renderResultInto(res, cell);
+    renderResultInto(res, cell, overlay);
     codeCell.appendChild(res);
   }
 
@@ -395,8 +512,8 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
 // Result rendering — editorial flavour (serif headers, mono cells, discreet)
 // ---------------------------------------------------------------------------
 
-function metaInfoFor(cell: NotebookCell): string {
-  const r = cell.lastResult;
+function metaInfoFor(cell: NotebookCell, overlay: RuntimeOverlay | null): string {
+  const r = effectiveResult(cell, overlay) ?? cell.lastResult;
   if (!r) {
     if (cell.lastMs != null) return formatMs(cell.lastMs);
     return cell.status === 'stale' ? 'stale' : '';
@@ -416,8 +533,8 @@ function formatMs(ms: number): string {
   return (ms / 1000).toFixed(2) + 's';
 }
 
-function renderResultInto(el: HTMLElement, cell: NotebookCell): void {
-  const r = cell.lastResult;
+function renderResultInto(el: HTMLElement, cell: NotebookCell, overlay: RuntimeOverlay | null): void {
+  const r = effectiveResult(cell, overlay) ?? cell.lastResult;
   el.innerHTML = '';
   if (!r) {
     el.innerHTML = `<div class="nbe-result-empty">press ▶ to run</div>`;
@@ -732,6 +849,88 @@ function injectLayoutStyles(): void {
 }
 .nbe-toast.nbe-toast-in { opacity: 1; transform: translateX(-50%) translateY(0); }
 .nbe-toast.nbe-toast-error { color: var(--color-accent2); border-color: var(--color-accent2); }
+
+/* Live mode — discreet toggle in header (edit mode only) */
+.nbe-live-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10.5px; color: var(--color-text2);
+  letter-spacing: 0.06em; text-transform: uppercase;
+  cursor: pointer; user-select: none;
+  padding: 2px 7px; border: 1px solid var(--color-border); border-radius: 4px;
+}
+.nbe-live-toggle:hover { color: var(--color-text1); border-color: var(--color-border2); }
+.nbe-live-toggle input { margin: 0; cursor: pointer; }
+
+/* Title row + Live badge (view mode + autoRun) */
+.nbe-title-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.nbe-title-row .nbe-title { flex: 1; min-width: 0; }
+.nbe-live-badge-slot { display: inline-flex; align-items: center; gap: 8px; }
+.nbe-refreshed-at {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10.5px; color: var(--color-text2);
+}
+
+/* Shared "● Live" pill */
+.nb-live-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px; border-radius: 999px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10px; font-weight: 500; letter-spacing: 0.04em;
+  background: rgba(46, 160, 67, 0.12);
+  color: #2ea043; border: 1px solid rgba(46, 160, 67, 0.35);
+}
+
+/* Per-cell live badges (in cell head) */
+.nbe-cell-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 6px; border-radius: 999px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 9.5px; letter-spacing: 0.04em;
+  border: 1px solid transparent;
+  margin-left: 4px;
+}
+.nbe-cell-running {
+  background: rgba(46, 160, 67, 0.10); color: #2ea043;
+  border-color: rgba(46, 160, 67, 0.30);
+}
+.nbe-cell-stale {
+  background: rgba(210, 153, 34, 0.12); color: var(--color-amber, #d29922);
+  border-color: rgba(210, 153, 34, 0.35);
+}
+.nbe-cell-frozen {
+  background: var(--color-surface2); color: var(--color-text2);
+  border-color: var(--color-border);
+  opacity: 0.75;
+}
+.nbe-spinner {
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1.5px solid currentColor; border-right-color: transparent;
+  display: inline-block; animation: nbe-spin 0.8s linear infinite;
+}
+@keyframes nbe-spin { to { transform: rotate(360deg); } }
+
+/* Empty-state banner */
+.nb-empty-state {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; margin: 12px 0 14px;
+  background: rgba(210, 153, 34, 0.08);
+  border: 1px solid rgba(210, 153, 34, 0.40);
+  border-radius: 8px;
+  color: var(--color-amber, #d29922);
+}
+.nb-empty-icon { font-size: 22px; line-height: 1; }
+.nb-empty-body { flex: 1; min-width: 0; }
+.nb-empty-title {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-weight: 600; font-size: 14px; color: var(--color-text1);
+}
+.nb-empty-desc {
+  margin-top: 2px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px; color: var(--color-text2);
+}
+.nb-empty-retry { white-space: nowrap; }
 `;
   document.head.appendChild(style);
 }

@@ -11,14 +11,16 @@ import {
   registerExecutor, addImportedCells,
   collectDataServers, startRun, renderCellLogs,
   createPublishControls, autoConnectFrontmatterServers,
-  type NotebookState, type NotebookCell, type CellResult,
+  createRuntimeOverlay, bootstrapLiveRefresh, effectiveResult,
+  cellRuntimeStatus, lastRefreshedAt, fmtRelTime,
+  type NotebookState, type NotebookCell, type CellResult, type RuntimeOverlay,
 } from './shared.js';
 import { renderChart } from './chart-renderer.js';
 import { dispatchShare } from './share-handlers.js';
 import { openAddMdModal, openAddRecipeModal } from './import-modals.js';
 import { extractCellsFromRecipe, extractCellFromMarkdown } from './resource-extractor.js';
 import { mountLeftPane } from './left-pane.js';
-import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
+import { callToolViaPostMessage, MultiMcpBridge } from '@webmcp-auto-ui/core';
 
 export async function render(container: HTMLElement, data: Record<string, unknown>): Promise<() => void> {
   injectStyles();
@@ -117,6 +119,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       <div class="nbw-header">
         <div class="nbw-logo"></div>
         <input class="nbw-title-edit nb-title-edit" value="${escapeAttr(state.title)}">
+        <span class="nbw-live-badge-slot"></span>
         <span class="nbw-publish-badge-slot"></span>
         <div class="nbw-ctx">
           <span class="nbw-source">${escapeAttr(sourceLabel)}</span>
@@ -127,9 +130,15 @@ export async function render(container: HTMLElement, data: Record<string, unknow
           <button class="nb-btn nbw-history-btn">⟲ history</button>
           <button class="nb-btn nbw-runall-btn">run all</button>
           <button class="nb-btn nbw-share-btn">share</button>
+          <label class="nbw-autorun-toggle" title="Re-run SQL cells live against connected servers when notebook is viewed">
+            <input type="checkbox" class="nbw-autorun-cb" ${state.autoRun ? 'checked' : ''}>
+            <span>live data</span>
+          </label>
           <span class="nbw-publish-btn-slot"></span>
         </div>
       </div>
+      <div class="nbw-live-meta-slot"></div>
+      <div class="nbw-empty-slot"></div>
       <div class="nb-history-panel nbw-history-panel"></div>
       <div class="nbw-toast-slot"></div>
       <div class="nbw-body">
@@ -158,6 +167,81 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const sourcesListEl = shell.querySelector('.nbw-sources-list') as HTMLElement;
   const toastSlot = shell.querySelector('.nbw-toast-slot') as HTMLElement;
   const sourceEl = shell.querySelector('.nbw-source') as HTMLElement;
+  const liveBadgeSlot = shell.querySelector('.nbw-live-badge-slot') as HTMLElement;
+  const liveMetaSlot = shell.querySelector('.nbw-live-meta-slot') as HTMLElement;
+  const emptySlot = shell.querySelector('.nbw-empty-slot') as HTMLElement;
+  const autorunToggle = shell.querySelector('.nbw-autorun-toggle') as HTMLElement;
+  const autorunCb = shell.querySelector('.nbw-autorun-cb') as HTMLInputElement;
+
+  // ---- Live mode (autoRun) overlay --------------------------------------
+  let overlay: RuntimeOverlay | null = null;
+  let liveCleanup: (() => void) | null = null;
+
+  function startLive(): void {
+    stopLive();
+    overlay = createRuntimeOverlay();
+    liveCleanup = bootstrapLiveRefresh({
+      state,
+      data,
+      overlay,
+      MultiMcpBridgeCtor: MultiMcpBridge as any,
+      onCellChange: () => { renderCells(); renderLiveHeader(); },
+      onTick: () => { renderLiveHeader(); },
+    });
+  }
+  function stopLive(): void {
+    try { liveCleanup?.(); } catch {}
+    liveCleanup = null;
+    overlay = null;
+  }
+
+  function renderLiveHeader(): void {
+    // Live pill (only in view + autoRun)
+    const showLive = state.mode === 'view' && state.autoRun === true;
+    liveBadgeSlot.innerHTML = showLive ? '<span class="nb-live-badge">● Live</span>' : '';
+    if (showLive) {
+      const ts = lastRefreshedAt(overlay);
+      liveMetaSlot.innerHTML = ts
+        ? `<div class="nbw-live-meta">Refreshed <time datetime="${new Date(ts).toISOString()}">${escapeHtml(fmtRelTime(ts))}</time></div>`
+        : '<div class="nbw-live-meta">Refreshing…</div>';
+    } else {
+      liveMetaSlot.innerHTML = '';
+    }
+
+    // Empty-state banner
+    const showEmpty = !!(state.autoRun && state.mode === 'view' && overlay
+      && (overlay.error || (overlay.finishedAt && overlay.outputs.size === 0)));
+    if (showEmpty) {
+      const ts = lastRefreshedAt(overlay);
+      const snapWhen = ts ? fmtRelTime(ts) : 'last save';
+      emptySlot.innerHTML = `
+        <div class="nb-empty-state">
+          <div class="nb-empty-icon">📡</div>
+          <div class="nb-empty-body">
+            <div class="nb-empty-title">Live mode active, but no data server is reachable.</div>
+            <div class="nb-empty-desc">Showing snapshots from <time>${escapeHtml(snapWhen)}</time>.</div>
+          </div>
+          <button class="nb-btn nb-empty-retry">retry connection</button>
+        </div>`;
+      const retry = emptySlot.querySelector('.nb-empty-retry') as HTMLElement | null;
+      retry?.addEventListener('click', () => { startLive(); renderLiveHeader(); });
+    } else {
+      emptySlot.innerHTML = '';
+    }
+  }
+
+  function applyAutoRunUiVisibility(): void {
+    // Toggle visible only in edit mode
+    autorunToggle.style.display = state.mode === 'edit' ? '' : 'none';
+  }
+
+  autorunCb.addEventListener('change', () => {
+    state.autoRun = autorunCb.checked;
+    if (state.autoRun && state.mode === 'view') startLive();
+    else stopLive();
+    renderLiveHeader();
+    renderCells();
+  });
 
   function rerenderSources() {
     const servers = collectDataServers(data);
@@ -216,7 +300,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       });
       navEl.appendChild(navItem);
 
-      cellsEl.appendChild(renderCell(cell, idx, state, rerender));
+      cellsEl.appendChild(renderCell(cell, idx, state, rerender, overlay));
     });
   }
 
@@ -224,6 +308,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); });
     renderCells();
     rerenderSources();
+    renderLiveHeader();
+    applyAutoRunUiVisibility();
     // Update source label
     const first = collectDataServers(data)[0];
     sourceEl.textContent = first?.name ?? 'no source connected';
@@ -344,11 +430,15 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     state.mode = 'edit';
     container.classList.remove('nb-view-mode');
     editBtn.classList.add('nb-on'); viewBtn.classList.remove('nb-on');
+    stopLive();
+    rerender();
   });
   viewBtn.addEventListener('click', () => {
     state.mode = 'view';
     container.classList.add('nb-view-mode');
     viewBtn.classList.add('nb-on'); editBtn.classList.remove('nb-on');
+    if (state.autoRun) startLive();
+    rerender();
   });
 
   // ---- Left pane (collapsed by default) ------------------------------------
@@ -376,16 +466,22 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     if (canvasAny?.subscribe) canvasUnsub = canvasAny.subscribe(() => rerenderSources());
   } catch {}
 
+  // ---- Live-mode bootstrap (view + autoRun at mount) ----------------------
+  if (state.autoRun && state.mode === 'view') {
+    startLive();
+  }
+
   rerender();
   return () => {
     unsubHistory();
     try { leftPaneHandle?.destroy?.(); } catch {}
     try { canvasUnsub?.(); } catch {}
     try { destroyPublish(); } catch {}
+    try { stopLive(); } catch {}
   };
 }
 
-function renderCell(cell: NotebookCell, idx: number, state: NotebookState, rerender: () => void): HTMLElement {
+function renderCell(cell: NotebookCell, idx: number, state: NotebookState, rerender: () => void, overlay: RuntimeOverlay | null): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'nb-cell-wrapper nbw-cell';
   wrap.dataset.id = cell.id;
@@ -397,8 +493,14 @@ function renderCell(cell: NotebookCell, idx: number, state: NotebookState, reren
   head.className = 'nbw-cell-head';
   const isCode = cell.type !== 'md';
 
-  // Compute meta info from lastResult
-  const metaInfo = computeMetaInfo(cell);
+  // Live-mode awareness
+  const liveActive = state.mode === 'view' && state.autoRun === true;
+  const rtStatus = cellRuntimeStatus(cell, overlay);
+  const liveResult = effectiveResult(cell, overlay);
+
+  // Compute meta info from effective (overlay-aware) result, no mutation
+  const metaInfo = computeMetaInfo(cell, liveResult);
+  const statusBadge = renderStatusBadge(rtStatus, liveActive);
 
   head.innerHTML = `
     <span class="nb-drag-handle" draggable="true" title="drag">⋮⋮</span>
@@ -406,6 +508,7 @@ function renderCell(cell: NotebookCell, idx: number, state: NotebookState, reren
     <span class="nbw-type nbw-type-${cell.type}">${cell.type}</span>
     <input class="nbw-cell-name-edit" value="${idx + 1} · ${escapeAttr(cell.name || '')}">
     <div class="nbw-meta">
+      ${isCode && statusBadge ? statusBadge : ''}
       ${isCode ? `<span class="nbw-meta-info">${escapeAttr(metaInfo)}</span>` : ''}
       <button class="nb-icon-btn nb-toggle-src">${cell.hideSource ? '▸ src' : '◂ src'}</button>
       ${isCode ? `<button class="nb-icon-btn nb-toggle-res">${cell.hideResult ? '▸ res' : '◂ res'}</button>` : ''}
@@ -429,9 +532,9 @@ function renderCell(cell: NotebookCell, idx: number, state: NotebookState, reren
   inner.appendChild(body);
   setTimeout(() => autosize(ta), 0);
 
-  // ---- Result rendering (from cell.lastResult) ----
-  if (isCode && !cell.hideResult && cell.lastResult) {
-    inner.appendChild(renderResult(cell.lastResult));
+  // ---- Result rendering (live overlay if available, else snapshot) ----
+  if (isCode && !cell.hideResult && liveResult) {
+    inner.appendChild(renderResult(liveResult));
   }
 
   (head.querySelector('.nb-toggle-src') as HTMLElement).addEventListener('click', () => { cell.hideSource = !cell.hideSource; rerender(); });
@@ -450,15 +553,25 @@ function renderCell(cell: NotebookCell, idx: number, state: NotebookState, reren
   return wrap;
 }
 
-function computeMetaInfo(cell: NotebookCell): string {
-  const ms = cell.lastMs != null ? cell.lastMs + 'ms' : '—';
-  const r = cell.lastResult;
+function computeMetaInfo(cell: NotebookCell, effective?: CellResult | undefined): string {
+  const r = effective ?? cell.lastResult;
+  const ms = (r && (r as any).durationMs != null)
+    ? (r as any).durationMs + 'ms'
+    : (cell.lastMs != null ? cell.lastMs + 'ms' : '—');
   if (!r) return ms + ' · (not run yet)';
   if (!r.ok) return ms + ' · error';
   if (r.kind === 'table') return ms + ' · ' + r.rowCount + ' rows';
   if (r.kind === 'value') return ms + ' · value';
   if (r.kind === 'chart') return ms + ' · chart';
   return ms + ' · empty';
+}
+
+function renderStatusBadge(status: string, liveActive: boolean): string {
+  if (status === 'running') return '<span class="nbw-rt-badge nbw-rt-running" title="re-running"><span class="nbw-rt-spin"></span>running</span>';
+  if (status === 'stale') return '<span class="nbw-rt-badge nbw-rt-stale" title="live refresh failed; showing snapshot">stale</span>';
+  if (status === 'frozen' && liveActive) return '<span class="nbw-rt-badge nbw-rt-frozen" title="not re-run in live mode (snapshot)">frozen</span>';
+  if (status === 'fresh') return '<span class="nbw-rt-badge nbw-rt-fresh" title="freshly refreshed">fresh</span>';
+  return '';
 }
 
 function renderResult(res: CellResult): HTMLElement {
@@ -672,6 +785,68 @@ function injectLayoutStyles(): void {
 }
 .nbw-toast a { color: var(--color-accent); text-decoration: underline; }
 .nbw-toast-out { opacity: 0; transform: translateY(6px); }
+
+/* ---- Live mode --------------------------------------------------------- */
+.nb-live-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(62, 207, 130, 0.16); color: #2ea96b;
+  border: 1px solid rgba(62, 207, 130, 0.45);
+  padding: 1px 8px; border-radius: 999px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10px; letter-spacing: 0.06em; font-weight: 600;
+  text-transform: uppercase;
+}
+.nbw-live-meta {
+  padding: 4px 14px; color: var(--color-text2);
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10.5px; background: var(--color-surface2);
+  border-bottom: 1px solid var(--color-border);
+}
+.nbw-autorun-toggle {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10.5px; color: var(--color-text2); cursor: pointer;
+  padding: 2px 6px; border-radius: 4px;
+  border: 1px solid var(--color-border);
+}
+.nbw-autorun-toggle:hover { color: var(--color-text1); }
+.nbw-autorun-cb { accent-color: var(--color-accent); margin: 0; }
+.nb-empty-state {
+  display: flex; align-items: center; gap: 12px;
+  margin: 10px 14px;
+  padding: 12px 14px;
+  background: rgba(245, 178, 53, 0.10);
+  border: 1px solid rgba(245, 178, 53, 0.45);
+  border-radius: 8px;
+  color: #a8741a;
+  font-size: 12.5px;
+}
+.nb-empty-icon { font-size: 22px; line-height: 1; }
+.nb-empty-body { flex: 1; }
+.nb-empty-title { font-weight: 600; color: #8a5e10; }
+.nb-empty-desc {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px; opacity: 0.85; margin-top: 2px;
+}
+.nb-empty-retry { white-space: nowrap; }
+
+.nbw-rt-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 6px; border-radius: 3px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.nbw-rt-running { background: rgba(124,109,250,0.16); color: var(--color-accent); }
+.nbw-rt-stale { background: rgba(245,178,53,0.18); color: #a8741a; }
+.nbw-rt-frozen { background: rgba(160,160,184,0.14); color: var(--color-text2); opacity: 0.75; }
+.nbw-rt-fresh { background: rgba(62,207,130,0.15); color: #2ea96b; }
+.nbw-rt-spin {
+  width: 7px; height: 7px; border-radius: 50%;
+  border: 1.5px solid currentColor; border-right-color: transparent;
+  display: inline-block; animation: nbw-rt-spin 0.7s linear infinite;
+}
+@keyframes nbw-rt-spin { to { transform: rotate(360deg); } }
 `;
   document.head.appendChild(style);
 }

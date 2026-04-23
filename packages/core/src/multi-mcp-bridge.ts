@@ -160,6 +160,36 @@ export class MultiMcpBridge {
     return this.client;
   }
 
+  /** True if a server with this name has completed its handshake. */
+  hasServer(serverName: string): boolean {
+    return this.connected.has(serverName);
+  }
+
+  /** Snapshot of currently connected server names. */
+  connectedServers(): string[] {
+    return Array.from(this.connected);
+  }
+
+  /**
+   * Wait until every enabled data server in the canvas is connected, or the
+   * timeout elapses. Resolves either way (no throw) — caller inspects
+   * `connectedServers()` to decide what's reachable.
+   */
+  async waitForEnabledServers(timeoutMs = 5000): Promise<void> {
+    const canvas = this.options.getCanvas();
+    if (!canvas) return;
+    const deadline = Date.now() + Math.max(0, timeoutMs);
+    while (Date.now() < deadline) {
+      const enabled = (Array.isArray(canvas.dataServers) ? canvas.dataServers : [])
+        .filter((s: { enabled?: boolean }) => s?.enabled !== false)
+        .map((s: { name: string }) => s.name);
+      if (enabled.length === 0) return;
+      const allReady = enabled.every((n: string) => this.connected.has(n));
+      if (allReady) return;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Reconciliation
   // -------------------------------------------------------------------------

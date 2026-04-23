@@ -13,7 +13,9 @@ import {
   createPublishControls, autoConnectFrontmatterServers,
   registerExecutor, logHistory, addImportedCells, fmtRelTime, uid,
   renderCellLogs,
-  type NotebookState, type NotebookCell, type CellResult,
+  createRuntimeOverlay, bootstrapLiveRefresh, effectiveResult,
+  cellRuntimeStatus, isReRunnable, lastRefreshedAt,
+  type NotebookState, type NotebookCell, type CellResult, type RuntimeOverlay,
 } from './shared.js';
 import { renderChart } from './chart-renderer.js';
 import { dispatchShare } from './share-handlers.js';
@@ -25,7 +27,7 @@ import {
   extractCellsFromRecipe, extractCellFromMarkdown,
 } from './resource-extractor.js';
 import { mountLeftPane } from './left-pane.js';
-import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
+import { callToolViaPostMessage, MultiMcpBridge } from '@webmcp-auto-ui/core';
 
 // ---------------------------------------------------------------------------
 // Comment types (extended: body editable + threaded replies)
@@ -186,6 +188,10 @@ export async function render(container: HTMLElement, data: Record<string, unknow
           </div>
           <span class="nbd-label">${presence!.count ?? presence!.editors!.length} editor${(presence!.count ?? presence!.editors!.length) > 1 ? 's' : ''} online</span>
         ` : ''}
+        <label class="nbd-live-toggle" title="re-execute SQL cells against connected MCP servers when viewed">
+          <input type="checkbox" class="nbd-live-checkbox" ${state.autoRun ? 'checked' : ''}>
+          <span>Live data</span>
+        </label>
         <div class="nb-mode-switch" style="margin-left:auto;">
           <button class="nb-mode-edit nb-on">edit</button>
           <button class="nb-mode-view">view</button>
@@ -193,8 +199,12 @@ export async function render(container: HTMLElement, data: Record<string, unknow
         <button class="nb-btn nbd-history-btn">⟲ history</button>
         <span class="nbd-publish-badge-slot"></span>
       </div>
-      <input class="nbd-title nb-doc-title" value="${escapeAttr(state.title)}">
+      <div class="nbd-title-row">
+        <input class="nbd-title nb-doc-title" value="${escapeAttr(state.title)}">
+        <span class="nbd-live-badge-slot"></span>
+      </div>
       <div class="nbd-meta">edited <span class="nbd-edited-rel">${fmtRelTime(state.lastEditAt)}</span> ago</div>
+      <div class="nbd-empty-state-slot"></div>
       <div class="nb-history-panel nbd-history-panel"></div>
       <div class="nbd-cells"></div>
       <div class="nbd-footer">
@@ -215,6 +225,14 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const cellsEl = shell.querySelector('.nbd-cells') as HTMLElement;
   const historyPanel = shell.querySelector('.nbd-history-panel') as HTMLElement;
   const editedRelEl = shell.querySelector('.nbd-edited-rel') as HTMLElement;
+  const liveBadgeSlot = shell.querySelector('.nbd-live-badge-slot') as HTMLElement;
+  const emptyStateSlot = shell.querySelector('.nbd-empty-state-slot') as HTMLElement;
+  const liveCheckbox = shell.querySelector('.nbd-live-checkbox') as HTMLInputElement;
+  const liveToggleLabel = shell.querySelector('.nbd-live-toggle') as HTMLElement;
+
+  // Live mode (autoRun) — overlay holds ephemeral results; canonical cells.lastResult untouched.
+  let overlay: RuntimeOverlay | null = null;
+  let liveCleanup: (() => void) | null = null;
 
   // Track active cell (last one clicked or focused) so imports insert near cursor
   let activeIdx: number | null = null;
@@ -223,7 +241,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   function renderCells() {
     cellsEl.innerHTML = '';
     state.cells.forEach((cell, idx) => {
-      const el = renderCell(cell, state, rerender);
+      const el = renderCell(cell, state, rerender, overlay);
       el.addEventListener('mousedown', () => { activeIdx = idx; }, true);
       cellsEl.appendChild(el);
     });
@@ -233,12 +251,96 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     if (editedRelEl) editedRelEl.textContent = fmtRelTime(state.lastEditAt);
   }
 
+  function renderLiveBadge() {
+    if (!liveBadgeSlot) return;
+    if (state.mode === 'view' && state.autoRun === true) {
+      const ts = lastRefreshedAt(overlay);
+      const rel = ts ? `refreshed ${fmtRelTime(ts)} ago` : 'connecting…';
+      liveBadgeSlot.innerHTML = `<span class="nb-live-badge nbd-live-badge">● Live</span><span class="nbd-live-rel">${escapeHtml(rel)}</span>`;
+    } else {
+      liveBadgeSlot.innerHTML = '';
+    }
+  }
+
+  function renderEmptyState() {
+    if (!emptyStateSlot) return;
+    const showEmpty = !!(
+      state.autoRun
+      && state.mode === 'view'
+      && overlay
+      && (overlay.error || (overlay.finishedAt && overlay.outputs.size === 0))
+    );
+    if (!showEmpty) { emptyStateSlot.innerHTML = ''; return; }
+    const ts = state.lastEditAt;
+    const rel = ts ? `${fmtRelTime(ts)} ago` : 'earlier';
+    emptyStateSlot.innerHTML = `
+      <div class="nb-empty-state nbd-empty-state-banner">
+        <div class="nb-empty-icon">📡</div>
+        <div class="nb-empty-title">Live mode active, but no data server is reachable.</div>
+        <div class="nb-empty-desc">Showing snapshots from <time>${escapeHtml(rel)}</time>.</div>
+        <button class="nb-btn nb-empty-retry">retry connection</button>
+      </div>`;
+    const retry = emptyStateSlot.querySelector('.nb-empty-retry') as HTMLButtonElement | null;
+    if (retry) retry.addEventListener('click', () => { startLiveRefresh(); });
+  }
+
+  function updateLiveToggleVisibility() {
+    if (!liveToggleLabel) return;
+    liveToggleLabel.style.display = state.mode === 'edit' ? '' : 'none';
+  }
+
+  function teardownLive() {
+    try { liveCleanup?.(); } catch { /* ignore */ }
+    liveCleanup = null;
+    overlay = null;
+  }
+
+  function startLiveRefresh() {
+    teardownLive();
+    if (!(state.autoRun && state.mode === 'view')) return;
+    overlay = createRuntimeOverlay();
+    liveCleanup = bootstrapLiveRefresh({
+      state,
+      data,
+      overlay,
+      MultiMcpBridgeCtor: MultiMcpBridge as any,
+      onCellChange: (cellId) => {
+        // Re-render only the affected cell to avoid full DOM churn
+        const idx = state.cells.findIndex((c) => c.id === cellId);
+        if (idx < 0) return;
+        const oldEl = cellsEl.children[idx] as HTMLElement | undefined;
+        if (!oldEl) return;
+        const newEl = renderCell(state.cells[idx]!, state, rerender, overlay);
+        newEl.addEventListener('mousedown', () => { activeIdx = idx; }, true);
+        oldEl.replaceWith(newEl);
+      },
+      onTick: () => { renderLiveBadge(); renderEmptyState(); },
+    });
+    renderLiveBadge();
+    renderEmptyState();
+  }
+
   function rerender() {
     mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); });
     renderCells();
     updateMeta();
+    renderLiveBadge();
+    renderEmptyState();
+    updateLiveToggleVisibility();
   }
   rerenderImpl = rerender;
+
+  if (liveCheckbox) {
+    liveCheckbox.addEventListener('change', () => {
+      state.autoRun = liveCheckbox.checked;
+      logHistory(state, 'edit', state.autoRun ? 'enabled live data' : 'disabled live data');
+      // When toggled in edit mode the overlay isn't active yet; re-evaluate on view switch.
+      if (state.mode === 'view') {
+        if (state.autoRun) startLiveRefresh();
+        else { teardownLive(); rerender(); }
+      }
+    });
+  }
 
   shell.querySelectorAll<HTMLElement>('[data-add]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -292,12 +394,14 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     state.mode = 'edit';
     container.classList.remove('nb-view-mode');
     editBtn.classList.add('nb-on'); viewBtn.classList.remove('nb-on');
+    teardownLive();
     rerender();
   });
   viewBtn.addEventListener('click', () => {
     state.mode = 'view';
     container.classList.add('nb-view-mode');
     viewBtn.classList.add('nb-on'); editBtn.classList.remove('nb-on');
+    if (state.autoRun) startLiveRefresh();
     rerender();
   });
 
@@ -324,8 +428,13 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   });
 
   rerender();
+
+  // Mount-time bootstrap: if published with autoRun + view, kick off live refresh.
+  if (state.autoRun && state.mode === 'view') startLiveRefresh();
+
   return () => {
     unsubHistory();
+    teardownLive();
     try { leftHandle.destroy(); } catch { /* ignore */ }
     try { publishCleanup?.(); } catch { /* ignore */ }
   };
@@ -335,7 +444,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
 // Cell renderer
 // ---------------------------------------------------------------------------
 
-function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => void): HTMLElement {
+function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => void, overlay: RuntimeOverlay | null): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'nb-cell-wrapper nbd-cell';
   wrap.dataset.id = cell.id;
@@ -399,10 +508,25 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
 
   const head = document.createElement('div');
   head.className = 'nbd-cell-head';
+  const showLiveBadges = state.mode === 'view' && state.autoRun === true;
+  const rtStatus = cellRuntimeStatus(cell, overlay);
+  let statusBadgeHtml = '';
+  if (showLiveBadges) {
+    if (rtStatus === 'running' || rtStatus === 'pending') {
+      statusBadgeHtml = '<span class="nbd-status-badge nbd-status-running" title="re-running"><span class="nbd-spinner"></span> running</span>';
+    } else if (rtStatus === 'stale') {
+      statusBadgeHtml = '<span class="nbd-status-badge nbd-status-stale" title="couldn\'t refresh — showing snapshot">stale</span>';
+    } else if (rtStatus === 'frozen' && !isReRunnable(cell)) {
+      statusBadgeHtml = '<span class="nbd-status-badge nbd-status-frozen" title="not re-executed in live mode">frozen</span>';
+    } else if (rtStatus === 'fresh') {
+      statusBadgeHtml = '<span class="nbd-status-badge nbd-status-fresh" title="re-executed against live data">fresh</span>';
+    }
+  }
   head.innerHTML = `
     <span class="nb-drag-handle" draggable="true" title="drag">⋮⋮</span>
     <span class="nbd-run-controls"></span>
     <span class="${cell.type === 'sql' ? 'nbd-type-sql' : 'nbd-type-js'}">${cell.type}</span>
+    ${statusBadgeHtml}
     <span class="nbd-meta-info">${cell.lastMs != null ? cell.lastMs + 'ms' : ''}</span>
     <div class="nbd-actions">
       <button class="nb-icon-btn nb-toggle-src">${cell.hideSource ? '▸ src' : '◂ src'}</button>
@@ -426,7 +550,9 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
   setTimeout(() => autosize(ta), 0);
 
   if (!cell.hideResult) {
-    const res = renderResult(cell);
+    // Live overlay takes precedence over frozen lastResult; canonical state untouched.
+    const eff = effectiveResult(cell, overlay) ?? cell.lastResult;
+    const res = renderResult(eff);
     if (res) codeCell.appendChild(res);
   }
 
@@ -459,8 +585,7 @@ function renderCell(cell: NotebookCell, state: NotebookState, rerender: () => vo
 // Document style: discrete tables, no ASCII bar charts.
 // ---------------------------------------------------------------------------
 
-function renderResult(cell: NotebookCell): HTMLElement | null {
-  const res = cell.lastResult;
+function renderResult(res: CellResult | undefined): HTMLElement | null {
   if (!res) return null;
 
   const wrap = document.createElement('div');
@@ -860,6 +985,81 @@ function injectLayoutStyles(): void {
 .nbd-publish-slot { display: inline-flex; }
 .nbd-publish-badge-slot { margin-left: 8px; }
 .nbd-publish-footer-slot { margin-top: 12px; padding: 0 16px; }
+
+/* Live mode (autoRun) */
+.nbd-live-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px; color: var(--color-text2);
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.nbd-live-toggle:hover { color: var(--color-text1); background: var(--color-bg); }
+.nbd-live-checkbox { margin: 0; cursor: pointer; }
+.nbd-title-row { display: flex; align-items: center; gap: 12px; }
+.nbd-title-row .nbd-title { flex: 1; }
+.nbd-live-badge-slot { display: inline-flex; align-items: center; gap: 8px; }
+.nb-live-badge.nbd-live-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 9px; border-radius: 999px;
+  background: rgba(62,207,178,0.15);
+  color: var(--color-teal, #3ecfb2);
+  border: 1px solid rgba(62,207,178,0.4);
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10.5px; font-weight: 500; letter-spacing: 0.04em;
+}
+.nbd-live-rel {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10.5px; color: var(--color-text2);
+}
+.nbd-status-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 7px; border-radius: 999px;
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 9.5px; font-weight: 500; letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.nbd-status-running { background: rgba(124,109,250,0.15); color: var(--color-accent, #7c6dfa); }
+.nbd-status-stale { background: rgba(240,160,80,0.18); color: var(--color-amber, #f0a050); border: 1px solid rgba(240,160,80,0.35); }
+.nbd-status-frozen { background: transparent; color: var(--color-text2); border: 1px dashed var(--color-border); opacity: 0.7; }
+.nbd-status-fresh { background: rgba(62,207,178,0.12); color: var(--color-teal, #3ecfb2); }
+.nbd-spinner {
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1.5px solid currentColor; border-top-color: transparent;
+  animation: nbd-spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes nbd-spin { to { transform: rotate(360deg); } }
+
+.nb-empty-state.nbd-empty-state-banner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 4px 14px;
+  align-items: center;
+  margin: 8px 0 16px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  background: rgba(240,160,80,0.08);
+  border: 1px solid rgba(240,160,80,0.35);
+  border-left: 3px solid var(--color-amber, #f0a050);
+}
+.nbd-empty-state-banner .nb-empty-icon {
+  grid-row: 1 / span 2;
+  font-size: 22px; line-height: 1;
+}
+.nbd-empty-state-banner .nb-empty-title {
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 12px; color: var(--color-amber, #f0a050); font-weight: 500;
+}
+.nbd-empty-state-banner .nb-empty-desc {
+  font-family: Palatino, Georgia, serif;
+  font-size: 12.5px; color: var(--color-text2);
+}
+.nbd-empty-state-banner .nb-empty-retry {
+  grid-row: 1 / span 2;
+}
 `;
   document.head.appendChild(style);
 }

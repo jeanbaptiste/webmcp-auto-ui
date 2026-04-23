@@ -63,6 +63,12 @@ export interface NotebookState {
   kicker?: string;
   publishedSlug?: string;
   publishedToken?: string;
+  /**
+   * Live mode (opt-in). When true and `mode === 'view'`, SQL cells are
+   * re-executed against their declared data servers at mount time, producing
+   * a RuntimeOverlay consumed at render. Default false (frozen snapshots).
+   */
+  autoRun?: boolean;
 }
 
 export interface HistoryEntry {
@@ -123,7 +129,290 @@ export function createState(initial?: Partial<NotebookState>): NotebookState {
     executors: initial?.executors ?? {},
     lastEditAt: initial?.lastEditAt ?? Date.now(),
     kicker: initial?.kicker,
+    autoRun: initial?.autoRun ?? false,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Live mode (autoRun) — RuntimeOverlay + helpers
+//
+// Principle: when a notebook is viewed with `state.autoRun && state.mode==='view'`,
+// SQL cells are re-executed against their declared data servers, but the
+// canonical state is NEVER mutated. All live results live in a RuntimeOverlay
+// (ephemeral, per-mount). Rendering reads `effectiveResult(cell, overlay)` which
+// falls back to `cell.lastResult` when the overlay has nothing.
+//
+// This preserves two invariants:
+//   1) The published JSON is an immutable source of truth.
+//   2) Toggling autoRun OFF at runtime re-shows frozen snapshots immediately.
+// ---------------------------------------------------------------------------
+
+export type CellRuntimeStatus = 'idle' | 'pending' | 'running' | 'fresh' | 'stale' | 'frozen';
+
+export interface RuntimeOverlay {
+  /** Fresh results keyed by cell id. */
+  outputs: Map<string, { result: CellResult; refreshedAt: number }>;
+  /** Per-cell status during/after the refresh cycle. */
+  status: Map<string, CellRuntimeStatus>;
+  startedAt: number | null;
+  finishedAt: number | null;
+  /** Last fatal reason (e.g. "no reachable server"). */
+  error: string | null;
+}
+
+export function createRuntimeOverlay(): RuntimeOverlay {
+  return {
+    outputs: new Map(),
+    status: new Map(),
+    startedAt: null,
+    finishedAt: null,
+    error: null,
+  };
+}
+
+/** Result to render for a cell: live if available, else frozen, else undefined. */
+export function effectiveResult(cell: NotebookCell, overlay: RuntimeOverlay | null | undefined): CellResult | undefined {
+  const live = overlay?.outputs.get(cell.id);
+  if (live) return live.result;
+  return cell.lastResult;
+}
+
+/** Display status (drives badges). Defaults to 'frozen' for non-rerunnable, else 'idle'. */
+export function cellRuntimeStatus(cell: NotebookCell, overlay: RuntimeOverlay | null | undefined): CellRuntimeStatus {
+  const s = overlay?.status.get(cell.id);
+  if (s) return s;
+  if (!isReRunnable(cell)) return 'frozen';
+  return 'idle';
+}
+
+/** Live-mode whitelist. Only SQL cells are re-executable publicly. */
+export function isReRunnable(cell: NotebookCell): boolean {
+  return cell.type === 'sql';
+}
+
+/**
+ * Host-supplied runner for a single cell. Returns the fresh result, or throws.
+ * The host decides how to talk to MCP (bridge, postMessage, local, etc.).
+ */
+export type CellRunner = (cell: NotebookCell, signal: AbortSignal) => Promise<CellResult>;
+
+export interface AutoRefreshOptions {
+  state: NotebookState;
+  overlay: RuntimeOverlay;
+  runner: CellRunner;
+  /** Per-cell sub-render request — invoked whenever the overlay changes for a cell. */
+  onCellChange?: (cellId: string) => void;
+  /** Global tick — invoked on start / per cell / on finish. UI uses it for toolbar badges. */
+  onTick?: (overlay: RuntimeOverlay) => void;
+  signal?: AbortSignal;
+}
+
+export interface AutoRefreshSummary {
+  rerun: number;
+  frozen: number;
+  stale: number;
+  failed: number;
+}
+
+/**
+ * Drive the live refresh cycle. Mutates ONLY the overlay (never the state).
+ * Calls runner sequentially per cell to keep load low and order predictable.
+ */
+export async function runAutoRefresh(opts: AutoRefreshOptions): Promise<AutoRefreshSummary> {
+  const { state, overlay, runner, onCellChange, onTick, signal } = opts;
+  overlay.startedAt = Date.now();
+  overlay.finishedAt = null;
+  overlay.error = null;
+
+  // Seed status
+  for (const c of state.cells) {
+    overlay.status.set(c.id, isReRunnable(c) ? 'pending' : 'frozen');
+  }
+  onTick?.(overlay);
+
+  const summary: AutoRefreshSummary = { rerun: 0, frozen: 0, stale: 0, failed: 0 };
+
+  for (const cell of state.cells) {
+    if (signal?.aborted) break;
+    if (!isReRunnable(cell)) { summary.frozen++; continue; }
+
+    overlay.status.set(cell.id, 'running');
+    onCellChange?.(cell.id);
+    onTick?.(overlay);
+
+    try {
+      const result = await runner(cell, signal ?? new AbortController().signal);
+      if (result.ok) {
+        overlay.outputs.set(cell.id, { result, refreshedAt: Date.now() });
+        overlay.status.set(cell.id, 'fresh');
+        summary.rerun++;
+      } else {
+        overlay.status.set(cell.id, 'stale');
+        summary.stale++;
+      }
+    } catch (err) {
+      overlay.status.set(cell.id, 'stale');
+      summary.failed++;
+      if (!overlay.error) overlay.error = err instanceof Error ? err.message : String(err);
+    }
+    onCellChange?.(cell.id);
+    onTick?.(overlay);
+  }
+
+  overlay.finishedAt = Date.now();
+  onTick?.(overlay);
+  return summary;
+}
+
+/** Last successful refresh timestamp (max refreshedAt across cells). */
+export function lastRefreshedAt(overlay: RuntimeOverlay | null | undefined): number | null {
+  if (!overlay || overlay.outputs.size === 0) return null;
+  let max = 0;
+  for (const v of overlay.outputs.values()) if (v.refreshedAt > max) max = v.refreshedAt;
+  return max || null;
+}
+
+/**
+ * Build a CellRunner backed by a MultiMcpBridge. Discovers a SQL-capable tool
+ * on the connected servers (matching `*_query_sql` then `query|run|execute`),
+ * calls it with `{ sql: cell.content }`, parses content-array into a table.
+ *
+ * Throws if no server is reachable / no SQL tool found. Callers are expected
+ * to surface this as a 'stale' status, not crash.
+ */
+export function createBridgeSqlRunner(bridge: {
+  hasServer?: (name: string) => boolean;
+  connectedServers?: () => string[];
+  multiClient: {
+    listTools?: (url: string) => Promise<{ name: string }[]>;
+    getToolsForUrl?: (url: string) => { name: string }[];
+  };
+  callTool: (serverName: string, toolName: string, args: unknown) => Promise<unknown>;
+}, getServerDescriptors: () => DataServerDescriptor[]): CellRunner {
+  const PATTERN_PRIMARY = /^.*query_sql$/i;
+  const PATTERN_FALLBACK = /^(query|run|execute)(_sql)?$/i;
+
+  function findSqlTool(servers: DataServerDescriptor[]): { serverName: string; toolName: string } | null {
+    for (const srv of servers) {
+      for (const t of srv.tools ?? []) {
+        if (PATTERN_PRIMARY.test(t.name)) return { serverName: srv.name, toolName: t.name };
+      }
+    }
+    for (const srv of servers) {
+      for (const t of srv.tools ?? []) {
+        if (PATTERN_FALLBACK.test(t.name)) return { serverName: srv.name, toolName: t.name };
+      }
+    }
+    return null;
+  }
+
+  function parseResult(raw: unknown, startedAt: number): CellResult {
+    const durationMs = Date.now() - startedAt;
+    try {
+      const content = (raw as { content?: unknown })?.content ?? raw;
+      let text: string | null = null;
+      if (Array.isArray(content)) {
+        const first = content.find((c: { type?: string; text?: string }) => c?.type === 'text' && typeof c.text === 'string');
+        text = first ? (first as { text: string }).text : null;
+      } else if (typeof content === 'string') {
+        text = content;
+      }
+      if (!text) return { ok: true, kind: 'empty', durationMs };
+      let parsed: unknown = text;
+      try { parsed = JSON.parse(text); } catch { /* keep raw string */ }
+      if (Array.isArray(parsed)) {
+        const rows = parsed as Record<string, unknown>[];
+        const cols = rows.length ? Object.keys(rows[0]!) : [];
+        return { ok: true, kind: 'table', rows, columns: cols, rowCount: rows.length, durationMs };
+      }
+      if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { rows?: unknown }).rows)) {
+        const rows = (parsed as { rows: Record<string, unknown>[] }).rows;
+        const cols = Array.isArray((parsed as { columns?: string[] }).columns)
+          ? (parsed as { columns: string[] }).columns
+          : (rows.length ? Object.keys(rows[0]!) : []);
+        return { ok: true, kind: 'table', rows, columns: cols, rowCount: rows.length, durationMs };
+      }
+      return { ok: true, kind: 'value', value: parsed, durationMs };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err), errorKind: 'runtime', durationMs };
+    }
+  }
+
+  return async (cell, _signal) => {
+    const startedAt = Date.now();
+    const servers = getServerDescriptors();
+    if (!servers.length) {
+      return { ok: false, error: 'No data server reachable', errorKind: 'schema', durationMs: 0 };
+    }
+    const hit = findSqlTool(servers);
+    if (!hit) {
+      return { ok: false, error: 'No SQL tool exposed by reachable servers', errorKind: 'schema', durationMs: 0 };
+    }
+    const raw = await bridge.callTool(hit.serverName, hit.toolName, { sql: cell.content });
+    return parseResult(raw, startedAt);
+  };
+}
+
+/**
+ * High-level bootstrap: auto-connect declared servers, wait for handshake, build
+ * a bridge-backed runner, fire runAutoRefresh. Safe to call from any layout at
+ * mount time when `state.autoRun && state.mode === 'view'`. Returns a cleanup.
+ *
+ * `MultiMcpBridgeCtor` is injected (via dynamic import from @webmcp-auto-ui/core
+ * by the caller) to keep this file free of a hard import cycle.
+ */
+export interface BootstrapLiveRefreshOptions {
+  state: NotebookState;
+  data: Record<string, unknown>;
+  overlay: RuntimeOverlay;
+  MultiMcpBridgeCtor: new (opts: { getCanvas: () => unknown }) => {
+    start(): void;
+    stop(): void;
+    waitForEnabledServers(timeoutMs?: number): Promise<void>;
+    connectedServers(): string[];
+    hasServer(name: string): boolean;
+    callTool(serverName: string, toolName: string, args: unknown): Promise<unknown>;
+    multiClient: unknown;
+  };
+  onCellChange?: (cellId: string) => void;
+  onTick?: (overlay: RuntimeOverlay) => void;
+  timeoutMs?: number;
+}
+
+export function bootstrapLiveRefresh(opts: BootstrapLiveRefreshOptions): () => void {
+  const { state, data, overlay, MultiMcpBridgeCtor, onCellChange, onTick, timeoutMs } = opts;
+  const ac = new AbortController();
+
+  void (async () => {
+    try {
+      autoConnectFrontmatterServers(data);
+      const canvas: unknown = (globalThis as { __canvasVanilla?: unknown; canvasVanilla?: unknown })
+        .__canvasVanilla ?? (globalThis as { canvasVanilla?: unknown }).canvasVanilla;
+      if (!canvas) {
+        overlay.error = 'No canvas available';
+        overlay.finishedAt = Date.now();
+        onTick?.(overlay);
+        return;
+      }
+      const bridge = new MultiMcpBridgeCtor({ getCanvas: () => canvas });
+      bridge.start();
+      await bridge.waitForEnabledServers(timeoutMs ?? 5000);
+
+      const runner = createBridgeSqlRunner(bridge, () => {
+        // filter collectDataServers to only connected ones
+        const all = collectDataServers(data);
+        return all.filter((s) => bridge.hasServer(s.name));
+      });
+
+      await runAutoRefresh({ state, overlay, runner, onCellChange, onTick, signal: ac.signal });
+    } catch (err) {
+      overlay.error = err instanceof Error ? err.message : String(err);
+      overlay.finishedAt = Date.now();
+      onTick?.(overlay);
+    }
+  })();
+
+  return () => { ac.abort(); };
 }
 
 export function registerExecutor(state: NotebookState, type: CellType, fn: CellExecutor): void {
