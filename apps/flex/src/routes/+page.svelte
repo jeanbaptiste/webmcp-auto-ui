@@ -189,9 +189,8 @@
   // trace widgets are enabled. We union into enabledServers (never remove), so
   // any server the user had already enabled stays on. We also don't disable on
   // OFF — the user may want to keep using these servers for their own widgets.
-  // autoui is required for the sankey widget; cytoscape for animated-flow;
-  // d3 for the tree. mermaid + plotly are no longer needed here.
-  const TRACE_REQUIRED_SERVERS = ['autoui', 'cytoscape', 'd3'];
+  // d3 is required for the tree widget (the only sub-widget that remains).
+  const TRACE_REQUIRED_SERVERS = ['d3'];
   $effect(() => {
     if (!visualTrace) return;
     untrack(() => {

@@ -374,9 +374,7 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
 
   function flush(): void {
     if (ids === null) return;
-    ctx.updateWidget(ids.dagId, buildCytoscapeData());
     ctx.updateWidget(ids.treeId, buildTreeData());
-    ctx.updateWidget(ids.sankeyId, buildSankeyData());
   }
 
   const callbacks: Partial<AgentCallbacks> = {
@@ -602,11 +600,11 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
     callbacks,
     mount(): { dagId: string; treeId: string; sankeyId: string } | null {
       if (ids !== null) return ids;
-      const dag = ctx.addWidget('animated-flow', buildCytoscapeData(), 'cytoscape');
       const tree = ctx.addWidget('tree', buildTreeData(), 'd3');
-      const sankey = ctx.addWidget('sankey', buildSankeyData(), 'autoui');
-      if (!dag || !tree || !sankey) return null;
-      ids = { dagId: dag.id, treeId: tree.id, sankeyId: sankey.id };
+      if (!tree) return null;
+      // dagId/sankeyId kept as empty strings for shape compatibility — the
+      // cytoscape + sankey sub-widgets were removed in favor of the tree only.
+      ids = { dagId: '', treeId: tree.id, sankeyId: '' };
       // Synchronous immediate flush — guarantees widgets reflect full buffer
       // when trace is toggled mid-run (retroactive within current session).
       flush();
@@ -633,18 +631,9 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
         flushTimer = null;
       }
       if (ids !== null) {
-        ctx.updateWidget(ids.dagId, {
-          elements: [],
-          style: CYTOSCAPE_STYLE,
-          layout: { name: 'cose', animate: true },
-        });
         ctx.updateWidget(ids.treeId, {
           root: { name: 'conv', children: [] },
           orientation: 'horizontal',
-        });
-        ctx.updateWidget(ids.sankeyId, {
-          nodes: [],
-          links: [],
         });
       }
     },

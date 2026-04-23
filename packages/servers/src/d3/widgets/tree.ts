@@ -8,12 +8,22 @@ export async function render(
   data: Record<string, unknown>,
 ): Promise<void | (() => void)> {
   const d3 = await import('d3');
-  const { root: rawRoot, title, colorScheme, orientation = 'horizontal' } = data as any;
+
+  // Beautiful system-UI stack — renders crisp at any size, no web-font roundtrip.
+  const FONT_FAMILY = 'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif';
+  const NODE_FONT_SIZE = 14;
+  const TITLE_FONT_SIZE = 18;
+  const TOOLTIP_FONT_SIZE = 13;
+  // Empirical char width for the system-UI stack at 14px.
+  const CHAR_PX = 8.2;
+
+  // Mutable ref to latest data — updated in place on widget:data-update events.
+  let current = data as { root: any; title?: string; colorScheme?: string; orientation?: 'horizontal' | 'vertical' };
 
   container.style.position = 'relative';
 
   const colors = d3.scaleOrdinal(
-    (d3 as any)[`scheme${colorScheme ?? 'Tableau10'}`] ?? d3.schemeTableau10,
+    (d3 as any)[`scheme${current.colorScheme ?? 'Tableau10'}`] ?? d3.schemeTableau10,
   );
 
   const tooltip = d3
@@ -21,21 +31,21 @@ export async function render(
     .append('div')
     .style('position', 'absolute')
     .style('pointer-events', 'none')
-    .style('background', 'rgba(0,0,0,0.8)')
+    .style('background', 'rgba(0,0,0,0.85)')
     .style('color', '#fff')
-    .style('padding', '4px 8px')
-    .style('border-radius', '4px')
-    .style('font-size', '12px')
+    .style('padding', '6px 10px')
+    .style('border-radius', '6px')
+    .style('font-family', FONT_FAMILY)
+    .style('font-size', `${TOOLTIP_FONT_SIZE}px`)
     .style('opacity', '0');
 
   const draw = (width: number, height: number) => {
+    const rawRoot = current.root;
+    const title = current.title;
+    const orientation = current.orientation ?? 'horizontal';
     d3.select(container).selectAll('svg').remove();
 
     const hierarchy = d3.hierarchy(rawRoot);
-
-    // Dynamic margins — measure longest leaf label so it doesn't get clipped.
-    // Approx width @ 11px sans-serif ≈ 6.5px per char; clamp to avoid absurd margins.
-    const CHAR_PX = 6.5;
     const leafLabels = hierarchy.leaves().map((n: any) => String(n.data?.name ?? ''));
     const rootLabels = hierarchy.descendants()
       .filter((n: any) => n.children)
@@ -67,16 +77,18 @@ export async function render(
       .style('width', '100%')
       .style('height', '100%')
       .style('display', 'block')
-      .style('font', '10px sans-serif');
+      .style('font-family', FONT_FAMILY)
+      .style('font-size', `${NODE_FONT_SIZE}px`);
 
     if (title) {
       svg
         .append('text')
         .attr('x', width / 2)
-        .attr('y', 20)
+        .attr('y', 24)
         .attr('text-anchor', 'middle')
-        .style('font-size', '14px')
-        .style('font-weight', 'bold')
+        .style('font-size', `${TITLE_FONT_SIZE}px`)
+        .style('font-weight', '600')
+        .style('letter-spacing', '-0.01em')
         .text(title);
     }
 
@@ -132,10 +144,15 @@ export async function render(
 
     nodes
       .append('text')
-      .attr('dx', (d) => (d.children ? -8 : 8))
+      .attr('dx', (d) => (d.children ? -10 : 10))
       .attr('dy', '0.35em')
       .attr('text-anchor', (d) => (d.children ? 'end' : 'start'))
-      .style('font-size', '11px')
+      .style('font-size', `${NODE_FONT_SIZE}px`)
+      .style('font-weight', (d) => (d.depth === 0 ? '600' : d.children ? '500' : '400'))
+      .style('paint-order', 'stroke')
+      .style('stroke', '#fff')
+      .style('stroke-width', '3px')
+      .style('stroke-linejoin', 'round')
       .text((d) => d.data.name);
 
     nodes.on('dblclick', (event, d) => {
@@ -179,7 +196,20 @@ export async function render(
   const ro = new ResizeObserver(() => draw(...getSize()));
   ro.observe(container);
 
+  // In-place data updates — preempt the WidgetRenderer's full remount by
+  // calling preventDefault(). We redraw against the latest data, which keeps
+  // the surrounding DOM stable (no flicker, no tooltip recreation).
+  const onDataUpdate = (ev: Event) => {
+    const ce = ev as CustomEvent<Record<string, unknown>>;
+    if (!ce.detail || typeof ce.detail !== 'object') return;
+    current = ce.detail as typeof current;
+    ce.preventDefault();
+    draw(...getSize());
+  };
+  container.addEventListener('widget:data-update', onDataUpdate);
+
   return () => {
+    container.removeEventListener('widget:data-update', onDataUpdate);
     ro.disconnect();
     tooltip.remove();
     d3.select(container).selectAll('svg').remove();

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { type Component, onMount, onDestroy } from 'svelte';
+  import { type Component, onMount, onDestroy, untrack } from 'svelte';
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import { bus } from '../messaging/bus.svelte.js';
 
@@ -151,13 +151,17 @@
   // ── Vanilla renderer container + lifecycle ────────────
   let vanillaContainer: HTMLElement | undefined = $state(undefined);
 
+  // Mount effect — re-runs only when the widget identity changes (type /
+  // renderer / container). Data changes are handled separately to avoid a
+  // flickering full remount on every agent update.
   $effect(() => {
+    // Touch only the mount deps; `plainData` is intentionally read via untrack
+    // so data updates don't retrigger this effect.
     if (!useVanilla || !vanillaRenderer || !vanillaContainer) return;
     const container = vanillaContainer;
-    // Clear previous content
+    const renderer = vanillaRenderer;
     container.innerHTML = '';
 
-    // Listen for the standard vanilla event contract: CustomEvent('widget:interact')
     const onInteract = (ev: Event) => {
       const ce = ev as CustomEvent<{ action?: string; payload?: unknown }>;
       const action = ce.detail?.action ?? 'interact';
@@ -169,7 +173,7 @@
     let cancelled = false;
 
     try {
-      const result = vanillaRenderer(container, plainData);
+      const result = renderer(container, untrack(() => plainData));
       if (result && typeof (result as Promise<unknown>).then === 'function') {
         (result as Promise<void | (() => void)>).then(
           (c) => { if (!cancelled) cleanup = c ?? undefined; },
@@ -188,6 +192,29 @@
         try { cleanup(); } catch (err) { console.error('[WidgetRenderer] cleanup failed:', err); }
       }
     };
+  });
+
+  // Data-update effect — only triggers when plainData changes. Renderers that
+  // support in-place updates should listen for `widget:data-update` and call
+  // preventDefault() on the event; doing so signals they've handled the new
+  // data themselves so we don't need to remount. Renderers that don't listen
+  // fall back to a full remount here (innerHTML cleared + mount effect re-run).
+  let firstDataCycle = true;
+  $effect(() => {
+    const data = plainData;
+    if (!vanillaContainer || !useVanilla) return;
+    if (firstDataCycle) { firstDataCycle = false; return; }
+    const ev = new CustomEvent('widget:data-update', { detail: data, cancelable: true });
+    const handled = !vanillaContainer.dispatchEvent(ev);
+    if (handled || !vanillaRenderer) return;
+    // Not handled — fall back to remount by clearing + calling renderer again.
+    const container = vanillaContainer;
+    container.innerHTML = '';
+    try {
+      vanillaRenderer(container, data);
+    } catch (err) {
+      console.error('[WidgetRenderer] fallback remount failed:', err);
+    }
   });
 
   // ── Auto-register WebMCP tools when modelContext is available ────────────
