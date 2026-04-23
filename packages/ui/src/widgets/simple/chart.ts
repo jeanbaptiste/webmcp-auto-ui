@@ -22,12 +22,71 @@ type ChartInput = Partial<ChartBlockData> | null | undefined;
 
 // ── derived computations (mirrors $derived in Svelte) ───────────────────────
 
-function computeBars(data: ChartInput): [string, number][] {
-  const raw = data?.bars;
+/**
+ * Defensive coercion of various "bars" shapes the LLM may produce.
+ *
+ * Accepts:
+ *   1. [[label, value], ...]                 canonical tuple form
+ *   2. [{label, value}, ...]                 object with standard keys
+ *   3. [{name, count}, ...] / [{name, value}]  LLM-natural fallback
+ *
+ * Everything else is skipped (never throws). In particular, if a tuple's
+ * first element is itself an object (not a string/number/boolean), the
+ * entry is dropped — this was the root cause of the "[object Object]"
+ * labels + 2px bars bug in production.
+ */
+function normalizeBars(raw: unknown): [string, number][] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (b) => Array.isArray(b) && b.length >= 2
-  ) as [string, number][];
+  const out: [string, number][] = [];
+
+  const toNum = (v: unknown): number => {
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    if (typeof v === 'string') {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  };
+
+  const isPrimitiveLabel = (v: unknown): v is string | number | boolean =>
+    typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
+
+  for (const entry of raw) {
+    // Case 1: tuple array
+    if (Array.isArray(entry)) {
+      if (entry.length < 2) continue;
+      const label = entry[0];
+      // Root-cause guard: if label is not a primitive, skip (this was the bug).
+      if (!isPrimitiveLabel(label)) continue;
+      out.push([String(label), toNum(entry[1])]);
+      continue;
+    }
+
+    // Case 2/3: object forms
+    if (entry && typeof entry === 'object') {
+      const o = entry as Record<string, unknown>;
+      let label: unknown;
+      let value: unknown;
+
+      if ('label' in o) {
+        label = o.label;
+        value = 'value' in o ? o.value : o.count;
+      } else if ('name' in o) {
+        label = o.name;
+        value = 'value' in o ? o.value : o.count;
+      } else {
+        continue;
+      }
+
+      if (!isPrimitiveLabel(label)) continue;
+      out.push([String(label), toNum(value)]);
+      continue;
+    }
+
+    // Anything else: skip silently.
+  }
+
+  return out;
 }
 
 function computeMax(bars: [string, number][]): number {
@@ -83,7 +142,7 @@ export function render(container: HTMLElement, data: ChartInput): () => void {
   // Reset in case of re-render into a dirty container.
   container.innerHTML = '';
 
-  const bars = computeBars(data);
+  const bars = normalizeBars(data?.bars);
   const max = computeMax(bars);
   const title = typeof data?.title === 'string' ? data.title : '';
 

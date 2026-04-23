@@ -143,7 +143,7 @@ Call widget_display({name: "list", params: {items: ["A", "B", "C"]}}).
   // ── chart ────────────────────────────────────────────────────────────────
   `---
 widget: chart
-description: Simple bar chart. Labels + numeric values.
+description: Simple bar chart. bars is an array of tuples [label: string, value: number]. Each entry MUST be an array of length exactly 2, NOT an object.
 schema:
   type: object
   required:
@@ -153,8 +153,11 @@ schema:
       type: string
     bars:
       type: array
+      description: Array of tuples [label, value]. Each item is an array [string, number] of length exactly 2. Do NOT use objects like {label, value}.
       items:
         type: array
+        minItems: 2
+        maxItems: 2
 ---
 
 ## When to use
@@ -162,6 +165,7 @@ Pour un graphique a barres simple avec des labels et valeurs numeriques.
 
 ## How to use
 Call widget_display({name: "chart", params: {bars: [["Jan", 10], ["Fev", 20]]}}).
+Each bar is a tuple array of exactly 2 elements: [label: string, value: number]. NEVER use objects.
 `,
 
   // ── alert ────────────────────────────────────────────────────────────────
@@ -882,9 +886,10 @@ schema:
             type: string
     rows:
       type: array
-      description: Tableau de tableaux de valeurs (row-major)
+      description: Array of rows, row-major. Each row is an array of primitive values (string/number/boolean) with length equal to the number of columns. Do NOT use objects as rows.
       items:
         type: array
+        minItems: 1
     highlights:
       type: array
       description: Cellules a coloriser
