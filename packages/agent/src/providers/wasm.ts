@@ -313,11 +313,13 @@ export class WasmProvider implements LLMProvider {
       }
     }
 
-    // Strip hallucinated framework tokens the model should never emit on its own:
-    // - <|tool_response>...<tool_response|>  (injected by the framework, never generated)
-    // - <|channel>thought...<channel|>      (ghost thought channels if Gemma emits one
-    //   without <|think|> activation — stray artefacts from pretraining)
-    // - <|think|>                            (stray thinking-mode markers)
+    // Strip hallucinated framework tokens the model should never emit on its own.
+    // Thinking mode is disabled for Gemma (since commit 164a24d) but the model
+    // may still leak these tokens as pretraining artefacts — keep the defensive
+    // strip regardless of activation.
+    // - <|tool_response>...<tool_response|>  (framework-injected, never generated)
+    // - <|channel>thought...<channel|>       (ghost thought channels)
+    // - <|think|>                             (stray pretraining artefacts)
     fullText = fullText
       .replace(/<\|tool_response>[\s\S]*?<tool_response\|>/g, '')
       .replace(/<\|channel>thought[\s\S]*?<channel\|>/g, '')

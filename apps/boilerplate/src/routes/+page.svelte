@@ -252,7 +252,7 @@
       {/if}
     </button>
     <button class="h-7 w-8 flex items-center justify-center rounded border border-border2 text-[11px] font-mono text-text2 hover:text-text1 transition-colors flex-shrink-0"
-            class:bg-accent={uiScaled} class:text-bg={uiScaled} class:border-accent={uiScaled}
+            class:bg-accent={uiScaled} class:!text-bg={uiScaled} class:border-accent={uiScaled}
             onclick={toggleScale} aria-label="Toggle UI scale" title={uiScaled ? 'Reset UI scale' : 'Scale UI up (2×)'}>
       {uiScaled ? '1×' : '2×'}
     </button>
