@@ -1248,7 +1248,7 @@
       connecting={canvas.mcpConnecting}
       connected={canvas.mcpConnected}
       name={canvas.mcpName ?? 'not connected'}
-      servers={(multiClient?.listServers() ?? []).map(s => ({ url: s.url, name: s.name, toolCount: s.tools.length }))}
+      servers={canvas.dataServers.filter((s) => s.connected).map((s) => ({ url: s.url, name: s.name, toolCount: (s.tools ?? []).length }))}
       onclick={() => { recipeBrowserOpen = true; recipeBrowserFilter = ''; }}
     />
     {#if gemmaStatus === 'ready'}

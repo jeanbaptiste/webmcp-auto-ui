@@ -171,9 +171,11 @@
         bind:showToken={mcpShowToken}
         connecting={canvas.mcpConnecting}
         connected={canvas.mcpConnected}
-        serverName={connectedUrls.length > 1 ? `multi-server (${connectedUrls.length})` : canvas.mcpName ?? ''}
+        serverName={canvas.dataServers.filter((s) => s.connected).length > 1
+          ? `multi-server (${canvas.dataServers.filter((s) => s.connected).length})`
+          : canvas.mcpName ?? ''}
         onconnect={onconnect}
-        ondisconnect={() => connectedUrls.forEach((u) => onremoveserver?.(u))}
+        ondisconnect={() => canvas.dataServers.filter((s) => s.connected).forEach((s) => onremoveserver?.(s.url))}
       />
     </section>
 
