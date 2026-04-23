@@ -144,7 +144,6 @@
     if (!mcpUrl.trim() || connecting) return;
     connecting = true;
     const provisionalName = canvas.addMcpServer(mcpUrl.trim());
-    canvas.setDataServerEnabled(provisionalName, false);
     canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
     try {
       if (!multiClient) throw new Error('MCP bridge not ready');

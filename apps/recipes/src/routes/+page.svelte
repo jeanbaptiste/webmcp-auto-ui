@@ -240,7 +240,6 @@
     if (!url.trim()) return;
     loadingUrls = [...loadingUrls, url];
     const provisionalName = canvas.addMcpServer(url.trim());
-    canvas.setDataServerEnabled(provisionalName, false);
     canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
     try {
       const opts = mcpToken.trim() ? { headers: { Authorization: `Bearer ${mcpToken.trim()}` } } : undefined;

@@ -479,11 +479,7 @@
   async function addMcpServer(url: string) {
     if (!url.trim()) return;
     loadingUrls = [...loadingUrls, url];
-    // Provisional canvas entry so UI can show "connecting". The app owns the
-    // real MCP client (multiClient); keep enabled=false so the singleton bridge
-    // does not try a parallel handshake on the same URL.
     const provisionalName = canvas.addMcpServer(url.trim());
-    canvas.setDataServerEnabled(provisionalName, false);
     canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
     try {
       const opts = mcpToken.trim() ? { headers: { Authorization: `Bearer ${mcpToken.trim()}` } } : undefined;

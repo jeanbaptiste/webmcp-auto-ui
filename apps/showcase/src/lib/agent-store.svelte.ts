@@ -233,7 +233,6 @@ export const agentStore = {
     connecting = true;
     connectError = '';
     const provisionalName = canvas.addMcpServer(url.trim());
-    canvas.setDataServerEnabled(provisionalName, false);
     canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
     try {
       const { tools } = await getMultiClient().addServer(url.trim());
