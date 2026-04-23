@@ -34,10 +34,15 @@
   }: Props = $props();
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let urlChangeTimer: ReturnType<typeof setTimeout> | null = null;
 
   function handleUrlInput(e: Event) {
     const v = (e.target as HTMLInputElement).value;
-    onurlchange?.(v);
+    // Debounce onurlchange so we don't pollute the canvas store with every keystroke.
+    if (urlChangeTimer) clearTimeout(urlChangeTimer);
+    urlChangeTimer = setTimeout(() => {
+      onurlchange?.(v);
+    }, 400);
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       if (v.startsWith('http') && !connected && !connecting) {
@@ -48,7 +53,11 @@
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter') {
+      if (urlChangeTimer) { clearTimeout(urlChangeTimer); urlChangeTimer = null; }
       if (debounceTimer) clearTimeout(debounceTimer);
+      // Flush current URL immediately before connecting.
+      const v = (e.target as HTMLInputElement).value;
+      onurlchange?.(v);
       onconnect?.();
     }
   }

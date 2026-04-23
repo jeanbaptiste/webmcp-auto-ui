@@ -223,7 +223,9 @@ export const agentStore = {
   get compressPreview() { return compressPreview; },
   set compressPreview(v: number) { compressPreview = v; },
 
-  /** Connect to an MCP server */
+  /** Connect to an MCP server — routed through the canvas store so the global
+   * MultiMcpBridge performs the handshake. Connection state mirrored back via
+   * the bridge's writes to `canvas.dataServers`. */
   async connect(url: string) {
     if (!url.trim() || connecting) return;
     // Disconnect previous if any
@@ -232,32 +234,33 @@ export const agentStore = {
     }
     connecting = true;
     connectError = '';
+    // Make sure the bridge is installed before mutating the store so its
+    // subscription is in place when the data-server appears.
+    ensureBridge();
     const provisionalName = canvas.addMcpServer(url.trim());
-    canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
-    try {
-      const { tools } = await getMultiClient().addServer(url.trim());
-      connectedUrl = url;
-      canvas.setDataServerMeta(provisionalName, {
-        connected: true, connecting: false,
-        tools: tools as any,
-        error: undefined,
-      });
-    } catch (e) {
-      connectError = e instanceof Error ? e.message : String(e);
-      canvas.setDataServerMeta(provisionalName, {
-        connected: false, connecting: false,
-        error: connectError,
-      });
-    } finally {
-      connecting = false;
+    connectedUrl = url;
+
+    // Poll briefly for the bridge to report a terminal state (connected or
+    // error). The bridge reconciles off a store subscription, so this only
+    // needs to wait one microtask tick in the normal case.
+    const deadline = Date.now() + 8000;
+    while (Date.now() < deadline) {
+      const entry = canvas.dataServers.find(s => s.name === provisionalName);
+      if (entry && entry.connected) break;
+      if (entry && entry.error) {
+        connectError = entry.error;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 50));
     }
+    connecting = false;
   },
 
-  /** Disconnect from MCP server */
+  /** Disconnect from MCP server — removing the entry from the canvas store
+   * triggers the bridge to tear down the underlying connection. */
   async disconnect() {
     if (connectedUrl) {
       const entry = canvas.dataServers.find(s => s.url === connectedUrl);
-      await getMultiClient().removeServer(connectedUrl);
       connectedUrl = '';
       if (entry) canvas.removeDataServer(entry.name);
     }

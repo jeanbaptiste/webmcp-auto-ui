@@ -10,7 +10,7 @@ import type {
 } from './types.js';
 import type { ToolLayer, SchemaTransformOptions } from './tool-layers.js';
 import { buildToolsFromLayers, buildDiscoveryToolsWithAliases, activateServerTools, toProviderTools, sanitizeServerName } from './tool-layers.js';
-import { buildSystemPromptWithAliases, buildSystemPrompt } from './prompts/index.js';
+import { buildSystemPromptWithAliases } from './prompts/index.js';
 import type { DiscoveryCache } from './discovery-cache.js';
 import { unflattenParams, validateJsonSchema } from '@webmcp-auto-ui/core';
 import type { JsonSchema } from '@webmcp-auto-ui/core';
@@ -395,13 +395,19 @@ export async function runAgentLoop(
             const protocol = tokenToProtocol(token);
             const serverKey = `${serverName}_${token}`;
             if (!activatedServers.has(serverKey)) {
-              activatedServers.add(serverKey);
               const layer = (options.layers ?? []).find(l => sanitizeServerName(l.serverName) === serverName && l.protocol === protocol);
               if (layer) {
-                const act = activateServerTools(activeTools, layer, schemaOptions, trace);
-                activeTools = act.tools;
-                // Merge new pathMaps so unflattenParams works for lazily-activated tools.
-                for (const [k, v] of act.pathMaps) localPathMaps.set(k, v);
+                try {
+                  const act = activateServerTools(activeTools, layer, schemaOptions, trace);
+                  activeTools = act.tools;
+                  // Merge new pathMaps so unflattenParams works for lazily-activated tools.
+                  for (const [k, v] of act.pathMaps) localPathMaps.set(k, v);
+                  activatedServers.add(serverKey);
+                } catch (e) {
+                  trace.push('activate', name, `activation failed for ${serverKey}: ${e instanceof Error ? e.message : String(e)}`, 'error');
+                }
+              } else {
+                trace.push('activate', name, `layer not found for server="${serverName}" protocol="${protocol}"`, 'warn');
               }
             }
           }

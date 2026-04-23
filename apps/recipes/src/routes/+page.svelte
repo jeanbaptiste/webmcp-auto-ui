@@ -31,7 +31,24 @@
   let multiClient = $state<McpMultiClient | null>(null);
   let connectedUrls = $state<string[]>([]);
   let loadingUrls = $state<string[]>([]);
-  let mcpRecipes = $state<McpRecipe[]>([]);
+  // Recipes are derived from the canvas data-servers (source of truth —
+  // populated by the global MultiMcpBridge on handshake). This automatically
+  // reflects per-server disconnects: a server dropping out of `dataServers`
+  // (or flipping `connected` to false) removes its recipes from the list.
+  const mcpRecipes = $derived.by((): McpRecipe[] => {
+    const out: McpRecipe[] = [];
+    const seen = new Set<string>();
+    for (const s of canvas.dataServers) {
+      if (!s.connected) continue;
+      for (const r of (s.recipes ?? [])) {
+        const rec = r as McpRecipe;
+        if (seen.has(rec.name)) continue;
+        seen.add(rec.name);
+        out.push(rec);
+      }
+    }
+    return out;
+  });
   let mcpToken = $state('');
 
   // Agent / Preview
@@ -236,57 +253,73 @@
   });
 
   // ── MCP ────────────────────────────────────────────────────────────────────
+  // All connect / disconnect flows go through the canvas store. The global
+  // MultiMcpBridge watches the store, performs the MCP handshake, and writes
+  // back `connected`, `tools`, and `recipes` on each data-server entry.
   async function addMcpServer(url: string) {
     if (!url.trim()) return;
-    loadingUrls = [...loadingUrls, url];
-    const provisionalName = canvas.addMcpServer(url.trim());
-    canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
-    try {
-      const opts = mcpToken.trim() ? { headers: { Authorization: `Bearer ${mcpToken.trim()}` } } : undefined;
-      if (!multiClient) throw new Error('MCP bridge not ready');
-      const { tools } = await multiClient.addServer(url.trim(), opts);
-      connectedUrls = [...connectedUrls, url];
-      canvas.setDataServerMeta(provisionalName, {
-        connected: true, connecting: false,
-        tools: tools as any,
-        error: undefined,
-      });
+    const trimmed = url.trim();
 
-      // Load recipes if server has list_recipes
-      if (tools.some(t => t.name === 'list_recipes')) {
-        try {
-          const r = await multiClient!.callToolOn(url.trim(), 'list_recipes', {});
-          const text = r.content?.find((c: any) => c.type === 'text') as any;
-          if (text?.text) {
-            const parsed = JSON.parse(text.text);
-            const newRecipes: McpRecipe[] = Array.isArray(parsed) ? parsed : (parsed?.recipes ?? []);
-            const existing = new Set(mcpRecipes.map(r => r.name));
-            mcpRecipes = [...mcpRecipes, ...newRecipes.filter(r => !existing.has(r.name))];
-          }
-        } catch { /* no recipes */ }
+    // Auth header fallback: MultiMcpBridge does not yet support per-server
+    // headers. When a bearer token is set, we bypass the bridge and call the
+    // multi-client directly. The canvas store is still updated so the UI
+    // observes a consistent state.
+    // TODO: bridge doesn't yet support per-server auth.
+    if (mcpToken.trim()) {
+      loadingUrls = [...loadingUrls, url];
+      // Add as disabled so the bridge's auto-handshake (without auth) doesn't
+      // race with our authed direct call.
+      let provisionalName: string;
+      try {
+        provisionalName = new URL(trimmed, 'http://local').host || trimmed;
+      } catch { provisionalName = trimmed; }
+      canvas.addDataServer({ name: provisionalName, url: trimmed });
+      canvas.setDataServerEnabled(provisionalName, false);
+      canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
+      try {
+        const opts = { headers: { Authorization: `Bearer ${mcpToken.trim()}` } };
+        if (!multiClient) throw new Error('MCP bridge not ready');
+        const { tools } = await multiClient.addServer(trimmed, opts);
+        connectedUrls = [...connectedUrls, url];
+        let recipes: any[] = [];
+        if (tools.some(t => t.name === 'list_recipes')) {
+          try {
+            const r = await multiClient.callToolOn(trimmed, 'list_recipes', {});
+            const text = r.content?.find((c: any) => c.type === 'text') as any;
+            if (text?.text) {
+              const parsed = JSON.parse(text.text);
+              recipes = Array.isArray(parsed) ? parsed : (parsed?.recipes ?? []);
+            }
+          } catch { /* no recipes */ }
+        }
+        canvas.setDataServerMeta(provisionalName, {
+          connected: true, connecting: false,
+          tools: tools as any,
+          recipes,
+          error: undefined,
+        });
+      } catch (e) {
+        canvas.setDataServerMeta(provisionalName, {
+          connected: false, connecting: false,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      } finally {
+        loadingUrls = loadingUrls.filter(u => u !== url);
       }
-    } catch (e) {
-      canvas.setDataServerMeta(provisionalName, {
-        connected: false, connecting: false,
-        error: e instanceof Error ? e.message : String(e),
-      });
-    } finally {
-      loadingUrls = loadingUrls.filter(u => u !== url);
+      return;
     }
+
+    // Default path: the bridge owns the handshake.
+    loadingUrls = [...loadingUrls, url];
+    canvas.addMcpServer(trimmed);
+    if (!connectedUrls.includes(url)) connectedUrls = [...connectedUrls, url];
+    loadingUrls = loadingUrls.filter(u => u !== url);
   }
 
   async function removeMcpServer(url: string) {
-    if (!multiClient) return;
-    const server = multiClient.listServers().find(s => s.url === url);
-    await multiClient.removeServer(url);
     connectedUrls = connectedUrls.filter(u => u !== url);
-    if (multiClient.serverCount === 0) {
-      mcpRecipes = []; // TODO: track recipes per-server like flex (mcpRecipesByServer Map)
-    }
-    // Locate canvas entry by URL (provisional name was URL-host based)
     const entry = canvas.dataServers.find(s => s.url === url);
     if (entry) canvas.removeDataServer(entry.name);
-    void server;
   }
 
   async function addAllServers() {

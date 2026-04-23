@@ -140,30 +140,28 @@
   const servers = $derived(localWebMcpServers.filter(e => e.enabled).map(e => e.server));
 
   // ── MCP connect ───────────────────────────────────────────────────────
+  // Route through the canvas store; the global MultiMcpBridge handles the
+  // handshake and populates tools/recipes on the data-server entry. The
+  // `$effect` below mirrors the result into the local `connected`/`mcpName`
+  // state for template consumption.
   async function connectMcp() {
     if (!mcpUrl.trim() || connecting) return;
     connecting = true;
-    const provisionalName = canvas.addMcpServer(mcpUrl.trim());
-    canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
-    try {
-      if (!multiClient) throw new Error('MCP bridge not ready');
-      const { tools } = await multiClient.addServer(mcpUrl.trim());
-      connected = true;
-      mcpName = multiClient.listServers().map(s => s.name).join(', ');
-      canvas.setDataServerMeta(provisionalName, {
-        connected: true, connecting: false,
-        tools: tools as any,
-        error: undefined,
-      });
-    } catch (e) {
-      canvas.setDataServerMeta(provisionalName, {
-        connected: false, connecting: false,
-        error: e instanceof Error ? e.message : String(e),
-      });
-    } finally {
-      connecting = false;
-    }
+    canvas.addMcpServer(mcpUrl.trim());
   }
+
+  $effect(() => {
+    const servers = canvas.dataServers;
+    const anyConnected = servers.some(s => s.connected);
+    connected = anyConnected;
+    mcpName = servers.filter(s => s.connected).map(s => s.name).join(', ');
+    // Clear the `connecting` flag once the bridge reports either success or
+    // failure on the last added server.
+    if (connecting && servers.length > 0) {
+      const latest = servers[servers.length - 1];
+      if (latest.connected || latest.error) connecting = false;
+    }
+  });
 
   // ── Agent ─────────────────────────────────────────────────────────────
   async function sendMessage(msg: string) {

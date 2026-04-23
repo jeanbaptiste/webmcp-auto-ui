@@ -4,6 +4,8 @@
 // Used by the four notebook layout renderers (compact/workspace/document/editorial)
 // ---------------------------------------------------------------------------
 
+import { installMultiMcpBridge } from '@webmcp-auto-ui/core';
+
 export const NB_PUBLISH_HOST: string = (() => {
   try {
     const override = (import.meta as any)?.env?.PUBLIC_NB_HOST;
@@ -409,35 +411,30 @@ export function createBridgeSqlRunner(bridge: {
  * a bridge-backed runner, fire runAutoRefresh. Safe to call from any layout at
  * mount time when `state.autoRun && state.mode === 'view'`. Returns a cleanup.
  *
- * `MultiMcpBridgeCtor` is injected (via dynamic import from @webmcp-auto-ui/core
- * by the caller) to keep this file free of a hard import cycle.
+ * Reuses the global singleton bridge on `globalThis.__multiMcp` (installed via
+ * `installMultiMcpBridge` from @webmcp-auto-ui/core) — never creates a parallel
+ * bridge. If no singleton exists yet we install it here, and only the installer
+ * is allowed to stop it on cleanup.
  */
 export interface BootstrapLiveRefreshOptions {
   state: NotebookState;
   data: Record<string, unknown>;
   overlay: RuntimeOverlay;
-  MultiMcpBridgeCtor: new (opts: { getCanvas: () => unknown }) => {
-    start(): void;
-    stop(): void;
-    waitForEnabledServers(timeoutMs?: number): Promise<void>;
-    connectedServers(): string[];
-    hasServer(name: string): boolean;
-    callTool(serverName: string, toolName: string, args: unknown): Promise<unknown>;
-    multiClient: unknown;
-  };
   onCellChange?: (cellId: string) => void;
   onTick?: (overlay: RuntimeOverlay) => void;
   timeoutMs?: number;
 }
 
 export function bootstrapLiveRefresh(opts: BootstrapLiveRefreshOptions): () => void {
-  const { state, data, overlay, MultiMcpBridgeCtor, onCellChange, onTick, timeoutMs } = opts;
+  const { state, data, overlay, onCellChange, onTick, timeoutMs } = opts;
   const ac = new AbortController();
+  let weCreatedBridge = false;
+  let bridgeRef: any = null;
 
   void (async () => {
     try {
       autoConnectFrontmatterServers(data);
-      const canvas: unknown = (globalThis as { __canvasVanilla?: unknown; canvasVanilla?: unknown })
+      const canvas: any = (globalThis as { __canvasVanilla?: unknown; canvasVanilla?: unknown })
         .__canvasVanilla ?? (globalThis as { canvasVanilla?: unknown }).canvasVanilla;
       if (!canvas) {
         overlay.error = 'No canvas available';
@@ -445,8 +442,12 @@ export function bootstrapLiveRefresh(opts: BootstrapLiveRefreshOptions): () => v
         onTick?.(overlay);
         return;
       }
-      const bridge = new MultiMcpBridgeCtor({ getCanvas: () => canvas });
-      bridge.start();
+      const existing = (globalThis as any).__multiMcp;
+      const bridge = existing ?? installMultiMcpBridge({ getCanvas: () => canvas });
+      weCreatedBridge = !existing;
+      bridgeRef = bridge;
+      // `installMultiMcpBridge` already starts the bridge; a pre-existing
+      // singleton is assumed to be running.
       await bridge.waitForEnabledServers(timeoutMs ?? 5000);
 
       const runner = createBridgeSqlRunner(bridge, () => {
@@ -463,7 +464,16 @@ export function bootstrapLiveRefresh(opts: BootstrapLiveRefreshOptions): () => v
     }
   })();
 
-  return () => { ac.abort(); };
+  return () => {
+    ac.abort();
+    if (weCreatedBridge && bridgeRef && typeof bridgeRef.stop === 'function') {
+      try { bridgeRef.stop(); } catch { /* ignore */ }
+      try {
+        const g: any = globalThis as any;
+        if (g.__multiMcp === bridgeRef) g.__multiMcp = undefined;
+      } catch { /* ignore */ }
+    }
+  };
 }
 
 export function registerExecutor(state: NotebookState, type: CellType, fn: CellExecutor): void {
@@ -877,7 +887,10 @@ export function autoConnectFrontmatterServers(
       if (existing) {
         if (existing.enabled === false) canvas.setDataServerEnabled?.(name, true);
       } else {
-        canvas.addDataServer({ name: String(name), url: url ? String(url) : undefined });
+        // Never register a server without a URL — downstream connect logic
+        // requires it and would silently fail otherwise.
+        if (!url) continue;
+        canvas.addDataServer({ name: String(name), url: String(url) });
       }
     }
     refresh?.();

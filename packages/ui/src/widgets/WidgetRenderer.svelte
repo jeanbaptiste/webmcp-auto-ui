@@ -166,6 +166,18 @@
   // ── Vanilla renderer container + lifecycle ────────────
   let vanillaContainer: HTMLElement | undefined = $state(undefined);
 
+  // Cleanup handle shared between the mount effect and the data-update fallback
+  // remount — so a fallback remount can tear down the previous render even
+  // though it doesn't re-run the mount effect.
+  let currentCleanup: (() => void) | undefined = undefined;
+  function runCurrentCleanup() {
+    const c = currentCleanup;
+    currentCleanup = undefined;
+    if (typeof c === 'function') {
+      try { c(); } catch (err) { console.error('[WidgetRenderer] cleanup failed:', err); }
+    }
+  }
+
   // Mount effect — re-runs only when the widget identity changes (type /
   // renderer / container). Data changes are handled separately to avoid a
   // flickering full remount on every agent update.
@@ -175,6 +187,9 @@
     if (!useVanilla || !vanillaRenderer || !vanillaContainer) return;
     const container = vanillaContainer;
     const renderer = vanillaRenderer;
+    // If a previous render is still live (e.g. via data-update fallback),
+    // tear it down before we clear the DOM.
+    runCurrentCleanup();
     container.innerHTML = '';
 
     const onInteract = (ev: Event) => {
@@ -184,17 +199,24 @@
     };
     container.addEventListener('widget:interact', onInteract);
 
-    let cleanup: (() => void) | void;
     let cancelled = false;
 
     try {
       const result = renderer(container, untrack(() => plainData));
       if (result && typeof (result as Promise<unknown>).then === 'function') {
         (result as Promise<void | (() => void)>).then(
-          (c) => { if (!cancelled) cleanup = c ?? undefined; },
+          (c) => {
+            // If we were torn down before the promise resolved, invoke the
+            // late cleanup immediately rather than leaking resources.
+            if (cancelled && typeof c === 'function') {
+              try { c(); } catch { /* ignore */ }
+            } else {
+              currentCleanup = c ?? undefined;
+            }
+          },
         ).catch((err) => { console.error('[WidgetRenderer] async render failed:', err); });
       } else {
-        cleanup = result as (() => void) | void;
+        currentCleanup = (result as (() => void) | undefined) ?? undefined;
       }
     } catch (err) {
       console.error('[WidgetRenderer] sync render failed:', err);
@@ -203,9 +225,7 @@
     return () => {
       cancelled = true;
       container.removeEventListener('widget:interact', onInteract);
-      if (typeof cleanup === 'function') {
-        try { cleanup(); } catch (err) { console.error('[WidgetRenderer] cleanup failed:', err); }
-      }
+      runCurrentCleanup();
     };
   });
 
@@ -223,10 +243,20 @@
     const handled = !vanillaContainer.dispatchEvent(ev);
     if (handled || !vanillaRenderer) return;
     // Not handled — fall back to remount by clearing + calling renderer again.
+    // Run the previous cleanup first so the old renderer releases its
+    // resources (timers, observers, third-party instances).
     const container = vanillaContainer;
+    runCurrentCleanup();
     container.innerHTML = '';
     try {
-      vanillaRenderer(container, data);
+      const result = vanillaRenderer(container, data);
+      if (result && typeof (result as Promise<unknown>).then === 'function') {
+        (result as Promise<void | (() => void)>).then(
+          (c) => { currentCleanup = c ?? undefined; },
+        ).catch((err) => { console.error('[WidgetRenderer] fallback async render failed:', err); });
+      } else {
+        currentCleanup = (result as (() => void) | undefined) ?? undefined;
+      }
     } catch (err) {
       console.error('[WidgetRenderer] fallback remount failed:', err);
     }

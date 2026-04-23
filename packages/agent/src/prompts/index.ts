@@ -43,7 +43,12 @@ export function buildSystemPromptWithAliases(
   return { prompt, aliasMap: refs.aliasMap };
 }
 
-/** Backward-compat wrapper — also populates the deprecated global toolAliasMap. */
+/**
+ * @deprecated Use `buildSystemPromptWithAliases()` instead and pass the returned
+ * `aliasMap` to the agent loop explicitly. This wrapper still populates the
+ * deprecated global `toolAliasMap` singleton as a side-effect, which is not
+ * parallel-safe across concurrent agent loops.
+ */
 export function buildSystemPrompt(
   layers: ToolLayer[],
   options?: { providerKind?: ProviderKind },
