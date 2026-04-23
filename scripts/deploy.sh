@@ -46,9 +46,10 @@ compute_fingerprint() {
          -o -name '*.astro' -o -name '*.svg' -o -name '*.conf' -o -name '*.template' \) \
       -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/dist/*' \
       -not -path '*/.svelte-kit/*' 2>/dev/null
-    find "$LOCAL_ROOT"/packages -maxdepth 3 \
+    find "$LOCAL_ROOT"/packages \
       \( -path '*/src/*' -o -name 'package.json' \) -type f \
-      -not -path '*/node_modules/*' -not -path '*/dist/*' 2>/dev/null
+      -not -path '*/node_modules/*' -not -path '*/dist/*' \
+      -not -path '*/.svelte-kit/*' 2>/dev/null
   } | LC_ALL=C sort | xargs shasum -a 256 2>/dev/null | shasum -a 256 | cut -c1-16
 }
 
