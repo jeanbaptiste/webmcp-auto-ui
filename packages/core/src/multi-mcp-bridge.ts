@@ -207,6 +207,10 @@ export class MultiMcpBridge {
     const seenNames = new Set<string>();
     for (const srv of servers) {
       if (!srv || typeof srv.name !== 'string' || typeof srv.url !== 'string') continue;
+      // Empty URL means a legacy placeholder entry (see canvas.ensurePrimary).
+      // Handshaking with '' resolves `fetch('')` against the current page origin,
+      // producing a POST storm on the app root (405 loop).
+      if (srv.url === '') continue;
       seenNames.add(srv.name);
       const key = srv.name;
       if (srv.enabled && !this.connected.has(key) && !this.connecting.has(key)) {

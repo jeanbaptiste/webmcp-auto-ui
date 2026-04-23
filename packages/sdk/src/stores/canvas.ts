@@ -226,7 +226,7 @@ function createCanvasVanilla() {
   // All these mutate the SAME _servers list; `mcpUrl` targets the primary
   // entry, creating one if none exists. Apps can equivalently call
   // addDataServer({primary: true}) + setDataServerMeta(name, ...) directly.
-  function ensurePrimary(url?: string): DataServer {
+  function ensurePrimary(url?: string): DataServer | undefined {
     let p = primaryServer();
     if (p) {
       if (url && p.url !== url) {
@@ -234,10 +234,13 @@ function createCanvasVanilla() {
       }
       return _servers.find((s) => s.primary)!;
     }
-    // Create a placeholder primary with a stable name derived from the URL.
-    const nm = url ? new URL(url, 'http://local').host || url : 'primary';
+    // Refuse to create a placeholder primary without a real URL — empty-URL
+    // ghosts caused MultiMcpBridge to POST to the current page origin, yielding
+    // a 405 storm (SvelteKit treats POST / as a form action).
+    if (!url) return undefined;
+    const nm = new URL(url, 'http://local').host || url;
     _servers = [..._servers, {
-      name: nm, url: url ?? '', kind: 'data', enabled: true, connected: false, primary: true,
+      name: nm, url, kind: 'data', enabled: true, connected: false, primary: true,
     }];
     return _servers[_servers.length - 1]!;
   }
@@ -250,6 +253,7 @@ function createCanvasVanilla() {
 
   function setMcpConnecting(connecting: boolean): void {
     const p = ensurePrimary();
+    if (!p) return;
     _servers = _servers.map((s) => s.name === p.name ? { ...s, connecting } : s);
     notify();
   }
@@ -269,6 +273,7 @@ function createCanvasVanilla() {
       return;
     }
     const p = ensurePrimary();
+    if (!p) return;
     const newName = name && name.length > 0 ? name : p.name;
     _servers = _servers.map((s) => s.name === p.name
       ? { ...s, name: newName, connected: true, connecting: false, tools: tools ?? s.tools ?? [], error: undefined }
@@ -278,6 +283,7 @@ function createCanvasVanilla() {
 
   function setMcpError(err: string): void {
     const p = ensurePrimary();
+    if (!p) return;
     _servers = _servers.map((s) => s.name === p.name
       ? { ...s, connected: false, connecting: false, error: err }
       : s);
@@ -452,7 +458,7 @@ function createCanvasVanilla() {
     set llm(v: LLMId) { _llm = v; notify(); },
     get mcpUrl() { return primaryServer()?.url ?? ''; },
     set mcpUrl(v: string) { setMcpUrl(v); },
-    get mcpConnected() { return primaryServer()?.connected ?? false; },
+    get mcpConnected() { return _servers.some((s) => s.connected); },
     get mcpConnecting() { return anyConnecting(); },
     get mcpName() { return displayName(); },
     get mcpTools() { return unionTools(); },
