@@ -21,11 +21,11 @@
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (!/not found/i.test(msg)) throw err;
-        const multi = (globalThis as unknown as { __multiMcp?: { callTool: (s: string, t: string, a: unknown) => Promise<unknown>; multiClient: { listServers: () => Array<{ name: string; tools: Array<{ name: string }> }> } } }).__multiMcp;
+        const multi = (globalThis as unknown as { __multiMcp?: { multiClient: { listServers: () => Array<{ url: string; name: string; tools: Array<{ name: string }> }>; callToolOn: (url: string, t: string, a: unknown) => Promise<unknown> } } }).__multiMcp;
         if (!multi) throw err;
         const server = multi.multiClient.listServers().find(s => s.tools.some(t => t.name === name));
         if (!server) throw err;
-        return multi.callTool(server.name, name, args) as ReturnType<typeof executeToolInternal>;
+        return multi.multiClient.callToolOn(server.url, name, args) as ReturnType<typeof executeToolInternal>;
       }
     });
 
