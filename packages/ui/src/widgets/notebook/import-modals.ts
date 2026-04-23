@@ -316,7 +316,14 @@ function extractRecipeBody(res: any): string | null {
   if (!text) return null;
   try {
     const parsed = JSON.parse(text);
-    if (parsed && typeof parsed === 'object' && typeof parsed.content === 'string') return parsed.content;
+    // Recipe servers return either { body: "..." } (autoui-style),
+    // { content: "..." } (legacy), or { markdown: "..." }. Pick whichever
+    // string field carries the markdown body, in priority order.
+    if (parsed && typeof parsed === 'object') {
+      if (typeof parsed.body === 'string') return parsed.body;
+      if (typeof parsed.content === 'string') return parsed.content;
+      if (typeof parsed.markdown === 'string') return parsed.markdown;
+    }
   } catch { /* not JSON */ }
   return text;
 }
