@@ -487,7 +487,7 @@ function injectImportStyles() {
     }
     .nb-imp-btn:hover { background: var(--color-surface3, #eeeef0); }
     .nb-imp-primary { background: var(--color-accent, #6a55ff); color: #fff; border: 0; }
-    .nb-imp-primary:hover { filter: brightness(1.08); }
+    .nb-imp-primary:hover { filter: brightness(1.1); color: #fff; }
     .nb-imp-search, .nb-imp-url {
       width: 100%; padding: 8px 10px; border: 1px solid var(--color-border, #e4e4e7);
       border-radius: 6px; font-size: 12px; margin-bottom: 10px;

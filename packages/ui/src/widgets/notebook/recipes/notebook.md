@@ -1,5 +1,5 @@
 ---
-widget: notebook-editorial
+widget: notebook
 description: Publication-ready notebook with serif prose and inline cells, all drag-and-droppable in a single ordered flow. Inspired by Observable — cells can be prose paragraphs, sql queries, or js charts, mixed freely in any order to build an article-like narrative.
 schema:
   type: object
@@ -35,7 +35,7 @@ schema:
 
 ## When to use
 
-Use `notebook-editorial` when the notebook is meant to be published or shared as a finished artifact:
+Use `notebook` when the notebook is meant to be published or shared as a finished artifact:
 - Research memos with code appendices visible on demand
 - Blog-style writeups mixing narrative and runnable code
 - Final deliverables where prose leads and code supports
@@ -46,7 +46,7 @@ The distinguishing feature: prose paragraphs and code cells share a single order
 
 1. **Start with prose-first seed content** and intersperse code cells:
    ```
-   widget_display({name: "notebook-editorial", params: {
+   widget_display({name: "notebook", params: {
      title: "Q3 observations",
      kicker: "memo",
      cells: [
@@ -74,7 +74,7 @@ The distinguishing feature: prose paragraphs and code cells share a single order
 - Prose cells are rendered via an HTML-sanitizing markdown pipeline: markdown syntax is resolved, unsafe tags are stripped (XSS closed), `<mark>` and other editorial tags are preserved.
 - The footer exposes a single `share` button.
 - Run / Stop controls are at the left of each code cell's header, same as the other notebook layouts.
-- Unlike the other widgets, `notebook-editorial` does not separate prose and code into different flows — they are the same flow in one list.
+- Unlike the other widgets, `notebook` does not separate prose and code into different flows — they are the same flow in one list.
 
 ## Left pane — resources from connected servers
 
@@ -105,7 +105,7 @@ An editorial piece earns its weight when the prose is anchored to real material.
 
    ```ts
    widget_display({
-     name: 'notebook-editorial',
+     name: 'notebook',
      params: {
        title: '...',
        kicker: 'memo',

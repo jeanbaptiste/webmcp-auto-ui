@@ -1,7 +1,7 @@
 ---
 id: hackathon-assemblee-nationale-mcp-webmcp
 name: Hackathon Assemblée Nationale · MCP & WebMCP starter
-components_used: [notebook-document, notebook-compact]
+components_used: [notebook]
 when: the user mentions the Assemblée Nationale hackathon, wants to experiment with parliamentary data (Tricoteuses, Legifrance), or asks for a starter notebook to explore deputies, votes, amendments, or legislative texts in a hackathon context. Keywords include "hackathon Assemblée Nationale", "MCP WebMCP hackathon", "tricoteuses playbook", "parlement playground", "hackathon parlementaire".
 servers: [autoui, tricoteuses]
 layout:
@@ -20,14 +20,9 @@ This recipe is a **specialization** of the generic `notebook-playbook` recipe �
 
 ## How to use
 
-### Step 1 — Pick the document layout
+### Step 1 — Use the `notebook` widget
 
-Default to `notebook-document` for the hackathon. Reasons:
-- Participants expect to collaborate and leave traces for each other (avatars, comments)
-- The document layout reads naturally as "hackathon brief + starter code" rather than "dev tool"
-- Margin comments can be seeded to hint at directions to explore
-
-If the participant asks for a minimal dev-focused playground instead, fall back to `notebook-compact`.
+The single `notebook` widget fits the hackathon brief: prose, SQL and JS share one drag-and-droppable flow, suited both to a "brief + starter code" read and to free exploration.
 
 ### Step 2 — Seed the cells
 
@@ -43,7 +38,7 @@ The notebook should contain 5–7 cells covering:
 Example template (to be refined with actual hackathon organizers' briefs):
 
 ```
-widget_display({name: "notebook-document", params: {
+widget_display({name: "notebook", params: {
   title: "Hackathon Assemblée Nationale · starter",
   cells: [
     {
@@ -108,4 +103,3 @@ These recipes produce more specialized layouts than a generic notebook, and are 
 - **Forgetting the hackathon framing**: without the "bienvenue" and "à vous" markdown cells, participants land on a bare notebook and lose the playbook feeling.
 - **SQL without LIMIT**: Tricoteuses queries without `LIMIT` can return thousands of rows and slow down the first impression.
 - **Inventing data**: do not seed with fake French parliamentary content (fake deputies, fake votes). If the actual data is not known at seed time, use generic queries (`SELECT * FROM scrutins LIMIT 5`) and let the user discover from there.
-- **Picking the wrong layout**: if the user is solo and wants to code fast, `notebook-compact` is better than `notebook-document`. Default to document for hackathon context because of the collaborative framing, not as a hard rule.

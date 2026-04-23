@@ -8,32 +8,29 @@
 //   3. /:slug          — permanent published notebook, fetched from /api/p/:slug
 //
 // In every case we normalize to `{ kind, data }` where:
-//   - `kind`  is the widget name (notebook-compact | notebook-workspace |
-//              notebook-document | notebook-editorial). Defaults to
-//              `notebook-compact` when the payload doesn't carry one.
+//   - `kind`  is the widget name (always `'notebook'`). Legacy payloads with
+//              `notebook-compact | -workspace | -document | -editorial` are
+//              transparently mapped to `notebook`.
 //   - `data`  is the notebook state object (id, title, mode, cells, ...) with
 //              `mode` forced to `'view'`.
 // ---------------------------------------------------------------------------
 
 import { decode, getHsParam, getShortToken } from '@webmcp-auto-ui/sdk';
 
-export type NotebookKind =
-  | 'notebook-compact'
-  | 'notebook-workspace'
-  | 'notebook-document'
-  | 'notebook-editorial';
+export type NotebookKind = 'notebook';
 
 export interface NotebookPayload {
   kind: NotebookKind;
   data: Record<string, unknown>;
 }
 
-const SUPPORTED_KINDS: NotebookKind[] = [
+const LEGACY_KINDS = new Set([
+  'notebook',
   'notebook-compact',
   'notebook-workspace',
   'notebook-document',
   'notebook-editorial',
-];
+]);
 
 export class NotebookLoadError extends Error {
   constructor(public code: 'invalid' | 'unsupported' | 'not_found' | 'network', message: string) {
@@ -47,11 +44,9 @@ export class NotebookLoadError extends Error {
 // We accept both shapes: `{kind, data}` or a plain state object.
 // ---------------------------------------------------------------------------
 
-function coerceKind(raw: unknown): NotebookKind {
-  if (typeof raw === 'string' && (SUPPORTED_KINDS as string[]).includes(raw)) {
-    return raw as NotebookKind;
-  }
-  return 'notebook-compact';
+function coerceKind(_raw: unknown): NotebookKind {
+  // Only one notebook widget remains. Legacy kinds are silently mapped.
+  return 'notebook';
 }
 
 export function normalizePayload(parsed: unknown): NotebookPayload {
@@ -63,11 +58,11 @@ export function normalizePayload(parsed: unknown): NotebookPayload {
   // Wrapped form: { kind, data }
   if (typeof obj.kind === 'string' && obj.data && typeof obj.data === 'object') {
     const kindStr = String(obj.kind);
-    if (!(SUPPORTED_KINDS as string[]).includes(kindStr)) {
+    if (!LEGACY_KINDS.has(kindStr)) {
       throw new NotebookLoadError('unsupported', `Unsupported widget kind: ${kindStr}`);
     }
     const data = { ...(obj.data as Record<string, unknown>), mode: 'view' };
-    return { kind: kindStr as NotebookKind, data };
+    return { kind: 'notebook', data };
   }
 
   // Plain state form: { id, title, cells, ... }

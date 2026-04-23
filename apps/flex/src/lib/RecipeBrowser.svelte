@@ -151,7 +151,7 @@
       servers,
     };
 
-    onOpenInNotebook?.('notebook-compact', data);
+    onOpenInNotebook?.('notebook', data);
     close();
   }
 

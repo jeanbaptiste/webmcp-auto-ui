@@ -5,22 +5,13 @@
 import { createWebMcpServer, parseFrontmatter } from '@webmcp-auto-ui/core';
 import { RAW_RECIPES } from './recipes/_generated.js';
 
-// Notebook widget recipes (vanilla renderers) — moved to @webmcp-auto-ui/ui
+// Notebook widget recipe (vanilla renderer) — moved to @webmcp-auto-ui/ui
 // @ts-ignore — Vite raw imports, not resolved by tsc
-import compactRecipe from '@webmcp-auto-ui/ui/widgets/notebook/recipes/compact.md?raw';
-// @ts-ignore
-import workspaceRecipe from '@webmcp-auto-ui/ui/widgets/notebook/recipes/workspace.md?raw';
-// @ts-ignore
-import documentRecipe from '@webmcp-auto-ui/ui/widgets/notebook/recipes/document.md?raw';
-// @ts-ignore
-import editorialRecipe from '@webmcp-auto-ui/ui/widgets/notebook/recipes/editorial.md?raw';
+import notebookRecipe from '@webmcp-auto-ui/ui/widgets/notebook/recipes/notebook.md?raw';
 
-// Notebook widget renderers (vanilla JS) — import via subpath to avoid pulling
+// Notebook widget renderer (vanilla JS) — import via subpath to avoid pulling
 // the .svelte exports of the ui package root through tsc.
-import { render as renderCompact } from '@webmcp-auto-ui/ui/widgets/notebook/compact.js';
-import { render as renderWorkspace } from '@webmcp-auto-ui/ui/widgets/notebook/workspace.js';
-import { render as renderDocument } from '@webmcp-auto-ui/ui/widgets/notebook/document.js';
-import { render as renderEditorial } from '@webmcp-auto-ui/ui/widgets/notebook/editorial.js';
+import { render as renderNotebook } from '@webmcp-auto-ui/ui/widgets/notebook/notebook.js';
 import { render as renderRecipeBrowser } from '@webmcp-auto-ui/ui/widgets/notebook/recipe-browser.js';
 
 // Inline recipe for recipe-browser (real vanilla widget)
@@ -987,10 +978,7 @@ Call widget_display({name: "js-sandbox", params: {code: "document.getElementById
 
 /** Derived from RECIPES + notebook widget recipes — always in sync with registered widgets */
 const _NOTEBOOK_RECIPE_SOURCES: string[] = [
-  compactRecipe as string,
-  workspaceRecipe as string,
-  documentRecipe as string,
-  editorialRecipe as string,
+  notebookRecipe as string,
   recipeBrowserRecipe,
 ];
 export const NATIVE_WIDGET_NAMES = [...RECIPES, ..._NOTEBOOK_RECIPE_SOURCES].map(r => {
@@ -1011,12 +999,9 @@ for (const recipe of RECIPES) {
   autoui.registerWidget(recipe, undefined);
 }
 
-// Notebook widgets — vanilla renderers (resolved via WidgetRenderer vanilla path)
+// Notebook widget — vanilla renderer (resolved via WidgetRenderer vanilla path)
 const NOTEBOOK_WIDGETS: Array<[string, (container: HTMLElement, data: any) => any]> = [
-  [compactRecipe as string, renderCompact],
-  [workspaceRecipe as string, renderWorkspace],
-  [documentRecipe as string, renderDocument],
-  [editorialRecipe as string, renderEditorial],
+  [notebookRecipe as string, renderNotebook],
   [recipeBrowserRecipe, renderRecipeBrowser],
 ];
 for (const [recipe, renderer] of NOTEBOOK_WIDGETS) {

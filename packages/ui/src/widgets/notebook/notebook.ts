@@ -1,6 +1,6 @@
 // @ts-nocheck
 // ---------------------------------------------------------------------------
-// notebook-editorial — publication-ready layout (observable-like)
+// notebook — publication-ready layout (observable-like)
 // Serif prose + cells in a single ordered list, all drag-and-droppable together.
 // Cells alternate freely: md (prose paragraph) / sql / js cells share the flow.
 // ---------------------------------------------------------------------------

@@ -5,8 +5,8 @@ Public read-only viewer for shared notebooks — deployed at **`nb.hyperskills.n
 ## What it does
 
 Displays notebooks that were shared via the `Share → Hyperskill link` button of
-any notebook widget (`notebook-compact`, `notebook-workspace`,
-`notebook-document`, `notebook-editorial`).
+the `notebook` widget. Legacy payloads with `notebook-compact`, `notebook-workspace`,
+`notebook-document` or `notebook-editorial` are transparently mapped to `notebook`.
 
 Three ingestion paths are supported:
 
