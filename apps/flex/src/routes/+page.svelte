@@ -582,7 +582,10 @@
           name: r.name ?? r.id ?? r.recipe_id ?? '(unnamed)',
           id: r.id ?? r.name,
         }));
-        discoveryCache.register(s.name, { recipes: cacheRecipes, tools: cacheTools });
+        // Cache key = aliased MCP name (serverName) so mcpRecipes filter
+        // and browsers (keyed by multiClient.listServers()[].name) find entries.
+        const cacheKey = (s as any).serverName ?? s.name;
+        discoveryCache.register(cacheKey, { recipes: cacheRecipes, tools: cacheTools });
         registeredServerNames.add(s.name);
         mutated = true;
       }
