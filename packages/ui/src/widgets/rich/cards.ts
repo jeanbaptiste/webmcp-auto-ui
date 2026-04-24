@@ -42,7 +42,10 @@ function resolveCards(spec: Partial<CardsSpec>, data: unknown): CardItem[] {
   if (Array.isArray(data)) {
     return (data as Record<string, unknown>[]).map((d) => ({
       title: String(d.title ?? d.name ?? d.label ?? JSON.stringify(d)),
-      description: typeof d.description === 'string' ? (d.description as string) : undefined,
+      description:
+        typeof d.description === 'string' ? (d.description as string)
+        : typeof d.content === 'string' ? (d.content as string)
+        : undefined,
       subtitle: typeof d.subtitle === 'string' ? (d.subtitle as string) : undefined,
     }));
   }
@@ -50,9 +53,10 @@ function resolveCards(spec: Partial<CardsSpec>, data: unknown): CardItem[] {
 }
 
 export function render(container: HTMLElement, data: any): () => void {
-  const payload: CardsPayload = (data && typeof data === 'object' ? data : {}) as CardsPayload;
-  const spec: Partial<CardsSpec> = payload.spec ?? {};
-  const inner = payload.data;
+  const raw: any = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  const spec: Partial<CardsSpec> =
+    raw.spec && typeof raw.spec === 'object' ? raw.spec : raw;
+  const inner = 'data' in raw ? raw.data : (Array.isArray(data) ? data : undefined);
   const interactive = spec.interactive === true;
   const cards = resolveCards(spec, inner);
 

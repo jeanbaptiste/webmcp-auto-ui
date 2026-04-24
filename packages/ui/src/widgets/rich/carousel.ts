@@ -41,10 +41,11 @@ function resolveSlides(spec: Partial<CarouselSpec>, data: unknown): CarouselSlid
 }
 
 export function render(container: HTMLElement, data: any): () => void {
-  const payload: CarouselPayload = (data && typeof data === 'object' ? data : {}) as CarouselPayload;
-  const spec: Partial<CarouselSpec> = payload.spec ?? {};
-  const inner = payload.data;
-  const onslidechange = typeof payload.onslidechange === 'function' ? payload.onslidechange : undefined;
+  const raw: any = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  const spec: Partial<CarouselSpec> =
+    raw.spec && typeof raw.spec === 'object' ? raw.spec : raw;
+  const inner = 'data' in raw ? raw.data : (Array.isArray(data) ? data : undefined);
+  const onslidechange = typeof raw.onslidechange === 'function' ? raw.onslidechange : undefined;
   const slides = resolveSlides(spec, inner);
   const autoPlay = spec.autoPlay !== false;
   const intervalMs = spec.interval ?? 5000;
