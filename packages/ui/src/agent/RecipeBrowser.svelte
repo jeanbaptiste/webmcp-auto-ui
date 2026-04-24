@@ -32,6 +32,8 @@
     /** Layout toggle: list (default) or grid */
     layout?: 'list' | 'grid';
     onOpenInNotebook?: (type: string, data: Record<string, unknown>) => void;
+    /** Called when user clicks a recipe to view its detail. Host shows the recipe modal. */
+    onOpenRecipe?: (recipe: RecipeItem) => void;
   }
 
   let {
@@ -41,6 +43,7 @@
     initialFilter = '',
     layout: initialLayout = 'list',
     onOpenInNotebook,
+    onOpenRecipe,
   }: Props = $props();
 
   function getMultiClient(): McpMultiClient | undefined {
@@ -87,6 +90,12 @@
 
   function onKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') close();
+  }
+
+  async function openRecipe(recipe: RecipeItem) {
+    await ensureBody(recipe);
+    selected = recipe;
+    onOpenRecipe?.(recipe);
   }
 
   async function downloadRecipe(recipe: RecipeItem) {
@@ -241,7 +250,7 @@
               {#each [...filteredMcp, ...filteredWebmcp] as recipe, i (`grid:${recipe.name}:${i}`)}
                 {@const isWebmcp = webmcpRecipes.includes(recipe)}
                 <div class="group flex flex-col gap-1 p-3 bg-surface2/50 rounded-lg hover:bg-surface2 transition-colors cursor-pointer border border-border2/50"
-                     onclick={() => { selected = recipe; }}>
+                     onclick={() => openRecipe(recipe)}>
                   <div class="font-mono text-[11px] text-text1 font-medium truncate">{recipe.name}</div>
                   {#if recipe.description}
                     <div class="font-mono text-[9px] text-text2 line-clamp-2">{recipe.description}</div>
@@ -291,7 +300,7 @@
                     <div class="group flex items-center gap-2 px-3 py-2 bg-surface2/50 rounded-lg hover:bg-surface2 transition-colors">
                       <button
                         class="flex-1 min-w-0 text-left cursor-pointer"
-                        onclick={() => { selected = recipe; }}
+                        onclick={() => openRecipe(recipe)}
                       >
                         <div class="font-mono text-[11px] text-text1 font-medium truncate">{recipe.name}</div>
                         {#if recipe.description}
@@ -337,7 +346,7 @@
                     <div class="group flex items-center gap-2 px-3 py-2 bg-surface2/50 rounded-lg hover:bg-surface2 transition-colors">
                       <button
                         class="flex-1 min-w-0 text-left cursor-pointer"
-                        onclick={() => { selected = recipe; }}
+                        onclick={() => openRecipe(recipe)}
                       >
                         <div class="font-mono text-[11px] text-text1 font-medium truncate">{recipe.name}</div>
                         {#if recipe.description}

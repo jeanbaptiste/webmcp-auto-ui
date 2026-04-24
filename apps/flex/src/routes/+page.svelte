@@ -1444,6 +1444,7 @@
   {webmcpRecipes}
   initialFilter={recipeBrowserFilter}
   onOpenInNotebook={(type, data) => { flexGrid?.addBlock(type, data, undefined, type); }}
+  onOpenRecipe={(r) => { detailRecipe = r as any; detailOpen = true; recipeBrowserOpen = false; }}
 />
 
 <!-- RECIPE DETAIL (opened from trace dblclick when a tool call matches a loaded recipe) -->
