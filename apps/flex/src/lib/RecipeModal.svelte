@@ -137,7 +137,7 @@
 
 <Dialog bind:open onOpenChange={(v) => { if (!v) close(); }}>
   <DialogContent
-    class="!p-0 !rounded-2xl !max-w-[1400px] !w-[calc(100vw-3rem)] !max-h-[90vh] {showSidePanel ? 'flex gap-4' : 'flex'} overflow-visible"
+    class="!p-0 !rounded-2xl !max-h-[90vh] overflow-visible {showSidePanel ? '!max-w-[1400px] !w-[calc(100vw-3rem)] flex gap-4' : '!max-w-[42rem] !w-[calc(100vw-3rem)] flex'}"
   >
     <!-- Recipe panel -->
     <div
