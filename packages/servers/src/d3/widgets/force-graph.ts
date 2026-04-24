@@ -29,9 +29,10 @@ export async function render(
     .style('opacity', '0');
 
   let activeSimulation: any = null;
+  let lastW = 0;
+  let lastH = 0;
 
   const draw = (width: number, height: number) => {
-    // Stop previous simulation and clear SVG
     if (activeSimulation) {
       activeSimulation.stop();
       activeSimulation = null;
@@ -41,8 +42,6 @@ export async function render(
     const simNodes = nodes.map((d) => ({ ...d }));
     const simLinks = links.map((d) => ({ ...d }));
 
-    // Truncate labels so they stay inside the viewBox without clamping node positions.
-    // Hover tooltip shows the full label.
     const maxChars = Math.max(10, Math.floor(width / 120));
     const truncate = (text: string): string =>
       text.length > maxChars ? text.slice(0, Math.max(1, maxChars - 1)) + '…' : text;
@@ -53,9 +52,11 @@ export async function render(
         'link',
         d3.forceLink(simLinks).id((d) => d.id).distance(60),
       )
-      .force('charge', d3.forceManyBody().strength(-120))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collide', d3.forceCollide().radius(20));
+      .force('charge', d3.forceManyBody().strength(-80))
+      .force('x', d3.forceX(width / 2).strength(0.05))
+      .force('y', d3.forceY(height / 2).strength(0.05))
+      .force('collide', d3.forceCollide().radius(20))
+      .alphaDecay(0.05);
 
     activeSimulation = simulation;
 
@@ -80,7 +81,19 @@ export async function render(
         .text(title);
     }
 
-    const link = svg
+    // All zoomable/pannable content lives inside this group.
+    const g = svg.append('g');
+
+    const zoom = d3
+      .zoom()
+      .scaleExtent([0.1, 8])
+      .on('zoom', (event) => g.attr('transform', event.transform));
+
+    svg.call(zoom).style('cursor', 'grab');
+    svg.on('mousedown', () => svg.style('cursor', 'grabbing'));
+    svg.on('mouseup', () => svg.style('cursor', 'grab'));
+
+    const link = g
       .append('g')
       .attr('stroke', '#999')
       .attr('stroke-opacity', 0.6)
@@ -89,7 +102,7 @@ export async function render(
       .join('line')
       .attr('stroke-width', (d) => Math.sqrt(d.value ?? 1));
 
-    const node = svg
+    const node = g
       .append('g')
       .selectAll('circle')
       .data(simNodes)
@@ -118,7 +131,7 @@ export async function render(
         }),
     );
 
-    const label = svg
+    const label = g
       .append('g')
       .selectAll('text')
       .data(simNodes)
@@ -155,6 +168,27 @@ export async function render(
       label.attr('x', (d) => d.x).attr('y', (d) => d.y);
     });
 
+    // Once the simulation settles, fit the viewport to the graph bbox.
+    simulation.on('end', () => {
+      const pad = 40;
+      const xs = simNodes.map((d) => d.x);
+      const ys = simNodes.map((d) => d.y);
+      const minX = Math.min(...xs) - pad;
+      const maxX = Math.max(...xs) + pad;
+      const minY = Math.min(...ys) - pad;
+      const maxY = Math.max(...ys) + pad;
+      const bw = maxX - minX;
+      const bh = maxY - minY;
+      if (bw <= 0 || bh <= 0) return;
+      const scale = Math.min(width / bw, height / bh, 1);
+      const tx = (width - bw * scale) / 2 - minX * scale;
+      const ty = (height - bh * scale) / 2 - minY * scale;
+      svg
+        .transition()
+        .duration(500)
+        .call(zoom.transform as any, d3.zoomIdentity.translate(tx, ty).scale(scale));
+    });
+
     svg.style('opacity', '0').transition().duration(400).style('opacity', '1');
   };
 
@@ -163,13 +197,29 @@ export async function render(
     container.clientHeight || 400,
   ];
 
-  draw(...getSize());
+  const [w0, h0] = getSize();
+  lastW = w0;
+  lastH = h0;
+  draw(w0, h0);
 
-  const ro = new ResizeObserver(() => draw(...getSize()));
+  // Only redraw when the container size changes by a meaningful amount,
+  // and throttle so we don't thrash the simulation on every resize frame.
+  let resizeTimer: any = null;
+  const ro = new ResizeObserver(() => {
+    const [w, h] = getSize();
+    if (Math.abs(w - lastW) < 8 && Math.abs(h - lastH) < 8) return;
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      lastW = w;
+      lastH = h;
+      draw(w, h);
+    }, 200);
+  });
   ro.observe(container);
 
   return () => {
     ro.disconnect();
+    if (resizeTimer) clearTimeout(resizeTimer);
     if (activeSimulation) activeSimulation.stop();
     tooltip.remove();
     d3.select(container).selectAll('svg').remove();
