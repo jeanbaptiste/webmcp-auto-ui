@@ -39,12 +39,24 @@ export async function render(
     }
     d3.select(container).selectAll('svg').remove();
 
-    const simNodes = nodes.map((d) => ({ ...d }));
     const simLinks = links.map((d) => ({ ...d }));
 
-    const maxChars = Math.max(10, Math.floor(width / 120));
-    const truncate = (text: string): string =>
-      text.length > maxChars ? text.slice(0, Math.max(1, maxChars - 1)) + '…' : text;
+    // Degree-based sizing: hubs (many connections) are larger than leaves.
+    // Explicit `radius` on a node always wins.
+    const degree = new Map<string, number>();
+    for (const l of simLinks) {
+      const s = typeof l.source === 'object' ? l.source.id : l.source;
+      const t = typeof l.target === 'object' ? l.target.id : l.target;
+      degree.set(s, (degree.get(s) ?? 0) + 1);
+      degree.set(t, (degree.get(t) ?? 0) + 1);
+    }
+    const maxDeg = Math.max(1, ...degree.values());
+    const simNodes = nodes.map((d) => {
+      if (d.radius != null) return { ...d };
+      const deg = degree.get(d.id) ?? 1;
+      const r = 6 + 14 * Math.sqrt(deg / maxDeg);
+      return { ...d, radius: r };
+    });
 
     const simulation = d3
       .forceSimulation(simNodes)
@@ -55,7 +67,13 @@ export async function render(
       .force('charge', d3.forceManyBody().strength(-80))
       .force('x', d3.forceX(width / 2).strength(0.05))
       .force('y', d3.forceY(height / 2).strength(0.05))
-      .force('collide', d3.forceCollide().radius(20))
+      .force(
+        'collide',
+        d3.forceCollide().radius((d) => {
+          const label = String(d.label ?? d.id ?? '');
+          return (d.radius ?? 8) + 12 + label.length * 3.5;
+        }),
+      )
       .alphaDecay(0.05);
 
     activeSimulation = simulation;
@@ -136,7 +154,7 @@ export async function render(
       .selectAll('text')
       .data(simNodes)
       .join('text')
-      .text((d) => truncate(String(d.label ?? d.id ?? '')))
+      .text((d) => String(d.label ?? d.id ?? ''))
       .attr('font-size', '10px')
       .attr('dx', 12)
       .attr('dy', '0.35em');
