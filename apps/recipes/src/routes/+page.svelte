@@ -10,7 +10,7 @@
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
   import {
-    RemoteLLMProvider, HawkProvider, WasmProvider, runAgentLoop, buildSystemPrompt,
+    runAgentLoop, buildSystemPrompt,
     WEBMCP_RECIPES, recipeRegistry,
     fromMcpTools, trimConversationHistory, TokenTracker,
     buildDiscoveryCache, ContextRAG,
@@ -18,6 +18,7 @@
   import type { ChatMessage, Recipe, McpRecipe, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
   import { autoui } from '@webmcp-auto-ui/agent';
   import { McpStatus, LLMSelector, ModelLoader, RemoteMCPserversDemo, AgentConsole, HeaderControls } from '@webmcp-auto-ui/ui';
+  import { createAgentLoop } from '@webmcp-auto-ui/ui/agent';
   import RecipeList from '$lib/RecipeList.svelte';
   import RecipeDetail from '$lib/RecipeDetail.svelte';
   import RecipePreview from '$lib/RecipePreview.svelte';
@@ -114,36 +115,10 @@
   // Settings panel
   let settingsOpen = $state(false);
 
-  // LLM optimization options (smart defaults via $effect below)
-  let schemaSanitize = $state(true);
-  let schemaFlatten = $state(false);
-  let maxResultLength = $state(10000);
-  let truncateResults = $state(false);
-  let compressHistory = $state(false);
-  let compressPreview = $state(500);
-  let cacheEnabled = $state(true);
-  let temperature = $state(1.0);
-
-  // Smart defaults: adjust optimization options when LLM model changes
+  // Smart defaults — apply when LLM changes
   $effect(() => {
-    const isGemma = canvas.llm.startsWith('gemma');
-    const isLocal = canvas.llm === 'local';
-    schemaSanitize = isLocal ? true : !isGemma;
-    schemaFlatten = isGemma || isLocal;
-    truncateResults = isGemma || isLocal;
-    compressHistory = isLocal;
-    if (isGemma) {
-      maxResultLength = 2000;
-      temperature = 0.7;
-      cacheEnabled = false;
-    } else if (isLocal) {
-      maxResultLength = 3000;
-    } else {
-      // Claude defaults
-      maxResultLength = 10000;
-      temperature = 1.0;
-      cacheEnabled = true;
-    }
+    canvas.llm; // reactive dependency
+    agent.applySmartDefaults();
   });
 
   // Nano-RAG (experimental, off by default)
@@ -163,81 +138,17 @@
   // Mobile tabs
   let mobileTab = $state<'list' | 'detail' | 'preview'>('list');
 
-  // Provider
-  const remoteProvider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
-  let hawkProvider: HawkProvider | null = null;
-  const tokenTracker = new TokenTracker();
+  // ── Agent loop composable (provider + Gemma lifecycle + smart defaults + tokens) ──
+  const agent = createAgentLoop({
+    chatApiBase: `${base}/api/chat`,
+    hawkApiBase: `${base}/api/hawk`,
+    enabledProviders: ['remote', 'wasm', 'hawk'],
+  });
 
-  // Gemma WASM state
-  let gemmaProvider = $state<WasmProvider | null>(null);
-  let gemmaStatus = $state<'idle'|'loading'|'ready'|'error'>('idle');
-  let gemmaProgress = $state(0);
-  let gemmaElapsed = $state(0);
-  let gemmaLoadStart = $state(0);
-  let gemmaLoadedMB = $state(0);
-  let gemmaTotalMB = $state(0);
-  let gemmaTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
-
-  function getProvider() {
-    if (canvas.llm.startsWith('hawk-')) {
-      const model = canvas.llm.slice(5);
-      if (!hawkProvider || hawkProvider.model !== model) {
-        hawkProvider = new HawkProvider({ proxyUrl: `${base}/api/hawk`, model });
-      }
-      return hawkProvider;
-    }
-    if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
-      if (gemmaProvider && gemmaProvider.model !== canvas.llm) {
-        unloadGemma();
-      }
-      if (!gemmaProvider) {
-        const wasmContext = 32_768;
-        gemmaProvider = new WasmProvider({
-          model: canvas.llm,
-          contextSize: wasmContext,
-          onProgress: (p, _s, loaded, total) => {
-            gemmaProgress = p * 100;
-            if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;
-            if (total) gemmaTotalMB = Math.round(total / 1048576 * 100) / 100;
-          },
-          onStatusChange: (s) => {
-            gemmaStatus = s;
-            if (s === 'loading') {
-              gemmaLoadStart = Date.now();
-              gemmaElapsed = 0;
-              if (gemmaTimerInterval) clearInterval(gemmaTimerInterval);
-              gemmaTimerInterval = setInterval(() => {
-                gemmaElapsed = Math.floor((Date.now() - gemmaLoadStart) / 1000);
-              }, 1000);
-            }
-            if (s === 'ready' || s === 'error') {
-              if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
-            }
-          },
-        });
-      }
-      return gemmaProvider;
-    }
-    remoteProvider.setModel(canvas.llm as any);
-    return remoteProvider;
-  }
-
-  function unloadGemma() {
-    (gemmaProvider as unknown as { destroy?: () => void })?.destroy?.();
-    gemmaProvider = null;
-    gemmaStatus = 'idle';
-    gemmaProgress = 0;
-    if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
-  }
-
+  // Auto-initialize Gemma when LLM switches to a Gemma model
   $effect(() => {
     const llm = canvas.llm;
-    untrack(() => {
-      if ((llm === 'gemma-e2b' || llm === 'gemma-e4b') && gemmaStatus === 'idle') {
-        const p = getProvider();
-        if (p instanceof WasmProvider) p.initialize();
-      }
-    });
+    untrack(() => { agent.initGemmaIfNeeded(); });
   });
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -425,21 +336,17 @@
 
       const result = await runAgentLoop(prompt, {
         client: multiClient?.hasConnections ? multiClient as any : undefined,
-        provider: getProvider(),
+        provider: agent.getProvider(),
         systemPrompt: systemPrompt || undefined,
         maxIterations: 15,
         maxTokens: 4096,
-        maxResultLength,
-        truncateResults,
-        compressHistory: compressHistory ? compressPreview : false,
-        temperature,
-        cacheEnabled,
+        ...agent.runOptions(),
         signal: abortController!.signal,
         initialMessages: trimConversationHistory(conversationHistory, 120_000),
         layers,
         discoveryCache,
         contextRAG: contextRAG ?? undefined,
-        schemaOptions: { sanitize: schemaSanitize, flatten: schemaFlatten, strict: false },
+        schemaOptions: { sanitize: agent.schemaSanitize, flatten: agent.schemaFlatten, strict: false },
         callbacks: {
           onIterationStart: (i: number, max: number) => {
             pushLog('iteration', `Iteration ${i}/${max}`);
@@ -454,11 +361,7 @@
           onLLMResponse: (response: any, latencyMs: number) => {
             const tokens = response.usage;
             pushLog('response', `${tokens?.input ?? '?'}in ${tokens?.output ?? '?'}out, ${Math.round(latencyMs)}ms, ${response.stopReason}`);
-            if (response.usage) {
-              tokenTracker.record(response.usage, latencyMs);
-            } else if (response.stats) {
-              tokenTracker.recordEstimate(0, response.stats.totalTokens * 4, latencyMs);
-            }
+            agent.recordTokens(response, latencyMs);
           },
           onWidget: (type: string, data: Record<string, unknown>) => {
             previewBlocks = [...previewBlocks, { id: uid(), type, data }];
@@ -542,10 +445,7 @@
   }
 
   onDestroy(() => {
-    if (gemmaTimerInterval) {
-      clearInterval(gemmaTimerInterval);
-      gemmaTimerInterval = null;
-    }
+    agent.destroy();
     if (multiMcpBridge) { try { multiMcpBridge.stop(); } catch {} multiMcpBridge = null; }
   });
 
@@ -592,7 +492,7 @@
       name={canvas.mcpName ?? 'not connected'}
     />
 
-    {#if gemmaStatus === 'ready'}
+    {#if agent.gemmaStatus === 'ready'}
       <span class="font-mono text-[10px] text-teal flex items-center gap-1 flex-shrink-0">
         <span class="w-1.5 h-1.5 rounded-full bg-teal"></span>
         {({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}
@@ -612,15 +512,15 @@
   </header>
 
   <!-- GEMMA LOADER -->
-  {#if gemmaStatus === 'loading' || gemmaStatus === 'error'}
+  {#if agent.gemmaStatus === 'loading' || agent.gemmaStatus === 'error'}
     <ModelLoader
-      status={gemmaStatus}
-      progress={gemmaProgress}
-      elapsed={gemmaElapsed}
-      loadedMB={gemmaLoadedMB}
-      totalMB={gemmaTotalMB}
+      status={agent.gemmaStatus}
+      progress={agent.gemmaProgress}
+      elapsed={agent.gemmaElapsed}
+      loadedMB={agent.gemmaLoadedMB}
+      totalMB={agent.gemmaTotalMB}
       modelName={({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}
-      onunload={unloadGemma}
+      onunload={() => agent.unloadGemma()}
     />
   {/if}
 

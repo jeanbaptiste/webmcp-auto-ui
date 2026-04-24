@@ -8,16 +8,13 @@ import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
 import { installMultiMcpBridge, MultiMcpBridge } from '@webmcp-auto-ui/core';
 import type { McpMultiClient } from '@webmcp-auto-ui/core';
 import {
-  RemoteLLMProvider,
-  HawkProvider,
-  WasmProvider,
   runAgentLoop,
   buildSystemPrompt,
   fromMcpTools,
-  TokenTracker,
   buildDiscoveryCache,
   ContextRAG,
 } from '@webmcp-auto-ui/agent';
+import { createAgentLoop } from '@webmcp-auto-ui/ui/agent';
 import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
 import { autoui } from '@webmcp-auto-ui/agent';
 import { base } from '$app/paths';
@@ -60,46 +57,16 @@ let lastToolName = $state('');
 let elapsed = $state(0);
 let abortController = $state<AbortController | null>(null);
 
-// Gemma state
-let gemmaProvider = $state<WasmProvider | null>(null);
-let gemmaStatus = $state<'idle' | 'loading' | 'ready' | 'error'>('idle');
-let gemmaProgress = $state(0);
-let gemmaElapsed = $state(0);
-let gemmaLoadedMB = $state(0);
-let gemmaTotalMB = $state(0);
-let gemmaTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
-let gemmaLoadStart = $state(0);
+// Agent loop composable (provider + Gemma lifecycle + smart defaults + tokens)
+const agentLoop = createAgentLoop({
+  chatApiBase: `${base}/api/chat`,
+  hawkApiBase: `${base}/api/hawk`,
+  enabledProviders: ['remote', 'wasm', 'hawk'],
+});
 
-// LLM optimization options (smart defaults via $effect below)
-let schemaSanitize = $state(true);
-let schemaFlatten = $state(false);
-let maxResultLength = $state(10000);
-let truncateResults = $state(false);
-let compressHistory = $state(false);
-let compressPreview = $state(500);
-let cacheEnabled = $state(true);
-let temperature = $state(1.0);
-
-// Smart defaults: called imperatively when LLM changes (not $effect — module-level)
+// Smart defaults — delegate to composable
 function applySmartDefaults() {
-  const isGemma = canvas.llm.startsWith('gemma');
-  const isLocal = canvas.llm === 'local';
-  schemaSanitize = isLocal ? true : !isGemma;
-  schemaFlatten = isGemma || isLocal;
-  truncateResults = isGemma || isLocal;
-  compressHistory = isLocal;
-  if (isGemma) {
-    maxResultLength = 2000;
-    temperature = 0.7;
-    cacheEnabled = false;
-  } else if (isLocal) {
-    maxResultLength = 3000;
-  } else {
-    // Claude defaults
-    maxResultLength = 10000;
-    temperature = 1.0;
-    cacheEnabled = true;
-  }
+  agentLoop.applySmartDefaults();
 }
 
 // Nano-RAG (experimental, off by default)
@@ -118,71 +85,14 @@ function setContextRAGEnabled(v: boolean) {
   }
 }
 
-// Token tracking
-const tokenTracker = new TokenTracker();
-let tokenMetrics = $state(tokenTracker.metrics);
-tokenTracker.subscribe(m => { tokenMetrics = m; });
-
-// Provider singleton
-const anthropicProvider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
-let hawkProvider: HawkProvider | null = null;
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 let blockCounter = 0;
 function uid() {
   return 'b' + (++blockCounter) + '_' + Date.now().toString(36);
 }
 
-function getProvider() {
-  const llm = canvas.llm;
-  if (llm.startsWith('hawk-')) {
-    const model = llm.slice(5);
-    if (!hawkProvider || hawkProvider.model !== model) {
-      hawkProvider = new HawkProvider({ proxyUrl: `${base}/api/hawk`, model });
-    }
-    return hawkProvider;
-  }
-  if (llm === 'gemma-e2b' || llm === 'gemma-e4b') {
-    if (gemmaProvider && gemmaProvider.model !== llm) {
-      unloadGemma();
-    }
-    if (!gemmaProvider) {
-      gemmaProvider = new WasmProvider({
-        model: llm,
-        contextSize: 32_768,
-        onProgress: (p, _s, loaded, total) => {
-          gemmaProgress = p * 100;
-          if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;
-          if (total) gemmaTotalMB = Math.round(total / 1048576 * 100) / 100;
-        },
-        onStatusChange: (s) => {
-          gemmaStatus = s;
-          if (s === 'loading') {
-            gemmaLoadStart = Date.now();
-            gemmaElapsed = 0;
-            if (gemmaTimerInterval) clearInterval(gemmaTimerInterval);
-            gemmaTimerInterval = setInterval(() => {
-              gemmaElapsed = Math.floor((Date.now() - gemmaLoadStart) / 1000);
-            }, 1000);
-          }
-          if (s === 'ready' || s === 'error') {
-            if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
-          }
-        },
-      });
-    }
-    return gemmaProvider;
-  }
-  anthropicProvider.setModel(llm as Parameters<typeof anthropicProvider.setModel>[0]);
-  return anthropicProvider;
-}
-
 function unloadGemma() {
-  (gemmaProvider as unknown as { destroy?: () => void })?.destroy?.();
-  gemmaProvider = null;
-  gemmaStatus = 'idle';
-  gemmaProgress = 0;
-  if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
+  agentLoop.unloadGemma();
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────
@@ -198,30 +108,30 @@ export const agentStore = {
   get toolCallCount() { return toolCallCount; },
   get lastToolName() { return lastToolName; },
   get elapsed() { return elapsed; },
-  get tokenMetrics() { return tokenMetrics; },
-  get gemmaStatus() { return gemmaStatus; },
-  get gemmaProgress() { return gemmaProgress; },
-  get gemmaElapsed() { return gemmaElapsed; },
-  get gemmaLoadedMB() { return gemmaLoadedMB; },
-  get gemmaTotalMB() { return gemmaTotalMB; },
+  get tokenMetrics() { return agentLoop.tokenMetrics; },
+  get gemmaStatus() { return agentLoop.gemmaStatus; },
+  get gemmaProgress() { return agentLoop.gemmaProgress; },
+  get gemmaElapsed() { return agentLoop.gemmaElapsed; },
+  get gemmaLoadedMB() { return agentLoop.gemmaLoadedMB; },
+  get gemmaTotalMB() { return agentLoop.gemmaTotalMB; },
   get multiClient() { return getMultiClient(); },
   get contextRAGEnabled() { return contextRAGEnabled; },
   set contextRAGEnabled(v: boolean) { setContextRAGEnabled(v); },
 
   /** Apply smart defaults for the current LLM */
   applySmartDefaults,
-  get schemaSanitize() { return schemaSanitize; },
-  set schemaSanitize(v: boolean) { schemaSanitize = v; },
-  get schemaFlatten() { return schemaFlatten; },
-  set schemaFlatten(v: boolean) { schemaFlatten = v; },
-  get maxResultLength() { return maxResultLength; },
-  set maxResultLength(v: number) { maxResultLength = v; },
-  get truncateResults() { return truncateResults; },
-  set truncateResults(v: boolean) { truncateResults = v; },
-  get compressHistory() { return compressHistory; },
-  set compressHistory(v: boolean) { compressHistory = v; },
-  get compressPreview() { return compressPreview; },
-  set compressPreview(v: number) { compressPreview = v; },
+  get schemaSanitize() { return agentLoop.schemaSanitize; },
+  set schemaSanitize(v: boolean) { agentLoop.schemaSanitize = v; },
+  get schemaFlatten() { return agentLoop.schemaFlatten; },
+  set schemaFlatten(v: boolean) { agentLoop.schemaFlatten = v; },
+  get maxResultLength() { return agentLoop.maxResultLength; },
+  set maxResultLength(v: number) { agentLoop.maxResultLength = v; },
+  get truncateResults() { return agentLoop.truncateResults; },
+  set truncateResults(v: boolean) { agentLoop.truncateResults = v; },
+  get compressHistory() { return agentLoop.compressHistoryEnabled; },
+  set compressHistory(v: boolean) { agentLoop.compressHistoryEnabled = v; },
+  get compressPreview() { return agentLoop.compressPreview; },
+  set compressPreview(v: number) { agentLoop.compressPreview = v; },
 
   /** Connect to an MCP server — routed through the canvas store so the global
    * MultiMcpBridge performs the handshake. Connection state mirrored back via
@@ -268,11 +178,7 @@ export const agentStore = {
 
   /** Initialize Gemma if needed */
   initGemma() {
-    const llm = canvas.llm;
-    if ((llm === 'gemma-e2b' || llm === 'gemma-e4b') && gemmaStatus === 'idle') {
-      const p = getProvider();
-      if (p instanceof WasmProvider) p.initialize();
-    }
+    agentLoop.initGemmaIfNeeded();
   },
 
   /** Unload Gemma */
@@ -321,27 +227,19 @@ export const agentStore = {
         `Explore the MCP server "${canvas.mcpName}" and create a demo page with at least 6 varied UI components using real data. Use stat, chart, data-table, list, kv, timeline, cards, etc.`,
         {
           client: getMultiClient() as Parameters<typeof runAgentLoop>[1]['client'],
-          provider: getProvider(),
+          provider: agentLoop.getProvider(),
           systemPrompt,
           maxIterations: 15,
           maxTokens: 4096,
-          maxResultLength,
-          truncateResults,
-          compressHistory: compressHistory ? compressPreview : false,
-          temperature,
-          cacheEnabled,
+          ...agentLoop.runOptions(),
           signal: abortController!.signal,
           layers,
           discoveryCache,
           contextRAG: contextRAG ?? undefined,
-          schemaOptions: { sanitize: schemaSanitize, flatten: schemaFlatten, strict: false },
+          schemaOptions: { sanitize: agentLoop.schemaSanitize, flatten: agentLoop.schemaFlatten, strict: false },
           callbacks: {
             onLLMResponse: (response, latencyMs) => {
-              if (response.usage) {
-                tokenTracker.record(response.usage, latencyMs);
-              } else if (response.stats) {
-                tokenTracker.recordEstimate(0, response.stats.totalTokens * 4, latencyMs);
-              }
+              agentLoop.recordTokens(response, latencyMs);
             },
             onWidget: (type, data) => {
               const block: GeneratedBlock = {

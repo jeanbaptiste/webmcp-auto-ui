@@ -16,6 +16,10 @@
       "svelte": "./src/stores/canvas.svelte.ts",
       "import": "./src/stores/canvas.svelte.ts"
     },
+    "./agent": {
+      "svelte": "./src/agent/useAgentLoop.svelte.ts",
+      "import": "./src/agent/useAgentLoop.svelte.ts"
+    },
     "./widgets/notebook/*": {
       "svelte": "./src/widgets/notebook/*",
       "import": "./src/widgets/notebook/*"
@@ -66,6 +70,7 @@
   ],
   "dependencies": {
     "@types/d3": "^7.4.3",
+    "@webmcp-auto-ui/agent": "*",
     "@webmcp-auto-ui/core": "*",
     "@webmcp-auto-ui/sdk": "*",
     "bits-ui": "^2.17.2",

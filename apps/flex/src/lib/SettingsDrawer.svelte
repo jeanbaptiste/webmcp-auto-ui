@@ -7,6 +7,7 @@
 <script lang="ts">
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
+  import { Dialog, DialogContent, DialogTitle } from '@webmcp-auto-ui/ui';
   import { McpConnector, LLMSelector, SettingsPanel, MCPserversList, WebMCPserversList, DiagnosticModal, DiagnosticIcon, ModelCacheManager } from '@webmcp-auto-ui/ui';
 
   const buildStamp = typeof __BUILD_TIME__ === 'string'
@@ -135,273 +136,248 @@
   }
 </script>
 
-<!-- Backdrop -->
-{#if open}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="fixed inset-0 bg-black/40 z-40" onclick={() => open = false}></div>
-{/if}
+<Dialog bind:open>
+  <DialogContent
+    class="!left-0 !top-0 !right-auto !bottom-0 !translate-x-0 !translate-y-0 !rounded-none !rounded-r-none !max-w-[320px] !w-[320px] !h-full !p-0 flex flex-col overflow-hidden !shadow-[4px_0_32px_rgba(0,0,0,0.2)]"
+  >
+    <!-- Title (visually hidden — required for a11y) -->
+    <DialogTitle class="sr-only">Settings</DialogTitle>
 
-<!-- Drawer -->
-<aside class="settings-drawer {open ? 'open' : ''}">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
+      <span class="font-mono text-sm font-bold text-text1">Settings</span>
+    </div>
 
-  <div class="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
-    <span class="font-mono text-sm font-bold text-text1">Settings</span>
-    <button class="text-text2 hover:text-text1 text-lg leading-none transition-colors"
-            onclick={() => open = false}>x</button>
-  </div>
+    <div class="flex flex-col gap-6 p-5 overflow-y-auto flex-1">
 
-  <div class="flex flex-col gap-6 p-5 overflow-y-auto flex-1">
-
-    <!-- MCP custom URL -->
-    <section class="flex flex-col gap-2">
-      <div class="flex items-center gap-1.5">
-        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">MCP server (manual URL)</span>
-        <button
-          onclick={() => mcpShowToken = !mcpShowToken}
-          class="text-text2 hover:text-text1 transition-colors flex-shrink-0"
-          title="Bearer token"
-          aria-label="Toggle bearer token input"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
-      </div>
-      <McpConnector
-        url={manualUrl}
-        onurlchange={(v) => { manualUrl = v; canvas.addMcpServer(v); }}
-        bind:token={mcpToken}
-        bind:showToken={mcpShowToken}
-        connecting={!!manualUrl && canvas.dataServers.some((s) => s.url === manualUrl && !s.connected)}
-        connected={!!manualUrl && canvas.dataServers.some((s) => s.url === manualUrl && s.connected)}
-        serverName={manualUrl ? (() => { const e = canvas.dataServers.find((s) => s.url === manualUrl); return e?.serverName ?? e?.name ?? ''; })() : ''}
-        onconnect={onconnect}
-        ondisconnect={() => { if (manualUrl) onremoveserver?.(manualUrl); manualUrl = ''; }}
-      />
-    </section>
-
-    <!-- MCP demo servers -->
-    <section class="flex flex-col gap-2">
-      <MCPserversList
-        servers={MCP_DEMO_SERVERS}
-        {connectedUrls}
-        loading={loadingUrls}
-        onconnect={(url) => onaddserver?.(url)}
-        onconnectall={() => onaddall?.()}
-        ondisconnect={(url) => onremoveserver?.(url)}
-        {recipeCountByServer}
-        {onrecipeclick}
-        {toolCountByServer}
-        ontoolclick={(url) => ontoolclick?.(url)}
-      />
-    </section>
-
-    <!-- WebMCP servers -->
-    {#if serverRegistry.length > 0}
+      <!-- MCP custom URL -->
       <section class="flex flex-col gap-2">
-        <WebMCPserversList
-          servers={serverRegistry}
-          {enabledServers}
-          onToggle={toggleServer}
-          recipeCountByServer={webmcpRecipeCountByServer}
-          toolCountByServer={webmcpToolCountByServer}
-          onrecipeclick={(id) => onwebmcprecipeclick?.(id)}
-          ontoolclick={(id) => onwebmcptoolclick?.(id)}
+        <div class="flex items-center gap-1.5">
+          <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">MCP server (manual URL)</span>
+          <button
+            onclick={() => mcpShowToken = !mcpShowToken}
+            class="text-text2 hover:text-text1 transition-colors flex-shrink-0"
+            title="Bearer token"
+            aria-label="Toggle bearer token input"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <McpConnector
+          url={manualUrl}
+          onurlchange={(v) => { manualUrl = v; canvas.addMcpServer(v); }}
+          bind:token={mcpToken}
+          bind:showToken={mcpShowToken}
+          connecting={!!manualUrl && canvas.dataServers.some((s) => s.url === manualUrl && !s.connected)}
+          connected={!!manualUrl && canvas.dataServers.some((s) => s.url === manualUrl && s.connected)}
+          serverName={manualUrl ? (() => { const e = canvas.dataServers.find((s) => s.url === manualUrl); return e?.serverName ?? e?.name ?? ''; })() : ''}
+          onconnect={onconnect}
+          ondisconnect={() => { if (manualUrl) onremoveserver?.(manualUrl); manualUrl = ''; }}
         />
       </section>
-    {/if}
 
-    <!-- LLM -->
-    <section class="flex flex-col gap-2">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">LLM model</div>
-      <LLMSelector
-        value={canvas.llm}
-        onchange={(v) => canvas.setLlm(v as 'haiku'|'sonnet'|'gemma-e2b'|'gemma-e4b')}
-        class="w-full"
-      />
-    </section>
-
-    <!-- Local LLM -->
-    {#if canvas.llm === 'local'}
-    <section class="flex flex-col gap-2">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Local LLM</div>
-      <input
-        type="text"
-        bind:value={localUrl}
-        placeholder="http://localhost:11434"
-        class="font-mono text-xs h-7 px-2 rounded border border-border2 bg-surface2 text-text1 w-full"
-      />
-      <input
-        type="text"
-        bind:value={localModel}
-        placeholder="llama3.2, qwen2.5, mistral..."
-        class="font-mono text-xs h-7 px-2 rounded border border-border2 bg-surface2 text-text1 w-full"
-      />
-      <div class="text-[9px] font-mono text-text2/60">
-        Compatible Ollama, vLLM, LM Studio, llama.cpp
-      </div>
-    </section>
-    {/if}
-
-    <!-- Model cache -->
-    <section class="flex flex-col gap-2">
-      <ModelCacheManager />
-    </section>
-
-    <!-- Agent settings -->
-    <section class="flex flex-col gap-2">
-      <div class="flex items-center gap-2">
-        <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Agent</span>
-        <DiagnosticIcon count={diagnostics.length} onclick={() => diagModalOpen = true} />
-      </div>
-      <SettingsPanel
-        bind:systemPrompt
-        {effectivePrompt}
-        bind:maxTokens
-        bind:maxContextTokens
-        bind:maxResultLength
-        bind:compressHistory
-        bind:compressPreview
-        bind:contextRAGEnabled
-        bind:ragResidueSize
-        bind:cacheEnabled
-        bind:temperature
-        bind:topK
-        bind:visualTrace
-        modelType={canvas.llm.startsWith('gemma') ? 'wasm' : 'remote'}
-        modelId={canvas.llm}
-      />
-    </section>
-
-    <!-- Mode & Layout -->
-    <section class="flex flex-col gap-3">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Mode</div>
-      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
-        <input type="checkbox" bind:checked={composerMode} class="accent-accent w-3.5 h-3.5" />
-        Composer mode
-      </label>
-      {#if composerMode}
-        <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
-          <input type="checkbox" checked={layoutMode === 'grid'} onchange={() => layoutMode = layoutMode === 'float' ? 'grid' : 'float'} class="accent-accent w-3.5 h-3.5" />
-          Grid layout
-        </label>
-      {/if}
-    </section>
-
-    <!-- Export & History -->
-    <section class="flex flex-col gap-3">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Export</div>
-      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
-        <input type="checkbox" bind:checked={includeSummary} class="accent-accent w-3.5 h-3.5" />
-        Include summary
-      </label>
-      <button class="font-mono text-xs h-7 px-3 rounded border transition-colors w-full text-left flex items-center gap-2
-                     {exportState === 'done' ? 'border-teal/40 text-teal' : 'border-border2 text-text2 hover:text-text1'}"
-              onclick={onexport}
-              disabled={exportState === 'loading'}>
-        {#if exportState === 'loading'}
-          <span class="inline-block w-3 h-3 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></span>
-          Preparing...
-        {:else if exportState === 'done'}
-          Copied &#x2713;
-        {:else}
-          Export HyperSkill
-        {/if}
-      </button>
-      <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-text2 hover:text-text1 transition-colors w-full text-left"
-              onclick={onhistory}>
-        History
-      </button>
-      {#if onclear}
-        <button class="font-mono text-xs h-7 px-3 rounded border border-accent2/30 text-accent2 hover:bg-accent2/10 transition-colors w-full text-left"
-                onclick={() => { onclear(); open = false; }}>
-          Clear (canvas + conversation)
-        </button>
-      {/if}
-    </section>
-
-    <!-- Schema transforms -->
-    <section class="flex flex-col gap-2">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Schema LLM</div>
-      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
-        <input type="checkbox" bind:checked={schemaFlatten} class="accent-teal w-3.5 h-3.5" />
-        Flatten <span class="text-[8px] text-text2/40 font-mono">(experimental)</span>
-      </label>
-      <div class="text-[9px] font-mono text-text2/60 pl-5">
-        {schemaFlatten ? 'Flattens nested objects to key__subkey' : 'Schemas with native nesting'}
-      </div>
-      <label class="flex items-center gap-2 font-mono text-xs text-text1 {providerKind === 'gemma' ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}">
-        <input type="checkbox" bind:checked={schemaStrict} disabled={providerKind === 'gemma'} class="accent-teal w-3.5 h-3.5" />
-        Strict tool use
-        <span class="text-[8px] text-text2/40 font-mono">constrained grammar</span>
-        {#if providerKind === 'gemma'}
-          <span class="text-[8px] text-text2/40 font-mono ml-auto">Ignored by Gemma (native format)</span>
-        {/if}
-      </label>
-      <div class="text-[9px] font-mono text-text2/60 pl-5">
-        {schemaStrict ? 'Grammar-constrained sampling + strips oneOf/anyOf/allOf/$ref from schemas' : 'Free sampling, schemas sent as-is (may break on complex MCP schemas)'}
-      </div>
-    </section>
-
-    <!-- Display -->
-    <section class="flex flex-col gap-2">
-      <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Display</div>
-      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
-        <input type="checkbox" bind:checked={showTokens} class="accent-accent w-3.5 h-3.5" />
-        Token usage
-      </label>
-      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
-        <input type="checkbox" bind:checked={showToolJSON} class="accent-accent w-3.5 h-3.5" />
-        Agent logs (bottom panel)
-      </label>
-      <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
-        <input type="checkbox" bind:checked={showPipelineTrace} class="accent-accent w-3.5 h-3.5" />
-        Pipeline trace (logs)
-      </label>
-    </section>
-
-    <!-- Recipes -->
-    {#if mcpRecipes.length > 0 || webmcpRecipes.length > 0}
+      <!-- MCP demo servers -->
       <section class="flex flex-col gap-2">
-        <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Recipes</div>
-        <button
-          class="font-mono text-[10px] h-6 px-3 rounded border border-accent/40 text-accent hover:bg-accent/10 transition-colors self-start"
-          onclick={() => onbrowserecipes?.()}
-        >
-          Browse all recipes &rarr;
-        </button>
+        <MCPserversList
+          servers={MCP_DEMO_SERVERS}
+          {connectedUrls}
+          loading={loadingUrls}
+          onconnect={(url) => onaddserver?.(url)}
+          onconnectall={() => onaddall?.()}
+          ondisconnect={(url) => onremoveserver?.(url)}
+          {recipeCountByServer}
+          {onrecipeclick}
+          {toolCountByServer}
+          ontoolclick={(url) => ontoolclick?.(url)}
+        />
       </section>
-    {/if}
 
-  </div>
+      <!-- WebMCP servers -->
+      {#if serverRegistry.length > 0}
+        <section class="flex flex-col gap-2">
+          <WebMCPserversList
+            servers={serverRegistry}
+            {enabledServers}
+            onToggle={toggleServer}
+            recipeCountByServer={webmcpRecipeCountByServer}
+            toolCountByServer={webmcpToolCountByServer}
+            onrecipeclick={(id) => onwebmcprecipeclick?.(id)}
+            ontoolclick={(id) => onwebmcptoolclick?.(id)}
+          />
+        </section>
+      {/if}
 
-  <!-- Build footer -->
-  <div class="px-5 py-3 border-t border-border flex-shrink-0 flex items-center justify-between">
-    <span class="font-mono text-[8px] text-text2/40">v{appVersion} · {gitHash} · {buildStamp}</span>
-    <a href="https://github.com/jeanbaptiste/webmcp-auto-ui/tree/main/apps/flex"
-       target="_blank" rel="noopener"
-       class="font-mono text-[8px] text-text2/40 hover:text-text2 transition-colors">GitHub</a>
-  </div>
-</aside>
+      <!-- LLM -->
+      <section class="flex flex-col gap-2">
+        <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">LLM model</div>
+        <LLMSelector
+          value={canvas.llm}
+          onchange={(v) => canvas.setLlm(v as 'haiku'|'sonnet'|'gemma-e2b'|'gemma-e4b')}
+          class="w-full"
+        />
+      </section>
+
+      <!-- Local LLM -->
+      {#if canvas.llm === 'local'}
+      <section class="flex flex-col gap-2">
+        <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Local LLM</div>
+        <input
+          type="text"
+          bind:value={localUrl}
+          placeholder="http://localhost:11434"
+          class="font-mono text-xs h-7 px-2 rounded border border-border2 bg-surface2 text-text1 w-full"
+        />
+        <input
+          type="text"
+          bind:value={localModel}
+          placeholder="llama3.2, qwen2.5, mistral..."
+          class="font-mono text-xs h-7 px-2 rounded border border-border2 bg-surface2 text-text1 w-full"
+        />
+        <div class="text-[9px] font-mono text-text2/60">
+          Compatible Ollama, vLLM, LM Studio, llama.cpp
+        </div>
+      </section>
+      {/if}
+
+      <!-- Model cache -->
+      <section class="flex flex-col gap-2">
+        <ModelCacheManager />
+      </section>
+
+      <!-- Agent settings -->
+      <section class="flex flex-col gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">Agent</span>
+          <DiagnosticIcon count={diagnostics.length} onclick={() => diagModalOpen = true} />
+        </div>
+        <SettingsPanel
+          bind:systemPrompt
+          {effectivePrompt}
+          bind:maxTokens
+          bind:maxContextTokens
+          bind:maxResultLength
+          bind:compressHistory
+          bind:compressPreview
+          bind:contextRAGEnabled
+          bind:ragResidueSize
+          bind:cacheEnabled
+          bind:temperature
+          bind:topK
+          bind:visualTrace
+          modelType={canvas.llm.startsWith('gemma') ? 'wasm' : 'remote'}
+          modelId={canvas.llm}
+        />
+      </section>
+
+      <!-- Mode & Layout -->
+      <section class="flex flex-col gap-3">
+        <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Mode</div>
+        <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+          <input type="checkbox" bind:checked={composerMode} class="accent-accent w-3.5 h-3.5" />
+          Composer mode
+        </label>
+        {#if composerMode}
+          <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+            <input type="checkbox" checked={layoutMode === 'grid'} onchange={() => layoutMode = layoutMode === 'float' ? 'grid' : 'float'} class="accent-accent w-3.5 h-3.5" />
+            Grid layout
+          </label>
+        {/if}
+      </section>
+
+      <!-- Export & History -->
+      <section class="flex flex-col gap-3">
+        <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Export</div>
+        <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+          <input type="checkbox" bind:checked={includeSummary} class="accent-accent w-3.5 h-3.5" />
+          Include summary
+        </label>
+        <button class="font-mono text-xs h-7 px-3 rounded border transition-colors w-full text-left flex items-center gap-2
+                       {exportState === 'done' ? 'border-teal/40 text-teal' : 'border-border2 text-text2 hover:text-text1'}"
+                onclick={onexport}
+                disabled={exportState === 'loading'}>
+          {#if exportState === 'loading'}
+            <span class="inline-block w-3 h-3 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></span>
+            Preparing...
+          {:else if exportState === 'done'}
+            Copied &#x2713;
+          {:else}
+            Export HyperSkill
+          {/if}
+        </button>
+        <button class="font-mono text-xs h-7 px-3 rounded border border-border2 text-text2 hover:text-text1 transition-colors w-full text-left"
+                onclick={onhistory}>
+          History
+        </button>
+        {#if onclear}
+          <button class="font-mono text-xs h-7 px-3 rounded border border-accent2/30 text-accent2 hover:bg-accent2/10 transition-colors w-full text-left"
+                  onclick={() => { onclear(); open = false; }}>
+            Clear (canvas + conversation)
+          </button>
+        {/if}
+      </section>
+
+      <!-- Schema transforms -->
+      <section class="flex flex-col gap-2">
+        <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Schema LLM</div>
+        <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+          <input type="checkbox" bind:checked={schemaFlatten} class="accent-teal w-3.5 h-3.5" />
+          Flatten <span class="text-[8px] text-text2/40 font-mono">(experimental)</span>
+        </label>
+        <div class="text-[9px] font-mono text-text2/60 pl-5">
+          {schemaFlatten ? 'Flattens nested objects to key__subkey' : 'Schemas with native nesting'}
+        </div>
+        <label class="flex items-center gap-2 font-mono text-xs text-text1 {providerKind === 'gemma' ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}">
+          <input type="checkbox" bind:checked={schemaStrict} disabled={providerKind === 'gemma'} class="accent-teal w-3.5 h-3.5" />
+          Strict tool use
+          <span class="text-[8px] text-text2/40 font-mono">constrained grammar</span>
+          {#if providerKind === 'gemma'}
+            <span class="text-[8px] text-text2/40 font-mono ml-auto">Ignored by Gemma (native format)</span>
+          {/if}
+        </label>
+        <div class="text-[9px] font-mono text-text2/60 pl-5">
+          {schemaStrict ? 'Grammar-constrained sampling + strips oneOf/anyOf/allOf/$ref from schemas' : 'Free sampling, schemas sent as-is (may break on complex MCP schemas)'}
+        </div>
+      </section>
+
+      <!-- Display -->
+      <section class="flex flex-col gap-2">
+        <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Display</div>
+        <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+          <input type="checkbox" bind:checked={showTokens} class="accent-accent w-3.5 h-3.5" />
+          Token usage
+        </label>
+        <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+          <input type="checkbox" bind:checked={showToolJSON} class="accent-accent w-3.5 h-3.5" />
+          Agent logs (bottom panel)
+        </label>
+        <label class="flex items-center gap-2 font-mono text-xs text-text1 cursor-pointer">
+          <input type="checkbox" bind:checked={showPipelineTrace} class="accent-accent w-3.5 h-3.5" />
+          Pipeline trace (logs)
+        </label>
+      </section>
+
+      <!-- Recipes -->
+      {#if mcpRecipes.length > 0 || webmcpRecipes.length > 0}
+        <section class="flex flex-col gap-2">
+          <div class="text-[9px] font-mono text-text2 uppercase tracking-wider">Recipes</div>
+          <button
+            class="font-mono text-[10px] h-6 px-3 rounded border border-accent/40 text-accent hover:bg-accent/10 transition-colors self-start"
+            onclick={() => onbrowserecipes?.()}
+          >
+            Browse all recipes &rarr;
+          </button>
+        </section>
+      {/if}
+
+    </div>
+
+    <!-- Build footer -->
+    <div class="px-5 py-3 border-t border-border flex-shrink-0 flex items-center justify-between">
+      <span class="font-mono text-[8px] text-text2/40">v{appVersion} · {gitHash} · {buildStamp}</span>
+      <a href="https://github.com/jeanbaptiste/webmcp-auto-ui/tree/main/apps/flex"
+         target="_blank" rel="noopener"
+         class="font-mono text-[8px] text-text2/40 hover:text-text2 transition-colors">GitHub</a>
+    </div>
+  </DialogContent>
+</Dialog>
 
 <DiagnosticModal bind:open={diagModalOpen} {diagnostics} onclose={() => diagModalOpen = false} />
-
-<style>
-  .settings-drawer {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 320px;
-    background: var(--color-surface);
-    border-right: 1px solid var(--color-border2);
-    z-index: 50;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    box-shadow: 4px 0 32px rgba(0,0,0,0.2);
-    transform: translateX(-100%);
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  .settings-drawer.open {
-    transform: translateX(0);
-  }
-</style>

@@ -23,7 +23,7 @@
     leafletServer, mermaidServer, pixijsServer,
     plotlyServer, roughServer, threejsServer,
   } from '@webmcp-auto-ui/servers';
-  import { McpStatus, ModelLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter, HeaderControls } from '@webmcp-auto-ui/ui';
+  import { McpStatus, ModelLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter, HeaderControls, DiagnosticModal, DiagnosticIcon } from '@webmcp-auto-ui/ui';
   import { Menu, Terminal, LayoutGrid, Paperclip, X as XIcon } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
@@ -31,7 +31,6 @@
   import { RecipeBrowser, ToolBrowser } from '@webmcp-auto-ui/ui';
   import RecipeModal from '$lib/RecipeModal.svelte';
   import LogDrawer from '$lib/LogDrawer.svelte';
-  import DebugPanel from '$lib/DebugPanel.svelte';
 
   // ── State ─────────────────────────────────────────────────────────────
   let input = $state('');
@@ -68,6 +67,7 @@
   let toolBrowserOpen = $state(false);
   let toolBrowserFilter = $state('');
   let skills = $state<Skill[]>([]);
+  let diagOpen = $state(false);
 
   // ── Vision input (image attachment for VLM models) ─────────────────
   let attachedImage = $state<{ dataUrl: string; mediaType: string; name: string } | null>(null);
@@ -854,7 +854,7 @@
   // Gemma-syntax `effectivePrompt` with the turn structure and tool declarations
   // that WasmProvider.buildPrompt() emits, so the user sees what the model actually gets.
   // `effectivePrompt` (built with the right providerKind) is used by runDiagnostics,
-  // the agent loop (options.systemPrompt), agentLogs, and DebugPanel.
+  // the agent loop (options.systemPrompt), agentLogs, and DiagnosticModal (debug tab).
   const displayedPrompt = $derived.by(() => {
     if (providerKind === 'gemma') {
       return buildGemmaPrompt({
@@ -869,6 +869,25 @@
     strict: schemaStrict,
     providerKind,
   }));
+
+  const debugInfo = $derived.by(() => {
+    const allTools = buildToolsFromLayers(layers);
+    const mcpToolCount = layers.reduce((sum, l) => sum + ('tools' in l && l.tools ? l.tools.length : 0), 0);
+    const recipeCount = layers.reduce((sum, l) => sum + ('recipes' in l && l.recipes ? l.recipes.length : 0), 0);
+    return {
+      estimatedTokens: Math.round((effectivePrompt ?? '').length / 4),
+      layerCount: layers.length,
+      toolCount: allTools.tools.length,
+      mcpToolCount,
+      recipeCount,
+      layers: layers.map((l, _i) => ({
+        protocol: l.protocol,
+        serverName: 'serverName' in l && l.serverName ? l.serverName : undefined,
+        toolCount: 'tools' in l && l.tools ? l.tools.length : undefined,
+      })),
+      prompt: effectivePrompt ?? '',
+    };
+  });
 
   // ── Helpers ────────────────────────────────────────────────────────
   function uid() { return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
@@ -1272,6 +1291,15 @@
     skills = listSkills();
     flexGridReady = true;
     document.addEventListener('widget:node-dblclick', onTraceNodeDblClick as EventListener);
+
+    function onDebugKey(e: KeyboardEvent) {
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        diagOpen = !diagOpen;
+      }
+    }
+    window.addEventListener('keydown', onDebugKey);
+    return () => window.removeEventListener('keydown', onDebugKey);
   });
 
   onDestroy(() => {
@@ -1505,8 +1533,13 @@
 <!-- HISTORY MODAL -->
 <HistoryModal bind:open={historyOpen} messages={historyLog} />
 
-<!-- DEBUG PANEL (Ctrl+Shift+D) -->
-<DebugPanel prompt={effectivePrompt} {layers} />
+<!-- DIAGNOSTIC MODAL (Ctrl+Shift+D) -->
+<DiagnosticModal
+  bind:open={diagOpen}
+  {diagnostics}
+  {debugInfo}
+  onclose={() => diagOpen = false}
+/>
 
 <!-- RECIPE BROWSER -->
 <RecipeBrowser

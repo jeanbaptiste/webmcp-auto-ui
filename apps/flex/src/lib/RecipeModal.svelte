@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { fade, fly } from 'svelte/transition';
   import { tick } from 'svelte';
-  import { MarkdownView } from '@webmcp-auto-ui/ui';
+  import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, MarkdownView } from '@webmcp-auto-ui/ui';
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import { parseBody, runCode } from '@webmcp-auto-ui/sdk';
   import type { RecipeData, RunResult, RunTab } from '@webmcp-auto-ui/sdk';
@@ -131,164 +130,142 @@
     onclose();
   }
 
-  function onKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      if (runModalOpen) { runModalOpen = false; return; }
-      close();
-    }
-  }
-
   // Show side panel only when we have runs AND viewport supports it
   const showSidePanel = $derived(runModalOpen && sideBySide);
   const showInlinePanel = $derived(runModalOpen && !sideBySide);
 </script>
 
-<svelte:window onkeydown={onKeydown} />
-
-{#if open && recipe}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6"
-    transition:fade={{ duration: 180 }}
-    onclick={(e) => { if (e.target === e.currentTarget) close(); }}
+<Dialog bind:open onOpenChange={(v) => { if (!v) close(); }}>
+  <DialogContent
+    class="!p-0 !rounded-2xl !max-w-[1400px] !w-[calc(100vw-3rem)] !max-h-[90vh] {showSidePanel ? 'flex gap-4' : 'flex'} overflow-visible"
   >
+    <!-- Recipe panel -->
     <div
-      class="flex gap-4 max-h-full w-full"
+      class="bg-surface border border-border2 rounded-2xl flex flex-col shadow-2xl overflow-hidden max-h-[90vh]"
       style={showSidePanel
-        ? `max-width: 1400px; ${splitRatio === '50/50' ? '' : ''}`
-        : 'max-width: 42rem;'}
-      transition:fly={{ y: 24, duration: 240 }}
+        ? `flex: ${splitRatio === '50/50' ? '1 1 50%' : '1 1 60%'}; min-width: 0;`
+        : 'flex: 1 1 100%; min-width: 0;'}
     >
-      <!-- Recipe panel -->
-      <div
-        class="bg-surface border border-border2 rounded-2xl flex flex-col shadow-2xl overflow-hidden max-h-[90vh]"
-        style={showSidePanel
-          ? `flex: ${splitRatio === '50/50' ? '1 1 50%' : '1 1 60%'}; min-width: 0;`
-          : 'flex: 1 1 100%; min-width: 0;'}
-      >
-        <!-- Header -->
-        <div class="flex items-center gap-4 px-6 py-4 border-b border-border flex-shrink-0">
-          <span class="font-mono text-sm font-bold text-text1 flex-1 truncate">{recipe.name ?? recipe.id ?? 'Untitled'}</span>
-          <button class="text-text2 hover:text-text1 font-mono text-base leading-none transition-colors"
-                  onclick={close}>x</button>
-        </div>
+      <!-- Header -->
+      <DialogHeader class="flex-row items-center gap-4 px-6 py-4 border-b border-border flex-shrink-0 !mb-0">
+        <DialogTitle class="!text-sm !font-bold flex-1 truncate">{recipe?.name ?? recipe?.id ?? 'Untitled'}</DialogTitle>
+      </DialogHeader>
 
-        <!-- Body -->
-        <div class="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
+      <!-- Body -->
+      <div class="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
 
-          {#if recipe.description}
-            <p class="font-mono text-xs text-text2 leading-relaxed">{recipe.description}</p>
-          {/if}
+        {#if recipe?.description}
+          <p class="font-mono text-xs text-text2 leading-relaxed">{recipe.description}</p>
+        {/if}
 
-          {#if recipe.when}
-            <div>
-              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1">When to use</div>
-              <p class="font-mono text-xs text-text1 leading-relaxed">{recipe.when}</p>
+        {#if recipe?.when}
+          <div>
+            <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1">When to use</div>
+            <p class="font-mono text-xs text-text1 leading-relaxed">{recipe.when}</p>
+          </div>
+        {/if}
+
+        {#if recipe?.components_used && recipe.components_used.length > 0}
+          <div>
+            <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Components</div>
+            <div class="flex flex-wrap gap-1.5">
+              {#each recipe.components_used as comp}
+                <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono border border-accent/40 text-accent bg-accent/5">{comp}</span>
+              {/each}
             </div>
-          {/if}
+          </div>
+        {/if}
 
-          {#if recipe.components_used && recipe.components_used.length > 0}
-            <div>
-              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Components</div>
-              <div class="flex flex-wrap gap-1.5">
-                {#each recipe.components_used as comp}
-                  <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono border border-accent/40 text-accent bg-accent/5">{comp}</span>
-                {/each}
-              </div>
+        {#if recipe?.servers && recipe.servers.length > 0}
+          <div>
+            <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Servers</div>
+            <div class="flex flex-wrap gap-1.5">
+              {#each recipe.servers as server}
+                <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono border border-teal/40 text-teal bg-teal/5">{server}</span>
+              {/each}
             </div>
-          {/if}
+          </div>
+        {/if}
 
-          {#if recipe.servers && recipe.servers.length > 0}
-            <div>
-              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1.5">Servers</div>
-              <div class="flex flex-wrap gap-1.5">
-                {#each recipe.servers as server}
-                  <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono border border-teal/40 text-teal bg-teal/5">{server}</span>
-                {/each}
-              </div>
-            </div>
-          {/if}
+        {#if recipe?.layout}
+          <div>
+            <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1">Layout</div>
+            <p class="font-mono text-xs text-text1">
+              {recipe.layout.type}{#if recipe.layout.columns}, {recipe.layout.columns} columns{/if}{#if recipe.layout.arrangement} — {recipe.layout.arrangement}{/if}
+            </p>
+          </div>
+        {/if}
 
-          {#if recipe.layout}
-            <div>
-              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-1">Layout</div>
-              <p class="font-mono text-xs text-text1">
-                {recipe.layout.type}{#if recipe.layout.columns}, {recipe.layout.columns} columns{/if}{#if recipe.layout.arrangement} — {recipe.layout.arrangement}{/if}
-              </p>
-            </div>
-          {/if}
-
-          {#if recipe.body}
-            <div>
-              <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-2">Content</div>
-              <div class="flex flex-col">
-                {#each segments as seg, i (i)}
-                  <div data-segment-idx={i} class="transition-shadow">
-                    {#if seg.type === 'markdown'}
-                      <MarkdownView source={seg.content} />
-                    {:else}
-                      <RecipeCodeBlock
-                        code={seg.content}
-                        lang={seg.lang ?? 'text'}
-                        onrun={(payload) => handleBlockRun(i, payload)}
-                      />
-                    {/if}
-                  </div>
-                {/each}
-              </div>
-
-              {#if showInlinePanel}
-                <div class="mt-3">
-                  <RecipeRunModal
-                    open={runModalOpen}
-                    {runs}
-                    {activeTabId}
-                    inline={true}
-                    onclose={closeRunModal}
-                    onreplay={handleReplay}
-                    onselectTab={(id) => (activeTabId = id)}
-                  />
+        {#if recipe?.body}
+          <div>
+            <div class="text-[9px] font-mono text-text2 uppercase tracking-wider mb-2">Content</div>
+            <div class="flex flex-col">
+              {#each segments as seg, i (i)}
+                <div data-segment-idx={i} class="transition-shadow">
+                  {#if seg.type === 'markdown'}
+                    <MarkdownView source={seg.content} />
+                  {:else}
+                    <RecipeCodeBlock
+                      code={seg.content}
+                      lang={seg.lang ?? 'text'}
+                      onrun={(payload) => handleBlockRun(i, payload)}
+                    />
+                  {/if}
                 </div>
-              {/if}
+              {/each}
             </div>
-          {/if}
 
-          {#if isMcpRecipe}
-            <div class="mt-2 px-3 py-2 rounded border border-accent/20 bg-accent/5">
-              <p class="font-mono text-[10px] text-text2 leading-relaxed">
-                Remote MCP recipe. Call <code class="text-accent">get_recipe('{recipe.name ?? recipe.id ?? ''}')</code> in the chat to get the full instructions.
-              </p>
-            </div>
-          {/if}
-        </div>
+            {#if showInlinePanel}
+              <div class="mt-3">
+                <RecipeRunModal
+                  open={runModalOpen}
+                  {runs}
+                  {activeTabId}
+                  inline={true}
+                  onclose={closeRunModal}
+                  onreplay={handleReplay}
+                  onselectTab={(id) => (activeTabId = id)}
+                />
+              </div>
+            {/if}
+          </div>
+        {/if}
 
-        <!-- Footer -->
-        <div class="flex items-center justify-end px-6 py-3 border-t border-border flex-shrink-0">
-          <button
-            class="font-mono text-xs h-7 px-4 rounded border border-border2 text-text2 hover:text-text1 transition-colors"
-            onclick={close}>
-            Close
-          </button>
-        </div>
+        {#if isMcpRecipe}
+          <div class="mt-2 px-3 py-2 rounded border border-accent/20 bg-accent/5">
+            <p class="font-mono text-[10px] text-text2 leading-relaxed">
+              Remote MCP recipe. Call <code class="text-accent">get_recipe('{recipe?.name ?? recipe?.id ?? ''}')</code> in the chat to get the full instructions.
+            </p>
+          </div>
+        {/if}
       </div>
 
-      <!-- Side Run panel (desktop / medium) -->
-      {#if showSidePanel}
-        <div
-          class="max-h-[90vh]"
-          style={`flex: ${splitRatio === '50/50' ? '1 1 50%' : '1 1 40%'}; min-width: 0; display: flex;`}
-        >
-          <RecipeRunModal
-            open={runModalOpen}
-            {runs}
-            {activeTabId}
-            inline={false}
-            onclose={closeRunModal}
-            onreplay={handleReplay}
-            onselectTab={(id) => (activeTabId = id)}
-          />
-        </div>
-      {/if}
+      <!-- Footer -->
+      <DialogFooter class="px-6 py-3 border-t border-border flex-shrink-0 !mt-0">
+        <button
+          class="font-mono text-xs h-7 px-4 rounded border border-border2 text-text2 hover:text-text1 transition-colors"
+          onclick={close}>
+          Close
+        </button>
+      </DialogFooter>
     </div>
-  </div>
-{/if}
+
+    <!-- Side Run panel (desktop / medium) -->
+    {#if showSidePanel}
+      <div
+        class="max-h-[90vh]"
+        style={`flex: ${splitRatio === '50/50' ? '1 1 50%' : '1 1 40%'}; min-width: 0; display: flex;`}
+      >
+        <RecipeRunModal
+          open={runModalOpen}
+          {runs}
+          {activeTabId}
+          inline={false}
+          onclose={closeRunModal}
+          onreplay={handleReplay}
+          onselectTab={(id) => (activeTabId = id)}
+        />
+      </div>
+    {/if}
+  </DialogContent>
+</Dialog>

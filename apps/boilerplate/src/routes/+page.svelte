@@ -9,12 +9,13 @@
   import { installMultiMcpBridge, MultiMcpBridge } from '@webmcp-auto-ui/core';
   import type { McpMultiClient, WebMcpServer } from '@webmcp-auto-ui/core';
   import {
-    RemoteLLMProvider, HawkProvider, runAgentLoop, buildSystemPrompt,
+    runAgentLoop, buildSystemPrompt,
     fromMcpTools, autoui,
     buildDiscoveryCache, ContextRAG,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
   import { LLMSelector, McpStatus, AgentProgress, WidgetRenderer, HeaderControls } from '@webmcp-auto-ui/ui';
+  import { createAgentLoop } from '@webmcp-auto-ui/ui/agent';
   import { tricoteusesServer } from '$lib/widgets/register';
 
   // ── State ─────────────────────────────────────────────────────────────
@@ -47,23 +48,11 @@
   let connecting = $state(false);
   let mcpName = $state('');
 
-  // ── Provider ──────────────────────────────────────────────────────────
-  const remoteProvider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
-  let hawkProvider: HawkProvider | null = null;
-
-  function getProvider() {
-    if (canvas.llm?.startsWith('hawk-')) {
-      const model = canvas.llm.slice(5);
-      if (!hawkProvider || hawkProvider.model !== model) {
-        hawkProvider = new HawkProvider({ proxyUrl: `${base}/api/hawk`, model });
-      }
-      return hawkProvider;
-    }
-    return remoteProvider;
-  }
-
-  $effect(() => {
-    remoteProvider.setModel(canvas.llm as any);
+  // ── Agent loop composable (provider + smart defaults) ─────────────────
+  const agent = createAgentLoop({
+    chatApiBase: `${base}/api/chat`,
+    hawkApiBase: `${base}/api/hawk`,
+    enabledProviders: ['remote', 'hawk'],
   });
 
   // ── Layers ────────────────────────────────────────────────────────────
@@ -86,36 +75,10 @@
     return result;
   });
 
-  // LLM optimization options (smart defaults via $effect below)
-  let schemaSanitize = $state(true);
-  let schemaFlatten = $state(false);
-  let maxResultLength = $state(10000);
-  let truncateResults = $state(false);
-  let compressHistory = $state(false);
-  let compressPreview = $state(500);
-  let cacheEnabled = $state(true);
-  let temperature = $state(1.0);
-
-  // Smart defaults: adjust optimization options when LLM model changes
+  // Smart defaults — apply when LLM changes
   $effect(() => {
-    const isGemma = canvas.llm.startsWith('gemma');
-    const isLocal = canvas.llm === 'local';
-    schemaSanitize = isLocal ? true : !isGemma;
-    schemaFlatten = isGemma || isLocal;
-    truncateResults = isGemma || isLocal;
-    compressHistory = isLocal;
-    if (isGemma) {
-      maxResultLength = 2000;
-      temperature = 0.7;
-      cacheEnabled = false;
-    } else if (isLocal) {
-      maxResultLength = 3000;
-    } else {
-      // Claude defaults
-      maxResultLength = 10000;
-      temperature = 1.0;
-      cacheEnabled = true;
-    }
+    canvas.llm; // reactive dependency
+    agent.applySmartDefaults();
   });
 
   // Nano-RAG (experimental, off by default)
@@ -173,21 +136,18 @@
     const timerInterval = setInterval(() => chatTimer++, 1000);
 
     try {
+      const opts = agent.runOptions();
       const result = await runAgentLoop(msg, {
         client: multiClient?.hasConnections ? multiClient as any : undefined,
-        provider: getProvider(),
+        provider: agent.getProvider(),
         systemPrompt: systemPrompt || undefined,
         maxIterations: 10,
         maxTokens: 4096,
-        maxResultLength,
-        truncateResults,
-        compressHistory: compressHistory ? compressPreview : false,
-        temperature,
-        cacheEnabled,
+        ...opts,
         layers,
         discoveryCache,
         contextRAG: contextRAG ?? undefined,
-        schemaOptions: { sanitize: schemaSanitize, flatten: schemaFlatten, strict: false },
+        schemaOptions: { sanitize: agent.schemaSanitize, flatten: agent.schemaFlatten, strict: false },
         initialMessages: conversationHistory,
         callbacks: {
           onWidget: (type, data) => {
@@ -226,6 +186,7 @@
   });
 
   onDestroy(() => {
+    agent.destroy();
     if (multiMcpBridge) { try { multiMcpBridge.stop(); } catch {} multiMcpBridge = null; }
   });
 </script>
