@@ -19,47 +19,20 @@ export { default as MarkdownView } from './primitives/MarkdownView.svelte';
 export { default as CodeView } from './primitives/CodeView.svelte';
 export { renderMarkdown, highlightCode, createMarkdownRenderer } from './primitives/markdown-renderer.js';
 
-// Simple widgets (vanilla renderers) — contract: render(container, data): () => void
-export { render as renderStat }    from './widgets/simple/stat.js';
-export { render as renderKv }      from './widgets/simple/kv.js';
-export { render as renderList }    from './widgets/simple/list.js';
-export { render as renderChart }   from './widgets/simple/chart.js';
-export { render as renderAlert }   from './widgets/simple/alert.js';
-export { render as renderCode }    from './widgets/simple/code.js';
-export { render as renderText }    from './widgets/simple/text.js';
-export { render as renderActions } from './widgets/simple/actions.js';
-export { render as renderTags }    from './widgets/simple/tags.js';
+// Widgets are shipped as Svelte 5 custom elements — import the widget file
+// side-effect to register its tag (e.g. `import '@webmcp-auto-ui/ui/widgets/simple/stat.svelte';`
+// then use `<auto-stat data={spec}></auto-stat>`). `WidgetRenderer` does this for you.
 
-// Rich widgets (vanilla renderers)
-export { render as renderStatCard }      from './widgets/rich/stat-card.js';
-export { render as renderDataTable }     from './widgets/rich/data-table.js';
-export { render as renderTimeline }      from './widgets/rich/timeline.js';
-export { render as renderProfile }       from './widgets/rich/profile.js';
-export { render as renderTrombinoscope } from './widgets/rich/trombinoscope.js';
-export { render as renderJsonViewer }    from './widgets/rich/json-viewer.js';
-export { render as renderHemicycle }     from './widgets/rich/hemicycle.js';
-export { render as renderChartRich }     from './widgets/rich/chart-rich.js';
-export { render as renderCards }         from './widgets/rich/cards.js';
-export { render as renderGridData }      from './widgets/rich/grid-data.js';
-export { render as renderSankey }        from './widgets/rich/sankey.js';
-export { render as renderMap }           from './widgets/rich/map.js';
-export { render as renderD3 }            from './widgets/rich/d3.js';
-export { render as renderJsSandbox }     from './widgets/rich/js-sandbox.js';
-export { render as renderLog }           from './widgets/rich/log.js';
-export { render as renderGallery }       from './widgets/rich/gallery.js';
-export { render as renderCarousel }      from './widgets/rich/carousel.js';
-
-// Notebook widget renderer (vanilla)
-export { render as renderNotebook }             from './widgets/notebook/notebook.js';
-export { render as renderRecipeBrowserWidget } from './widgets/notebook/recipe-browser.js';
+// Notebook vanilla renderer (kept — notebook is wrapped by a custom element that
+// delegates to the legacy vanilla code; full Svelte rewrite is Phase 3).
+export { render as renderNotebook } from './widgets/notebook/notebook.js';
 // Notebook types (optional public API)
 export type { NotebookState, NotebookCell } from './widgets/notebook/shared.js';
 // Notebook cell extractors (for hosts that build notebooks from recipes/tools)
 export { extractCellsFromRecipe, extractCellsFromTool, extractCellFromMarkdown, extractCellFromFence } from './widgets/notebook/resource-extractor.js';
 
-// Safe image helper (URL validation + error fallback)
-export { createSafeImage } from './widgets/helpers/safe-image.js';
-export type { SafeImageOptions } from './widgets/helpers/safe-image.js';
+// Safe image Svelte component — prefer this in .svelte code over the legacy helper.
+export { default as SafeImage } from './widgets/SafeImage.svelte';
 
 // Widget export utility
 export { exportWidget, getExportFormats, exportWidgetAs } from './widgets/export-widget.js';
@@ -109,8 +82,12 @@ export { default as ChatPanel } from './agent/ChatPanel.svelte';
 export type { ChatFeedItem, ChatBubble, ChatBlock } from './agent/ChatPanel.svelte';
 export { default as AgentConsole } from './agent/AgentConsole.svelte';
 export { default as SettingsPanel } from './agent/SettingsPanel.svelte';
+export { default as MCPserversList } from './agent/MCPserversList.svelte';
+/** @deprecated Use MCPserversList instead. Alias kept for backward compatibility. */
 export { default as RemoteMCPserversDemo } from './agent/RemoteMCPserversDemo.svelte';
 export { default as WebMCPserversList } from './agent/WebMCPserversList.svelte';
+export { default as RecipeBrowser } from './agent/RecipeBrowser.svelte';
+export { default as ToolBrowser } from './agent/ToolBrowser.svelte';
 export { default as EphemeralBubble } from './agent/EphemeralBubble.svelte';
 export { default as TokenBubble } from './agent/TokenBubble.svelte';
 export { default as DiagnosticModal } from './agent/DiagnosticModal.svelte';

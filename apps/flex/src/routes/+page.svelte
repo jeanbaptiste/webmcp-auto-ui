@@ -28,9 +28,8 @@
   import FlexGrid from '$lib/FlexGrid.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
   import SettingsDrawer from '$lib/SettingsDrawer.svelte';
-  import RecipeBrowser from '$lib/RecipeBrowser.svelte';
+  import { RecipeBrowser, ToolBrowser } from '@webmcp-auto-ui/ui';
   import RecipeModal from '$lib/RecipeModal.svelte';
-  import ToolBrowser from '$lib/ToolBrowser.svelte';
   import LogDrawer from '$lib/LogDrawer.svelte';
   import DebugPanel from '$lib/DebugPanel.svelte';
 

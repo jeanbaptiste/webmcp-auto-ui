@@ -1,3 +1,5 @@
+<svelte:options customElement={{ tag: 'auto-tool-browser', shadow: 'none' }} />
+
 <script lang="ts">
   import { filterRecipes, sortRecipes, groupToolsByServer, formatToolSchema } from '@webmcp-auto-ui/agent';
   import type { BrowsableTool } from '@webmcp-auto-ui/agent';

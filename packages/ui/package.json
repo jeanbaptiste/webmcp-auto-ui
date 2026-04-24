@@ -20,7 +20,15 @@
       "svelte": "./src/widgets/notebook/*",
       "import": "./src/widgets/notebook/*"
     },
-    "./widgets/notebook/recipes/*": "./src/widgets/notebook/recipes/*"
+    "./widgets/notebook/recipes/*": "./src/widgets/notebook/recipes/*",
+    "./widgets/simple/*": {
+      "svelte": "./src/widgets/simple/*",
+      "import": "./src/widgets/simple/*"
+    },
+    "./widgets/rich/*": {
+      "svelte": "./src/widgets/rich/*",
+      "import": "./src/widgets/rich/*"
+    }
   },
   "scripts": {
     "build": "svelte-package -i src",

@@ -12,7 +12,6 @@ import notebookRecipe from '@webmcp-auto-ui/ui/widgets/notebook/recipes/notebook
 // Notebook widget renderer (vanilla JS) — import via subpath to avoid pulling
 // the .svelte exports of the ui package root through tsc.
 import { render as renderNotebook } from '@webmcp-auto-ui/ui/widgets/notebook/notebook.js';
-import { render as renderRecipeBrowser } from '@webmcp-auto-ui/ui/widgets/notebook/recipe-browser.js';
 
 // Inline recipe for recipe-browser (real vanilla widget)
 const recipeBrowserRecipe = `---
@@ -771,57 +770,6 @@ Call widget_display({name: "carousel", params: {slides: [{src: "https://...", ti
 - NEVER fabricate image URLs for src — only use those returned by MCP tools
 `,
 
-  // ── map ──────────────────────────────────────────────────────────────────
-  `---
-widget: map
-description: Interactive Leaflet map with markers. Dark CARTO basemap.
-schema:
-  type: object
-  properties:
-    title:
-      type: string
-    center:
-      type: object
-      description: Centre de la carte
-      required:
-        - lat
-        - lng
-      properties:
-        lat:
-          type: number
-        lng:
-          type: number
-    zoom:
-      type: number
-      description: Niveau de zoom (1-18)
-    height:
-      type: string
-      description: Hauteur CSS de la carte (ex "400px")
-    markers:
-      type: array
-      items:
-        type: object
-        required:
-          - lat
-          - lng
-        properties:
-          lat:
-            type: number
-          lng:
-            type: number
-          label:
-            type: string
-          color:
-            type: string
----
-
-## When to use
-Display a geographic map with markers.
-
-## How to use
-Call widget_display({name: "map", params: {center: {lat: 48.8, lng: 2.3}, zoom: 12, markers: [{lat: 48.8, lng: 2.3, label: "Paris"}]}}).
-`,
-
   // ── stat-card ────────────────────────────────────────────────────────────
   `---
 widget: stat-card
@@ -914,34 +862,6 @@ Pour des grilles de donnees avec mise en valeur de cellules (heatmap, comparaiso
 Call widget_display({name: "grid-data", params: {columns: [{key:"a",label:"A"}], rows: [[1,2],[3,4]], highlights: [{row:0,col:1,color:"#ff0"}]}}).
 `,
 
-  // ── d3 ───────────────────────────────────────────────────────────────────
-  `---
-widget: d3
-description: D3.js visualization (hex-heatmap, radial, treemap, force graph).
-schema:
-  type: object
-  required:
-    - preset
-    - data
-  properties:
-    title:
-      type: string
-    preset:
-      type: string
-      enum: [hex-heatmap, radial, treemap, force]
-    data:
-      type: object
-    config:
-      type: object
----
-
-## When to use
-Pour des visualisations avancees D3.js (heatmap hexagonale, radial, treemap, graphe de force).
-
-## How to use
-Call widget_display({name: "d3", params: {preset: "treemap", data: {name: "root", children: [...]}}}).
-`,
-
   // ── js-sandbox ───────────────────────────────────────────────────────────
   `---
 widget: js-sandbox
@@ -975,6 +895,31 @@ Pour des visualisations custom, animations, ou prototypes interactifs en JS pur.
 Call widget_display({name: "js-sandbox", params: {code: "document.getElementById('root').innerHTML = '<h1>Hello</h1>'"}}).
 `,
 
+`---
+widget: chat-input
+description: Minimal inline chat bar with a text input and stop button. Use when the agent needs to solicit a short free-form user reply inside the current canvas (e.g. "explain this result").
+group: rich
+schema:
+  type: object
+  properties:
+    placeholder:
+      type: string
+      description: Placeholder text shown in the input (default "Your reply...").
+    value:
+      type: string
+      description: Optional initial value.
+    disabled:
+      type: boolean
+      description: Disable the input (while the agent is processing).
+---
+
+## When to use
+When you need the user to reply with a short text — clarifying questions, follow-ups, free-form input mid-canvas. Prefer this over a modal for lightweight conversation inside a widget layout.
+
+## How to use
+Call widget_display({name: "chat-input", params: {placeholder: "Your reply..."}}). The widget emits a bubbling 'widget:interact' CustomEvent with detail={action: "submit", payload: {text}} when the user submits, and detail={action: "stop"} when the stop button is pressed.
+`,
+
 ];
 
 // ---------------------------------------------------------------------------
@@ -1004,14 +949,11 @@ for (const recipe of RECIPES) {
   autoui.registerWidget(recipe, undefined);
 }
 
-// Notebook widget — vanilla renderer (resolved via WidgetRenderer vanilla path)
-const NOTEBOOK_WIDGETS: Array<[string, (container: HTMLElement, data: any) => any]> = [
-  [notebookRecipe as string, renderNotebook],
-  [recipeBrowserRecipe, renderRecipeBrowser],
-];
-for (const [recipe, renderer] of NOTEBOOK_WIDGETS) {
-  autoui.registerWidget(recipe, renderer as any);
-}
+// Notebook widget — vanilla renderer (wrapped by <auto-notebook> custom element)
+autoui.registerWidget(notebookRecipe as string, renderNotebook as any);
+
+// Recipe browser — resolved by WidgetRenderer as <auto-recipe-browser> custom element
+autoui.registerWidget(recipeBrowserRecipe, undefined);
 
 // Register flow recipes (multi-step procedures) from the global recipe registry
 // that declare this server (autoui) in their frontmatter.

@@ -39,73 +39,63 @@
     }
   }
 
-  // ── Native vanilla renderers ─────────────────────────────────────────────
-  // Simple widgets
-  import { render as renderStat }    from './simple/stat.js';
-  import { render as renderKv }      from './simple/kv.js';
-  import { render as renderList }    from './simple/list.js';
-  import { render as renderChart }   from './simple/chart.js';
-  import { render as renderAlert }   from './simple/alert.js';
-  import { render as renderCode }    from './simple/code.js';
-  import { render as renderText }    from './simple/text.js';
-  import { render as renderActions } from './simple/actions.js';
-  import { render as renderTags }    from './simple/tags.js';
-  // Rich widgets
-  import { render as renderStatCard }      from './rich/stat-card.js';
-  import { render as renderProfile }       from './rich/profile.js';
-  import { render as renderJsonViewer }    from './rich/json-viewer.js';
-  import { render as renderChartRich }     from './rich/chart-rich.js';
-  import { render as renderSankey }        from './rich/sankey.js';
-  import { render as renderHemicycle }     from './rich/hemicycle.js';
-  import { render as renderDataTable }     from './rich/data-table.js';
-  import { render as renderTimeline }      from './rich/timeline.js';
-  import { render as renderTrombinoscope } from './rich/trombinoscope.js';
-  import { render as renderCards }         from './rich/cards.js';
-  import { render as renderGridData }      from './rich/grid-data.js';
-  import { render as renderMap }           from './rich/map.js';
-  import { render as renderD3 }            from './rich/d3.js';
-  import { render as renderJsSandbox }    from './rich/js-sandbox.js';
-  import { render as renderLog }           from './rich/log.js';
-  import { render as renderGallery }       from './rich/gallery.js';
-  import { render as renderCarousel }      from './rich/carousel.js';
+  // ── Native custom-element widgets (Svelte 5 compiled) ────────────────────
+  // Side-effect imports register the custom elements with the browser.
+  // Simple (9)
+  import './simple/stat.svelte';
+  import './simple/kv.svelte';
+  import './simple/list.svelte';
+  import './simple/chart.svelte';
+  import './simple/alert.svelte';
+  import './simple/code.svelte';
+  import './simple/text.svelte';
+  import './simple/actions.svelte';
+  import './simple/tags.svelte';
+  // Rich (15) — map and d3 intentionally omitted (see plan: handled by leaflet/d3 servers)
+  import './rich/stat-card.svelte';
+  import './rich/profile.svelte';
+  import './rich/json-viewer.svelte';
+  import './rich/chart-rich.svelte';
+  import './rich/sankey.svelte';
+  import './rich/hemicycle.svelte';
+  import './rich/data-table.svelte';
+  import './rich/timeline.svelte';
+  import './rich/trombinoscope.svelte';
+  import './rich/cards.svelte';
+  import './rich/grid-data.svelte';
+  import './rich/js-sandbox.svelte';
+  import './rich/log.svelte';
+  import './rich/gallery.svelte';
+  import './rich/carousel.svelte';
+  import './rich/chat-input.svelte';
+  // Notebook (1)
+  import './notebook/notebook.svelte';
+  // Agent browsers (registered as widgets for widget_display)
+  import '../agent/RecipeBrowser.svelte';
 
-  /** A vanilla renderer: returns cleanup or Promise thereof. */
+  /** Native widget types served as custom elements (`<auto-${type}>`). */
+  const NATIVE_CUSTOM_ELEMENTS = new Set<string>([
+    // Simple
+    'stat', 'kv', 'list', 'chart', 'alert', 'code', 'text', 'actions', 'tags',
+    // Rich
+    'stat-card', 'profile', 'json-viewer', 'chart-rich', 'sankey', 'hemicycle',
+    'data-table', 'timeline', 'trombinoscope', 'cards', 'grid-data',
+    'js-sandbox', 'log', 'gallery', 'carousel', 'chat-input',
+    // Notebook
+    'notebook',
+    // Agent browsers
+    'recipe-browser',
+  ]);
+
+  /** A vanilla renderer: returns cleanup or Promise thereof. Still used for
+   *  server-provided custom widgets via `widget.vanilla = true`. */
   type VanillaRenderer = (
     container: HTMLElement,
     data: Record<string, unknown>,
   ) => void | (() => void) | Promise<void | (() => void)>;
 
-  /** Static map of all native widget types → vanilla renderer */
-  const NATIVE_VANILLA_MAP: Record<string, VanillaRenderer> = {
-    // Simple
-    'stat':           renderStat,
-    'kv':             renderKv,
-    'list':           renderList,
-    'chart':          renderChart,
-    'alert':          renderAlert,
-    'code':           renderCode,
-    'text':           renderText,
-    'actions':        renderActions,
-    'tags':           renderTags,
-    // Rich
-    'stat-card':      renderStatCard,
-    'profile':        renderProfile,
-    'json-viewer':    renderJsonViewer,
-    'chart-rich':     renderChartRich,
-    'sankey':         renderSankey,
-    'hemicycle':      renderHemicycle,
-    'data-table':     renderDataTable,
-    'timeline':       renderTimeline,
-    'trombinoscope':  renderTrombinoscope,
-    'cards':          renderCards,
-    'grid-data':      renderGridData,
-    'map':            renderMap,
-    'd3':             renderD3 as unknown as VanillaRenderer,
-    'js-sandbox':     renderJsSandbox as unknown as VanillaRenderer,
-    'log':            renderLog,
-    'gallery':        renderGallery,
-    'carousel':       renderCarousel,
-  };
+  /** No native vanilla widgets remain — all native widgets are custom elements. */
+  const NATIVE_VANILLA_MAP: Record<string, VanillaRenderer> = {};
 
   interface Props {
     id?: string;
@@ -130,7 +120,7 @@
     bus.broadcast(busId, 'interact', { type, action, payload });
   }
 
-  // ── Renderer resolution: servers > native vanilla > fallback ────────────
+  // ── Renderer resolution: servers > native custom-element > native vanilla > fallback ────
 
   // Look up a custom widget entry from connected WebMCP servers
   const customWidgetEntry = $derived.by(() => {
@@ -145,8 +135,13 @@
   const customRenderer = $derived(customWidgetEntry?.renderer ?? null);
   const isCustomVanilla = $derived(customWidgetEntry?.vanilla === true);
 
+  /** True if this widget type is served as a native Svelte-compiled custom element. */
+  const isNativeCustomElement = $derived(
+    !customRenderer && NATIVE_CUSTOM_ELEMENTS.has(type),
+  );
+
   const nativeVanillaRenderer = $derived<VanillaRenderer | undefined>(
-    customRenderer ? undefined : NATIVE_VANILLA_MAP[type],
+    customRenderer || isNativeCustomElement ? undefined : NATIVE_VANILLA_MAP[type],
   );
 
   /** True when a vanilla renderer (custom or native) should be used */
@@ -162,6 +157,39 @@
   // Deep-clone data to strip Svelte 5 $state proxies — vanilla renderers + third-party
   // libs (D3, Leaflet, etc.) rely on Object.defineProperty which conflicts with proxies.
   const plainData: Record<string, unknown> = $derived(safeClone(data) as Record<string, unknown>);
+
+  // ── Custom element container + element handle ─────────
+  let ceContainer: HTMLElement | undefined = $state(undefined);
+  let ceElement: HTMLElement | undefined = undefined;
+
+  $effect(() => {
+    if (!isNativeCustomElement || !ceContainer) return;
+    const tag = `auto-${type}`;
+    // Instantiate on first mount. `data` setter is reactive via Svelte 5 custom-element.
+    const el = document.createElement(tag) as HTMLElement;
+    (el as unknown as { data: unknown }).data = plainData;
+    const onInteract = (ev: Event) => {
+      const ce = ev as CustomEvent<{ action?: string; payload?: unknown }>;
+      const action = ce.detail?.action ?? 'interact';
+      emit(action, ce.detail?.payload);
+    };
+    el.addEventListener('widget:interact', onInteract);
+    ceContainer.innerHTML = '';
+    ceContainer.appendChild(el);
+    ceElement = el;
+    return () => {
+      el.removeEventListener('widget:interact', onInteract);
+      ceElement = undefined;
+      if (ceContainer) ceContainer.innerHTML = '';
+    };
+  });
+
+  // In-place data updates on the custom element — no remount.
+  $effect(() => {
+    const next = plainData;
+    if (!isNativeCustomElement || !ceElement) return;
+    (ceElement as unknown as { data: unknown }).data = next;
+  });
 
   // ── Vanilla renderer container + lifecycle ────────────
   let vanillaContainer: HTMLElement | undefined = $state(undefined);
@@ -322,7 +350,9 @@
   });
 </script>
 
-{#if useVanilla}
+{#if isNativeCustomElement}
+  <div bind:this={ceContainer} class="ce-container w-full h-full overflow-auto p-2"></div>
+{:else if useVanilla}
   <div bind:this={vanillaContainer} class="vanilla-container w-full h-full overflow-auto p-2"></div>
 {:else if customRenderer}
   <svelte:component this={customRenderer as Component<any>} {data} {id} />

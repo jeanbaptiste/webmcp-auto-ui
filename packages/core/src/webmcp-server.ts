@@ -326,6 +326,24 @@ export function mountWidget(
   data: Record<string, unknown>,
   servers: WebMcpServer[],
 ): (() => void) | void {
+  // 1) Native custom element path — preferred when the element tag is defined.
+  //    Applies to widgets restored as Svelte-compiled custom elements
+  //    (`<svelte:options customElement="auto-<type>" />`).
+  if (typeof customElements !== 'undefined') {
+    const tag = `auto-${type}`;
+    if (customElements.get(tag)) {
+      const plainData = JSON.parse(JSON.stringify(data));
+      const el = document.createElement(tag) as HTMLElement;
+      (el as unknown as { data: unknown }).data = plainData;
+      container.innerHTML = '';
+      container.appendChild(el);
+      return () => {
+        try { container.innerHTML = ''; } catch { /* ignore */ }
+      };
+    }
+  }
+
+  // 2) Server-provided vanilla widgets (fallback path, historical).
   for (const server of servers) {
     const widget = server.getWidget(type);
     if (widget?.renderer && widget.vanilla) {

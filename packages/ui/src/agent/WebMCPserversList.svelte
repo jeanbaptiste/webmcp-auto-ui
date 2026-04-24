@@ -1,3 +1,5 @@
+<svelte:options customElement={{ tag: 'auto-webmcp-servers-list', shadow: 'none' }} />
+
 <script lang="ts">
   interface Server {
     id: string;
