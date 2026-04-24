@@ -323,7 +323,7 @@
       description: `Update the data of ${type} widget (id: ${busId}).`,
       inputSchema: { type: 'object', properties: {}, additionalProperties: true },
       execute: (args: Record<string, unknown>) => {
-        oninteract?.(type, 'update', args);
+        oninteract?.(type, 'bus-update', args);
         return { content: [{ type: 'text', text: `widget_${busId} updated` }] };
       },
     });
@@ -333,7 +333,7 @@
       description: `Remove ${type} widget (id: ${busId}) from the view.`,
       inputSchema: { type: 'object', properties: {} },
       execute: () => {
-        oninteract?.(type, 'remove', {});
+        oninteract?.(type, 'bus-remove', {});
         return { content: [{ type: 'text', text: `widget_${busId} removed` }] };
       },
       annotations: { destructiveHint: true },

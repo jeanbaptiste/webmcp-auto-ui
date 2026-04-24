@@ -146,6 +146,10 @@
       canvas.updateBlock(widgetId, payload as Record<string, unknown>);
       return;
     }
+    if (action === 'bus-remove') {
+      canvas.removeBlock(widgetId);
+      return;
+    }
     // Only allow interactive actions (no update/remove to avoid loops)
     if (!INTERACTIVE_ACTIONS.has(action)) return;
     // Debounce
