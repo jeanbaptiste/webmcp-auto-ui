@@ -21,8 +21,10 @@
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import {
     canvas2dServer, chartjsServer, cytoscapeServer, d3server,
-    leafletServer, maplibreServer, mermaidServer, pixijsServer,
-    plotlyServer, roughServer, threejsServer,
+    echartsServer, leafletServer, maplibreServer, mermaidServer,
+    nivoServer, observablePlotServer, pixijsServer, plotlyServer,
+    rechartsServer, roughServer, threejsServer, tremorServer,
+    vegaServer, vegaLiteServer,
   } from '@webmcp-auto-ui/servers';
   import { McpStatus, ModelLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter, HeaderControls, DiagnosticModal, DiagnosticIcon } from '@webmcp-auto-ui/ui';
   import { Menu, Terminal, LayoutGrid, Paperclip, X as XIcon } from 'lucide-svelte';
@@ -104,13 +106,20 @@
     { id: 'chartjs', label: 'Chart.js', description: 'Graphiques interactifs Chart.js (bar, line, pie, radar...)', server: chartjsServer },
     { id: 'cytoscape', label: 'Cytoscape', description: 'Graphes et reseaux (nodes, edges, layouts)', server: cytoscapeServer },
     { id: 'd3', label: 'D3.js', description: 'Visualisations D3.js avancees (treemap, force, chord...)', server: d3server },
+    { id: 'echarts', label: 'Apache ECharts', description: 'Charts Apache ECharts (bar, radar, sankey, funnel, gauge, calendar, graph, 22 widgets)', server: echartsServer },
     { id: 'leaflet', label: 'Leaflet', description: 'Cartes interactives Leaflet (markers, GeoJSON, heatmap)', server: leafletServer },
     { id: 'maplibre', label: 'MapLibre GL', description: 'Cartes vectorielles WebGL (markers, heatmap, 3D buildings, terrain, clusters, vector tiles)', server: maplibreServer },
     { id: 'mermaid', label: 'Mermaid', description: 'Diagrammes Mermaid (flowchart, sequence, gantt...)', server: mermaidServer },
+    { id: 'nivo', label: 'Nivo', description: 'Charts Nivo React (bar, line, pie, heatmap, sankey, calendar, chord, 24 widgets)', server: nivoServer },
+    { id: 'observable-plot', label: 'Observable Plot', description: 'Observable Plot (dot, line, hexbin, contour, voronoi, delaunay, tree, 38 widgets)', server: observablePlotServer },
     { id: 'pixijs', label: 'PixiJS', description: 'Rendus PixiJS haute performance (sprites, particles)', server: pixijsServer },
     { id: 'plotly', label: 'Plotly', description: 'Graphiques scientifiques Plotly (scatter, 3D, contour...)', server: plotlyServer },
+    { id: 'recharts', label: 'Recharts', description: 'Charts Recharts React (line, bar, area, composed, pie, sankey, funnel, 12 widgets)', server: rechartsServer },
     { id: 'rough', label: 'Rough.js', description: 'Dessins style croquis (hand-drawn look)', server: roughServer },
     { id: 'threejs', label: 'Three.js', description: 'Scenes 3D Three.js (mesh, lights, animations)', server: threejsServer },
+    { id: 'tremor', label: 'Tremor', description: 'Dashboards Tremor React (KPI cards, metrics, sparklines, progress, 20 widgets)', server: tremorServer },
+    { id: 'vega', label: 'Vega', description: 'Vega full — force, contour, wordcloud, chord, geo (17 widgets bas niveau)', server: vegaServer },
+    { id: 'vegalite', label: 'Vega-Lite', description: 'Vega-Lite — grammaire concise (26 widgets : marks, transforms, facets, SPLOM)', server: vegaLiteServer },
   ];
   let enabledServers = $state(new Set<string>(['autoui']));
   let activeServers = $derived<WebMcpServer[]>(

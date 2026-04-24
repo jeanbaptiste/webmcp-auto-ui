@@ -50,5 +50,15 @@
   },
   "overrides": {
     "@astrojs/sitemap": "3.3.0"
+  },
+  "dependencies": {
+    "@here/harp-datasource-protocol": "^0.28.0",
+    "@here/harp-map-controls": "^0.28.0",
+    "@here/harp-mapview": "^0.28.0",
+    "@here/harp-omv-datasource": "^0.28.0",
+    "kepler.gl": "^3.3.0-alpha.0",
+    "react-redux": "^9.2.0",
+    "redux": "^5.0.1",
+    "styled-components": "^6.4.1"
   }
 }
