@@ -1,5 +1,6 @@
 <script lang="ts">
   import { AgentConsole } from '@webmcp-auto-ui/ui';
+  import { Dialog, DialogContent, DialogTitle } from '@webmcp-auto-ui/ui';
 
   interface Props {
     open: boolean;
@@ -7,7 +8,7 @@
     onclear: () => void;
   }
 
-  let { open, logs, onclear }: Props = $props();
+  let { open = $bindable(false), logs, onclear }: Props = $props();
 
   let height = $state(200);
   let dragging = $state(false);
@@ -36,8 +37,13 @@
   }
 </script>
 
-{#if open}
-  <div class="log-drawer" style="height:{height}px">
+<Dialog bind:open>
+  <DialogContent
+    class="!left-0 !bottom-0 !right-0 !top-auto !translate-x-0 !translate-y-0 !rounded-none !rounded-t-none !max-w-none !w-full !p-0 flex flex-col overflow-hidden !shadow-[0_-4px_32px_rgba(0,0,0,0.2)]"
+    style="height:{height}px"
+  >
+    <DialogTitle class="sr-only">Agent Logs</DialogTitle>
+
     <!-- Resize bar -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="resize-bar"
@@ -48,19 +54,10 @@
     </div>
 
     <AgentConsole {logs} {onclear} />
-  </div>
-{/if}
+  </DialogContent>
+</Dialog>
 
 <style>
-  .log-drawer {
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    background: var(--color-bg, #0e0e16);
-    border-top: 1px solid var(--color-border2, #333);
-    overflow: hidden;
-  }
-
   .resize-bar {
     height: 6px;
     cursor: ns-resize;

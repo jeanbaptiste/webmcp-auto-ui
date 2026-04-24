@@ -34,13 +34,24 @@ import {
   LocalLLMProvider,
   TokenTracker,
 } from '@webmcp-auto-ui/agent';
-import type { LLMProvider } from '@webmcp-auto-ui/agent';
+import type { LLMProvider, AgentCallbacks } from '@webmcp-auto-ui/agent';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export type GemmaStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export type EnabledProvider = 'remote' | 'wasm' | 'hawk' | 'local';
+
+/**
+ * Options for a custom LLM provider registered via `customProviders`.
+ * The factory receives the same progress/status callbacks that useAgentLoop
+ * wires up for Gemma — so Gemma-style loading UI works out of the box.
+ */
+export interface CustomProviderOpts {
+  model: string;
+  onProgress: (progress: number, status: string, loadedBytes?: number, totalBytes?: number) => void;
+  onStatusChange: (status: GemmaStatus) => void;
+}
 
 export interface UseAgentLoopOptions {
   /** Base URL for the remote (Claude) proxy, e.g. `${base}/api/chat` */
@@ -55,6 +66,23 @@ export interface UseAgentLoopOptions {
   localModel?: string;
   /** Gemma contextSize for WasmProvider (default 32768) */
   gemmaContextSize?: number;
+  /**
+   * Custom provider registrations. Each entry maps a model-name prefix to a
+   * factory. The factory receives the standard progress/status callbacks so
+   * the GemmaLoader UI works transparently (e.g. TransformersProvider).
+   *
+   * Example (flex):
+   *   customProviders: [{ prefix: 'transformers-', factory: (opts) => new TransformersProvider(opts) }]
+   */
+  customProviders?: Array<{ prefix: string; factory: (opts: CustomProviderOpts) => LLMProvider }>;
+  /**
+   * Optional observer whose callbacks are merged (via `mergeCallbacks`) into
+   * every `runAgentLoop` call. Designed to accept a `TraceObserver` directly.
+   *
+   * Example (flex):
+   *   observer: traceObserver
+   */
+  observer?: { callbacks: Partial<AgentCallbacks> };
 }
 
 export interface AgentRunOptions {
@@ -84,6 +112,8 @@ export function createAgentLoop(options: UseAgentLoopOptions) {
     localUrl = 'http://localhost:11434',
     localModel = 'llama3.2',
     gemmaContextSize = 32_768,
+    customProviders = [],
+    observer,
   } = options;
 
   const canUse = (p: EnabledProvider) =>
@@ -240,30 +270,94 @@ export function createAgentLoop(options: UseAgentLoopOptions) {
         return gemmaProvider;
       }
 
+      // Custom providers (e.g. TransformersProvider registered by the host app)
+      for (const { prefix, factory } of customProviders) {
+        if (llm.startsWith(prefix)) {
+          // Custom providers share the gemma progress/status slots so GemmaLoader
+          // works transparently without extra state in the host component.
+          if (gemmaProvider && (gemmaProvider as unknown as { model?: string }).model !== llm) {
+            this.unloadGemma();
+          }
+          if (!gemmaProvider) {
+            const provider = factory({
+              model: llm,
+              onProgress: (p, _s, loaded, total) => {
+                gemmaProgress = p * 100;
+                if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;
+                if (total) gemmaTotalMB = Math.round(total / 1048576 * 100) / 100;
+              },
+              onStatusChange: (s: GemmaStatus) => {
+                gemmaStatus = s;
+                if (s === 'loading') _startGemmaTimer();
+                if (s === 'ready' || s === 'error') _stopGemmaTimer();
+              },
+            });
+            // Store under gemmaProvider slot so lifecycle (unload, status) works
+            gemmaProvider = provider as unknown as WasmProvider;
+          }
+          return gemmaProvider as unknown as LLMProvider;
+        }
+      }
+
       // Remote Claude (default)
       remoteProvider.setModel(llm as Parameters<typeof remoteProvider.setModel>[0]);
       return remoteProvider;
     },
 
     /**
-     * Initialize Gemma if `canvas.llm` is a Gemma model and status is idle.
-     * Idempotent — safe to call on every LLM change.
+     * Initialize Gemma (or a custom WASM-style provider) if `canvas.llm` matches
+     * and status is idle. Idempotent — safe to call on every LLM change.
      */
     initGemmaIfNeeded() {
       const llm = canvas.llm;
-      if ((llm === 'gemma-e2b' || llm === 'gemma-e4b') && gemmaStatus === 'idle') {
+      if (gemmaStatus !== 'idle') return;
+      const isGemma = llm === 'gemma-e2b' || llm === 'gemma-e4b';
+      const isCustom = customProviders.some(({ prefix }) => llm.startsWith(prefix));
+      if (isGemma || isCustom) {
         const p = this.getProvider();
-        if (p instanceof WasmProvider) p.initialize();
+        // Both WasmProvider and custom providers expose initialize()
+        (p as unknown as { initialize?: () => void }).initialize?.();
       }
     },
 
-    /** Destroy and reset the current WasmProvider instance. */
+    /** Destroy and reset the current WasmProvider instance (or custom provider stored in the same slot). */
     unloadGemma() {
       (gemmaProvider as unknown as { destroy?: () => void })?.destroy?.();
       gemmaProvider = null;
       gemmaStatus = 'idle';
       gemmaProgress = 0;
       _stopGemmaTimer();
+    },
+
+    /**
+     * Merge the observer's callbacks (if any) with the host component's own callbacks.
+     * Call this to produce the final `callbacks` object passed to `runAgentLoop`:
+     *
+     *   callbacks: agent.mergeCallbacks({ onWidget, onLLMResponse, ... })
+     *
+     * Each observer callback is invoked AFTER the host callback so host logic
+     * (e.g. agentLogs push) runs first.
+     */
+    mergeCallbacks(userCallbacks: Partial<AgentCallbacks>): Partial<AgentCallbacks> {
+      if (!observer) return userCallbacks;
+      const obs = observer.callbacks;
+      const merged: Partial<AgentCallbacks> = { ...userCallbacks };
+      // For each key in observer.callbacks, wrap with the user callback if present.
+      (Object.keys(obs) as Array<keyof AgentCallbacks>).forEach((key) => {
+        const obsFn = obs[key] as ((...args: unknown[]) => unknown) | undefined;
+        if (!obsFn) return;
+        const userFn = userCallbacks[key] as ((...args: unknown[]) => unknown) | undefined;
+        if (userFn) {
+          (merged as Record<string, unknown>)[key] = (...args: unknown[]) => {
+            const r = (userFn as (...a: unknown[]) => unknown)(...args);
+            (obsFn as (...a: unknown[]) => unknown)(...args);
+            return r;
+          };
+        } else {
+          (merged as Record<string, unknown>)[key] = obsFn;
+        }
+      });
+      return merged;
     },
 
     /**
@@ -284,8 +378,9 @@ export function createAgentLoop(options: UseAgentLoopOptions) {
 
     /** Record an LLM response into the TokenTracker (use in onLLMResponse callback). */
     recordTokens(response: { usage?: Record<string, number>; stats?: { totalTokens: number } }, latencyMs: number) {
+      const isWasm = canvas.llm?.startsWith('gemma') || canvas.llm?.startsWith('transformers-') || false;
       if (response.usage) {
-        tokenTracker.record(response.usage as any, latencyMs);
+        tokenTracker.record(response.usage as any, latencyMs, isWasm);
       } else if (response.stats) {
         tokenTracker.recordEstimate(0, response.stats.totalTokens * 4, latencyMs);
       }

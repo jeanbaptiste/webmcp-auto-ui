@@ -8,14 +8,15 @@
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
   import {
-    RemoteLLMProvider, WasmProvider, TransformersProvider, LocalLLMProvider, HawkProvider, runAgentLoop, buildSystemPrompt,
-    fromMcpTools, trimConversationHistory, summarizeChat, TokenTracker,
+    TransformersProvider, runAgentLoop, buildSystemPrompt,
+    fromMcpTools, trimConversationHistory, summarizeChat,
     buildToolsFromLayers, runDiagnostics, DiscoveryCache, DISCOVERY_TOOL_NAMES, ContextRAG,
     buildGemmaPrompt,
     createTraceObserver,
     TRANSFORMERS_MODELS,
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, ContentBlock, ToolLayer, McpLayer, BrowsableTool, TraceObserver } from '@webmcp-auto-ui/agent';
+  import { createAgentLoop } from '@webmcp-auto-ui/ui/agent';
   import { autoui } from '@webmcp-auto-ui/agent';
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import {
@@ -170,8 +171,6 @@
   }
 
   // ── Token tracking ─────────────────────────────────────────────────
-  const tokenTracker = new TokenTracker();
-  let tokenMetrics = $state(tokenTracker.metrics);
   let showTokens = $state(true);
   let showToolJSON = $state(false);
   let showPipelineTrace = $state(false);
@@ -412,7 +411,6 @@
     add('text', { content: detail.label ?? '(no detail)' });
   }
   let lastLoggedToolCount = $state(0);
-  tokenTracker.subscribe(m => { tokenMetrics = m; });
 
   let agentLogs = $state<{ ts: number; type: string; detail: string; ctxSize?: number }[]>([]);
   let abortController = $state<AbortController | null>(null);
@@ -611,144 +609,54 @@
     }
   }
 
-  // ── Gemma ──────────────────────────────────────────────────────────
-  let gemmaProvider = $state<WasmProvider | null>(null);
-  let transformersProvider = $state<TransformersProvider | null>(null);
-  let gemmaStatus = $state<'idle'|'loading'|'ready'|'error'>('idle');
-  let gemmaProgress = $state(0);
-  let gemmaElapsed = $state(0);
-  let gemmaLoadStart = $state(0);
-  let gemmaLoadedMB = $state(0);
-  let gemmaTotalMB = $state(0);
-  let gemmaTimerInterval = $state<ReturnType<typeof setInterval> | null>(null);
-
-  const anthropicProvider = new RemoteLLMProvider({ proxyUrl: `${base}/api/chat` });
-
-  function getProvider() {
-    if (canvas.llm.startsWith('hawk-')) {
-      return new HawkProvider({ proxyUrl: `${base}/api/hawk`, model: canvas.llm.slice(5) });
-    }
-    if (canvas.llm === 'local') {
-      return new LocalLLMProvider({ baseUrl: localUrl, model: localModel || 'llama3.2' });
-    }
-    if (canvas.llm.startsWith('transformers-')) {
-      if (transformersProvider && transformersProvider.model !== canvas.llm) unloadTransformers();
-      if (!transformersProvider) {
-        transformersProvider = new TransformersProvider({
-          model: canvas.llm,
-          onProgress: (p, _s, loaded, total) => {
-            gemmaProgress = p * 100;
-            if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;
-            if (total) gemmaTotalMB = Math.round(total / 1048576 * 100) / 100;
-          },
-          onStatusChange: (s) => {
-            gemmaStatus = s === 'ready' ? 'ready' : s === 'error' ? 'error' : s === 'loading' ? 'loading' : 'idle';
-            if (s === 'loading') {
-              gemmaLoadStart = Date.now();
-              gemmaElapsed = 0;
-              if (gemmaTimerInterval) clearInterval(gemmaTimerInterval);
-              gemmaTimerInterval = setInterval(() => { gemmaElapsed = Math.floor((Date.now() - gemmaLoadStart) / 1000); }, 1000);
-            }
-            if (s === 'ready' || s === 'error') {
-              if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
-            }
-          },
-        });
-      }
-      return transformersProvider;
-    }
-    if (canvas.llm === 'gemma-e2b' || canvas.llm === 'gemma-e4b') {
-      if (gemmaProvider && gemmaProvider.model !== canvas.llm) unloadGemma();
-      if (!gemmaProvider) {
-        const wasmContext = Math.min(maxContextTokens, 32768);
-        gemmaProvider = new WasmProvider({
-          model: canvas.llm,
-          contextSize: wasmContext,
-          onProgress: (p, _s, loaded, total) => {
-            gemmaProgress = p * 100;
-            if (loaded) gemmaLoadedMB = Math.round(loaded / 1048576 * 100) / 100;
-            if (total) gemmaTotalMB = Math.round(total / 1048576 * 100) / 100;
-          },
-          onStatusChange: (s) => {
-            gemmaStatus = s;
-            if (s === 'loading') {
-              gemmaLoadStart = Date.now();
-              gemmaElapsed = 0;
-              if (gemmaTimerInterval) clearInterval(gemmaTimerInterval);
-              gemmaTimerInterval = setInterval(() => { gemmaElapsed = Math.floor((Date.now() - gemmaLoadStart) / 1000); }, 1000);
-            }
-            if (s === 'ready' || s === 'error') {
-              if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
-            }
-          },
-        });
-      }
-      return gemmaProvider;
-    }
-    anthropicProvider.setModel(canvas.llm as any);
-    return anthropicProvider;
-  }
-
-  function unloadGemma() {
-    (gemmaProvider as unknown as { destroy?: () => void })?.destroy?.();
-    gemmaProvider = null;
-    gemmaStatus = 'idle';
-    gemmaProgress = 0;
-    if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
-  }
-
-  function unloadTransformers() {
-    transformersProvider?.destroy();
-    transformersProvider = null;
-    gemmaStatus = 'idle';
-    gemmaProgress = 0;
-    if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
-  }
-
-  $effect(() => {
-    const llm = canvas.llm;
-    untrack(() => {
-      if ((llm === 'gemma-e2b' || llm === 'gemma-e4b') && gemmaStatus === 'idle') {
-        const p = getProvider();
-        if (p instanceof WasmProvider) p.initialize();
-      }
-      if (llm.startsWith('transformers-') && gemmaStatus === 'idle') {
-        const p = getProvider();
-        if (p instanceof TransformersProvider) p.initialize();
-      }
-    });
+  // ── Agent loop (providers + smart defaults + token tracking) ───────
+  const agent = createAgentLoop({
+    chatApiBase: `${base}/api/chat`,
+    hawkApiBase: `${base}/api/hawk`,
+    localUrl,
+    localModel: localModel || 'llama3.2',
+    gemmaContextSize: Math.min(maxContextTokens, 32768),
+    // TransformersProvider registered as a custom provider so GemmaLoader UI works
+    customProviders: [{
+      prefix: 'transformers-',
+      factory: (opts) => new TransformersProvider(opts as any),
+    }],
+    observer: traceObserver,
   });
 
+  // Proxy reactive getters so the template keeps its local names
+  const tokenTracker = agent.tokenTracker;
+  $effect(() => {
+    const _llm = canvas.llm; // reactive dependency
+    untrack(() => agent.initGemmaIfNeeded());
+  });
 
-  // Smart defaults: sanitize ON for Claude/local, flatten ON for Gemma/local
+  // Smart defaults: standard set via composable + flex-specific extras
   $effect(() => {
     const isGemma = canvas.llm.startsWith('gemma');
     const isE4B = canvas.llm === 'gemma-e4b';
     const isLocal = canvas.llm === 'local';
-    schemaFlatten = isGemma || isLocal;
-    truncateResults = isGemma || isLocal;
-    compressHistory = isLocal;
+    agent.applySmartDefaults();
+    // flex-specific overrides on top of the shared defaults
     schemaStrict = false;
     if (isGemma) {
-      maxResultLength = 2000;
       ragResidueSize = 500;
-      // Google's AI Edge Gallery default for Gemma — sweet spot for quality
-      temperature = 1.0;
       topK = 64;
       maxContextTokens = isE4B ? 32768 : 32768;
-      cacheEnabled = false;
     } else if (isLocal) {
-      maxResultLength = 3000;
       ragResidueSize = 300;
     } else {
-      // Claude defaults
-      maxResultLength = 10000;
       ragResidueSize = 200;
-      temperature = 0.7;
       topK = 64;
       maxContextTokens = 120_000;
-      cacheEnabled = true;
     }
+    // Mirror agent state → local vars so existing template bindings continue to work
+    schemaFlatten = agent.schemaFlatten;
+    truncateResults = agent.truncateResults;
+    compressHistory = agent.compressHistoryEnabled;
+    maxResultLength = agent.maxResultLength;
+    temperature = agent.temperature;
+    cacheEnabled = agent.cacheEnabled;
   });
 
   // ── Layers & prompt ────────────────────────────────────────────────
@@ -937,7 +845,7 @@
         (async () => {
           try {
             const result = await summarizeChat({
-              messages: conversationHistory, provider: getProvider(),
+              messages: conversationHistory, provider: agent.getProvider(),
               toolsUsed: allToolsUsed, toolCallCount: chatToolCount,
               mcpServers: (multiClient?.listServers() ?? []).map(s => ({ name: s.name, url: s.url })),
               skillsReferenced: skills.map(s => s.name),
@@ -1063,7 +971,7 @@
     try {
       result = await runAgentLoop(userTurn, {
         client: multiClient?.hasConnections ? multiClient as any : undefined,
-        provider: getProvider(),
+        provider: agent.getProvider(),
         systemPrompt: effectivePrompt || undefined,
         maxIterations: 15, maxTokens, maxResultLength: maxResultLength >= 50000 ? Infinity : maxResultLength, temperature, topK, cacheEnabled,
         truncateResults, compressHistory: compressHistory ? compressPreview : false,
@@ -1078,7 +986,7 @@
           flatten: schemaFlatten,
           strict: schemaStrict,
         },
-        callbacks: {
+        callbacks: agent.mergeCallbacks({
           onIterationStart: (i, max) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'iteration', detail: `Iteration ${i}/${max}` }];
             if (i === 1) {
@@ -1086,7 +994,6 @@
               agentLogs = [...agentLogs, { ts: Date.now(), type: 'prompt', detail: effectivePrompt ?? '(none)' }];
               traceObserver.reset();
             }
-            traceObserver?.callbacks.onIterationStart?.(i, max);
           },
           onLLMRequest: (messages, tools) => {
             const ctxChars = messages.reduce((sum, m) => {
@@ -1108,20 +1015,16 @@
                 agentLogs = [...agentLogs, { ts: Date.now(), type: 'schema', detail: `${tool.name}: {${summary}}` }];
               }
             }
-            traceObserver?.callbacks.onLLMRequest?.(messages, tools);
           },
           onLLMResponse: (response, latencyMs, tokens) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'response', detail: `${tokens?.input ?? '?'}in ${tokens?.output ?? '?'}out, ${Math.round(latencyMs)}ms, ${response.stopReason}`, ctxSize: tokens?.input }];
-            if (response.usage) tokenTracker.record(response.usage, latencyMs, canvas.llm?.startsWith('gemma') ?? false);
-            else if (response.stats) tokenTracker.recordEstimate(0, response.stats.totalTokens * 4, latencyMs);
-            traceObserver?.callbacks.onLLMResponse?.(response, latencyMs, tokens);
+            agent.recordTokens(response, latencyMs);
           },
           onWidget: (type, data, serverName) => {
                 // Use serverName from the agent loop (WebMCP server that produced the widget),
                 // fall back to currentServerName (external MCP) if not set.
                 const provServer = serverName || currentServerName || undefined;
                 const widget = flexGrid?.addBlock(type, data, provServer, type);
-                traceObserver?.callbacks.onWidget?.(type, data, provServer);
                 return widget ? { id: widget.id } : undefined;
               },
           onClear: () => { flexGrid?.clearBlocks(); conversationHistory = []; traceObserver?.reset(); },
@@ -1133,7 +1036,6 @@
             if (showPipelineTrace) {
               agentLogs = [...agentLogs, { ts: Date.now(), type: 'trace', detail: message }];
             }
-            traceObserver?.callbacks.onTrace?.(message);
           },
           onToken: () => {},
           onText: (text) => {
@@ -1144,9 +1046,6 @@
                 agentLogs = [...agentLogs, { ts: Date.now(), type: 'text', detail: text }];
               }
               // Strip Gemma tool call tags from ephemeral display.
-              // Handle both closed and unclosed (mid-stream) tags — a bare
-              // non-greedy + optional closing matches only the opening tag
-              // and leaks the body into the pill until the closing arrives.
               const clean = text
                 .replace(/<\|tool_call>[\s\S]*?<tool_call\|>/g, '')
                 .replace(/<\|tool_call>[\s\S]*$/g, '')
@@ -1194,13 +1093,11 @@
               pill = `<span style="display:inline-flex;align-items:center;gap:6px;"><span style="font-size:10px;font-weight:700;letter-spacing:0.03em;color:#ec4899;background:rgba(236,72,153,0.12);border-radius:3px;padding:1px 5px;">📄 ${rid}</span><strong>${call.name}</strong></span>`;
             }
             updateEphemeral(assistantId, pill);
-            traceObserver?.callbacks.onToolCall?.(call);
           },
           onDone: (metrics) => {
             agentLogs = [...agentLogs, { ts: Date.now(), type: 'done', detail: `${metrics.iterations} iter, ${metrics.toolCalls} tools, ${metrics.totalTokens} tokens, ${Math.round(metrics.totalLatencyMs)}ms` }];
-            traceObserver?.callbacks.onDone?.(metrics);
           },
-        },
+        }),
       });
       if (result) {
         conversationHistory = result.messages;
@@ -1232,7 +1129,6 @@
     chatLastTool = '';
     chatTimer = 0;
     tokenTracker.reset();
-    tokenMetrics = tokenTracker.metrics;
     lastLoggedToolCount = 0;
   }
 
@@ -1303,7 +1199,7 @@
   });
 
   onDestroy(() => {
-    if (gemmaTimerInterval) { clearInterval(gemmaTimerInterval); gemmaTimerInterval = null; }
+    agent.destroy();
     if (typeof document !== 'undefined') {
       document.removeEventListener('widget:node-dblclick', onTraceNodeDblClick as EventListener);
     }
@@ -1324,7 +1220,7 @@
         <span class="text-text1">Auto-UI</span> <span class="text-accent">flex</span>
       </span>
     </button>
-    <TokenBubble metrics={tokenMetrics} {maxContextTokens} visible={showTokens && composerMode} />
+    <TokenBubble metrics={agent.tokenMetrics} {maxContextTokens} visible={showTokens && composerMode} />
     <div class="flex-1"></div>
 
     {#if composerMode}
@@ -1342,7 +1238,7 @@
       servers={canvas.dataServers.filter((s) => s.connected).map((s) => ({ url: s.url, name: s.serverName ?? s.name, toolCount: (s.tools ?? []).length }))}
       onclick={() => { recipeBrowserOpen = true; recipeBrowserFilter = ''; }}
     />
-    {#if gemmaStatus === 'ready'}
+    {#if agent.gemmaStatus === 'ready'}
       <span class="font-mono text-[10px] text-teal flex items-center gap-1 flex-shrink-0">
         <span class="w-1.5 h-1.5 rounded-full bg-teal"></span>
         {({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}
@@ -1352,12 +1248,12 @@
   </header>
 
   <!-- GEMMA LOADER -->
-  {#if gemmaStatus === 'loading' || gemmaStatus === 'error'}
+  {#if agent.gemmaStatus === 'loading' || agent.gemmaStatus === 'error'}
     <ModelLoader
-      status={gemmaStatus} progress={gemmaProgress} elapsed={gemmaElapsed}
-      loadedMB={gemmaLoadedMB} totalMB={gemmaTotalMB}
+      status={agent.gemmaStatus} progress={agent.gemmaProgress} elapsed={agent.gemmaElapsed}
+      loadedMB={agent.gemmaLoadedMB} totalMB={agent.gemmaTotalMB}
       modelName={({'gemma-e2b':'Gemma E2B','gemma-e4b':'Gemma E4B'} as Record<string,string>)[canvas.llm] ?? canvas.llm}
-      onunload={unloadGemma}
+      onunload={() => agent.unloadGemma()}
     />
   {/if}
 

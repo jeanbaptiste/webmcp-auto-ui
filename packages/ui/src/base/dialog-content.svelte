@@ -4,10 +4,11 @@
 
 	type Props = {
 		class?: string;
+		style?: string;
 		children?: import('svelte').Snippet;
 	};
 
-	let { class: className, children }: Props = $props();
+	let { class: className, style, children }: Props = $props();
 </script>
 
 <Dialog.Portal>
@@ -17,6 +18,7 @@
 			'fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 bg-surface border border-border2 rounded-xl shadow-2xl max-w-lg w-full mx-4 p-6',
 			className
 		)}
+		{style}
 	>
 		{@render children?.()}
 	</Dialog.Content>

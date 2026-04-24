@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
-import { openRecipeViewerModal, openToolViewerModal, type ImportedRecipe } from './import-modals.js';
+import { openRecipeViewerModal, openToolViewerModal, type ImportedRecipe } from './import-modal-api.js';
 import type { NotebookCell, NotebookState, DataServerDescriptor } from './shared.js';
 
 export interface LeftPaneHandlers {

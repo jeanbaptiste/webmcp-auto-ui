@@ -20,7 +20,7 @@ import {
 import { renderChart } from './chart-renderer.js';
 import { dispatchShare } from './share-handlers.js';
 import { renderProse, mountEditableProse } from './prose.js';
-import { openAddMdModal, openAddRecipeModal } from './import-modals.js';
+import { openAddMdModal, openAddRecipeModal } from './import-modal-api.js';
 import { extractCellsFromRecipe, extractCellFromMarkdown } from './resource-extractor.js';
 import { mountLeftPane } from './left-pane.js';
 import { highlightCode } from '../../primitives/markdown-renderer.js';
