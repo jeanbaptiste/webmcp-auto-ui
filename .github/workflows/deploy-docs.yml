@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'docs-site/**'
+      - 'docs/starlight/**'
       - 'packages/*/src/**'
       - 'scripts/generate-docs.*'
   workflow_dispatch:
@@ -33,11 +33,11 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       - name: Build Starlight
-        working-directory: docs-site
+        working-directory: docs/starlight
         run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs-site/dist
+          path: docs/starlight/dist
 
   deploy:
     needs: build

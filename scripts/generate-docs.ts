@@ -18,8 +18,8 @@ import { join, dirname } from 'path';
 // ---------------------------------------------------------------------------
 
 const ROOT = join(new URL('.', import.meta.url).pathname, '..');
-const DOCS_FR = join(ROOT, 'docs-site/src/content/docs');  // root locale = FR
-const DOCS_EN = join(ROOT, 'docs-site/src/content/docs/en');
+const DOCS_FR = join(ROOT, 'docs/starlight/src/content/docs');  // root locale = FR
+const DOCS_EN = join(ROOT, 'docs/starlight/src/content/docs/en');
 const DRY_RUN = process.argv.includes('--dry-run');
 const MODEL = 'claude-haiku-4-5-20251001';
 
@@ -116,8 +116,8 @@ function normalizeFilePath(rawPath: string, expectedPaths: string[]): string | n
     'en/',
     'src/content/docs/',
     'src/content/docs/en/',
-    'docs-site/src/content/docs/',
-    'docs-site/src/content/docs/en/',
+    'docs/starlight/src/content/docs/',
+    'docs/starlight/src/content/docs/en/',
   ];
   for (const prefix of prefixes) {
     if (rawPath.startsWith(prefix)) {

@@ -35,7 +35,7 @@ playwright-report/
 packages/core/src/*.d.ts
 
 # Astro cache
-docs-site/.astro/
+docs/starlight/.astro/
 
 # Auto-generated recipe file
 packages/agent/src/recipes/_generated.ts

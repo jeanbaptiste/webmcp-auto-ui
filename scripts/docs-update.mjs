@@ -27,9 +27,9 @@ import { tmpdir } from 'os';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = join(__dirname, '..');
-const DOCS_FR = join(ROOT, 'docs-site/src/content/docs');
-const DOCS_EN = join(ROOT, 'docs-site/src/content/docs/en');
-const DIAGRAMS = join(ROOT, 'docs-site/public/diagrams');
+const DOCS_FR = join(ROOT, 'docs/starlight/src/content/docs');
+const DOCS_EN = join(ROOT, 'docs/starlight/src/content/docs/en');
+const DIAGRAMS = join(ROOT, 'docs/starlight/public/diagrams');
 const SNAPSHOT_LIGHT = join(ROOT, '.docs-snapshot-light.txt');
 const MANIFEST = join(ROOT, '.docs-manifest.json');
 const LASTRUN = join(ROOT, '.docs-lastrun');
@@ -396,10 +396,10 @@ function syncDocs() {
 // ============================================================================
 
 function buildDocs() {
-  step('Step 7 — Build docs-site');
+  step('Step 7 — Build docs/starlight');
   info('Running astro build...');
   try {
-    const output = run(`npm --prefix "${join(ROOT, 'docs-site')}" run build 2>&1 | tail -5`);
+    const output = run(`npm --prefix "${join(ROOT, 'docs/starlight')}" run build 2>&1 | tail -5`);
     if (output) console.log(output);
     ok('Build successful');
   } catch (e) {

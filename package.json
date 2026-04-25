@@ -15,7 +15,7 @@
     "apps/recipes",
     "apps/boilerplate",
     "apps/notebook-viewer",
-    "docs-site"
+    "docs/starlight"
   ],
   "scripts": {
     "dev": "concurrently -n home,flex,viewer,showcase,todo -c blue,magenta,yellow,green,red \"npm -w apps/home run dev\" \"npm -w apps/flex run dev\" \"npm -w apps/viewer run dev\" \"npm -w apps/showcase run dev\" \"npm -w apps/todo run dev\"",
