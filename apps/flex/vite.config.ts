@@ -18,9 +18,13 @@ export default defineConfig({
     },
   },
   build: {
+    target: 'es2022',  // top-level await needed by perspective-viewer-d3fc and others
     rollupOptions: {
       external: ['onnxruntime-web', '@huggingface/transformers'],  // loaded from CDN at runtime (~70MB savings)
     },
+  },
+  optimizeDeps: {
+    esbuildOptions: { target: 'es2022' },
   },
   resolve: {
     alias: {
