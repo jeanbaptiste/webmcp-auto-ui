@@ -3,15 +3,18 @@
     placeholder?: string;
     disabled?: boolean;
     value?: string;
+    onsubmit?: (text: string) => void;
+    onstop?: () => void;
   }
 
-  let { placeholder = 'Type a message...', disabled = false, value = $bindable('') }: Props = $props();
+  let { placeholder = 'Type a message...', disabled = false, value = $bindable(''), onsubmit, onstop }: Props = $props();
 
   let inputEl = $state<HTMLInputElement | null>(null);
 
   function handleSubmit() {
     const text = value?.trim();
     if (!text || disabled) return;
+    onsubmit?.(text);
     inputEl?.dispatchEvent(new CustomEvent('submit', { detail: text, bubbles: true }));
     value = '';
   }
@@ -24,6 +27,7 @@
   }
 
   function handleStop() {
+    onstop?.();
     inputEl?.dispatchEvent(new CustomEvent('stop', { bubbles: true }));
   }
 </script>

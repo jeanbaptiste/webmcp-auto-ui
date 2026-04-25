@@ -5,11 +5,12 @@
 	type Props = {
 		class?: string;
 		children?: import('svelte').Snippet;
+		onclick?: (e: MouseEvent) => void;
 	};
 
-	let { class: className, children: childrenSnippet }: Props = $props();
+	let { class: className, children: childrenSnippet, onclick }: Props = $props();
 </script>
 
-<Dialog.Trigger class={cn(className)}>
+<Dialog.Trigger class={cn(className)} {onclick}>
 	{@render childrenSnippet?.()}
 </Dialog.Trigger>

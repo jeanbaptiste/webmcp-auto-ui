@@ -20,8 +20,7 @@
 
   let rootEl = $state<HTMLElement | null>(null);
 
-  function handleSubmit(e: CustomEvent<string>) {
-    const text = e.detail;
+  function handleSubmit(text: string) {
     if (!text) return;
     rootEl?.dispatchEvent(
       new CustomEvent('widget:interact', {
