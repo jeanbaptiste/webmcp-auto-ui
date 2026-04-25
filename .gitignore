@@ -94,3 +94,6 @@ _retex_flex/
 
 # Infra nginx configs (gérées hors repo)
 infra/bot/nginx/
+
+# E2E tests (non utilisés)
+tests/e2e/
