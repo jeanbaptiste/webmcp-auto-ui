@@ -7,7 +7,6 @@
 <script lang="ts">
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
-  import { Dialog, DialogContent, DialogTitle } from '@webmcp-auto-ui/ui';
   import { McpConnector, LLMSelector, SettingsPanel, MCPserversList, DiagnosticModal, DiagnosticIcon, ModelCacheManager } from '@webmcp-auto-ui/ui';
 
   const buildStamp = typeof __BUILD_TIME__ === 'string'
@@ -157,15 +156,19 @@
   );
 </script>
 
-<Dialog bind:open>
-  <DialogContent
-    class="!left-0 !top-0 !right-auto !bottom-0 !translate-x-0 !translate-y-0 !rounded-none !rounded-r-none !max-w-[320px] !w-[320px] !h-full !p-0 flex flex-col overflow-hidden !shadow-[4px_0_32px_rgba(0,0,0,0.2)]"
-  >
-    <!-- Title (visually hidden — required for a11y) -->
-    <DialogTitle class="sr-only">Settings</DialogTitle>
+<!-- Backdrop -->
+{#if open}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="fixed inset-0 bg-black/40 z-40" onclick={() => open = false}></div>
+{/if}
+
+<!-- Drawer -->
+<aside class="settings-drawer {open ? 'open' : ''}">
 
     <div class="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
       <span class="font-mono text-sm font-bold text-text1">Settings</span>
+      <button class="text-text2 hover:text-text1 text-lg leading-none transition-colors"
+              onclick={() => open = false}>x</button>
     </div>
 
     <div class="flex flex-col gap-6 p-5 overflow-y-auto flex-1">
@@ -447,7 +450,28 @@
          target="_blank" rel="noopener"
          class="font-mono text-[8px] text-text2/40 hover:text-text2 transition-colors">GitHub</a>
     </div>
-  </DialogContent>
-</Dialog>
+</aside>
 
 <DiagnosticModal bind:open={diagModalOpen} {diagnostics} onclose={() => diagModalOpen = false} />
+
+<style>
+  .settings-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 320px;
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border2);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 4px 0 32px rgba(0,0,0,0.2);
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .settings-drawer.open {
+    transform: translateX(0);
+  }
+</style>
