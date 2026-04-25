@@ -635,15 +635,21 @@ export function createWebMcpServer(
         }
       }
 
-      // Merge flow recipes into the layer's recipe list so the UI can browse them
-      // alongside any explicitly set McpRecipeSummary entries.
+      // Merge widget recipes + flow recipes into the layer's recipe list so the
+      // UI can browse them alongside any explicitly set McpRecipeSummary entries.
+      const widgetSummaries: McpRecipeSummary[] = [...widgets.values()].map((w) => ({
+        name: w.name,
+        description: w.description,
+        body: w.recipe,
+        group: w.group ?? 'widget',
+      }));
       const flowSummaries: McpRecipeSummary[] = [...flowRecipes.values()].map((f) => ({
         name: f.name,
         description: f.description,
         body: f.body,
         group: 'flow',
       }));
-      const mergedRecipes = [...currentRecipes, ...flowSummaries];
+      const mergedRecipes = [...currentRecipes, ...widgetSummaries, ...flowSummaries];
 
       return {
         protocol: 'webmcp' as const,
