@@ -21,7 +21,6 @@
   export interface NotebookData {
     id?: string;
     title?: string;
-    kicker?: string;
     mode?: 'edit' | 'view';
     autoRun?: boolean;
     hideLiveToggle?: boolean;

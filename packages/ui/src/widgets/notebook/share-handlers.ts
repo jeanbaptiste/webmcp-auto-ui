@@ -191,7 +191,6 @@ function minify(state: NotebookState): Record<string, unknown> {
     id: state.id,
     title: state.title,
     mode: state.mode,
-    kicker: state.kicker,
     cells: state.cells.map((c: NotebookCell) => ({
       id: c.id,
       type: c.type,

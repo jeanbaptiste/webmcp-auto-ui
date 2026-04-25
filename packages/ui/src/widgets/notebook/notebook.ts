@@ -35,10 +35,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     title: data.title as string ?? 'Untitled notebook',
     mode: (data.mode as any) ?? 'edit',
     cells: data.cells as any,
-    kicker: (data.kicker as string) ?? undefined,
     autoRun: (data as any).autoRun === true,
   });
-  if (!state.kicker) state.kicker = (data.kicker as string) ?? 'untitled';
 
   // Live mode runtime overlay (created lazily). Never mutates state.
   let overlay: RuntimeOverlay | null = null;
@@ -56,7 +54,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       <div class="nbe-leftpane-slot"></div>
       <div class="nbe-shell">
         <div class="nbe-kicker">
-          <input class="nbe-kicker-input" value="${escapeAttr(state.kicker || '')}" placeholder="kicker…">
           <span class="nbe-live-toggle-slot"></span>
           <div class="nb-mode-switch" style="margin-left:auto;">
             <button class="nb-mode-edit nb-on">edit</button>
@@ -258,10 +255,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     badgeSlot: shell.querySelector('.nbe-publish-badge-slot') as HTMLElement,
     footerSlot: shell.querySelector('.nbe-publish-footer-slot') as HTMLElement,
     onPublished: () => rerender(),
-  });
-  (shell.querySelector('.nbe-kicker-input') as HTMLInputElement).addEventListener('input', (e) => {
-    state.kicker = (e.target as HTMLInputElement).value;
-    state.lastEditAt = Date.now();
   });
   (shell.querySelector('.nbe-title') as HTMLInputElement).addEventListener('input', (e) => {
     state.title = (e.target as HTMLInputElement).value;
@@ -623,16 +616,6 @@ function injectLayoutStyles(): void {
   letter-spacing: 0.1em; text-transform: uppercase;
   margin-bottom: 14px;
 }
-.nbe-kicker-input {
-  flex: 0 0 auto; min-width: 120px;
-  background: transparent; border: 1px dashed transparent;
-  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-  font-size: 11px; color: var(--color-text2);
-  letter-spacing: 0.1em; text-transform: uppercase;
-  padding: 2px 4px; border-radius: 3px; outline: none;
-}
-.nbe-kicker-input:focus { border-color: var(--color-border); background: var(--color-bg); color: var(--color-text1); }
-.nb-root.nb-view-mode .nbe-kicker-input { pointer-events: none; }
 .nbe-title {
   font-family: var(--font-serif, 'EB Garamond', Georgia, serif);
   font-size: 30px; font-weight: 500;

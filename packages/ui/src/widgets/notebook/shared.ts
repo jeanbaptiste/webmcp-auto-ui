@@ -62,7 +62,6 @@ export interface NotebookState {
   scope: Record<string, unknown>;
   executors: CellExecutors;
   lastEditAt: number;
-  kicker?: string;
   publishedSlug?: string;
   publishedToken?: string;
   /**
@@ -168,22 +167,44 @@ export function defaultCellContent(type: CellType): string {
 // ---------------------------------------------------------------------------
 
 export function createState(initial?: Partial<NotebookState>): NotebookState {
-  return {
-    id: initial?.id ?? uid(),
-    title: initial?.title ?? 'Untitled notebook',
-    mode: initial?.mode ?? 'edit',
-    cells: initial?.cells ?? [
-      { id: uid(), type: 'md', content: '### Untitled notebook\n\nAdd some context here.', hideSource: false, hideResult: false },
+  const title = initial?.title ?? 'Untitled notebook';
+  const cells = stripDuplicateTitleHeading(
+    initial?.cells ?? [
+      { id: uid(), type: 'md', content: 'Add some context here.', hideSource: false, hideResult: false },
       { id: uid(), type: 'sql', content: 'select *\nfrom source\nlimit 5', varname: 'rows', hideSource: false, hideResult: false, status: 'fresh' },
       { id: uid(), type: 'js', content: 'console.log(rows)', hideSource: false, hideResult: false, status: 'stale' },
     ],
+    title,
+  );
+  return {
+    id: initial?.id ?? uid(),
+    title,
+    mode: initial?.mode ?? 'edit',
+    cells,
     history: initial?.history ?? [],
     scope: initial?.scope ?? {},
     executors: initial?.executors ?? {},
     lastEditAt: initial?.lastEditAt ?? Date.now(),
-    kicker: initial?.kicker,
     autoRun: initial?.autoRun ?? false,
   };
+}
+
+// If the first md cell opens with a heading whose plain text matches the
+// notebook title, drop that heading line so the title is not rendered twice.
+function stripDuplicateTitleHeading(cells: NotebookCell[], title: string): NotebookCell[] {
+  if (!title || cells.length === 0) return cells;
+  const first = cells[0];
+  if (first.type !== 'md' || typeof first.content !== 'string') return cells;
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const lines = first.content.split('\n');
+  let i = 0;
+  while (i < lines.length && lines[i].trim() === '') i++;
+  if (i >= lines.length) return cells;
+  const m = lines[i].match(/^#{1,6}\s+(.+?)\s*$/);
+  if (!m || norm(m[1]) !== norm(title)) return cells;
+  let drop = i + 1;
+  while (drop < lines.length && lines[drop].trim() === '') drop++;
+  return [{ ...first, content: lines.slice(drop).join('\n') }, ...cells.slice(1)];
 }
 
 // ---------------------------------------------------------------------------
@@ -715,7 +736,7 @@ export interface PublishControlsOptions {
   onPublished?: (info: { slug: string; url: string; updated: boolean }) => void;
   /** Optional toast function — falls back to internal toast helper if absent. */
   toast?: (message: string, isError?: boolean) => void;
-  /** Minimal projection of the state sent to the server. If absent, sends { id, title, kicker, mode, cells }. */
+  /** Minimal projection of the state sent to the server. If absent, sends { id, title, mode, cells }. */
   serializeState?: (state: NotebookState) => Record<string, unknown>;
 }
 
@@ -819,7 +840,6 @@ export function createPublishControls(state: NotebookState, opts: PublishControl
         : {
             id: state.id,
             title: state.title,
-            kicker: state.kicker,
             mode: state.mode,
             cells: state.cells,
           };

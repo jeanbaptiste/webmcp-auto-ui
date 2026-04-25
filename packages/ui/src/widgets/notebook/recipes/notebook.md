@@ -11,9 +11,6 @@ schema:
     mode:
       type: string
       enum: [edit, view]
-    kicker:
-      type: string
-      description: Small uppercase label above the title (e.g. "analysis", "memo", "brief"). Editable inline. Defaults to "untitled".
     hideLiveToggle:
       type: boolean
       default: false
@@ -52,7 +49,6 @@ The distinguishing feature: prose paragraphs and code cells share a single order
    ```
    widget_display({name: "notebook", params: {
      title: "Q3 observations",
-     kicker: "memo",
      cells: [
        {type: "md", content: "This memo covers the highlights of last quarter."},
        {type: "md", content: "We first look at revenue, then at churn."},
@@ -74,7 +70,6 @@ The distinguishing feature: prose paragraphs and code cells share a single order
 ## Notes
 
 - The serif font (EB Garamond, with Georgia fallback) applies only to prose content inside this widget — it signals "publication" the moment the user sees it.
-- The **kicker** above the title ("analysis", "memo", "internal") is editable inline — click to rename. Keep it short.
 - Prose cells are rendered via an HTML-sanitizing markdown pipeline: markdown syntax is resolved, unsafe tags are stripped (XSS closed), `<mark>` and other editorial tags are preserved.
 - The footer exposes a single `share` button.
 - Run / Stop controls are at the left of each code cell's header, same as the other notebook layouts.
@@ -112,7 +107,6 @@ An editorial piece earns its weight when the prose is anchored to real material.
      name: 'notebook',
      params: {
        title: '...',
-       kicker: 'memo',
        cells: [...],
        servers: [{ name: 'tricoteuses', url: 'https://...', kind: 'data' }]
      }
