@@ -1,0 +1,23 @@
+---
+widget: perspective-y-line
+description: Y Line chart. Explicit Y-axis line variant.
+group: perspective
+schema:
+  type: object
+  required: [rows]
+  properties:
+    title: { type: string }
+    rows: { type: array }
+    group_by: { type: array }
+    split_by: { type: array }
+    columns: { type: array }
+    aggregates: { type: object }
+---
+
+## When to use
+Time-series and ordered trends.
+
+## Example
+```
+perspective_webmcp_widget_display({name: "perspective-y-line", params: { rows: [...], group_by: ['date'], columns: ['close'] }})
+```
