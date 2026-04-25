@@ -3,8 +3,7 @@
 /**
  * sync-docs.js — Keeps documentation in sync with source code.
  *
- * 1. GENERATE: Parses source code and updates auto-generated sections in .md files
- * 2. BUILD:    Inlines all .md files into docs/site/index.html
+ * Parses source code and updates auto-generated sections in .md files.
  *
  * Usage: node scripts/sync-docs.js
  *        npm run docs:sync
@@ -176,58 +175,7 @@ function generatePortsTable(ports) {
   return md;
 }
 
-// ─── 4. BUILD SELF-CONTAINED HTML ─────────────────────────────────────────
-
-function buildDocsHtml() {
-  const siteDir = path.join(DOCS, 'site');
-  const htmlPath = path.join(siteDir, 'index.html');
-  let html = fs.readFileSync(htmlPath, 'utf8');
-
-  const pages = {
-    'install': 'install.md',
-    'architecture': 'architecture.md',
-    'core': 'packages/core.md',
-    'ui': 'packages/ui.md',
-    'sdk': 'packages/sdk.md',
-    'agent': 'packages/agent.md',
-    'deploy': 'tutorials/deploy.md',
-    'themed-demo': 'tutorials/themed-demo.md',
-    'theming': 'theming.md',
-    'agents-theming': 'agents/theming.md',
-    'agents-composing': 'agents/composing.md',
-    'agents-ui-widgets': 'agents/ui-widgets.md',
-    'agents-mcp': 'agents/mcp.md',
-    'agents-skills': 'agents/skills.md',
-  };
-
-  // Remove ALL old inlined markdown and the marker comment
-  html = html.replace(/\n  <!-- Inlined markdown content -->\n(?:  <script type="text\/markdown"[^]*?<\/script>\n)*/, '');
-
-  // Build new inlined content
-  let mdScripts = '\n  <!-- Inlined markdown content -->\n';
-  let count = 0;
-  for (const [id, relPath] of Object.entries(pages)) {
-    const fullPath = path.join(DOCS, relPath);
-    if (fs.existsSync(fullPath)) {
-      const content = fs.readFileSync(fullPath, 'utf8').replace(/<\/script>/g, '<\\/script>');
-      mdScripts += `  <script type="text/markdown" data-page="${id}">\n${content}\n  </script>\n`;
-      count++;
-    } else {
-      console.warn(`  warn: missing ${relPath}`);
-    }
-  }
-
-  // Insert before the main <script>
-  html = html.replace(
-    /(\n  <script>\n)/,
-    mdScripts + '$1'
-  );
-
-  fs.writeFileSync(htmlPath, html);
-  return count;
-}
-
-// ─── 5. MAIN ──────────────────────────────────────────────────────────────
+// ─── 4. MAIN ──────────────────────────────────────────────────────────────
 
 function main() {
   console.log('docs:sync — syncing documentation with source code\n');
@@ -267,11 +215,6 @@ function main() {
 
   console.log(`  ${updatedFiles} files updated with auto-generated content`);
 
-  // Build self-contained HTML
-  console.log('');
-  const pageCount = buildDocsHtml();
-  console.log(`  built: docs/site/index.html (${pageCount} pages inlined)`);
-
   console.log('\ndocs:sync complete.\n');
 }
 
@@ -279,7 +222,7 @@ function findMdFiles(dir) {
   const results = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory() && entry.name !== 'site') {
+    if (entry.isDirectory()) {
       results.push(...findMdFiles(full));
     } else if (entry.isFile() && entry.name.endsWith('.md')) {
       results.push(full);
