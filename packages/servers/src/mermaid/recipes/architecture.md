@@ -54,3 +54,8 @@ Renders an architecture diagram. Provide either a raw `definition` or structured
 
 ## How
 1. Call `mermaid_webmcp_widget_display({name: "architecture", params: {definition: "architecture-beta\n  service api(server)[API]\n  service db(database)[DB]\n  api:R --> L:db"}})`
+
+## Example
+```
+mermaid_webmcp_widget_display({name: "mermaid-architecture", params: {definition: "architecture-beta\n  group backend[Backend]\n  service api(server)[API Gateway] in backend\n  service db(database)[Postgres] in backend\n  service cache(disk)[Redis]\n  api:R --> L:db\n  api:B --> T:cache"}})
+```

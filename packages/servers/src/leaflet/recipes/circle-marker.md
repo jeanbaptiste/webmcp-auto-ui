@@ -38,7 +38,7 @@ Like a circle, but its radius is defined in pixels and stays constant regardless
 ## How
 1. Call `leaflet_webmcp_widget_display({name: "leaflet-circle-marker", params: {center: [48.85, 2.35], zoom: 12, markers: [{latlng: [48.856, 2.352], radius: 12, color: "#9b59b6", popup: "Large"}]}})`
 
-### Example
+## Example
 
 ```json
 {

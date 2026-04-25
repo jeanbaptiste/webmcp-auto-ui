@@ -34,7 +34,7 @@ Renders massive point datasets (100k+) using GPU-accelerated WebGL via Leaflet.g
 ## How
 1. Call `leaflet_webmcp_widget_display({name: "leaflet-webgl-points", params: {center: [48.85, 2.35], zoom: 11, points: [[48.856, 2.352], [48.857, 2.354]], color: "#e74c3c", size: 8}})`
 
-### Example
+## Example
 
 ```json
 {

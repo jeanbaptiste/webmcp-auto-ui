@@ -51,3 +51,8 @@ threejs_webmcp_widget_display({name: "bar-chart-3d", params: {
   ]
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "bar-chart-3d", params: { title: "Q1 Revenue", bars: [{label:"Jan",value:82,color:"#4488ff"},{label:"Feb",value:110,color:"#44cc88"},{label:"Mar",value:95,color:"#ff8844"}], barWidth: 0.6, barDepth: 0.6 }})
+```

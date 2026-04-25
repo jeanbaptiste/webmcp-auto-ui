@@ -53,3 +53,8 @@ Finds and highlights the shortest path between two nodes using Dijkstra's algori
 ## How
 
 1. Call `cytoscape_webmcp_widget_display({name: "shortest-path", params: {elements: [{data: {id: "a", label: "A"}}, {data: {id: "b", label: "B"}}, {data: {id: "c", label: "C"}}, {data: {id: "d", label: "D"}}, {data: {source: "a", target: "b", weight: 1}}, {data: {source: "b", target: "c", weight: 2}}, {data: {source: "a", target: "c", weight: 5}}, {data: {source: "c", target: "d", weight: 1}}], source: "a", target: "d"}})`
+
+## Example
+```
+cytoscape_webmcp_widget_display({name: "shortest-path", params: {elements: [{data: {id: "a", label: "A"}}, {data: {id: "b", label: "B"}}, {data: {id: "c", label: "C"}}, {data: {id: "d", label: "D"}}, {data: {source: "a", target: "b", weight: 1}}, {data: {source: "b", target: "c", weight: 2}}, {data: {source: "a", target: "c", weight: 5}}, {data: {source: "c", target: "d", weight: 1}}], source: "a", target: "d"}})
+```

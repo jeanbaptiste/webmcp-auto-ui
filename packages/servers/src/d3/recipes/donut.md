@@ -44,3 +44,8 @@ Like pie but cleaner, with space in the center for a summary stat (total, percen
 ## Common errors
 - Same as pie: keep slices under 7, all values positive
 - centerText is optional; use it for the most important stat
+
+## Example
+```
+d3_webmcp_widget_display({name: "donut", params: {title: "Revenue by Channel", slices: [{label: "Direct", value: 42}, {label: "Organic", value: 31}, {label: "Referral", value: 18}, {label: "Social", value: 9}], centerText: "$1.2M"}})
+```

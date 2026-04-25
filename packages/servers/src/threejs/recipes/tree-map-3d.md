@@ -46,3 +46,8 @@ threejs_webmcp_widget_display({name: "tree-map-3d", params: {
   ]
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "tree-map-3d", params: { title: "Repo Disk Usage", items: [{label:"node_modules",value:1450,color:"#ff4444"},{label:"dist",value:380,color:"#4488ff"},{label:"src",value:520,color:"#44cc88"},{label:"public",value:210,color:"#ffaa22"},{label:"docs",value:90,color:"#aa88ff"}], maxHeight: 3, gap: 0.1 }})
+```

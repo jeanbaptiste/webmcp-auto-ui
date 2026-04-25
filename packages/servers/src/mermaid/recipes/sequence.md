@@ -32,3 +32,8 @@ Renders a Mermaid sequence diagram. Provide either a raw `definition` string or 
 
 ## How
 1. Call `mermaid_webmcp_widget_display({name: "sequence", params: {definition: "sequenceDiagram\n  Alice->>Bob: Hello\n  Bob-->>Alice: Hi"}})`
+
+## Example
+```
+mermaid_webmcp_widget_display({name: "mermaid-sequence", params: {definition: "sequenceDiagram\n  participant Client\n  participant API\n  participant Auth\n  participant DB\n  Client->>API: POST /login {email, password}\n  API->>Auth: validate(email, password)\n  Auth->>DB: SELECT user WHERE email=?\n  DB-->>Auth: user record\n  Auth-->>API: JWT token\n  API-->>Client: 200 {token}"}})
+```

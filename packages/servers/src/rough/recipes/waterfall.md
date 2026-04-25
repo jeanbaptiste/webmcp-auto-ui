@@ -34,3 +34,8 @@ Sequential bars showing how an initial value is modified by increments.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "waterfall", params: {labels: ["Start","Sales","Returns","Costs","Net"], values: [100,60,-20,-40,0], title: "Profit Breakdown"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-waterfall", params: {labels: ["Start","Sales","Returns","OpEx","Tax","Net"], values: [0,200,-30,-80,-20,0], title: "Q3 Profit Breakdown"}})
+```

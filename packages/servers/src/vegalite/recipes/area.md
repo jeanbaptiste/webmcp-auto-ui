@@ -19,3 +19,8 @@ schema:
 
 ## When to use
 Show magnitude over time, or part-to-whole breakdowns (`stack: 'normalize'` for 100%).
+
+## Example
+```
+vegalite_webmcp_widget_display({name: "vegalite-area", params: { title: "Monthly revenue", values: [{x:"Jan",y:120},{x:"Feb",y:145},{x:"Mar",y:98},{x:"Apr",y:172},{x:"May",y:160}], xLabel: "Month", yLabel: "Revenue (k$)" }})
+```

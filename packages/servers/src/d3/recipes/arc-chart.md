@@ -42,3 +42,8 @@ For showing progress/completion of multiple KPIs in a compact gauge format (CPU 
 ## Common errors
 - `value` should be between 0 and `max`; values are clamped
 - Each arc is a half-circle; for full gauges use donut instead
+
+## Example
+```
+d3_webmcp_widget_display({name: "arc-chart", params: {title: "System Health", arcs: [{label: "CPU", value: 0.72, max: 1}, {label: "Memory", value: 6.4, max: 8}, {label: "Disk", value: 320, max: 500}]}})
+```

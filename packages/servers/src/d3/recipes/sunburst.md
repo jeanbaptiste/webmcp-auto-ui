@@ -37,3 +37,8 @@ For hierarchical data with multiple levels (org charts, file systems, budgets by
 - Data must be a tree with `name` and `children` properties
 - Leaf nodes need a `value` property (non-leaf nodes derive their value from children)
 - Do not create circular references in the tree
+
+## Example
+```
+d3_webmcp_widget_display({name: "sunburst", params: {title: "Company Headcount", root: {name: "Company", children: [{name: "Engineering", children: [{name: "Frontend", value: 12}, {name: "Backend", value: 18}, {name: "DevOps", value: 6}]}, {name: "Product", children: [{name: "Design", value: 8}, {name: "PM", value: 5}]}, {name: "Sales", value: 22}, {name: "Marketing", value: 14}]}}})
+```

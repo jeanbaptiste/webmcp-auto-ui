@@ -48,3 +48,8 @@ Like radial-line but with filled areas — better for comparing overall "area" b
 ## Common errors
 - Same as radial-line: all series must have equal number of points
 - Overlapping areas use transparency; more than 3 series becomes cluttered
+
+## Example
+```
+d3_webmcp_widget_display({name: "radial-area", params: {title: "Product Comparison", labels: ["Performance","Reliability","UX","Price","Support"], series: [{label: "Product A", points: [{value:8},{value:9},{value:7},{value:5},{value:8}]}, {label: "Product B", points: [{value:6},{value:7},{value:9},{value:8},{value:6}]}]}})
+```

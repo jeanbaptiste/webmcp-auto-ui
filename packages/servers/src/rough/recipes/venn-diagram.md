@@ -37,3 +37,8 @@ Overlapping circles representing set sizes and intersections.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "venn-diagram", params: {sets: [{label: "JavaScript", size: 100}, {label: "TypeScript", size: 60}, {label: "Python", size: 80}], title: "Language Skills"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-venn-diagram", params: {sets: [{label: "JavaScript", size: 100}, {label: "TypeScript", size: 60}, {label: "Python", size: 80}], title: "Language Skills"}})
+```

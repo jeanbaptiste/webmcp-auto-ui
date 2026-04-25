@@ -27,3 +27,8 @@ widget_display({name: "canvas2d-heatmap", params: {
   yLabels: ['Morning','Afternoon','Evening']
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-heatmap", params: {title: "Temperature by hour/day", values: [[10,15,20],[12,18,25],[8,14,22]], xLabels: ["Mon","Tue","Wed"], yLabels: ["Morning","Afternoon","Evening"]}})
+```

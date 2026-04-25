@@ -45,3 +45,8 @@ For geographic influence zones, nearest-neighbor visualization, or artistic spac
 ## Common errors
 - Need at least 3 points to form meaningful cells
 - Points at identical coordinates will cause degenerate cells
+
+## Example
+```
+d3_webmcp_widget_display({name: "voronoi", params: {title: "Service Area Zones", points: [{x:15,y:25,label:"Depot A",value:120},{x:60,y:70,label:"Depot B",value:95},{x:85,y:20,label:"Depot C",value:140},{x:35,y:80,label:"Depot D",value:75},{x:70,y:45,label:"Depot E",value:110}]}})
+```

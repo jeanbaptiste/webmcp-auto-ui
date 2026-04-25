@@ -45,3 +45,8 @@ Computes PageRank on the graph and scales node sizes proportionally to their Pag
 ## How
 
 1. Call `cytoscape_webmcp_widget_display({name: "pagerank-graph", params: {elements: [{data: {id: "a", label: "Home"}}, {data: {id: "b", label: "About"}}, {data: {id: "c", label: "Blog"}}, {data: {id: "d", label: "Contact"}}, {data: {source: "a", target: "b"}}, {data: {source: "a", target: "c"}}, {data: {source: "b", target: "a"}}, {data: {source: "c", target: "a"}}, {data: {source: "d", target: "a"}}]}})`
+
+## Example
+```
+cytoscape_webmcp_widget_display({name: "pagerank-graph", params: {elements: [{data: {id: "a", label: "Home"}}, {data: {id: "b", label: "About"}}, {data: {id: "c", label: "Blog"}}, {data: {id: "d", label: "Contact"}}, {data: {source: "a", target: "b"}}, {data: {source: "a", target: "c"}}, {data: {source: "b", target: "a"}}, {data: {source: "c", target: "a"}}, {data: {source: "d", target: "a"}}]}})
+```

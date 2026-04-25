@@ -36,3 +36,8 @@ widget_display({name: "canvas2d-scatter", params: {
   xLabel: 'Sepal length', yLabel: 'Sepal width'
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-scatter", params: {title: "Iris dataset", points: [{x: 5.1, y: 3.5, category: "setosa"}, {x: 7.0, y: 3.2, category: "versicolor"}, {x: 6.3, y: 3.3, category: "virginica"}], xLabel: "Sepal length", yLabel: "Sepal width"}})
+```

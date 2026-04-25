@@ -34,3 +34,8 @@ Half-circle meter with needle indicating current value.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "gauge", params: {value: 72, max: 100, label: "CPU Usage", title: "System Monitor"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-gauge", params: {value: 72, max: 100, label: "CPU Usage", title: "System Monitor"}})
+```

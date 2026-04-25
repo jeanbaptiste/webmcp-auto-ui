@@ -34,3 +34,8 @@ Classic pie chart with hand-drawn arcs and hachure fills.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "pie-chart", params: {labels: ["Desktop","Mobile","Tablet"], values: [55,35,10], title: "Device Usage"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-pie-chart", params: {labels: ["Desktop","Mobile","Tablet"], values: [55,35,10], title: "Device Usage"}})
+```

@@ -37,3 +37,8 @@ Horizontal positions of dots on category rows.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "dot-plot", params: {items: [{label: "Marketing", value: 85}, {label: "Engineering", value: 92}], title: "Team Satisfaction"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-dot-plot", params: {items: [{label: "Marketing", value: 85}, {label: "Engineering", value: 92}, {label: "Design", value: 78}, {label: "Sales", value: 65}], title: "Team Satisfaction"}})
+```

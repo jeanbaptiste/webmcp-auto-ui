@@ -53,3 +53,8 @@ Like line chart but emphasizes volume/magnitude below the line. Good for showing
 ## Common errors
 - Y-axis starts at 0 (unlike line chart which auto-scales)
 - Multiple overlapping areas can be hard to read; use stacked-area instead
+
+## Example
+```
+d3_webmcp_widget_display({name: "area-chart", params: {title: "Monthly Traffic", xLabel: "Month", yLabel: "Visitors", series: [{label: "Organic", points: [{x:1,y:4200},{x:2,y:5100},{x:3,y:4800},{x:4,y:6300},{x:5,y:7100}]}, {label: "Paid", points: [{x:1,y:1800},{x:2,y:2200},{x:3,y:2600},{x:4,y:2400},{x:5,y:3100}]}]}})
+```

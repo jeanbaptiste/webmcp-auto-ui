@@ -73,3 +73,8 @@ threejs_webmcp_widget_display({name: "globe-3d", params: {
   ]
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "globe-3d", params: { title: "Global Offices", points: [{lat:48.86,lon:2.35,label:"Paris",color:"#ff4444"},{lat:40.71,lon:-74.01,label:"New York",color:"#4488ff"},{lat:35.68,lon:139.69,label:"Tokyo",color:"#44cc88"},{lat:-33.87,lon:151.21,label:"Sydney",color:"#ffaa22"}], arcs: [{from:0,to:1,color:"#ff8800"},{from:1,to:2,color:"#00ff88"},{from:2,to:3,color:"#8844ff"}], autoRotate: true }})
+```

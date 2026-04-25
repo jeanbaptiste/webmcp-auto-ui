@@ -38,3 +38,8 @@ Polygon on radial axes, ideal for comparing multiple attributes.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "radar-chart", params: {labels: ["Speed","Power","Range","Durability","Accuracy"], values: [8,6,9,4,7], max: 10, title: "Character Stats"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-radar-chart", params: {labels: ["Speed","Power","Range","Durability","Accuracy"], values: [8,6,9,4,7], max: 10, title: "Character Stats"}})
+```

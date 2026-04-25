@@ -51,3 +51,8 @@ For showing point-level geographic data where size encodes quantity (city popula
 ## Common errors
 - `value` controls circle size via square root scaling
 - Ensure lat/lon are in the correct range (-90 to 90, -180 to 180)
+
+## Example
+```
+d3_webmcp_widget_display({name: "symbol-map", params: {title: "Store Revenue by City", geojson: {type:"FeatureCollection",features:[{type:"Feature",properties:{name:"France"},geometry:{type:"Polygon",coordinates:[[[2,48],[3,48],[3,47],[2,47],[2,48]]]}}]}, points: [{lat:48.85,lon:2.35,label:"Paris",value:2400000},{lat:45.74,lon:4.84,label:"Lyon",value:780000},{lat:43.30,lon:5.37,label:"Marseille",value:620000},{lat:43.60,lon:1.44,label:"Toulouse",value:510000}], projection: "geoMercator"}})
+```

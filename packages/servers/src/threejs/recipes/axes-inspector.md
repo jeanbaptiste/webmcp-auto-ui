@@ -55,3 +55,8 @@ threejs_webmcp_widget_display({name: "axes-inspector", params: {
   ]
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "axes-inspector", params: { title: "Coordinate Frame", range: 4, xLabel: "X", yLabel: "Y", zLabel: "Z", showLabels: true, objects: [{x:1,y:2,z:1,color:"#ff4444",size:0.3},{x:-2,y:1,z:3,color:"#44ff88",size:0.2}] }})
+```

@@ -51,3 +51,8 @@ For comparing totals and their composition across discrete categories (revenue b
 - Each series.values must have the same length as categories
 - All values must be non-negative
 - Set `horizontal: true` for long category labels
+
+## Example
+```
+d3_webmcp_widget_display({name: "stacked-bar", params: {title: "Revenue by Product", xLabel: "Quarter", yLabel: "Revenue ($K)", categories: ["Q1","Q2","Q3","Q4"], series: [{label: "Product A", values: [120,145,132,168]}, {label: "Product B", values: [85,92,108,115]}, {label: "Product C", values: [42,55,61,73]}]}})
+```

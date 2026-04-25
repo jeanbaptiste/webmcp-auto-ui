@@ -36,3 +36,8 @@ threejs_webmcp_widget_display({name: "animated-morph", params: {
   speed: 1.5
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "animated-morph", params: { title: "Morph Demo", fromShape: "box", toShape: "icosahedron", color: "#ff8833", speed: 1.2, scale: 1.0 }})
+```

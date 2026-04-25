@@ -40,3 +40,8 @@ Vertical timeline with date markers and event descriptions.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "timeline", params: {events: [{date: "2024-01", label: "Founded"}, {date: "2024-06", label: "Seed Round"}, {date: "2025-01", label: "Launch"}], title: "Company Milestones"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-timeline", params: {events: [{date: "Jan 2024", label: "Founded", description: "Company incorporated"}, {date: "Jun 2024", label: "Seed Round", description: "$1.2M raised"}, {date: "Jan 2025", label: "Public Launch"}], title: "Company Milestones"}})
+```

@@ -29,3 +29,8 @@ Renders a network packet diagram. Provide either a raw `definition` or structure
 
 ## How
 1. Call `mermaid_webmcp_widget_display({name: "packet", params: {definition: "packet-beta\n  0-15: \"Source Port\"\n  16-31: \"Dest Port\"\n  32-63: \"Sequence Number\""}})`
+
+## Example
+```
+mermaid_webmcp_widget_display({name: "mermaid-packet", params: {definition: "packet-beta\n  title UDP Datagram\n  0-15: \"Source Port\"\n  16-31: \"Destination Port\"\n  32-47: \"Length\"\n  48-63: \"Checksum\"\n  64-95: \"Data (variable)\""}})
+```

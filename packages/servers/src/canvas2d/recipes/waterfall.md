@@ -32,3 +32,8 @@ widget_display({name: "canvas2d-waterfall", params: {
   ]
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-waterfall", params: {title: "Q4 Profit breakdown", items: [{label: "Revenue", value: 500}, {label: "COGS", value: -200}, {label: "OpEx", value: -150}, {label: "Tax", value: -45}]}})
+```

@@ -45,3 +45,8 @@ Distributes nodes evenly to fill the available space while respecting edge conne
 ## How
 
 1. Call `cytoscape_webmcp_widget_display({name: "spread-layout", params: {elements: [{data: {id: "a", label: "A"}}, {data: {id: "b", label: "B"}}, {data: {id: "c", label: "C"}}, {data: {id: "d", label: "D"}}, {data: {id: "e", label: "E"}}, {data: {source: "a", target: "b"}}, {data: {source: "c", target: "d"}}, {data: {source: "d", target: "e"}}]}})`
+
+## Example
+```
+cytoscape_webmcp_widget_display({name: "spread-layout", params: {elements: [{data: {id: "a", label: "A"}}, {data: {id: "b", label: "B"}}, {data: {id: "c", label: "C"}}, {data: {id: "d", label: "D"}}, {data: {id: "e", label: "E"}}, {data: {source: "a", target: "b"}}, {data: {source: "c", target: "d"}}, {data: {source: "d", target: "e"}}]}})
+```

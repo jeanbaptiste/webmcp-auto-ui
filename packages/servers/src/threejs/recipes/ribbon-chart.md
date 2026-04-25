@@ -43,3 +43,8 @@ threejs_webmcp_widget_display({name: "ribbon-chart", params: {
   ribbonWidth: 0.4
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "ribbon-chart", params: { title: "Sales Trends 2024", ribbons: [{points:[{x:0,y:5},{x:1,y:8},{x:2,y:6},{x:3,y:11},{x:4,y:9}],color:"#4488ff"},{points:[{x:0,y:3},{x:1,y:4},{x:2,y:7},{x:3,y:6},{x:4,y:10}],color:"#44cc88"}], ribbonWidth: 0.5 }})
+```

@@ -57,3 +57,8 @@ threejs_webmcp_widget_display({name: "force-graph-3d", params: {
   ]
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "force-graph-3d", params: { title: "Service Dependencies", nodes: [{id:"api",color:"#ff4444",label:"API"},{id:"db",color:"#44ff88",label:"DB"},{id:"cache",color:"#4488ff",label:"Cache"},{id:"auth",color:"#ffaa22",label:"Auth"}], links: [{source:0,target:1},{source:0,target:2},{source:0,target:3},{source:3,target:1}] }})
+```

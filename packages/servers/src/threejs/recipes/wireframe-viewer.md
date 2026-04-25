@@ -45,3 +45,8 @@ threejs_webmcp_widget_display({name: "wireframe-viewer", params: {
   autoRotate: true
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "wireframe-viewer", params: { title: "Icosahedron Wireframe", shape: "icosahedron", color: "#44aaff", scale: 1.8, segments: 1, autoRotate: true }})
+```

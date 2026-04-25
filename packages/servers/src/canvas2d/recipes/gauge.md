@@ -33,3 +33,8 @@ widget_display({name: "canvas2d-gauge", params: {
   label: 'CPU %'
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-gauge", params: {title: "Server load", value: 72, min: 0, max: 100, label: "CPU %"}})
+```

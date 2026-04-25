@@ -15,3 +15,8 @@ schema:
 
 ## When to use
 Explore relationships across many numeric dimensions simultaneously.
+
+## Example
+```
+vegalite_webmcp_widget_display({name: "vegalite-repeat", params: { title: "Iris SPLOM", values: [{sepalLength:5.1,sepalWidth:3.5,petalLength:1.4,species:"setosa"},{sepalLength:6.3,sepalWidth:3.3,petalLength:4.7,species:"versicolor"},{sepalLength:7.1,sepalWidth:3.0,petalLength:5.9,species:"virginica"},{sepalLength:4.9,sepalWidth:3.0,petalLength:1.4,species:"setosa"},{sepalLength:5.8,sepalWidth:2.7,petalLength:4.1,species:"versicolor"}], fields: ["sepalLength","sepalWidth","petalLength"], colorField: "species" }})
+```

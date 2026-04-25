@@ -48,3 +48,8 @@ Renders a force-directed graph with positioning constraints. Uses the Cola layou
 ## How
 
 1. Call `cytoscape_webmcp_widget_display({name: "constrained-layout", params: {elements: [{data: {id: "a", label: "A"}}, {data: {id: "b", label: "B"}}, {data: {id: "c", label: "C"}}, {data: {source: "a", target: "b"}}, {data: {source: "b", target: "c"}}], constraints: [{type: "alignment", axis: "y", offsets: [{node: "a", offset: 0}, {node: "b", offset: 0}]}]}})`
+
+## Example
+```
+cytoscape_webmcp_widget_display({name: "constrained-layout", params: {elements: [{data: {id: "a", label: "A"}}, {data: {id: "b", label: "B"}}, {data: {id: "c", label: "C"}}, {data: {source: "a", target: "b"}}, {data: {source: "b", target: "c"}}], constraints: [{type: "alignment", axis: "y", offsets: [{node: "a", offset: 0}, {node: "b", offset: 0}]}]}})
+```

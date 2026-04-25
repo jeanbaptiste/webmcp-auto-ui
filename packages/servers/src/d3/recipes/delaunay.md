@@ -40,3 +40,8 @@ For mesh generation visualization, computational geometry, or connecting scatter
 ## Common errors
 - Need at least 3 non-collinear points
 - Collinear points produce degenerate triangulations
+
+## Example
+```
+d3_webmcp_widget_display({name: "delaunay", params: {title: "Sensor Network Mesh", points: [{x:10,y:20,label:"S1"},{x:50,y:60,label:"S2"},{x:80,y:30,label:"S3"},{x:40,y:80,label:"S4"},{x:70,y:90,label:"S5"},{x:20,y:55,label:"S6"}]}})
+```

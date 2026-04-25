@@ -38,3 +38,8 @@ threejs_webmcp_widget_display({name: "particle-system", params: {
   speed: 2
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "particle-system", params: { title: "Vortex Effect", count: 2500, color: "#44ccff", pattern: "vortex", speed: 1.5, spread: 3, particleSize: 0.03 }})
+```

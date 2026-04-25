@@ -32,3 +32,8 @@ widget_display({name: "canvas2d-pie", params: {
   ]
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-pie", params: {title: "Market share", slices: [{label: "Chrome", value: 65}, {label: "Firefox", value: 15}, {label: "Safari", value: 12}, {label: "Other", value: 8}]}})
+```

@@ -23,3 +23,8 @@ Compact line chart (200x60px) for inline trend visualization.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "sparkline", params: {values: [5,8,3,12,7,10,15]}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-sparkline", params: {values: [5,8,3,12,7,10,15]}})
+```

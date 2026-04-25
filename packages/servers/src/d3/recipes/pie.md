@@ -38,3 +38,8 @@ For showing part-to-whole relationships with few categories (3-7 ideal). Use don
 ## Common errors
 - Too many slices (>7) make the chart unreadable; group small values into "Other"
 - All values must be positive
+
+## Example
+```
+d3_webmcp_widget_display({name: "pie", params: {title: "Market Share 2024", slices: [{label: "Chrome", value: 65}, {label: "Safari", value: 19}, {label: "Firefox", value: 4}, {label: "Edge", value: 4}, {label: "Other", value: 8}]}})
+```

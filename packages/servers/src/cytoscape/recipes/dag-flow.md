@@ -45,3 +45,8 @@ Renders a directed acyclic graph (DAG) with a top-to-bottom flow using the Dagre
 ## How
 
 1. Call `cytoscape_webmcp_widget_display({name: "dag-flow", params: {elements: [{data: {id: "start", label: "Start"}}, {data: {id: "process", label: "Process"}}, {data: {id: "review", label: "Review"}}, {data: {id: "end", label: "End"}}, {data: {source: "start", target: "process"}}, {data: {source: "process", target: "review"}}, {data: {source: "review", target: "end"}}]}})`
+
+## Example
+```
+cytoscape_webmcp_widget_display({name: "dag-flow", params: {elements: [{data: {id: "start", label: "Start"}}, {data: {id: "process", label: "Process"}}, {data: {id: "review", label: "Review"}}, {data: {id: "end", label: "End"}}, {data: {source: "start", target: "process"}}, {data: {source: "process", target: "review"}}, {data: {source: "review", target: "end"}}]}})
+```

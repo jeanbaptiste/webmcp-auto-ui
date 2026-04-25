@@ -42,3 +42,8 @@ threejs_webmcp_widget_display({name: "mesh-viewer", params: {
   wireframe: true
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "mesh-viewer", params: { title: "Octahedron", vertices: [0,1,0, -1,0,0, 0,0,1, 1,0,0, 0,0,-1, 0,-1,0], faces: [0,1,2, 0,2,3, 0,3,4, 0,4,1, 5,2,1, 5,3,2, 5,4,3, 5,1,4], color: "#6699cc", flatShading: true, autoCenter: true }})
+```

@@ -29,3 +29,8 @@ widget_display({name: "canvas2d-correlation", params: {
   ]
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-correlation", params: {title: "Feature correlations", labels: ["height", "weight", "age"], matrix: [[1.0, 0.8, 0.2], [0.8, 1.0, 0.3], [0.2, 0.3, 1.0]]}})
+```

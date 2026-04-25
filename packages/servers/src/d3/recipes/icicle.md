@@ -39,3 +39,8 @@ Like sunburst but rectangular — easier to read labels. Good for file system vi
 ## Common errors
 - Same tree structure as treemap/sunburst
 - Leaf nodes must have `value`
+
+## Example
+```
+d3_webmcp_widget_display({name: "icicle", params: {title: "Budget Breakdown", root: {name: "Total", children: [{name: "Engineering", children: [{name: "Salaries", value: 800}, {name: "Tools", value: 120}, {name: "Cloud", value: 200}]}, {name: "Marketing", children: [{name: "Ads", value: 350}, {name: "Events", value: 150}]}, {name: "Operations", value: 180}]}}})
+```

@@ -14,3 +14,8 @@ schema:
 
 ## When to use
 Show intensity across two categorical dimensions (correlation matrix, calendar heatmap, etc).
+
+## Example
+```
+vegalite_webmcp_widget_display({name: "vegalite-heatmap", params: { title: "Error rate by hour & day", values: [{x:"Mon",y:"09h",value:5},{x:"Mon",y:"14h",value:12},{x:"Tue",y:"09h",value:3},{x:"Tue",y:"14h",value:8},{x:"Wed",y:"09h",value:15},{x:"Wed",y:"14h",value:2}], scheme: "reds", xLabel: "Day", yLabel: "Hour" }})
+```

@@ -37,3 +37,8 @@ For hierarchical clustering results, phylogenetic trees, or any dendrogram where
 ## Common errors
 - Unlike tree, dendrogram aligns all leaves at the same radius/x-position
 - Set `radial: false` for a traditional linear dendrogram
+
+## Example
+```
+d3_webmcp_widget_display({name: "dendrogram", params: {title: "Species Clustering", root: {name: "Animalia", children: [{name: "Mammals", children: [{name: "Primates", children: [{name: "Human"}, {name: "Chimp"}]}, {name: "Rodents", children: [{name: "Mouse"}, {name: "Rat"}]}]}, {name: "Birds", children: [{name: "Passerines", children: [{name: "Sparrow"}, {name: "Robin"}]}, {name: "Raptors", children: [{name: "Eagle"}]}]}]}, radial: true}})
+```

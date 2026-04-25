@@ -14,3 +14,8 @@ schema:
 
 ## When to use
 Compare the same chart across subgroups side by side.
+
+## Example
+```
+vegalite_webmcp_widget_display({name: "vegalite-facet", params: { title: "Sales by region", values: [{x:"Jan",y:30,series:"North"},{x:"Feb",y:45,series:"North"},{x:"Jan",y:20,series:"South"},{x:"Feb",y:35,series:"South"},{x:"Jan",y:50,series:"West"},{x:"Feb",y:60,series:"West"}], mark: "bar", facetField: "series", columns: 3 }})
+```

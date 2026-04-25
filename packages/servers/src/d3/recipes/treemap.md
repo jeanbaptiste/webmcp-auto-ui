@@ -40,3 +40,8 @@ For hierarchical data where you want to compare leaf sizes (disk usage, budget b
 - Leaf nodes must have a `value` property
 - Non-leaf nodes derive value from children; do not set `value` on non-leaf nodes
 - Very deep hierarchies (>5 levels) become hard to read; consider sunburst instead
+
+## Example
+```
+d3_webmcp_widget_display({name: "treemap", params: {title: "Disk Usage (GB)", root: {name: "Home", children: [{name: "Projects", children: [{name: "webmcp", value: 4.2}, {name: "blog", value: 1.8}, {name: "archive", value: 12.5}]}, {name: "Downloads", value: 8.7}, {name: "Photos", value: 24.3}, {name: "Documents", children: [{name: "Work", value: 3.1}, {name: "Personal", value: 1.4}]}]}}})
+```

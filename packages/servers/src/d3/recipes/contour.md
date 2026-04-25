@@ -40,3 +40,8 @@ For showing density/concentration of scattered 2D data (event hotspots, populati
 - Points are `[x, y]` arrays, not objects
 - Bandwidth controls smoothness: smaller = more detail, larger = smoother
 - Need enough points (>20) for meaningful density estimation
+
+## Example
+```
+d3_webmcp_widget_display({name: "contour", params: {title: "Click Heatmap", points: [[120,80],[125,82],[118,79],[122,85],[310,200],[315,198],[308,202],[312,205],[313,197],[160,300],[155,305],[162,298],[158,302]], bandwidth: 18, thresholds: 8}})
+```

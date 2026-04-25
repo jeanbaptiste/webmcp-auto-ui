@@ -33,3 +33,8 @@ widget_display({name: "canvas2d-treemap", params: {
   }
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-treemap", params: {title: "Disk usage", root: {name: "root", children: [{name: "src", value: 400}, {name: "node_modules", value: 800}, {name: "assets", value: 200}]}}})
+```

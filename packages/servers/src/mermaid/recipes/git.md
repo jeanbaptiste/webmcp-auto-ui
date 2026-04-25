@@ -34,3 +34,8 @@ Renders a git graph. Provide either a raw `definition` or an `actions` array des
 
 ## How
 1. Call `mermaid_webmcp_widget_display({name: "git", params: {definition: "gitGraph\n  commit\n  branch feature\n  checkout feature\n  commit\n  checkout main\n  merge feature"}})`
+
+## Example
+```
+mermaid_webmcp_widget_display({name: "mermaid-git", params: {definition: "gitGraph\n  commit id: \"init\"\n  branch develop\n  checkout develop\n  commit id: \"feat: add login\"\n  commit id: \"feat: add signup\"\n  branch hotfix\n  checkout hotfix\n  commit id: \"fix: XSS\"\n  checkout main\n  merge hotfix tag: \"v1.0.1\"\n  checkout develop\n  merge main\n  checkout main\n  merge develop tag: \"v1.1.0\""}})
+```

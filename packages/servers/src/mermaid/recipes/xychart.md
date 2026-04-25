@@ -45,3 +45,8 @@ Renders an XY chart with bar and/or line series. Provide either a raw `definitio
 
 ## How
 1. Call `mermaid_webmcp_widget_display({name: "xychart", params: {definition: "xychart-beta\n  title Sales\n  x-axis [Q1, Q2, Q3, Q4]\n  y-axis \"Revenue\"\n  bar [10, 25, 15, 30]\n  line [10, 25, 15, 30]"}})`
+
+## Example
+```
+mermaid_webmcp_widget_display({name: "mermaid-xychart", params: {definition: "xychart-beta\n  title Monthly Active Users 2025\n  x-axis [Jan, Feb, Mar, Apr, May, Jun]\n  y-axis \"Users (k)\" 0 --> 100\n  bar [42, 48, 55, 61, 70, 78]\n  line [42, 48, 55, 61, 70, 78]"}})
+```

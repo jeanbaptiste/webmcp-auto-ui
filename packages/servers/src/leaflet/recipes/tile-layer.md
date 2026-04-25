@@ -28,7 +28,7 @@ Renders a Leaflet map with a custom XYZ tile layer. If no URL is provided, falls
 ## How
 1. Call `leaflet_webmcp_widget_display({name: "leaflet-tile-layer", params: {center: [48.85, 2.35], zoom: 13, url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"}})`
 
-### Example
+## Example
 
 ```json
 {

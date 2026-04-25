@@ -53,3 +53,8 @@ For scatter plots with many points where precise hover detection matters. Vorono
 - Works best with >10 points
 - `showVoronoi: true` is useful for debugging but clutters the visualization
 - For few points, a regular scatter plot suffices
+
+## Example
+```
+d3_webmcp_widget_display({name: "scatter-voronoi", params: {title: "Height vs Weight", xLabel: "Height (cm)", yLabel: "Weight (kg)", points: [{x:162,y:58,label:"Alice",group:1},{x:175,y:72,label:"Bob",group:2},{x:168,y:65,label:"Carol",group:1},{x:182,y:88,label:"Dave",group:2},{x:155,y:52,label:"Eve",group:1},{x:178,y:80,label:"Frank",group:2},{x:165,y:61,label:"Grace",group:1},{x:190,y:95,label:"Hank",group:2}]}})
+```

@@ -39,3 +39,8 @@ For hierarchical data where nesting relationships matter more than exact size co
 ## Common errors
 - Leaf nodes must have a `value` property
 - Circle packing wastes more space than treemap; use treemap for precise comparisons
+
+## Example
+```
+d3_webmcp_widget_display({name: "circle-pack", params: {title: "Repository Size (KB)", root: {name: "repo", children: [{name: "src", children: [{name: "components", value: 420}, {name: "utils", value: 180}, {name: "hooks", value: 95}]}, {name: "tests", value: 210}, {name: "docs", value: 130}]}}})
+```

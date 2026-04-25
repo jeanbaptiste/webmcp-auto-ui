@@ -34,3 +34,8 @@ Step function chart — horizontal segments connected by vertical jumps.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "step-chart", params: {labels: ["Jan","Feb","Mar","Apr"], values: [10,10,25,25], title: "Pricing Tiers"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-step-chart", params: {labels: ["Jan","Feb","Mar","Apr","May"], values: [10,10,25,25,40], title: "Pricing Tiers"}})
+```

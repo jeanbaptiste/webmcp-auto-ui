@@ -43,3 +43,8 @@ Hierarchical tree structure with nodes and connecting lines.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "tree-diagram", params: {root: {label: "CEO", children: [{label: "CTO"}, {label: "CFO"}]}, title: "Org Chart"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-tree-diagram", params: {root: {label: "CEO", children: [{label: "CTO", children: [{label: "Backend"}, {label: "Frontend"}]}, {label: "CFO"}, {label: "CMO"}]}, title: "Org Chart"}})
+```

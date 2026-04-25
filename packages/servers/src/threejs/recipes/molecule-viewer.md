@@ -64,3 +64,8 @@ threejs_webmcp_widget_display({name: "molecule-viewer", params: {
   ]
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "molecule-viewer", params: { title: "Methane (CH4)", atoms: [{x:0,y:0,z:0,element:"C"},{x:0.63,y:0.63,z:0.63,element:"H"},{x:-0.63,y:-0.63,z:0.63,element:"H"},{x:-0.63,y:0.63,z:-0.63,element:"H"},{x:0.63,y:-0.63,z:-0.63,element:"H"}], bonds: [{from:0,to:1},{from:0,to:2},{from:0,to:3},{from:0,to:4}] }})
+```

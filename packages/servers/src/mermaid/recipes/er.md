@@ -48,3 +48,8 @@ Renders an Entity-Relationship diagram. Provide either a raw `definition` or str
 
 ## How
 1. Call `mermaid_webmcp_widget_display({name: "er", params: {definition: "erDiagram\n  CUSTOMER ||--o{ ORDER : places\n  ORDER ||--|{ LINE-ITEM : contains"}})`
+
+## Example
+```
+mermaid_webmcp_widget_display({name: "mermaid-er", params: {definition: "erDiagram\n  USER {\n    int id PK\n    string email\n    string name\n  }\n  POST {\n    int id PK\n    string title\n    string body\n    int userId FK\n  }\n  COMMENT {\n    int id PK\n    string text\n    int postId FK\n  }\n  USER ||--o{ POST : writes\n  POST ||--o{ COMMENT : receives"}})
+```

@@ -32,7 +32,7 @@ Calculates and displays the optimal route between waypoints using OSRM (Open Sou
 ## How
 1. Call `leaflet_webmcp_widget_display({name: "leaflet-routing", params: {center: [48.85, 2.35], zoom: 13, waypoints: [[48.8566, 2.3522], [48.8606, 2.3376]], profile: "driving"}})`
 
-### Example
+## Example
 
 ```json
 {

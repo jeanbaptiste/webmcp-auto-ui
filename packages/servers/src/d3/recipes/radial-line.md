@@ -48,3 +48,8 @@ For comparing multiple entities across several dimensions (skill radar, product 
 ## Common errors
 - All series must have the same number of points (matching labels length)
 - Values should be on a comparable scale (normalize if needed)
+
+## Example
+```
+d3_webmcp_widget_display({name: "radial-line", params: {title: "Athlete Skills", labels: ["Speed","Strength","Endurance","Agility","Technique"], series: [{label: "Sprinter", points: [{value:10},{value:7},{value:5},{value:9},{value:8}]}, {label: "Marathon", points: [{value:8},{value:5},{value:10},{value:6},{value:7}]}]}})
+```

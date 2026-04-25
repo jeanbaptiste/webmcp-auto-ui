@@ -46,3 +46,8 @@ threejs_webmcp_widget_display({name: "shadow-scene", params: {
   ]
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "shadow-scene", params: { title: "Object Composition", objects: [{shape:"sphere",x:0,y:1,z:0,color:"#4488ff",size:1},{shape:"box",x:2.5,y:0.5,z:0,color:"#ff4488",size:1},{shape:"cone",x:-2,y:0.8,z:1,color:"#44cc88",size:0.8},{shape:"torus",x:0,y:2.5,z:-1,color:"#ffaa22",size:0.7}], groundColor: "#cccccc", lightColor: "#ffffff" }})
+```

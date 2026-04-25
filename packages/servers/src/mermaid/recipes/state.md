@@ -29,3 +29,8 @@ Renders a Mermaid state diagram (v2). Provide either a raw `definition` or struc
 
 ## How
 1. Call `mermaid_webmcp_widget_display({name: "state", params: {definition: "stateDiagram-v2\n  [*] --> Idle\n  Idle --> Running : start\n  Running --> Idle : stop"}})`
+
+## Example
+```
+mermaid_webmcp_widget_display({name: "mermaid-state", params: {definition: "stateDiagram-v2\n  [*] --> Draft\n  Draft --> Review : submit\n  Review --> Approved : approve\n  Review --> Draft : request changes\n  Approved --> Published : publish\n  Published --> Archived : archive\n  Archived --> [*]"}})
+```

@@ -41,3 +41,8 @@ Horizontal bars representing task durations and overlaps.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "gantt", params: {tasks: [{name: "Research", start: 0, end: 3}, {name: "Design", start: 2, end: 5}, {name: "Dev", start: 4, end: 9}], title: "Project Timeline"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-gantt", params: {tasks: [{name: "Research", start: 0, end: 3}, {name: "Design", start: 2, end: 5}, {name: "Development", start: 4, end: 10}, {name: "Testing", start: 9, end: 12}], title: "Q2 Project Plan"}})
+```

@@ -35,7 +35,7 @@ Colors polygons by a numeric property to show geographic distribution. Includes 
 ## How
 1. Call `leaflet_webmcp_widget_display({name: "leaflet-choropleth", params: {center: [47.0, 2.0], zoom: 5, geojson: {type: "FeatureCollection", features: []}, valueProperty: "population", steps: 5, colors: ["#ffffcc", "#41b6c4", "#253494"], legend: true}})`
 
-### Example
+## Example
 
 ```json
 {

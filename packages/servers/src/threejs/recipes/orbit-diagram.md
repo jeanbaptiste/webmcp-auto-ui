@@ -53,3 +53,8 @@ threejs_webmcp_widget_display({name: "orbit-diagram", params: {
   ]
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "orbit-diagram", params: { title: "Inner Solar System", centralBody: {radius:0.5,color:"#ffdd00"}, orbits: [{radius:1.2,color:"#aaaaaa",planetRadius:0.07,speed:2.4},{radius:2.0,color:"#44aaff",planetRadius:0.10,speed:1.0},{radius:3.2,color:"#ff4422",planetRadius:0.09,speed:0.5}], animate: true }})
+```

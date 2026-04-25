@@ -53,3 +53,8 @@ For time series, trends, and comparing multiple series over a continuous axis.
 ## Common errors
 - Points must be sorted by x for line to render correctly
 - Use `curve: "step"` for discrete data, `"natural"` for smooth trends
+
+## Example
+```
+d3_webmcp_widget_display({name: "line-chart", params: {title: "Monthly Revenue", xLabel: "Month", yLabel: "Revenue ($K)", series: [{label: "2024", points: [{x:1,y:82},{x:2,y:95},{x:3,y:88},{x:4,y:110},{x:5,y:124},{x:6,y:137}]}, {label: "2023", points: [{x:1,y:61},{x:2,y:74},{x:3,y:70},{x:4,y:85},{x:5,y:91},{x:6,y:103}]}]}})
+```

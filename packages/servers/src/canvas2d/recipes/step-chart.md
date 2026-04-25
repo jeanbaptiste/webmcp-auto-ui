@@ -23,3 +23,8 @@ widget_display({name: "canvas2d-step-chart", params: {
   labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul']
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-step-chart", params: {title: "Pricing tiers", values: [10, 10, 15, 15, 20, 25, 25], labels: ["Jan","Feb","Mar","Apr","May","Jun","Jul"]}})
+```

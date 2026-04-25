@@ -36,3 +36,8 @@ threejs_webmcp_widget_display({name: "skybox-panorama", params: {
   starCount: 300
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "skybox-panorama", params: { title: "Night Sky", topColor: "#000011", horizonColor: "#112244", bottomColor: "#001122", starCount: 500, showGround: true, autoRotate: true }})
+```

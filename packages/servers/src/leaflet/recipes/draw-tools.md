@@ -38,7 +38,7 @@ Adds interactive drawing controls to the map. Users can draw polygons, polylines
 ## How
 1. Call `leaflet_webmcp_widget_display({name: "leaflet-draw-tools", params: {center: [48.85, 2.35], zoom: 14, draw: {polygon: true, polyline: true, circle: true, marker: true}, edit: true}})`
 
-### Example
+## Example
 
 ```json
 {

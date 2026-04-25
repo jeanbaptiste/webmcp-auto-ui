@@ -39,3 +39,8 @@ Renders a block diagram. Provide either a raw `definition` or structured `blocks
 
 ## How
 1. Call `mermaid_webmcp_widget_display({name: "block", params: {definition: "block-beta\n  columns 3\n  a[\"A\"] b[\"B\"] c[\"C\"]\n  a --> b"}})`
+
+## Example
+```
+mermaid_webmcp_widget_display({name: "mermaid-block", params: {definition: "block-beta\n  columns 3\n  ui[\"UI Layer\"]\n  api[\"API Layer\"]\n  db[(\"Database\")]\n  ui --> api\n  api --> db"}})
+```

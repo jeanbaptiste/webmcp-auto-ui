@@ -40,3 +40,8 @@ Multiple horizontal bars showing completion toward a goal.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "progress-bar", params: {items: [{label: "Backend", value: 85}, {label: "Frontend", value: 60}], title: "Sprint Progress"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-progress-bar", params: {items: [{label: "Backend", value: 85}, {label: "Frontend", value: 60}, {label: "Tests", value: 40}, {label: "Docs", value: 20}], title: "Sprint Progress"}})
+```

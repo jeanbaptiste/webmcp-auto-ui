@@ -15,3 +15,8 @@ schema:
 
 ## When to use
 Overlay thresholds or reference values. Often layered on top of other marks.
+
+## Example
+```
+vegalite_webmcp_widget_display({name: "vegalite-rule", params: { title: "SLA thresholds", values: [{y:200},{y:500}], orientation: "h", color: "red", yLabel: "Latency (ms)" }})
+```

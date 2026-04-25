@@ -16,3 +16,8 @@ schema:
 
 ## When to use
 Display regions coloured by a metric (requires a TopoJSON / GeoJSON input).
+
+## Example
+```
+vegalite_webmcp_widget_display({name: "vegalite-geoshape", params: { title: "Population by country", topojson: <TopoJSON object>, feature: "countries", valueField: "population", projection: "naturalEarth1", scheme: "blues" }})
+```

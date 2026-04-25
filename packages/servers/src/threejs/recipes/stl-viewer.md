@@ -46,3 +46,8 @@ threejs_webmcp_widget_display({name: "stl-viewer", params: {
   color: "#8899bb"
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "stl-viewer", params: { title: "Wedge Part", triangles: [[[0,0,0],[2,0,0],[1,1,0]],[[0,0,0],[1,1,0],[0.5,0.5,1.5]],[[2,0,0],[1,1,0],[1.5,0.5,1.5]],[[0,0,0],[2,0,0],[1,0,1.5]],[[0,0,0],[0.5,0.5,1.5],[1,0,1.5]],[[2,0,0],[1,0,1.5],[1.5,0.5,1.5]]], color: "#779abb" }})
+```

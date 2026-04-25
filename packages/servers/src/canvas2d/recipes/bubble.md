@@ -33,3 +33,8 @@ widget_display({name: "canvas2d-bubble", params: {
   ]
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-bubble", params: {title: "GDP vs Life expectancy", points: [{x: 45000, y: 78, r: 330, category: "US"}, {x: 12000, y: 75, r: 1400, category: "China"}, {x: 8000, y: 72, r: 200, category: "Brazil"}]}})
+```

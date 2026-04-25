@@ -34,3 +34,8 @@ Pie chart with a hole in the center, displaying the total sum.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "donut-chart", params: {labels: ["Rent","Food","Transport"], values: [1200,400,200], title: "Monthly Budget"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-donut-chart", params: {labels: ["Rent","Food","Transport","Savings"], values: [1200,400,200,300], title: "Monthly Budget"}})
+```

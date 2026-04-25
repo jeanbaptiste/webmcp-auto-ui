@@ -47,3 +47,8 @@ Runs a continuous physics simulation where nodes can be dragged and the layout r
 ## How
 
 1. Call `cytoscape_webmcp_widget_display({name: "physics-simulation", params: {elements: [{data: {id: "a", label: "A", mass: 2}}, {data: {id: "b", label: "B", mass: 1}}, {data: {id: "c", label: "C", mass: 1}}, {data: {source: "a", target: "b"}}, {data: {source: "b", target: "c"}}, {data: {source: "a", target: "c"}}]}})`
+
+## Example
+```
+cytoscape_webmcp_widget_display({name: "physics-simulation", params: {elements: [{data: {id: "a", label: "A", mass: 2}}, {data: {id: "b", label: "B", mass: 1}}, {data: {id: "c", label: "C", mass: 1}}, {data: {source: "a", target: "b"}}, {data: {source: "b", target: "c"}}, {data: {source: "a", target: "c"}}]}})
+```

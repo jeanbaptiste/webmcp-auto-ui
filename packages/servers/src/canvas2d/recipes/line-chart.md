@@ -31,3 +31,8 @@ widget_display({name: "canvas2d-line-chart", params: {
   ]
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-line-chart", params: {title: "Monthly users", series: [{name: "Desktop", values: [100,120,115,140,160]}, {name: "Mobile", values: [80,95,110,130,150]}]}})
+```

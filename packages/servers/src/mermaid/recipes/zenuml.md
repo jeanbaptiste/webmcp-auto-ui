@@ -26,3 +26,8 @@ Renders a ZenUML diagram. Provide either a raw `definition` or structured `messa
 
 ## How
 1. Call `mermaid_webmcp_widget_display({name: "zenuml", params: {definition: "zenuml\n  Client.call() {\n    Server.process() {\n      DB.query()\n    }\n  }"}})`
+
+## Example
+```
+mermaid_webmcp_widget_display({name: "mermaid-zenuml", params: {definition: "zenuml\n  Browser.fetchPage() {\n    CDN.getAsset() {\n      @return cachedAsset\n    }\n    API.getData() {\n      AuthService.verify() {\n        @return token\n      }\n      DB.query() {\n        @return rows\n      }\n      @return json\n    }\n  }"}})
+```

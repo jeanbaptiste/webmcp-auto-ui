@@ -43,3 +43,8 @@ Grid of cells colored by intensity value.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "heatmap", params: {rows: ["Mon","Tue","Wed"], cols: ["9am","12pm","3pm"], values: [[2,5,8],[4,7,6],[1,9,5]], title: "Activity Heatmap"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-heatmap", params: {rows: ["Mon","Tue","Wed","Thu"], cols: ["9am","12pm","3pm","6pm"], values: [[2,5,8,3],[4,7,6,9],[1,9,5,7],[3,6,4,8]], title: "Hourly Activity"}})
+```

@@ -41,3 +41,8 @@ Data points with vertical error bars indicating uncertainty.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "error-bar", params: {points: [{label: "Exp 1", value: 45, error: 8}, {label: "Exp 2", value: 52, error: 5}], title: "Measurement Uncertainty"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-error-bar", params: {points: [{label: "Control", value: 45, error: 8}, {label: "Treatment A", value: 62, error: 5}, {label: "Treatment B", value: 58, error: 10}], title: "Experiment Results"}})
+```

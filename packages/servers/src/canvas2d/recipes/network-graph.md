@@ -41,3 +41,8 @@ widget_display({name: "canvas2d-network-graph", params: {
   edges: [{ source: 'a', target: 'b' }, { source: 'b', target: 'c' }]
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-network-graph", params: {title: "Team connections", nodes: [{id: "a", label: "Alice", group: 0}, {id: "b", label: "Bob", group: 0}, {id: "c", label: "Charlie", group: 1}], edges: [{source: "a", target: "b"}, {source: "b", target: "c"}]}})
+```

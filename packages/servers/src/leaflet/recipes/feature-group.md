@@ -37,7 +37,7 @@ A collection of mixed features (markers, circles, polygons, polylines) displayed
 ## How
 1. Call `leaflet_webmcp_widget_display({name: "leaflet-feature-group", params: {features: [{type: "marker", latlng: [48.856, 2.352], popup: "POI"}, {type: "circle", latlng: [48.858, 2.355], radius: 300, color: "#e74c3c"}]}})`
 
-### Example
+## Example
 
 ```json
 {

@@ -45,3 +45,8 @@ Renders a hierarchical tree using the Dagre layout engine. Ideal for org charts,
 ## How
 
 1. Call `cytoscape_webmcp_widget_display({name: "tree-hierarchy", params: {elements: [{data: {id: "ceo", label: "CEO"}}, {data: {id: "cto", label: "CTO"}}, {data: {id: "cfo", label: "CFO"}}, {data: {id: "dev", label: "Dev Lead"}}, {data: {source: "ceo", target: "cto"}}, {data: {source: "ceo", target: "cfo"}}, {data: {source: "cto", target: "dev"}}]}})`
+
+## Example
+```
+cytoscape_webmcp_widget_display({name: "tree-hierarchy", params: {elements: [{data: {id: "ceo", label: "CEO"}}, {data: {id: "cto", label: "CTO"}}, {data: {id: "cfo", label: "CFO"}}, {data: {id: "dev", label: "Dev Lead"}}, {data: {source: "ceo", target: "cto"}}, {data: {source: "ceo", target: "cfo"}}, {data: {source: "cto", target: "dev"}}]}})
+```

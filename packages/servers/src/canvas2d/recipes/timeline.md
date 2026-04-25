@@ -33,3 +33,8 @@ widget_display({name: "canvas2d-timeline", params: {
   ]
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-timeline", params: {title: "Project phases", events: [{label: "Design", start: 0, end: 3, category: "plan"}, {label: "Dev", start: 2, end: 8, category: "build"}, {label: "Test", start: 7, end: 10, category: "qa"}]}})
+```

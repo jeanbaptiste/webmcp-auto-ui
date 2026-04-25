@@ -24,3 +24,8 @@ widget_display({name: "canvas2d-bar-chart", params: {
   labels: ['Q1', 'Q2', 'Q3', 'Q4']
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-bar-chart", params: {title: "Sales by quarter", values: [120, 200, 150, 280], labels: ["Q1", "Q2", "Q3", "Q4"]}})
+```

@@ -48,3 +48,8 @@ Weighted flow between source and target nodes.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "sankey", params: {nodes: ["Budget","Marketing","Engineering"], links: [{source: 0, target: 1, value: 40}, {source: 0, target: 2, value: 50}], title: "Budget Allocation"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-sankey", params: {nodes: ["Revenue","Marketing","Engineering","Ops"], links: [{source: 0, target: 1, value: 40}, {source: 0, target: 2, value: 80}, {source: 0, target: 3, value: 30}], title: "Budget Allocation"}})
+```

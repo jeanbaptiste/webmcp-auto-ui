@@ -45,3 +45,8 @@ Renders all nodes in a circle with edges drawn between them. Useful for showing 
 ## How
 
 1. Call `cytoscape_webmcp_widget_display({name: "circle-graph", params: {elements: [{data: {id: "a", label: "Alice"}}, {data: {id: "b", label: "Bob"}}, {data: {id: "c", label: "Carol"}}, {data: {id: "d", label: "Dave"}}, {data: {source: "a", target: "b"}}, {data: {source: "b", target: "c"}}, {data: {source: "c", target: "d"}}, {data: {source: "d", target: "a"}}]}})`
+
+## Example
+```
+cytoscape_webmcp_widget_display({name: "circle-graph", params: {elements: [{data: {id: "a", label: "Alice"}}, {data: {id: "b", label: "Bob"}}, {data: {id: "c", label: "Carol"}}, {data: {id: "d", label: "Dave"}}, {data: {source: "a", target: "b"}}, {data: {source: "b", target: "c"}}, {data: {source: "c", target: "d"}}, {data: {source: "d", target: "a"}}]}})
+```

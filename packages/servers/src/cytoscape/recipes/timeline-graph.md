@@ -48,3 +48,8 @@ Positions nodes along a horizontal timeline based on their `time` data value. Ed
 ## How
 
 1. Call `cytoscape_webmcp_widget_display({name: "timeline-graph", params: {elements: [{data: {id: "a", label: "Design", time: 1}}, {data: {id: "b", label: "Develop", time: 2}}, {data: {id: "c", label: "Test", time: 3}}, {data: {id: "d", label: "Deploy", time: 4}}, {data: {source: "a", target: "b"}}, {data: {source: "b", target: "c"}}, {data: {source: "c", target: "d"}}]}})`
+
+## Example
+```
+cytoscape_webmcp_widget_display({name: "timeline-graph", params: {elements: [{data: {id: "a", label: "Design", time: 1}}, {data: {id: "b", label: "Develop", time: 2}}, {data: {id: "c", label: "Test", time: 3}}, {data: {id: "d", label: "Deploy", time: 4}}, {data: {source: "a", target: "b"}}, {data: {source: "b", target: "c"}}, {data: {source: "c", target: "d"}}]}})
+```

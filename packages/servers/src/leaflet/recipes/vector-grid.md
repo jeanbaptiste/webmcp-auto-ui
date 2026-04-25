@@ -28,7 +28,7 @@ Renders Mapbox Vector Tiles (MVT/PBF) using the Leaflet.VectorGrid plugin. Suppo
 ## How
 1. Call `leaflet_webmcp_widget_display({name: "leaflet-vector-grid", params: {center: [48.85, 2.35], zoom: 14, url: "https://tiles.example.com/{z}/{x}/{y}.pbf"}})`
 
-### Example
+## Example
 
 ```json
 {

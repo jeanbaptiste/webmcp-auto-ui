@@ -40,3 +40,8 @@ For showing hot spots in 2D data as a pixelated heatmap. Faster and simpler than
 - Points are `[x, y]` arrays
 - Too many bins with few points creates sparse/empty grids
 - Too few bins loses detail
+
+## Example
+```
+d3_webmcp_widget_display({name: "density-map", params: {title: "Event Hotspots", points: [[1.1,2.0],[1.2,2.1],[1.0,1.9],[1.3,2.2],[1.1,2.0],[5.5,6.0],[5.6,5.9],[5.4,6.1],[5.5,6.2],[5.7,5.8],[3.0,8.0],[3.1,7.9],[2.9,8.1]], binsX: 20, binsY: 20, colorScheme: "YlOrRd"}})
+```

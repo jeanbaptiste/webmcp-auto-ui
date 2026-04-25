@@ -28,7 +28,7 @@ Places an image on the map anchored to geographic bounds. Useful for historical 
 ## How
 1. Call `leaflet_webmcp_widget_display({name: "leaflet-image-overlay", params: {imageUrl: "https://example.com/map.png", bounds: [[48.83, 2.30], [48.88, 2.40]], opacity: 0.6}})`
 
-### Example
+## Example
 
 ```json
 {

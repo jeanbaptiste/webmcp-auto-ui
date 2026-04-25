@@ -40,3 +40,8 @@ threejs_webmcp_widget_display({name: "surface-plot", params: {
   colorHigh: "#ff0000"
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "surface-plot", params: { title: "Gaussian Surface", zValues: [[0.1,0.3,0.6,0.3,0.1],[0.3,0.7,1.0,0.7,0.3],[0.6,1.0,1.5,1.0,0.6],[0.3,0.7,1.0,0.7,0.3],[0.1,0.3,0.6,0.3,0.1]], colorLow: "#0000ff", colorHigh: "#ff0000" }})
+```

@@ -36,3 +36,8 @@ Circular layout with arcs and chords showing mutual flows.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "chord-diagram", params: {labels: ["A","B","C"], matrix: [[0,10,5],[10,0,8],[5,8,0]], title: "Inter-department Flow"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-chord-diagram", params: {labels: ["Sales","Engineering","Marketing"], matrix: [[0,15,8],[15,0,12],[8,12,0]], title: "Cross-team Collaboration"}})
+```

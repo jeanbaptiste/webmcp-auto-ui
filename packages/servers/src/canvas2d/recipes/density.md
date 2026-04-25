@@ -22,3 +22,8 @@ widget_display({name: "canvas2d-density", params: {
   values: [12,14,15,13,16,18,20,14,15,22,25,13,14]
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-density", params: {title: "Response time distribution", values: [12,14,15,13,16,18,20,14,15,22,25,13,14]}})
+```

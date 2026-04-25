@@ -46,3 +46,8 @@ Multiple series displayed as adjacent bars per category.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "grouped-bar", params: {labels: ["Jan","Feb","Mar"], series: [{name: "A", values: [30,45,60]}, {name: "B", values: [50,35,70]}], title: "Sales Comparison"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-grouped-bar", params: {labels: ["Jan","Feb","Mar","Apr"], series: [{name: "Online", values: [30,45,60,75]}, {name: "In-Store", values: [50,40,55,65]}], title: "Sales by Channel"}})
+```

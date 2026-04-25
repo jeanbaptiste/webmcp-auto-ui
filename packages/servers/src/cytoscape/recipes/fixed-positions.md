@@ -52,3 +52,8 @@ Renders nodes at exact x/y positions specified in each element's `position` fiel
 ## How
 
 1. Call `cytoscape_webmcp_widget_display({name: "fixed-positions", params: {elements: [{data: {id: "a", label: "Server"}, position: {x: 100, y: 50}}, {data: {id: "b", label: "DB"}, position: {x: 300, y: 50}}, {data: {id: "c", label: "Cache"}, position: {x: 200, y: 200}}, {data: {source: "a", target: "b"}}, {data: {source: "a", target: "c"}}]}})`
+
+## Example
+```
+cytoscape_webmcp_widget_display({name: "fixed-positions", params: {elements: [{data: {id: "a", label: "Server"}, position: {x: 100, y: 50}}, {data: {id: "b", label: "DB"}, position: {x: 300, y: 50}}, {data: {id: "c", label: "Cache"}, position: {x: 200, y: 200}}, {data: {source: "a", target: "b"}}, {data: {source: "a", target: "c"}}]}})
+```

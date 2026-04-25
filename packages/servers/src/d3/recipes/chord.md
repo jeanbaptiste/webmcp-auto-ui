@@ -39,3 +39,8 @@ For showing flows or relationships between groups (trade between countries, migr
 - The matrix must be square (N x N where N = labels.length)
 - Diagonal values (self-flows) can be 0 or positive
 - All values must be non-negative
+
+## Example
+```
+d3_webmcp_widget_display({name: "chord", params: {title: "Trade Flows (€B)", labels: ["France", "Germany", "Italy", "Spain"], matrix: [[0, 45, 18, 22], [42, 0, 31, 27], [16, 29, 0, 14], [20, 25, 12, 0]]}})
+```

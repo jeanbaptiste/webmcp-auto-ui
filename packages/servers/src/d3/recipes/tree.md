@@ -37,3 +37,8 @@ For showing parent-child relationships (org charts, decision trees, taxonomy). U
 ## Common errors
 - Nodes don't need `value` — this is a structural layout, not area-based
 - Very large trees (>100 nodes) may need pagination or collapsing
+
+## Example
+```
+d3_webmcp_widget_display({name: "tree", params: {title: "Org Chart", root: {name: "CEO", children: [{name: "CTO", children: [{name: "VP Engineering", children: [{name: "Frontend Lead"}, {name: "Backend Lead"}]}, {name: "VP Infra"}]}, {name: "CFO", children: [{name: "Controller"}, {name: "FP&A"}]}, {name: "CPO", children: [{name: "Head of Design"}, {name: "Head of PM"}]}]}}})
+```

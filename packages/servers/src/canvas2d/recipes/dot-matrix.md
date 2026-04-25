@@ -35,3 +35,8 @@ widget_display({name: "canvas2d-dot-matrix", params: {
   ]
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-dot-matrix", params: {title: "Survey results (100 respondents)", total: 100, segments: [{label: "Agree", count: 62}, {label: "Neutral", count: 23}, {label: "Disagree", count: 15}]}})
+```

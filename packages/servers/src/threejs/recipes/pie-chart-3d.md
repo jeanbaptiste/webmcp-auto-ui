@@ -46,3 +46,8 @@ threejs_webmcp_widget_display({name: "pie-chart-3d", params: {
   height: 0.5
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "pie-chart-3d", params: { title: "Browser Market Share", slices: [{value:65,label:"Chrome",color:"#4488ff"},{value:19,label:"Safari",color:"#ff8844"},{value:4,label:"Firefox",color:"#44cc88"},{value:12,label:"Other",color:"#aaaaaa"}], height: 0.6, innerRadius: 0 }})
+```

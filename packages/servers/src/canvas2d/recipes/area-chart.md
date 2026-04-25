@@ -27,3 +27,8 @@ widget_display({name: "canvas2d-area-chart", params: {
   values: [10, 25, 18, 32, 45, 38]
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-area-chart", params: {title: "Revenue trend", values: [10, 25, 18, 32, 45, 38]}})
+```

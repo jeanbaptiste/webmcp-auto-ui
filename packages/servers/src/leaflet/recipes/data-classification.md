@@ -33,7 +33,7 @@ Like choropleth but with explicit control over the classification method (quanti
 ## How
 1. Call `leaflet_webmcp_widget_display({name: "leaflet-data-classification", params: {geojson: {type: "FeatureCollection", features: []}, valueProperty: "income", method: "quantile", numClasses: 5, colorScheme: ["#edf8fb", "#8c96c6", "#810f7c"]}})`
 
-### Example
+## Example
 
 ```json
 {

@@ -53,3 +53,8 @@ threejs_webmcp_widget_display({name: "scatter-plot-3d", params: {
   axes: { x: "Width", y: "Height", z: "Depth" }
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "scatter-plot-3d", params: { title: "Iris Dataset Sample", points: [{x:5.1,y:3.5,z:1.4,color:"#ff4444"},{x:7.0,y:3.2,z:4.7,color:"#4488ff"},{x:6.3,y:3.3,z:6.0,color:"#44cc88"},{x:4.9,y:3.0,z:1.4,color:"#ff4444"},{x:6.4,y:3.2,z:4.5,color:"#4488ff"}], axes: {x:"Sepal L",y:"Sepal W",z:"Petal L"} }})
+```

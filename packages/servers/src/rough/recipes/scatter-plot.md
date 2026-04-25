@@ -40,3 +40,8 @@ Individual data points plotted by x/y coordinates.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "scatter-plot", params: {points: [{x: 10, y: 20}, {x: 30, y: 45}, {x: 50, y: 35}], title: "Correlation Study"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-scatter-plot", params: {points: [{x: 10, y: 20, label: "A"}, {x: 30, y: 45, label: "B"}, {x: 50, y: 35, label: "C"}, {x: 70, y: 60, label: "D"}], title: "Height vs Weight"}})
+```

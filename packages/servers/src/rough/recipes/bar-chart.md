@@ -39,3 +39,8 @@ A simple vertical bar chart rendered with Rough.js hand-drawn style.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "bar-chart", params: {labels: ["Q1","Q2","Q3","Q4"], values: [120,200,150,280], title: "Quarterly Revenue"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-bar-chart", params: {labels: ["Q1","Q2","Q3","Q4"], values: [120,200,150,280], title: "Quarterly Revenue"}})
+```

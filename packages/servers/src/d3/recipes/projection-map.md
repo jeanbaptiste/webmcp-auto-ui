@@ -42,3 +42,8 @@ For flat world or regional maps with various projections. Use instead of choropl
 ## Common errors
 - Available projections: geoMercator, geoNaturalEarth1, geoEquirectangular, geoAlbersUsa, geoConicEqualArea, etc.
 - geoAlbersUsa only works with US data
+
+## Example
+```
+d3_webmcp_widget_display({name: "projection-map", params: {title: "CO₂ Emissions (Mt)", geojson: {type:"FeatureCollection",features:[{type:"Feature",properties:{name:"China"},geometry:{type:"Polygon",coordinates:[[[100,35],[105,35],[105,30],[100,30],[100,35]]]}},{type:"Feature",properties:{name:"USA"},geometry:{type:"Polygon",coordinates:[[[-100,40],[-95,40],[-95,35],[-100,35],[-100,40]]]}}]}, values: [{id: "China", value: 11472}, {id: "USA", value: 5007}], projection: "geoNaturalEarth1"}})
+```

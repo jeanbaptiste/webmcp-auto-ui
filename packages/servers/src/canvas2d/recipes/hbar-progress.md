@@ -32,3 +32,8 @@ widget_display({name: "canvas2d-hbar-progress", params: {
   ]
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-hbar-progress", params: {title: "Feature completion", items: [{label: "Auth", value: 90, max: 100}, {label: "Dashboard", value: 60, max: 100}, {label: "Reports", value: 30, max: 100}]}})
+```

@@ -44,3 +44,8 @@ threejs_webmcp_widget_display({name: "line-chart-3d", params: {
   ]
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "line-chart-3d", params: { title: "Monthly KPIs", series: [{points:[{x:0,y:10},{x:1,y:14},{x:2,y:12},{x:3,y:18}],color:"#ff4444",showPoints:true},{points:[{x:0,y:8},{x:1,y:11},{x:2,y:15},{x:3,y:13}],color:"#4488ff",showPoints:true}] }})
+```

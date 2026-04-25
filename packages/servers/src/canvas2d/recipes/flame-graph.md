@@ -32,3 +32,8 @@ widget_display({name: "canvas2d-flame-graph", params: {
   }
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-flame-graph", params: {title: "CPU Profile", root: {name: "main", value: 100, children: [{name: "parse", value: 40, children: [{name: "tokenize", value: 25}]}, {name: "render", value: 60}]}}})
+```

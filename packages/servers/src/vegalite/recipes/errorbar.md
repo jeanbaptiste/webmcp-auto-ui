@@ -15,3 +15,8 @@ schema:
 
 ## When to use
 Show uncertainty around mean / median per category.
+
+## Example
+```
+vegalite_webmcp_widget_display({name: "vegalite-errorbar", params: { title: "Mean latency ± CI", values: [{x:"API A",yMin:80,yMax:120},{x:"API B",yMin:50,yMax:70},{x:"API C",yMin:110,yMax:160}], xLabel: "Endpoint", yLabel: "Latency (ms)" }})
+```

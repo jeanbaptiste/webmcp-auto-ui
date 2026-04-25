@@ -48,3 +48,8 @@ Financial chart showing open, high, low, close per period.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "candlestick", params: {candles: [{date: "Mon", open: 100, high: 115, low: 95, close: 110}, {date: "Tue", open: 110, high: 120, low: 105, close: 108}], title: "Stock Price"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-candlestick", params: {candles: [{date: "Mon", open: 100, high: 115, low: 95, close: 110}, {date: "Tue", open: 110, high: 125, low: 105, close: 122}, {date: "Wed", open: 122, high: 130, low: 112, close: 118}], title: "ACME Stock"}})
+```

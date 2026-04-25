@@ -21,3 +21,8 @@ widget_display({name: "canvas2d-sparkline", params: {
   color: '#3b82f6'
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-sparkline", params: {values: [5, 8, 3, 12, 7, 15, 10], color: "#3b82f6"}})
+```

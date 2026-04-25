@@ -45,3 +45,8 @@ Supports node shapes (rect, round, stadium, diamond, circle, hexagon) and edge s
 
 ## How
 1. Call `mermaid_webmcp_widget_display({name: "flowchart", params: {definition: "flowchart TD\n  A[Start] --> B[End]"}})`
+
+## Example
+```
+mermaid_webmcp_widget_display({name: "mermaid-flowchart", params: {definition: "flowchart LR\n  A([User]) --> B{Authenticated?}\n  B -- Yes --> C[Dashboard]\n  B -- No --> D[Login Page]\n  D --> E[Submit Credentials]\n  E --> B"}})
+```

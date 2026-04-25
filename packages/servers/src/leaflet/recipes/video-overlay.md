@@ -34,7 +34,7 @@ Places a video element on the map within geographic bounds. Supports autoplay, l
 ## How
 1. Call `leaflet_webmcp_widget_display({name: "leaflet-video-overlay", params: {videoUrl: "https://example.com/video.webm", bounds: [[32, -130], [13, -100]], autoplay: true, loop: true, opacity: 0.7}})`
 
-### Example
+## Example
 
 ```json
 {

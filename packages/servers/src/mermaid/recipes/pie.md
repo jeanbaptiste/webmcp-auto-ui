@@ -27,3 +27,8 @@ Renders a pie chart. Provide either a raw `definition` or structured `slices` wi
 
 ## How
 1. Call `mermaid_webmcp_widget_display({name: "pie", params: {definition: "pie title Languages\n  \"JS\" : 60\n  \"Python\" : 25\n  \"Go\" : 15"}})`
+
+## Example
+```
+mermaid_webmcp_widget_display({name: "mermaid-pie", params: {definition: "pie showData\n  title Browser Market Share 2025\n  \"Chrome\" : 65\n  \"Safari\" : 19\n  \"Firefox\" : 4\n  \"Edge\" : 4\n  \"Other\" : 8"}})
+```

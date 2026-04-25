@@ -33,3 +33,8 @@ widget_display({name: "canvas2d-donut", params: {
   ]
 }})
 ```
+
+## Example
+```
+canvas2d_webmcp_widget_display({name: "canvas2d-donut", params: {title: "Budget allocation", centerLabel: "$1.2M", slices: [{label: "Engineering", value: 500}, {label: "Marketing", value: 300}, {label: "Operations", value: 400}]}})
+```

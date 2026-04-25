@@ -45,3 +45,8 @@ Renders a force-directed graph using fCoSE (fast Compound Spring Embedder), opti
 ## How
 
 1. Call `cytoscape_webmcp_widget_display({name: "graph-force-fast", params: {elements: [{data: {id: "a", label: "A"}}, {data: {id: "b", label: "B"}}, {data: {id: "c", label: "C"}}, {data: {id: "d", label: "D"}}, {data: {source: "a", target: "b"}}, {data: {source: "b", target: "c"}}, {data: {source: "c", target: "d"}}, {data: {source: "a", target: "d"}}]}})`
+
+## Example
+```
+cytoscape_webmcp_widget_display({name: "graph-force-fast", params: {elements: [{data: {id: "a", label: "A"}}, {data: {id: "b", label: "B"}}, {data: {id: "c", label: "C"}}, {data: {id: "d", label: "D"}}, {data: {source: "a", target: "b"}}, {data: {source: "b", target: "c"}}, {data: {source: "c", target: "d"}}, {data: {source: "a", target: "d"}}]}})
+```

@@ -44,3 +44,8 @@ threejs_webmcp_widget_display({name: "heatmap-3d", params: {
   colorHigh: "#ff4400"
 }})
 ```
+
+## Example
+```
+threejs_webmcp_widget_display({name: "heatmap-3d", params: { title: "Feature Correlation", values: [[1.0,0.9,0.3,0.1],[0.9,1.0,0.4,0.2],[0.3,0.4,1.0,0.8],[0.1,0.2,0.8,1.0]], colorLow: "#000066", colorHigh: "#ff4400", heightScale: 2 }})
+```

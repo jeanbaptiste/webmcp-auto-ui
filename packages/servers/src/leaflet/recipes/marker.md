@@ -33,7 +33,7 @@ Place one or more markers on the map. Each marker can have an optional popup (sh
 ## How
 1. Call `leaflet_webmcp_widget_display({name: "leaflet-marker", params: {center: [48.85, 2.35], zoom: 13, markers: [{latlng: [48.8566, 2.3522], popup: "Paris", tooltip: "Paris"}]}})`
 
-### Example
+## Example
 
 ```json
 {

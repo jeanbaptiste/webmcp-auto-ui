@@ -46,3 +46,8 @@ Compare multiple trends on a shared axis.
 
 ## How
 1. Call `rough_webmcp_widget_display({name: "multi-line", params: {labels: ["Q1","Q2","Q3","Q4"], series: [{name: "Revenue", values: [100,150,130,200]}, {name: "Costs", values: [80,90,110,120]}], title: "Revenue vs Costs"}})`
+
+## Example
+```
+rough_webmcp_widget_display({name: "rough-multi-line", params: {labels: ["Q1","Q2","Q3","Q4"], series: [{name: "Revenue", values: [100,150,130,200]}, {name: "Costs", values: [80,90,110,120]}, {name: "Profit", values: [20,60,20,80]}], title: "P&L Overview"}})
+```
