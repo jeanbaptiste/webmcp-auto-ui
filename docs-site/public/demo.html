@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>webmcp-auto-ui — demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: #FAFAFA;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      color: #1A1A1A;
+      min-height: 100vh;
+    }
+    .demo-frame {
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+      aspect-ratio: 1280 / 720;
+      position: relative;
+      overflow: hidden;
+    }
+    svg { width: 100%; height: 100%; display: block; }
+  </style>
+</head>
+<body>
+
+<div class="demo-frame">
+
+<!--
+  Total: ~116s, then loops.
+  Timing map (seconds):
+   SCENE_0_TITLE              0  → 4
+   SCENE_1A_MCP_SERVER        4  → 10    zoom: 300 200 700 380
+   SCENE_1B_MCP_TOOLS        10  → 18    zoom: 100 230 600 280
+   SCENE_1C_MCP_RECIPES      18  → 28    zoom: 180 140 920 500
+   SCENE_2A_WEBMCP_SERVER    28  → 34    zoom: 300 200 700 380
+   SCENE_2B_WIDGETS          34  → 42    zoom: 420 230 760 320
+   SCENE_2C_UI_RECIPES       42  → 52    zoom: 120 130 1040 510
+   SCENE_3_UNIFIED           52  → 60    zoom: 20 80 1240 480
+   SCENE_4_ONE_CALL          60  → 72    zoom: 20 230 1240 460
+   SCENE_5_REAL_DEMO         72  → 100
+     - 72-75   wide shell
+     - 75-79   zoom on prompt (20 60 880 100)
+     - 79-82   wide enough to see prompt + panel start
+     - 82-90   zoom on tool calls panel (580 140 680 480)
+     - 90-96   zoom on canvas (20 130 620 480) — widgets render here
+     - 96-100  pull all the way back, contemplate dashboard
+   SCENE_6_HYPERSKILLS      100 → 108
+   SCENE_7_END              108 → 116
+
+  Animation rule: every element animates ONLY opacity (no transform).
+  Camera (viewBox) is animated via SMIL <animate>.
+-->
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img"
+     aria-label="webmcp-auto-ui — demo of WebMCP widgets connected to multiple MCP servers">
+  <title>webmcp-auto-ui · demo</title>
+
+  <!-- camera animation moved to a wrapper <g> below for browser compatibility -->
+
+
+
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="2"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.10"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="brand" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#000091"/>
+      <stop offset="1" stop-color="#2A2AB5"/>
+    </linearGradient>
+    <marker id="ar-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#000091"/>
+    </marker>
+    <marker id="ar-grey" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6B6B6B"/>
+    </marker>
+  </defs>
+
+  <style>
+    .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+    /* helpers — every animation is opacity-only to avoid transform conflicts */
+    @keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
+    @keyframes fadeOut { from { opacity: 1 } to { opacity: 0 } }
+    @keyframes blink   { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+    @keyframes dot     { 0%, 80%, 100% { opacity: .25 } 40% { opacity: 1 } }
+    @keyframes pulse   { 0% {opacity:0} 15%{opacity:1} 85%{opacity:1} 100%{opacity:0} }
+
+    /* ── SCENE 0 — TITLE (0–4s) ── */
+    .s0           { opacity: 0; animation: fadeIn .8s .2s forwards, fadeOut .6s 4s forwards; }
+    .s0-pre       { opacity: 0; animation: fadeIn .6s .3s forwards; }
+    .s0-title     { opacity: 0; animation: fadeIn 1s .8s forwards; }
+    .s0-tag       { opacity: 0; animation: fadeIn .8s 2s forwards; }
+
+    /* ── SCENE 1A — what is an MCP server (4–10s) ── */
+    .s1a          { opacity: 0; animation: fadeIn .6s 4.2s forwards, fadeOut .5s 10s forwards; }
+    .s1a-label    { opacity: 0; animation: fadeIn .5s 4.4s forwards; }
+    .s1a-box      { opacity: 0; animation: fadeIn .6s 5s forwards; }
+    .s1a-d1       { opacity: 0; animation: fadeIn .5s 6s forwards; }
+    .s1a-d2       { opacity: 0; animation: fadeIn .5s 7s forwards; }
+    .s1a-d3       { opacity: 0; animation: fadeIn .5s 8s forwards; }
+
+    /* ── SCENE 1B — MCP tools (10–18s) ── */
+    .s1b          { opacity: 0; animation: fadeIn .6s 10.2s forwards, fadeOut .5s 18s forwards; }
+    .s1b-label    { opacity: 0; animation: fadeIn .5s 10.4s forwards; }
+    .s1b-server   { opacity: 0; animation: fadeIn .5s 10.7s forwards; }
+    .s1b-defn     { opacity: 0; animation: fadeIn .5s 11.5s forwards; }
+    .s1b-t1       { opacity: 0; animation: fadeIn .4s 12.3s forwards; }
+    .s1b-t2       { opacity: 0; animation: fadeIn .4s 13s forwards; }
+    .s1b-t3       { opacity: 0; animation: fadeIn .4s 13.7s forwards; }
+    .s1b-call     { opacity: 0; animation: fadeIn .5s 14.5s forwards; }
+    .s1b-arrow    { opacity: 0; animation: fadeIn .5s 15.2s forwards; }
+    .s1b-result   { opacity: 0; animation: fadeIn .5s 16s forwards; }
+
+    /* ── SCENE 1C — MCP recipes (18–28s) ── */
+    .s1c          { opacity: 0; animation: fadeIn .6s 18.2s forwards, fadeOut .5s 28s forwards; }
+    .s1c-label    { opacity: 0; animation: fadeIn .5s 18.4s forwards; }
+    .s1c-defn     { opacity: 0; animation: fadeIn .6s 19s forwards; }
+    .s1c-card     { opacity: 0; animation: fadeIn .6s 20.5s forwards; }
+    .s1c-l1       { opacity: 0; animation: fadeIn .4s 21.5s forwards; }
+    .s1c-l2       { opacity: 0; animation: fadeIn .4s 22.3s forwards; }
+    .s1c-l3       { opacity: 0; animation: fadeIn .4s 23.1s forwards; }
+    .s1c-note     { opacity: 0; animation: fadeIn .6s 24.5s forwards; }
+    .s1c-key      { opacity: 0; animation: fadeIn .6s 26s forwards; }
+
+    /* ── SCENE 2A — what is a WebMCP server (28–34s) ── */
+    .s2a          { opacity: 0; animation: fadeIn .6s 28.2s forwards, fadeOut .5s 34s forwards; }
+    .s2a-label    { opacity: 0; animation: fadeIn .5s 28.4s forwards; }
+    .s2a-box      { opacity: 0; animation: fadeIn .6s 29s forwards; }
+    .s2a-d1       { opacity: 0; animation: fadeIn .5s 30s forwards; }
+    .s2a-d2       { opacity: 0; animation: fadeIn .5s 31s forwards; }
+    .s2a-d3       { opacity: 0; animation: fadeIn .5s 32s forwards; }
+
+    /* ── SCENE 2B — widgets (34–42s) ── */
+    .s2b          { opacity: 0; animation: fadeIn .6s 34.2s forwards, fadeOut .5s 42s forwards; }
+    .s2b-label    { opacity: 0; animation: fadeIn .5s 34.4s forwards; }
+    .s2b-defn     { opacity: 0; animation: fadeIn .5s 35s forwards; }
+    .s2b-w1       { opacity: 0; animation: fadeIn .5s 36.2s forwards; }
+    .s2b-w2       { opacity: 0; animation: fadeIn .5s 37.4s forwards; }
+    .s2b-w3       { opacity: 0; animation: fadeIn .5s 38.6s forwards; }
+    .s2b-w4       { opacity: 0; animation: fadeIn .5s 39.8s forwards; }
+    .s2b-note     { opacity: 0; animation: fadeIn .5s 40.8s forwards; }
+
+    /* ── SCENE 2C — UI recipes (42–52s) ── */
+    .s2c          { opacity: 0; animation: fadeIn .6s 42.2s forwards, fadeOut .5s 52s forwards; }
+    .s2c-label    { opacity: 0; animation: fadeIn .5s 42.4s forwards; }
+    .s2c-defn     { opacity: 0; animation: fadeIn .5s 43s forwards; }
+    .s2c-card     { opacity: 0; animation: fadeIn .6s 44s forwards; }
+    .s2c-fm       { opacity: 0; animation: fadeIn .5s 45s forwards; }
+    .s2c-when     { opacity: 0; animation: fadeIn .5s 46s forwards; }
+    .s2c-comp     { opacity: 0; animation: fadeIn .5s 47s forwards; }
+    .s2c-body     { opacity: 0; animation: fadeIn .5s 48.2s forwards; }
+    .s2c-note     { opacity: 0; animation: fadeIn .5s 50s forwards; }
+
+    /* ── SCENE 3 — unified (52–60s) ── */
+    .s3           { opacity: 0; animation: fadeIn .6s 52.2s forwards, fadeOut .5s 60s forwards; }
+    .s3-mcp       { opacity: 0; animation: fadeIn .6s 52.5s forwards; }
+    .s3-wmc       { opacity: 0; animation: fadeIn .6s 53.5s forwards; }
+    .s3-agent     { opacity: 0; animation: fadeIn .6s 54.5s forwards; }
+    .s3-arr1      { opacity: 0; animation: fadeIn .5s 55.5s forwards; }
+    .s3-arr2      { opacity: 0; animation: fadeIn .5s 56.2s forwards; }
+    .s3-layer     { opacity: 0; animation: fadeIn .6s 57.2s forwards; }
+    .s3-note      { opacity: 0; animation: fadeIn .6s 58.5s forwards; }
+
+    /* ── SCENE 4 — one call → one widget (60–72s) ── */
+    .s4           { opacity: 0; animation: fadeIn .6s 60.2s forwards, fadeOut .5s 72s forwards; }
+    .s4-label     { opacity: 0; animation: fadeIn .5s 60.4s forwards; }
+    .s4-agent     { opacity: 0; animation: fadeIn .5s 60.8s forwards; }
+    .s4-mcp       { opacity: 0; animation: fadeIn .5s 61.3s forwards; }
+    .s4-widget    { opacity: 0; animation: fadeIn .5s 61.8s forwards; }
+    .s4-req       { opacity: 0; animation: fadeIn .5s 62.5s forwards; }
+    .s4-reqL      { opacity: 0; animation: fadeIn .4s 63s forwards; }
+    .s4-resp      { opacity: 0; animation: fadeIn .5s 63.8s forwards; }
+    .s4-respL     { opacity: 0; animation: fadeIn .4s 64.3s forwards; }
+    .s4-json      { opacity: 0; animation: fadeIn .5s 65.2s forwards; }
+    .s4-warr      { opacity: 0; animation: fadeIn .5s 66s forwards; }
+    .s4-axis      { opacity: 0; animation: fadeIn .4s 66.8s forwards; }
+    .s4-p1 { opacity: 0; animation: fadeIn .25s 67.2s forwards; }
+    .s4-p2 { opacity: 0; animation: fadeIn .25s 67.4s forwards; }
+    .s4-p3 { opacity: 0; animation: fadeIn .25s 67.6s forwards; }
+    .s4-p4 { opacity: 0; animation: fadeIn .25s 67.8s forwards; }
+    .s4-p5 { opacity: 0; animation: fadeIn .25s 68.0s forwards; }
+    .s4-p6 { opacity: 0; animation: fadeIn .25s 68.2s forwards; }
+    .s4-cap       { opacity: 0; animation: fadeIn .6s 70s forwards; }
+
+    /* ── SCENE 5 — REAL DEMO (72–100s, EXTENDED) ── */
+    .s5           { opacity: 0; animation: fadeIn .6s 72.2s forwards, fadeOut .5s 100s forwards; }
+    .s5-shell     { opacity: 0; animation: fadeIn .6s 72.5s forwards; }
+    /* prompt zoom: 75–79s */
+    .s5-prompt    { opacity: 0; animation: fadeIn 1.2s 75.3s forwards; }
+    .s5-cursor    { opacity: 1; animation: blink .6s 75.3s 6, fadeOut .2s 78.5s forwards; }
+    /* zoom out + submit: 79–82s */
+    .s5-submit    { opacity: 0; animation: fadeIn .4s 79.3s forwards; }
+    .s5-think     { opacity: 0; animation: fadeIn .4s 79.8s forwards, fadeOut .4s 95s forwards; }
+    .s5-d1 { animation: dot 1.3s 79.8s infinite; }
+    .s5-d2 { animation: dot 1.3s 80.1s infinite; }
+    .s5-d3 { animation: dot 1.3s 80.4s infinite; }
+
+    /* tool calls panel zoom: 82–89.5s */
+    .s5-tc1 { opacity: 0; animation: fadeIn .35s 82.8s forwards; }
+    .s5-tc2 { opacity: 0; animation: fadeIn .35s 84s forwards; }
+    .s5-tc3 { opacity: 0; animation: fadeIn .35s 85.2s forwards; }
+    .s5-tc4 { opacity: 0; animation: fadeIn .35s 86.4s forwards; }
+    .s5-tc5 { opacity: 0; animation: fadeIn .35s 87.6s forwards; }
+
+    .s5-tip-mcp    { opacity: 0; animation: pulse 2.5s 83.2s forwards; }
+    .s5-tip-wmc    { opacity: 0; animation: pulse 2.5s 85.6s forwards; }
+
+    /* canvas zoom: 90–95.5s */
+    .s5-tl  { opacity: 0; animation: fadeIn .5s 90.3s forwards; }
+    .s5-tld1 { opacity: 0; animation: fadeIn .25s 90.8s forwards; }
+    .s5-tld2 { opacity: 0; animation: fadeIn .25s 91.0s forwards; }
+    .s5-tld3 { opacity: 0; animation: fadeIn .25s 91.2s forwards; }
+    .s5-tld4 { opacity: 0; animation: fadeIn .25s 91.4s forwards; }
+    .s5-tld5 { opacity: 0; animation: fadeIn .25s 91.6s forwards; }
+    .s5-tld6 { opacity: 0; animation: fadeIn .25s 91.8s forwards; }
+
+    .s5-tab { opacity: 0; animation: fadeIn .5s 92.2s forwards; }
+    .s5-tr1 { opacity: 0; animation: fadeIn .3s 92.6s forwards; }
+    .s5-tr2 { opacity: 0; animation: fadeIn .3s 92.85s forwards; }
+    .s5-tr3 { opacity: 0; animation: fadeIn .3s 93.1s forwards; }
+    .s5-tr4 { opacity: 0; animation: fadeIn .3s 93.35s forwards; }
+
+    .s5-ch  { opacity: 0; animation: fadeIn .5s 93.8s forwards; }
+    .s5-cb1 { opacity: 0; animation: fadeIn .35s 94.2s forwards; }
+    .s5-cb2 { opacity: 0; animation: fadeIn .35s 94.45s forwards; }
+    .s5-cb3 { opacity: 0; animation: fadeIn .35s 94.7s forwards; }
+    .s5-cb4 { opacity: 0; animation: fadeIn .35s 94.95s forwards; }
+
+    /* ── SCENE 6 — HYPERSKILLS (100–108s) ── */
+    .s6           { opacity: 0; animation: fadeIn .6s 100.2s forwards, fadeOut .5s 108s forwards; }
+    .s6-title     { opacity: 0; animation: fadeIn .5s 100.4s forwards; }
+    .s6-form      { opacity: 0; animation: fadeIn .5s 101s forwards; }
+    .s6-src       { opacity: 0; animation: fadeIn .5s 102s forwards; }
+    .s6-gz        { opacity: 0; animation: fadeIn .5s 103s forwards; }
+    .s6-b64       { opacity: 0; animation: fadeIn .5s 104s forwards; }
+    .s6-hash      { opacity: 0; animation: fadeIn .5s 105.5s forwards; }
+    .s6-quote     { opacity: 0; animation: fadeIn .5s 107s forwards; }
+
+    /* ── SCENE 7 — END CARD (108–116s) ── */
+    .s7           { opacity: 0; animation: fadeIn .8s 108.2s forwards; }
+  </style>
+
+  <rect width="1280" height="720" fill="#FAFAFA"/>
+
+  <!-- CAMERA: animates transform on this wrapper to simulate viewBox zoom -->
+  <g class="camera">
+    <animate
+      attributeName="transform"
+      attributeType="XML"
+      dur="116s"
+      repeatCount="indefinite"
+      keyTimes="0.000000;0.032759;0.034483;0.084483;0.086207;0.153448;0.155172;0.239655;0.241379;0.291379;0.293103;0.360345;0.362069;0.446552;0.448276;0.515517;0.517241;0.618966;0.620690;0.644828;0.646552;0.679310;0.681034;0.774138;0.775862;0.823276;0.827586;0.860345;0.862069;0.929310;0.931034;1.000000"
+      values="translate(0.00 0.00) scale(1.0000);translate(0.00 0.00) scale(1.0000);translate(-431.63 -184.19) scale(1.6744);translate(-431.63 -184.19) scale(1.6744);translate(-302.55 -483.64) scale(2.3273);translate(-302.55 -483.64) scale(2.3273);translate(-141.54 -60.97) scale(1.2202);translate(-141.54 -60.97) scale(1.2202);translate(-431.63 -184.19) scale(1.6744);translate(-431.63 -184.19) scale(1.6744);translate(-653.57 -177.98) scale(1.6180);translate(-653.57 -177.98) scale(1.6180);translate(-141.54 -60.97) scale(1.2202);translate(-141.54 -60.97) scale(1.2202);translate(-53.98 0.00) scale(1.0843);translate(-53.98 0.00) scale(1.0843);translate(0.00 0.06) scale(1.0240);translate(0.00 0.06) scale(1.0240);translate(0.00 0.00) scale(1.0000);translate(0.00 0.00) scale(1.0000);translate(-29.09 200.00) scale(1.4545);translate(-29.09 200.00) scale(1.4545);translate(-740.00 -210.00) scale(1.5000);translate(-740.00 -210.00) scale(1.5000);translate(145.00 -195.00) scale(1.5000);translate(145.00 -195.00) scale(1.5000);translate(0.00 0.00) scale(1.0000);translate(0.00 0.00) scale(1.0000);translate(0.00 0.00) scale(1.0000);translate(0.00 0.00) scale(1.0000);translate(0.00 0.00) scale(1.0000);translate(0.00 0.00) scale(1.0000)"
+      calcMode="spline"
+      keySplines="0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;0 0 1 1;0 0 1 1;0 0 1 1;0 0 1 1;0 0 1 1"
+    />
+
+  <!-- ============================================================ -->
+  <!-- SCENE 0 — TITLE                                               -->
+  <!-- ============================================================ -->
+  <g class="s0">
+    <text x="640" y="280" font-size="14" font-weight="700" fill="#000091" text-anchor="middle" letter-spacing="2" class="s0-pre">WEBMCP-AUTO-UI</text>
+    <text x="640" y="350" font-size="36" font-weight="700" fill="#1A1A1A" text-anchor="middle" class="s0-title">
+      WebMCP widgets connected to
+    </text>
+    <text x="640" y="400" font-size="36" font-weight="700" fill="#1A1A1A" text-anchor="middle" class="s0-title">
+      multiple MCP servers
+    </text>
+    <text x="640" y="460" font-size="14" fill="#6B6B6B" text-anchor="middle" class="s0-tag" font-style="italic">
+      a quick tour
+    </text>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SCENE 1A — what is an MCP server? (zoom: 80 100 1120 540)     -->
+  <!-- ============================================================ -->
+  <g class="s1a">
+    
+    <text x="640" y="180" font-size="26" font-weight="700" fill="#1A1A1A" text-anchor="middle" class="s1a-label">
+      What is an MCP server?
+    </text>
+
+    <g class="s1a-box">
+      <rect x="440" y="240" width="400" height="120" rx="10" fill="url(#brand)" filter="url(#shadow)"/>
+      <text x="640" y="278" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="1.5">MCP SERVER</text>
+      <text x="640" y="310" font-size="20" font-weight="600" fill="#FFFFFF" text-anchor="middle">An RPC server</text>
+      <text x="640" y="338" font-size="14" fill="#FFFFFF" text-anchor="middle" opacity="0.85">designed to be called by AI agents</text>
+    </g>
+
+    <text x="640" y="430" font-size="15" fill="#1A1A1A" text-anchor="middle" class="s1a-d1">
+      Lives anywhere — local process, remote service, container.
+    </text>
+    <text x="640" y="470" font-size="15" fill="#1A1A1A" text-anchor="middle" class="s1a-d2">
+      Speaks the Model Context Protocol over stdio, HTTP or SSE.
+    </text>
+    <text x="640" y="510" font-size="15" fill="#1A1A1A" text-anchor="middle" class="s1a-d3">
+      Exposes <tspan font-weight="600">tools</tspan> and <tspan font-weight="600">recipes</tspan> the agent can discover and call.
+    </text>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SCENE 1B — what is a tool? (zoom: 120 200 600 320)            -->
+  <!-- ============================================================ -->
+  <g class="s1b">
+    
+    <text x="420" y="265" font-size="20" font-weight="700" fill="#1A1A1A" text-anchor="middle" class="s1b-label">
+      A tool
+    </text>
+
+    <!-- a typed function the agent can call -->
+    <text x="420" y="300" font-size="13" fill="#6B6B6B" text-anchor="middle" class="s1b-defn">
+      a typed function the agent can call
+    </text>
+
+    <!-- mini server with 3 tools listed -->
+    <g class="s1b-server">
+      <rect x="160" y="325" width="220" height="160" rx="8" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="270" y="350" font-size="10" font-weight="700" fill="#000091" text-anchor="middle" letter-spacing="1.5">MCP SERVER</text>
+      <text x="270" y="370" font-size="11" fill="#9CA3AF" text-anchor="middle" class="mono">tricoteuses</text>
+      <line x1="180" y1="385" x2="360" y2="385" stroke="#F3F4F6"/>
+      <text x="180" y="408" font-size="12" fill="#1A1A1A" class="mono s1b-t1">→ list_amendments</text>
+      <text x="180" y="432" font-size="12" fill="#1A1A1A" class="mono s1b-t2">→ get_votes</text>
+      <text x="180" y="456" font-size="12" fill="#1A1A1A" class="mono s1b-t3">→ query_sql</text>
+    </g>
+
+    <!-- example call → result -->
+    <g class="s1b-call">
+      <rect x="430" y="325" width="220" height="50" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+      <text x="445" y="345" font-size="10" font-weight="700" fill="#6B6B6B" letter-spacing="1.5">CALL</text>
+      <text x="445" y="365" font-size="12" fill="#1A1A1A" class="mono">get_votes(year: 2026)</text>
+    </g>
+    <path d="M 430 350 L 388 350" stroke="#000091" stroke-width="2" marker-end="url(#ar-blue)"
+          class="s1b-arrow" fill="none"/>
+    <g class="s1b-result">
+      <rect x="430" y="395" width="220" height="90" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+      <text x="445" y="415" font-size="10" font-weight="700" fill="#6B6B6B" letter-spacing="1.5">RESULT</text>
+      <text x="445" y="437" font-size="11" fill="#1A1A1A" class="mono">[ {id, date, party,</text>
+      <text x="445" y="453" font-size="11" fill="#1A1A1A" class="mono">    pour, contre, abst},</text>
+      <text x="445" y="469" font-size="11" fill="#1A1A1A" class="mono">  ... 43 items ]</text>
+    </g>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SCENE 1C — MCP recipes (zoom: 0 0 1280 720, full)             -->
+  <!-- ============================================================ -->
+  <g class="s1c">
+    
+    <text x="640" y="118" font-size="24" font-weight="700" fill="#1A1A1A" text-anchor="middle" class="s1c-label">
+      A recipe (MCP)
+    </text>
+    <text x="640" y="148" font-size="14" fill="#6B6B6B" text-anchor="middle" class="s1c-defn">
+      a named playbook the server suggests to the agent
+    </text>
+
+    <!-- A recipe card -->
+    <g class="s1c-card">
+      <rect x="240" y="190" width="800" height="280" rx="10" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="265" y="220" font-size="10" font-weight="700" fill="#000091" letter-spacing="1.5">MCP RECIPE</text>
+      <line x1="260" y1="232" x2="1020" y2="232" stroke="#F3F4F6"/>
+
+      <!-- the type from the source code -->
+      <text x="265" y="258" font-size="11" font-weight="700" fill="#9CA3AF" letter-spacing="1" class="s1c-l1">SHAPE</text>
+      <text x="265" y="284" font-size="14" fill="#1A1A1A" class="mono s1c-l1">
+        { name: string, description?: string }
+      </text>
+    </g>
+
+    <g class="s1c-l2">
+      <text x="265" y="328" font-size="11" font-weight="700" fill="#9CA3AF" letter-spacing="1">EXAMPLE</text>
+      <text x="265" y="354" font-size="14" fill="#1A1A1A" class="mono">
+        name: "find-deputy-profile"
+      </text>
+      <text x="265" y="376" font-size="14" fill="#6B6B6B" class="mono">
+        description: "Use query_sql to retrieve a deputy by name, group, or constituency"
+      </text>
+    </g>
+
+    <g class="s1c-l3">
+      <text x="265" y="416" font-size="13" fill="#1A1A1A">
+        The agent calls <tspan class="mono" font-weight="600">search_recipes(...)</tspan> to discover them, then <tspan class="mono" font-weight="600">get_recipe(name)</tspan> to read one.
+      </text>
+      <text x="265" y="442" font-size="12" fill="#6B6B6B">
+        Recipes save the agent from re-deriving common query patterns from scratch.
+      </text>
+    </g>
+
+    <text x="640" y="510" font-size="14" fill="#1A1A1A" text-anchor="middle" class="s1c-note">
+      So an MCP server gives the agent <tspan font-weight="600">tools</tspan> (capabilities) <tspan>+</tspan> <tspan font-weight="600">recipes</tspan> (proven ways to use them).
+    </text>
+
+    <text x="640" y="600" font-size="13" fill="#9CA3AF" text-anchor="middle" font-style="italic" class="s1c-key">
+      An MCP server says: "here is what I can do, here is how others have used it."
+    </text>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SCENE 2A — what is a WebMCP server (zoom: 80 100 1120 540)    -->
+  <!-- ============================================================ -->
+  <g class="s2a">
+    
+    <text x="640" y="180" font-size="26" font-weight="700" fill="#1A1A1A" text-anchor="middle" class="s2a-label">
+      What is a WebMCP server?
+    </text>
+
+    <g class="s2a-box">
+      <rect x="440" y="240" width="400" height="120" rx="10" fill="url(#brand)" filter="url(#shadow)"/>
+      <text x="640" y="278" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="1.5">WEBMCP SERVER</text>
+      <text x="640" y="310" font-size="20" font-weight="600" fill="#FFFFFF" text-anchor="middle">Same idea, in the browser</text>
+      <text x="640" y="338" font-size="14" fill="#FFFFFF" text-anchor="middle" opacity="0.85">an MCP server that runs in the page</text>
+    </g>
+
+    <text x="640" y="430" font-size="15" fill="#1A1A1A" text-anchor="middle" class="s2a-d1">
+      Created by the page itself — not by a remote service.
+    </text>
+    <text x="640" y="470" font-size="15" fill="#1A1A1A" text-anchor="middle" class="s2a-d2">
+      Exposes the things the page knows how to do <tspan font-weight="600">visually</tspan>.
+    </text>
+    <text x="640" y="510" font-size="15" fill="#1A1A1A" text-anchor="middle" class="s2a-d3">
+      Its tools are called <tspan font-weight="600">widgets</tspan>; they ship with their own recipes too.
+    </text>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SCENE 2B — widgets (zoom: 400 100 800 540)                    -->
+  <!-- ============================================================ -->
+  <g class="s2b">
+    
+    <text x="800" y="180" font-size="26" font-weight="700" fill="#1A1A1A" text-anchor="middle" class="s2b-label">
+      A widget
+    </text>
+    <text x="800" y="215" font-size="14" fill="#6B6B6B" text-anchor="middle" class="s2b-defn">
+      a UI building block exposed as a WebMCP tool
+    </text>
+
+    <!-- 4 widget cards in a row -->
+    <g class="s2b-w1">
+      <rect x="450" y="260" width="160" height="160" rx="8" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="530" y="288" font-size="10" font-weight="700" fill="#000091" text-anchor="middle" letter-spacing="1.5">WIDGET</text>
+      <text x="530" y="308" font-size="13" fill="#1A1A1A" text-anchor="middle" class="mono">stat-card</text>
+      <!-- mini stat card preview -->
+      <text x="530" y="354" font-size="11" fill="#9CA3AF" text-anchor="middle">Revenue</text>
+      <text x="530" y="378" font-size="20" font-weight="700" fill="#1A1A1A" text-anchor="middle">45 230</text>
+      <text x="530" y="402" font-size="11" fill="#059669" text-anchor="middle">↑ +12.4%</text>
+    </g>
+
+    <g class="s2b-w2">
+      <rect x="630" y="260" width="160" height="160" rx="8" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="710" y="288" font-size="10" font-weight="700" fill="#000091" text-anchor="middle" letter-spacing="1.5">WIDGET</text>
+      <text x="710" y="308" font-size="13" fill="#1A1A1A" text-anchor="middle" class="mono">chart</text>
+      <!-- mini bar chart preview -->
+      <rect x="660" y="385" width="14" height="22" fill="#000091" opacity="0.85"/>
+      <rect x="680" y="370" width="14" height="37" fill="#000091" opacity="0.85"/>
+      <rect x="700" y="350" width="14" height="57" fill="#000091" opacity="0.85"/>
+      <rect x="720" y="335" width="14" height="72" fill="#000091" opacity="0.85"/>
+      <rect x="740" y="360" width="14" height="47" fill="#000091" opacity="0.85"/>
+      <line x1="654" y1="408" x2="760" y2="408" stroke="#E5E7EB"/>
+    </g>
+
+    <g class="s2b-w3">
+      <rect x="810" y="260" width="160" height="160" rx="8" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="890" y="288" font-size="10" font-weight="700" fill="#000091" text-anchor="middle" letter-spacing="1.5">WIDGET</text>
+      <text x="890" y="308" font-size="13" fill="#1A1A1A" text-anchor="middle" class="mono">table</text>
+      <line x1="828" y1="328" x2="952" y2="328" stroke="#F3F4F6"/>
+      <text x="836" y="346" font-size="9" fill="#9CA3AF" letter-spacing="1">A</text>
+      <text x="900" y="346" font-size="9" fill="#9CA3AF" letter-spacing="1" text-anchor="end">B</text>
+      <text x="945" y="346" font-size="9" fill="#9CA3AF" letter-spacing="1" text-anchor="end">C</text>
+      <line x1="828" y1="354" x2="952" y2="354" stroke="#F3F4F6"/>
+      <line x1="828" y1="374" x2="952" y2="374" stroke="#F3F4F6"/>
+      <line x1="828" y1="394" x2="952" y2="394" stroke="#F3F4F6"/>
+      <text x="836" y="370" font-size="10" fill="#1A1A1A">LFI</text>
+      <text x="900" y="370" font-size="10" fill="#1A1A1A" text-anchor="end" class="mono">32</text>
+      <text x="945" y="370" font-size="10" fill="#059669" text-anchor="end" class="mono">4</text>
+      <text x="836" y="390" font-size="10" fill="#1A1A1A">SOC</text>
+      <text x="900" y="390" font-size="10" fill="#1A1A1A" text-anchor="end" class="mono">24</text>
+      <text x="945" y="390" font-size="10" fill="#059669" text-anchor="end" class="mono">6</text>
+    </g>
+
+    <g class="s2b-w4">
+      <rect x="990" y="260" width="160" height="160" rx="8" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="1070" y="288" font-size="10" font-weight="700" fill="#000091" text-anchor="middle" letter-spacing="1.5">WIDGET</text>
+      <text x="1070" y="308" font-size="13" fill="#1A1A1A" text-anchor="middle" class="mono">timeline</text>
+      <!-- mini timeline preview -->
+      <line x1="1010" y1="375" x2="1135" y2="375" stroke="#E5E7EB"/>
+      <circle cx="1020" cy="375" r="3" fill="#000091"/>
+      <circle cx="1045" cy="375" r="5" fill="#000091"/>
+      <circle cx="1075" cy="375" r="7" fill="#000091"/>
+      <circle cx="1105" cy="375" r="4" fill="#000091"/>
+      <circle cx="1130" cy="375" r="3" fill="#000091"/>
+    </g>
+
+    <text x="800" y="490" font-size="13" fill="#6B6B6B" text-anchor="middle" class="s2b-note">
+      <tspan class="mono" font-weight="600">stat-card · chart · table · timeline · map · profile · gallery · hemicycle · kv...</tspan>
+    </text>
+    <text x="800" y="525" font-size="13" fill="#1A1A1A" text-anchor="middle" class="s2b-note">
+      The agent calls <tspan class="mono" font-weight="600">component(name, props)</tspan>. The widget renders.
+    </text>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SCENE 2C — UI recipes (zoom out, full)                        -->
+  <!-- ============================================================ -->
+  <g class="s2c">
+    
+    <text x="640" y="118" font-size="24" font-weight="700" fill="#1A1A1A" text-anchor="middle" class="s2c-label">
+      A recipe (UI)
+    </text>
+    <text x="640" y="148" font-size="14" fill="#6B6B6B" text-anchor="middle" class="s2c-defn">
+      a Markdown playbook for assembling widgets into a coherent dashboard
+    </text>
+
+    <!-- A recipe card showing real content from dashboard-kpi.md -->
+    <g class="s2c-card">
+      <rect x="160" y="180" width="960" height="380" rx="10" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="185" y="208" font-size="10" font-weight="700" fill="#000091" letter-spacing="1.5">UI RECIPE — dashboard-kpi.md</text>
+      <line x1="180" y1="220" x2="1100" y2="220" stroke="#F3F4F6"/>
+
+      <!-- frontmatter -->
+      <g class="s2c-fm">
+        <text x="185" y="250" font-size="11" font-weight="700" fill="#9CA3AF" letter-spacing="1.5">FRONTMATTER</text>
+        <text x="185" y="275" font-size="13" fill="#1A1A1A" class="mono">id: compose-kpi-dashboard-from-aggregated-metrics</text>
+        <text x="185" y="295" font-size="13" fill="#1A1A1A" class="mono">name: Compose a KPI dashboard from aggregated metrics</text>
+      </g>
+
+      <g class="s2c-when">
+        <text x="185" y="330" font-size="11" font-weight="700" fill="#9CA3AF" letter-spacing="1.5">WHEN</text>
+        <text x="185" y="355" font-size="13" fill="#1A1A1A">
+          MCP data contains numeric metrics, totals, percentages, or aggregated stats
+        </text>
+      </g>
+
+      <g class="s2c-comp">
+        <text x="185" y="395" font-size="11" font-weight="700" fill="#9CA3AF" letter-spacing="1.5">COMPONENTS USED</text>
+        <text x="185" y="420" font-size="13" fill="#1A1A1A" class="mono">[stat-card, chart, table, kv]</text>
+      </g>
+
+      <g class="s2c-body">
+        <text x="185" y="460" font-size="11" font-weight="700" fill="#9CA3AF" letter-spacing="1.5">BODY (excerpt)</text>
+        <text x="185" y="486" font-size="12" fill="#1A1A1A" class="mono">component("stat-card", {label: "Revenue", value: "45 230 EUR",</text>
+        <text x="185" y="504" font-size="12" fill="#1A1A1A" class="mono">                         trend: "+12.4%", trendDir: "up"})</text>
+        <text x="185" y="528" font-size="12" fill="#1A1A1A" class="mono">component("chart", {type: "bar", labels: months, ...})</text>
+      </g>
+    </g>
+
+    <text x="640" y="610" font-size="13" fill="#1A1A1A" text-anchor="middle" class="s2c-note" font-style="italic">
+      A WebMCP server says: "here are my widgets, here are the patterns that work well."
+    </text>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SCENE 3 — UNIFIED                                             -->
+  <!-- ============================================================ -->
+  <g class="s3">
+    <text x="640" y="80" font-size="13" font-weight="700" fill="#000091" text-anchor="middle" letter-spacing="2">PUTTING IT TOGETHER</text>
+    <text x="640" y="118" font-size="24" font-weight="700" fill="#1A1A1A" text-anchor="middle">
+      The agent talks to both, the same way
+    </text>
+
+    <g class="s3-mcp">
+      <rect x="80" y="200" width="320" height="200" rx="10" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="240" y="230" font-size="11" font-weight="700" fill="#000091" text-anchor="middle" letter-spacing="1.5">MCP SERVERS (REMOTE)</text>
+      <text x="240" y="260" font-size="13" fill="#6B6B6B" text-anchor="middle">data + behaviour</text>
+      <line x1="100" y1="280" x2="380" y2="280" stroke="#F3F4F6"/>
+      <text x="100" y="305" font-size="12" fill="#1A1A1A" class="mono">tricoteuses → tools, recipes</text>
+      <text x="100" y="328" font-size="12" fill="#1A1A1A" class="mono">inaturalist → tools, recipes</text>
+      <text x="100" y="351" font-size="12" fill="#1A1A1A" class="mono">openmeteo → tools, recipes</text>
+      <text x="100" y="374" font-size="11" fill="#9CA3AF" class="mono">+ many more...</text>
+    </g>
+
+    <g class="s3-wmc">
+      <rect x="880" y="200" width="320" height="200" rx="10" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="1040" y="230" font-size="11" font-weight="700" fill="#000091" text-anchor="middle" letter-spacing="1.5">WEBMCP SERVER (LOCAL)</text>
+      <text x="1040" y="260" font-size="13" fill="#6B6B6B" text-anchor="middle">widgets + UI recipes</text>
+      <line x1="900" y1="280" x2="1180" y2="280" stroke="#F3F4F6"/>
+      <text x="900" y="305" font-size="12" fill="#1A1A1A" class="mono">autoui → stat-card, chart...</text>
+      <text x="900" y="328" font-size="12" fill="#1A1A1A" class="mono">         dashboard-kpi.md</text>
+      <text x="900" y="351" font-size="12" fill="#1A1A1A" class="mono">         cross-server.md</text>
+      <text x="900" y="374" font-size="11" fill="#9CA3AF" class="mono">         + 18 more recipes</text>
+    </g>
+
+    <g class="s3-agent">
+      <rect x="540" y="270" width="200" height="80" rx="10" fill="url(#brand)" filter="url(#shadow)"/>
+      <text x="640" y="298" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="1.5">AGENT</text>
+      <text x="640" y="324" font-size="14" fill="#FFFFFF" text-anchor="middle">consumes both</text>
+    </g>
+
+    <path d="M 400 310 L 535 310" stroke="#000091" stroke-width="2.5" fill="none"
+          marker-end="url(#ar-blue)" class="s3-arr1"/>
+    <path d="M 745 310 L 878 310" stroke="#000091" stroke-width="2.5" fill="none"
+          marker-end="url(#ar-blue)" class="s3-arr2"/>
+
+    <g class="s3-layer">
+      <rect x="490" y="430" width="300" height="40" rx="6" fill="#FFFFFF" stroke="#000091"/>
+      <text x="640" y="455" font-size="13" fill="#1A1A1A" text-anchor="middle">
+        same <tspan class="mono" font-weight="600">layer()</tspan> interface to the agent
+      </text>
+    </g>
+
+    <text x="640" y="540" font-size="14" fill="#6B6B6B" text-anchor="middle" font-style="italic" class="s3-note">
+      The agent does not see a difference between a remote tool and a local widget.
+    </text>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SCENE 4 — ONE CALL → ONE WIDGET                               -->
+  <!-- ============================================================ -->
+  <g class="s4">
+    <text x="640" y="62" font-size="13" font-weight="700" fill="#000091" text-anchor="middle" letter-spacing="2" class="s4-label">EXAMPLE</text>
+    <text x="640" y="100" font-size="22" font-weight="700" fill="#1A1A1A" text-anchor="middle" class="s4-label">
+      One call · from data to widget
+    </text>
+
+    <g class="s4-agent">
+      <rect x="60" y="270" width="200" height="100" rx="10" fill="url(#brand)" filter="url(#shadow)"/>
+      <text x="160" y="300" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="1.5">AGENT</text>
+      <text x="160" y="330" font-size="13" fill="#FFFFFF" text-anchor="middle">picks a tool,</text>
+      <text x="160" y="350" font-size="13" fill="#FFFFFF" text-anchor="middle">calls it</text>
+    </g>
+
+    <g class="s4-mcp">
+      <rect x="450" y="270" width="220" height="100" rx="10" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="560" y="300" font-size="11" font-weight="700" fill="#000091" text-anchor="middle" letter-spacing="1.5">MCP SERVER</text>
+      <text x="560" y="328" font-size="13" fill="#1A1A1A" text-anchor="middle" class="mono">tricoteuses</text>
+      <text x="560" y="352" font-size="11" fill="#6B6B6B" text-anchor="middle">parliamentary data</text>
+    </g>
+
+    <g class="s4-widget">
+      <rect x="860" y="240" width="360" height="240" rx="10" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="1040" y="270" font-size="11" font-weight="700" fill="#000091" text-anchor="middle" letter-spacing="1.5">WEBMCP WIDGET</text>
+      <text x="1040" y="295" font-size="13" fill="#1A1A1A" text-anchor="middle" class="mono">component("timeline")</text>
+
+      <line x1="890" y1="430" x2="1190" y2="430" stroke="#E5E7EB" stroke-width="1" class="s4-axis"/>
+      <text x="890" y="450" font-size="9" fill="#9CA3AF" class="mono s4-axis">Oct</text>
+      <text x="1040" y="450" font-size="9" fill="#9CA3AF" class="mono s4-axis">Nov</text>
+      <text x="1180" y="450" font-size="9" fill="#9CA3AF" text-anchor="end" class="mono s4-axis">Dec</text>
+
+      <circle cx="910"  cy="410" r="5" fill="#000091" class="s4-p1"/>
+      <circle cx="970"  cy="380" r="7" fill="#000091" class="s4-p2"/>
+      <circle cx="1010" cy="390" r="6" fill="#000091" class="s4-p3"/>
+      <circle cx="1080" cy="360" r="9" fill="#000091" class="s4-p4"/>
+      <circle cx="1140" cy="395" r="6" fill="#000091" class="s4-p5"/>
+      <circle cx="1180" cy="405" r="5" fill="#000091" class="s4-p6"/>
+    </g>
+
+    <line x1="265" y1="310" x2="445" y2="310" stroke="#6B6B6B" stroke-width="2" fill="none"
+          marker-end="url(#ar-grey)" class="s4-req"/>
+    <text x="355" y="296" font-size="12" fill="#1A1A1A" text-anchor="middle" class="mono s4-reqL">list_amendments()</text>
+
+    <line x1="445" y1="345" x2="265" y2="345" stroke="#000091" stroke-width="2" fill="none"
+          marker-end="url(#ar-blue)" class="s4-resp"/>
+    <text x="355" y="365" font-size="12" fill="#000091" text-anchor="middle" class="mono s4-respL">JSON payload</text>
+
+    <g class="s4-json" transform="translate(280, 510)">
+      <rect width="540" height="80" rx="6" fill="#FFFFFF" stroke="#E5E7EB"/>
+      <text x="14" y="22" font-size="11" font-weight="700" fill="#6B6B6B" letter-spacing="1.5">PAYLOAD</text>
+      <text x="14" y="46" font-size="11" fill="#1A1A1A" class="mono">[{ date: "2025-10-08", count: 7, party: "LFI" },</text>
+      <text x="14" y="64" font-size="11" fill="#1A1A1A" class="mono"> { date: "2025-10-15", count: 4, party: "SOC" }, ...]</text>
+    </g>
+
+    <path d="M 820 540 Q 880 540 920 510" stroke="#000091" stroke-width="2" fill="none"
+          marker-end="url(#ar-blue)" stroke-dasharray="4 4" class="s4-warr"/>
+
+    <text x="640" y="660" font-size="14" fill="#6B6B6B" text-anchor="middle" class="s4-cap" font-style="italic">
+      One call. The demo below chains five.
+    </text>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SCENE 5 — REAL DEMO                                           -->
+  <!-- ============================================================ -->
+  <g class="s5">
+    <g class="s5-shell">
+      <text x="40" y="38" font-size="13" font-weight="700" fill="#000091">webmcp-auto-ui · flex</text>
+      <text x="40" y="56" font-size="11" fill="#6B6B6B">5 tool calls · 3 widgets · MCP + WebMCP</text>
+
+      <rect x="40" y="80" width="800" height="50" rx="8" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <rect x="62" y="92" width="2" height="22" fill="#000091" class="s5-cursor"/>
+      <text x="60" y="110" font-size="14" fill="#1A1A1A" class="s5-prompt">
+        Amendments to the 2026 budget bill, grouped by party, with the related votes
+      </text>
+
+      <g class="s5-submit" transform="translate(770, 92)">
+        <rect width="60" height="28" rx="5" fill="url(#brand)"/>
+        <text x="30" y="19" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="600">submit</text>
+      </g>
+
+      <g class="s5-think" transform="translate(860, 110)">
+        <text x="0" y="3" font-size="11" fill="#6B6B6B" class="mono">agent</text>
+        <circle cx="40" cy="0" r="2.5" fill="#000091" class="s5-d1"/>
+        <circle cx="50" cy="0" r="2.5" fill="#000091" class="s5-d2"/>
+        <circle cx="60" cy="0" r="2.5" fill="#000091" class="s5-d3"/>
+      </g>
+
+      <!-- TOOL CALLS PANEL -->
+      <rect x="600" y="150" width="640" height="450" rx="8" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="620" y="178" font-size="11" font-weight="700" fill="#6B6B6B" letter-spacing="1.5">TOOL CALLS</text>
+      <line x1="615" y1="190" x2="1225" y2="190" stroke="#F3F4F6"/>
+    </g>
+
+    <g class="s5-tc1" transform="translate(620, 220)">
+      <text y="0" font-size="14" fill="#1A1A1A" class="mono">→ list_amendments</text>
+      <text y="20" font-size="11" fill="#9CA3AF" class="mono">  source: tricoteuses_mcp</text>
+    </g>
+    <g class="s5-tc2" transform="translate(620, 280)">
+      <text y="0" font-size="14" fill="#1A1A1A" class="mono">→ group_by(party)</text>
+      <text y="20" font-size="11" fill="#9CA3AF" class="mono">  source: autoui_webmcp</text>
+    </g>
+    <g class="s5-tc3" transform="translate(620, 340)">
+      <text y="0" font-size="14" fill="#1A1A1A" class="mono">→ component("timeline")</text>
+      <text y="20" font-size="11" fill="#9CA3AF" class="mono">  source: autoui_webmcp</text>
+    </g>
+    <g class="s5-tc4" transform="translate(620, 400)">
+      <text y="0" font-size="14" fill="#1A1A1A" class="mono">→ get_votes</text>
+      <text y="20" font-size="11" fill="#9CA3AF" class="mono">  source: tricoteuses_mcp</text>
+    </g>
+    <g class="s5-tc5" transform="translate(620, 460)">
+      <text y="0" font-size="14" fill="#1A1A1A" class="mono">→ component("chart")</text>
+      <text y="20" font-size="11" fill="#9CA3AF" class="mono">  source: autoui_webmcp</text>
+    </g>
+
+    <!-- TOOLTIPS -->
+    <g class="s5-tip-mcp" transform="translate(880, 220)">
+      <rect x="0" y="-16" width="340" height="62" rx="6" fill="#000091"/>
+      <path d="M 0 6 L -10 14 L 0 22 z" fill="#000091"/>
+      <text x="14" y="3" font-size="11" font-weight="700" fill="#FFFFFF" letter-spacing="1.5">MCP CALL</text>
+      <text x="14" y="24" font-size="12" fill="#FFFFFF">The agent fetches data from a remote</text>
+      <text x="14" y="40" font-size="12" fill="#FFFFFF">MCP server. Here: tricoteuses.</text>
+    </g>
+
+    <g class="s5-tip-wmc" transform="translate(880, 340)">
+      <rect x="0" y="-16" width="340" height="78" rx="6" fill="#000091"/>
+      <path d="M 0 6 L -10 14 L 0 22 z" fill="#000091"/>
+      <text x="14" y="3" font-size="11" font-weight="700" fill="#FFFFFF" letter-spacing="1.5">WEBMCP CALL</text>
+      <text x="14" y="24" font-size="12" fill="#FFFFFF">The agent renders a widget locally.</text>
+      <text x="14" y="40" font-size="12" fill="#FFFFFF">The widget itself becomes a tool the</text>
+      <text x="14" y="56" font-size="12" fill="#FFFFFF">agent can re-read or update.</text>
+    </g>
+
+    <!-- CANVAS BLOCKS -->
+    <g class="s5-tl">
+      <rect x="40" y="150" width="540" height="100" rx="8" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="60" y="174" font-size="12" font-weight="600" fill="#1A1A1A">Amendments — chronology</text>
+      <line x1="80" y1="220" x2="560" y2="220" stroke="#E5E7EB"/>
+      <circle cx="110" cy="220" r="4" fill="#000091" class="s5-tld1"/>
+      <circle cx="190" cy="220" r="6" fill="#000091" class="s5-tld2"/>
+      <circle cx="280" cy="220" r="9" fill="#000091" class="s5-tld3"/>
+      <circle cx="370" cy="220" r="11" fill="#000091" class="s5-tld4"/>
+      <circle cx="450" cy="220" r="7" fill="#000091" class="s5-tld5"/>
+      <circle cx="525" cy="220" r="5" fill="#000091" class="s5-tld6"/>
+    </g>
+
+    <g class="s5-tab">
+      <rect x="40" y="270" width="260" height="320" rx="8" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="60" y="294" font-size="12" font-weight="600" fill="#1A1A1A">By party</text>
+      <line x1="60" y1="320" x2="280" y2="320" stroke="#F3F4F6"/>
+      <text x="60"  y="338" font-size="10" font-weight="700" fill="#9CA3AF" letter-spacing="1">PARTY</text>
+      <text x="200" y="338" font-size="10" font-weight="700" fill="#9CA3AF" letter-spacing="1" text-anchor="end">FILED</text>
+      <text x="270" y="338" font-size="10" font-weight="700" fill="#9CA3AF" letter-spacing="1" text-anchor="end">PASSED</text>
+      <line x1="60" y1="346" x2="280" y2="346" stroke="#F3F4F6"/>
+      <g class="s5-tr1">
+        <text x="60" y="370" font-size="12" fill="#1A1A1A">LFI</text>
+        <text x="200" y="370" font-size="12" fill="#1A1A1A" text-anchor="end" class="mono">32</text>
+        <text x="270" y="370" font-size="12" fill="#059669" text-anchor="end" class="mono">4</text>
+      </g>
+      <g class="s5-tr2">
+        <text x="60" y="394" font-size="12" fill="#1A1A1A">SOC</text>
+        <text x="200" y="394" font-size="12" fill="#1A1A1A" text-anchor="end" class="mono">24</text>
+        <text x="270" y="394" font-size="12" fill="#059669" text-anchor="end" class="mono">6</text>
+      </g>
+      <g class="s5-tr3">
+        <text x="60" y="418" font-size="12" fill="#1A1A1A">LR</text>
+        <text x="200" y="418" font-size="12" fill="#1A1A1A" text-anchor="end" class="mono">21</text>
+        <text x="270" y="418" font-size="12" fill="#059669" text-anchor="end" class="mono">8</text>
+      </g>
+      <g class="s5-tr4">
+        <text x="60" y="442" font-size="12" fill="#1A1A1A">REN</text>
+        <text x="200" y="442" font-size="12" fill="#1A1A1A" text-anchor="end" class="mono">13</text>
+        <text x="270" y="442" font-size="12" fill="#059669" text-anchor="end" class="mono">11</text>
+      </g>
+    </g>
+
+    <g class="s5-ch">
+      <rect x="320" y="270" width="260" height="320" rx="8" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="340" y="294" font-size="12" font-weight="600" fill="#1A1A1A">Votes — for / against</text>
+      <line x1="350" y1="540" x2="560" y2="540" stroke="#E5E7EB"/>
+      <g class="s5-cb1">
+        <rect x="370" y="430" width="40" height="110" fill="#000091" opacity="0.85"/>
+        <text x="390" y="558" font-size="10" fill="#6B6B6B" class="mono" text-anchor="middle">LFI</text>
+      </g>
+      <g class="s5-cb2">
+        <rect x="420" y="450" width="40" height="90" fill="#000091" opacity="0.85"/>
+        <text x="440" y="558" font-size="10" fill="#6B6B6B" class="mono" text-anchor="middle">SOC</text>
+      </g>
+      <g class="s5-cb3">
+        <rect x="470" y="380" width="40" height="160" fill="#000091" opacity="0.85"/>
+        <text x="490" y="558" font-size="10" fill="#6B6B6B" class="mono" text-anchor="middle">LR</text>
+      </g>
+      <g class="s5-cb4">
+        <rect x="520" y="340" width="40" height="200" fill="#000091" opacity="0.85"/>
+        <text x="540" y="558" font-size="10" fill="#6B6B6B" class="mono" text-anchor="middle">REN</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SCENE 6 — HYPERSKILLS                                         -->
+  <!-- ============================================================ -->
+  <g class="s6">
+    <text x="640" y="62" font-size="14" font-weight="700" fill="#000091" text-anchor="middle" letter-spacing="2" class="s6-title">SHARING THE COMPOSED UI</text>
+    <text x="640" y="100" font-size="22" font-weight="700" fill="#1A1A1A" text-anchor="middle" class="s6-title">
+      HyperSkills — UI as a portable URL
+    </text>
+
+    <g class="s6-form">
+      <rect x="240" y="160" width="800" height="100" rx="10" fill="#FFFFFF" stroke="#E5E7EB" filter="url(#shadow)"/>
+      <text x="640" y="222" font-size="22" fill="#1A1A1A" text-anchor="middle" class="mono">
+        https://example.com<tspan>?hs=</tspan><tspan fill="#000091">gz</tspan>.<tspan fill="#059669">base64</tspan>(skill)
+      </text>
+    </g>
+
+    <g class="s6-src">
+      <line x1="430" y1="260" x2="430" y2="310" stroke="#6B6B6B"/>
+      <rect x="270" y="310" width="320" height="64" rx="6" fill="#FFFFFF" stroke="#6B6B6B"/>
+      <text x="284" y="332" font-size="10" font-weight="700" fill="#6B6B6B" letter-spacing="1.5">SOURCE URL</text>
+      <text x="284" y="352" font-size="12" fill="#1A1A1A">where the skill is hosted</text>
+      <text x="284" y="368" font-size="11" fill="#6B6B6B">used in the SHA-256 hash</text>
+    </g>
+
+    <g class="s6-gz">
+      <line x1="715" y1="260" x2="715" y2="390" stroke="#000091"/>
+      <rect x="600" y="390" width="240" height="64" rx="6" fill="#FFFFFF" stroke="#000091"/>
+      <text x="614" y="412" font-size="10" font-weight="700" fill="#000091" letter-spacing="1.5">GZIP</text>
+      <text x="614" y="432" font-size="12" fill="#1A1A1A">compressed</text>
+      <text x="614" y="448" font-size="11" fill="#6B6B6B">to fit in URL length</text>
+    </g>
+
+    <g class="s6-b64">
+      <line x1="845" y1="260" x2="845" y2="310" stroke="#059669"/>
+      <rect x="745" y="310" width="240" height="64" rx="6" fill="#FFFFFF" stroke="#059669"/>
+      <text x="759" y="332" font-size="10" font-weight="700" fill="#059669" letter-spacing="1.5">BASE64</text>
+      <text x="759" y="352" font-size="12" fill="#1A1A1A">URL-safe encoding</text>
+      <text x="759" y="368" font-size="11" fill="#6B6B6B">appended to source URL</text>
+    </g>
+
+    <text x="640" y="540" font-size="13" fill="#1A1A1A" text-anchor="middle" class="s6-hash">
+      Each version carries a <tspan font-weight="600">SHA-256 hash</tspan> of <tspan class="mono">source_url + content</tspan>, chainable for traceability.
+    </text>
+    <text x="640" y="610" font-size="11" fill="#9CA3AF" text-anchor="middle" class="s6-quote">
+      Defined at hyperskills.net · npm install hyperskills
+    </text>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- SCENE 7 — END CARD                                            -->
+  <!-- ============================================================ -->
+  <g class="s7">
+    <rect width="1280" height="720" fill="#FAFAFA"/>
+    <rect width="1280" height="4" fill="url(#brand)"/>
+
+    <text x="640" y="240" font-size="13" font-weight="700" fill="#000091" text-anchor="middle" letter-spacing="2">WEBMCP-AUTO-UI</text>
+    <text x="640" y="310" font-size="40" font-weight="700" fill="#1A1A1A" text-anchor="middle">
+      WebMCP widgets connected to
+    </text>
+    <text x="640" y="358" font-size="40" font-weight="700" fill="#1A1A1A" text-anchor="middle">
+      multiple MCP servers
+    </text>
+
+    <line x1="540" y1="410" x2="740" y2="410" stroke="#E5E7EB"/>
+
+    <text x="640" y="460" font-size="14" fill="#6B6B6B" text-anchor="middle" class="mono">
+      @webmcp-auto-ui/agent · core · sdk · ui
+    </text>
+    <text x="640" y="488" font-size="14" fill="#6B6B6B" text-anchor="middle" class="mono">
+      hyperskills.net
+    </text>
+
+    <text x="640" y="600" font-size="12" fill="#9CA3AF" text-anchor="middle" class="mono">
+      AGPL-3.0-or-later · Copyright CERI SAS
+    </text>
+  </g>
+
+  </g><!-- /camera wrapper -->
+
+</svg>
+
+</div>
+
+</body>
+</html>
