@@ -4,7 +4,7 @@ https://github.com/user-attachments/assets/689126f5-64d9-48dd-8ac4-defb3cbf37d4
 
 Dynamic UI composition by humans and LLMs connected to multiple MCP servers.
 
-An LLM agent (e.g. Claude, Gemini, ChatGPT, Mistral, Qwen via remote API, Gemma via in-browser WASM, or any Ollama model locally) reads available tools and recipes from MCP + WebMCP servers, fetches data, and assembles typed UI blocks (stat cards, tables, charts, timelines, etc.). Each block is exposed as a live WebMCP tool that agents can read and update. The system implements [HyperSkills](https://hyperskills.net/) for portable, versionable UI snapshots (`?hs=gzip.base64`).
+An LLM agent (via remote API or in-browser WASM/WebGPU or locally) reads available tools and recipes from MCP + WebMCP servers, fetches data, and assembles typed UI blocks (stat cards, tables, charts, dashboards, geo...). Each block is exposed as a live WebMCP tool that agents can read and update. The system implements [HyperSkills](https://hyperskills.net/) (hyperlink skills or recipes) for portable, versionable UI snapshots (`?hs=gzip.base64`).
 
 ## Packages
 
