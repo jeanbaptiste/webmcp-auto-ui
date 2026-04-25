@@ -17,7 +17,7 @@
   "scripts": {
     "prebuild": "node ../../scripts/recipes-to-ts.js",
     "check": "tsc --noEmit",
-    "build": "node ../../scripts/recipes-to-ts.js && tsc"
+    "build": "tsc"
   },
   "publishConfig": {
     "access": "public"

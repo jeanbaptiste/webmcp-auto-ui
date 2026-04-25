@@ -512,16 +512,48 @@ if [ -z "$MAX_JOBS" ]; then
   [ "$MAX_JOBS" -gt 4 ] && MAX_JOBS=4
 fi
 
+# ── Package fingerprint helpers ─────────────────────────────────────────────
+pkg_fingerprint() {
+  local pkg=$1
+  local extra=""
+  [ "$pkg" = "agent" ] && extra="$LOCAL_ROOT/packages/agent/recipes"
+  {
+    find "$LOCAL_ROOT/packages/$pkg/src" "$LOCAL_ROOT/packages/$pkg/package.json" $extra \
+      -type f 2>/dev/null
+  } | LC_ALL=C sort | xargs shasum -a 256 2>/dev/null | shasum -a 256 | cut -c1-16
+}
+
+pkg_changed() {
+  local pkg=$1
+  [ "$FORCE" = "1" ] && return 0
+  local f="$STATE_DIR/pkg.$pkg.sha"
+  [ ! -f "$f" ] && return 0
+  local current; current=$(pkg_fingerprint "$pkg")
+  [ "$(cat "$f")" = "$current" ] && return 1
+  return 0
+}
+
+pkg_record() {
+  local pkg=$1
+  mkdir -p "$STATE_DIR"
+  pkg_fingerprint "$pkg" > "$STATE_DIR/pkg.$pkg.sha"
+}
+
 # Preamble: workspace versions sync + package builds (skipped on dry-run)
 if [ "$DRY_RUN" != "1" ]; then
   ROOT_VERSION=$(node -e "console.log(require('$LOCAL_ROOT/package.json').version)")
   for pkg in "$LOCAL_ROOT"/apps/*/package.json "$LOCAL_ROOT"/packages/*/package.json; do
     node -e "const f=require('fs'); const p=JSON.parse(f.readFileSync('$pkg','utf8')); if(p.version!=='$ROOT_VERSION'){p.version='$ROOT_VERSION'; f.writeFileSync('$pkg', JSON.stringify(p,null,2)+'\n')}"
   done
-  (cd "$LOCAL_ROOT" && npm run build --workspace=packages/core > /dev/null 2>&1) || true
-  (cd "$LOCAL_ROOT" && npm run build --workspace=packages/sdk  > /dev/null 2>&1) || true
-  (cd "$LOCAL_ROOT" && npm run build --workspace=packages/ui   > /dev/null 2>&1) || true
-  (cd "$LOCAL_ROOT" && npm run build --workspace=packages/agent > /dev/null 2>&1) || true
+  for pkg in core sdk ui agent; do
+    if pkg_changed "$pkg"; then
+      if (cd "$LOCAL_ROOT" && npm run build --workspace=packages/$pkg > /dev/null 2>&1); then
+        pkg_record "$pkg"
+      else
+        warn "  [pkg:$pkg] build failed"
+      fi
+    fi
+  done
 fi
 
 # ── Progress + sampler ──────────────────────────────────────────────────────
