@@ -515,10 +515,8 @@ fi
 # ── Package fingerprint helpers ─────────────────────────────────────────────
 pkg_fingerprint() {
   local pkg=$1
-  local extra=""
-  [ "$pkg" = "agent" ] && extra="$LOCAL_ROOT/packages/agent/recipes"
   {
-    find "$LOCAL_ROOT/packages/$pkg/src" "$LOCAL_ROOT/packages/$pkg/package.json" $extra \
+    find "$LOCAL_ROOT/packages/$pkg/src" "$LOCAL_ROOT/packages/$pkg/package.json" \
       -type f 2>/dev/null
   } | LC_ALL=C sort | xargs shasum -a 256 2>/dev/null | shasum -a 256 | cut -c1-16
 }
