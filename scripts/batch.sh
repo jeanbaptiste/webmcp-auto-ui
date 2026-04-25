@@ -12,11 +12,23 @@ set -euo pipefail
 #   ./scripts/batch.sh --no-docs          # skip docs update
 #   ./scripts/batch.sh --message "msg"    # custom commit message
 #   ./scripts/batch.sh --dry-run          # show what would be done
+#   ./scripts/batch.sh --no-progress      # disable progress bars
+#   ./scripts/batch.sh --json             # JSON events on stderr
+#   ./scripts/batch.sh --quiet            # silent (errors only)
+#   ./scripts/batch.sh --stats            # dump timings cache and exit
+#   ./scripts/batch.sh --reset-cache      # reset ETA cache and exit
 #
-# Combines: commit → deploy → push → bump → push → tag (triggers npm publish via CI)
+# Combines: commit → docs → deploy → push → bump → push → tag
 # ─────────────────────────────────────────────────────────────────────────────
 
 LOCAL_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# ── Source instrumentation libs ──────────────────────────────────────────────
+
+# shellcheck disable=SC1091
+source "$LOCAL_ROOT/scripts/lib/progress.sh"
+# shellcheck disable=SC1091
+source "$LOCAL_ROOT/scripts/lib/eta.sh"
 
 # ── Colors ──────────────────────────────────────────────────────────────────
 
@@ -40,14 +52,21 @@ NO_BUMP=0
 NO_TAG=0
 NO_DOCS=0
 COMMIT_MSG=""
+SHOW_STATS=0
+RESET_CACHE=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --dry-run)    DRY_RUN=1 ;;
-    --no-deploy)  NO_DEPLOY=1 ;;
-    --no-bump)    NO_BUMP=1 ;;
-    --no-tag)     NO_TAG=1 ;;
-    --no-docs)    NO_DOCS=1 ;;
+    --dry-run)     DRY_RUN=1 ;;
+    --no-deploy)   NO_DEPLOY=1 ;;
+    --no-bump)     NO_BUMP=1 ;;
+    --no-tag)      NO_TAG=1 ;;
+    --no-docs)     NO_DOCS=1 ;;
+    --no-progress) export PB_NO_PROGRESS=1 ;;
+    --json)        export PB_JSON=1 ;;
+    --quiet)       export PB_NO_PROGRESS=1 ;;
+    --stats)       SHOW_STATS=1 ;;
+    --reset-cache) RESET_CACHE=1 ;;
     --message)
       shift
       COMMIT_MSG="$1"
@@ -59,11 +78,43 @@ while [ $# -gt 0 ]; do
     *)
       echo "Unknown flag: $1"
       echo "Usage: ./scripts/batch.sh [--no-deploy] [--no-bump] [--no-docs] [--message \"msg\"] [--dry-run]"
+      echo "                          [--no-progress] [--json] [--quiet] [--stats] [--reset-cache]"
       exit 1
       ;;
   esac
   shift
 done
+
+# ── --stats / --reset-cache short-circuits ──────────────────────────────────
+
+if [ "$SHOW_STATS" = "1" ]; then
+  eta_init
+  eta_stats
+  exit 0
+fi
+
+if [ "$RESET_CACHE" = "1" ]; then
+  eta_init
+  eta_reset_cache
+  echo "ETA cache reset: $ETA_CACHE_FILE"
+  exit 0
+fi
+
+# ── Load ETA history ────────────────────────────────────────────────────────
+
+eta_init
+
+# ── Stage definitions (id, label, weight) ───────────────────────────────────
+
+# Stages match the actual pipeline (from backup): pre-checks, commit, docs,
+# deploy, push, bump, tag. Weights sum to ~100.
+STAGE_IDS=(pre-checks commit docs deploy push bump tag)
+STAGE_LABELS=("pre-checks" "commit" "docs" "deploy" "push" "bump" "tag")
+STAGE_WEIGHTS=(2 8 5 40 5 25 15)
+
+# Per-stage start time (for eta_record on success).
+STAGE_START=()
+for _ in "${STAGE_IDS[@]}"; do STAGE_START+=("0"); done
 
 # ── Timer helpers ───────────────────────────────────────────────────────────
 
@@ -113,6 +164,74 @@ bump_patch() {
   echo "${major}.${minor}.$(( patch + 1 ))"
 }
 
+# ── Progress init ───────────────────────────────────────────────────────────
+
+PB_INSTRUMENTED=0
+if [ "${PB_NO_PROGRESS:-0}" != "1" ]; then
+  pb_init
+  pb_set_header "$(printf '%bbatch — release pipeline%b' "$BOLD" "$NC")"
+  for i in "${!STAGE_IDS[@]}"; do
+    pb_register "batch:${STAGE_IDS[$i]}" "${STAGE_LABELS[$i]}" "${STAGE_WEIGHTS[$i]}"
+  done
+  PB_INSTRUMENTED=1
+fi
+
+# Wrappers: noop when progress disabled.
+_p_set()  { [ "$PB_INSTRUMENTED" = "1" ] && pb_set_status "batch:$1" "$2" || true; }
+_p_tick() { [ "$PB_INSTRUMENTED" = "1" ] && pb_tick "batch:$1" "$2" || true; }
+_p_done() { [ "$PB_INSTRUMENTED" = "1" ] && pb_done "batch:$1" || true; }
+_p_fail() { [ "$PB_INSTRUMENTED" = "1" ] && pb_fail "batch:$1" "${2:-failed}" || true; }
+
+# Track which stage is currently active (for trap).
+CURRENT_STAGE=""
+
+stage_begin() {
+  CURRENT_STAGE="$1"
+  local i
+  for i in "${!STAGE_IDS[@]}"; do
+    if [ "${STAGE_IDS[$i]}" = "$1" ]; then
+      STAGE_START[$i]=$(date +%s)
+      break
+    fi
+  done
+  _p_tick "$1" 1
+}
+
+stage_end_ok() {
+  local id="$1"
+  local i
+  for i in "${!STAGE_IDS[@]}"; do
+    if [ "${STAGE_IDS[$i]}" = "$id" ]; then
+      local dur=$(( $(date +%s) - ${STAGE_START[$i]} ))
+      [[ "${DRY_RUN:-0}" == "1" ]] || eta_record "batch.${id}" "$dur" || true
+      break
+    fi
+  done
+  _p_done "$id"
+  CURRENT_STAGE=""
+}
+
+stage_skip() {
+  local id="$1"
+  _p_set "$id" "skipped"
+  _p_done "$id"
+}
+
+# ── Trap: on error, mark current stage failed and finish bars ───────────────
+
+_on_err() {
+  local code=$?
+  if [ -n "$CURRENT_STAGE" ]; then
+    _p_fail "$CURRENT_STAGE" "exited with code $code"
+  fi
+  if [ "$PB_INSTRUMENTED" = "1" ]; then
+    pb_finish || true
+  fi
+  [[ "${DRY_RUN:-0}" == "1" ]] || eta_save 2>/dev/null || true
+  exit "$code"
+}
+trap _on_err ERR
+
 # ── Pre-checks ──────────────────────────────────────────────────────────────
 
 echo ""
@@ -127,9 +246,9 @@ if [ "$DRY_RUN" = "1" ]; then
 fi
 echo ""
 
-# Check git status
 echo -e "${BOLD}Pre-checks${NC}"
 step_start "pre-checks"
+stage_begin "pre-checks"
 
 cd "$LOCAL_ROOT"
 
@@ -152,8 +271,10 @@ if [ -n "$UNPUSHED" ]; then
   ok "$UNPUSHED_COUNT unpushed commit(s)"
 fi
 
-if [ "$HAS_LOCAL_CHANGES" = "0" ] && [ "$HAS_UNPUSHED" = "0" ]; then
+if [ "$HAS_LOCAL_CHANGES" = "0" ] && [ "$HAS_UNPUSHED" = "0" ] && [ "$DRY_RUN" != "1" ]; then
   fail "nothing to do — working tree is clean and all commits are pushed"
+  stage_end_ok "pre-checks"
+  [ "$PB_INSTRUMENTED" = "1" ] && pb_finish
   exit 0
 fi
 
@@ -165,33 +286,33 @@ else
 fi
 
 step_end "pre-checks"
+stage_end_ok "pre-checks"
 echo ""
 
 # ── Step 1: Commit ──────────────────────────────────────────────────────────
 
 echo -e "${BOLD}Step 1 — Commit${NC}"
 step_start "commit"
+stage_begin "commit"
 
 if [ "$HAS_LOCAL_CHANGES" = "1" ]; then
-  # Stage modified/deleted tracked files
   if [ -n "$MODIFIED" ]; then
     info "staging modified files..."
-    git add -u
+    _p_set "commit" "staging modified"
+    [ "$DRY_RUN" = "1" ] || git add -u
   fi
 
-  # Stage untracked files only if they're in apps/ or packages/
   if [ -n "$UNTRACKED" ]; then
     RELEVANT_UNTRACKED=$(echo "$UNTRACKED" | grep -E '^(apps/|packages/)' || true)
     if [ -n "$RELEVANT_UNTRACKED" ]; then
       info "staging untracked files in apps/ and packages/..."
-      echo "$RELEVANT_UNTRACKED" | xargs git add
+      _p_set "commit" "staging untracked"
+      [ "$DRY_RUN" = "1" ] || echo "$RELEVANT_UNTRACKED" | xargs git add
     fi
   fi
 
-  # Determine commit message
   if [ -z "$COMMIT_MSG" ]; then
-    if [ -t 0 ]; then
-      # Interactive — prompt
+    if [ -t 0 ] && [ "$DRY_RUN" != "1" ]; then
       echo -e "  ${CYAN}?${NC} Commit message (default: release: v${VERSION}):"
       read -r -p "    > " COMMIT_MSG
     fi
@@ -206,6 +327,7 @@ if [ "$HAS_LOCAL_CHANGES" = "1" ]; then
     info "$STAGED_COUNT files staged"
     git reset HEAD -- . > /dev/null 2>&1 || true
   else
+    _p_set "commit" "git commit"
     git commit -m "$COMMIT_MSG"
     ok "committed: $COMMIT_MSG"
   fi
@@ -214,6 +336,7 @@ else
 fi
 
 step_end "commit"
+stage_end_ok "commit"
 echo ""
 
 # ── Step 2: Docs update ────────────────────────────────────────────────────
@@ -221,16 +344,18 @@ echo ""
 if [ "$NO_DOCS" = "1" ]; then
   echo -e "${BOLD}Step 2 — Docs update${NC}"
   skip "docs update"
+  stage_skip "docs"
   echo ""
 else
   echo -e "${BOLD}Step 2 — Docs update${NC}"
   step_start "docs"
+  stage_begin "docs"
 
   if [ "$DRY_RUN" = "1" ]; then
     skip "would run npm run docs:sync"
   else
+    _p_set "docs" "npm run docs:sync"
     if npm run docs:sync --if-present > /dev/null 2>&1; then
-      # Check if docs:sync created changes
       if [ -n "$(git diff --name-only 2>/dev/null)" ]; then
         git add -u
         git commit -m "docs: sync after v${VERSION}"
@@ -244,6 +369,7 @@ else
   fi
 
   step_end "docs"
+  stage_end_ok "docs"
   echo ""
 fi
 
@@ -252,19 +378,30 @@ fi
 if [ "$NO_DEPLOY" = "1" ]; then
   echo -e "${BOLD}Step 3 — Deploy${NC}"
   skip "deploy"
+  stage_skip "deploy"
   echo ""
 else
   echo -e "${BOLD}Step 3 — Deploy${NC}"
   step_start "deploy"
+  stage_begin "deploy"
 
+  # Pass --no-progress to deploy.sh so its bars don't collide with batch's
+  # global stages. If deploy.sh doesn't (yet) accept --no-progress, retry
+  # without the flag.
   if [ "$DRY_RUN" = "1" ]; then
     skip "would run ./scripts/deploy.sh --force --dry-run"
-    "$LOCAL_ROOT/scripts/deploy.sh" --force --dry-run
+    if ! "$LOCAL_ROOT/scripts/deploy.sh" --force --dry-run --no-progress 2>/dev/null; then
+      "$LOCAL_ROOT/scripts/deploy.sh" --force --dry-run || true
+    fi
   else
-    "$LOCAL_ROOT/scripts/deploy.sh" --force
+    _p_set "deploy" "./scripts/deploy.sh --force"
+    if ! PB_NO_PROGRESS=1 "$LOCAL_ROOT/scripts/deploy.sh" --force --no-progress 2>/dev/null; then
+      "$LOCAL_ROOT/scripts/deploy.sh" --force
+    fi
   fi
 
   step_end "deploy"
+  stage_end_ok "deploy"
   echo ""
 fi
 
@@ -272,10 +409,12 @@ fi
 
 echo -e "${BOLD}Step 4 — Push${NC}"
 step_start "push"
+stage_begin "push"
 
 if [ "$DRY_RUN" = "1" ]; then
   skip "would push to origin"
 else
+  _p_set "push" "git push"
   if git push 2>/dev/null; then
     ok "pushed via SSH"
   else
@@ -287,12 +426,14 @@ else
       ok "pushed via HTTPS"
     else
       fail "push failed (both SSH and HTTPS)"
+      _p_fail "push" "ssh+https failed"
       exit 1
     fi
   fi
 fi
 
 step_end "push"
+stage_end_ok "push"
 echo ""
 
 # ── Step 5: Bump ────────────────────────────────────────────────────────────
@@ -300,10 +441,12 @@ echo ""
 if [ "$NO_BUMP" = "1" ]; then
   echo -e "${BOLD}Step 5 — Bump version${NC}"
   skip "version bump"
+  stage_skip "bump"
   echo ""
 else
   echo -e "${BOLD}Step 5 — Bump version${NC}"
   step_start "bump"
+  stage_begin "bump"
 
   CURRENT=$(current_version)
   NEXT=$(bump_patch "$CURRENT")
@@ -312,6 +455,7 @@ else
     skip "would bump $CURRENT → $NEXT in ${#BUMP_FILES[@]} files"
   else
     info "bumping $CURRENT → $NEXT..."
+    _p_set "bump" "$CURRENT → $NEXT"
 
     for pkg in "${BUMP_FILES[@]}"; do
       if [ -f "$pkg" ]; then
@@ -326,6 +470,7 @@ else
     ok "updated ${#BUMP_FILES[@]} package.json files"
 
     info "updating package-lock.json..."
+    _p_set "bump" "npm install lock"
     npm install --package-lock-only > /dev/null 2>&1
     ok "lock file updated"
 
@@ -334,6 +479,7 @@ else
     ok "committed bump: $NEXT"
 
     info "pushing bump..."
+    _p_set "bump" "pushing bump"
     if git push 2>/dev/null; then
       ok "pushed bump via SSH"
     else
@@ -345,12 +491,14 @@ else
         ok "pushed bump via HTTPS"
       else
         fail "bump push failed"
+        _p_fail "bump" "push failed"
         exit 1
       fi
     fi
   fi
 
   step_end "bump"
+  stage_end_ok "bump"
   echo ""
 fi
 
@@ -359,10 +507,12 @@ fi
 if [ "$NO_TAG" = "1" ] || [ "$NO_BUMP" = "1" ]; then
   echo -e "${BOLD}Step 6 — Tag npm publish${NC}"
   skip "npm publish tag"
+  stage_skip "tag"
   echo ""
 else
   echo -e "${BOLD}Step 6 — Tag npm publish${NC}"
   step_start "tag"
+  stage_begin "tag"
 
   FINAL=$(current_version)
   TAG="v${FINAL}"
@@ -370,8 +520,10 @@ else
   if [ "$DRY_RUN" = "1" ]; then
     skip "would create and push tag $TAG"
   else
+    _p_set "tag" "git tag $TAG"
     if git tag "$TAG" 2>/dev/null; then
       info "created tag $TAG"
+      _p_set "tag" "git push tag"
       if git push origin "$TAG" 2>/dev/null; then
         ok "pushed tag $TAG — npm publish workflow triggered"
       else
@@ -390,24 +542,39 @@ else
   fi
 
   step_end "tag"
+  stage_end_ok "tag"
   echo ""
+fi
+
+# ── Save ETA history ────────────────────────────────────────────────────────
+
+[[ "${DRY_RUN:-0}" == "1" ]] || eta_save 2>/dev/null || true
+
+# ── Finish progress ─────────────────────────────────────────────────────────
+
+if [ "$PB_INSTRUMENTED" = "1" ]; then
+  pb_finish
 fi
 
 # ── Summary ─────────────────────────────────────────────────────────────────
 
 TOTAL_ELAPSED=$(( $(date +%s) - TOTAL_START ))
 FINAL_VERSION=$(current_version)
+TOTAL_FMT=$(eta_format_duration "$TOTAL_ELAPSED")
 
 echo -e "${BOLD}────────────────────────────────────────${NC}"
 echo -e "${BOLD}Summary${NC}"
 echo ""
 echo -e "  version: ${BOLD}v${FINAL_VERSION}${NC}"
-echo -e "  total:   ${TOTAL_ELAPSED}s"
+echo -e "  total:   ${TOTAL_FMT}"
 echo ""
 
 if [ "$DRY_RUN" = "1" ]; then
   echo -e "  ${YELLOW}Dry run complete — no changes were made.${NC}"
+  echo -e "  Batch dry-run finished in ${TOTAL_FMT}."
+  echo -e "  (dry-run: cache ETA non mis à jour)"
 else
   echo -e "  ${GREEN}Release complete.${NC}"
+  echo -e "  Batch done in ${TOTAL_FMT}."
 fi
 echo ""

@@ -9,6 +9,10 @@ build/
 # Deploy fingerprint state (skip rebuild when sources unchanged)
 .deploy-state/
 
+# Deploy ETA cache (timings history) and script backups
+.deploy-cache/
+*.back
+
 # Environment
 .env
 .env.*

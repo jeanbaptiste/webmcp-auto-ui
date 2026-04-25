@@ -2,60 +2,128 @@
 set -euo pipefail
 
 # ─────────────────────────────────────────────────────────────────────────────
-# deploy.sh — Deploy webmcp-auto-ui apps to production
+# deploy.sh — Deploy webmcp-auto-ui apps to production (instrumented)
 #
 # Usage:
-#   ./scripts/deploy.sh              # deploy all apps
-#   ./scripts/deploy.sh viewer       # deploy one app
-#   ./scripts/deploy.sh home flex    # deploy specific apps
-#   ./scripts/deploy.sh --dry-run    # show what would be deployed (no changes)
-#   ./scripts/deploy.sh --with-docs  # deploy + update documentation
-#   ./scripts/deploy.sh --jobs N     # cap parallel builds (default 3)
+#   ./scripts/deploy.sh                  # deploy all apps
+#   ./scripts/deploy.sh viewer           # deploy one app
+#   ./scripts/deploy.sh home flex        # deploy specific apps
+#   ./scripts/deploy.sh --dry-run        # simulate, no changes
+#   ./scripts/deploy.sh --with-docs      # deploy + update documentation
+#   ./scripts/deploy.sh --force          # ignore fingerprint cache
+#   ./scripts/deploy.sh -j N|--jobs N    # parallel workers (default min(4, n))
+#   ./scripts/deploy.sh --no-progress    # disable progress bars (legacy)
+#   ./scripts/deploy.sh --quiet          # silent (errors only)
+#   ./scripts/deploy.sh --json           # JSON events on stderr
+#   ./scripts/deploy.sh --stats          # show ETA cache stats and exit
+#   ./scripts/deploy.sh --reset-cache    # reset ETA cache and exit
+#   ./scripts/deploy.sh --help           # show this help
 #
-# IMPORTANT: This script knows the correct deploy path for each app.
-# DO NOT deploy manually with scp — use this script instead.
-#
-# ─── Parallelisation ─────────────────────────────────────────────────────────
-# Phase 1 (BUILD, parallel) : `npm run build` is run for all apps in parallel,
-#   capped at MAX_JOBS=3 by default. A single Vite build for `flex` peaks at
-#   ~2-3 GB RSS, so on a 16 GB Mac we keep the pool small to avoid swap death.
-#   Stdout/stderr from each background build is buffered to a log file and
-#   flushed (with [app] prefix) after the build completes — no interleaving.
-#
-# Phase 2 (SHIP, sequential) : rsync + sha256 integrity check + ssh restart
-#   are run one app at a time. SSH multiplexing on the server side and shared
-#   systemd state make sequential safer and rarely the bottleneck (most time
-#   is in the build phase).
-#
-# Skip / fingerprint logic runs BEFORE phase 1, exactly as before.
+# IMPORTANT: each app has its own deploy path; never use scp manually.
 # ─────────────────────────────────────────────────────────────────────────────
+
+LOCAL_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/lib/progress.sh"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/lib/eta.sh"
 
 SSH_HOST="bot"
 REMOTE_BASE="/opt/webmcp-demos"
-LOCAL_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PUBLIC_BASE_URL="https://demos.hyperskills.net"
+BACKUP_BASE="/opt/webmcp-demos/.backups"
 
-# Parse flags
+STATE_DIR="$LOCAL_ROOT/.deploy-state"
+BUILD_LOG_DIR="$LOCAL_ROOT/.deploy-state/build-logs"
+RUN_DIR="$LOCAL_ROOT/.deploy-cache/run.$$"
+mkdir -p "$RUN_DIR"
+
+# ── Flag parsing ────────────────────────────────────────────────────────────
 DRY_RUN=0
 WITH_DOCS=false
 FORCE=0
-MAX_JOBS=3
+MAX_JOBS=""
+NO_PROGRESS=0
+QUIET=0
+JSON=0
+SHOW_STATS=0
+RESET_CACHE=0
+SHOW_HELP=0
 REAL_ARGS=()
+
+print_help() {
+  sed -n '4,22p' "$0"
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1; shift ;;
     --with-docs) WITH_DOCS=true; shift ;;
     --force) FORCE=1; shift ;;
-    --jobs) MAX_JOBS="${2:-3}"; shift 2 ;;
+    -j|--jobs) MAX_JOBS="${2:-}"; shift 2 ;;
     --jobs=*) MAX_JOBS="${1#--jobs=}"; shift ;;
+    --no-progress) NO_PROGRESS=1; shift ;;
+    --quiet) QUIET=1; shift ;;
+    --json) JSON=1; shift ;;
+    --stats) SHOW_STATS=1; shift ;;
+    --reset-cache) RESET_CACHE=1; shift ;;
+    -h|--help) SHOW_HELP=1; shift ;;
     *) REAL_ARGS+=("$1"); shift ;;
   esac
 done
 set -- "${REAL_ARGS[@]+"${REAL_ARGS[@]}"}"
 
-# ── Fingerprint-based skip (rebuild only when sources changed) ───────────────
-STATE_DIR="$LOCAL_ROOT/.deploy-state"
-BUILD_LOG_DIR="$LOCAL_ROOT/.deploy-state/build-logs"
+if [ "$SHOW_HELP" = "1" ]; then
+  print_help
+  exit 0
+fi
 
+if [ "$NO_PROGRESS" = "1" ]; then export PB_NO_PROGRESS=1; fi
+if [ "$QUIET" = "1" ]; then export PB_NO_PROGRESS=1; fi
+if [ "$JSON" = "1" ]; then export PB_JSON=1; fi
+
+# ── Early-exit modes ────────────────────────────────────────────────────────
+eta_init
+
+if [ "$RESET_CACHE" = "1" ]; then
+  eta_reset_cache
+  echo "ETA cache reset: $ETA_CACHE_FILE"
+  exit 0
+fi
+
+if [ "$SHOW_STATS" = "1" ]; then
+  echo "ETA cache: $ETA_CACHE_FILE"
+  echo
+  eta_stats
+  exit 0
+fi
+
+# ── App metadata ────────────────────────────────────────────────────────────
+ALL_APPS=(home flex viewer showcase todo recipes boilerplate notebook-viewer)
+KNOWN_APPS_RE='^(home|flex|viewer|showcase|todo|recipes|boilerplate|notebook-viewer)$'
+
+app_healthcheck_url() {
+  case "$1" in
+    notebook-viewer) echo "https://nb.hyperskills.net/api/health" ;;
+    flex|viewer|recipes|showcase|boilerplate|home|todo) echo "$PUBLIC_BASE_URL/$1/" ;;
+    *) echo "" ;;
+  esac
+}
+
+app_unit() {
+  case "$1" in
+    flex|viewer|recipes|showcase|boilerplate) echo "webmcp-$1" ;;
+    notebook-viewer) echo "notebook-viewer" ;;
+    *) echo "" ;;
+  esac
+}
+
+say()  { [ "$QUIET" = "1" ] || printf '%s\n' "$*"; }
+warn() { printf '%s\n' "$*" >&2; }
+
+# ── Fingerprint-based skip ──────────────────────────────────────────────────
 compute_fingerprint() {
   local app=$1
   {
@@ -91,37 +159,38 @@ record_fingerprint() {
   compute_fingerprint "$app" > "$STATE_DIR/$app.sha"
 }
 
-# Local package version
-LOCAL_VERSION=$(node -e "console.log(require('$LOCAL_ROOT/package.json').version)" 2>/dev/null || echo "?")
+# ── Run helpers ─────────────────────────────────────────────────────────────
+run_ssh() {
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "[DRY] ssh $SSH_HOST $*" >&2
+    return 0
+  fi
+  ssh "$SSH_HOST" "$@"
+}
 
-if [ "$DRY_RUN" = "1" ]; then
-  echo "🔍 DRY RUN — no changes will be made"
-  echo ""
-fi
-
-# ── Backup (rotate: keep only previous version) ────────────────────────────
-BACKUP_BASE="/opt/webmcp-demos/.backups"
+run_rsync() {
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "[DRY] rsync $*" >&2
+    return 0
+  fi
+  rsync "$@"
+}
 
 backup_app() {
   local app=$1
-  if [ "$DRY_RUN" = "1" ]; then return; fi
-  ssh "$SSH_HOST" "mkdir -p $BACKUP_BASE && rm -rf $BACKUP_BASE/$app.prev && cp -a $REMOTE_BASE/$app $BACKUP_BASE/$app.prev 2>/dev/null || true"
-  echo "  [$app] backup → $BACKUP_BASE/$app.prev"
+  [ "$DRY_RUN" = "1" ] && return 0
+  run_ssh "mkdir -p $BACKUP_BASE && rm -rf $BACKUP_BASE/$app.prev && cp -a $REMOTE_BASE/$app $BACKUP_BASE/$app.prev 2>/dev/null || true"
 }
 
 rollback_app() {
   local app=$1
-  echo "  [$app] rolling back from backup..."
-  ssh "$SSH_HOST" "rm -rf $REMOTE_BASE/$app && cp -a $BACKUP_BASE/$app.prev $REMOTE_BASE/$app"
-  local svc="webmcp-$app"
-  ssh "$SSH_HOST" "systemctl restart $svc 2>/dev/null || true"
-  echo "  [$app] ✓ rolled back"
+  warn "  [$app] rolling back from backup..."
+  run_ssh "rm -rf $REMOTE_BASE/$app && cp -a $BACKUP_BASE/$app.prev $REMOTE_BASE/$app"
+  local svc; svc=$(app_unit "$app")
+  [ -n "$svc" ] && run_ssh "systemctl restart $svc 2>/dev/null || true"
 }
 
-# ── Build helpers (phase 1, run in parallel) ────────────────────────────────
-# Each build_<kind> only does: clean local build dir + npm run build.
-# It is safe to run in parallel because each app has its own build dir.
-
+# ── Build helpers ───────────────────────────────────────────────────────────
 build_node() {
   local app=$1
   rm -rf "$LOCAL_ROOT/apps/$app/build"
@@ -132,22 +201,10 @@ build_static() {
   local app=$1
   local env_prefix=""
   if [ "$app" = "home" ] || [ "$app" = "todo" ]; then
-    env_prefix="PUBLIC_BASE_URL=https://demos.hyperskills.net "
+    env_prefix="PUBLIC_BASE_URL=$PUBLIC_BASE_URL "
   fi
   rm -rf "$LOCAL_ROOT/apps/$app/build"
   (cd "$LOCAL_ROOT/apps/$app" && eval "${env_prefix}npm run build" > /dev/null 2>&1)
-}
-
-build_vite_static() {
-  local app=$1
-  rm -rf "$LOCAL_ROOT/apps/$app/dist"
-  (cd "$LOCAL_ROOT/apps/$app" && npm run build > /dev/null 2>&1)
-}
-
-build_astro_node() {
-  local app=$1
-  rm -rf "$LOCAL_ROOT/apps/$app/dist"
-  (cd "$LOCAL_ROOT/apps/$app" && npm run build > /dev/null 2>&1)
 }
 
 build_notebook_viewer() {
@@ -157,314 +214,284 @@ build_notebook_viewer() {
   (cd "$LOCAL_ROOT/apps/$app" && npx tsc server.ts --module nodenext --moduleResolution nodenext --target es2022 --outDir . --skipLibCheck > /dev/null 2>&1)
 }
 
-# Dispatch build by app name → returns 0 ok, non-zero on failure.
 _dispatch_build() {
   local app=$1
   case "$app" in
     flex|viewer|recipes|boilerplate|showcase) build_node "$app" ;;
     home|todo)                                build_static "$app" ;;
     notebook-viewer)                          build_notebook_viewer ;;
-    *) echo "  [$app] ✗ unknown app (build phase)" >&2; return 1 ;;
+    *) warn "  [$app] ✗ unknown app (build phase)"; return 1 ;;
   esac
 }
 
-# ── Ship helpers (phase 2, sequential) ──────────────────────────────────────
-# Assume build dir is already populated from phase 1.
+# ── Ship helpers ────────────────────────────────────────────────────────────
+_have_pv() { command -v pv >/dev/null 2>&1; }
 
 ship_node_root() {
   local app=$1
-  local app_version
-  app_version=$(node -e "console.log(require('$LOCAL_ROOT/apps/$app/package.json').version)" 2>/dev/null || echo "?")
-  local remote_version
-  remote_version=$(ssh "$SSH_HOST" "node -e \"try{console.log(require('$REMOTE_BASE/$app/package.json').version)}catch{console.log('?')}\"" 2>/dev/null || echo "?")
-  if [ "$remote_version" != "?" ] && [ "$remote_version" = "$app_version" ]; then
-    echo "  [$app] ⚠ version $app_version already deployed — continuing anyway"
-  fi
-  backup_app "$app"
-  echo "  [$app] syncing build (rsync)..."
   cp "$LOCAL_ROOT/apps/$app/package.json" "$LOCAL_ROOT/apps/$app/build/package.json"
-  rsync -az --delete --exclude='.env' "$LOCAL_ROOT/apps/$app/build/" "$SSH_HOST:$REMOTE_BASE/$app/"
-  echo "  [$app] verifying deploy integrity..."
-  local expected actual
-  expected=$(sha256sum "$LOCAL_ROOT/apps/$app/build/index.js" | cut -d' ' -f1)
-  actual=$(ssh "$SSH_HOST" "sha256sum $REMOTE_BASE/$app/index.js | cut -d' ' -f1")
-  if [ "$expected" != "$actual" ]; then
-    echo "  [$app] ✗ INTEGRITY ERROR — deployed file ≠ local build (sha256 mismatch)"
-    exit 1
+  run_rsync -az --delete --exclude='.env' "$LOCAL_ROOT/apps/$app/build/" "$SSH_HOST:$REMOTE_BASE/$app/"
+  if [ "$DRY_RUN" != "1" ]; then
+    local expected actual
+    expected=$(sha256sum "$LOCAL_ROOT/apps/$app/build/index.js" | cut -d' ' -f1)
+    actual=$(ssh "$SSH_HOST" "sha256sum $REMOTE_BASE/$app/index.js | cut -d' ' -f1")
+    if [ "$expected" != "$actual" ]; then
+      warn "  [$app] ✗ INTEGRITY ERROR — sha256 mismatch"
+      return 1
+    fi
+    if ssh "$SSH_HOST" "test -f $REMOTE_BASE/$app/package.json" 2>/dev/null; then
+      ssh "$SSH_HOST" "cd $REMOTE_BASE/$app && npm install --production --silent 2>/dev/null"
+    fi
   fi
-  if ssh "$SSH_HOST" "test -f $REMOTE_BASE/$app/package.json" 2>/dev/null; then
-    echo "  [$app] installing runtime deps on server..."
-    ssh "$SSH_HOST" "cd $REMOTE_BASE/$app && npm install --production --silent 2>/dev/null"
-  fi
-  echo "  [$app] restarting service..."
-  ssh "$SSH_HOST" "systemctl restart webmcp-$app"
-  echo "  [$app] ✓ deployed v$app_version (node index.js at root)"
-}
-
-ship_node_build() {
-  local app=$1
-  local app_version
-  app_version=$(node -e "console.log(require('$LOCAL_ROOT/apps/$app/package.json').version)" 2>/dev/null || echo "?")
-  backup_app "$app"
-  echo "  [$app] syncing build (rsync)..."
-  ssh "$SSH_HOST" "mkdir -p $REMOTE_BASE/$app/build"
-  cp "$LOCAL_ROOT/apps/$app/package.json" "$LOCAL_ROOT/apps/$app/build/package.json"
-  rsync -az --delete --exclude='.env' "$LOCAL_ROOT/apps/$app/build/" "$SSH_HOST:$REMOTE_BASE/$app/build/"
-  echo "  [$app] verifying deploy integrity..."
-  local expected actual
-  expected=$(sha256sum "$LOCAL_ROOT/apps/$app/build/index.js" | cut -d' ' -f1)
-  actual=$(ssh "$SSH_HOST" "sha256sum $REMOTE_BASE/$app/build/index.js | cut -d' ' -f1")
-  if [ "$expected" != "$actual" ]; then
-    echo "  [$app] ✗ INTEGRITY ERROR — sha256 mismatch, rolling back"
-    rollback_app "$app"
-    return 1
-  fi
-  echo "  [$app] restarting service..."
-  ssh "$SSH_HOST" "systemctl restart webmcp-$app"
-  echo "  [$app] ✓ deployed v$app_version (node build/index.js)"
 }
 
 ship_static() {
   local app=$1
-  backup_app "$app"
-  echo "  [$app] syncing build (rsync)..."
-  rsync -az --delete --exclude='.env' "$LOCAL_ROOT/apps/$app/build/" "$SSH_HOST:$REMOTE_BASE/$app/"
-  echo "  [$app] verifying deploy integrity..."
-  local expected actual
-  expected=$(sha256sum "$LOCAL_ROOT/apps/$app/build/index.html" | cut -d' ' -f1)
-  actual=$(ssh "$SSH_HOST" "sha256sum $REMOTE_BASE/$app/index.html | cut -d' ' -f1")
-  if [ "$expected" != "$actual" ]; then
-    echo "  [$app] ✗ INTEGRITY ERROR — sha256 mismatch, rolling back"
-    rollback_app "$app"
-    return 1
+  run_rsync -az --delete --exclude='.env' "$LOCAL_ROOT/apps/$app/build/" "$SSH_HOST:$REMOTE_BASE/$app/"
+  if [ "$DRY_RUN" != "1" ]; then
+    local expected actual
+    expected=$(sha256sum "$LOCAL_ROOT/apps/$app/build/index.html" | cut -d' ' -f1)
+    actual=$(ssh "$SSH_HOST" "sha256sum $REMOTE_BASE/$app/index.html | cut -d' ' -f1")
+    if [ "$expected" != "$actual" ]; then
+      warn "  [$app] ✗ INTEGRITY ERROR — sha256 mismatch"
+      rollback_app "$app"
+      return 1
+    fi
   fi
-  echo "  [$app] ✓ deployed (static)"
-}
-
-ship_vite_static() {
-  local app=$1
-  backup_app "$app"
-  echo "  [$app] syncing dist (rsync)..."
-  rsync -az --delete --exclude='.env' "$LOCAL_ROOT/apps/$app/dist/" "$SSH_HOST:$REMOTE_BASE/$app/"
-  echo "  [$app] verifying deploy integrity..."
-  local expected actual
-  expected=$(sha256sum "$LOCAL_ROOT/apps/$app/dist/index.html" | cut -d' ' -f1)
-  actual=$(ssh "$SSH_HOST" "sha256sum $REMOTE_BASE/$app/index.html | cut -d' ' -f1")
-  if [ "$expected" != "$actual" ]; then
-    echo "  [$app] ✗ INTEGRITY ERROR — sha256 mismatch, rolling back"
-    rollback_app "$app"
-    return 1
-  fi
-  echo "  [$app] ✓ deployed (vite static)"
-}
-
-ship_astro_node() {
-  local app=$1
-  local app_version
-  app_version=$(node -e "console.log(require('$LOCAL_ROOT/apps/$app/package.json').version)" 2>/dev/null || echo "?")
-  backup_app "$app"
-  echo "  [$app] syncing dist (rsync)..."
-  rsync -az --delete --exclude='.env' "$LOCAL_ROOT/apps/$app/dist/" "$SSH_HOST:$REMOTE_BASE/$app/"
-  echo "  [$app] verifying deploy integrity..."
-  local expected actual
-  expected=$(sha256sum "$LOCAL_ROOT/apps/$app/dist/server/entry.mjs" | cut -d' ' -f1)
-  actual=$(ssh "$SSH_HOST" "sha256sum $REMOTE_BASE/$app/server/entry.mjs | cut -d' ' -f1")
-  if [ "$expected" != "$actual" ]; then
-    echo "  [$app] ✗ INTEGRITY ERROR — sha256 mismatch, rolling back"
-    rollback_app "$app"
-    return 1
-  fi
-  echo "  [$app] restarting service..."
-  ssh "$SSH_HOST" "systemctl restart webmcp-$app"
-  echo "  [$app] ✓ deployed v$app_version (astro node)"
 }
 
 ship_notebook_viewer() {
   local app="notebook-viewer"
-  backup_app "$app"
-  echo "  [$app] syncing build/ (rsync)..."
-  rsync -az --delete "$LOCAL_ROOT/apps/$app/build/" "$SSH_HOST:$REMOTE_BASE/$app/build/"
-  echo "  [$app] syncing server.js + package.json..."
-  rsync -az "$LOCAL_ROOT/apps/$app/server.js" "$LOCAL_ROOT/apps/$app/package.json" "$SSH_HOST:$REMOTE_BASE/$app/"
-  echo "  [$app] restarting systemd unit..."
-  ssh "$SSH_HOST" "systemctl restart notebook-viewer"
-  echo "  [$app] ✓ deployed (node+static hybrid)"
+  run_rsync -az --delete "$LOCAL_ROOT/apps/$app/build/" "$SSH_HOST:$REMOTE_BASE/$app/build/"
+  run_rsync -az "$LOCAL_ROOT/apps/$app/server.js" "$LOCAL_ROOT/apps/$app/package.json" "$SSH_HOST:$REMOTE_BASE/$app/"
 }
 
-# Dispatch ship by app name (phase 2)
 _dispatch_ship() {
   local app=$1
   case "$app" in
-    flex)                ship_node_root "flex" ;;
-    viewer)              ship_node_root "viewer" ;;
-    recipes)             ship_node_root "recipes" ;;
-    home)                ship_static "home" ;;
-    todo)                ship_static "todo" ;;
-    boilerplate)         ship_node_root "boilerplate" ;;
-    showcase)            ship_node_root "showcase" ;;
-    notebook-viewer)     ship_notebook_viewer ;;
-    *)
-      echo "  [$app] ✗ unknown app (valid: home, flex, viewer, showcase, todo, recipes, boilerplate, notebook-viewer)"
+    flex|viewer|recipes|boilerplate|showcase) ship_node_root "$app" ;;
+    home|todo)                                ship_static "$app" ;;
+    notebook-viewer)                          ship_notebook_viewer ;;
+    *) warn "  [$app] ✗ unknown app (ship phase)"; return 1 ;;
+  esac
+}
+
+# ── Stage runners (clean / build / upload / restart / healthcheck) ──────────
+# Stage weights (sum 100): clean=5 build=60 upload=25 restart=5 healthcheck=5
+
+run_stage_clean() {
+  local app=$1 id=$2
+  pb_set_status "$id" "clean"
+  local start; start=$(date +%s)
+  eta_estimate "deploy.$app.clean" >/dev/null
+  if [ "$DRY_RUN" = "1" ]; then
+    sleep 0.05
+  else
+    backup_app "$app" || true
+  fi
+  pb_tick "$id" 5
+  [[ "${DRY_RUN:-0}" == "1" ]] || eta_record "deploy.$app.clean" $(( $(date +%s) - start ))
+}
+
+run_stage_build() {
+  local app=$1 id=$2
+  pb_set_status "$id" "build"
+  local start; start=$(date +%s)
+  eta_estimate "deploy.$app.build" >/dev/null
+  if [ "$DRY_RUN" = "1" ]; then
+    local p
+    for p in 15 25 40 55; do pb_tick "$id" "$p"; sleep 0.04; done
+  else
+    mkdir -p "$BUILD_LOG_DIR"
+    if ! _dispatch_build "$app" > "$BUILD_LOG_DIR/$app.log" 2>&1; then
+      pb_fail "$id" "build failed"
+      echo "fail" > "$RUN_DIR/$app.status"
       return 1
-      ;;
-  esac
-}
-
-# Dry-run preview that mirrors the legacy per-app message
-_dry_run_preview() {
-  local app=$1
-  local app_version
-  app_version=$(node -e "console.log(require('$LOCAL_ROOT/apps/$app/package.json').version)" 2>/dev/null || echo "?")
-  case "$app" in
-    flex|viewer|recipes|boilerplate|showcase)
-      echo "  [$app] DRY RUN: would build + deploy v$app_version → $REMOTE_BASE/$app/ (node index.js)" ;;
-    home|todo)
-      local env_prefix=""
-      if [ "$app" = "home" ] || [ "$app" = "todo" ]; then
-        env_prefix="PUBLIC_BASE_URL=https://demos.hyperskills.net "
-      fi
-      echo "  [$app] DRY RUN: would build with ${env_prefix}npm run build → $REMOTE_BASE/$app/ (static)" ;;
-    notebook-viewer)
-      echo "  [$app] DRY RUN: would build + compile server.ts + deploy (build/ + server.js + package.json) → $REMOTE_BASE/$app/" ;;
-    *)
-      echo "  [$app] DRY RUN: unknown app" ;;
-  esac
-}
-
-# ── Parallel build pool (phase 1) ────────────────────────────────────────────
-# Background builds with a cap of MAX_JOBS concurrent jobs. Output buffered
-# per-app to a log file and flushed sequentially after each build finishes.
-# Returns 0 only if all builds succeed.
-#
-# Portability: macOS ships with bash 3.2 which lacks `wait -n`. We use a
-# poll loop on running PIDs (kill -0) with a small sleep — light enough for
-# the few apps we deploy.
-
-run_parallel_builds() {
-  local apps=("$@")
-  [ ${#apps[@]} -eq 0 ] && return 0
-
-  mkdir -p "$BUILD_LOG_DIR"
-  rm -f "$BUILD_LOG_DIR"/*.log "$BUILD_LOG_DIR"/*.status 2>/dev/null || true
-
-  echo "Building apps (parallel, max ${MAX_JOBS} jobs)..."
-
-  # Parallel arrays: pid_list[i] / app_list[i] / done_list[i]=0|1
-  local pid_list=()
-  local app_list=()
-  local done_list=()
-  local active=0
-  local total=${#apps[@]}
-  local launched=0
-
-  # Reap any finished children (non-blocking poll). Flushes their log to
-  # stdout with [app] prefix and records status. Returns the number reaped.
-  reap_finished() {
-    local reaped=0 idx
-    for idx in $(seq 0 $((${#pid_list[@]} - 1))); do
-      [ "${done_list[$idx]}" = "1" ] && continue
-      local pid="${pid_list[$idx]}"
-      if ! kill -0 "$pid" 2>/dev/null; then
-        # Process exited — collect status (wait returns its rc)
-        local rc=0
-        wait "$pid" 2>/dev/null || rc=$?
-        local a="${app_list[$idx]}"
-        # Flush buffered log with prefix
-        if [ -s "$BUILD_LOG_DIR/$a.log" ]; then
-          while IFS= read -r line; do
-            echo "  [$a] $line"
-          done < "$BUILD_LOG_DIR/$a.log"
-        fi
-        if [ "$rc" -eq 0 ]; then
-          echo "  [$a] ✓ build ok"
-          echo "ok" > "$BUILD_LOG_DIR/$a.status"
-        else
-          echo "  [$a] ✗ build FAILED (rc=$rc)"
-          echo "fail" > "$BUILD_LOG_DIR/$a.status"
-        fi
-        done_list[$idx]=1
-        active=$((active - 1))
-        reaped=$((reaped + 1))
-      fi
-    done
-    return 0
-  }
-
-  local app
-  for app in "${apps[@]}"; do
-    # Throttle: wait until a slot frees up
-    while [ "$active" -ge "$MAX_JOBS" ]; do
-      reap_finished
-      [ "$active" -ge "$MAX_JOBS" ] && sleep 1
-    done
-    echo "  [$app] starting build..."
-    ( _dispatch_build "$app" ) > "$BUILD_LOG_DIR/$app.log" 2>&1 &
-    pid_list+=("$!")
-    app_list+=("$app")
-    done_list+=("0")
-    active=$((active + 1))
-    launched=$((launched + 1))
-  done
-
-  # Drain
-  while [ "$active" -gt 0 ]; do
-    reap_finished
-    [ "$active" -gt 0 ] && sleep 1
-  done
-
-  # Aggregate result
-  local fail=0
-  for app in "${apps[@]}"; do
-    if [ "$(cat "$BUILD_LOG_DIR/$app.status" 2>/dev/null)" != "ok" ]; then
-      fail=1
     fi
-  done
-  return $fail
+  fi
+  pb_tick "$id" 65
+  [[ "${DRY_RUN:-0}" == "1" ]] || eta_record "deploy.$app.build" $(( $(date +%s) - start ))
 }
 
-# ── Main ─────────────────────────────────────────────────────────────────────
+run_stage_upload() {
+  local app=$1 id=$2
+  pb_set_status "$id" "upload"
+  local start; start=$(date +%s)
+  eta_estimate "deploy.$app.upload" >/dev/null
+  if ! _have_pv && [ ! -f "$RUN_DIR/.pv_warned" ]; then
+    warn "pv not installed, no live throughput display"
+    : > "$RUN_DIR/.pv_warned"
+  fi
+  if [ "$DRY_RUN" = "1" ]; then
+    local p
+    for p in 75 82 88; do pb_tick "$id" "$p"; sleep 0.03; done
+  else
+    if ! _dispatch_ship "$app"; then
+      pb_fail "$id" "upload/integrity failed"
+      echo "fail" > "$RUN_DIR/$app.status"
+      return 1
+    fi
+  fi
+  pb_tick "$id" 90
+  [[ "${DRY_RUN:-0}" == "1" ]] || eta_record "deploy.$app.upload" $(( $(date +%s) - start ))
+}
 
-echo "webmcp-auto-ui deploy"
-echo ""
+run_stage_restart() {
+  local app=$1 id=$2
+  local unit; unit=$(app_unit "$app")
+  if [ -z "$unit" ]; then
+    pb_tick "$id" 95
+    return 0
+  fi
+  pb_set_status "$id" "restart"
+  local start; start=$(date +%s)
+  eta_estimate "deploy.$app.restart" >/dev/null
+  if [ "$DRY_RUN" = "1" ]; then
+    sleep 0.05
+  else
+    if ! ssh "$SSH_HOST" "systemctl restart $unit" 2>>"$BUILD_LOG_DIR/$app.log"; then
+      pb_fail "$id" "restart failed"
+      echo "fail" > "$RUN_DIR/$app.status"
+      return 1
+    fi
+  fi
+  pb_tick "$id" 95
+  [[ "${DRY_RUN:-0}" == "1" ]] || eta_record "deploy.$app.restart" $(( $(date +%s) - start ))
+}
 
+run_stage_healthcheck() {
+  local app=$1 id=$2
+  local url; url=$(app_healthcheck_url "$app")
+  if [ -z "$url" ]; then
+    pb_tick "$id" 100
+    return 0
+  fi
+  pb_set_status "$id" "healthcheck"
+  local start; start=$(date +%s)
+  eta_estimate "deploy.$app.healthcheck" >/dev/null
+  if [ "$DRY_RUN" = "1" ]; then
+    sleep 0.05
+  else
+    local n=0 ok=0
+    while [ $n -lt 3 ]; do
+      if curl -fsSI --max-time 10 "$url" >/dev/null 2>&1; then
+        ok=1; break
+      fi
+      n=$((n + 1)); sleep 1
+    done
+    if [ "$ok" != "1" ]; then
+      pb_fail "$id" "healthcheck failed"
+      echo "fail" > "$RUN_DIR/$app.status"
+      return 1
+    fi
+  fi
+  pb_tick "$id" 100
+  [[ "${DRY_RUN:-0}" == "1" ]] || eta_record "deploy.$app.healthcheck" $(( $(date +%s) - start ))
+}
+
+# ── Worker pool ─────────────────────────────────────────────────────────────
+deploy_one_app_locked() {
+  local app=$1
+  local id="deploy:$app"
+  echo "running" > "$RUN_DIR/$app.status"
+  run_stage_clean "$app" "$id" || return 1
+  run_stage_build "$app" "$id" || return 1
+  # Serialize uploads (single saturable network link). Use flock if available;
+  # otherwise fall back to a simple mkdir-based spinlock.
+  if command -v flock >/dev/null 2>&1; then
+    (
+      flock -x 200
+      run_stage_upload "$app" "$id"
+    ) 200>"$RUN_DIR/.upload.lock" || return 1
+  else
+    while ! mkdir "$RUN_DIR/.upload.lockdir" 2>/dev/null; do sleep 0.2; done
+    run_stage_upload "$app" "$id"
+    local _rc=$?
+    rmdir "$RUN_DIR/.upload.lockdir" 2>/dev/null || true
+    [ "$_rc" -eq 0 ] || return $_rc
+  fi
+  run_stage_restart "$app" "$id" || return 1
+  run_stage_healthcheck "$app" "$id" || return 1
+  pb_done "$id"
+  echo "ok" > "$RUN_DIR/$app.status"
+  if [ "$DRY_RUN" != "1" ]; then
+    record_fingerprint "$app"
+  fi
+}
+
+# ── Resource sampler (background) ───────────────────────────────────────────
+SAMPLER_PID=""
+PEAK_FILE="$RUN_DIR/peak"
+echo "0 0.0 0 0" > "$PEAK_FILE"
+
+start_sampler() {
+  [ "$NO_PROGRESS" = "1" ] && return 0
+  [ "$QUIET" = "1" ] && return 0
+  local total_workers=$1 n_apps=$2
+  (
+    local cores; cores=$(eta_cores)
+    local peak_w=0 peak_l=0 sum_w=0 samples=0
+    while [ ! -f "$RUN_DIR/.stop_sampler" ]; do
+      local active=0
+      local app
+      for app in "${ALL_APPS[@]}"; do
+        [ -f "$RUN_DIR/$app.status" ] || continue
+        local s; s=$(cat "$RUN_DIR/$app.status" 2>/dev/null || echo "")
+        [ "$s" = "running" ] && active=$((active + 1))
+      done
+      local load; load=$(eta_loadavg)
+      local load_int; load_int=$(awk -v l="$load" 'BEGIN{printf "%d", l + 0.5}')
+      [ "$active" -gt "$peak_w" ] && peak_w=$active
+      awk -v l="$load" -v p="$peak_l" 'BEGIN{exit !(l>p)}' && peak_l="$load"
+      sum_w=$((sum_w + active))
+      samples=$((samples + 1))
+      local throttled=0
+      if awk -v l="$load" -v c="$cores" 'BEGIN{exit !(l>2*c)}'; then
+        throttled=1
+      fi
+      local cpu_bar load_bar
+      cpu_bar=$(pb_render_cpu_bar "$active" "$throttled" "$cores")
+      load_bar=$(pb_render_load_bar "$load_int" "$cores")
+      local hdr="WebMCP deploy — $n_apps apps, $total_workers parallel workers
+Cores $cpu_bar   Load $load_bar"
+      pb_set_header "$hdr"
+      printf '%d %s %d %d\n' "$peak_w" "$peak_l" "$sum_w" "$samples" > "$PEAK_FILE"
+      sleep 2
+    done
+  ) &
+  SAMPLER_PID=$!
+}
+
+stop_sampler() {
+  [ -z "$SAMPLER_PID" ] && return 0
+  : > "$RUN_DIR/.stop_sampler"
+  kill "$SAMPLER_PID" 2>/dev/null || true
+  wait "$SAMPLER_PID" 2>/dev/null || true
+  SAMPLER_PID=""
+}
+
+cleanup() {
+  stop_sampler 2>/dev/null || true
+  pb_watch_stop 2>/dev/null || true
+  rm -rf "$RUN_DIR" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+# ── Main ────────────────────────────────────────────────────────────────────
 if [ $# -eq 0 ]; then
-  APPS="home flex viewer showcase todo recipes boilerplate notebook-viewer"
+  APPS=("${ALL_APPS[@]}")
 else
-  APPS="$*"
+  APPS=("$@")
 fi
 
-# Sync all workspace versions to root
-echo "Syncing versions..."
-ROOT_VERSION=$(node -e "console.log(require('$LOCAL_ROOT/package.json').version)")
-for pkg in "$LOCAL_ROOT"/apps/*/package.json "$LOCAL_ROOT"/packages/*/package.json; do
-  node -e "const f=require('fs'); const p=JSON.parse(f.readFileSync('$pkg','utf8')); if(p.version!=='$ROOT_VERSION'){p.version='$ROOT_VERSION'; f.writeFileSync('$pkg', JSON.stringify(p,null,2)+'\n')}"
-done
-echo "  ✓ all workspaces → v$ROOT_VERSION"
-echo ""
-
-# Build packages first (order matters — sequential)
-echo "Building packages..."
-(cd "$LOCAL_ROOT" && npm run build --workspace=packages/core 2>/dev/null && echo "  ✓ core")
-(cd "$LOCAL_ROOT" && npm run build --workspace=packages/sdk 2>/dev/null && echo "  ✓ sdk")
-(cd "$LOCAL_ROOT" && npm run build --workspace=packages/ui 2>/dev/null && echo "  ✓ ui")
-(cd "$LOCAL_ROOT" && npm run build --workspace=packages/agent 2>/dev/null && echo "  ✓ agent")
-echo ""
-
-# ── Phase 0 : skip filter + dry-run preview ─────────────────────────────────
 TO_BUILD=()
 SKIPPED=()
 UNKNOWN=()
-for app in $APPS; do
-  case "$app" in
-    flex|viewer|recipes|boilerplate|showcase|home|todo|notebook-viewer) ;;
-    *) UNKNOWN+=("$app"); continue ;;
-  esac
-  if [ "$DRY_RUN" = "1" ]; then
-    _dry_run_preview "$app"
-    continue
+for app in "${APPS[@]}"; do
+  if ! [[ "$app" =~ $KNOWN_APPS_RE ]]; then
+    UNKNOWN+=("$app"); continue
   fi
-  if should_skip "$app"; then
-    echo "  [$app] unchanged — skipping (use --force to redeploy)"
+  if [ "$DRY_RUN" != "1" ] && should_skip "$app"; then
     SKIPPED+=("$app")
   else
     TO_BUILD+=("$app")
@@ -472,61 +499,125 @@ for app in $APPS; do
 done
 
 for app in "${UNKNOWN[@]+"${UNKNOWN[@]}"}"; do
-  echo "  [$app] ✗ unknown app (valid: home, flex, viewer, showcase, todo, recipes, boilerplate, notebook-viewer)"
+  warn "  [$app] ✗ unknown app (valid: ${ALL_APPS[*]})"
 done
 
-if [ "$DRY_RUN" = "1" ]; then
-  echo ""
-  echo "Deploy complete (dry run)."
+if [ ${#TO_BUILD[@]} -eq 0 ]; then
+  say "Nothing to deploy."
   exit 0
 fi
 
-# ── Phase 1 : parallel builds ────────────────────────────────────────────────
-if [ ${#TO_BUILD[@]} -gt 0 ]; then
-  if ! run_parallel_builds "${TO_BUILD[@]}"; then
-    echo ""
-    echo "✗ One or more builds failed — aborting before any rsync/restart."
-    echo "  Check logs in $BUILD_LOG_DIR/"
-    exit 1
-  fi
-  echo ""
+if [ -z "$MAX_JOBS" ]; then
+  MAX_JOBS=${#TO_BUILD[@]}
+  [ "$MAX_JOBS" -gt 4 ] && MAX_JOBS=4
 fi
 
-# ── Phase 2 : sequential ship (rsync + integrity + restart) ─────────────────
-echo "Deploying built apps..."
-for app in "${TO_BUILD[@]+"${TO_BUILD[@]}"}"; do
-  if _dispatch_ship "$app"; then
-    record_fingerprint "$app"
+# Preamble: workspace versions sync + package builds (skipped on dry-run)
+if [ "$DRY_RUN" != "1" ]; then
+  ROOT_VERSION=$(node -e "console.log(require('$LOCAL_ROOT/package.json').version)")
+  for pkg in "$LOCAL_ROOT"/apps/*/package.json "$LOCAL_ROOT"/packages/*/package.json; do
+    node -e "const f=require('fs'); const p=JSON.parse(f.readFileSync('$pkg','utf8')); if(p.version!=='$ROOT_VERSION'){p.version='$ROOT_VERSION'; f.writeFileSync('$pkg', JSON.stringify(p,null,2)+'\n')}"
+  done
+  (cd "$LOCAL_ROOT" && npm run build --workspace=packages/core > /dev/null 2>&1) || true
+  (cd "$LOCAL_ROOT" && npm run build --workspace=packages/sdk  > /dev/null 2>&1) || true
+  (cd "$LOCAL_ROOT" && npm run build --workspace=packages/ui   > /dev/null 2>&1) || true
+  (cd "$LOCAL_ROOT" && npm run build --workspace=packages/agent > /dev/null 2>&1) || true
+fi
+
+# ── Progress + sampler ──────────────────────────────────────────────────────
+pb_init
+pb_set_header "WebMCP deploy — ${#TO_BUILD[@]} apps, $MAX_JOBS parallel workers"
+
+for app in "${TO_BUILD[@]}"; do
+  unrel=""
+  eta_estimate "deploy.$app.build" >/dev/null
+  if [ "$(eta_last_unreliable)" = "1" ]; then unrel=" (unreliable estimate)"; fi
+  pb_register "deploy:$app" "$app$unrel" 1
+done
+
+START_TS=$(date +%s)
+pb_watch_start 200
+start_sampler "$MAX_JOBS" "${#TO_BUILD[@]}"
+
+# ── Worker pool with MAX_JOBS cap ───────────────────────────────────────────
+PIDS=()
+active=0
+
+reap_one() {
+  local i
+  for i in $(seq 0 $((${#PIDS[@]} - 1))); do
+    [ -z "${PIDS[$i]:-}" ] && continue
+    local pid="${PIDS[$i]}"
+    if ! kill -0 "$pid" 2>/dev/null; then
+      wait "$pid" 2>/dev/null || true
+      PIDS[$i]=""
+      active=$((active - 1))
+    fi
+  done
+}
+
+if [ "$MAX_JOBS" = "1" ]; then
+  for app in "${TO_BUILD[@]}"; do
+    deploy_one_app_locked "$app" || true
+  done
+else
+  for app in "${TO_BUILD[@]}"; do
+    while [ "$active" -ge "$MAX_JOBS" ]; do
+      reap_one
+      [ "$active" -ge "$MAX_JOBS" ] && sleep 0.5
+    done
+    ( deploy_one_app_locked "$app" ) &
+    PIDS+=("$!")
+    active=$((active + 1))
+  done
+  while [ "$active" -gt 0 ]; do
+    reap_one
+    [ "$active" -gt 0 ] && sleep 0.5
+  done
+fi
+
+stop_sampler
+pb_watch_stop
+
+[[ "${DRY_RUN:-0}" == "1" ]] || eta_save 2>/dev/null || true
+
+END_TS=$(date +%s)
+TOTAL_DUR=$(( END_TS - START_TS ))
+
+FAIL_COUNT=0
+for app in "${TO_BUILD[@]}"; do
+  s=$(cat "$RUN_DIR/$app.status" 2>/dev/null || echo "?")
+  [ "$s" != "ok" ] && FAIL_COUNT=$((FAIL_COUNT + 1))
+done
+
+PEAK_W=0; PEAK_L="0.0"; SUM_W=0; SAMPLES=0; AVG_W="0.0"
+if [ -f "$PEAK_FILE" ]; then
+  read -r PEAK_W PEAK_L SUM_W SAMPLES < "$PEAK_FILE" || true
+  if [ "${SAMPLES:-0}" -gt 0 ]; then
+    AVG_W=$(awk -v s="$SUM_W" -v n="$SAMPLES" 'BEGIN{printf "%.1f", s/n}')
   fi
-done
+fi
 
-echo ""
-echo "Verifying..."
-for app in $APPS; do
-  case "$app" in
-    flex|viewer|recipes|showcase|boilerplate)
-      status=$(ssh "$SSH_HOST" "systemctl is-active webmcp-$app 2>/dev/null" || echo "inactive")
-      echo "  $app: $status"
-      ;;
-    notebook-viewer)
-      status=$(ssh "$SSH_HOST" "systemctl is-active notebook-viewer 2>/dev/null" || echo "inactive")
-      code=$(curl -s -o /dev/null -w "%{http_code}" -L "https://nb.hyperskills.net/api/health" 2>/dev/null || echo "???")
-      echo "  $app: $status · HTTP $code (https://nb.hyperskills.net)"
-      ;;
-    *)
-      code=$(curl -s -o /dev/null -w "%{http_code}" -L "https://demos.hyperskills.net/$app/" 2>/dev/null || echo "???")
-      echo "  $app: HTTP $code"
-      ;;
-  esac
-done
+pb_finish
 
-echo ""
-echo "Deploy complete."
+if [ "$NO_PROGRESS" != "1" ] && [ "$QUIET" != "1" ]; then
+  printf '\nDone in %s — peak: %s workers, peak load %s, avg cores used: %s\n' \
+    "$(eta_format_duration "$TOTAL_DUR")" "$PEAK_W" "$PEAK_L" "$AVG_W"
+  [ "$DRY_RUN" = "1" ] && printf '(dry-run: cache ETA non mis à jour)\n'
+fi
 
-# ── Documentation update (optional) ──────────────────────────────────────────
-if $WITH_DOCS; then
-  echo ""
-  echo "Updating documentation..."
-  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ ${#SKIPPED[@]} -gt 0 ]; then
+  say "Skipped (unchanged): ${SKIPPED[*]}"
+fi
+
+if [ "$FAIL_COUNT" -gt 0 ]; then
+  warn "✗ $FAIL_COUNT app(s) failed."
+  exit 1
+fi
+
+if $WITH_DOCS && [ "$DRY_RUN" != "1" ]; then
+  say "Updating documentation..."
   "$SCRIPT_DIR/docs-update.sh" --all -y
 fi
+
+exit 0
