@@ -69,6 +69,7 @@
     "auto-ui"
   ],
   "dependencies": {
+    "@internationalized/date": "^3.8.1",
     "@types/d3": "^7.4.3",
     "@webmcp-auto-ui/agent": "*",
     "@webmcp-auto-ui/core": "*",
