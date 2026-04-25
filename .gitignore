@@ -18,6 +18,9 @@ build/
 .env.*
 !.env.example
 
+# Healthcheck credentials (basic auth for deploy.sh)
+.netrc
+
 # Logs
 *.log
 npm-debug.log*

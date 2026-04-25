@@ -374,7 +374,7 @@ run_stage_healthcheck() {
   else
     local n=0 ok=0
     while [ $n -lt 3 ]; do
-      if curl -fsSI --max-time 10 "$url" >/dev/null 2>&1; then
+      if curl -fsSI --netrc-file "$LOCAL_ROOT/.netrc" --max-time 10 "$url" >/dev/null 2>&1; then
         ok=1; break
       fi
       n=$((n + 1)); sleep 1
