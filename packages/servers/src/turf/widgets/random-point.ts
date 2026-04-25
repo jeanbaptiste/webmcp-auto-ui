@@ -9,8 +9,8 @@ export async function render(
   if (!Array.isArray(bbox) || bbox.length !== 4)
     return renderEmpty(container, 'turf-random-point', 'Pass <code>bbox</code> [w,s,e,n] and <code>count</code>.');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
 
   let pts: any = null;
   try {

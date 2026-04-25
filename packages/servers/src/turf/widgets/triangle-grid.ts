@@ -9,8 +9,8 @@ export async function render(
   if (!Array.isArray(bbox) || bbox.length !== 4)
     return renderEmpty(container, 'turf-triangle-grid', 'Pass <code>bbox</code>, <code>cellSide</code>.');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
 
   let grid: any = null;
   try {

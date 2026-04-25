@@ -9,8 +9,8 @@ export async function render(
   const inputRaw = line ?? feature;
   if (!inputRaw) return renderEmpty(container, 'turf-along', 'Pass a <code>line</code> and <code>distance</code>.');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
   const input = asFeature(turf, inputRaw);
   if (!input) return renderEmpty(container, 'turf-along', 'Could not parse line.');
 

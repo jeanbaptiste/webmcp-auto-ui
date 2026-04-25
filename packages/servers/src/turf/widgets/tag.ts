@@ -8,8 +8,8 @@ export async function render(
   const { points, polygons, field = 'name', outField = 'tag' } = data as any;
   if (!points || !polygons) return renderEmpty(container, 'turf-tag', 'Pass <code>points</code> and <code>polygons</code>.');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
   const pts = asFeatureCollection(turf, points);
   const polys = asFeatureCollection(turf, polygons);
 

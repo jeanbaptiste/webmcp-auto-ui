@@ -9,8 +9,8 @@ export async function render(
   const inputRaw = feature ?? geojson;
   if (!inputRaw) return renderEmpty(container, 'turf-clean-coords', 'Pass a <code>feature</code>.');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
   const input = asFeature(turf, inputRaw);
   if (!input) return renderEmpty(container, 'turf-clean-coords', 'Could not parse feature.');
 

@@ -8,8 +8,8 @@ export async function render(
   const { points, polygon } = data as any;
   if (!points || !polygon) return renderEmpty(container, 'turf-points-within-polygon', 'Pass <code>points</code> and <code>polygon</code>.');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
   const pts = asFeatureCollection(turf, points);
   const poly = asFeature(turf, polygon);
   if (!poly) return renderEmpty(container, 'turf-points-within-polygon', 'Could not parse polygon.');

@@ -8,8 +8,8 @@ export async function render(
   const { a, b } = data as any;
   if (!a || !b) return renderEmpty(container, 'turf-intersect', 'Pass two polygons as <code>a</code> and <code>b</code>.');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
   const fa = asFeature(turf, a);
   const fb = asFeature(turf, b);
   if (!fa || !fb) return renderEmpty(container, 'turf-intersect', 'Inputs must be polygons.');

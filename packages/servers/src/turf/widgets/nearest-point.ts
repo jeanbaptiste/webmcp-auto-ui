@@ -8,8 +8,8 @@ export async function render(
   const { target, points } = data as any;
   if (!target || !points) return renderEmpty(container, 'turf-nearest-point', 'Pass a <code>target</code> point and a <code>points</code> set.');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
   const t = asPoint(turf, target);
   const pts = asFeatureCollection(turf, points);
   if (!t || !pts.features.length) return renderEmpty(container, 'turf-nearest-point', 'Could not parse inputs.');

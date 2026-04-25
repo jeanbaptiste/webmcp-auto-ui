@@ -9,8 +9,8 @@ export async function render(
   const inputRaw = geojson ?? feature;
   if (!inputRaw) return renderEmpty(container, 'turf-envelope', 'Pass <code>geojson</code>.');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
   const input = asFeatureCollection(turf, inputRaw);
 
   let env: any = null;

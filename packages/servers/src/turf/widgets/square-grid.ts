@@ -9,8 +9,8 @@ export async function render(
   if (!Array.isArray(bbox) || bbox.length !== 4)
     return renderEmpty(container, 'turf-square-grid', 'Pass <code>bbox</code> [w,s,e,n], <code>cellSide</code>, <code>units</code>.');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
 
   let grid: any = null;
   try {

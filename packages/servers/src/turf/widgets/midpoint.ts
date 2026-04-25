@@ -8,8 +8,8 @@ export async function render(
   const { a, b } = data as any;
   if (!a || !b) return renderEmpty(container, 'turf-midpoint', 'Pass two points <code>a</code> and <code>b</code>.');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
   const pa = asPoint(turf, a);
   const pb = asPoint(turf, b);
   if (!pa || !pb) return renderEmpty(container, 'turf-midpoint', 'Could not parse points.');

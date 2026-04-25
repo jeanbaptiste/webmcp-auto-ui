@@ -9,8 +9,8 @@ export async function render(
   const inputRaw = origin ?? point;
   if (!inputRaw) return renderEmpty(container, 'turf-destination', 'Pass an <code>origin</code> point, <code>distance</code>, <code>bearing</code>.');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
   const o = asPoint(turf, inputRaw);
   if (!o) return renderEmpty(container, 'turf-destination', 'Could not parse origin.');
 

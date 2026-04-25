@@ -9,8 +9,8 @@ export async function render(
   const inputRaw = points ?? geojson;
   if (!inputRaw) return renderEmpty(container, 'turf-concave', 'Pass <code>points</code> (FeatureCollection of points).');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
   const input = asFeatureCollection(turf, inputRaw);
   if (!input.features.length) return renderEmpty(container, 'turf-concave', 'Empty input.');
 

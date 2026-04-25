@@ -9,8 +9,8 @@ export async function render(
   const inputRaw = points ?? geojson;
   if (!inputRaw) return renderEmpty(container, 'turf-clusters-dbscan', 'Pass <code>points</code>, <code>maxDistance</code>.');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
   const pts = asFeatureCollection(turf, inputRaw);
   if (!pts.features.length) return renderEmpty(container, 'turf-clusters-dbscan', 'Empty input.');
 

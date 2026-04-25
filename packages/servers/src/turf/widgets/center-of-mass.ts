@@ -9,8 +9,8 @@ export async function render(
   const inputRaw = feature ?? geojson;
   if (!inputRaw) return renderEmpty(container, 'turf-center-of-mass', 'Pass a polygon as <code>feature</code>.');
 
-  const turfMod = await import('@turf/turf');
-  const turf = turfMod.default ?? turfMod;
+  const { loadTurf } = await import('./shared.js');
+  const turf = await loadTurf();
   const input = asFeature(turf, inputRaw);
   if (!input) return renderEmpty(container, 'turf-center-of-mass', 'Could not parse feature.');
 
