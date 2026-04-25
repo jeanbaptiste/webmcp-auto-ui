@@ -51,6 +51,7 @@ export interface NotebookCell {
   status?: 'fresh' | 'stale';
   comment?: { who: string; when: string; body: string } | null;
   lastResult?: CellResult;
+  args?: Record<string, unknown>;  // override of tool args, parsed from `@meta {...}` leading comment
 }
 
 export interface NotebookState {
@@ -662,6 +663,7 @@ export function tickRunningCell(cell: NotebookCell, elapsedEl: HTMLElement, onDo
 export interface DataServerTool {
   name: string;
   description?: string;
+  inputSchema?: unknown;
 }
 
 export interface DataServerRecipe {

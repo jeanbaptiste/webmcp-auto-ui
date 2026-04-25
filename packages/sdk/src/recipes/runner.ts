@@ -70,7 +70,7 @@ interface McpToolDef {
  * Inspects a tool's inputSchema to find the string parameter that likely
  * holds the code/script/query. Returns the param name or null.
  */
-function findCodeParamName(schema: unknown): string | null {
+export function findCodeParamName(schema: unknown): string | null {
   const s = schema as
     | { properties?: Record<string, { type?: string }>; required?: string[] }
     | null
@@ -132,7 +132,7 @@ function inferParamValue(
  *   or leaving it unset if nothing can be inferred (MCP will error explicitly
  *   so the user knows what to add).
  */
-function buildToolArgs(
+export function buildToolArgs(
   schema: unknown,
   codeParam: string,
   code: string,

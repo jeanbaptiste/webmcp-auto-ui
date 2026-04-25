@@ -26,6 +26,23 @@ const LANG_TO_TYPE: Record<string, CellType> = {
  *  whenever such a fence is mapped so the user gets a hint. */
 const TS_LIKE_LANGS = new Set(['ts', 'typescript']);
 
+/**
+ * Peel a leading `-- @meta {...}` (SQL) or `// @meta {...}` (JS) line from the
+ * cell content and return the parsed JSON args plus the remaining content.
+ * Round-trip with serializeCellMeta in share-handlers.ts.
+ */
+export function peelMetaComment(content: string): { content: string; args?: Record<string, unknown> } {
+  const m = /^[ \t]*(?:--|\/\/)[ \t]*@meta[ \t]+(\{[\s\S]*?\})[ \t]*\r?\n?/.exec(content);
+  if (!m) return { content };
+  try {
+    const parsed = JSON.parse(m[1]);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return { content: content.slice(m[0].length), args: parsed as Record<string, unknown> };
+    }
+  } catch { /* invalid JSON → ignore, keep line in content */ }
+  return { content };
+}
+
 export function fenceLangToCellType(lang: string): CellType | null {
   const key = (lang || '').toLowerCase().trim();
   if (TS_LIKE_LANGS.has(key)) {
@@ -45,7 +62,10 @@ export function fenceLangToCellType(lang: string): CellType | null {
 export function extractCellFromFence(lang: string, content: string): NotebookCell {
   const cellType = fenceLangToCellType(lang);
   if (cellType) {
-    return { id: uid(), type: cellType, content: content.trim(), hideSource: false, hideResult: false };
+    const { content: stripped, args } = peelMetaComment(content.trim());
+    const cell: NotebookCell = { id: uid(), type: cellType, content: stripped, hideSource: false, hideResult: false };
+    if (args) cell.args = args;
+    return cell;
   }
   // Detect pseudo-code MCP tool calls like: query_sql({sql: "..."})
   // Only attempted when the fence language is unknown/text (cellType === null).

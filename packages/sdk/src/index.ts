@@ -91,7 +91,7 @@ export type { McpDemoServer } from './mcp-demo-servers.js';
 // import { canvas } from '@webmcp-auto-ui/sdk/canvas'
 
 // Recipe runner — markdown-fence parser + JS/TS/SQL/etc executor over MCP
-export { parseBody, runCode, estimateTokens, safeStringify } from './recipes/index.js';
+export { parseBody, runCode, estimateTokens, safeStringify, findCodeParamName, buildToolArgs } from './recipes/index.js';
 export type { ParsedSegment, RunResult, RunLog, RunTab, RecipeData } from './recipes/index.js';
 
 // Short URL — domain-dependent compact token

@@ -36,7 +36,11 @@ function serializeToMarkdown(state: NotebookState): string {
     } else {
       const lang = cell.type === 'sql' ? 'sql' : 'js';
       const varname = cell.varname ? ` // → ${cell.varname}` : '';
-      parts.push('```' + lang + varname, cell.content.trim(), '```', '');
+      const commentPrefix = cell.type === 'sql' ? '--' : '//';
+      const metaLine = cell.args && Object.keys(cell.args).length > 0
+        ? `${commentPrefix} @meta ${JSON.stringify(cell.args)}\n`
+        : '';
+      parts.push('```' + lang + varname, metaLine + cell.content.trim(), '```', '');
     }
   }
   return parts.join('\n').trim() + '\n';
