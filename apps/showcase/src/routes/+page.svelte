@@ -5,7 +5,7 @@
   import { onMount, untrack } from 'svelte';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
-  import { WidgetRenderer, getTheme, LLMSelector, ModelLoader, AgentProgress, McpStatus, HeaderControls } from '@webmcp-auto-ui/ui';
+  import { WidgetRenderer, getTheme, LLMSelector, ModelLoader, AgentProgress, McpStatus, HeaderControls, MCPserversList } from '@webmcp-auto-ui/ui';
   import { PRESETS, type ThemePreset } from '$lib/themes';
   import { SIMPLE_BLOCKS, RICH_BLOCKS } from '$lib/demo-data';
   import { agentStore } from '$lib/agent-store.svelte';
@@ -40,8 +40,10 @@
     if (!selectedServerUrl) return;
     mode = 'agent';
     agentStore.clearBlocks();
-    await agentStore.connect(selectedServerUrl);
-    if (agentStore.connectError) return;
+    if (agentStore.connectedUrl !== selectedServerUrl) {
+      await agentStore.connect(selectedServerUrl);
+      if (agentStore.connectError) return;
+    }
     await agentStore.generate();
   }
 
@@ -108,24 +110,22 @@
     </div>
   </header>
 
+  <!-- Available MCP servers -->
+  <div class="border-b border-border bg-surface/30">
+    <div class="max-w-7xl mx-auto px-4 py-3">
+      <MCPserversList
+        servers={MCP_DEMO_SERVERS}
+        connectedUrls={agentStore.connectedUrl ? [agentStore.connectedUrl] : []}
+        loading={agentStore.connecting && selectedServerUrl ? [selectedServerUrl] : []}
+        onconnect={(url) => { selectedServerUrl = url; agentStore.connect(url); }}
+        ondisconnect={() => agentStore.disconnect()}
+      />
+    </div>
+  </div>
+
   <!-- Agent Controls Bar -->
   <div class="border-b border-border bg-surface/50 backdrop-blur-sm">
     <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
-      <!-- MCP Server Selector -->
-      <div class="flex items-center gap-2">
-        <label class="text-[10px] font-mono text-text2 uppercase tracking-widest">MCP</label>
-        <select
-          class="bg-surface2 border border-border2 rounded-lg px-3 py-1.5 text-xs font-mono text-text1
-                 outline-none focus:border-accent/60 transition-colors min-w-[200px]"
-          bind:value={selectedServerUrl}
-          disabled={agentStore.generating}
-        >
-          {#each MCP_DEMO_SERVERS as server}
-            <option value={server.url}>{server.name}</option>
-          {/each}
-        </select>
-      </div>
-
       <!-- LLM Selector -->
       <div class="flex items-center gap-2">
         <label class="text-[10px] font-mono text-text2 uppercase tracking-widest">LLM</label>
