@@ -80,3 +80,7 @@ docs/retex/
 scripts/audit-widget-schemas.mjs
 scripts/smoke-test-widgets.mjs
 scripts/vm-monitoring/
+
+# Local audit reports + retex notes
+.cdn-test-report.md
+_retex_flex/
