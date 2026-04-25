@@ -28,6 +28,7 @@
 
 import type { ContentBlock } from '../types.js';
 import type { TransformersModelEntry } from './transformers-models.js';
+import { ORT_TRANSFORMERS_CDN_BASE } from '../ort-version.js';
 
 // --------------------------------------------------------------------------
 // Gemma 4 chat_template override.
@@ -204,7 +205,7 @@ async function loadModel(modelEntry: TransformersModelEntry): Promise<void> {
       // on jsdelivr). For the 3.8.1 path, ORT 1.22.0-dev is a transformers.js-
       // internal build not mirrored on jsdelivr — let transformers.js use its
       // default wasmPaths (which resolve against esm.sh, matching the JS bundle).
-      env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0-dev.20260410-5e55544225/dist/';
+      env.backends.onnx.wasm.wasmPaths = `${ORT_TRANSFORMERS_CDN_BASE}/dist/`;
     }
     if (env) {
       env.allowLocalModels = false;

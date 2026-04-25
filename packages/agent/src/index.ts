@@ -79,6 +79,14 @@ export type { RepairResult } from './auto-repair.js';
 // Pipeline trace
 export { PipelineTrace, type TraceEntry } from './pipeline-trace.js';
 
+// onnxruntime-web version pins (centralised — see ort-version.ts)
+export {
+  ORT_VERSION,
+  ORT_CDN_BASE,
+  ORT_TRANSFORMERS_VERSION,
+  ORT_TRANSFORMERS_CDN_BASE,
+} from './ort-version.js';
+
 // Trace observer — live visual trace for runAgentLoop
 export { createTraceObserver, type TraceObserver, type TraceObserverContext, type RoundTripDetail } from './trace-observer.js';
 

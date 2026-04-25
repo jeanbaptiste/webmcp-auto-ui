@@ -9,6 +9,7 @@
  */
 
 import type * as OrtTypes from 'onnxruntime-web';
+import { ORT_CDN_BASE } from '../ort-version.js';
 
 export const EMBEDDING_DIMS = 384;
 
@@ -47,7 +48,7 @@ export class Embedder {
 
     // Use WASM backend, load WASM binaries from CDN (avoids bundling 70MB in builds)
     ort.env.wasm.numThreads = 1;
-    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/';
+    ort.env.wasm.wasmPaths = `${ORT_CDN_BASE}/dist/`;
 
     const modelUrl =
       'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model_quantized.onnx';
