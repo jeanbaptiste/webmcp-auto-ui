@@ -3,8 +3,16 @@
   import { renderMarkdown } from '../primitives/markdown-renderer.js';
 
   interface EphemeralMsg { id: string; role: 'user' | 'assistant'; html: string; }
-  interface Props { ephemeral: EphemeralMsg[]; }
-  let { ephemeral }: Props = $props();
+  interface Props { ephemeral: EphemeralMsg[]; ondismiss?: () => void; }
+  let { ephemeral, ondismiss }: Props = $props();
+
+  let wrapper: HTMLDivElement | undefined = $state();
+
+  function onWindowPointerDown(e: PointerEvent) {
+    if (!ondismiss || ephemeral.length === 0) return;
+    const target = e.target as Node | null;
+    if (wrapper && target && !wrapper.contains(target)) ondismiss();
+  }
 
   // Detect if content has any markdown markers worth parsing.
   // If not, we skip marked entirely and fall back to {@html} for the
@@ -36,7 +44,9 @@
   }
 </script>
 
-<div class="flex flex-col gap-2 items-start w-full">
+<svelte:window onpointerdown={onWindowPointerDown} />
+
+<div bind:this={wrapper} class="flex flex-col gap-2 items-start w-full">
   {#each ephemeral as msg (msg.id)}
     <div
       in:fly={{ y: 16, duration: 280, opacity: 0 }}

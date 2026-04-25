@@ -1278,7 +1278,7 @@
 
     {#if composerMode}
       <div class="absolute bottom-3 left-[50px] right-[50px] flex flex-col gap-2 pointer-events-none z-20">
-        <EphemeralBubble {ephemeral} />
+        <EphemeralBubble {ephemeral} ondismiss={() => { ephemeral = []; }} />
       </div>
     {/if}
   </div>
