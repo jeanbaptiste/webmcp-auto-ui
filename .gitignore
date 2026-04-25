@@ -91,3 +91,6 @@ scripts/vm-monitoring/
 # Local audit reports + retex notes
 .cdn-test-report.md
 _retex_flex/
+
+# Infra nginx configs (gérées hors repo)
+infra/bot/nginx/
