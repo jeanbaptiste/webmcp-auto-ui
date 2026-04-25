@@ -49,9 +49,13 @@
     "vitest": "^4.1.2"
   },
   "overrides": {
-    "@astrojs/sitemap": "3.3.0"
+    "@astrojs/sitemap": "3.3.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
   },
   "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "@here/harp-datasource-protocol": "^0.28.0",
     "@here/harp-map-controls": "^0.28.0",
     "@here/harp-mapview": "^0.28.0",
