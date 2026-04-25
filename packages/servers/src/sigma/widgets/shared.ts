@@ -61,6 +61,10 @@ export async function loadGenerators(): Promise<any> {
 /** Default themed Sigma settings (transparent bg, mid-gray labels). */
 export function sigmaSettings(extra?: any): any {
   return {
+    // Tolerate a 0×0 container at first mount — the ResizeObserver in
+    // mountSigma() triggers refresh() once the real size is computed.
+    // See _retex_flex/06-sigma-preload-placeholders.md.
+    allowInvalidContainer: true,
     defaultEdgeColor: '#bbb',
     defaultNodeColor: '#4a90e2',
     labelColor: { color: '#666' },

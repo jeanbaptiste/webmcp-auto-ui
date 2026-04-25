@@ -48,10 +48,38 @@ export async function ensurePmtilesProtocol(maplibre: any): Promise<void> {
 
 /**
  * Default public Protomaps demo bundle — worldwide vector tiles, free.
- * If the URL ever rotates, callers can pass an explicit `url`.
+ *
+ * In production we proxy through `demos.hyperskills.net/pmtiles/` because the
+ * upstream `demo-bucket.protomaps.com` does not serve CORS for third-party
+ * origins (see _retex_flex/05-protomaps-cors.md). The reverse proxy nginx
+ * snippet lives in `infra/bot/nginx/protomaps-cors.conf` on the bot VM.
+ *
+ * Override priority:
+ *   1. caller-provided `props.url` (highest — per-widget override)
+ *   2. `import.meta.env.PUBLIC_PMTILES_URL` (Vite/SvelteKit build-time)
+ *   3. `process.env.PUBLIC_PMTILES_URL` (Node/SSR build-time)
+ *   4. hard-coded fallback to the CORS proxy
+ *
+ * Callers can pass any CORS-enabled pmtiles archive URL (R2, S3, B2,
+ * self-hosted, etc.).
  */
-export const DEFAULT_PMTILES_URL =
-  'https://demo-bucket.protomaps.com/v4.pmtiles';
+function _resolveDefaultPmtilesUrl(): string {
+  // Vite / SvelteKit-style build-time env.
+  try {
+    // @ts-ignore — import.meta.env may be undefined depending on bundler
+    const v = import.meta?.env?.PUBLIC_PMTILES_URL;
+    if (typeof v === 'string' && v.length > 0) return v;
+  } catch {
+    /* not in a Vite context */
+  }
+  // Node / SSR-style env.
+  if (typeof process !== 'undefined' && process.env?.PUBLIC_PMTILES_URL) {
+    return process.env.PUBLIC_PMTILES_URL;
+  }
+  return 'https://demos.hyperskills.net/pmtiles/v4.pmtiles';
+}
+
+export const DEFAULT_PMTILES_URL = _resolveDefaultPmtilesUrl();
 
 /**
  * Overture Maps sample (open data, alternative to OSM).

@@ -12,13 +12,19 @@ let _vendorLoaded = false;
  */
 export async function loadPerspective(): Promise<any> {
   if (!_vendorLoaded) {
-    await import('@finos/perspective-viewer');
+    // Use the *.inline.js variants of @finos/perspective and
+    // @finos/perspective-viewer (v3.x): they embed the wasm bytes as a
+    // base64 blob and call init_client / init_server at module load time,
+    // so the bundler does not need to emit (or fetch) any .wasm asset.
+    // Cost: ~6.9 MB extra JS (3.3 MB viewer + 3.6 MB engine), ungzipped.
+    // Trade-off accepted: zero wasm plumbing in the Vite/SvelteKit build.
+    await import('@finos/perspective-viewer/dist/esm/perspective-viewer.inline.js');
     await import('@finos/perspective-viewer-datagrid');
     await import('@finos/perspective-viewer-d3fc');
     _vendorLoaded = true;
   }
   if (_worker) return _worker;
-  const ps = await import('@finos/perspective');
+  const ps = await import('@finos/perspective/dist/esm/perspective.inline.js');
   const mod: any = (ps as any).default ?? ps;
   // v3.x exposes `worker()` factory at module top-level.
   if (typeof mod.worker === 'function') {

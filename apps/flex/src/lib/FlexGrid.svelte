@@ -96,10 +96,15 @@
 </script>
 
 <div class="relative w-full h-full {cls}">
-  <!-- Both layouts are always mounted to preserve WidgetRenderer instances (and their
-       resolved customWidgetEntry for external server widgets) across mode switches.
-       Use offscreen positioning instead of display:none so ResizeObserver keeps measuring. -->
-  <div class="w-full h-full" class:layout-offscreen={layoutMode !== 'grid'}>
+  <!-- Only the active layout is mounted. Mounting both in parallel doubled every
+       widget's WebGL context (Chrome caps at 16 → cascade of Context Lost). The
+       toggle is a rare manual action, so a remount on switch is acceptable.
+       Trade-off: per-window positions/sizes set by the user in FloatingLayout
+       (state held in the layout's local `saved` Map) are lost across a
+       float→grid→float round trip — windows fall back to the default tiled
+       layout from computeFloatingLayout(). Block-level x/y/w/h kept in the
+       canvas store survive; only the in-component drag state is reset. -->
+  {#if layoutMode === 'grid'}
     <FlexLayout {windows} minWidth={260} maxWidth={600}>
       {#snippet children(win, _lw, _ctx)}
         {@const block = canvas.blocks.find(b => b.id === win.id)}
@@ -132,8 +137,7 @@
         {/if}
       {/snippet}
     </FlexLayout>
-  </div>
-  <div class="w-full h-full" class:layout-offscreen={layoutMode !== 'float'}>
+  {:else}
     <FloatingLayout bind:this={fl} {windows} defaultWidth={380} defaultHeight={280}>
       {#snippet children(win, _lw, ctx)}
         {@const block = canvas.blocks.find(b => b.id === win.id)}
@@ -174,7 +178,7 @@
         {/if}
       {/snippet}
     </FloatingLayout>
-  </div>
+  {/if}
   <ExportModal
     open={exportTarget !== null}
     type={exportTarget?.type ?? ''}
@@ -184,11 +188,3 @@
   />
 </div>
 
-<style>
-  .layout-offscreen {
-    position: absolute;
-    visibility: hidden;
-    pointer-events: none;
-    z-index: -1;
-  }
-</style>

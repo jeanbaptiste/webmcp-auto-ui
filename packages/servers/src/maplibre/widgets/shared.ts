@@ -38,6 +38,43 @@ export const POSITRON_STYLE =
   'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
 /**
+ * Resolve a style alias or pass-through value to a MapLibre-usable style.
+ *
+ * Accepts:
+ *   - `undefined`/`null`  → DEFAULT_STYLE (Carto Voyager)
+ *   - StyleSpecification object → returned as-is
+ *   - URL string (`http(s)://`, `mapbox://`) → returned as-is
+ *   - Known alias (`voyager`, `dark`, `dark-matter`, `positron`, `light`) → resolved CDN URL
+ *   - Any other string → returned as-is (assumed user-provided URL)
+ *
+ * Centralised here so the 28 widgets that call `createMap({ style })` with
+ * the bare alias `'voyager'` no longer trigger a 404 against the page base.
+ */
+export function resolveStyle(style?: any): any {
+  if (style == null) return DEFAULT_STYLE;
+  if (typeof style !== 'string') return style; // StyleSpecification object — pass through
+  if (
+    style.startsWith('http://') ||
+    style.startsWith('https://') ||
+    style.startsWith('mapbox://')
+  ) {
+    return style;
+  }
+  switch (style.toLowerCase()) {
+    case 'dark':
+    case 'dark-matter':
+      return DARK_STYLE;
+    case 'positron':
+    case 'light':
+      return POSITRON_STYLE;
+    case 'voyager':
+      return DEFAULT_STYLE;
+    default:
+      return style; // unknown string — assume caller knows what they're doing
+  }
+}
+
+/**
  * Create a MapLibre map inside `container`. Returns `{ maplibre, map, cleanup }`.
  * Wires a ResizeObserver so the map stays fit when the container resizes.
  */
@@ -55,11 +92,13 @@ export async function createMap(
   const {
     center = [2.3522, 48.8566],
     zoom = 5,
-    style = DEFAULT_STYLE,
+    style: rawStyle = DEFAULT_STYLE,
     pitch = 0,
     bearing = 0,
     ...rest
   } = options ?? {};
+
+  const style = resolveStyle(rawStyle);
 
   const map = new maplibre.Map({
     container,

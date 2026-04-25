@@ -30,6 +30,16 @@ export default defineConfig({
   },
   optimizeDeps: {
     esbuildOptions: { target: 'es2022' },
+    // Skip pre-bundling for the inline perspective variants — they embed a
+    // ~3 MB base64 wasm blob and a top-level-await init_client/init_server
+    // call. esbuild's pre-bundle chokes on both; serving them as native ESM
+    // modules works fine.
+    exclude: [
+      '@finos/perspective',
+      '@finos/perspective-viewer',
+      '@finos/perspective-viewer-datagrid',
+      '@finos/perspective-viewer-d3fc',
+    ],
   },
   resolve: {
     alias: {

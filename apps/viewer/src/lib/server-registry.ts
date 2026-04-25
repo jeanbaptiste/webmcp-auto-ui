@@ -1,7 +1,8 @@
 import type { WebMcpServer } from '@webmcp-auto-ui/core';
 import {
   agChartsServer, canvas2dServer, cesiumServer, chartjsServer, cytoscapeServer,
-  d3server, deckglServer, echartsServer, g6Server, h3Server, harpServer,
+  d3server, deckglServer, echartsServer, g6Server, h3Server,
+  // harpServer disabled: harp.gl archived (PlaneBufferGeometry removed in three r150) — see _retex_flex/02-harp-three-incompat.md
   leafletServer, maplibreServer, mermaidServer, nivoServer, observablePlotServer,
   openLayersServer, perspectiveServer, pixijsServer, plotlyServer,
   protomapsServer, rechartsServer, roughServer, s2Server, sigmaServer,
@@ -26,7 +27,6 @@ export const SERVER_REGISTRY: ServerEntry[] = [
   { id: 'echarts',         server: echartsServer },
   { id: 'g6',              server: g6Server },
   { id: 'h3',              server: h3Server },
-  { id: 'harp',            server: harpServer },
   { id: 'leaflet',         server: leafletServer },
   { id: 'maplibre',        server: maplibreServer },
   { id: 'mermaid',         server: mermaidServer },

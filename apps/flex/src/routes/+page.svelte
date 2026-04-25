@@ -21,7 +21,8 @@
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import {
     agChartsServer, canvas2dServer, cesiumServer, chartjsServer, cytoscapeServer,
-    d3server, deckglServer, echartsServer, g6Server, h3Server, harpServer,
+    d3server, deckglServer, echartsServer, g6Server, h3Server,
+    // harpServer disabled: harp.gl archived (PlaneBufferGeometry removed in three r150) — see _retex_flex/02-harp-three-incompat.md
     leafletServer, maplibreServer, mermaidServer, nivoServer, observablePlotServer,
     openLayersServer, perspectiveServer, pixijsServer, plotlyServer,
     protomapsServer, rechartsServer, roughServer, s2Server, sigmaServer,
@@ -113,7 +114,6 @@
     { id: 'echarts', label: 'Apache ECharts', description: 'Charts Apache ECharts (bar, radar, sankey, funnel, gauge, calendar, graph, 22 widgets)', server: echartsServer },
     { id: 'g6', label: 'G6 (AntV)', description: 'Graphes AntV G6 v5 (force, dagre, mindmap, ego-network, chord, combo, 21 widgets)', server: g6Server },
     { id: 'h3', label: 'H3', description: 'Indexation hexagonale H3 (Uber) sur MapLibre (grid, polyfill, compact, edges, 14 widgets visuels)', server: h3Server },
-    { id: 'harp', label: 'Harp.gl', description: 'Cartes 3D HERE Harp (archived 2023 — globe, mercator, OMV, themes, 8 widgets)', server: harpServer },
     { id: 'leaflet', label: 'Leaflet', description: 'Cartes interactives Leaflet (markers, GeoJSON, heatmap)', server: leafletServer },
     { id: 'maplibre', label: 'MapLibre GL', description: 'Cartes vectorielles WebGL (markers, heatmap, 3D buildings, terrain, clusters, vector tiles)', server: maplibreServer },
     { id: 'mermaid', label: 'Mermaid', description: 'Diagrammes Mermaid (flowchart, sequence, gantt...)', server: mermaidServer },
@@ -203,7 +203,7 @@
   // visualTrace mid-run rebuilds the full trace retroactively from the buffer.
   const traceObserver: TraceObserver = createTraceObserver({
     addWidget: (type, data, serverName) => {
-      const widget = flexGrid?.addBlock(type, data, serverName, type);
+      const widget = addBlock(type, data, serverName, type);
       return widget ? { id: widget.id } : undefined;
     },
     updateWidget: (id, data) => bus.send('agent', id, 'data-update', data),
@@ -227,6 +227,30 @@
       enabledServers = next;
     });
   });
+
+  // Auto-enable a server when one of its widgets is added to the canvas.
+  // Without this, addBlock('sigma-degree-sized', ..., 'sigma') would render the
+  // [type] placeholder fallback in WidgetRenderer because `sigma` is not in
+  // enabledServers, so getWidget(type) returns null on every active server.
+  // Generalises the TRACE_REQUIRED_SERVERS pattern above. We never remove —
+  // users keep the server enabled even if they later delete the widget.
+  function ensureServerEnabled(serverId?: string): void {
+    if (!serverId || enabledServers.has(serverId)) return;
+    if (!SERVER_REGISTRY.some(s => s.id === serverId)) return;
+    enabledServers = new Set([...enabledServers, serverId]);
+  }
+  // Wrapper used everywhere we used to call flexGrid?.addBlock directly.
+  // Order matters: enable the server FIRST so the activeServers $derived
+  // recomputes before <FlexGrid> mounts the new <WidgetRenderer> for the block.
+  function addBlock(
+    type: string,
+    data: Record<string, unknown>,
+    server?: string,
+    component?: string,
+  ): { id: string } | undefined {
+    ensureServerEnabled(server);
+    return flexGrid?.addBlock(type, data, server, component);
+  }
 
   $effect(() => {
     if (visualTrace && flexGridReady && !traceMountedIds) {
@@ -329,7 +353,7 @@
     if (!detail) return;
 
     const add = (type: string, data: Record<string, unknown>) =>
-      flexGrid?.addBlock(type, data, 'autoui', type);
+      addBlock(type, data, 'autoui', type);
 
     // 1. tool_error (tool_result with toolError) → alert
     if (detail.kind === 'tool_result' && detail.toolError) {
@@ -1047,7 +1071,7 @@
                 // Use serverName from the agent loop (WebMCP server that produced the widget),
                 // fall back to currentServerName (external MCP) if not set.
                 const provServer = serverName || currentServerName || undefined;
-                const widget = flexGrid?.addBlock(type, data, provServer, type);
+                const widget = addBlock(type, data, provServer, type);
                 return widget ? { id: widget.id } : undefined;
               },
           onClear: () => { flexGrid?.clearBlocks(); conversationHistory = []; traceObserver?.reset(); },
@@ -1466,7 +1490,7 @@
   {mcpRecipes}
   {webmcpRecipes}
   initialFilter={recipeBrowserFilter}
-  onOpenInNotebook={(type, data) => { flexGrid?.addBlock(type, data, undefined, type); }}
+  onOpenInNotebook={(type, data) => { addBlock(type, data, undefined, type); }}
   onOpenRecipe={(r) => { detailRecipe = r as any; detailOpen = true; recipeBrowserOpen = false; }}
 />
 

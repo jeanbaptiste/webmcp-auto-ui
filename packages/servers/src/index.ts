@@ -8,7 +8,8 @@ export { deckglServer } from './deckgl/server.js';
 export { echartsServer } from './echarts/server.js';
 export { g6Server } from './g6/server.js';
 export { h3Server } from './h3/server.js';
-export { harpServer } from './harp/server.js';
+// disabled: harp.gl archived (PlaneBufferGeometry removed in three r150) — see _retex_flex/02-harp-three-incompat.md
+// export { harpServer } from './harp/server.js';
 // kepler.gl 3.3.0-alpha has no dist/ — disabled until stable release available
 // export { keplerServer } from './kepler/server.js';
 export { leafletServer } from './leaflet/server.js';
