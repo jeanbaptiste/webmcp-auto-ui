@@ -19,6 +19,7 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',  // top-level await needed by perspective-viewer-d3fc and others
+    sourcemap: false,
     rollupOptions: {
       external: [
         'onnxruntime-web',

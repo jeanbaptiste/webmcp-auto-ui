@@ -8,6 +8,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(JSON.parse(execSync('cat ./package.json').toString()).version),
   },
   plugins: [sveltekit()],
+  build: { sourcemap: false },
   worker: { format: 'es' },
   server: {
     headers: {

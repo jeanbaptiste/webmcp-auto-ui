@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 3007",
-    "build": "NODE_OPTIONS=--max-old-space-size=12288 vite build",
+    "build": "NODE_OPTIONS=--max-old-space-size=12288 vite build && find build/server -name '*.map' -delete",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },

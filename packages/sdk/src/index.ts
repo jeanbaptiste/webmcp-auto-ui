@@ -96,3 +96,6 @@ export type { ParsedSegment, RunResult, RunLog, RunTab, RecipeData } from './rec
 
 // Short URL — domain-dependent compact token
 export { buildShortUrl, getShortToken } from './short-url.js';
+
+// Widget sample-data extractor — parses the `## Example` block of a recipe
+export { extractSampleData } from './widget-sample-data.js';

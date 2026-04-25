@@ -15,9 +15,14 @@ export default defineConfig({
     },
   },
   build: {
+    target: 'es2022',
+    sourcemap: false,
     rollupOptions: {
-      external: ['onnxruntime-web', '@huggingface/transformers'],
+      external: ['onnxruntime-web', '@huggingface/transformers', '@here/harp-features-datasource'],
     },
+  },
+  optimizeDeps: {
+    esbuildOptions: { target: 'es2022' },
   },
   ssr: {
     external: ['@huggingface/transformers', 'onnxruntime-web'],

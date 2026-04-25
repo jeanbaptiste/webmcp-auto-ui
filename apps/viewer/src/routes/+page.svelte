@@ -10,19 +10,48 @@
     getHsParam, type HyperSkill, type HyperSkillMeta,
   } from '@webmcp-auto-ui/sdk';
   import { parseFrontmatter, type WebMcpServer } from '@webmcp-auto-ui/core';
-  import {
-    canvas2dServer, chartjsServer, cytoscapeServer, d3server,
-    leafletServer, mermaidServer, pixijsServer,
-    plotlyServer, roughServer, threejsServer,
-  } from '@webmcp-auto-ui/servers';
-  import { autoui } from '@webmcp-auto-ui/agent';
+  import { SERVER_REGISTRY, loadEnabledServers, saveEnabledServers } from '$lib/server-registry.js';
+  import ServerDrawer from '$lib/ServerDrawer.svelte';
+  import BlockRendererPicker from '$lib/BlockRendererPicker.svelte';
+  import { ExternalLink, Pencil, Plus, Trash2, FlaskConical, GitBranch, Github, Server } from 'lucide-svelte';
 
-  const allServers: WebMcpServer[] = [
-    autoui, canvas2dServer, chartjsServer, cytoscapeServer, d3server,
-    leafletServer, mermaidServer, pixijsServer,
-    plotlyServer, roughServer, threejsServer,
-  ];
-  import { ExternalLink, Pencil, Plus, Trash2, FlaskConical, GitBranch, Github } from 'lucide-svelte';
+  let enabledServerIds = $state<Set<string>>(new Set());
+  let serverDrawerOpen = $state(false);
+
+  const activeServers = $derived<WebMcpServer[]>(
+    SERVER_REGISTRY.filter(e => enabledServerIds.has(e.id)).map(e => e.server)
+  );
+
+  function toggleServer(id: string) {
+    const next = new Set(enabledServerIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    enabledServerIds = next;
+    saveEnabledServers(next);
+  }
+
+  // Tracks original (type, data) of blocks whose renderer was swapped, so
+  // the user can restore the source HyperSkill state on demand.
+  let originalBlocks = $state(new Map<string, { type: string; data: Record<string, unknown> }>());
+
+  function swapBlockRenderer(block: Block, newType: string, sample: Record<string, unknown> | null) {
+    if (!originalBlocks.has(block.id)) {
+      originalBlocks.set(block.id, { type: block.type, data: block.data });
+      originalBlocks = new Map(originalBlocks);
+    }
+    block.type = newType;
+    if (sample) block.data = sample;
+    blocks = [...blocks];
+  }
+
+  function restoreBlock(block: Block) {
+    const orig = originalBlocks.get(block.id);
+    if (!orig) return;
+    block.type = orig.type;
+    block.data = orig.data;
+    originalBlocks.delete(block.id);
+    originalBlocks = new Map(originalBlocks);
+    blocks = [...blocks];
+  }
 
   interface Block { id: string; type: string; data: Record<string, unknown>; }
   interface DagNode { hash: string; previousHash?: string; label: string; active: boolean; url?: string; }
@@ -230,6 +259,7 @@
   }
 
   onMount(async () => {
+    enabledServerIds = loadEnabledServers();
     const hs = getHsParam(window.location.href);
     if (!hs) {
       loading = false;
@@ -279,6 +309,11 @@
         <Pencil size={11} /> Edit
       </Button>
     {/if}
+    <Button variant="outline" size="sm" class="flex items-center gap-1.5"
+      onclick={() => serverDrawerOpen = true}
+      title="Toggle WebMCP servers and swap renderers">
+      <Server size={11} /> Servers <span class="text-text2 text-[10px]">({enabledServerIds.size})</span>
+    </Button>
     <a href="https://github.com/jeanbaptiste/webmcp-auto-ui/tree/main/apps/viewer"
        target="_blank" rel="noopener"
        class="font-mono text-xs text-text2 hover:text-text1 hidden xl:inline flex items-center gap-1 transition-colors"
@@ -428,6 +463,18 @@
           <div class="rounded-lg border border-border bg-surface group relative">
             <!-- Block toolbar -->
             <div class="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              <BlockRendererPicker
+                currentType={block.type}
+                {activeServers}
+                onpick={(newType, sample) => swapBlockRenderer(block, newType, sample)}
+              />
+              {#if originalBlocks.has(block.id)}
+                <button
+                  class="p-1 rounded hover:bg-surface2 text-text2 hover:text-accent transition-colors"
+                  onclick={() => restoreBlock(block)}
+                  title="Restore original renderer"
+                >↺</button>
+              {/if}
               <button
                 class="p-1 rounded hover:bg-surface2 text-text2 hover:text-accent transition-colors"
                 onclick={() => startEdit(block)}
@@ -465,7 +512,7 @@
                 </div>
               </div>
             {:else}
-              <WidgetRenderer type={block.type} data={block.data} servers={allServers} />
+              <WidgetRenderer type={block.type} data={block.data} servers={activeServers} />
             {/if}
           </div>
         {/each}
@@ -506,3 +553,10 @@
     </div>
   </footer>
 </div>
+
+<ServerDrawer
+  open={serverDrawerOpen}
+  enabledServers={enabledServerIds}
+  onclose={() => serverDrawerOpen = false}
+  onToggle={toggleServer}
+/>
