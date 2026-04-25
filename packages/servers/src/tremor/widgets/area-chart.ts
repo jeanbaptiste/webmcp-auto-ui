@@ -1,11 +1,13 @@
 // @ts-nocheck
-import { loadTremor, ensureTailwind, ensureSize, mountReact, createElement } from './shared.js';
+import { loadTremor, ensureTailwind, ensureSize, mountReact, createElement, normalizeChartData, renderTremorEmpty } from './shared.js';
 
 export async function render(container: HTMLElement, data: any): Promise<() => void> {
   await ensureTailwind();
   ensureSize(container);
   const { AreaChart } = await loadTremor();
-  const { data: rows, index, categories, colors, valueFormatter, title, showLegend = true, showGridLines = true, curveType = 'linear', stack = false } = data;
+  const { data: rows, index, categories } = normalizeChartData(data);
+  if (!rows.length) return renderTremorEmpty(container, 'tremor-area-chart');
+  const { colors, title, showLegend = true, showGridLines = true, curveType = 'linear', stack = false } = data;
   const children: any[] = [];
   if (title) children.push(createElement('h3', { className: 'text-lg font-semibold mb-2' }, title));
   children.push(createElement(AreaChart, {
