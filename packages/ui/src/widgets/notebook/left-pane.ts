@@ -140,19 +140,39 @@ export function mountLeftPane(
           let body = text;
           try {
             const parsed = JSON.parse(text);
-            // Recipe servers return either { content: "..." } (legacy) or
-            // { name, description, body, ... } (autoui-style). Pick whichever
-            // string field carries the markdown body, in priority order.
             if (parsed && typeof parsed === 'object') {
-              if (typeof parsed.body === 'string') body = parsed.body;
-              else if (typeof parsed.content === 'string') body = parsed.content;
-              else if (typeof parsed.markdown === 'string') body = parsed.markdown;
+              const candidates = [
+                parsed.body,
+                parsed.content,
+                parsed.markdown,
+                parsed.recipe?.body,
+                parsed.recipe?.content,
+                parsed.recipe?.markdown,
+                parsed.result?.body,
+                parsed.result?.content,
+                parsed.data?.body,
+                parsed.data?.content,
+              ];
+              const hit = candidates.find((c) => typeof c === 'string' && c.trim().length > 0);
+              if (hit) {
+                body = hit;
+              } else {
+                console.warn(
+                  `[notebook] get_recipe(${srv.name}/${r.name}): no recognized body key in parsed JSON. Keys:`,
+                  Object.keys(parsed),
+                );
+              }
             }
           } catch { /* not JSON, use raw text */ }
           imported.body = body;
           recipeBodyCache.set(key, body);
         }
-      } catch { /* pass empty body to viewer */ }
+      } catch (err) {
+        console.warn(`[notebook] get_recipe(${srv.name}/${r.name}) failed:`, err);
+      }
+    }
+    if (!imported.body) {
+      imported.body = `> ⚠ Failed to load recipe body from \`${srv.name}\`. The server returned no usable content for \`${r.name}\`.`;
     }
     openRecipeViewerModal(imported, (cell) => handlers.onInjectCells([cell]));
   }

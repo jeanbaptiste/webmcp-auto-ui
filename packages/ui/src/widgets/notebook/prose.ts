@@ -1,7 +1,6 @@
 // @ts-nocheck
 // ---------------------------------------------------------------------------
 // Lightweight markdown renderer + allowlist sanitizer for notebook prose cells.
-// Also: renderMarkdownWithInjectButtons — used by recipe viewer modal.
 // No external dependencies.
 // ---------------------------------------------------------------------------
 
@@ -546,80 +545,3 @@ function updateEmptyState(host: HTMLElement): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Renderer with inject buttons — used by recipe viewer modal.
-// Each fenced code block gets an "↳ inject" button next to it.
-// ---------------------------------------------------------------------------
-
-export interface InjectFenceEvent {
-  lang: string;
-  content: string;
-}
-
-/**
- * Render markdown into a container. Each fenced code block is rendered with
- * an "↳ inject" button; clicking it calls onInject({lang, content}).
- * Returns a cleanup function.
- */
-export function renderMarkdownWithInjectButtons(
-  body: string,
-  onInject: (e: InjectFenceEvent) => void,
-): { root: HTMLElement; destroy: () => void } {
-  const root = document.createElement('div');
-  root.className = 'nb-md-render';
-
-  const lines = (body || '').replace(/\r\n/g, '\n').split('\n');
-  const buf: string[] = [];
-  let i = 0;
-  const cleanups: Array<() => void> = [];
-
-  const flushProse = () => {
-    if (buf.length) {
-      const chunk = buf.join('\n');
-      const p = document.createElement('div');
-      p.innerHTML = renderProse(chunk);
-      root.appendChild(p);
-      buf.length = 0;
-    }
-  };
-
-  while (i < lines.length) {
-    const line = lines[i];
-    if (/^```/.test(line)) {
-      flushProse();
-      const lang = line.replace(/^```/, '').trim().toLowerCase() || 'text';
-      const code: string[] = [];
-      i++;
-      while (i < lines.length && !/^```/.test(lines[i])) {
-        code.push(lines[i]);
-        i++;
-      }
-      i++; // closing fence
-      const content = code.join('\n');
-
-      const block = document.createElement('div');
-      block.className = 'nb-md-fence';
-      block.innerHTML = `
-        <div class="nb-md-fence-head">
-          <span class="nb-md-fence-lang">${escapeHtml(lang)}</span>
-          <button type="button" class="nb-md-fence-inject">↳ inject</button>
-        </div>
-        <pre class="hljs-pre"><code class="hljs language-${escapeHtml(lang)}">${highlightCode(content, lang)}</code></pre>
-      `;
-      const btn = block.querySelector('.nb-md-fence-inject') as HTMLButtonElement;
-      const handler = () => onInject({ lang, content });
-      btn.addEventListener('click', handler);
-      cleanups.push(() => btn.removeEventListener('click', handler));
-      root.appendChild(block);
-      continue;
-    }
-    buf.push(line);
-    i++;
-  }
-  flushProse();
-
-  return {
-    root,
-    destroy: () => cleanups.forEach((f) => f()),
-  };
-}

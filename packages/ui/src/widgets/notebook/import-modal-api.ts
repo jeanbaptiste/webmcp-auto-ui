@@ -16,7 +16,6 @@
 // Side-effect import: registers <auto-import-modal> custom element
 import './import-modal.svelte';
 
-import { renderMarkdownWithInjectButtons } from './prose.js';
 import { extractCellsFromRecipe, extractCellsFromTool, extractCellFromFence } from './resource-extractor.js';
 import type { NotebookCell } from './shared.js';
 import type { McpToolLike } from './resource-extractor.js';
@@ -150,9 +149,6 @@ export function openRecipeViewerModal(
 
   _cleanup?.();
 
-  // We'll hold a reference to the prose renderer's destroy fn.
-  let proseDestroy: (() => void) | null = null;
-
   const handler = (e: CustomEvent) => {
     const { action, payload } = e.detail ?? {};
 
@@ -172,8 +168,6 @@ export function openRecipeViewerModal(
 
     if (action === 'inject-all' || action === 'close') {
       el.removeEventListener('widget:interact', handler as EventListener);
-      proseDestroy?.();
-      proseDestroy = null;
       _cleanup = null;
     }
   };
@@ -181,27 +175,9 @@ export function openRecipeViewerModal(
   el.addEventListener('widget:interact', handler as EventListener);
   _cleanup = () => {
     el.removeEventListener('widget:interact', handler as EventListener);
-    proseDestroy?.();
-    proseDestroy = null;
   };
 
   el.openModal({ mode: 'recipe-viewer', recipe });
-
-  // After the CE opens, inject the rendered markdown into [data-role="render"].
-  // requestAnimationFrame ensures Svelte has rendered the modal DOM.
-  requestAnimationFrame(() => {
-    const renderTarget = el.querySelector('[data-role="render"]') as HTMLElement | null;
-    if (!renderTarget) return;
-    const { root, destroy } = renderMarkdownWithInjectButtons(
-      recipe.body ?? '',
-      ({ lang, content }) => {
-        const cell = extractCellFromFence(lang, content);
-        onInjectCell(cell);
-      },
-    );
-    renderTarget.appendChild(root);
-    proseDestroy = destroy;
-  });
 }
 
 // ---------------------------------------------------------------------------

@@ -2,24 +2,34 @@
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import type { RunResult } from '@webmcp-auto-ui/sdk';
   import { runCode, estimateTokens } from '@webmcp-auto-ui/sdk';
-  import { highlightCode } from '@webmcp-auto-ui/ui';
-  // github-dark.css is already loaded via MarkdownView in the same page
+  import { highlightCode } from '../primitives/markdown-renderer.js';
+  import type { RecipeBlockAction } from './types.js';
 
   interface Props {
     code: string;
     lang?: string;
-    /** Called when user clicks Run; receives the final RunResult + context. */
+    /**
+     * Custom action buttons in the gutter. If omitted AND `onrun` is provided,
+     * a default Run button is rendered (back-compat with original flex behavior).
+     */
+    actions?: RecipeBlockAction[];
+    /**
+     * Back-compat: legacy flex usage. When set, a default Run button is rendered
+     * that calls runCode(code, lang) and forwards the result to this callback.
+     * Ignored when `actions` is provided.
+     */
     onrun?: (payload: { code: string; lang: string; result: RunResult }) => void;
   }
 
   let {
     code = '',
     lang = 'text',
+    actions = undefined,
     onrun,
   }: Props = $props();
 
   let editable = $state('');
-  let status = $state<'idle' | 'running' | 'done' | 'error'>('idle');
+  let runStatus = $state<'idle' | 'running' | 'done' | 'error'>('idle');
   let elapsed = $state(0);
   let liveTokens = $state(0);
   let lastDuration = $state<number | undefined>(undefined);
@@ -27,7 +37,6 @@
   let timerId: ReturnType<typeof setInterval> | undefined;
   let doneResetId: ReturnType<typeof setTimeout> | undefined;
 
-  // Keep textarea in sync when the prop changes (different recipe opened).
   $effect(() => {
     editable = code;
   });
@@ -64,12 +73,12 @@
   }
 
   async function handleRun() {
-    if (status === 'running') return;
+    if (runStatus === 'running') return;
     if (doneResetId) {
       clearTimeout(doneResetId);
       doneResetId = undefined;
     }
-    status = 'running';
+    runStatus = 'running';
     elapsed = 0;
     liveTokens = estimateTokens(editable);
     const t0 = performance.now();
@@ -81,49 +90,85 @@
     stopTimer();
     lastDuration = result.durationMs;
     lastTokens = result.tokens;
-    status = result.status === 'error' ? 'error' : 'done';
+    runStatus = result.status === 'error' ? 'error' : 'done';
 
     onrun?.({ code: editable, lang, result });
 
-    // Reset icon to idle after 1s on success (keep error state until next run)
-    if (status === 'done') {
+    if (runStatus === 'done') {
       doneResetId = setTimeout(() => {
-        if (status === 'done') status = 'idle';
+        if (runStatus === 'done') runStatus = 'idle';
       }, 1000);
     }
+  }
+
+  // Resolve the action list: explicit actions OR back-compat single Run button.
+  const resolvedActions = $derived<RecipeBlockAction[]>(
+    actions && actions.length > 0
+      ? actions
+      : onrun
+        ? [{
+            icon: '▶',
+            label: 'Run',
+            onclick: () => handleRun(),
+          }]
+        : []
+  );
+
+  // For the single-action Run case, we render run-status icon + stats inline.
+  const isSingleRunAction = $derived(
+    !actions && !!onrun && resolvedActions.length === 1
+  );
+
+  function handleActionClick(a: RecipeBlockAction) {
+    a.onclick(editable, lang);
   }
 </script>
 
 <div class="code-block">
-  <button
-    type="button"
-    class="run-btn {status}"
-    onclick={handleRun}
-    disabled={status === 'running'}
-    title={status === 'running' ? 'Running...' : 'Run'}
-  >
-    <span class="icon">
-      {#if status === 'running'}
-        {@html '&#x25D0;'}
-      {:else if status === 'done'}
-        {@html '&#x2713;'}
-      {:else if status === 'error'}
-        !
-      {:else}
-        {@html '&#x25B6;'}
-      {/if}
-    </span>
-    {#if status === 'running' || lastDuration !== undefined}
-      <span class="stats">
-        <span class="t">
-          {status === 'running' ? `${elapsed}ms` : `${lastDuration}ms`}
+  <div class="gutter">
+    {#if isSingleRunAction}
+      <button
+        type="button"
+        class="run-btn {runStatus}"
+        onclick={() => handleRun()}
+        disabled={runStatus === 'running'}
+        title={runStatus === 'running' ? 'Running...' : 'Run'}
+      >
+        <span class="icon">
+          {#if runStatus === 'running'}
+            {@html '&#x25D0;'}
+          {:else if runStatus === 'done'}
+            {@html '&#x2713;'}
+          {:else if runStatus === 'error'}
+            !
+          {:else}
+            {@html '&#x25B6;'}
+          {/if}
         </span>
-        <span class="tok">
-          {formatTokens(status === 'running' ? liveTokens : (lastTokens ?? 0))}
-        </span>
-      </span>
+        {#if runStatus === 'running' || lastDuration !== undefined}
+          <span class="stats">
+            <span class="t">
+              {runStatus === 'running' ? `${elapsed}ms` : `${lastDuration}ms`}
+            </span>
+            <span class="tok">
+              {formatTokens(runStatus === 'running' ? liveTokens : (lastTokens ?? 0))}
+            </span>
+          </span>
+        {/if}
+      </button>
+    {:else}
+      {#each resolvedActions as a}
+        <button
+          type="button"
+          class="action-btn {a.variant ?? 'default'}"
+          onclick={() => handleActionClick(a)}
+          title={a.label ?? a.icon}
+        >
+          <span class="icon">{@html a.icon}</span>
+        </button>
+      {/each}
     {/if}
-  </button>
+  </div>
 
   <div class="editor-wrap">
     {#if lang && lang !== 'text'}
@@ -149,7 +194,14 @@
     gap: 6px;
     margin: 0.5rem 0;
   }
-  .run-btn {
+  .gutter {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: stretch;
+  }
+  .run-btn,
+  .action-btn {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -166,25 +218,30 @@
     cursor: pointer;
     transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
   }
-  .run-btn:hover:not(:disabled) {
+  .run-btn:hover:not(:disabled),
+  .action-btn:hover:not(:disabled) {
     background: #161b22;
     color: #fff;
   }
-  .run-btn:disabled {
+  .run-btn:disabled,
+  .action-btn:disabled {
     cursor: progress;
   }
-  .run-btn .icon {
+  .run-btn .icon,
+  .action-btn .icon {
     font-size: 14px;
     line-height: 1;
   }
   .run-btn.running .icon {
     animation: spin 0.9s linear infinite;
   }
-  .run-btn.done {
+  .run-btn.done,
+  .action-btn.success {
     color: rgb(74, 222, 128);
     border-color: rgba(74, 222, 128, 0.4);
   }
-  .run-btn.error {
+  .run-btn.error,
+  .action-btn.error {
     color: rgb(248, 113, 113);
     border-color: rgba(248, 113, 113, 0.4);
   }
@@ -233,7 +290,6 @@
     tab-size: 2;
     margin: 0;
   }
-  /* Overlay: highlighted <pre> below, transparent <textarea> on top */
   .highlight-layer {
     position: absolute;
     inset: 0;

@@ -19,6 +19,9 @@
 
   import { filterRecipes, sortRecipes, WEBMCP_RECIPES } from '@webmcp-auto-ui/agent';
   import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
+  import { parseBody } from '@webmcp-auto-ui/sdk';
+  import MarkdownView from '../../primitives/MarkdownView.svelte';
+  import RecipeCodeBlock from '../../recipe/RecipeCodeBlock.svelte';
 
   // ---------------------------------------------------------------------------
   // Types (inlined to avoid import-modals.ts cycle)
@@ -90,6 +93,10 @@
   const mode = $derived(data?.mode ?? 'add-md');
   const recipe = $derived(data?.recipe);
   const tool = $derived(data?.tool);
+  const recipeSegments = $derived(parseBody(recipe?.body ?? ''));
+  const recipeCellCount = $derived(
+    recipeSegments.length + ((recipe?.name || recipe?.description) ? 1 : 0),
+  );
 
   // ---------------------------------------------------------------------------
   // Public API — called by wrapper functions
@@ -255,25 +262,13 @@
   // Handlers — recipe-viewer
   // ---------------------------------------------------------------------------
 
-  // prose rendering is done server-side for recipe-viewer; we re-use the
-  // renderMarkdownWithInjectButtons helper injected via slot or data.
-  // Since this is a CE, we render as raw HTML via {@html} after sanitizing.
-  // The inject buttons are wired via event delegation on the section.
-
   function handleInjectAll() {
-    // extractCellsFromRecipe is a pure function from resource-extractor.ts —
-    // but import would create a cycle ui<->notebook. We emit the raw body
-    // and let the consumer (notebook.ts) call extractCellsFromRecipe.
+    // Notebook owns extractCellsFromRecipe to avoid a ui<->notebook cycle.
     emitInteract('inject-all', { recipe: recipe });
     closeModal();
   }
 
-  function handleInjectFence(e: Event) {
-    // Delegated click on .nb-md-fence-inject buttons rendered via {@html}
-    const btn = (e.target as HTMLElement).closest('[data-fence-inject]') as HTMLElement | null;
-    if (!btn) return;
-    const lang = btn.dataset.lang ?? '';
-    const content = btn.dataset.content ?? '';
+  function handleInjectFence(content: string, lang: string) {
     emitInteract('inject-fence', { lang, content });
   }
 
@@ -426,12 +421,30 @@
         {#if recipe?.description}<p>{recipe.description}</p>{/if}
         {#if recipe?.serverName}<span class="nb-imp-recipe-srv">{recipe.serverName}</span>{/if}
       </div>
-      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-      <section class="nb-imp-body nb-imp-body-recipe" data-role="render" onclick={handleInjectFence}>
-        <!-- Content injected imperatively by notebook.ts via renderMarkdownWithInjectButtons -->
+      <section class="nb-imp-body nb-imp-body-recipe">
+        {#each recipeSegments as seg, i (i)}
+          {#if seg.type === 'markdown'}
+            <MarkdownView source={seg.content} />
+          {:else}
+            <RecipeCodeBlock
+              code={seg.content}
+              lang={seg.lang ?? 'text'}
+              actions={[{
+                icon: '+',
+                label: 'Inject as cell',
+                onclick: handleInjectFence,
+              }]}
+            />
+          {/if}
+        {/each}
       </section>
       <footer class="nb-imp-foot">
-        <button type="button" class="nb-imp-btn" onclick={handleInjectAll}>Inject all cells</button>
+        <button
+          type="button"
+          class="nb-imp-btn nb-imp-primary"
+          onclick={handleInjectAll}
+          disabled={recipeCellCount === 0}
+        >Inject all cells{recipeCellCount > 0 ? ` (${recipeCellCount})` : ''}</button>
       </footer>
 
     <!-- ================================================================ -->
@@ -691,48 +704,4 @@
     font-size: 11.5px;
   }
 
-  /* ---- Styles for prose rendered inside recipe-viewer (delegated via {@html} in consumers) ---- */
-  :global(.nb-md-render) { font-size: 13px; line-height: 1.5; }
-  :global(.nb-md-render h1),
-  :global(.nb-md-render h2),
-  :global(.nb-md-render h3) { margin: 12px 0 6px; }
-  :global(.nb-md-render p) { margin: 6px 0; }
-  :global(.nb-md-render ul),
-  :global(.nb-md-render ol) { margin: 6px 0 6px 20px; }
-  :global(.nb-md-render pre) {
-    background: var(--color-surface2, #f4f4f5);
-    padding: 10px 12px;
-    border-radius: 6px;
-    overflow-x: auto;
-    font-size: 12px;
-  }
-  :global(.nb-md-render code) { font-family: var(--font-mono, monospace); font-size: 12px; }
-  :global(.nb-md-fence) {
-    border: 1px solid var(--color-border, #e4e4e7);
-    border-radius: 8px;
-    margin: 10px 0;
-    overflow: hidden;
-  }
-  :global(.nb-md-fence-head) {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 10px;
-    background: var(--color-surface2, #f4f4f5);
-    font-size: 11px;
-    color: var(--color-text2, #666);
-    border-bottom: 1px solid var(--color-border, #e4e4e7);
-  }
-  :global(.nb-md-fence-lang) { font-family: monospace; flex: 1; }
-  :global(.nb-md-fence-inject) {
-    background: var(--color-accent, #6a55ff);
-    color: #fff;
-    border: 0;
-    border-radius: 4px;
-    padding: 3px 9px;
-    font-size: 11px;
-    cursor: pointer;
-  }
-  :global(.nb-md-fence-inject:hover) { filter: brightness(1.08); }
-  :global(.nb-md-fence pre) { margin: 0; border-radius: 0; background: transparent; }
 </style>

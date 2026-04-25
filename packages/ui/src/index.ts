@@ -19,6 +19,10 @@ export { default as MarkdownView } from './primitives/MarkdownView.svelte';
 export { default as CodeView } from './primitives/CodeView.svelte';
 export { renderMarkdown, highlightCode, createMarkdownRenderer } from './primitives/markdown-renderer.js';
 
+// Recipe building blocks (used by RecipeModal and notebook recipe-viewer)
+export { default as RecipeCodeBlock } from './recipe/RecipeCodeBlock.svelte';
+export type { RecipeBlockAction } from './recipe/types.js';
+
 // Widgets are shipped as Svelte 5 custom elements — import the widget file
 // side-effect to register its tag (e.g. `import '@webmcp-auto-ui/ui/widgets/simple/stat.svelte';`
 // then use `<auto-stat data={spec}></auto-stat>`). `WidgetRenderer` does this for you.
