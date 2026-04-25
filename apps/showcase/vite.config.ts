@@ -13,12 +13,28 @@ export default defineConfig({
   worker: {
     format: 'es',
     rollupOptions: {
-      external: ['onnxruntime-web', '@huggingface/transformers'],
+      external: [
+        'onnxruntime-web',
+        '@huggingface/transformers',
+        'vega-embed',
+        'marked',
+        'highlight.js',
+        'html-to-image',
+        'turndown',
+      ],
     },
   },
   build: {
     rollupOptions: {
-      external: ['onnxruntime-web', '@huggingface/transformers'],
+      external: [
+        'onnxruntime-web',
+        '@huggingface/transformers',
+        'vega-embed',
+        'marked',
+        'highlight.js',
+        'html-to-image',
+        'turndown',
+      ],
     },
   },
   resolve: {
@@ -27,7 +43,15 @@ export default defineConfig({
     }
   },
   ssr: {
-    external: ['@huggingface/transformers', 'onnxruntime-web'],
+    external: [
+      '@huggingface/transformers',
+      'onnxruntime-web',
+      'vega-embed',
+      'marked',
+      'highlight.js',
+      'html-to-image',
+      'turndown',
+    ],
   },
   server: {
     headers: {

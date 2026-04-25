@@ -5,6 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Public notebook viewer — nb.hyperskills.net" />
     <meta property="og:site_name" content="nb.hyperskills.net" />
+    <!--
+      ESM import map — bare-specifier resolution for libs marked external in
+      vite.config.ts. Versions are pinned to what's installed in node_modules
+      (see package.json / lockfile). The viewer code itself doesn't import
+      these directly; widget renderers (chart, markdown, export) inside
+      @webmcp-auto-ui/ui and the optional nano-rag embedder load them on
+      demand via dynamic import().
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "vega-embed": "https://esm.sh/vega-embed@6.29.0",
+          "marked": "https://esm.sh/marked@16.4.2",
+          "highlight.js": "https://esm.sh/highlight.js@10.7.3",
+          "html-to-image": "https://esm.sh/html-to-image@1.11.13",
+          "onnxruntime-web": "https://esm.sh/onnxruntime-web@1.21.0",
+          "@huggingface/transformers": "https://esm.sh/@huggingface/transformers@4.0.1"
+        }
+      }
+    </script>
     <script>
       (function () {
         try {

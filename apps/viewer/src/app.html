@@ -4,11 +4,57 @@
   <meta charset="utf-8" />
   <link rel="icon" href="%sveltekit.assets%/favicon.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!--
+    ESM import map — heavy widget libraries are externalised by Vite (see
+    vite.config.ts) and resolved here from esm.sh. Versions match
+    packages/servers/package.json (and currently installed lockfile).
+    Keep in sync when bumping deps.
+  -->
   <script type="importmap">
   {
     "imports": {
       "@huggingface/transformers": "https://esm.sh/@huggingface/transformers@4.1.0",
-      "onnxruntime-web": "https://esm.sh/onnxruntime-web@1.26.0-dev.20260410-5e55544225"
+      "onnxruntime-web": "https://esm.sh/onnxruntime-web@1.26.0-dev.20260410-5e55544225",
+
+      "cesium": "https://esm.sh/cesium@1.140.0",
+      "three": "https://esm.sh/three@0.168.0",
+
+      "plotly.js-dist-min": "https://esm.sh/plotly.js-dist-min@2.35.3",
+      "plotly.js": "https://esm.sh/plotly.js@2.35.3",
+
+      "@finos/perspective": "https://esm.sh/@finos/perspective@3.8.0",
+      "@finos/perspective-viewer": "https://esm.sh/@finos/perspective-viewer@3.8.0",
+      "@finos/perspective-viewer-datagrid": "https://esm.sh/@finos/perspective-viewer-datagrid@3.8.0",
+      "@finos/perspective-viewer-d3fc": "https://esm.sh/@finos/perspective-viewer-d3fc@3.8.0",
+      "@finos/perspective/dist/esm/perspective.inline.js": "https://cdn.jsdelivr.net/npm/@finos/perspective@3.8.0/dist/esm/perspective.inline.js",
+      "@finos/perspective-viewer/dist/esm/perspective-viewer.inline.js": "https://cdn.jsdelivr.net/npm/@finos/perspective-viewer@3.8.0/dist/esm/perspective-viewer.inline.js",
+
+      "deck.gl": "https://esm.sh/deck.gl@9.3.1",
+      "@deck.gl/core": "https://esm.sh/@deck.gl/core@9.3.1",
+      "@deck.gl/layers": "https://esm.sh/@deck.gl/layers@9.3.1",
+      "@deck.gl/geo-layers": "https://esm.sh/@deck.gl/geo-layers@9.3.1",
+      "@deck.gl/aggregation-layers": "https://esm.sh/@deck.gl/aggregation-layers@9.3.1",
+      "@deck.gl/mesh-layers": "https://esm.sh/@deck.gl/mesh-layers@9.3.1",
+
+      "maplibre-gl": "https://esm.sh/maplibre-gl@4.7.1",
+      "mapbox-gl": "https://esm.sh/mapbox-gl@1.13.1",
+      "ol": "https://esm.sh/ol@10.9.0",
+      "leaflet": "https://esm.sh/leaflet@1.9.4",
+      "pmtiles": "https://esm.sh/pmtiles@4.4.1",
+
+      "echarts": "https://esm.sh/echarts@5.6.0",
+      "vega": "https://esm.sh/vega@5.33.1",
+      "vega-lite": "https://esm.sh/vega-lite@5.23.0",
+      "vega-embed": "https://esm.sh/vega-embed@6.29.0",
+      "mermaid": "https://esm.sh/mermaid@11.14.0",
+      "ag-charts-community": "https://esm.sh/ag-charts-community@10.3.9",
+
+      "@antv/g6": "https://esm.sh/@antv/g6@5.1.0",
+      "sigma": "https://esm.sh/sigma@3.0.2",
+      "cytoscape": "https://esm.sh/cytoscape@3.33.2",
+
+      "pixi.js": "https://esm.sh/pixi.js@8.18.1",
+      "s2js": "https://esm.sh/s2js@1.44.0"
     }
   }
   </script>
