@@ -8,7 +8,7 @@
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
   import { Dialog, DialogContent, DialogTitle } from '@webmcp-auto-ui/ui';
-  import { McpConnector, LLMSelector, SettingsPanel, MCPserversList, WebMCPserversList, DiagnosticModal, DiagnosticIcon, ModelCacheManager } from '@webmcp-auto-ui/ui';
+  import { McpConnector, LLMSelector, SettingsPanel, MCPserversList, DiagnosticModal, DiagnosticIcon, ModelCacheManager } from '@webmcp-auto-ui/ui';
 
   const buildStamp = typeof __BUILD_TIME__ === 'string'
     ? __BUILD_TIME__.replace('T', ' ').replace('Z', '').slice(0, 23) : '';
@@ -58,7 +58,7 @@
     localUrl?: string;
     localModel?: string;
     diagnostics?: Array<{ severity: 'error' | 'warning'; title: string; detail: string; quickFix?: string; codeFix?: string }>;
-    serverRegistry?: Array<{ id: string; label: string; description: string; widgetCount: number }>;
+    serverRegistry?: Array<{ id: string; label: string; description: string; widgetCount: number; category?: 'generic' | '2d3d' | 'charts' | 'graph' | 'dashboard' | 'geo' }>;
     enabledServers?: Set<string>;
     onbrowserecipes?: () => void;
     recipeCountByServer?: Record<string, number>;
@@ -134,6 +134,27 @@
     else next.add(id);
     enabledServers = next;
   }
+
+  // ── WebMCP server grouping by category ──────────────────────────────
+  const CATEGORY_ORDER = ['generic', 'charts', 'graph', 'dashboard', '2d3d', 'geo'] as const;
+  const CATEGORY_LABELS: Record<(typeof CATEGORY_ORDER)[number], string> = {
+    generic: 'Générique',
+    charts: 'Charts',
+    graph: 'Graphes & réseaux',
+    dashboard: 'Dashboards',
+    '2d3d': '2D / 3D',
+    geo: 'Géo & cartes',
+  };
+  let serversCollapsed = $state(true);
+  let groupedServers = $derived(
+    CATEGORY_ORDER
+      .map((cat) => ({
+        key: cat,
+        label: CATEGORY_LABELS[cat],
+        items: serverRegistry.filter((s) => (s.category ?? 'generic') === cat),
+      }))
+      .filter((g) => g.items.length > 0)
+  );
 </script>
 
 <Dialog bind:open>
@@ -194,15 +215,64 @@
       <!-- WebMCP servers -->
       {#if serverRegistry.length > 0}
         <section class="flex flex-col gap-2">
-          <WebMCPserversList
-            servers={serverRegistry}
-            {enabledServers}
-            onToggle={toggleServer}
-            recipeCountByServer={webmcpRecipeCountByServer}
-            toolCountByServer={webmcpToolCountByServer}
-            onrecipeclick={(id) => onwebmcprecipeclick?.(id)}
-            ontoolclick={(id) => onwebmcptoolclick?.(id)}
-          />
+          <div class="flex flex-col gap-2">
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div class="flex items-center gap-1 cursor-pointer select-none"
+                 onclick={() => serversCollapsed = !serversCollapsed}>
+              <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">WebMCP servers</span>
+              <span class="text-[9px] text-text2/60 font-mono">({enabledServers.size}/{serverRegistry.length})</span>
+              <span class="text-[10px] text-text2 ml-auto transition-transform {serversCollapsed ? '' : 'rotate-90'}">{@html '&#x25B6;'}</span>
+            </div>
+
+            {#if !serversCollapsed}
+              <div class="flex flex-col gap-3">
+                {#each groupedServers as group (group.key)}
+                  <div class="flex flex-col gap-1">
+                    <div class="text-[9px] font-mono text-text2/70 uppercase tracking-wider pl-0.5">{group.label}</div>
+                    {#each group.items as srv (srv.id)}
+                      {@const enabled = enabledServers.has(srv.id)}
+                      {@const recipes = webmcpRecipeCountByServer?.[srv.id] ?? 0}
+                      {@const tools = webmcpToolCountByServer?.[srv.id] ?? 0}
+                      <div class="group flex items-center gap-2 px-2 py-1.5 rounded border border-border2 bg-surface2 hover:border-accent/30 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={enabled}
+                          onchange={() => toggleServer(srv.id)}
+                          class="w-3.5 h-3.5 rounded border-border2 accent-accent cursor-pointer flex-shrink-0"
+                        />
+                        <div class="flex-1 min-w-0 flex flex-col">
+                          <span class="font-mono text-xs font-medium text-text1 truncate">{srv.label}</span>
+                          {#if srv.description}
+                            <span class="text-[10px] text-text2 truncate">{srv.description}</span>
+                          {/if}
+                          {#if enabled && (recipes > 0 || tools > 0)}
+                            <span class="flex items-center gap-1.5 mt-0.5">
+                              {#if recipes > 0}
+                                <button class="text-[10px] font-mono text-accent hover:underline"
+                                        onclick={(e) => { e.stopPropagation(); onwebmcprecipeclick?.(srv.id); }}>
+                                  {recipes} recipes
+                                </button>
+                              {/if}
+                              {#if recipes > 0 && tools > 0}
+                                <span class="text-[10px] text-text2">·</span>
+                              {/if}
+                              {#if tools > 0}
+                                <button class="text-[10px] font-mono text-accent hover:underline"
+                                        onclick={(e) => { e.stopPropagation(); onwebmcptoolclick?.(srv.id); }}>
+                                  {tools} tools
+                                </button>
+                              {/if}
+                            </span>
+                          {/if}
+                        </div>
+                        <span class="text-[9px] font-mono text-text2/50 flex-shrink-0">{srv.widgetCount}w</span>
+                      </div>
+                    {/each}
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
         </section>
       {/if}
 
