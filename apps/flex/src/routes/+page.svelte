@@ -1444,10 +1444,7 @@
         </div>
         {#if exportedBlockSummary.count > 0}
           <div class="flex items-center gap-2 flex-wrap">
-            <span class="font-mono text-[10px] text-text2">{exportedBlockSummary.count} widget{exportedBlockSummary.count > 1 ? 's' : ''} inclus :</span>
-            {#each exportedBlockSummary.types as t}
-              <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-mono border border-accent/30 text-accent bg-accent/5">{t}</span>
-            {/each}
+            <span class="font-mono text-[10px] text-text2">{exportedBlockSummary.count} widget{exportedBlockSummary.count > 1 ? 's' : ''} inclus</span>
           </div>
         {/if}
         {#if exportError}

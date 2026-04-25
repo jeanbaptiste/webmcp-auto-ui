@@ -633,9 +633,13 @@ function injectLayoutStyles(): void {
 .nbe-handle { position: absolute; left: 0; top: 6px; }
 .nbe-del-abs {
   position: absolute; top: 4px; right: 4px;
-  opacity: 0; transition: opacity 0.15s;
+  opacity: 0.65; transition: opacity 0.15s;
+  width: 26px; height: 26px;
+  font-size: 16px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0;
+  z-index: 2;
 }
-.nbe-cell:hover .nbe-del-abs { opacity: 0.5; }
 .nbe-del-abs:hover { opacity: 1 !important; }
 
 .nbe-prose {
@@ -694,7 +698,7 @@ function injectLayoutStyles(): void {
 }
 .nbe-cell-head {
   display: flex; align-items: center; gap: 8px;
-  padding: 7px 12px;
+  padding: 7px 44px 7px 12px;
   border-bottom: 1px solid var(--color-border);
   font-family: var(--font-mono, 'IBM Plex Mono', monospace);
   font-size: 10px; color: var(--color-text2);
