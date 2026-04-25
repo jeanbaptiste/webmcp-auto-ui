@@ -1,6 +1,6 @@
 # webmcp-auto-ui
 
-https://raw.githubusercontent.com/jeanbaptiste/webmcp-auto-ui/main/docs/demo.mp4
+https://github.com/user-attachments/assets/689126f5-64d9-48dd-8ac4-defb3cbf37d4
 
 Dynamic UI composition by humans and LLMs connected to multiple MCP servers.
 
