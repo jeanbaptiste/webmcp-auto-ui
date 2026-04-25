@@ -74,7 +74,6 @@ export function mountLeftPane(
         <header class="nb-lp-srv-head">
           <span class="nb-lp-srv-dot"></span>
           <span class="nb-lp-srv-name">${escapeHtml(srv.name)}</span>
-          <span class="nb-lp-srv-meta">${(srv.recipes?.length ?? 0)} recipes · ${(srv.tools?.length ?? 0)} tools</span>
         </header>
         <div class="nb-lp-srv-groups">
           ${srv.recipes?.length ? `
@@ -236,7 +235,6 @@ function injectLeftPaneStyles() {
       flex-shrink: 0;
     }
     .nb-lp-srv-name { font-weight: 600; color: var(--color-text1, #111); }
-    .nb-lp-srv-meta { margin-left: auto; font-family: monospace; font-size: 10.5px; }
     .nb-lp-group > summary {
       cursor: pointer; padding: 4px 2px; font-size: 11px;
       color: var(--color-text2, #666); font-family: monospace;
