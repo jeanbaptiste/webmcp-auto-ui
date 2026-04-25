@@ -9,6 +9,11 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   for (const k of ['x1', 'x2', 'y1', 'y2', 'stroke', 'strokeWidth', 'curve']) {
     if (d[k] !== undefined) opts[k] = d[k];
   }
+  // Plot.link needs explicit channel keys; default them when rows already use {x1,y1,x2,y2}.
+  const sample = rows[0] ?? {};
+  for (const k of ['x1', 'y1', 'x2', 'y2']) {
+    if (opts[k] === undefined && sample[k] !== undefined) opts[k] = k;
+  }
   return renderPlot(container, () => ({
     ...commonOpts(d),
     marks: [Plot.link(rows, opts)],
