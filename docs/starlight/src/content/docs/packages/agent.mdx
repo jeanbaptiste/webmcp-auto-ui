@@ -1,15 +1,15 @@
 ---
 title: "@webmcp-auto-ui/agent"
-description: "Agent LLM avec support MCP/WebMCP, providers multiples, tool layers, recipes, nano-RAG, et exécution de recettes."
+description: "LLM agent with MCP/WebMCP support, multiple providers, tool layers, recipes, nano-RAG, and recipe execution."
 sidebar:
   order: 1
 ---
 
-Le package `@webmcp-auto-ui/agent` est le cerveau de la plateforme. Il orchestre la boucle agent LLM (prompt → tool call → resultat → prompt), gere les providers (LLM distant via toute API compatible OpenAI, Gemma WASM in-browser, Ollama local), structure les outils en layers avec lazy loading, et fournit un serveur WebMCP integre (`autoui`) avec plus de 25 widgets natifs.
+The `@webmcp-auto-ui/agent` package is the brain of the platform. It orchestrates the LLM agent loop (prompt, tool call, result, prompt), manages providers (remote LLM via any OpenAI-compatible API, in-browser Gemma WASM, local Ollama), structures tools into layers with lazy loading, and provides a built-in WebMCP server (`autoui`) with over 25 native widgets.
 
-C'est le package le plus volumineux du monorepo, et celui qui relie tous les autres.
+This is the largest package in the monorepo and the one that ties everything together.
 
-## Architecture interne
+## Internal Architecture
 
 ```mermaid
 graph TD
@@ -30,9 +30,9 @@ graph TD
         LAYERS --> PROMPT[buildSystemPromptWithAliases]
 
         AUTOUI[autoui Server] --> RECIPES[Recipes]
-        AUTOUI --> WIDGETS[25+ Widgets natifs]
+        AUTOUI --> WIDGETS[25+ Native Widgets]
 
-        NRAG[ContextRAG] --> EMBED[Embedder ONNX]
+        NRAG[ContextRAG] --> EMBED[ONNX Embedder]
         NRAG --> VINDEX[VectorIndex]
 
         TRACKER[TokenTracker] --> LOOP
@@ -51,7 +51,7 @@ graph TD
 import { runAgentLoop, RemoteLLMProvider, autoui } from '@webmcp-auto-ui/agent';
 ```
 
-Dans un `package.json` d'app :
+In an app's `package.json`:
 
 ```json
 {
@@ -62,18 +62,18 @@ Dans un `package.json` d'app :
 }
 ```
 
-Le package depend de `@webmcp-auto-ui/core` et optionnellement de `@huggingface/transformers` + `onnxruntime-web` pour le nano-RAG et les embeddings.
+The package depends on `@webmcp-auto-ui/core` and optionally on `@huggingface/transformers` + `onnxruntime-web` for nano-RAG and embeddings.
 
 ---
 
 ## runAgentLoop
 
-La fonction centrale du package. Execute une boucle iterative : envoyer un message au LLM, recevoir une reponse (texte ou tool calls), executer les outils, renvoyer les resultats au LLM, jusqu'a `end_turn` ou `maxIterations`.
+The central function. Runs an iterative loop: send a message to the LLM, receive a response (text or tool calls), execute the tools, send results back, until `end_turn` or `maxIterations`.
 
 ```ts
 import { runAgentLoop } from '@webmcp-auto-ui/agent';
 
-const result = await runAgentLoop('Affiche un graphique des ventes Q1', {
+const result = await runAgentLoop('Show a Q1 sales chart', {
   provider: remoteLLMProvider,
   layers: toolLayers,
   maxIterations: 5,
@@ -87,9 +87,9 @@ const result = await runAgentLoop('Affiche un graphique des ventes Q1', {
   },
 });
 
-console.log(result.text);           // Reponse finale
-console.log(result.toolCalls);      // Tous les appels d'outils
-console.log(result.metrics);        // Tokens, latence, iterations
+console.log(result.text);           // Final response
+console.log(result.toolCalls);      // All tool calls
+console.log(result.metrics);        // Tokens, latency, iterations
 console.log(result.stopReason);     // 'end_turn' | 'max_iterations'
 ```
 
@@ -97,37 +97,37 @@ console.log(result.stopReason);     // 'end_turn' | 'max_iterations'
 
 ```ts
 interface AgentLoopOptions {
-  // Obligatoire
-  provider: LLMProvider;              // Provider LLM (Remote, Wasm, ou Local)
+  // Required
+  provider: LLMProvider;              // LLM provider (Remote, Wasm, or Local)
 
-  // Connexion MCP (optionnel si WebMCP seulement)
-  client?: McpClient;                 // Client MCP pour les serveurs distants
+  // MCP connection (optional if WebMCP only)
+  client?: McpClient;
 
-  // Outils
-  layers?: ToolLayer[];               // Couches de tools structurees
-  maxTools?: number;                  // Max outils par appel LLM
+  // Tools
+  layers?: ToolLayer[];               // Structured tool layers
+  maxTools?: number;                  // Max tools per LLM call
 
-  // Controle de la boucle
-  maxIterations?: number;             // Max iterations (defaut: 5)
-  signal?: AbortSignal;               // Annulation
+  // Loop control
+  maxIterations?: number;             // Max iterations (default: 5)
+  signal?: AbortSignal;               // Cancellation
 
-  // Parametres LLM
-  maxTokens?: number;                 // Max tokens en sortie
-  temperature?: number;               // Temperature (creativite)
-  topK?: number;                      // Top K sampling
-  cacheEnabled?: boolean;             // Cache de prompts (defaut: true)
+  // LLM parameters
+  maxTokens?: number;
+  temperature?: number;
+  topK?: number;
+  cacheEnabled?: boolean;             // Prompt caching (default: true)
 
   // Prompt
-  systemPrompt?: string;              // Prompt systeme custom
-  initialMessages?: ChatMessage[];    // Historique precedent
+  systemPrompt?: string;              // Custom system prompt
+  initialMessages?: ChatMessage[];    // Previous history
 
-  // Optimisation contexte
-  truncateResults?: boolean;          // Tronquer resultats longs (defaut: true)
-  compressHistory?: boolean;          // Compresser anciens resultats (defaut: true)
-  maxResultLength?: number;           // Max chars par resultat (defaut: 10000)
+  // Context optimization
+  truncateResults?: boolean;          // Truncate long results (default: true)
+  compressHistory?: boolean;          // Compress old results (default: true)
+  maxResultLength?: number;           // Max chars per result (default: 10000)
 
   // Streaming
-  callbacks?: AgentCallbacks;         // Callbacks temps reel
+  callbacks?: AgentCallbacks;
 }
 ```
 
@@ -135,17 +135,17 @@ interface AgentLoopOptions {
 
 ```ts
 interface AgentResult {
-  text: string;                       // Reponse finale texte
-  toolCalls: ToolCall[];              // Historique des appels d'outils
-  metrics: AgentMetrics;              // Metriques globales
+  text: string;                       // Final text response
+  toolCalls: ToolCall[];              // Tool call history
+  metrics: AgentMetrics;              // Global metrics
   stopReason: 'end_turn' | 'max_iterations';
-  messages: ChatMessage[];            // Conversation complete (utile pour continuer)
+  messages: ChatMessage[];            // Full conversation (useful for continuation)
 }
 ```
 
 ### AgentCallbacks
 
-Les callbacks permettent le streaming en temps reel et la reaction aux evenements de l'agent :
+Callbacks enable real-time streaming and event-driven reactions:
 
 ```ts
 interface AgentCallbacks {
@@ -156,15 +156,15 @@ interface AgentCallbacks {
   // LLM
   onLLMRequest?: (messages: ChatMessage[], tools: ProviderTool[]) => void;
   onLLMResponse?: (response: LLMResponse, latencyMs: number, tokens?: { input: number; output: number }) => void;
-  onToken?: (token: string) => void;       // Streaming token par token
-  onText?: (text: string) => void;         // Texte complet du bloc
+  onToken?: (token: string) => void;       // Token-by-token streaming
+  onText?: (text: string) => void;         // Complete text block
 
-  // Outils
+  // Tools
   onToolCall?: (call: ToolCall) => void;
 
   // Widgets
   onWidget?: (type: string, data: Record<string, unknown>) => { id: string } | void;
-  onClear?: () => void;                    // Canvas clear demande par l'agent
+  onClear?: () => void;
   onUpdate?: (id: string, data: Record<string, unknown>) => void;
   onMove?: (id: string, x: number, y: number) => void;
   onResize?: (id: string, w: number, h: number) => void;
@@ -173,24 +173,24 @@ interface AgentCallbacks {
 ```
 
 :::tip[Streaming]
-Le callback `onToken` est appele pour chaque token genere par le LLM, permettant d'afficher la reponse progressivement. `onText` est appele une seule fois avec le texte complet du bloc, apres tous les tokens.
+The `onToken` callback fires for each token generated, enabling progressive display. `onText` fires once with the complete text block after all tokens.
 :::
 
-### Mecanismes internes
+### Internal mechanisms
 
-**Compression de l'historique** : apres chaque iteration, les anciens `tool_result` sont compresses pour economiser le contexte. Les resultats volumineux sont tronques avec un hint `recall('id')` pour que le LLM puisse les recuperer a la demande via le tool `recall`.
+**History compression**: after each iteration, old `tool_result` blocks are compressed to save context. Large results are truncated with a `recall('id')` hint so the LLM can retrieve them on demand.
 
-**Result buffer** : chaque resultat d'outil est stocke dans un buffer interne. L'outil `recall(id)` permet au LLM de re-lire un resultat complet qui a ete compresse.
+**Result buffer**: every tool result is stored in an internal buffer. The `recall(id)` tool lets the LLM re-read a complete result that has been compressed.
 
-**Auto-repair** : si le LLM genere des parametres invalides (objet aplati, JSON stringify au lieu d'objet, champs manquants), `autoRepairParams` tente une reparation mecanique avant de renvoyer une erreur.
+**Auto-repair**: if the LLM generates invalid parameters (flat instead of nested, stringified JSON, missing fields), `autoRepairParams` attempts mechanical fixes before returning an error.
 
-**Discovery tools** : au premier tour, l'agent ne voit que les outils de decouverte (`search_tools`, `list_tools`). Quand il active un serveur, les outils complets sont reveles (lazy loading).
+**Discovery tools**: on the first turn, the agent only sees discovery tools (`search_tools`, `list_tools`). When it activates a server, the full tool set is revealed (lazy loading).
 
 ---
 
-## Providers LLM
+## LLM Providers
 
-Tous les providers implementent l'interface `LLMProvider` :
+All providers implement the `LLMProvider` interface:
 
 ```ts
 interface LLMProvider {
@@ -203,103 +203,78 @@ interface LLMProvider {
 
 ### RemoteLLMProvider
 
-Provider pour toute API LLM distante compatible OpenAI (e.g. Claude/Anthropic, Gemini/Google, ChatGPT/OpenAI, Le Chat/Mistral, Qwen) via un proxy HTTP. Le proxy (typiquement un `+server.ts` SvelteKit) ajoute la cle API et relaie la requete au provider.
+Provider for any OpenAI-compatible remote LLM API (e.g. Claude/Anthropic, Gemini/Google, ChatGPT/OpenAI, Le Chat/Mistral, Qwen) via an HTTP proxy. The proxy (typically a SvelteKit `+server.ts`) adds the API key and relays requests to the provider.
 
 ```ts
 import { RemoteLLMProvider } from '@webmcp-auto-ui/agent';
 
 const provider = new RemoteLLMProvider({
-  proxyUrl: '/api/chat',       // URL du proxy (obligatoire)
-  model: 'sonnet',             // 'haiku' | 'sonnet' | 'opus' (defaut: 'haiku')
-  apiKey: 'sk-...',            // Optionnel, injecte dans le body
+  proxyUrl: '/api/chat',       // Proxy URL (required)
+  model: 'sonnet',             // 'haiku' | 'sonnet' | 'opus' (default: 'haiku')
+  apiKey: 'sk-...',            // Optional, injected into the body
 });
 ```
 
-Les identifiants de modele sont resolus automatiquement :
-- `'haiku'` → `claude-haiku-4-5-20250414`
-- `'sonnet'` → `claude-sonnet-4-6-20250514`
-- `'opus'` → `claude-opus-4-6-20250514`
-
-```ts
-interface RemoteLLMProviderOptions {
-  proxyUrl: string;
-  model?: string;    // Defaut: 'haiku'
-  apiKey?: string;   // Optionnel
-}
-```
+Model identifiers resolve automatically:
+- `'haiku'` resolves to `claude-haiku-4-5-20250414`
+- `'sonnet'` resolves to `claude-sonnet-4-6-20250514`
+- `'opus'` resolves to `claude-opus-4-6-20250514`
 
 ### WasmProvider
 
-Provider Gemma 4 LiteRT qui execute le modele directement dans le navigateur via WASM, sans serveur. Le modele tourne sur le **thread principal** (pas de Web Worker) et supporte nativement le format `<|tool_call|>` pour les appels d'outils.
+Gemma 4 LiteRT provider that runs the model directly in the browser via WASM, with no server required. The model runs on the **main thread** (no Web Worker) and natively supports the `<|tool_call|>` format for tool calls.
 
 ```ts
 import { WasmProvider } from '@webmcp-auto-ui/agent';
 
 const provider = new WasmProvider({
-  model: 'gemma-e2b',       // 'gemma-e2b' (2B params) ou 'gemma-e4b' (4B params)
-  contextSize: 32768,        // Taille du contexte (defaut: 32768)
+  model: 'gemma-e2b',       // 'gemma-e2b' (2B params) or 'gemma-e4b' (4B params)
+  contextSize: 32768,        // Context size (default: 32768)
   onProgress: (progress, status, loadedBytes, totalBytes) => {
-    console.log(`Chargement: ${Math.round(progress * 100)}%`);
-    console.log(`${loadedBytes} / ${totalBytes} octets`);
+    console.log(`Loading: ${Math.round(progress * 100)}%`);
   },
   onStatusChange: (status) => {
-    console.log(`Statut: ${status}`);
-    // 'idle' → 'loading' → 'ready' (ou 'error')
+    console.log(`Status: ${status}`);
+    // 'idle' -> 'loading' -> 'ready' (or 'error')
   },
 });
 
-// Initialiser le modele (telecharge les poids ~200-400 MB)
+// Initialize the model (downloads weights ~200-400 MB)
 await provider.initialize();
 ```
 
-```ts
-interface WasmProviderOptions {
-  model: WasmModelId;        // 'gemma-e2b' | 'gemma-e4b'
-  contextSize?: number;      // Defaut: 32768
-  onProgress?: (progress: number, status: string, loaded?: number, total?: number) => void;
-  onStatusChange?: (status: 'idle' | 'loading' | 'ready' | 'error') => void;
-}
-```
-
-:::caution[Thread principal]
-Gemma tourne sur le thread principal. Pendant l'inference, l'UI peut etre momentanement bloquee. Pour les taches longues, utilisez le provider LLM distant.
+:::caution[Main thread]
+Gemma runs on the main thread. During inference, the UI may momentarily freeze. For long tasks, use the remote LLM provider instead.
 :::
 
 ### LocalLLMProvider
 
-Provider pour Ollama (LLM local via serveur HTTP).
+Provider for Ollama (local LLM via HTTP server).
 
 ```ts
 import { LocalLLMProvider } from '@webmcp-auto-ui/agent';
 
 const provider = new LocalLLMProvider({
-  baseUrl: 'http://localhost:11434',   // URL Ollama
-  model: 'mistral',                    // Nom du modele Ollama
+  baseUrl: 'http://localhost:11434',
+  model: 'mistral',
 });
 ```
 
 ### createProvider (factory)
 
-Instancie le bon provider a partir d'une configuration declarative :
+Instantiates the correct provider from a declarative config:
 
 ```ts
 import { createProvider } from '@webmcp-auto-ui/agent';
-import type { LLMConfig } from '@webmcp-auto-ui/agent';
 
-// Remote
 const remote = createProvider({ type: 'remote', proxyUrl: '/api/chat', model: 'sonnet' });
-
-// WASM
 const wasm = createProvider({ type: 'wasm', model: 'gemma-e2b' });
-
-// Local
 const local = createProvider({ type: 'local', baseUrl: 'http://localhost:11434', model: 'mistral' });
 ```
 
-### Aliases de compatibilite (deprecies)
+### Backward-compatibility aliases (deprecated)
 
 ```ts
-// Ces aliases sont conserves pour retrocompatibilite mais deprecies
 import { AnthropicProvider } from '@webmcp-auto-ui/agent';  // = RemoteLLMProvider
 import { GemmaProvider } from '@webmcp-auto-ui/agent';      // = WasmProvider
 ```
@@ -308,99 +283,85 @@ import { GemmaProvider } from '@webmcp-auto-ui/agent';      // = WasmProvider
 
 ## Tool Layers
 
-Les tool layers structurent les outils en couches pour le lazy loading, l'injection dans le prompt, et la resolution d'alias. C'est le systeme qui permet a l'agent de decouvrir progressivement les outils disponibles sans saturer le contexte.
+Tool layers structure tools into layers for lazy loading, system prompt injection, and alias resolution. This system lets the agent discover tools progressively without saturating the context.
 
 ```mermaid
 graph LR
     subgraph Layers
-        MCP[MCP Layer<br/>Donnees distantes] --> TOOLS[Tool Pool]
-        WMCP[WebMCP Layer<br/>Widgets locaux] --> TOOLS
+        MCP[MCP Layer<br/>Remote data] --> TOOLS[Tool Pool]
+        WMCP[WebMCP Layer<br/>Local widgets] --> TOOLS
     end
 
     TOOLS --> DISCOVERY[Discovery Tools<br/>search_tools, list_tools]
-    TOOLS --> ACTIVATE[Activated Tools<br/>Outils complets]
+    TOOLS --> ACTIVATE[Activated Tools<br/>Full tool set]
 
-    DISCOVERY -->|Premier tour| LLM
-    ACTIVATE -->|Apres activation| LLM
+    DISCOVERY -->|First turn| LLM
+    ACTIVATE -->|After activation| LLM
 
     LLM --> DISPATCH[Dispatch<br/>prefix_protocol_tool]
 ```
 
-### Types de layers
+### Layer types
 
 ```ts
 type ToolLayer = McpLayer | WebMcpLayer;
 
 interface McpLayer {
   protocol: 'mcp';
-  serverName: string;        // Nom du serveur (utilise pour le prefix)
+  serverName: string;
   description?: string;
   serverUrl?: string;
-  tools: McpToolDef[];       // Outils MCP
-  recipes?: McpRecipe[];     // Recipes optionnelles
+  tools: McpToolDef[];
+  recipes?: McpRecipe[];
 }
 
 interface WebMcpLayer {
   protocol: 'webmcp';
   serverName: string;
   description: string;
-  tools: WebMcpToolDef[];    // Outils WebMCP (avec execute)
+  tools: WebMcpToolDef[];
 }
 ```
 
-### Convention de nommage des outils
+### Tool naming convention
 
-Les outils sont prefixes selon la convention `{server}_{protocol}_{tool}` :
-- `recipes_mcp_search_recipes` — outil `search_recipes` du serveur MCP `recipes`
-- `autoui_webmcp_widget_display` — outil `widget_display` du serveur WebMCP `autoui`
-
-La fonction `sanitizeServerName` nettoie les noms de serveur (supprime "mcp", "server", "srv", normalise les separateurs).
+Tools are prefixed following the `{server}_{protocol}_{tool}` convention:
+- `recipes_mcp_search_recipes` — `search_recipes` tool from the MCP server `recipes`
+- `autoui_webmcp_widget_display` — `widget_display` tool from the WebMCP server `autoui`
 
 ### buildSystemPromptWithAliases
 
-Genere le prompt systeme avec la liste des outils, les aliases canoniques, et les instructions d'execution.
+Generates the system prompt with tool listings, canonical aliases, and execution instructions.
 
 ```ts
 import { buildSystemPromptWithAliases } from '@webmcp-auto-ui/agent';
 
 const { prompt, aliasMap } = buildSystemPromptWithAliases(layers);
-// prompt: texte complet du prompt systeme
-// aliasMap: Map<"alias_name", "real_name">
 ```
-
-Le prompt genere inclut :
-- La liste des serveurs disponibles et leurs descriptions
-- Les instructions pour la decouverte progressive des outils
-- Les aliases canoniques (ex: `search_recipes` → `recipes_mcp_search_recipes`)
-- Les recipes formatees pour l'injection dans le contexte
 
 ### buildDiscoveryToolsWithAliases
 
-Construit les outils de decouverte initiaux. Au premier tour, l'agent ne voit que ces outils — il doit "activer" un serveur pour voir ses outils complets.
+Builds the initial discovery tools. On the first turn, the agent only sees these tools — it must "activate" a server to see its full tool set.
 
 ```ts
 import { buildDiscoveryToolsWithAliases } from '@webmcp-auto-ui/agent';
 
 const { tools, aliasMap } = buildDiscoveryToolsWithAliases(layers);
-// tools: ProviderTool[] — discovery tools + aliases canoniques
-// aliasMap: Map pour la resolution
 ```
 
 ### activateServerTools
 
-Active les outils complets d'une layer. Appele quand l'agent decouvre un serveur via les outils de decouverte.
+Activates the full tools of a layer. Called when the agent discovers a server through discovery tools.
 
 ```ts
 import { activateServerTools } from '@webmcp-auto-ui/agent';
 
-// currentTools = outils actuels (discovery + deja actives)
-// layer = la layer a activer
 const nextTools = activateServerTools(currentTools, layer);
 ```
 
 ### resolveCanonicalTools
 
-Resout les outils MCP en roles canoniques via un systeme de matching a 4 couches. Permet au prompt de reference des noms generiques (`search_recipes`, `list_recipes`, `get_recipe`) qui sont mappes aux noms reels des outils du serveur.
+Resolves MCP tools to canonical roles via a 4-layer matching system. This lets the prompt reference generic names (`search_recipes`, `list_recipes`, `get_recipe`) that map to the server's actual tool names.
 
 ```ts
 import { resolveCanonicalTools } from '@webmcp-auto-ui/agent';
@@ -409,254 +370,180 @@ const matches = resolveCanonicalTools(mcpTools);
 // CanonicalMatch[] { role, realToolName }
 ```
 
-Les 4 couches de matching :
+The 4 matching layers:
 
-1. **Exact match** — le nom de l'outil correspond exactement (`search_recipes`)
-2. **Decompose** — tokenise le nom et teste toutes les paires (action, resource). Ex: `find_dishes` → action=find (synonyme de search), resource=dishes
-3. **Description keywords** — scanne la description pour des mots-cles (recipe, template, workflow, content)
-4. **Fallback** — aucune correspondance trouvee
-
-```ts
-// Actions reconnues par role
-// search: 'search', 'find', 'query'
-// list: 'list', 'browse', 'explore', 'discover'
-// get: 'get', 'read', 'fetch', 'show', 'describe', 'detail', 'view', 'load'
-```
-
-### SchemaTransformOptions
-
-Options pour transformer les schemas avant envoi au LLM :
-
-```ts
-interface SchemaTransformOptions {
-  sanitize?: boolean;   // Nettoyer pour compatibilite API LLM (defaut: true)
-  flatten?: boolean;    // Aplatir les objets imbriques (defaut: false)
-  onSchemaPatch?: (toolName: string, patches: SchemaPatch[]) => void;
-}
-```
+1. **Exact match** — tool name matches exactly (`search_recipes`)
+2. **Decompose** — tokenize name and test all (action, resource) pairs
+3. **Description keywords** — scan description for keywords (recipe, template, workflow)
+4. **Fallback** — no match found
 
 ---
 
-## Serveur WebMCP integre (autoui)
+## Built-in WebMCP Server (autoui)
 
-Le package fournit un serveur WebMCP pre-configure avec plus de 25 widgets natifs et 6 outils de base. C'est le serveur par defaut utilise par toutes les apps de demo.
+The package ships with a pre-configured WebMCP server featuring over 25 native widgets and 6 core tools.
 
 ```ts
 import { autoui, NATIVE_WIDGET_NAMES } from '@webmcp-auto-ui/agent';
 
-// autoui est un WebMcpServer pret a l'emploi
 const layer = autoui.layer();
 ```
 
-### Widgets natifs
+### Native widgets
 
 | Widget | Description |
 |--------|-------------|
-| `stat` | Statistique cle (label + valeur + tendance) |
-| `kv` | Paires cle-valeur |
-| `list` | Liste d'items |
-| `chart` | Graphique a barres simple |
-| `alert` | Alerte (info, warning, error, success) |
-| `code` | Bloc de code avec coloration syntaxique |
-| `text` | Texte Markdown |
-| `actions` | Boutons d'action interactifs |
-| `tags` | Badges/tags colores |
-| `stat-card` | Carte statistique enrichie |
-| `data-table` | Tableau de donnees triable |
-| `timeline` | Chronologie d'evenements |
-| `profile` | Fiche profil utilisateur |
-| `trombinoscope` | Grille de profils |
-| `json-viewer` | Arbre JSON interactif |
-| `hemicycle` | Hemicycle parlementaire |
-| `chart-rich` | Graphique multi-series (bar, line, area, pie, donut) |
-| `cards` | Grille de cartes |
-| `grid-data` | Grille de donnees |
-| `sankey` | Diagramme Sankey |
-| `map` | Carte Leaflet avec marqueurs |
-| `log` | Visionneuse de logs |
-| `gallery` | Galerie d'images |
-| `carousel` | Carousel d'images/contenus |
-| `d3` | Visualisations D3.js (treemap, force, heatmap, radial) |
-| `js-sandbox` | Sandbox JavaScript pour visualisations custom |
-| `recipe-browser` | Navigateur de recipes |
+| `stat` | Key statistic (label + value + trend) |
+| `kv` | Key-value pairs |
+| `list` | Item list |
+| `chart` | Simple bar chart |
+| `alert` | Alert (info, warning, error, success) |
+| `code` | Syntax-highlighted code block |
+| `text` | Markdown text |
+| `actions` | Interactive action buttons |
+| `tags` | Colored badges/tags |
+| `stat-card` | Rich statistic card |
+| `data-table` | Sortable data table |
+| `timeline` | Event timeline |
+| `profile` | User profile card |
+| `trombinoscope` | Profile grid |
+| `json-viewer` | Interactive JSON tree |
+| `hemicycle` | Parliamentary hemicycle |
+| `chart-rich` | Multi-series chart (bar, line, area, pie, donut) |
+| `cards` | Card grid |
+| `grid-data` | Data grid |
+| `sankey` | Sankey diagram |
+| `map` | Leaflet map with markers |
+| `log` | Log viewer |
+| `gallery` | Image gallery |
+| `carousel` | Image/content carousel |
+| `d3` | D3.js visualizations (treemap, force, heatmap, radial) |
+| `js-sandbox` | JavaScript sandbox for custom visualizations |
+| `recipe-browser` | Recipe browser |
 
-### Outils natifs
+### Native tools
 
 ```ts
-// widget_display — afficher un widget sur le canvas
-await callTool('widget_display', {
-  name: 'stat',
-  params: { label: 'Revenue', value: '$42k', trend: 'up' }
-});
+// widget_display — display a widget on the canvas
+await callTool('widget_display', { name: 'stat', params: { label: 'Revenue', value: '$42k' } });
 
-// canvas — manipuler le canvas
-await callTool('canvas', {
-  action: 'clear'           // Vider le canvas
-});
-await callTool('canvas', {
-  action: 'update',
-  id: 'widget_123',
-  params: { value: '$45k' } // Mettre a jour un widget
-});
-await callTool('canvas', {
-  action: 'move',
-  id: 'widget_123',
-  x: 100, y: 200            // Deplacer un widget
-});
+// canvas — manipulate the canvas
+await callTool('canvas', { action: 'clear' });
+await callTool('canvas', { action: 'update', id: 'widget_123', params: { value: '$45k' } });
+await callTool('canvas', { action: 'move', id: 'widget_123', x: 100, y: 200 });
 
-// recall — rejouer un resultat d'outil precedent
+// recall — replay a previous tool result
 await callTool('recall', { id: 'toolu_abc123' });
 
-// search_recipes / list_recipes / get_recipe — decouvrir les widgets
+// search_recipes / list_recipes / get_recipe — discover widgets
 await callTool('search_recipes', { query: 'chart' });
-await callTool('list_recipes');
-await callTool('get_recipe', { name: 'stat' });
 ```
 
 ---
 
 ## Recipes
 
-Les recipes sont des fichiers Markdown avec frontmatter YAML qui documentent les widgets pour l'agent. Elles sont compilees a la build et injectees dans le prompt systeme.
+Recipes are Markdown files with YAML frontmatter that document widgets for the agent. They are compiled at build time and injected into the system prompt.
 
 ### WEBMCP_RECIPES
 
-Tableau statique de toutes les recipes compilees :
+Static array of all compiled recipes:
 
 ```ts
 import { WEBMCP_RECIPES } from '@webmcp-auto-ui/agent';
-
-console.log(WEBMCP_RECIPES.length);  // Nombre de recipes disponibles
+console.log(WEBMCP_RECIPES.length);
 ```
 
 ### parseRecipe / parseRecipes
 
-Parsent un fichier Markdown en objet `Recipe` :
+Parse Markdown files into `Recipe` objects:
 
 ```ts
 import { parseRecipe, parseRecipes } from '@webmcp-auto-ui/agent';
 
-const recipe = parseRecipe(markdownString);
-// Recipe | null
-
-const recipes = parseRecipes(arrayOfMarkdownStrings);
-// Recipe[]
+const recipe = parseRecipe(markdownString);   // Recipe | null
+const recipes = parseRecipes(markdownArray);  // Recipe[]
 ```
 
 ### recipeRegistry
 
-Registre global avec enregistrement, filtrage et formatage :
+Global registry with registration, filtering, and formatting:
 
 ```ts
 import {
-  recipeRegistry,
   registerRecipes,
   filterRecipesByServer,
   formatRecipesForPrompt,
   formatMcpRecipesForPrompt,
 } from '@webmcp-auto-ui/agent';
 
-// Enregistrer des recipes dans le registre global
 registerRecipes(recipes);
-
-// Filtrer par serveur
-const nasaRecipes = filterRecipesByServer(recipes, 'nasa');
-
-// Formater pour injection dans le system prompt
+const filtered = filterRecipesByServer(recipes, 'nasa');
 const promptBlock = formatRecipesForPrompt(recipes);
-const mcpBlock = formatMcpRecipesForPrompt(mcpRecipes);
 ```
 
 ---
 
 ## summarizeChat
 
-Resume une conversation agent pour l'export HyperSkill. Envoie l'historique au LLM pour generer un resume anonymise de 2-3 phrases.
+Summarizes an agent conversation for HyperSkill export. Sends the history to the LLM for an anonymized 2-3 sentence summary.
 
 ```ts
 import { summarizeChat } from '@webmcp-auto-ui/agent';
-import type { SummarizeOptions, ChatSummaryResult } from '@webmcp-auto-ui/agent';
 
-const result: ChatSummaryResult = await summarizeChat({
+const result = await summarizeChat({
   messages: conversationHistory,
   provider: remoteLLMProvider,
   toolsUsed: ['widget_display', 'search_recipes'],
   toolCallCount: 5,
   mcpServers: ['nasa', 'hackernews'],
-  skillsReferenced: [],
 });
 
-console.log(result.chatSummary);   // Resume textuel anonymise
-console.log(result.provenance);     // Objet de traçabilite
+console.log(result.chatSummary);    // Anonymized text summary
+console.log(result.provenance);     // Traceability object
 ```
 
-Le resume est anonymise automatiquement : les noms de personnes, entreprises, lieux et URLs sont remplaces par des termes generiques.
-
-```ts
-interface ChatSummaryResult {
-  chatSummary: string;
-  provenance: {
-    mcpServers?: string[];
-    toolsUsed?: string[];
-    toolCallCount?: number;
-    skillsReferenced?: string[];
-    llm?: string;
-    exportedAt: string;
-  };
-}
-```
+The summary is automatically anonymized: names of people, companies, locations, and URLs are replaced with generic terms.
 
 ---
 
 ## Token Tracker
 
-Suit les tokens et la latence en temps reel avec des taux glissants sur 60 secondes.
+Tracks tokens and latency in real time with 60-second rolling rates.
 
 ```ts
 import { TokenTracker } from '@webmcp-auto-ui/agent';
 
 const tracker = new TokenTracker();
 
-// Enregistrer les metriques apres chaque reponse LLM
 tracker.record(
   { input_tokens: 1500, output_tokens: 200, cache_read_input_tokens: 800 },
-  1200  // latence en ms
+  1200  // latency in ms
 );
 
-// Lire les metriques
 const m = tracker.metrics;
 console.log(`Total: ${m.totalInputTokens} in / ${m.totalOutputTokens} out`);
-console.log(`Taux: ${m.requestsPerMin} req/min`);
-console.log(`Cache: ${m.totalCachedGB.toFixed(3)} GB lu depuis le cache`);
+console.log(`Rate: ${m.requestsPerMin} req/min`);
+console.log(`Cache: ${m.totalCachedGB.toFixed(3)} GB read from cache`);
 
-// S'abonner aux mises a jour en temps reel
-const unsubscribe = tracker.subscribe((metrics) => {
-  updateUI(metrics);
-});
+const unsubscribe = tracker.subscribe((metrics) => updateUI(metrics));
 ```
 
 ```ts
 interface TokenMetrics {
-  // Cumulatifs
   totalRequests: number;
   totalInputTokens: number;
   totalOutputTokens: number;
   totalCacheReadTokens: number;
-
-  // Taux glissants (fenetre de 60s)
   requestsPerMin: number;
   inputTokensPerMin: number;
   outputTokensPerMin: number;
-
-  // Derniere requete
   lastInputTokens: number;
   lastOutputTokens: number;
   lastCacheReadTokens: number;
   lastLatencyMs: number;
-
-  // Derives
-  totalCachedGB: number;   // totalCacheReadTokens * 4 / 1e9
-  isWasm: boolean;          // true si metriques estimees (WASM)
+  totalCachedGB: number;
+  isWasm: boolean;
 }
 ```
 
@@ -664,68 +551,52 @@ interface TokenMetrics {
 
 ## Nano-RAG (context compaction)
 
-Le module nano-RAG compresse le contexte agent en decoupant les resultats d'outils en chunks, en les embedant via ONNX (modele `all-MiniLM-L6-v2`), et en ne recuperant que les chunks pertinents avant chaque appel LLM.
+The nano-RAG module compresses agent context by chunking tool results, embedding them via ONNX (`all-MiniLM-L6-v2`), and retrieving only the relevant chunks before each LLM call.
 
 ```mermaid
 graph LR
     TR[tool_result] -->|chunkToolResult| CHUNKS[Chunks]
-    CHUNKS -->|contextualizeChunk| CTX[Chunks contextualises]
-    CTX -->|Embedder ONNX| VEC[Vecteurs 384D]
+    CHUNKS -->|contextualizeChunk| CTX[Contextualized chunks]
+    CTX -->|ONNX Embedder| VEC[384D Vectors]
     VEC -->|VectorIndex| INDEX[Index]
 
-    QUERY[User query] -->|Embedder| QVEC[Vecteur requete]
+    QUERY[User query] -->|Embedder| QVEC[Query vector]
     QVEC -->|cosine + BM25| INDEX
-    INDEX -->|top-K| RESULTS[Chunks pertinents]
-    RESULTS -->|deduplication| FINAL[Contexte compact]
+    INDEX -->|top-K| RESULTS[Relevant chunks]
+    RESULTS -->|deduplication| FINAL[Compact context]
 ```
 
 ### ContextRAG
 
 ```ts
-import { ContextRAG, type ContextRAGOptions } from '@webmcp-auto-ui/agent';
+import { ContextRAG } from '@webmcp-auto-ui/agent';
 
 const rag = new ContextRAG({
-  topK: 5,              // Chunks a recuperer par requete (defaut: 5)
-  maxChunkSize: 300,    // Taille max d'un chunk en chars (defaut: 300)
-  enabled: true,        // Activer/desactiver
-  onProgress: (status, loaded, total) => {
-    console.log(`Embedder: ${status} (${loaded}/${total})`);
-  },
+  topK: 5,              // Chunks to retrieve per query (default: 5)
+  maxChunkSize: 300,    // Max chunk size in chars (default: 300)
+  enabled: true,
+  onProgress: (status, loaded, total) => console.log(`Embedder: ${status}`),
 });
 
-// Initialiser (telecharge le modele ONNX au premier usage)
 await rag.initialize();
-
-// Ingerer un resultat d'outil
 await rag.ingest('toolu_123', toolResultText);
-
-// Recuperer les chunks pertinents pour une requete
 const context = await rag.query('revenue Q1');
-// string — chunks concatenes, prets pour injection dans le prompt
 ```
 
-Le nano-RAG utilise un systeme hybride embeddings + BM25, avec deduplication par similarite Jaccard et eviction LRU des anciens chunks.
+Uses hybrid embeddings + BM25 retrieval with Jaccard deduplication and LRU eviction.
 
 ---
 
 ## Diagnostics
 
-Analyse les layers, les schemas et le prompt pour detecter les problemes potentiels.
+Analyzes layers, schemas, and prompts to detect potential issues.
 
 ```ts
 import { runDiagnostics } from '@webmcp-auto-ui/agent';
-import type { Diagnostic } from '@webmcp-auto-ui/agent';
 
-const diagnostics: Diagnostic[] = runDiagnostics(layers, tools, systemPrompt, {
-  sanitize: true,
-  flatten: false,
-});
-
+const diagnostics = runDiagnostics(layers, tools, systemPrompt);
 diagnostics.forEach(d => {
-  console.log(`[${d.severity}] ${d.title}`);
-  console.log(`  ${d.detail}`);
-  if (d.quickFix) console.log(`  Fix rapide: ${d.quickFix}`);
-  if (d.codeFix) console.log(`  Fix code: ${d.codeFix}`);
+  console.log(`[${d.severity}] ${d.title}: ${d.detail}`);
 });
 ```
 
@@ -734,67 +605,43 @@ interface Diagnostic {
   severity: 'error' | 'warning';
   title: string;
   detail: string;
-  quickFix?: string;    // Instruction pour le prompt
-  codeFix?: string;     // Modification de code suggeree
+  quickFix?: string;
+  codeFix?: string;
 }
 ```
-
-Detecte :
-- Bruit dans les prefixes de serveur ("mcp", "server" residuels)
-- Schemas invalides ou incompatibles avec les API LLM
-- Incoherences entre le prompt et les outils enregistres
 
 ---
 
 ## Auto-Repair
 
-Repare automatiquement les parametres d'appel d'outil quand le LLM genere des structures incorrectes.
+Automatically repairs tool call parameters when the LLM generates incorrect structures.
 
 ```ts
 import { autoRepairParams } from '@webmcp-auto-ui/agent';
-import type { RepairResult } from '@webmcp-auto-ui/agent';
 
 const { params, fixes } = autoRepairParams(rawInput, toolSchema, toolName);
-
-if (fixes.length > 0) {
-  console.log('Reparations appliquees:', fixes);
-  // Ex: ['flat params → nested {name, params:{...}}', 'data: stringified JSON → parsed object']
-}
+if (fixes.length > 0) console.log('Repairs applied:', fixes);
 ```
 
-Reparations supportees :
-- **Flat → nested** : si le schema attend `{name, params}` mais reçoit `{name, key1, key2}`, regroupe automatiquement en `{name, params: {key1, key2}}`
-- **String → object** : si un champ attend un objet mais reçoit une chaine JSON, parse automatiquement
-- **Champs manquants** : ajoute les champs obligatoires avec des valeurs par defaut quand possible
+Supported repairs:
+- **Flat to nested**: `{name, key1, key2}` becomes `{name, params: {key1, key2}}`
+- **String to object**: stringified JSON is parsed automatically
+- **Missing fields**: required fields get default values when possible
 
 ---
 
-## Utilitaires
+## Utilities
 
-### toProviderTools
-
-Convertit les outils MCP en format provider LLM (utilise par la boucle agent) :
+### toProviderTools / fromMcpTools
 
 ```ts
-import { toProviderTools } from '@webmcp-auto-ui/agent';
+import { toProviderTools, fromMcpTools } from '@webmcp-auto-ui/agent';
 
-const providerTools = toProviderTools(mcpTools);
-// ProviderTool[] — format attendu par l'API du provider LLM
-```
-
-### fromMcpTools
-
-Convertit les `McpTool[]` (du core) en `McpToolDef[]` (agent) :
-
-```ts
-import { fromMcpTools } from '@webmcp-auto-ui/agent';
-
-const toolDefs = fromMcpTools(tools);
+const providerTools = toProviderTools(mcpTools);  // McpToolDef[] -> ProviderTool[]
+const toolDefs = fromMcpTools(tools);             // McpTool[] -> McpToolDef[]
 ```
 
 ### trimConversationHistory
-
-Reduit l'historique a un budget de tokens en supprimant les messages les plus anciens :
 
 ```ts
 import { trimConversationHistory } from '@webmcp-auto-ui/agent';
@@ -802,23 +649,11 @@ import { trimConversationHistory } from '@webmcp-auto-ui/agent';
 const trimmed = trimConversationHistory(messages, 4096);
 ```
 
-### Discovery Cache
-
-Cache pour les resultats de decouverte (recipes MCP, schemas) :
-
-```ts
-import { DiscoveryCache } from '@webmcp-auto-ui/agent';
-import type { CachedRecipe, ServerCache } from '@webmcp-auto-ui/agent';
-
-const cache = new DiscoveryCache();
-// Utilisé en interne par buildDiscoveryCache()
-```
-
 ---
 
 ## Types
 
-### Messages et contenus
+### Messages and content
 
 ```ts
 interface ChatMessage {
@@ -838,7 +673,7 @@ interface LLMResponse {
 }
 ```
 
-### Outils et metriques
+### Tools and metrics
 
 ```ts
 interface ToolCall {
@@ -848,7 +683,7 @@ interface ToolCall {
   result?: string;
   error?: string;
   elapsed?: number;
-  guided?: boolean;    // Precede par un outil de decouverte
+  guided?: boolean;    // Preceded by a discovery tool
 }
 
 interface AgentMetrics {
@@ -862,59 +697,48 @@ interface AgentMetrics {
 }
 ```
 
-### Modeles
+### Models
 
 ```ts
 type RemoteModelId = 'haiku' | 'sonnet' | 'opus';
 type WasmModelId = 'gemma-e2b' | 'gemma-e4b';
 type LLMId = RemoteModelId | WasmModelId;
-type ModelId = LLMId | string;  // Inclut les modeles Ollama
+type ModelId = LLMId | string;  // Includes Ollama models
 ```
 
 ---
 
-## Tutoriel : agent complet avec MCP + WebMCP
+## Tutorial: Full Agent with MCP + WebMCP
 
-Ce tutoriel construit un agent qui se connecte a un serveur MCP distant pour les donnees, utilise les widgets natifs pour l'affichage, et gere le streaming en temps reel.
-
-### Etape 1 : configurer les providers et clients
+### Step 1: Set up providers and clients
 
 ```ts
 import { runAgentLoop, RemoteLLMProvider, autoui } from '@webmcp-auto-ui/agent';
 import { McpClient } from '@webmcp-auto-ui/core';
 
-// Provider LLM distant (e.g. Claude Sonnet)
-const provider = new RemoteLLMProvider({
-  proxyUrl: '/api/chat',
-  model: 'sonnet',
-});
-
-// Client MCP pour le serveur de donnees
+const provider = new RemoteLLMProvider({ proxyUrl: '/api/chat', model: 'sonnet' });
 const client = new McpClient('https://mcp.example.com/mcp');
 await client.connect();
-const mcpTools = await client.listTools();
 ```
 
-### Etape 2 : construire les layers
+### Step 2: Build layers
 
 ```ts
 const layers = [
-  // Layer MCP — donnees distantes
   {
     protocol: 'mcp' as const,
     serverName: 'data-api',
-    description: 'API de donnees: utilisateurs, ventes, metriques',
-    tools: mcpTools,
+    description: 'Data API: users, sales, metrics',
+    tools: await client.listTools(),
   },
-  // Layer WebMCP — widgets natifs (autoui)
   autoui.layer(),
 ];
 ```
 
-### Etape 3 : lancer la boucle avec callbacks
+### Step 3: Run the loop with callbacks
 
 ```ts
-const result = await runAgentLoop('Montre-moi les ventes du trimestre en graphique', {
+const result = await runAgentLoop('Show me quarterly sales in a chart', {
   client,
   provider,
   layers,
@@ -922,64 +746,60 @@ const result = await runAgentLoop('Montre-moi les ventes du trimestre en graphiq
   callbacks: {
     onIterationStart: (i, max) => console.log(`--- Iteration ${i}/${max} ---`),
     onToken: (token) => process.stdout.write(token),
-    onToolCall: (call) => {
-      console.log(`\n[Tool] ${call.name}(${JSON.stringify(call.args)})`);
-    },
+    onToolCall: (call) => console.log(`[Tool] ${call.name}`),
     onWidget: (type, data) => {
-      console.log(`\n[Widget] ${type}:`, JSON.stringify(data));
+      console.log(`[Widget] ${type}`);
       return { id: `w_${Date.now()}` };
     },
-    onDone: (metrics) => {
-      console.log(`\nTermine: ${metrics.totalTokens} tokens, ${metrics.iterations} iterations`);
-    },
+    onDone: (metrics) => console.log(`Done: ${metrics.totalTokens} tokens`),
   },
 });
 ```
 
-### Deroulement typique
+### Typical flow
 
-1. L'agent reçoit le message utilisateur
-2. Il appelle `search_tools` ou `list_tools` pour decouvrir les outils
-3. Il active le serveur MCP `data-api` (lazy loading)
-4. Il appelle l'outil MCP pour recuperer les donnees de ventes
-5. Il appelle `widget_display` avec le widget `chart-rich` pour afficher le graphique
-6. Il repond avec un texte de synthese
+1. Agent receives the user message
+2. Calls `search_tools` or `list_tools` to discover tools
+3. Activates the `data-api` MCP server (lazy loading)
+4. Calls the MCP tool to fetch sales data
+5. Calls `widget_display` with `chart-rich` to display the chart
+6. Responds with a summary
 
 ---
 
-## Bonnes pratiques
+## Best Practices
 
-:::tip[Limiter les iterations]
-Gardez `maxIterations` entre 3 et 8. Au-dela, l'agent risque de tourner en boucle. Si l'agent atteint systematiquement la limite, le prompt systeme a probablement besoin d'etre affine.
+:::tip[Limit iterations]
+Keep `maxIterations` between 3 and 8. Beyond that, the agent may loop endlessly. If it consistently hits the limit, the system prompt likely needs tuning.
 :::
 
-:::tip[Cache de prompts]
-Le cache (`cacheEnabled: true` par defaut) reduit les couts de 90% en evitant de re-envoyer le prompt systeme a chaque requete. Laissez-le active sauf pour le debug.
+:::tip[Prompt caching]
+Caching (`cacheEnabled: true` by default) reduces costs by 90% by avoiding re-sending the system prompt on every request. Leave it enabled except for debugging.
 :::
 
-:::caution[Taille des resultats]
-`truncateResults` et `compressHistory` sont actifs par defaut. Si vous les desactivez, l'historique peut exploser et depasser le contexte du LLM. Pour les resultats volumineux (>10k chars), utilisez le tool `recall` plutot que de tout garder en contexte.
+:::caution[Result size]
+`truncateResults` and `compressHistory` are active by default. Disabling them risks exceeding the LLM's context window. For large results (>10k chars), use the `recall` tool rather than keeping everything in context.
 :::
 
-:::caution[Schemas des outils]
-Certains serveurs MCP exposent des schemas avec `$ref`, `oneOf`, ou `anyOf` que certaines API LLM ne supportent pas. La sanitization est active par defaut (`sanitize: true`), mais verifiez avec `runDiagnostics` si vous rencontrez des erreurs de schema.
+:::caution[Tool schemas]
+Some MCP servers expose schemas with `$ref`, `oneOf`, or `anyOf` that certain LLM APIs don't support. Sanitization is enabled by default (`sanitize: true`), but check with `runDiagnostics` if you encounter schema errors.
 :::
 
 ---
 
 ## FAQ
 
-**Quelle est la difference entre RemoteLLMProvider et WasmProvider ?**
-Remote envoie les requetes a une API LLM cloud (e.g. Claude, Gemini, ChatGPT) via un proxy HTTP. Wasm telecharge et execute le modele Gemma directement dans le navigateur, sans serveur. Remote est plus puissant mais payant ; Wasm est gratuit mais plus lent et moins capable.
+**What's the difference between RemoteLLMProvider and WasmProvider?**
+Remote sends requests to a cloud LLM API (e.g. Claude, Gemini, ChatGPT) via an HTTP proxy. Wasm downloads and runs the Gemma model directly in the browser with no server. Remote is more powerful but paid; Wasm is free but slower and less capable.
 
-**Comment l'agent sait quel widget utiliser ?**
-Les recipes injectees dans le prompt systeme decrivent chaque widget (nom, description, schema des parametres, cas d'utilisation). L'agent choisit le widget le plus adapte a la donnee qu'il veut afficher.
+**How does the agent know which widget to use?**
+Recipes injected into the system prompt describe each widget (name, description, parameter schema, use cases). The agent picks the best match for the data it wants to display.
 
-**Le nano-RAG est-il active par defaut ?**
-Non. Il faut creer explicitement une instance `ContextRAG` et la passer a la boucle. Le nano-RAG est surtout utile pour les conversations longues avec de nombreux resultats d'outils volumineux.
+**Is nano-RAG enabled by default?**
+No. You need to explicitly create a `ContextRAG` instance. Nano-RAG is most useful for long conversations with many large tool results.
 
-**Puis-je utiliser un modele Ollama avec les widgets ?**
-Oui, mais les modeles Ollama sont generalement moins performants que les grands modeles distants (e.g. Claude, Gemini) pour les tool calls. Testez avec `runDiagnostics` pour verifier la compatibilite des schemas.
+**Can I use an Ollama model with widgets?**
+Yes, but Ollama models are generally less effective than large remote models (e.g. Claude, Gemini) for tool calls. Test with `runDiagnostics` to verify schema compatibility.
 
-**Comment fonctionne l'auto-repair ?**
-Quand le LLM genere des parametres invalides (objet aplati, JSON stringify, champs manquants), `autoRepairParams` tente des corrections mecaniques avant de renvoyer une erreur. Cela ameliore significativement le taux de reussite des tool calls, surtout avec les modeles locaux.
+**How does auto-repair work?**
+When the LLM generates invalid parameters (flat object, stringified JSON, missing fields), `autoRepairParams` attempts mechanical fixes before returning an error. This significantly improves tool call success rates, especially with local models.

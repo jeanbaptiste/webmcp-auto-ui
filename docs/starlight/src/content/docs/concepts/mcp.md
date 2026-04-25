@@ -1,167 +1,167 @@
 ---
 title: MCP
-description: Integration MCP multi-serveurs, McpMultiClient, transport Streamable HTTP, et recettes serveur
+description: Multi-server MCP integration, McpMultiClient, Streamable HTTP transport, and server recipes
 sidebar:
   order: 5
 ---
 
-Imaginez un traducteur universel dans une conference internationale. Chaque intervenant parle une langue differente (SQL, API REST, GraphQL...), mais le traducteur convertit tout en un langage commun que tout le monde comprend. MCP joue exactement ce role entre les agents IA et les sources de donnees.
+Think of a universal translator at an international conference. Each speaker talks in a different language (SQL, REST API, GraphQL...), but the translator converts everything into a common language everyone understands. MCP plays exactly this role between AI agents and data sources.
 
-## Qu'est-ce que MCP ?
+## What is MCP?
 
-**MCP** (Model Context Protocol) est un protocole standardise par Anthropic, base sur JSON-RPC 2.0, qui permet a un agent IA de decouvrir et appeler des **outils** exposes par des serveurs distants. C'est le "USB" de l'IA : un connecteur unique pour brancher n'importe quelle source de donnees.
+**MCP** (Model Context Protocol) is a protocol standardized by Anthropic, built on JSON-RPC 2.0, that allows an AI agent to discover and call **tools** exposed by remote servers. Think of it as the "USB" of AI: a single connector to plug in any data source.
 
-Dans webmcp-auto-ui, MCP est la couche de communication entre les **donnees** (serveurs MCP) et l'**interface** (widgets WebMCP).
+In webmcp-auto-ui, MCP is the communication layer between **data** (MCP servers) and the **interface** (WebMCP widgets).
 
-## Pourquoi deux protocoles ? MCP vs WebMCP
+## Why two protocols? MCP vs WebMCP
 
-C'est la distinction fondamentale du projet. Deux mondes cohabitent :
+This is the fundamental distinction in the project. Two worlds coexist:
 
-| | MCP (standard Anthropic) | WebMCP (polyfill navigateur) |
-|--|--------------------------|------------------------------|
-| **Ou ca tourne** | Reseau (HTTP/SSE) | Dans le navigateur (postMessage) |
-| **Transport** | JSON-RPC 2.0 sur HTTP POST | Appels de fonctions JS en memoire |
-| **Qui l'expose** | Un serveur distant (ex: base de donnees parlementaire) | Le serveur `autoui` local (widgets UI) |
-| **Ce qu'il fournit** | Des **donnees** (SQL, API, fichiers) | De l'**affichage** (stat, chart, table, carte) |
-| **Session** | Header `Mcp-Session-Id`, reconnexion auto | Pas de session, tout est local |
+| | MCP (Anthropic standard) | WebMCP (browser polyfill) |
+|--|--------------------------|---------------------------|
+| **Where it runs** | Network (HTTP/SSE) | In the browser (postMessage) |
+| **Transport** | JSON-RPC 2.0 over HTTP POST | In-memory JS function calls |
+| **Who exposes it** | A remote server (e.g., parliamentary database) | The local `autoui` server (UI widgets) |
+| **What it provides** | **Data** (SQL, API, files) | **Display** (stat, chart, table, map) |
+| **Session** | `Mcp-Session-Id` header, auto-reconnect | No session, everything is local |
 | **Spec** | Anthropic MCP specification | W3C WebMCP Draft CG Report (2026-03-27) |
 
-:::tip[La regle d'or]
-**MCP** = "qu'est-ce que je vais chercher ?" (donnees)
-**WebMCP** = "comment est-ce que je l'affiche ?" (interface)
+:::tip[The golden rule]
+**MCP** = "what am I fetching?" (data)
+**WebMCP** = "how am I displaying it?" (interface)
 :::
 
-### Diagramme : MCP vs WebMCP en action
+### Diagram: MCP vs WebMCP in action
 
 ```mermaid
 sequenceDiagram
-    participant U as Utilisateur
+    participant U as User
     participant A as Agent (LLM)
-    participant MCP as Serveur MCP<br/>(Tricoteuses)
+    participant MCP as MCP Server<br/>(Tricoteuses)
     participant WM as WebMCP<br/>(autoui)
 
-    U->>A: "Montre-moi les deputes ecologistes"
+    U->>A: "Show me the green party deputies"
     A->>MCP: query_sql({sql: "SELECT * FROM deputes WHERE groupe = 'ECO'"})
     MCP-->>A: [{nom: "Dupont", circo: "Paris 5e"}, ...]
     A->>WM: widget_display({name: "data-table", params: {columns: [...], rows: [...]}})
     WM-->>A: {widget: "data-table", id: "w_a3f2"}
-    A-->>U: Tableau des deputes ecologistes
+    A-->>U: Table of green party deputies
 ```
 
-Le LLM orchestre les deux protocoles de facon transparente : il **recupere** les donnees via MCP, puis les **presente** via WebMCP. L'utilisateur ne voit que le resultat final.
+The LLM orchestrates both protocols transparently: it **retrieves** data via MCP, then **presents** it via WebMCP. The user only sees the final result.
 
-## Architecture multi-serveurs
+## Multi-server architecture
 
-Un agent peut se connecter a **plusieurs** serveurs MCP simultanement. Chaque serveur produit un `McpLayer` avec ses propres outils et recettes. Le LLM voit tous les outils de tous les serveurs dans un seul prompt unifie.
+An agent can connect to **multiple** MCP servers simultaneously. Each server produces an `McpLayer` with its own tools and recipes. The LLM sees all tools from all servers in a single unified prompt.
 
 ```mermaid
 graph TD
     subgraph Agent
         L[Agent Loop]
-        LLM[LLM distant/WASM/local]
+        LLM[LLM remote/WASM/local]
     end
 
-    subgraph "Couche donnees MCP"
-        S1[Serveur MCP 1<br/>Tricoteuses<br/>12 outils DATA]
-        S2[Serveur MCP 2<br/>iNaturalist<br/>8 outils DATA]
+    subgraph "Data layer MCP"
+        S1[MCP Server 1<br/>Tricoteuses<br/>12 DATA tools]
+        S2[MCP Server 2<br/>iNaturalist<br/>8 DATA tools]
     end
 
-    subgraph "Couche affichage WebMCP"
-        UI[autoui<br/>24+ widgets natifs<br/>+ canvas + recall]
+    subgraph "Display layer WebMCP"
+        UI[autoui<br/>24+ native widgets<br/>+ canvas + recall]
     end
 
     L --> LLM
     LLM -->|tool_use| S1
     LLM -->|tool_use| S2
     LLM -->|widget_display| UI
-    S1 -->|resultats JSON| LLM
-    S2 -->|resultats JSON| LLM
+    S1 -->|JSON results| LLM
+    S2 -->|JSON results| LLM
     UI -->|{widget, id}| LLM
 ```
 
-## McpClient : la connexion a un serveur
+## McpClient: connecting to a server
 
-Le `McpClient` gere une connexion unique vers un serveur MCP. Il s'occupe de l'initialisation de session, des appels d'outils, et de la reconnexion automatique.
+The `McpClient` manages a single connection to an MCP server. It handles session initialization, tool calls, and automatic reconnection.
 
 ```ts
 import { McpClient } from '@webmcp-auto-ui/core';
 
-// 1. Creer le client avec ses options
+// 1. Create the client with options
 const client = new McpClient('https://mcp.code4code.eu/mcp', {
-  clientName: 'my-app',        // identifiant de votre app
+  clientName: 'my-app',        // your app's identifier
   clientVersion: '1.0.0',
-  timeout: 30000,               // 30s par requete
-  headers: {                    // authentification si necessaire
+  timeout: 30000,               // 30s per request
+  headers: {                    // authentication if needed
     'Authorization': 'Bearer <token>',
   },
-  autoReconnect: true,           // re-initialise si la session expire
-  maxReconnectAttempts: 3,       // abandonne apres 3 tentatives
+  autoReconnect: true,           // re-initialize on session expiry
+  maxReconnectAttempts: 3,       // give up after 3 attempts
 });
 
-// 2. Initialiser la session (obligatoire avant tout appel)
+// 2. Initialize the session (required before any call)
 await client.connect();
 
-// 3. Decouvrir les outils du serveur
+// 3. Discover the server's tools
 const tools = await client.listTools();
-// -> [{ name: "query_sql", description: "Execute une requete SQL", inputSchema: {...} }, ...]
+// -> [{ name: "query_sql", description: "Execute a SQL query", inputSchema: {...} }, ...]
 
-// 4. Appeler un outil
+// 4. Call a tool
 const result = await client.callTool('query_sql', { sql: 'SELECT COUNT(*) FROM deputes' });
 // -> { content: [{ type: "text", text: "[{\"count\": 577}]" }] }
 
-// 5. Fermer proprement (eviter les fuites de session)
+// 5. Clean up (avoid session leaks)
 await client.disconnect();
 ```
 
-### API du McpClient
+### McpClient API
 
-| Methode | Retour | Description |
-|---------|--------|-------------|
-| `connect()` | `McpInitializeResult` | Initialise la session JSON-RPC, echange les capabilities |
-| `listTools()` | `McpTool[]` | Liste les outils avec nom, description, schema |
-| `callTool(name, args?)` | `McpToolResult` | Appelle un outil, retourne du contenu texte/image |
-| `disconnect()` | `void` | Ferme la session proprement |
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `connect()` | `McpInitializeResult` | Initializes the JSON-RPC session, exchanges capabilities |
+| `listTools()` | `McpTool[]` | Lists tools with name, description, schema |
+| `callTool(name, args?)` | `McpToolResult` | Calls a tool, returns text/image content |
+| `disconnect()` | `void` | Closes the session cleanly |
 
-## McpMultiClient : la connexion multi-serveurs
+## McpMultiClient: multi-server connections
 
-Quand vous devez interroger plusieurs sources de donnees simultanement, le `McpMultiClient` gere les connexions, agrege les listes d'outils, et route chaque appel vers le bon serveur.
+When you need to query multiple data sources simultaneously, `McpMultiClient` manages connections, aggregates tool lists, and routes each call to the correct server.
 
 ```ts
 import { McpMultiClient } from '@webmcp-auto-ui/core';
 
 const multi = new McpMultiClient();
 
-// Connecter deux serveurs
-await multi.addServer('https://mcp.code4code.eu/mcp');    // politique
-await multi.addServer('https://mcp.inaturalist.org/mcp');  // biodiversite
+// Connect two servers
+await multi.addServer('https://mcp.code4code.eu/mcp');    // politics
+await multi.addServer('https://mcp.inaturalist.org/mcp');  // biodiversity
 
-// Voir tous les outils de tous les serveurs
+// See all tools from all servers
 const allTools = multi.listAllTools();
 // -> [query_sql, search_deputes, list_species, search_observations, ...]
 
-// Appeler un outil — le routing est automatique
+// Call a tool -- routing is automatic
 const result = await multi.callTool('query_sql', { sql: 'SELECT 1' });
 
-// Deconnecter un serveur specifique
+// Disconnect a specific server
 await multi.removeServer('https://mcp.code4code.eu/mcp');
 
-// Deconnecter tout
+// Disconnect everything
 await multi.disconnectAll();
 ```
 
-## Transport : Streamable HTTP
+## Transport: Streamable HTTP
 
-Le protocole MCP utilise HTTP POST avec JSON-RPC 2.0. Voici ce qui se passe sous le capot :
+The MCP protocol uses HTTP POST with JSON-RPC 2.0. Here's what happens under the hood:
 
 ```mermaid
 sequenceDiagram
     participant C as McpClient
-    participant S as Serveur MCP
+    participant S as MCP Server
 
     C->>S: POST /mcp<br/>{"jsonrpc":"2.0","method":"initialize",...}
     S-->>C: {"result":{"serverInfo":...,"capabilities":...}}<br/>+ Mcp-Session-Id: abc123
 
-    Note over C,S: Toutes les requetes suivantes incluent<br/>Mcp-Session-Id: abc123
+    Note over C,S: All subsequent requests include<br/>Mcp-Session-Id: abc123
 
     C->>S: POST /mcp<br/>{"method":"tools/list"}
     S-->>C: {"result":{"tools":[...]}}
@@ -170,24 +170,24 @@ sequenceDiagram
     S-->>C: {"result":{"content":[{"type":"text","text":"[...]"}]}}
 ```
 
-### Details du transport
+### Transport details
 
-- **Content-Type** : `application/json`
-- **Accept** : `application/json, text/event-stream`
-- **Session** : le header `Mcp-Session-Id` est gere automatiquement apres `connect()`
-- **Reconnexion** : sur une reponse 404 (session expiree), le client re-initialise avec backoff exponentiel
-- **SSE** : quand le serveur repond en `text/event-stream`, le client parse les evenements Server-Sent Events
+- **Content-Type**: `application/json`
+- **Accept**: `application/json, text/event-stream`
+- **Session**: the `Mcp-Session-Id` header is managed automatically after `connect()`
+- **Reconnection**: on a 404 response (expired session), the client re-initializes with exponential backoff
+- **SSE**: when the server responds with `text/event-stream`, the client parses Server-Sent Events
 
-## Construction des couches MCP (ToolLayers)
+## Building MCP layers (ToolLayers)
 
-Chaque serveur connecte produit un `McpLayer`. Le serveur `autoui` produit un `WebMcpLayer`. Ensemble, ils forment les `ToolLayer[]` qui structurent tout le prompt et les outils du LLM.
+Each connected server produces an `McpLayer`. The `autoui` server produces a `WebMcpLayer`. Together, they form the `ToolLayer[]` that structures the entire prompt and LLM toolset.
 
 ```ts
 import { McpClient } from '@webmcp-auto-ui/core';
 import { autoui } from '@webmcp-auto-ui/agent';
 import type { McpLayer } from '@webmcp-auto-ui/agent';
 
-// Couche donnees : serveur MCP
+// Data layer: MCP server
 const client = new McpClient('https://mcp.code4code.eu/mcp');
 await client.connect();
 
@@ -197,69 +197,69 @@ const mcpLayer: McpLayer = {
   serverName: 'Tricoteuses',
   tools: await client.listTools(),
   recipes: [
-    { name: 'profil-depute', description: 'Fiche complete depute' },
+    { name: 'profil-depute', description: 'Full deputy profile' },
   ],
 };
 
-// Couche affichage : serveur WebMCP
+// Display layer: WebMCP server
 const uiLayer = autoui.layer();
 
-// Combiner les couches
+// Combine the layers
 const layers = [mcpLayer, uiLayer];
 ```
 
-:::note[Les recettes serveur]
-Les recettes MCP viennent du serveur et decrivent comment combiner ses outils. Elles sont distinctes des recettes WebMCP qui guident l'affichage. Voir la page [Recettes](/webmcp-auto-ui/concepts/recipes/) pour la comparaison complete.
+:::note[Server recipes]
+MCP recipes come from the server and describe how to combine its tools. They are distinct from WebMCP recipes which guide display. See the [Recipes](/webmcp-auto-ui/concepts/recipes/) page for the full comparison.
 :::
 
-## Ce que le LLM voit dans le prompt
+## What the LLM sees in the prompt
 
-La fonction `buildSystemPrompt(layers)` genere un prompt structure qui presente les outils et recettes par couche :
+The `buildSystemPrompt(layers)` function generates a structured prompt that guides the LLM through a 4-step flow:
 
 ```
-ETAPE 1 -- Recherche de recette
-Cherche une recette pertinente :
+STEP 1 -- Recipe search
+Search for a relevant recipe:
 autoui_webmcp_search_recipes()
 tricoteuses_mcp_search_recipes()
 
-ETAPE 2 -- Lecture de la recette
+STEP 2 -- Read the recipe
 autoui_webmcp_get_recipe()
 tricoteuses_mcp_get_recipe()
 
-ETAPE 3 -- Execution
-Suis les instructions de la recette...
+STEP 3 -- Execution
+Follow the recipe instructions...
 
-ETAPE 4 -- Affichage UI
+STEP 4 -- UI display
 autoui_webmcp_widget_display
 autoui_webmcp_canvas
 ```
 
-Le prompt guide le LLM a travers un flux en 4 etapes : decouvrir les recettes, les lire, executer les outils DATA, puis afficher avec les widgets.
+The prompt guides the LLM through a 4-step flow: discover recipes, read them, execute DATA tools, then display with widgets.
 
-## Pattern complet : de la question au dashboard
+## Complete pattern: from question to dashboard
 
 ```mermaid
 graph LR
-    Q["Question utilisateur"] --> D["Decouverte<br/>search_recipes()"]
-    D --> R["Lecture recette<br/>get_recipe()"]
-    R --> E["Execution outils MCP<br/>query_sql(), search_deputes()"]
-    E --> W["Affichage widgets<br/>widget_display()"]
-    W --> C["Dashboard genere"]
+    Q["User question"] --> D["Discovery<br/>search_recipes()"]
+    D --> R["Read recipe<br/>get_recipe()"]
+    R --> E["Execute MCP tools<br/>query_sql(), search_deputes()"]
+    E --> W["Display widgets<br/>widget_display()"]
+    W --> C["Generated dashboard"]
 ```
 
-### Exemple complet annote
+### Full annotated example
 
 ```ts
 import { McpClient } from '@webmcp-auto-ui/core';
 import { runAgentLoop, autoui } from '@webmcp-auto-ui/agent';
 import type { McpLayer } from '@webmcp-auto-ui/agent';
 
-// 1. Connexion au serveur MCP
+// 1. Connect to the MCP server
 const client = new McpClient('https://mcp.code4code.eu/mcp');
 await client.connect();
 const tools = await client.listTools();
 
-// 2. Construction de la couche DATA
+// 2. Build the DATA layer
 const mcpLayer: McpLayer = {
   protocol: 'mcp',
   serverUrl: 'https://mcp.code4code.eu/mcp',
@@ -267,100 +267,100 @@ const mcpLayer: McpLayer = {
   tools,
 };
 
-// 3. Couche UI (autoui fournit les 24+ widgets natifs)
+// 3. UI layer (autoui provides 24+ native widgets)
 const uiLayer = autoui.layer();
 
-// 4. Lancer la boucle agent
-const result = await runAgentLoop('Liste les deputes ecologistes', {
+// 4. Run the agent loop
+const result = await runAgentLoop('List the green party deputies', {
   provider: claudeProvider,
-  layers: [mcpLayer, uiLayer],     // les deux couches ensemble
+  layers: [mcpLayer, uiLayer],     // both layers together
   callbacks: {
-    // Chaque widget rendu par le LLM arrive ici
+    // Each widget rendered by the LLM arrives here
     onWidget: (type, data) => {
       blocks.push({ type, data });
       return { id: 'w_' + Math.random().toString(36).slice(2, 6) };
     },
-    // Le texte de l'assistant arrive ici
+    // The assistant's text arrives here
     onText: (text) => console.log('Assistant:', text),
   },
 });
 ```
 
-## Relations avec les autres concepts
+## How MCP relates to other concepts
 
 ```mermaid
 graph TD
-    MCP["MCP<br/>(ce concept)"] --> TL["ToolLayers<br/>Structure les outils"]
-    MCP --> R["Recettes MCP<br/>Guident les donnees"]
-    TL --> CT["widget_display()<br/>Rend les widgets"]
-    CT --> W["Widgets UI<br/>Affichage final"]
-    R --> WR["Recettes WebMCP<br/>Guident l'affichage"]
+    MCP["MCP<br/>(this concept)"] --> TL["ToolLayers<br/>Structures tools"]
+    MCP --> R["MCP Recipes<br/>Guide data retrieval"]
+    TL --> CT["widget_display<br/>Renders widgets"]
+    CT --> W["UI Widgets<br/>Final display"]
+    R --> WR["WebMCP Recipes<br/>Guide display"]
 ```
 
-- **ToolLayers** : MCP produit des `McpLayer` qui entrent dans le systeme de couches
-- **Recettes** : les recettes MCP (serveur) et WebMCP (UI) sont deux systemes complementaires
-- **widget_display** : le LLM appelle cet outil pour rendre les donnees MCP en widgets
+- **ToolLayers**: MCP produces `McpLayer` instances that feed into the layer system
+- **Recipes**: MCP recipes (server) and WebMCP recipes (UI) are two complementary systems
+- **widget_display**: the tool the LLM calls to render MCP data as widgets
 
-## Patterns avances
+## Advanced patterns
 
-### Multi-serveurs avec correlation de donnees
+### Multi-server data correlation
 
-Un agent peut croiser les donnees de deux serveurs MCP differents :
+An agent can cross-reference data from two different MCP servers:
 
 ```ts
 const layers = [
-  tricoteusesLayer,  // donnees parlementaires
-  iNaturalistLayer,  // donnees biodiversite
+  tricoteusesLayer,  // parliamentary data
+  iNaturalistLayer,  // biodiversity data
   autoui.layer(),    // widgets
 ];
 
-// Le LLM peut chercher les deputes d'une region ET les observations
-// de biodiversite dans la meme region, puis les presenter ensemble
-await runAgentLoop('Compare les deputes du Var avec la biodiversite du departement', {
+// The LLM can look up deputies from a region AND biodiversity
+// observations in the same region, then present them together
+await runAgentLoop('Compare deputies from Var with local biodiversity', {
   provider: claudeProvider,
   layers,
   callbacks: { onWidget },
 });
 ```
 
-### Reconnexion avec session
+### Session reconnection
 
-Si le serveur MCP expire la session, le client re-initialise automatiquement :
+If the MCP server expires the session, the client re-initializes automatically:
 
 ```
 Client -> POST /mcp (callTool)
-Server -> 404 (session expiree)
-Client -> POST /mcp (initialize)   // re-init automatique
-Server -> 200 + nouveau session-id
-Client -> POST /mcp (callTool)     // retry avec nouvelle session
-Server -> 200 (resultat)
+Server -> 404 (session expired)
+Client -> POST /mcp (initialize)   // automatic re-init
+Server -> 200 + new session-id
+Client -> POST /mcp (callTool)     // retry with new session
+Server -> 200 (result)
 ```
 
-## Resume : tableau synthetique
+## Summary table
 
 | Aspect | MCP | WebMCP |
 |--------|-----|--------|
-| **Role** | Recuperer les donnees | Afficher les donnees |
-| **Transport** | HTTP + JSON-RPC 2.0 | Appels JS en memoire |
-| **Outils typiques** | `query_sql`, `search`, `list_tables` | `widget_display`, `canvas`, `recall` |
-| **Recettes** | Comment combiner les outils DATA | Comment presenter avec les widgets |
-| **Client** | `McpClient` / `McpMultiClient` | Pas de client (serveur local) |
-| **Exemples de serveurs** | Tricoteuses, iNaturalist, Hacker News | `autoui` (le seul serveur WebMCP) |
+| **Role** | Retrieve data | Display data |
+| **Transport** | HTTP + JSON-RPC 2.0 | In-memory JS calls |
+| **Typical tools** | `query_sql`, `search`, `list_tables` | `widget_display`, `canvas`, `recall` |
+| **Recipes** | How to combine DATA tools | How to present with widgets |
+| **Client** | `McpClient` / `McpMultiClient` | No client needed (local server) |
+| **Example servers** | Tricoteuses, iNaturalist, Hacker News | `autoui` (the only WebMCP server) |
 
-## Contraintes
+## Constraints
 
-- Le serveur MCP doit supporter Streamable HTTP (POST JSON-RPC 2.0)
-- `connect()` est obligatoire avant `listTools()` ou `callTool()`
-- Les resultats sont text-based : parser le JSON depuis `content[0].text`
-- La boucle agent tronque les resultats a 10 000 caracteres
-- CORS : le serveur doit autoriser les requetes depuis votre domaine
+- The MCP server must support Streamable HTTP (POST JSON-RPC 2.0)
+- `connect()` is required before `listTools()` or `callTool()`
+- Results are text-based: parse JSON from `content[0].text`
+- The agent loop truncates results at 10,000 characters
+- CORS: the server must allow requests from your domain
 
-## Erreurs courantes
+## Common errors
 
-| Erreur | Consequence | Correction |
-|--------|-------------|-----------|
-| `listTools()` avant `connect()` | Erreur session | Toujours `connect()` d'abord |
-| Header `Authorization` manquant | 401/403 | Passer le Bearer token dans les options |
-| `timeout` trop bas | Requete abortee | Augmenter pour les queries lourdes (60000+) |
-| Pas de `disconnect()` | Fuite de session serveur | Appeler au unmount du composant |
-| Confondre MCP et WebMCP | Mauvais outil appele | MCP = donnees, WebMCP = affichage |
+| Error | Consequence | Fix |
+|-------|-------------|-----|
+| `listTools()` before `connect()` | Session error | Always `connect()` first |
+| Missing `Authorization` header | 401/403 | Pass the Bearer token in options |
+| `timeout` too low | Request aborted | Increase for heavy queries (60000+) |
+| No `disconnect()` | Server session leak | Call on component unmount |
+| Confusing MCP with WebMCP | Wrong tool called | MCP = data, WebMCP = display |

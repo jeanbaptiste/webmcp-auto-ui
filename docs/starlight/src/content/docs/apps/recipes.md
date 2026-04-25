@@ -1,40 +1,40 @@
 ---
 title: Recipes
-description: Explorateur de recettes MCP et WebMCP avec layout 3 colonnes, chat input et test live
+description: MCP and WebMCP recipe explorer with 3-column layout, chat input and live testing
 sidebar:
   order: 4
 ---
 
-Recipes (`apps/recipes/`) est un explorateur interactif pour les recettes WebMCP (UI) et MCP (serveur). Les recettes sont des templates qui guident l'agent IA pour generer le bon ensemble de widgets selon le contexte (donnees meteo = graphiques + KPI, donnees parlementaires = fiche depute + hemicycle, etc.). L'app permet de parcourir, inspecter et tester chaque recette avec des donnees reelles.
+Recipes (`apps/recipes/`) is an interactive explorer for WebMCP (UI) and MCP (server) recipes. Recipes are templates that guide the AI agent to generate the right set of widgets based on context (weather data = charts + KPIs, parliamentary data = deputy profile + hemicycle, etc.). The app lets you browse, inspect, and test each recipe with real data.
 
-## Ce que vous voyez quand vous ouvrez l'app
+## What you see when you open the app
 
-Quand vous ouvrez Recipes, vous decouvrez une interface professionnelle en 3 colonnes sur desktop, avec un layout adaptatif tablette/mobile.
+When you open Recipes, you'll see a professional interface in 3 columns on desktop, with an adaptive tablet/mobile layout.
 
-**Barre d'outils** (haut) : titre "Auto-UI recipes" a gauche. A droite : un bouton "MCP" pour ouvrir le panneau de connexion aux serveurs, une checkbox Nano-RAG, un selecteur LLM, un indicateur MCP, le compteur de recettes ("X local + Y mcp"), un lien GitHub, et un toggle de theme.
+**Toolbar** (top): "Auto-UI recipes" title on the left. On the right: an "MCP" button to open the server connection panel, a Nano-RAG checkbox, an LLM selector, an MCP indicator, a recipe counter ("X local + Y mcp"), a GitHub link, and a theme toggle.
 
-**Colonne gauche** (redimensionnable, ~220px par defaut) : le composant `RecipeList` affiche le catalogue des recettes. En haut, les recettes WebMCP locales (built-in). En bas, les recettes MCP chargees depuis les serveurs connectes. Chaque recette est un item cliquable avec son nom.
+**Left column** (resizable, ~220px default): the `RecipeList` component shows the recipe catalog. At the top, local WebMCP recipes (built-in). At the bottom, MCP recipes loaded from connected servers. Each recipe is a clickable item with its name.
 
-**Colonne centrale** (redimensionnable, ~350px) : le composant `RecipeDetail` affiche le detail de la recette selectionnee -- nom, description, composants attendus, conditions d'activation ("when"), corps markdown, et un bouton "Tester" pour lancer l'agent.
+**Center column** (resizable, ~350px): the `RecipeDetail` component shows the selected recipe's details -- name, description, expected components, activation conditions ("when"), markdown body, and a "Test" button to launch the agent.
 
-**Colonne droite** (extensible) : le composant `RecipePreview` combine un chat input en bas et une zone de preview en haut. Les widgets generes par l'agent s'affichent ici, avec le texte de sortie et les erreurs eventuelles. Le chat permet de poser des questions libres (avec un placeholder contextuel qui change selon la recette selectionnee) ou de tester la recette selectionnee.
+**Right column** (expandable): the `RecipePreview` component combines a chat input at the bottom and a preview area at the top. Agent-generated widgets appear here, along with text output and any errors. The chat lets you ask free-form questions (with a contextual placeholder that changes based on the selected recipe) or test the selected recipe.
 
-**Barre de resize** : entre chaque colonne, une barre verticale draggable permet de redimensionner les colonnes.
+**Resize bars**: between each column, a draggable vertical bar lets you resize columns.
 
-**Console agent** (bas) : un tiroir redimensionnable (drag vertical) affiche les logs structures de l'agent via `AgentConsole` : iterations, requetes LLM, reponses (tokens + latence), appels d'outils avec arguments et resultats, metriques finales.
+**Agent console** (bottom): a resizable drawer (vertical drag) displays structured agent logs via `AgentConsole`: iterations, LLM requests, responses (tokens + latency), tool calls with arguments and results, final metrics.
 
-**Panneau MCP** (pliable) : quand le bouton "MCP" est active, un panneau horizontal s'affiche sous la barre d'outils avec `RemoteMCPserversDemo` pour connecter/deconnecter les serveurs de demo.
+**MCP panel** (collapsible): when the "MCP" button is active, a horizontal panel appears below the toolbar with `RemoteMCPserversDemo` to connect/disconnect demo servers.
 
-**Mobile** : sur ecran < 768px, les 3 colonnes sont remplacees par des onglets (Recettes, Detail, Preview). La console est reduite a 120px.
+**Mobile**: on screens < 768px, the 3 columns are replaced by tabs (Recipes, Detail, Preview). The console is reduced to 120px.
 
 ## Architecture
 
 ```mermaid
 graph TD
     subgraph Frontend
-        Page["+page.svelte<br/>3 colonnes + console"]
-        RecipeList["RecipeList.svelte<br/>Catalogue filtrable"]
-        RecipeDetail["RecipeDetail.svelte<br/>Inspection recette"]
+        Page["+page.svelte<br/>3 columns + console"]
+        RecipeList["RecipeList.svelte<br/>Filterable catalog"]
+        RecipeDetail["RecipeDetail.svelte<br/>Recipe inspection"]
         RecipePreview["RecipePreview.svelte<br/>Preview + chat"]
     end
 
@@ -54,148 +54,148 @@ graph TD
     Agent --> Proxy
 ```
 
-## Stack technique
+## Tech stack
 
-| Composant | Detail |
+| Component | Detail |
 |-----------|--------|
 | Framework | SvelteKit + Svelte 5 |
-| Styles | TailwindCSS 3.4 + CSS custom (3-column layout) |
-| Icones | lucide-svelte |
+| Styles | TailwindCSS 3.4 + custom CSS (3-column layout) |
+| Icons | lucide-svelte |
 | LLM providers | `RemoteLLMProvider`, `WasmProvider` |
 | MCP | `McpMultiClient` |
-| Recettes | `WEBMCP_RECIPES`, `recipeRegistry` |
+| Recipes | `WEBMCP_RECIPES`, `recipeRegistry` |
 | RAG | `ContextRAG` (experimental) |
 | Adapter | `@sveltejs/adapter-node` |
 
-**Packages utilises :**
-- `@webmcp-auto-ui/agent` : `WEBMCP_RECIPES`, `recipeRegistry`, `runAgentLoop`, `RemoteLLMProvider`, `WasmProvider`, `buildSystemPrompt`, `fromMcpTools`, `trimConversationHistory`, `TokenTracker`, `autoui`, `buildDiscoveryCache`, `ContextRAG`
-- `@webmcp-auto-ui/core` : `McpMultiClient`
-- `@webmcp-auto-ui/sdk` : `MCP_DEMO_SERVERS`, `canvas`
-- `@webmcp-auto-ui/ui` : `McpStatus`, `LLMSelector`, `ModelLoader`, `RemoteMCPserversDemo`, `AgentConsole`, `THEME_MAP`
+**Packages used:**
+- `@webmcp-auto-ui/agent`: `WEBMCP_RECIPES`, `recipeRegistry`, `runAgentLoop`, `RemoteLLMProvider`, `WasmProvider`, `buildSystemPrompt`, `fromMcpTools`, `trimConversationHistory`, `TokenTracker`, `autoui`, `buildDiscoveryCache`, `ContextRAG`
+- `@webmcp-auto-ui/core`: `McpMultiClient`
+- `@webmcp-auto-ui/sdk`: `MCP_DEMO_SERVERS`, `canvas`
+- `@webmcp-auto-ui/ui`: `McpStatus`, `LLMSelector`, `ModelLoader`, `RemoteMCPserversDemo`, `AgentConsole`, `THEME_MAP`
 
-## Lancement
+## Getting started
 
-| Environnement | Port | Commande |
-|---------------|------|----------|
+| Environment | Port | Command |
+|-------------|------|---------|
 | Dev | 3009 | `npm -w apps/recipes run dev` |
 | Production | 3009 | `node index.js` (via systemd) |
 
 ```bash
 npm -w apps/recipes run dev
-# Accessible sur http://localhost:3009
+# Available at http://localhost:3009
 ```
 
-## Fonctionnalites
+## Features
 
-### Catalogue de recettes
+### Recipe catalog
 
-Les recettes sont chargees depuis deux sources :
-- **Locales** : `WEBMCP_RECIPES` du package agent (built-in, toujours disponibles)
-- **MCP** : chargees dynamiquement depuis les serveurs connectes qui exposent un outil `list_recipes`
+Recipes are loaded from two sources:
+- **Local**: `WEBMCP_RECIPES` from the agent package (built-in, always available)
+- **MCP**: dynamically loaded from connected servers that expose a `list_recipes` tool
 
-Le composant `RecipeList` affiche les deux listes separees avec selection par clic.
+The `RecipeList` component displays both lists separately with click selection.
 
-### Inspection de recette
+### Recipe inspection
 
-Le composant `RecipeDetail` affiche pour chaque recette :
-- Nom et description
-- Composants attendus (types de widgets)
-- Conditions d'activation ("when" -- quand l'agent doit utiliser cette recette)
-- Corps markdown (instructions detaillees)
-- Bouton "Tester" pour lancer l'agent
+The `RecipeDetail` component shows for each recipe:
+- Name and description
+- Expected components (widget types)
+- Activation conditions ("when" -- when the agent should use this recipe)
+- Markdown body (detailed instructions)
+- "Test" button to launch the agent
 
-### Test live avec placeholder contextuel
+### Live testing with contextual placeholder
 
-Le chat input adapte son placeholder en fonction de la recette selectionnee. Par exemple :
-- Recette "biodiversite" : "Quels oiseaux observe-t-on a Paris ?"
-- Recette "profil parlementaire" : "Montre-moi les derniers scrutins publics"
-- Recette "meteo" : "Quel temps fait-il a Lyon demain ?"
+The chat input adapts its placeholder based on the selected recipe. For example:
+- "biodiversity" recipe: "What birds are observed in Paris?"
+- "parliamentary profile" recipe: "Show me the latest public votes"
+- "weather" recipe: "What's the weather like in Lyon tomorrow?"
 
-Le prefill est derive reactivement via `PLACEHOLDER_ID_MAP` et `PLACEHOLDER_MAP`.
+The prefill is reactively derived via `PLACEHOLDER_ID_MAP` and `PLACEHOLDER_MAP`.
 
-### Colonnes redimensionnables
+### Resizable columns
 
-Les barres de resize entre les colonnes utilisent l'API `PointerEvent` (capture + move + up). Les largeurs minimales sont protegees (150px min).
+Column resize bars use the `PointerEvent` API (capture + move + up). Minimum widths are protected (150px min).
 
-### Console agent redimensionnable
+### Resizable agent console
 
-Le tiroir de console en bas utilise le meme pattern de resize vertical. Hauteur min 80px, max 50% de la fenetre.
+The bottom console drawer uses the same vertical resize pattern. Min height 80px, max 50% of the window.
 
-### Recettes disponibles (built-in)
+### Available recipes (built-in)
 
-| Recette | Composants | Quand |
-|---------|-----------|-------|
-| Tableau de bord KPI | stat-card, chart, table, kv | Metriques numeriques |
-| Oeuvres d'art | gallery, cards, carousel | Collection d'images |
-| Actualites | cards, table, stat-card | Articles |
-| Biodiversite | map, stat-card, table | Donnees geographiques |
-| Dossiers legislatifs | timeline, kv, table | Parcours legislatif |
-| Profil parlementaire | profile, hemicycle, timeline | Fiche depute |
-| Textes juridiques | list, kv, code | Textes de loi |
+| Recipe | Components | When |
+|--------|-----------|------|
+| KPI Dashboard | stat-card, chart, table, kv | Numeric metrics |
+| Art Collection | gallery, cards, carousel | Image collections |
+| News Analysis | cards, table, stat-card | Articles |
+| Biodiversity | map, stat-card, table | Geographic data |
+| Legislative Records | timeline, kv, table | Legislative process |
+| Parliamentary Profile | profile, hemicycle, timeline | Deputy profile |
+| Legal Texts | list, kv, code | Legal documents |
 
 ### Gemma WASM
 
-Meme support que Flex et Multi-Svelte : chargement in-browser avec progression.
+Same support as Flex and Multi-Svelte: in-browser loading with progress tracking.
 
-### Conversation continue
+### Continuous conversation
 
-Le chat supporte la conversation continue. Les messages precedents sont conserves dans `conversationHistory` et tronques si necessaire via `trimConversationHistory`. Un bouton "Clear" reinitialise la conversation et les previews.
+The chat supports continuous conversation. Previous messages are preserved in `conversationHistory` and truncated as needed via `trimConversationHistory`. A "Clear" button resets the conversation and previews.
 
 ## Configuration
 
-| Variable | Description | Defaut |
-|----------|-------------|--------|
-| `LLM_API_KEY` | Cle API du provider LLM distant (`.env`) | requis |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LLM_API_KEY` | Remote LLM provider API key (`.env`) | required |
 
 ## Code walkthrough
 
 ### `+page.svelte`
-Fichier principal (~850 lignes). Gere :
-- L'etat de selection des recettes (locale vs MCP)
-- La connexion multi-MCP avec chargement automatique des recettes
-- Les providers LLM (distant + Gemma) avec smart defaults
-- Les layers (MCP + autoui) et le prompt systeme
-- La boucle agent avec callbacks detailles (logs, widgets, texte, outils)
-- Le layout 3 colonnes avec resize
-- La console agent redimensionnable
-- Le theme via `THEME_MAP`
+Main file (~850 lines). Manages:
+- Recipe selection state (local vs MCP)
+- Multi-MCP connection with automatic recipe loading
+- LLM providers (remote + Gemma) with smart defaults
+- Layers (MCP + autoui) and system prompt
+- Agent loop with detailed callbacks (logs, widgets, text, tools)
+- 3-column layout with resize
+- Resizable agent console
+- Theming via `THEME_MAP`
 
 ### `src/lib/RecipeList.svelte`
-Composant de liste avec deux sections (local + MCP). Gere la selection et le callback `onselect(id, source)`.
+List component with two sections (local + MCP). Handles selection and `onselect(id, source)` callback.
 
 ### `src/lib/RecipeDetail.svelte`
-Composant de detail avec affichage du frontmatter, du corps markdown, et du bouton "Tester".
+Detail component with frontmatter display, markdown body, and "Test" button.
 
 ### `src/lib/RecipePreview.svelte`
-Composant de preview avec chat input en bas, widgets rendus via `WidgetRenderer` en haut, et indicateur `AgentProgress`.
+Preview component with chat input at the bottom, widgets rendered via `WidgetRenderer` at the top, and `AgentProgress` indicator.
 
-## Personnalisation
+## Customization
 
-### Ajouter des recettes
+### Adding recipes
 
-Les recettes sont definies dans le package `agent`. Pour en ajouter, modifier le fichier de recettes dans `packages/agent/src/recipes/`.
+Recipes are defined in the `agent` package. To add new ones, modify the recipes file in `packages/agent/src/recipes/`.
 
-### Modifier le layout
+### Modifying the layout
 
-Le layout 3 colonnes est defini en CSS dans `<style>` du `+page.svelte`. Les breakpoints sont :
-- Desktop (> 1024px) : 3 colonnes
-- Tablette (768-1024px) : 2 colonnes (liste + detail)
-- Mobile (< 768px) : onglets
+The 3-column layout is defined in CSS within `+page.svelte`'s `<style>`. Breakpoints are:
+- Desktop (> 1024px): 3 columns
+- Tablet (768-1024px): 2 columns (list + detail)
+- Mobile (< 768px): tabs
 
-## Deploiement
+## Deployment
 
-| Chemin sur le serveur | `/opt/webmcp-demos/recipes/` (racine) |
-|----------------------|----------------------------------------|
-| Service systemd | `webmcp-recipes` |
+| Server path | `/opt/webmcp-demos/recipes/` (root) |
+|------------|----------------------------------------|
+| systemd service | `webmcp-recipes` |
 | ExecStart | `node index.js` |
 
 ```bash
 ./scripts/deploy.sh recipes
 ```
 
-## Liens
+## Links
 
-- [Demo live](https://demos.hyperskills.net/recipes/)
-- [Package agent](/webmcp-auto-ui/packages/agent/) -- `WEBMCP_RECIPES`, `recipeRegistry`
-- [Flex](/webmcp-auto-ui/apps/flex/) -- utilisation des recettes en contexte
-- [Viewer](/webmcp-auto-ui/apps/viewer/) -- pour consulter les skills generees
+- [Live demo](https://demos.hyperskills.net/recipes/)
+- [Agent package](/webmcp-auto-ui/packages/agent/) -- `WEBMCP_RECIPES`, `recipeRegistry`
+- [Flex](/webmcp-auto-ui/apps/flex/) -- using recipes in context
+- [Viewer](/webmcp-auto-ui/apps/viewer/) -- for viewing generated skills

@@ -1,133 +1,133 @@
 ---
-title: Recettes
-description: Recettes WebMCP (UI) et recettes MCP (serveur) pour guider le LLM
+title: Recipes
+description: WebMCP recipes (UI) and MCP recipes (server) to guide the LLM
 sidebar:
   order: 3
 ---
 
-Imaginez un chef cuisinier dans une cuisine equipee. Il a les ingredients (les donnees MCP) et les ustensiles (les widgets UI). Mais sans **recette**, il devrait improviser a chaque plat. Les recettes lui disent : "avec ces ingredients, utilise ces ustensiles, dans cet ordre, pour obtenir ce resultat". C'est exactement ce que font les recettes dans webmcp-auto-ui.
+Picture a chef in a well-equipped kitchen. They have the ingredients (MCP data) and the utensils (UI widgets). But without a **recipe**, they'd have to improvise every dish. Recipes tell them: "with these ingredients, use these utensils, in this order, to get this result." That's exactly what recipes do in webmcp-auto-ui.
 
-## Qu'est-ce qu'une recette ?
+## What is a recipe?
 
-Une recette est un **guide de composition** qui indique a l'agent comment transformer des donnees en interface. Il en existe deux types complementaires :
+A recipe is a **composition guide** that tells the agent how to transform data into an interface. There are two complementary types:
 
-| | Recette WebMCP (UI) | Recette MCP (serveur) |
+| | WebMCP Recipe (UI) | MCP Recipe (server) |
 |--|---------------------|----------------------|
-| **Qui la fournit** | Le package `agent` (fichiers `.md`) | Le serveur MCP distant |
-| **Ce qu'elle guide** | **Comment afficher** les donnees (quels widgets, quel layout) | **Comment obtenir** les donnees (quels outils, dans quel ordre) |
-| **Analogie** | La recette de presentation du plat | La recette de cuisson |
+| **Who provides it** | The `agent` package (`.md` files) | The remote MCP server |
+| **What it guides** | **How to display** data (which widgets, what layout) | **How to get** data (which tools, in what order) |
+| **Analogy** | The plating recipe | The cooking recipe |
 
-:::tip[Deux axes, un resultat]
-L'agent utilise les deux ensemble : une recette MCP lui dit **quoi demander** au serveur, une recette WebMCP lui dit **comment presenter** le resultat. Comme un chef qui suit une recette de cuisson ET une recette de dressage.
+:::tip[Two axes, one result]
+The agent uses both together: an MCP recipe tells it **what to request** from the server, a WebMCP recipe tells it **how to present** the result. Like a chef following both a cooking recipe AND a plating guide.
 :::
 
-## Pourquoi les recettes existent
+## Why recipes exist
 
-Sans recettes, l'agent devrait :
-1. Deviner quels outils MCP appeler et dans quel ordre
-2. Deviner quel widget convient pour quel type de donnees
-3. Improviser la mise en page a chaque demande
+Without recipes, the agent would have to:
+1. Guess which MCP tools to call and in what order
+2. Guess which widget fits which type of data
+3. Improvise the layout for every request
 
-Avec les recettes, l'agent suit un **chemin balisee** : il cherche une recette pertinente, la lit, et l'execute. Le resultat est plus fiable, plus rapide (moins de tokens de reflexion), et plus coherent.
+With recipes, the agent follows a **guided path**: it finds a relevant recipe, reads it, and executes it. The result is more reliable, faster (fewer reasoning tokens), and more consistent.
 
-## Le flux complet : de la question au dashboard
+## The full flow: from question to dashboard
 
 ```mermaid
 sequenceDiagram
-    participant U as Utilisateur
+    participant U as User
     participant A as Agent LLM
     participant SR as search_recipes
     participant GR as get_recipe
-    participant MCP as Serveur MCP
+    participant MCP as MCP Server
     participant WD as widget_display
 
-    U->>A: "Fais-moi un dashboard des deputes"
+    U->>A: "Build me a deputy dashboard"
 
-    Note over A: ETAPE 1 -- Recherche de recette
-    A->>SR: search_recipes("depute")
+    Note over A: STEP 1 -- Recipe search
+    A->>SR: search_recipes("deputy")
     SR-->>A: [{name: "parlementaire-profile"}, {name: "dashboard-kpi"}]
 
-    Note over A: ETAPE 2 -- Lecture de la recette
+    Note over A: STEP 2 -- Read the recipe
     A->>GR: get_recipe("parlementaire-profile")
-    GR-->>A: {schema: {...}, recipe: "1. Appeler search_deputes...\n2. Utiliser profile + hemicycle..."}
+    GR-->>A: {schema: {...}, recipe: "1. Call search_deputes...\n2. Use profile + hemicycle..."}
 
-    Note over A: ETAPE 3 -- Execution des outils DATA
+    Note over A: STEP 3 -- Execute DATA tools
     A->>MCP: search_deputes({groupe: "ECO"})
     MCP-->>A: [{nom: "Dupont", ...}, ...]
 
-    Note over A: ETAPE 4 -- Affichage UI
+    Note over A: STEP 4 -- UI display
     A->>WD: widget_display({name: "profile", params: {name: "Dupont", ...}})
     WD-->>A: {widget: "profile", id: "w_1"}
     A->>WD: widget_display({name: "hemicycle", params: {groups: [...]}})
     WD-->>A: {widget: "hemicycle", id: "w_2"}
 
-    A-->>U: Dashboard avec profil + hemicycle
+    A-->>U: Dashboard with profile + hemicycle
 ```
 
-### Economie de tokens : le chargement paresseux
+### Token economy: lazy loading
 
-Le detail des recettes n'est **jamais** injecte dans le prompt initial. Seuls les noms et descriptions sont presents. Le LLM demande le body complet uniquement quand il en a besoin :
+Recipe details are **never** injected into the initial prompt. Only names and descriptions are present. The LLM requests the full body only when needed:
 
 ```
-Prompt initial (~500 tokens pour 10 recettes) :
-  "Recettes disponibles :
-   - parlementaire-profile : profil depute [profile, hemicycle, timeline]
-   - dashboard-kpi : metriques numeriques [stat-card, chart, table]"
+Initial prompt (~500 tokens for 10 recipes):
+  "Available recipes:
+   - parlementaire-profile: deputy profile [profile, hemicycle, timeline]
+   - dashboard-kpi: numeric metrics [stat-card, chart, table]"
 
-→ Le LLM appelle get_recipe("parlementaire-profile")
-→ Il recoit le body complet (~200 tokens) uniquement quand il en a besoin
+-> The LLM calls get_recipe("parlementaire-profile")
+-> It receives the full body (~200 tokens) only when it needs it
 ```
 
-Comparaison : injecter 10 recettes completes dans le prompt couterait ~2000 tokens supplementaires. Le chargement paresseux reduit ce cout a ~500 tokens fixes + ~200 tokens par recette effectivement utilisee.
+Comparison: injecting 10 complete recipes into the prompt would cost ~2000 extra tokens. Lazy loading reduces this to ~500 fixed tokens + ~200 tokens per recipe actually used.
 
-## Recettes WebMCP (UI)
+## WebMCP Recipes (UI)
 
-Les recettes WebMCP guident le LLM sur le **choix des widgets** et leur **agencement**. Ce sont des fichiers Markdown avec frontmatter YAML, distribues avec le package `@webmcp-auto-ui/agent`.
+WebMCP recipes guide the LLM on **widget selection** and **arrangement**. They are Markdown files with YAML frontmatter, distributed with the `@webmcp-auto-ui/agent` package.
 
-### Format d'une recette
+### Recipe format
 
 ```markdown
 ---
-id: composer-tableau-de-bord-kpi
-name: Composer un tableau de bord KPI
+id: compose-kpi-dashboard
+name: Compose a KPI dashboard
 components_used: [stat-card, chart, table, kv]
-when: les donnees contiennent des metriques numeriques
+when: data contains numeric metrics
 servers: []
 layout:
   type: grid
   columns: 3
-  arrangement: stat-cards en ligne, chart + table en dessous
+  arrangement: stat-cards in a row, chart + table below
 ---
 
-## Quand utiliser
-Les resultats MCP contiennent des metriques numeriques qu'il faut
-presenter de facon synthetique : totaux, pourcentages, series temporelles.
+## When to use
+MCP results contain numeric metrics that need a synthetic
+presentation: totals, percentages, time series.
 
-## Comment
-1. Identifier les 3-5 KPIs principaux
-2. Afficher chaque KPI en stat-card avec formatage soigne
-3. Ajouter un chart si des series temporelles existent
-4. Completer avec un data-table pour les details
+## How
+1. Identify the 3-5 main KPIs
+2. Display each KPI as a stat-card with proper formatting
+3. Add a chart if time series data exists
+4. Complete with a data-table for details
 
-## Erreurs courantes
-- Trop de stat-cards : au-dela de 5, basculer vers kv ou table
-- Nombres non formates : "45230" au lieu de "45 230"
+## Common mistakes
+- Too many stat-cards: beyond 5, switch to kv or table
+- Unformatted numbers: "45230" instead of "45,230"
 ```
 
-### Anatomie du frontmatter
+### Frontmatter anatomy
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `id` | `string` | Identifiant unique de la recette |
-| `name` | `string` | Nom lisible par l'agent et l'utilisateur |
-| `components_used` | `string[]` | Widgets recommandes par cette recette |
-| `when` | `string` | Condition de declenchement (texte libre) |
-| `servers` | `string[]` | Serveurs MCP cibles. Vide = universelle |
-| `layout` | `object` | Suggestion d'agencement (type, colonnes, arrangement) |
+| `id` | `string` | Unique recipe identifier |
+| `name` | `string` | Human-readable name for agent and user |
+| `components_used` | `string[]` | Widgets recommended by this recipe |
+| `when` | `string` | Trigger condition (free text) |
+| `servers` | `string[]` | Target MCP servers. Empty = universal |
+| `layout` | `object` | Layout suggestion (type, columns, arrangement) |
 
-Le `body` (tout ce qui suit le frontmatter) contient les instructions detaillees en Markdown.
+The `body` (everything after the frontmatter) contains detailed instructions in Markdown.
 
-### Interface TypeScript
+### TypeScript interface
 
 ```ts
 interface Recipe {
@@ -142,85 +142,85 @@ interface Recipe {
 }
 ```
 
-### Les 10 recettes built-in
+### The 10 built-in recipes
 
-| ID | Quand | Widgets recommandes |
-|----|-------|-----------|
-| `composer-tableau-de-bord-kpi` | Metriques numeriques, KPIs | stat-card, chart, table, kv |
-| `afficher-oeuvres-art-collection-musee` | Collection d'images ou d'oeuvres | gallery, cards, carousel |
-| `analyser-actualites-hacker-news` | Articles, actualites, flux | cards, table, stat-card |
-| `cartographier-observations-biodiversite` | Donnees geographiques, observations | map, stat-card, table |
-| `explorer-dossiers-legislatifs` | Parcours legislatif, textes de loi | timeline, kv, table |
-| `gallery-images` | Collections d'images multiples | gallery, carousel |
-| `parlementaire-profile` | Profil de depute ou senateur | profile, hemicycle, timeline |
-| `rechercher-textes-juridiques` | Textes juridiques, articles de loi | list, kv, code |
-| `weather-viz` | Donnees meteorologiques | stat-card, chart |
-| `cross-server` | Donnees provenant de plusieurs serveurs | table, chart, kv |
+| ID | When | Recommended widgets |
+|----|------|-----------|
+| `composer-tableau-de-bord-kpi` | Numeric metrics, KPIs | stat-card, chart, table, kv |
+| `afficher-oeuvres-art-collection-musee` | Image or art collections | gallery, cards, carousel |
+| `analyser-actualites-hacker-news` | News articles, feeds | cards, table, stat-card |
+| `cartographier-observations-biodiversite` | Geographic data, observations | map, stat-card, table |
+| `explorer-dossiers-legislatifs` | Legislative records, bills | timeline, kv, table |
+| `gallery-images` | Multiple image collections | gallery, carousel |
+| `parlementaire-profile` | Deputy or senator profile | profile, hemicycle, timeline |
+| `rechercher-textes-juridiques` | Legal texts, statutory articles | list, kv, code |
+| `weather-viz` | Weather data | stat-card, chart |
+| `cross-server` | Multi-server data | table, chart, kv |
 
-### Filtrage par serveur
+### Server filtering
 
-Les recettes avec un champ `servers` non-vide ne s'appliquent qu'aux serveurs indiques. Les recettes universelles (`servers: []`) sont toujours disponibles.
+Recipes with a non-empty `servers` field only apply to the listed servers. Universal recipes (`servers: []`) are always available.
 
 ```ts
 import { filterRecipesByServer, WEBMCP_RECIPES } from '@webmcp-auto-ui/agent';
 
 const recipes = filterRecipesByServer(WEBMCP_RECIPES, ['tricoteuses']);
-// → recettes universelles + celles qui ciblent "tricoteuses"
+// -> universal recipes + those targeting "tricoteuses"
 ```
 
-### Ecrire une recette personnalisee
+### Writing a custom recipe
 
-Pour ajouter une recette a votre projet :
+To add a recipe to your project:
 
 ```ts
 import { parseRecipe, registerRecipes } from '@webmcp-auto-ui/agent';
 
 const myRecipe = parseRecipe(`---
-id: mon-dashboard-meteo
-name: Dashboard meteo personnalise
+id: custom-weather-dashboard
+name: Custom weather dashboard
 components_used: [stat-card, chart-rich, map]
-when: les donnees contiennent temperature, humidite, vent
+when: data contains temperature, humidity, wind
 servers: []
 ---
 
-## Quand utiliser
-Donnees meteorologiques avec coordonnees geographiques.
+## When to use
+Weather data with geographic coordinates.
 
-## Comment
-1. Afficher temperature, humidite, vent en stat-cards
-2. Graphique line des previsions sur 7 jours
-3. Carte avec marqueurs pour chaque station
+## How
+1. Display temperature, humidity, wind as stat-cards
+2. Line chart for 7-day forecast
+3. Map with markers for each station
 `);
 
 registerRecipes([myRecipe]);
 ```
 
-### API complete
+### Full API
 
 ```ts
 import {
-  WEBMCP_RECIPES,           // 10 recettes built-in, auto-enregistrees
-  parseRecipe,               // parser un fichier .md → Recipe
-  parseRecipes,              // parser un lot de fichiers .md → Recipe[]
-  recipeRegistry,            // registre singleton (lecture seule)
-  registerRecipes,           // ajouter des recettes au registre
-  filterRecipesByServer,     // filtrer par serveur connecte
-  formatRecipesForPrompt,    // formater pour injection dans le prompt
-  formatMcpRecipesForPrompt, // formater les recettes MCP serveur
+  WEBMCP_RECIPES,           // 10 built-in recipes, auto-registered
+  parseRecipe,               // parse a .md file -> Recipe
+  parseRecipes,              // parse a batch of .md files -> Recipe[]
+  recipeRegistry,            // singleton registry (read-only)
+  registerRecipes,           // add recipes to the registry
+  filterRecipesByServer,     // filter by connected server
+  formatRecipesForPrompt,    // format for prompt injection
+  formatMcpRecipesForPrompt, // format MCP server recipes
 } from '@webmcp-auto-ui/agent';
 ```
 
-## Recettes MCP (serveur)
+## MCP Recipes (server)
 
-Les recettes MCP viennent du **serveur distant** et decrivent comment utiliser ses outils. Elles repondent a la question "comment obtenir les donnees" :
+MCP recipes come from the **remote server** and describe how to use its tools. They answer the question "how to get the data":
 
 ```
-Recette MCP "profil-depute" :
-1. Appeler search_deputes(nom: "Dupont")
-2. Prendre le premier resultat, extraire l'ID
-3. Appeler get_votes(depute_id: ID)
-4. Appeler get_mandats(depute_id: ID)
-5. Combiner les resultats
+MCP Recipe "profil-depute":
+1. Call search_deputes(nom: "Dupont")
+2. Take the first result, extract the ID
+3. Call get_votes(depute_id: ID)
+4. Call get_mandats(depute_id: ID)
+5. Combine the results
 ```
 
 ### Interface
@@ -232,145 +232,145 @@ interface McpRecipe {
 }
 ```
 
-### Collecte et injection
+### Collection and injection
 
 ```ts
-// 1. Le client collecte les recettes a la connexion
+// 1. The client collects recipes on connection
 const recipesResult = await client.callTool('list_recipes', {});
 const mcpRecipes: McpRecipe[] = JSON.parse(recipesResult.content[0].text);
-// → [{ name: 'profil-depute', description: 'Fiche complete avec votes et mandats' }]
+// -> [{ name: 'profil-depute', description: 'Full profile with votes and mandates' }]
 
-// 2. Elles sont ajoutees a la couche MCP
+// 2. They are added to the MCP layer
 const mcpLayer: McpLayer = {
   protocol: 'mcp',
   serverUrl: 'https://mcp.code4code.eu/mcp',
   serverName: 'Tricoteuses',
   tools: await client.listTools(),
-  recipes: mcpRecipes,       // ← ici
+  recipes: mcpRecipes,       // <- here
 };
 ```
 
-### Lecture du detail par le LLM
+### Detail retrieval by the LLM
 
-Le LLM voit les resumes dans le prompt. Quand il a besoin des instructions completes, il appelle `get_recipe` (outil MCP expose par le serveur) :
+The LLM sees summaries in the prompt. When it needs full instructions, it calls `get_recipe` (an MCP tool exposed by the server):
 
 ```mermaid
 sequenceDiagram
     participant LLM as Agent LLM
-    participant MCP as Serveur MCP
+    participant MCP as MCP Server
 
-    Note over LLM: Le prompt contient :<br/>"profil-depute : Fiche complete avec votes et mandats"
+    Note over LLM: The prompt contains:<br/>"profil-depute: Full profile with votes and mandates"
     LLM->>MCP: get_recipe({name: "profil-depute"})
-    MCP-->>LLM: {body: "1. Appeler search_deputes(...)\n2. Appeler get_votes(...)"}
-    Note over LLM: L'agent suit maintenant<br/>les instructions etape par etape
+    MCP-->>LLM: {body: "1. Call search_deputes(...)\n2. Call get_votes(...)"}
+    Note over LLM: The agent now follows<br/>the instructions step by step
 ```
 
-## Recettes widget (inline dans autoui)
+## Widget recipes (inline in autoui)
 
-En plus des recettes WebMCP (fichiers `.md`) et des recettes MCP (serveur), il existe des **recettes widget** inline definies directement dans le serveur `autoui`. Ce sont les recettes les plus granulaires : chaque widget natif a sa propre recette qui documente son schema et son usage.
+In addition to WebMCP recipes (`.md` files) and MCP recipes (server), there are **widget recipes** defined inline in the `autoui` server. These are the most granular recipes: each native widget has its own recipe documenting its schema and usage.
 
 ```
 search_recipes("stat")
-→ { name: "stat", description: "Statistique cle (KPI, compteur, total)" }
+-> { name: "stat", description: "Key statistic (KPI, counter, total)" }
 
 get_recipe("stat")
-→ { schema: { type: "object", required: ["label", "value"], ... },
-    recipe: "## Quand utiliser\nPour afficher un chiffre cle unique..." }
+-> { schema: { type: "object", required: ["label", "value"], ... },
+    recipe: "## When to use\nTo display a single key figure..." }
 ```
 
-Le LLM decouvre les widgets disponibles via `search_recipes` et obtient le schema exact via `get_recipe`.
+The LLM discovers available widgets via `search_recipes` and gets the exact schema via `get_recipe`.
 
-## Comparaison complete
+## Full comparison
 
-| | Recette WebMCP (UI) | Recette MCP (serveur) | Recette widget (autoui) |
+| | WebMCP Recipe (UI) | MCP Recipe (server) | Widget Recipe (autoui) |
 |--|---------------------|----------------------|------------------------|
-| **Source** | Fichiers `.md` dans le package agent | Serveur MCP distant (`list_recipes`) | Serveur autoui (inline) |
-| **Portee** | Composition multi-widgets | Workflow multi-outils | Un seul widget |
-| **Guide quoi** | La presentation (View) | L'obtention des donnees (Model) | Le schema d'un widget |
-| **Type TS** | `Recipe` | `McpRecipe` | `WidgetEntry` |
-| **Porte par** | `WebMcpLayer` | `McpLayer.recipes` | `WebMcpLayer` (autoui) |
+| **Source** | `.md` files in the agent package | Remote MCP server (`list_recipes`) | autoui server (inline) |
+| **Scope** | Multi-widget composition | Multi-tool workflow | Single widget |
+| **Guides what** | Presentation (View) | Data retrieval (Model) | Widget schema |
+| **TypeScript type** | `Recipe` | `McpRecipe` | `WidgetEntry` |
+| **Carried by** | `WebMcpLayer` | `McpLayer.recipes` | `WebMcpLayer` (autoui) |
 | **Lazy loading** | `get_recipe("id")` | `get_recipe(name)` (MCP) | `get_recipe("widget-name")` |
-| **Body dans le prompt** | Non (resumes) | Non (resumes) | Non (resumes) |
+| **Body in prompt** | No (summaries) | No (summaries) | No (summaries) |
 
-### Comment les trois niveaux s'articulent
+### How the three levels connect
 
 ```mermaid
 graph TD
-    subgraph "Niveau 1 : Recette MCP"
+    subgraph "Level 1: MCP Recipe"
         MR["profil-depute<br/>1. search_deputes()<br/>2. get_votes()<br/>3. get_mandats()"]
     end
 
-    subgraph "Niveau 2 : Recette WebMCP"
-        WR["parlementaire-profile<br/>Utiliser profile + hemicycle + timeline"]
+    subgraph "Level 2: WebMCP Recipe"
+        WR["parlementaire-profile<br/>Use profile + hemicycle + timeline"]
     end
 
-    subgraph "Niveau 3 : Recettes widget"
+    subgraph "Level 3: Widget Recipes"
         R1["profile<br/>schema: {name, fields, stats}"]
         R2["hemicycle<br/>schema: {groups, totalSeats}"]
         R3["timeline<br/>schema: {events}"]
     end
 
-    MR -->|"quoi demander"| DATA["Donnees brutes"]
-    DATA -->|"comment afficher"| WR
-    WR -->|"quel widget"| R1
+    MR -->|"what to request"| DATA["Raw data"]
+    DATA -->|"how to display"| WR
+    WR -->|"which widget"| R1
     WR --> R2
     WR --> R3
 ```
 
-## Relations avec les autres concepts
+## How recipes relate to other concepts
 
-- **ToolLayers** : les recettes WebMCP sont portees par la `WebMcpLayer`, les recettes MCP par les `McpLayer`
-- **Widgets** : les recettes WebMCP referent les widgets par leur nom (`stat-card`, `profile`...)
-- **widget_display** : l'outil que le LLM appelle apres avoir lu la recette
-- **MCP** : les recettes MCP guident l'utilisation des outils DATA du serveur
+- **ToolLayers**: WebMCP recipes are carried by the `WebMcpLayer`, MCP recipes by `McpLayer` instances
+- **Widgets**: WebMCP recipes reference widgets by name (`stat-card`, `profile`...)
+- **widget_display**: the tool the LLM calls after reading the recipe
+- **MCP**: MCP recipes guide usage of the server's DATA tools
 
-## Patterns avances
+## Advanced patterns
 
-### Recettes cross-server
+### Cross-server recipes
 
-La recette `cross-server` est concue pour les agents connectes a plusieurs serveurs MCP :
+The `cross-server` recipe is designed for agents connected to multiple MCP servers:
 
 ```markdown
 ---
 id: cross-server
-name: Correlation multi-serveurs
-when: l'utilisateur compare des donnees provenant de serveurs differents
+name: Cross-server correlation
+when: user compares data from different servers
 servers: []
 ---
-1. Identifier les serveurs pertinents
-2. Interroger chaque serveur separement
-3. Croiser les resultats par cle commune (region, date, etc.)
-4. Presenter en table comparative ou chart overlay
+1. Identify relevant servers
+2. Query each server separately
+3. Cross-reference results by common key (region, date, etc.)
+4. Present as comparative table or chart overlay
 ```
 
-### Recettes interactives (recipe-browser)
+### Interactive recipes (recipe-browser)
 
-Le widget `recipe-browser` permet a l'utilisateur d'explorer les recettes disponibles via une interface visuelle. Le clic sur une recette charge son detail et l'agent peut ensuite la executer.
+The `recipe-browser` widget lets users explore available recipes through a visual interface. Clicking a recipe loads its detail and the agent can then execute it.
 
-### Registre dynamique
+### Dynamic registry
 
-Le registre de recettes (`recipeRegistry`) est un singleton lecture seule. Pour ajouter des recettes a l'execution :
+The recipe registry (`recipeRegistry`) is a read-only singleton. To add recipes at runtime:
 
 ```ts
 import { registerRecipes, parseRecipes, recipeRegistry } from '@webmcp-auto-ui/agent';
 
-// Charger des recettes depuis un fichier
+// Load recipes from a file
 const newRecipes = parseRecipes([myMarkdown1, myMarkdown2]);
 registerRecipes(newRecipes);
 
-// Le registre contient maintenant les built-in + les nouvelles
-console.log(recipeRegistry.size); // 12 (10 built-in + 2 nouvelles)
+// The registry now contains built-in + new recipes
+console.log(recipeRegistry.size); // 12 (10 built-in + 2 new)
 ```
 
-## Resume visuel
+## Visual summary
 
 ```mermaid
 graph LR
-    Q["Question utilisateur"] --> S["search_recipes()<br/>Trouver la bonne recette"]
-    S --> G["get_recipe()<br/>Lire les instructions"]
-    G --> E["Outils MCP<br/>Obtenir les donnees"]
-    E --> W["widget_display()<br/>Afficher avec les widgets"]
-    W --> D["Dashboard final"]
+    Q["User question"] --> S["search_recipes()<br/>Find the right recipe"]
+    S --> G["get_recipe()<br/>Read the instructions"]
+    G --> E["MCP tools<br/>Get the data"]
+    E --> W["widget_display()<br/>Display with widgets"]
+    W --> D["Final dashboard"]
 
     style S fill:#e3f2fd
     style G fill:#e8f5e9

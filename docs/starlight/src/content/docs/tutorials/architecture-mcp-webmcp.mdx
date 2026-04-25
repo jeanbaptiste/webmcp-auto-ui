@@ -1,129 +1,127 @@
 ---
-title: Architecture MCP / WebMCP
-description: Comprendre la symetrie entre MCP (donnees distantes) et WebMCP (affichage local), et comment la boucle agent les orchestre
+title: MCP / WebMCP Architecture
+description: Understand the symmetry between MCP (remote data) and WebMCP (local display), and how the agent loop orchestrates them
 sidebar:
   order: 4
 ---
 
-Ce tutoriel est un voyage dans l'architecture de webmcp-auto-ui. Vous n'allez pas ecrire de code ici, mais vous allez comprendre comment chaque piece s'assemble. A la fin, vous saurez exactement ce qui se passe quand un utilisateur pose une question et qu'un widget apparait sur l'ecran.
+This tutorial is a deep dive into the architecture of webmcp-auto-ui. You will not write code here, but you will understand how every piece fits together. By the end, you will know exactly what happens when a user asks a question and a widget appears on screen.
 
-## Objectif
+## Goal
 
-Comprendre l'architecture complete de webmcp-auto-ui : les deux protocoles (MCP et WebMCP), leur symetrie, le prefixage uniforme, le lazy loading, le pipeline de schemas, et le resolver canonique.
+Understand the complete architecture: the two protocols (MCP and WebMCP), their symmetry, uniform prefixing, lazy loading, the schema pipeline, and the canonical resolver.
 
-## Prerequis
+## Prerequisites
 
-- Avoir lu le tutoriel [Demarrer avec le boilerplate](./boilerplate) (ou avoir utilise l'app)
-- Comprendre ce qu'est un LLM et un appel d'outil (tool call)
+- Have read [Getting started with the boilerplate](./boilerplate) (or used the app)
+- Understand what an LLM and a tool call are
 
-## Resultat final
+## What you will learn
 
-Une comprehension profonde de l'architecture qui vous permettra de :
-- Debugger des problemes de routage d'outils
-- Ajouter de nouveaux serveurs MCP et WebMCP
-- Comprendre les logs de la boucle agent
-- Etendre le systeme avec de nouveaux protocoles
+A deep understanding of the architecture that will let you:
+- Debug tool routing issues
+- Add new MCP and WebMCP servers
+- Understand agent loop logs
+- Extend the system with new protocols
 
 ---
 
-## Les deux protocoles
+## The two protocols
 
-Le systeme repose sur deux protocoles symetriques :
+The system relies on two symmetric protocols:
 
-- **MCP** (Model Context Protocol) fournit les **donnees distantes** -- requetes SQL, API REST, scraping, etc.
-- **WebMCP** fournit l'**affichage local** -- widgets, canvas, interactions navigateur.
+- **MCP** (Model Context Protocol) provides **remote data** -- SQL queries, REST APIs, scraping, etc.
+- **WebMCP** provides **local display** -- widgets, canvas, browser interactions.
 
-Chacun expose des **tools** (actions atomiques) et des **recettes** (guides de composition).
+Each exposes **tools** (atomic actions) and **recipes** (composition guides).
 
 ```mermaid
 graph TB
-    subgraph MCP ["MCP (donnees distantes)"]
+    subgraph MCP ["MCP (remote data)"]
         direction TB
         M1[query_sql]
         M2[fetch_document]
         M3[search_recipes]
     end
 
-    subgraph WebMCP ["WebMCP (affichage local)"]
+    subgraph WebMCP ["WebMCP (local display)"]
         direction TB
         W1[widget_display]
         W2[canvas]
         W3[search_recipes]
     end
 
-    LLM[Agent LLM] -->|HTTP| MCP
+    LLM[LLM Agent] -->|HTTP| MCP
     LLM -->|JS in-process| WebMCP
 ```
 
-### Tableau comparatif
+### Comparison table
 
 | Dimension | MCP | WebMCP |
 |-----------|-----|--------|
-| Role | Donnees, API, bases | Affichage, interaction |
-| Transport | HTTP Streamable / stdio | Appels JS in-process |
-| Execution | Serveur distant | Navigateur local |
-| Latence | Reseau (50-500ms) | Instantane (&lt;1ms) |
-| Exemples tools | query_sql, fetch_document | widget_display, canvas |
-| Recettes | Decrivent les donnees | Decrivent la presentation |
+| Role | Data, APIs, databases | Display, interaction |
+| Transport | HTTP Streamable / stdio | In-process JS calls |
+| Execution | Remote server | Local browser |
+| Latency | Network (50-500ms) | Instant (&lt;1ms) |
+| Example tools | query_sql, fetch_document | widget_display, canvas |
+| Recipes | Describe the data | Describe the presentation |
 | Package | `@webmcp-auto-ui/core` | `@webmcp-auto-ui/core` |
 
 ---
 
-## La symetrie fondamentale
+## The fundamental symmetry
 
-Le design fondamental est la **symetrie** : le LLM ne distingue pas un tool MCP d'un tool WebMCP. Les deux protocoles exposent la meme interface :
+The key design principle is **symmetry**: the LLM does not distinguish an MCP tool from a WebMCP tool. Both protocols expose the same interface:
 
-- `search_recipes()` -- decouvrir les recettes disponibles
-- `get_recipe()` -- obtenir le schema et les instructions
-- Des tools specifiques -- executer des actions
+- `search_recipes()` -- discover available recipes
+- `get_recipe()` -- get the schema and instructions
+- Specific tools -- execute actions
 
-Du point de vue du LLM, un appel MCP et un appel WebMCP suivent le meme cycle : decouverte, lecture du schema, execution. Seul le routage interne differe -- la boucle agent dispatche vers le bon serveur selon le prefixe.
+From the LLM's perspective, an MCP call and a WebMCP call follow the same cycle: discovery, schema reading, execution. Only the internal routing differs.
 
 ```mermaid
 graph LR
-    LLM -->|tool_call| Router{Routeur}
+    LLM -->|tool_call| Router{Router}
     Router -->|protocol = mcp| HTTP[McpClient.callTool via HTTP]
-    Router -->|protocol = webmcp| JS[WebMcpServer.executeTool en JS]
-    HTTP --> ServerMCP[Serveur distant]
-    JS --> Navigateur[Navigateur local]
+    Router -->|protocol = webmcp| JS[WebMcpServer.executeTool in JS]
+    HTTP --> ServerMCP[Remote server]
+    JS --> Browser[Local browser]
 ```
 
-:::note[Pourquoi cette symetrie ?]
-En rendant les deux protocoles interchangeables du point de vue du LLM, on simplifie le system prompt, on reduit les erreurs de routage, et on peut combiner des sources de donnees et des modes d'affichage arbitrairement.
+:::note[Why this symmetry?]
+By making both protocols interchangeable from the LLM's perspective, we simplify the system prompt, reduce routing errors, and can combine data sources and display modes arbitrarily.
 :::
 
 ---
 
-## Le prefixage uniforme
+## Uniform prefixing
 
-Tous les tools suivent la convention de nommage :
+All tools follow the naming convention:
 
 ```
 {serverName}_{protocol}_{toolName}
 ```
 
-Exemples concrets avec plusieurs serveurs connectes :
+Examples with multiple connected servers:
 
-| Tool prefixe complet | serverName | protocol | toolName |
-|---------------------|------------|----------|----------|
+| Full prefixed tool | serverName | protocol | toolName |
+|-------------------|------------|----------|----------|
 | `tricoteuses_mcp_query_sql` | tricoteuses | mcp | query_sql |
-| `tricoteuses_mcp_search_recipes` | tricoteuses | mcp | search_recipes |
 | `datagouv_mcp_fetch_dataset` | datagouv | mcp | fetch_dataset |
 | `autoui_webmcp_widget_display` | autoui | webmcp | widget_display |
-| `autoui_webmcp_search_recipes` | autoui | webmcp | search_recipes |
 | `designkit_webmcp_widget_display` | designkit | webmcp | widget_display |
 
-Le routage dans la boucle agent parse ce prefixe avec une regex :
+The agent loop parses this prefix with a regex:
 
 ```typescript
 /^(.+?)_(mcp|webmcp)_(.+)$/
 ```
 
-Puis dispatche :
+Then dispatches:
 - `protocol === 'mcp'` --> `McpClient.callTool(toolName, params)`
 - `protocol === 'webmcp'` --> `WebMcpServer.executeTool(toolName, params)`
 
-Ce prefixage garantit qu'il n'y a **aucune collision de noms** meme avec 10 serveurs connectes simultanement.
+This guarantees **no name collisions** even with 10 servers connected simultaneously.
 
 ```mermaid
 graph TD
@@ -132,20 +130,20 @@ graph TD
     Parse --> P["protocol = mcp"]
     Parse --> TN["toolName = query_sql"]
     P -->|mcp| HTTP["McpClient(tricoteuses).callTool('query_sql', params)"]
-    P -->|webmcp| JS["WebMcpServer(nom).executeTool('toolName', params)"]
+    P -->|webmcp| JS["WebMcpServer(name).executeTool('toolName', params)"]
 ```
 
 ---
 
-## Le system prompt dynamique
+## The dynamic system prompt
 
-`buildSystemPrompt(layers)` genere un prompt **recipe-driven** adapte aux serveurs connectes. Le prompt impose un workflow strict en 4 etapes :
+`buildSystemPrompt(layers)` generates a **recipe-driven** prompt adapted to the connected servers. The prompt enforces a strict 4-step workflow:
 
 ```mermaid
 graph LR
-    A["1. Decouverte"] --> B["2. Lecture"]
+    A["1. Discovery"] --> B["2. Reading"]
     B --> C["3. Execution"]
-    C --> D["4. Affichage"]
+    C --> D["4. Display"]
 
     A -.- A1["search_recipes()"]
     B -.- B1["get_recipe()"]
@@ -153,83 +151,68 @@ graph LR
     D -.- D1["widget_display(), canvas()"]
 ```
 
-1. **Decouverte** -- appeler `search_recipes()` pour trouver la recette pertinente
-2. **Lecture** -- appeler `get_recipe()` pour lire les instructions
-3. **Execution** -- suivre les instructions de la recette (fetch data, etc.)
-4. **Affichage** -- utiliser `widget_display`, `canvas`, `recall` pour le rendu UI
+### Dynamic placeholders
 
-### Placeholders dynamiques
-
-Les listes d'outils aux etapes 1, 2 et 4 sont des **placeholders** : `buildSystemPrompt` injecte automatiquement les noms prefixes selon les layers connectes. Avec 2 serveurs MCP et 1 WebMCP, l'etape 1 contiendra par exemple :
+The tool lists at steps 1, 2, and 4 are **placeholders**: `buildSystemPrompt` automatically injects the prefixed names based on the connected layers. With 2 MCP servers and 1 WebMCP, step 1 will contain:
 
 ```
 tricoteuses_mcp_search_recipes(), datagouv_mcp_search_recipes(), autoui_webmcp_search_recipes()
 ```
 
-### Personnalisation par app
-
-Les apps peuvent passer un `systemPrompt` custom dans les options de `runAgentLoop()`. Quand il est fourni, il remplace le prompt genere. Cependant, le prompt unifie s'adapte aux serveurs presents et couvre la majorite des cas.
-
 ---
 
-## Le lazy loading
+## Lazy loading
 
-Au demarrage, la boucle agent n'expose **pas** tous les tools de tous les serveurs. Elle ne fournit que les tools de decouverte :
+At startup, the agent loop does **not** expose all tools from all servers. It only provides discovery tools:
 
-| Protocol | Tools exposes au depart |
-|----------|------------------------|
+| Protocol | Tools exposed at start |
+|----------|----------------------|
 | MCP | `search_recipes`, `get_recipe` |
 | WebMCP | `search_recipes`, `get_recipe`, `widget_display`, `canvas`, `recall` |
-
-Les tools WebMCP d'action (`widget_display`, `canvas`, `recall`) sont toujours presents car ils sont necessaires pour afficher des resultats.
 
 ```mermaid
 sequenceDiagram
     participant LLM
-    participant AgentLoop as Agent Loop
-    participant MCP as Serveur MCP
+    participant Loop as Agent Loop
+    participant MCP as MCP Server
 
-    Note over AgentLoop: Depart : seulement search_recipes, get_recipe
-    LLM->>AgentLoop: search_recipes("donnees")
-    AgentLoop->>MCP: search_recipes
-    MCP-->>AgentLoop: recettes trouvees
-    LLM->>AgentLoop: query_sql(...)
-    Note over AgentLoop: Premier appel a ce serveur !
-    AgentLoop->>AgentLoop: activateServerTools(serveur)
-    Note over AgentLoop: Tous les outils du serveur sont maintenant actifs
-    AgentLoop->>MCP: query_sql
-    MCP-->>AgentLoop: resultats
+    Note over Loop: Start: only search_recipes, get_recipe
+    LLM->>Loop: search_recipes("data")
+    Loop->>MCP: search_recipes
+    MCP-->>Loop: recipes found
+    LLM->>Loop: query_sql(...)
+    Note over Loop: First call to this server!
+    Loop->>Loop: activateServerTools(server)
+    Note over Loop: All server tools now active
+    Loop->>MCP: query_sql
+    MCP-->>Loop: results
 ```
 
-Quand le LLM appelle un tool d'un serveur pour la premiere fois, `activateServerTools()` ajoute tous les tools de ce serveur au jeu actif. Le serveur n'est active qu'une seule fois.
+### Token savings
 
-### Economie de tokens
+With 4 servers and 50 tools total, discovery mode exposes about 20 tools instead of 50 -- saving 3,000--5,000 tokens in the initial prompt.
 
-Avec 4 serveurs et 50 tools au total, le mode discovery expose environ 20 tools au lieu de 50. Cela represente une economie d'environ 3000-5000 tokens dans le prompt initial -- significatif quand le budget est de 8K tokens par tour.
-
-:::tip[Pourquoi c'est important]
-Moins de tokens dans le prompt = plus de tokens disponibles pour les donnees et la reflexion du LLM. C'est particulierement critique avec les modeles legers (Haiku, Gemma) qui ont des fenetres de contexte plus petites.
+:::tip[Why it matters]
+Fewer tokens in the prompt = more tokens available for data and LLM reasoning. This is particularly critical with lightweight models (Haiku, Gemma) that have smaller context windows.
 :::
 
 ---
 
-## Le pipeline de schemas
+## The schema pipeline
 
-Les schemas des widgets suivent un pipeline en 4 etapes, du composant Svelte au runtime :
+Widget schemas follow a 4-step pipeline from Svelte component to runtime:
 
 ```mermaid
 graph LR
     A["interface Props (Svelte)"] -->|sync-schemas.ts| B["JSON Schema"]
-    B -->|frontmatter .md| C["Recette"]
+    B -->|frontmatter .md| C["Recipe"]
     C -->|registerWidget| D["WebMCP Server"]
-    D -->|widget_display| E["Validation runtime"]
+    D -->|widget_display| E["Runtime validation"]
 ```
 
-Le script `sync-schemas.ts` maintient un mapping explicite entre chaque nom de widget et son fichier `.svelte` (ex: `"stat"` -- `StatBlock.svelte`, `"profile"` -- `ProfileCard.svelte`).
+### Runtime validation
 
-### Validation au runtime
-
-Quand le LLM appelle `widget_display(name, params)`, le serveur WebMCP valide les params contre le JSON Schema **avant** de les passer au renderer :
+When the LLM calls `widget_display(name, params)`, the WebMCP server validates params against the JSON Schema **before** passing them to the renderer:
 
 ```mermaid
 sequenceDiagram
@@ -240,85 +223,79 @@ sequenceDiagram
 
     LLM->>WS: widget_display('stat', {label: "Test"})
     WS->>V: validate(params, schema)
-    alt Valide
+    alt Valid
         V-->>WS: {valid: true}
-        WS->>R: rendre le widget
+        WS->>R: render widget
         R-->>WS: {id: "w_abc123"}
         WS-->>LLM: OK, id=w_abc123
-    else Invalide
+    else Invalid
         V-->>WS: {valid: false, errors: [...]}
-        WS-->>LLM: Erreur + schema attendu
-        Note over LLM: Auto-correction au prochain tour
+        WS-->>LLM: Error + expected schema
+        Note over LLM: Self-correction on next turn
     end
 ```
 
-Si la validation echoue, le LLM recoit un message d'erreur avec le schema attendu, ce qui lui permet de corriger son appel.
-
 ---
 
-## Le flow complet d'une conversation
+## Full conversation flow
 
-Voici la sequence complete quand l'utilisateur demande : "Montre-moi le profil du depute Jean Dupont".
+Here is the complete sequence when the user asks: "Show me the profile of MP Jean Dupont".
 
 ```mermaid
 sequenceDiagram
-    participant User as Utilisateur
+    participant User
     participant App
-    participant AgentLoop as Agent Loop
+    participant Loop as Agent Loop
     participant LLM as LLM
-    participant MCP as Serveur MCP
+    participant MCP as MCP Server
     participant WebMCP as WebMCP Server
 
-    User->>App: "Montre-moi le profil du depute Jean Dupont"
-    App->>AgentLoop: runAgentLoop message, options
+    User->>App: "Show me MP Jean Dupont's profile"
+    App->>Loop: runAgentLoop(message, options)
 
-    Note over AgentLoop: Iteration 1 : Decouverte
-    AgentLoop->>LLM: prompt + tools discovery
-    LLM-->>AgentLoop: tool_call: tricoteuses_mcp_search_recipes
-    AgentLoop->>MCP: search_recipes
-    MCP-->>AgentLoop: recette "fiche-depute"
+    Note over Loop: Iteration 1: Discovery
+    Loop->>LLM: prompt + discovery tools
+    LLM-->>Loop: tool_call: search_recipes("MP profile")
+    Loop->>MCP: search_recipes
+    MCP-->>Loop: recipe "deputy-profile"
 
-    Note over AgentLoop: Iteration 2 : Lecture + Execution
-    AgentLoop->>LLM: resultat recettes
-    LLM-->>AgentLoop: tool_call: tricoteuses_mcp_get_recipe
-    AgentLoop->>MCP: get_recipe
-    MCP-->>AgentLoop: schema + instructions
+    Note over Loop: Iteration 2: Reading + Execution
+    Loop->>LLM: recipe results
+    LLM-->>Loop: tool_call: get_recipe("deputy-profile")
+    Loop->>MCP: get_recipe
+    MCP-->>Loop: schema + instructions
 
-    Note over AgentLoop: Iteration 3 : Donnees
-    AgentLoop->>LLM: schema du widget
-    LLM-->>AgentLoop: tool_call: tricoteuses_mcp_query_sql
-    AgentLoop->>MCP: query_sql
-    MCP-->>AgentLoop: donnees JSON du depute
+    Note over Loop: Iteration 3: Data
+    Loop->>LLM: widget schema
+    LLM-->>Loop: tool_call: query_sql(...)
+    Loop->>MCP: query_sql
+    MCP-->>Loop: deputy JSON data
 
-    Note over AgentLoop: Iteration 4 : Affichage
-    AgentLoop->>LLM: donnees
-    LLM-->>AgentLoop: tool_call: autoui_webmcp_widget_display
-    AgentLoop->>WebMCP: widget_display
-    WebMCP-->>AgentLoop: id w_xyz
-    AgentLoop-->>App: AgentResult
-    App-->>User: Widget profile affiche !
+    Note over Loop: Iteration 4: Display
+    Loop->>LLM: data
+    LLM-->>Loop: tool_call: widget_display("profile", {...})
+    Loop->>WebMCP: widget_display
+    WebMCP-->>Loop: {id: "w_xyz"}
+    Loop-->>App: AgentResult
+    App-->>User: Profile widget displayed!
 ```
 
-### Mecanismes de securite
+### Safety mechanisms
 
-Deux garde-fous evitent les boucles infinies :
+Two safeguards prevent infinite loops:
 
-1. **Compteur d'iterations sans rendu** -- apres 4 iterations sans `widget_display`, les tools de discovery sont retires du jeu actif. Apres 5 iterations, un message de nudge est injecte.
-2. **`maxIterations`** (defaut 5) -- la boucle s'arrete meme si le LLM n'a pas termine.
+1. **No-render iteration counter** -- after 4 iterations without `widget_display`, discovery tools are removed. After 5, a nudge message is injected.
+2. **`maxIterations`** (default 5) -- the loop stops even if the LLM has not finished.
 
-### Compression des resultats
+### Result compression
 
-Apres chaque iteration, les anciens `tool_result` sont comprimes : les textes de plus de 300 caracteres sont tronques a 200 avec un hint `recall('id')`. Le LLM peut recuperer le resultat complet via l'outil `recall`.
-
-:::tip[Pourquoi la compression ?]
-Sans compression, les resultats des outils (souvent du JSON volumineux) s'accumulent et epuisent le budget de tokens. La compression avec `recall` permet au LLM de garder un resume tout en pouvant revenir aux details complets si necessaire.
-:::
+After each iteration, previous `tool_result` entries are compressed: texts longer than 300 characters are truncated to 200 with a `recall('id')` hint. The LLM can retrieve the full result via the `recall` tool.
 
 ---
 
-## Multi-serveurs
+## Multi-server
 
-Plusieurs serveurs MCP et WebMCP coexistent grace au prefixage uniforme.
+Multiple MCP and WebMCP servers coexist thanks to uniform prefixing.
 
 ```mermaid
 graph TB
@@ -327,95 +304,86 @@ graph TB
     Agent --> WMCP1["autoui_webmcp_*"]
     Agent --> WMCP2["designkit_webmcp_*"]
 
-    MCP1 --> S1[Serveur Tricoteuses]
-    MCP2 --> S2[Serveur Wikipedia]
-    WMCP1 --> W1[Widgets natifs]
-    WMCP2 --> W2[Widgets design]
+    MCP1 --> S1[Tricoteuses Server]
+    MCP2 --> S2[Wikipedia Server]
+    WMCP1 --> W1[Native Widgets]
+    WMCP2 --> W2[Design Widgets]
 ```
 
-### Isolation des namespaces
+### Namespace isolation
 
-Chaque serveur est un namespace complet. Si `autoui` et `designkit` exposent tous les deux un tool `widget_display`, le LLM voit :
+Each server is a complete namespace. If `autoui` and `designkit` both expose a `widget_display` tool, the LLM sees:
 
-- `autoui_webmcp_widget_display` -- widgets standards (stat, chart, map...)
-- `designkit_webmcp_widget_display` -- widgets design (mockup, wireframe...)
+- `autoui_webmcp_widget_display` -- standard widgets (stat, chart, map...)
+- `designkit_webmcp_widget_display` -- design widgets (mockup, wireframe...)
 
-Pas de confusion possible.
+No confusion possible.
 
 ---
 
-## Le resolver canonique (4 couches)
+## The canonical resolver (4 layers)
 
-Les serveurs MCP n'utilisent pas toujours les noms exacts `search_recipes` et `get_recipe`. Le resolver canonique identifie les tools equivalents via 4 couches de matching :
+MCP servers do not always use the exact names `search_recipes` and `get_recipe`. The canonical resolver identifies equivalent tools via 4 matching layers:
 
-| Couche | Strategie | Exemple |
-|--------|-----------|---------|
-| Layer 1 | Correspondance exacte sur le nom | `search_recipes` |
-| Layer 2 | Decomposition (action, resource) | `list_skills` --> action=list, resource=skills --> search_recipes |
-| Layer 3 | Scan de la description pour keywords | description contient "recipe" + action "search" |
-| Layer 4 | Fallback : pas de tool recette, liste les tools bruts | serveur sans recettes |
+| Layer | Strategy | Example |
+|-------|----------|---------|
+| Layer 1 | Exact name match | `search_recipes` |
+| Layer 2 | Decomposition (action, resource) | `list_skills` --> search_recipes |
+| Layer 3 | Description scan for keywords | description contains "recipe" + "search" |
+| Layer 4 | Fallback: no recipe tool, list raw tools | server without recipes |
 
 ```mermaid
 graph TD
-    Tool["list_skills"] --> L1{Layer 1: nom exact ?}
-    L1 -->|non| L2{Layer 2: decomposition ?}
+    Tool["list_skills"] --> L1{Layer 1: exact match?}
+    L1 -->|no| L2{Layer 2: decomposition?}
     L2 -->|action=list, resource=skills| Match["= search_recipes"]
-    L2 -->|non| L3{Layer 3: description ?}
-    L3 -->|non| L4["Layer 4: fallback (tools bruts)"]
+    L2 -->|no| L3{Layer 3: description?}
+    L3 -->|no| L4["Layer 4: fallback (raw tools)"]
 ```
 
-Le resolver enregistre des **alias** dans une map locale :
+The resolver registers **aliases** in a local map:
 
 ```typescript
-// Si le serveur expose "list_skills" au lieu de "search_recipes"
-aliasMap.set('serveur_mcp_search_recipes', 'serveur_mcp_list_skills');
+aliasMap.set('server_mcp_search_recipes', 'server_mcp_list_skills');
 ```
 
-Le system prompt utilise le nom canonique (`search_recipes`), et la boucle agent resout l'alias au moment de l'execution.
+The system prompt uses the canonical name (`search_recipes`), and the agent loop resolves the alias at execution time.
 
 ---
 
-## Extensibilite
+## Extensibility
 
-L'architecture par layers est concue pour accueillir de nouveaux types de serveurs sans modifier la boucle agent.
+The layer-based architecture accommodates new server types without modifying the agent loop.
 
-### Browser WebMCP
+### New protocols
 
-Un serveur WebMCP `browser` pourrait exposer `notify`, `clipboard`, `share`, `download`. Le LLM appellerait `browser_webmcp_notify(...)`.
-
-### Native WebMCP (SwiftUI bridge)
-
-Un bridge natif pourrait exposer `widget_display` (rendu SwiftUI), `haptic`, `speech`. Meme convention : `native_webmcp_*`.
-
-### Nouveaux protocoles
-
-`ToolLayer` est un union discrimine par `protocol`. Ajouter un troisieme type = nouveau membre d'union + un cas dans `buildToolsFromLayers()`.
+`ToolLayer` is a discriminated union by `protocol`. Adding a third type = new union member + a case in `buildToolsFromLayers()`.
 
 ```typescript
-// Aujourd'hui
+// Today
 export type ToolLayer = McpLayer | WebMcpLayer;
-// Demain
+// Tomorrow
 export type ToolLayer = McpLayer | WebMcpLayer | WasmLayer;
 ```
 
 ---
 
-## Architecture globale
+## Overall architecture
 
 ```mermaid
 graph TB
-    subgraph Navigateur
-        App[Application SvelteKit]
+    subgraph Browser
+        App[SvelteKit App]
         Agent[Agent Loop]
         Canvas[Canvas Store]
         Widgets[WidgetRenderer]
-        WebMCPs[Serveurs WebMCP locaux]
+        WebMCPs[Local WebMCP Servers]
     end
 
     subgraph Cloud
-        LLMApi[API LLM distante]
-        MCP1[Serveur MCP 1]
-        MCP2[Serveur MCP 2]
+        LLMApi[Remote LLM API]
+        MCP1[MCP Server 1]
+        MCP2[MCP Server 2]
     end
 
     App -->|message| Agent
@@ -425,49 +393,49 @@ graph TB
     Agent -->|mcp calls| MCP2
     Agent -->|webmcp calls| WebMCPs
     Agent -->|widget data| Canvas
-    Canvas -->|blocs reactifs| Widgets
-    Widgets -->|rendu DOM| App
+    Canvas -->|reactive blocks| Widgets
+    Widgets -->|DOM render| App
 ```
 
 ---
 
-## Resume
+## Summary
 
 | Concept | Implementation |
 |---------|---------------|
-| Protocoles | MCP (distant) + WebMCP (local), symetriques |
-| Prefixage | `{server}_{protocol}_{tool}` |
+| Protocols | MCP (remote) + WebMCP (local), symmetric |
+| Prefixing | `{server}_{protocol}_{tool}` |
 | Layers | `McpLayer[]` + `WebMcpLayer[]` = `ToolLayer[]` |
 | Lazy loading | `buildDiscoveryTools()` + `activateServerTools()` |
-| System prompt | `buildSystemPrompt(layers)` -- dynamique |
-| Pipeline schemas | Props TS --> sync-schemas --> .md --> WebMCP |
-| Validation | JSON Schema au runtime avant rendu |
-| Multi-serveurs | Namespaces isoles, alias, filtrage recettes |
-| Resolver canonique | 4 couches : exact, decomposition, description, fallback |
-| Compression contexte | Troncature + recall() pour long results |
-| Extensibilite | Union discriminee `ToolLayer`, nouveau type |
+| System prompt | `buildSystemPrompt(layers)` -- dynamic |
+| Schema pipeline | TS Props --> sync-schemas --> .md --> WebMCP |
+| Validation | JSON Schema at runtime before rendering |
+| Multi-server | Isolated namespaces, aliases, recipe filtering |
+| Canonical resolver | 4 layers: exact, decomposition, description, fallback |
+| Context compression | Truncation + recall() for long results |
+| Extensibility | Discriminated union `ToolLayer`, new type |
 
 ---
 
 ## Troubleshooting
 
-| Probleme | Cause probable | Solution |
-|----------|---------------|----------|
-| "Unknown tool" dans les logs | Le prefixe ne correspond a aucun serveur | Verifiez que le serverName dans le layer correspond |
-| Le LLM ignore un serveur MCP | Pas de recettes, le LLM ne sait pas quoi demander | Ajoutez un fichier `recipes.json` au serveur |
-| Boucle infinie | Le LLM ne termine jamais | Reduisez `maxIterations` ou verifiez le system prompt |
-| Outils non visibles | Le serveur n'est pas dans les layers | Verifiez que `layers` contient le layer du serveur |
+| Problem | Likely cause | Solution |
+|---------|-------------|----------|
+| "Unknown tool" in logs | Prefix doesn't match any server | Verify serverName in the layer matches |
+| LLM ignores an MCP server | No recipes, LLM doesn't know what to ask | Add a `recipes.json` file to the server |
+| Infinite loop | LLM never finishes | Reduce `maxIterations` or check system prompt |
+| Tools not visible | Server missing from layers | Verify `layers` contains the server's layer |
 
 ---
 
-## Aller plus loin
+## Going further
 
-- **Implementer un nouveau protocole** : etendez l'union `ToolLayer` et ajoutez un cas dans `buildToolsFromLayers()`
-- **Creer un bridge natif** : implementez un serveur WebMCP qui communique avec du code natif (Swift, Kotlin)
-- **Optimiser le lazy loading** : utilisez `buildDiscoveryCache()` pour pre-calculer les outils de decouverte
+- **Implement a new protocol**: extend the `ToolLayer` union and add a case in `buildToolsFromLayers()`
+- **Create a native bridge**: implement a WebMCP server that communicates with native code (Swift, Kotlin)
+- **Optimize lazy loading**: use `buildDiscoveryCache()` to pre-compute discovery tools
 
-## Voir aussi
+## See also
 
-- [Demarrer avec le boilerplate](./boilerplate)
-- [Creer un serveur WebMCP](./create-webmcp-server)
-- [Architecture du systeme](/webmcp-auto-ui/guide/architecture)
+- [Getting started with the boilerplate](./boilerplate)
+- [Create a WebMCP server](./create-webmcp-server)
+- [System architecture](/webmcp-auto-ui/guide/architecture)

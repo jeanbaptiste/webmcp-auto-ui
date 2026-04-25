@@ -1,15 +1,15 @@
 ---
 title: "@webmcp-auto-ui/sdk"
-description: "SDK application: canvas store, HyperSkill encoding/decoding, skills registry, serveurs MCP demo."
+description: "Application SDK: canvas store, HyperSkill encoding/decoding, skills registry, MCP demo servers."
 sidebar:
   order: 3
 ---
 
-Le package `@webmcp-auto-ui/sdk` fournit la couche applicative entre l'agent et l'UI. Il gere l'etat reactif du canvas (widgets, chat, connexion MCP), le systeme HyperSkill pour serialiser et partager des configurations completes en URLs courtes, et un registre de skills persistant en localStorage.
+The `@webmcp-auto-ui/sdk` package provides the application layer between the agent and the UI. It manages reactive canvas state (widgets, chat, MCP connection), the HyperSkill system for serializing and sharing complete configurations as short URLs, and a persistent skills registry backed by localStorage.
 
-C'est le lien entre ce que l'agent produit et ce que l'UI affiche.
+It bridges what the agent produces and what the UI displays.
 
-## Architecture interne
+## Internal Architecture
 
 ```mermaid
 graph TD
@@ -18,7 +18,7 @@ graph TD
         CV[Canvas Vanilla] --> HS
         HS --> ENC[encode / decode]
         HS --> HASH[hash / diff]
-        HS --> COMP[Compression gzip/brotli]
+        HS --> COMP[gzip/brotli compression]
         SR[Skills Registry] --> LS[localStorage]
         DEMOS[MCP Demo Servers]
     end
@@ -32,17 +32,17 @@ graph TD
 ## Installation
 
 ```ts
-// Import principal (types + HyperSkill + skills registry)
+// Main import (types + HyperSkill + skills registry)
 import { encodeHyperSkill, decodeHyperSkill, createSkill } from '@webmcp-auto-ui/sdk';
 
-// Canvas store Svelte 5 (avec runes $state/$derived)
+// Canvas store — Svelte 5 (with $state/$derived runes)
 import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 
-// Canvas store vanilla (React, Vue, ou plain JS)
+// Canvas store — vanilla (React, Vue, or plain JS)
 import { canvas } from '@webmcp-auto-ui/sdk/canvas-vanilla';
 ```
 
-Dans un `package.json` d'app :
+In an app's `package.json`:
 
 ```json
 {
@@ -52,153 +52,137 @@ Dans un `package.json` d'app :
 }
 ```
 
-Le package depend de `hyperskills` (NPM) pour l'encoding/decoding HyperSkill, et de Svelte 5 en peer dependency pour le canvas store reactif.
+The package depends on `hyperskills` (NPM) for HyperSkill encoding/decoding, and on Svelte 5 as a peer dependency for the reactive canvas store.
 
 ---
 
 ## Canvas Store
 
-Le canvas store est le magasin d'etat central de l'application. Il gere :
-- Les **widgets** affiches (blocks)
-- Le **modele LLM** selectionne
-- La **connexion MCP** (URL, statut, outils)
-- L'**historique chat** (messages)
-- Les **overrides de theme**
-- L'etat de **generation** (l'agent est-il en train de repondre ?)
+The canvas store is the central state store for the application. It manages:
+- Displayed **widgets** (blocks)
+- Selected **LLM model**
+- **MCP connection** (URL, status, tools)
+- **Chat history** (messages)
+- **Theme overrides**
+- **Generation state** (is the agent currently responding?)
 
-### Deux versions du store
+### Two store versions
 
-Le SDK exporte deux versions du meme store, avec la meme API :
+The SDK exports two versions of the same store with identical APIs:
 
-| Import | Framework | Reactivite |
+| Import | Framework | Reactivity |
 |--------|-----------|-----------|
 | `@webmcp-auto-ui/sdk/canvas` | Svelte 5 | Runes (`$state` / `$derived`) |
-| `@webmcp-auto-ui/sdk/canvas-vanilla` | Agnostique | `subscribe()` / `getSnapshot()` |
+| `@webmcp-auto-ui/sdk/canvas-vanilla` | Agnostic | `subscribe()` / `getSnapshot()` |
 
-### API complete
+### Full API
 
 ```ts
-// ── Widgets ──────────────────────────────────────────────
-canvas.blocks: Widget[];                      // Liste des widgets affiches
-canvas.addWidget(type, data): Widget;         // Ajouter un widget, retourne l'objet cree
-canvas.removeBlock(id): void;                 // Supprimer un widget par ID
-canvas.updateBlock(id, data): void;           // Mettre a jour les donnees d'un widget
-canvas.moveBlock(fromId, toId): void;         // Deplacer un widget (reorder)
-canvas.clearBlocks(): void;                   // Vider le canvas
-canvas.setBlocks(widgets): void;              // Remplacer tous les widgets d'un coup
+// -- Widgets -------------------------------------------------------
+canvas.blocks: Widget[];                      // List of displayed widgets
+canvas.addWidget(type, data): Widget;         // Add a widget, returns the created object
+canvas.removeBlock(id): void;                 // Remove a widget by ID
+canvas.updateBlock(id, data): void;           // Update widget data
+canvas.moveBlock(fromId, toId): void;         // Reorder a widget
+canvas.clearBlocks(): void;                   // Clear the canvas
+canvas.setBlocks(widgets): void;              // Replace all widgets at once
 
-// ── Mode ─────────────────────────────────────────────────
-canvas.mode: 'auto' | 'drag' | 'chat';       // Mode d'interaction
+// -- Mode ----------------------------------------------------------
+canvas.mode: 'auto' | 'drag' | 'chat';
 canvas.setMode(mode): void;
 
-// ── LLM ──────────────────────────────────────────────────
+// -- LLM -----------------------------------------------------------
 canvas.llm: 'haiku' | 'sonnet' | 'gemma-e2b' | 'gemma-e4b';
 canvas.setLlm(model): void;
 
-// ── MCP ──────────────────────────────────────────────────
-canvas.mcpUrl: string;                        // URL du serveur MCP
+// -- MCP -----------------------------------------------------------
+canvas.mcpUrl: string;
 canvas.setMcpUrl(url): void;
-canvas.mcpConnected: boolean;                 // Est-on connecte ?
-canvas.mcpConnecting: boolean;                // Connexion en cours ?
-canvas.mcpName: string;                       // Nom du serveur
-canvas.mcpTools: McpToolInfo[];               // Outils disponibles
+canvas.mcpConnected: boolean;
+canvas.mcpConnecting: boolean;
+canvas.mcpName: string;
+canvas.mcpTools: McpToolInfo[];
 canvas.setMcpConnecting(bool): void;
 canvas.setMcpConnected(connected, name?, tools?): void;
 canvas.setMcpError(error): void;
 
-// ── Chat ─────────────────────────────────────────────────
-canvas.messages: ChatMsg[];                   // Historique des messages
-canvas.addMsg(role, content, thinking?): ChatMsg;   // Ajouter un message
-canvas.updateMsg(id, content, thinking?): void;     // Modifier un message
-canvas.clearMessages(): void;                       // Effacer l'historique
+// -- Chat ----------------------------------------------------------
+canvas.messages: ChatMsg[];
+canvas.addMsg(role, content, thinking?): ChatMsg;
+canvas.updateMsg(id, content, thinking?): void;
+canvas.clearMessages(): void;
 
-// ── Theme ────────────────────────────────────────────────
+// -- Theme ---------------------------------------------------------
 canvas.themeOverrides: Record<string, string>;
 canvas.setThemeOverrides(overrides): void;
 
-// ── Metriques derivees ───────────────────────────────────
-canvas.blockCount: number;                    // Nombre de widgets
-canvas.isEmpty: boolean;                      // Canvas vide ?
-canvas.generating: boolean;                   // Agent en cours de generation ?
+// -- Derived metrics -----------------------------------------------
+canvas.blockCount: number;
+canvas.isEmpty: boolean;
+canvas.generating: boolean;
 ```
 
-### Exemple Svelte 5
+### Svelte 5 example
 
 ```svelte
 <script lang="ts">
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { WidgetRenderer } from '@webmcp-auto-ui/ui';
-
-  // La reactivite est automatique grace aux runes $state/$derived
-  // Pas besoin de subscribe() ni de set()
 </script>
 
-<!-- Selecteur de modele -->
 <select bind:value={canvas.llm}>
   <option value="haiku">Haiku (remote)</option>
   <option value="sonnet">Sonnet (remote)</option>
   <option value="gemma-e2b">Gemma 2B (local)</option>
-  <option value="gemma-e4b">Gemma 4B (local)</option>
 </select>
 
-<!-- Ajouter un widget -->
 <button onclick={() => canvas.addWidget('stat', { label: 'Sales', value: '1000' })}>
-  Ajouter un widget
+  Add widget
 </button>
 
-<!-- Afficher les widgets -->
 <div class="grid grid-cols-2 gap-4">
   {#each canvas.blocks as widget (widget.id)}
     <WidgetRenderer type={widget.type} data={widget.data} />
   {/each}
 </div>
 
-<!-- Compteur reactif -->
-<p>{canvas.blockCount} widgets affiches</p>
+<p>{canvas.blockCount} widgets displayed</p>
 ```
 
-### Exemple vanilla (React, Vue, plain JS)
+### Vanilla example (React, Vue, plain JS)
 
 ```ts
 import { canvas } from '@webmcp-auto-ui/sdk/canvas-vanilla';
 
-// S'abonner aux changements
 const unsubscribe = canvas.subscribe(() => {
   const snapshot = canvas.getSnapshot();
   console.log('Widgets:', snapshot.blocks.length);
-  console.log('LLM:', snapshot.llm);
-  console.log('MCP connecte:', snapshot.mcpConnected);
-
-  // Mettre a jour l'UI
   renderWidgets(snapshot.blocks);
 });
 
-// Modifier l'etat
 canvas.addWidget('stat', { label: 'Users', value: '42k' });
-canvas.setLlm('sonnet');
 
-// Se desabonner
 unsubscribe();
 ```
 
-:::tip[Pattern useSyncExternalStore]
-Le canvas vanilla est compatible avec le pattern `useSyncExternalStore` de React 18+ pour une integration sans wrapper supplementaire.
+:::tip[useSyncExternalStore pattern]
+The vanilla canvas is compatible with React 18+'s `useSyncExternalStore` pattern for seamless integration without additional wrappers.
 :::
 
 ---
 
-## HyperSkill : serialisation d'experiences
+## HyperSkill: Experience Serialization
 
-Le systeme HyperSkill permet de serialiser une experience complete (widgets, theme, connexion MCP, historique) en un parametre URL court et partageable. C'est le mecanisme qui rend les demos partageables par simple lien.
+The HyperSkill system serializes a complete experience (widgets, theme, MCP connection, history) into a short, shareable URL parameter. This is what makes demos shareable via simple links.
 
-### Flux de serialisation
+### Serialization flow
 
 ```mermaid
 graph LR
     SKILL[HyperSkill Object] -->|JSON.stringify| JSON[JSON String]
-    JSON -->|"> 6KB ?"| CHECK{Taille}
-    CHECK -->|Oui| GZ[gzip compress]
-    CHECK -->|Non| B64[Base64 encode]
+    JSON -->|"> 6KB ?"| CHECK{Size}
+    CHECK -->|Yes| GZ[gzip compress]
+    CHECK -->|No| B64[Base64 encode]
     GZ --> B64_GZ[Base64 encode]
     B64 --> PARAM["?hs=..."]
     B64_GZ --> PARAM_GZ["?hs=gz...."]
@@ -206,61 +190,55 @@ graph LR
 
 ### encodeHyperSkill
 
-Serialise un objet HyperSkill en parametre URL. Compresse automatiquement avec gzip si la charge depasse 6 KB.
+Serializes a HyperSkill object into a URL parameter. Automatically compresses with gzip when the payload exceeds 6 KB.
 
 ```ts
 import { encodeHyperSkill } from '@webmcp-auto-ui/sdk';
 
 const skill = {
   meta: {
-    title: 'Dashboard Q1',
+    title: 'Q1 Dashboard',
     llm: 'sonnet',
     mcp: 'https://mcp.example.com/mcp',
     tags: ['sales', 'quarterly'],
-    theme: { '--color-primary': '#4F46E5' },
   },
   content: {
     blocks: [
       { type: 'stat', data: { label: 'Revenue', value: '$42k', trend: 'up' } },
-      { type: 'chart-rich', data: { type: 'bar', labels: ['Q1', 'Q2'], data: [{ label: 'Sales', values: [42, 58] }] } },
     ],
   },
 };
 
-// Le deuxieme argument est l'URL de base (optionnel, defaut: window.location)
 const param = await encodeHyperSkill(skill, 'https://demos.hyperskills.net');
-// "g_qs9K2wZqE..." ou "gz.eJzLSM3JyVcozy/KSQEAHmwFpA==" (si compresse)
+// "g_qs9K2wZqE..." or "gz.eJzLSM3JyVcozy/KSQEAHmwFpA==" (if compressed)
 ```
 
 ### decodeHyperSkill
 
-Deserialise un parametre URL ou une URL complete en objet HyperSkill :
+Deserializes a URL parameter or full URL into a HyperSkill object:
 
 ```ts
 import { decodeHyperSkill } from '@webmcp-auto-ui/sdk';
 
-// Depuis un parametre brut
 const skill = await decodeHyperSkill('g_qs9K2wZqE...');
-
-// Depuis une URL complete
 const skill2 = await decodeHyperSkill('https://demos.hyperskills.net?hs=g_qs9K2w...');
 
-console.log(skill.meta.title);       // 'Dashboard Q1'
-console.log(skill.content.blocks);   // [{ type: 'stat', ... }, ...]
+console.log(skill.meta.title);       // 'Q1 Dashboard'
+console.log(skill.content.blocks);   // [{ type: 'stat', ... }]
 ```
 
-Supporte automatiquement :
-- **gzip** (prefixe `gz.`)
-- **brotli** (prefixe `br.`)
-- **Base64 plain** (pas de prefixe)
-- **URL complete** avec `?hs=...`
+Automatically supports:
+- **gzip** (`gz.` prefix)
+- **brotli** (`br.` prefix)
+- **Plain Base64** (no prefix)
+- **Full URLs** with `?hs=...`
 
-### Interface HyperSkill
+### HyperSkill interface
 
 ```ts
 interface HyperSkill {
   meta: HyperSkillMeta;
-  content: unknown;         // Donnees arbitraires (blocks, etc.)
+  content: unknown;
 }
 
 interface HyperSkillMeta {
@@ -268,14 +246,14 @@ interface HyperSkillMeta {
   description?: string;
   version?: string;
   created?: string;
-  mcp?: string;              // URL du serveur MCP
-  mcpName?: string;          // Nom du serveur MCP
-  llm?: string;              // Modele LLM utilise
+  mcp?: string;
+  mcpName?: string;
+  llm?: string;
   tags?: string[];
-  theme?: Record<string, string>;  // Overrides CSS
-  hash?: string;             // Hash de version
-  previousHash?: string;     // Hash de la version precedente (linked list)
-  chatSummary?: string;      // Resume anonymise de la conversation
+  theme?: Record<string, string>;
+  hash?: string;
+  previousHash?: string;
+  chatSummary?: string;
   provenance?: {
     mcpServers?: string[];
     toolsUsed?: string[];
@@ -287,135 +265,85 @@ interface HyperSkillMeta {
 }
 ```
 
-### Fonctions brutes (re-exports)
+### Raw functions (re-exports)
 
-Le SDK re-exporte les fonctions brutes du package NPM `hyperskills` pour un acces direct :
+The SDK re-exports raw functions from the `hyperskills` NPM package:
 
 ```ts
 import { encode, decode, hash, diff, getHsParam } from '@webmcp-auto-ui/sdk';
 
-// encode(sourceUrl, content, options?) → Promise<string>
 const param = await encode('https://example.com', jsonString, { compress: 'gz' });
-
-// decode(urlOrParam) → Promise<{ sourceUrl, content }>
 const { sourceUrl, content } = await decode(param);
-
-// hash(sourceUrl, content) → Promise<string>
 const h = await hash('https://example.com', jsonString);
-
-// diff(oldContent, newContent) → changes
 const changes = await diff(oldJson, newJson);
-
-// getHsParam(url) → string | null
-const param2 = getHsParam('https://example.com?hs=abc123');
-// 'abc123'
+const hsParam = getHsParam('https://example.com?hs=abc123'); // 'abc123'
 ```
 
-:::note[Wrapper type]
-Le package `hyperskills` est en JavaScript pur. Le SDK l'importe avec `// @ts-ignore` et re-exporte chaque fonction avec des types explicites, suivant la convention du projet pour les packages JS sans types.
+:::note[Typed wrapper]
+The `hyperskills` package is pure JavaScript. The SDK imports it with `// @ts-ignore` and re-exports each function with explicit types, following the project's convention for untyped JS packages.
 :::
 
-### Hash et versioning
+### Hash and versioning
 
-Le systeme de hash permet de versionner les skills avec une linked list de hashes :
+The hash system enables skill versioning with a linked list of hashes:
 
 ```ts
 import { computeHash, createVersion } from '@webmcp-auto-ui/sdk';
 
-// Calculer le hash d'un contenu
 const h = await computeHash('https://example.com', skillContent);
-// "c7d3e2a1f4b5..."
 
-// Creer une version avec lien vers la precedente
 const version = await createVersion(skill, 'https://example.com', previousHash);
-// {
-//   hash: "a1b2c3...",
-//   previousHash: "c7d3e2...",
-//   timestamp: 1710000000000,
-//   skill: { meta: { hash: "a1b2c3...", previousHash: "c7d3e2...", ... }, content: ... }
-// }
-```
-
-```ts
-interface HyperSkillVersion {
-  hash: string;
-  previousHash?: string;
-  timestamp: number;
-  skill: HyperSkill;
-}
+// { hash, previousHash, timestamp, skill }
 ```
 
 ### Diff
 
-Comparer deux versions de skill :
+Compare two skill versions:
 
 ```ts
 import { diffSkills } from '@webmcp-auto-ui/sdk';
-
 const changes = await diffSkills(oldSkill, newSkill);
-// { added: [...], modified: [...], removed: [...] }
 ```
 
 ---
 
 ## Canvas Store x HyperSkill
 
-Le canvas store integre nativement les fonctions HyperSkill pour l'export et l'import :
+The canvas store natively integrates HyperSkill functions for export and import:
 
 ```ts
 import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 
-// ── Export ────────────────────────────────────────────────
-
-// Generer un objet skill JSON depuis l'etat actuel
+// Export current state as skill JSON
 const skill = canvas.buildSkillJSON();
-// {
-//   version: '1.0',
-//   name: 'skill-1710000000',
-//   created: '2024-01-15T10:00:00.000Z',
-//   mcp: canvas.mcpUrl,
-//   llm: canvas.llm,
-//   blocks: canvas.blocks.map(b => ({ type: b.type, data: b.data })),
-//   theme: canvas.themeOverrides,
-// }
 
-// Generer un parametre HyperSkill compresse
+// Generate a compressed HyperSkill parameter
 const param = await canvas.buildHyperskillParam();
-// "g_qs9K2wZqE..." — pret a mettre dans ?hs=...
-
 const url = `https://demos.hyperskills.net?hs=${param}`;
 
-// ── Import ────────────────────────────────────────────────
-
-// Charger depuis un parametre
+// Import from a parameter
 await canvas.loadFromParam(param);
 
-// Charger depuis une URL complete
+// Import from a full URL
 await canvas.loadFromUrl('https://demos.hyperskills.net?hs=g_qs9K2w...');
 ```
 
-:::tip[Partage de demos]
-Ce mecanisme est utilise par toutes les apps de demo pour generer des liens partageables. Un utilisateur peut configurer un dashboard, cliquer "Partager", et envoyer l'URL a un collegue qui retrouvera exactement le meme etat.
+:::tip[Sharing demos]
+This mechanism powers all demo apps' sharing features. A user can configure a dashboard, click "Share", and send the URL to a colleague who will see the exact same state.
 :::
 
 ---
 
 ## Skills Registry
 
-Le registre de skills persiste les configurations en localStorage avec une API CRUD complete.
+The skills registry persists configurations in localStorage with a full CRUD API.
 
-### API du registre
+### Registry API
 
 ```ts
 import {
-  createSkill,
-  updateSkill,
-  deleteSkill,
-  getSkill,
-  listSkills,
-  clearSkills,
-  loadSkills,
-  loadDemoSkills,
+  createSkill, updateSkill, deleteSkill, getSkill,
+  listSkills, clearSkills, loadSkills, loadDemoSkills,
   onSkillsChange,
 } from '@webmcp-auto-ui/sdk';
 ```
@@ -427,9 +355,9 @@ interface Skill {
   id: string;
   name: string;
   description?: string;
-  content: any;            // Contenu arbitraire (blocks, config, etc.)
-  created: number;         // Timestamp creation
-  updated: number;         // Timestamp derniere modification
+  content: any;
+  created: number;
+  updated: number;
   version?: string;
   tags?: string[];
 }
@@ -440,57 +368,38 @@ interface SkillBlock {
 }
 ```
 
-### CRUD
+### CRUD operations
 
 ```ts
-// Creer un skill
 const skill = createSkill('dashboard-q1', {
-  description: 'Dashboard trimestriel des ventes',
+  description: 'Quarterly sales dashboard',
   content: { blocks: [{ type: 'stat', data: { label: 'Revenue', value: '$42k' } }] },
-  tags: ['sales', 'quarterly'],
+  tags: ['sales'],
 });
 
-// Lire
 const retrieved = getSkill(skill.id);
 const all = listSkills();
-
-// Mettre a jour
-updateSkill(skill.id, {
-  name: 'Dashboard Q1 2024',
-  content: { blocks: [/* ... */] },
-});
-
-// Supprimer
+updateSkill(skill.id, { name: 'Dashboard Q1 2024' });
 deleteSkill(skill.id);
 ```
 
-### Operations batch
+### Batch operations
 
 ```ts
-// Charger un ensemble de skills d'un coup
-await loadSkills(skillObjects);
-
-// Charger les skills de demo pre-configures (utile pour le dev)
-await loadDemoSkills();
-
-// Vider tout le registre
-clearSkills();
+await loadSkills(skillObjects);      // Load a set of skills at once
+await loadDemoSkills();              // Load pre-configured demo skills
+clearSkills();                       // Clear the entire registry
 ```
 
-### Reactivite
+### Reactivity
 
 ```ts
-// S'abonner aux changements
 const unsubscribe = onSkillsChange((skills) => {
-  console.log(`${skills.length} skills dans le registre`);
-  updateSidebar(skills);
+  console.log(`${skills.length} skills in registry`);
 });
-
-// Se desabonner
-unsubscribe();
 ```
 
-### Exemple : sauvegarde automatique
+### Auto-save example
 
 ```svelte
 <script lang="ts">
@@ -509,9 +418,8 @@ unsubscribe();
     }
   }
 
-  // Sauvegarder 5 secondes apres chaque modification
   $effect(() => {
-    canvas.blocks;  // Dependance reactive
+    canvas.blocks;  // Reactive dependency
     const timer = setTimeout(autoSave, 5000);
     return () => clearTimeout(timer);
   });
@@ -522,7 +430,7 @@ unsubscribe();
 
 ## MCP Demo Servers
 
-Liste des serveurs MCP de demonstration disponibles pour tester l'agent :
+List of available MCP demo servers for testing the agent:
 
 ```ts
 import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
@@ -531,26 +439,22 @@ interface McpDemoServer {
   name: string;
   description: string;
   url: string;
-  tools: string[];        // Noms des outils exposes
+  tools: string[];
 }
 
-// Lister les serveurs disponibles
 MCP_DEMO_SERVERS.forEach(server => {
   console.log(`${server.name}: ${server.url}`);
-  console.log(`  ${server.description}`);
-  console.log(`  Outils: ${server.tools.join(', ')}`);
+  console.log(`  Tools: ${server.tools.join(', ')}`);
 });
 ```
 
-Ce tableau est utilise par le composant `<RemoteMCPserversDemo>` du package UI pour afficher l'interface de connexion multi-serveurs.
+This array feeds the `<RemoteMCPserversDemo>` component from the UI package.
 
 ---
 
-## Tutoriel : application multi-skills
+## Tutorial: Multi-Skills Application
 
-Ce tutoriel construit une application qui gere une collection de skills, permet de naviguer entre eux, et d'exporter/importer via HyperSkill.
-
-### Etape 1 : initialiser le canvas
+### Step 1: Initialize the canvas
 
 ```svelte
 <script lang="ts">
@@ -561,7 +465,6 @@ Ce tutoriel construit une application qui gere une collection de skills, permet 
   let skills = $state(listSkills());
   let selectedId = $state<string | null>(null);
 
-  // Charger les skills de demo au premier lancement
   $effect(() => {
     if (skills.length === 0) {
       loadDemoSkills().then(() => { skills = listSkills(); });
@@ -570,17 +473,16 @@ Ce tutoriel construit une application qui gere une collection de skills, permet 
 </script>
 ```
 
-### Etape 2 : navigation entre skills
+### Step 2: Navigate between skills
 
 ```svelte
 <aside class="w-64 p-4 bg-gray-100">
   <h2 class="font-bold mb-4">Skills</h2>
   <ul>
     {#each skills as skill (skill.id)}
-      <li class="mb-2">
+      <li>
         <button
           class:bg-blue-500={selectedId === skill.id}
-          class:text-white={selectedId === skill.id}
           onclick={() => {
             selectedId = skill.id;
             const s = getSkill(skill.id);
@@ -596,7 +498,7 @@ Ce tutoriel construit une application qui gere une collection de skills, permet 
 </aside>
 ```
 
-### Etape 3 : export HyperSkill
+### Step 3: HyperSkill export
 
 ```svelte
 <script lang="ts">
@@ -604,14 +506,14 @@ Ce tutoriel construit une application qui gere une collection de skills, permet 
     const param = await canvas.buildHyperskillParam();
     const url = `https://demos.hyperskills.net?hs=${param}`;
     await navigator.clipboard.writeText(url);
-    alert('Lien copie !');
+    alert('Link copied!');
   }
 </script>
 
-<button onclick={shareSkill}>Partager</button>
+<button onclick={shareSkill}>Share</button>
 ```
 
-### Etape 4 : import depuis URL
+### Step 4: Import from URL
 
 ```svelte
 <script lang="ts">
@@ -620,16 +522,14 @@ Ce tutoriel construit une application qui gere une collection de skills, permet 
 
   onMount(async () => {
     const param = getHsParam(window.location.href);
-    if (param) {
-      await canvas.loadFromParam(param);
-    }
+    if (param) await canvas.loadFromParam(param);
   });
 </script>
 ```
 
 ---
 
-## Integration avec les autres packages
+## Integration with Other Packages
 
 ```mermaid
 graph TD
@@ -638,43 +538,37 @@ graph TD
     AGENT -->|summarizeChat| SDK
     UI -->|WidgetRenderer| SDK
     SDK -->|MCP_DEMO_SERVERS| UI
-
     SDK -->|"hyperskills (npm)"| EXT[hyperskills package]
 ```
 
-- Le **canvas store** est lu par les composants UI pour afficher les widgets et reagir aux changements
-- L'**agent** ecrit dans le canvas via les callbacks (`onWidget`, `onClear`, `onUpdate`)
-- **summarizeChat** genere un resume qui est integre dans la `provenance` HyperSkill
-- **MCP_DEMO_SERVERS** alimente le composant `<RemoteMCPserversDemo>`
-
 ---
 
-## Bonnes pratiques
+## Best Practices
 
 :::tip[Canvas Svelte vs Vanilla]
-Utilisez `@webmcp-auto-ui/sdk/canvas` dans les composants Svelte pour beneficier de la reactivite automatique. Utilisez `@webmcp-auto-ui/sdk/canvas-vanilla` dans les contextes non-Svelte (React, tests, scripts).
+Use `@webmcp-auto-ui/sdk/canvas` in Svelte components for automatic reactivity. Use `@webmcp-auto-ui/sdk/canvas-vanilla` in non-Svelte contexts (React, tests, scripts).
 :::
 
-:::caution[Taille des URLs HyperSkill]
-Les URLs avec `?hs=...` sont limitees par la configuration nginx (~8 KB par defaut). La compression gzip s'active automatiquement au-dessus de 6 KB, mais les skills tres volumineux (nombreux widgets avec beaucoup de donnees) peuvent quand meme depasser la limite. Dans ce cas, envisagez de stocker le skill sur un backend et d'utiliser un identifiant court.
+:::caution[HyperSkill URL size]
+URLs with `?hs=...` are limited by nginx configuration (~8 KB by default). Gzip compression kicks in automatically above 6 KB, but very large skills may still exceed the limit. Consider storing the skill on a backend with a short identifier in that case.
 :::
 
-:::caution[localStorage]
-Le registre de skills utilise localStorage, qui est limite a ~5 MB par origine. Ne stockez pas de donnees volumineuses dans le contenu des skills (images base64, gros JSON). Preferez stocker des references (URLs) plutot que des donnees brutes.
+:::caution[localStorage limits]
+The skills registry uses localStorage, which is limited to ~5 MB per origin. Avoid storing large data in skill content (base64 images, large JSON). Prefer storing references (URLs) rather than raw data.
 :::
 
 ---
 
 ## FAQ
 
-**Pourquoi deux versions du canvas store ?**
-Le store Svelte 5 utilise les runes (`$state`/`$derived`) pour une reactivite fine-grained native. Le store vanilla utilise un pattern `subscribe`/`getSnapshot` compatible avec n'importe quel framework. Les deux partagent la meme logique interne.
+**Why are there two canvas store versions?**
+The Svelte 5 store uses runes (`$state`/`$derived`) for fine-grained native reactivity. The vanilla store uses a `subscribe`/`getSnapshot` pattern compatible with any framework. Both share the same internal logic.
 
-**Le parametre HyperSkill est-il securise ?**
-Le parametre est encode en Base64 (optionnellement compresse), pas chiffre. Ne mettez pas de donnees sensibles dans un skill. Le resume de chat est anonymise automatiquement par `summarizeChat`.
+**Is the HyperSkill parameter secure?**
+The parameter is Base64-encoded (optionally compressed), not encrypted. Don't put sensitive data in a skill. Chat summaries are automatically anonymized by `summarizeChat`.
 
-**Comment fonctionne la compression ?**
-Au-dessus de 6 KB, `encodeHyperSkill` utilise gzip via l'API `CompressionStream` du navigateur. Le prefixe `gz.` indique a `decodeHyperSkill` qu'il faut decompresser. Brotli est aussi supporte (prefixe `br.`), mais gzip est le defaut car plus largement supporte.
+**How does compression work?**
+Above 6 KB, `encodeHyperSkill` uses gzip via the browser's `CompressionStream` API. The `gz.` prefix tells `decodeHyperSkill` to decompress. Brotli is also supported (`br.` prefix), but gzip is the default due to wider support.
 
-**Les skills persistent-ils entre les sessions ?**
-Oui, le registre utilise localStorage. Les skills sont disponibles tant que l'utilisateur ne vide pas le stockage de son navigateur. Pour un partage entre appareils, utilisez l'export HyperSkill.
+**Do skills persist across sessions?**
+Yes, the registry uses localStorage. Skills remain available as long as the user doesn't clear their browser storage. For cross-device sharing, use HyperSkill export.

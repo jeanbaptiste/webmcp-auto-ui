@@ -1,42 +1,42 @@
 ---
 title: ToolLayers
-description: Structuration des outils en couches McpLayer et WebMcpLayer
+description: Structuring tools into McpLayer and WebMcpLayer layers
 sidebar:
   order: 1
 ---
 
-Imaginez un restaurant avec deux equipes distinctes : la cuisine (qui prepare les plats) et le service en salle (qui dresse les assiettes et les presente aux clients). Les deux sont essentiels, mais chacun a son metier. Les ToolLayers fonctionnent exactement ainsi : une couche **DATA** (la cuisine) et une couche **UI** (le service).
+Picture a restaurant with two distinct teams: the kitchen (preparing the food) and the front-of-house staff (plating and presenting it to guests). Both are essential, but each has its own job. ToolLayers work the same way: a **DATA** layer (the kitchen) and a **UI** layer (the service).
 
-## Qu'est-ce qu'un ToolLayer ?
+## What is a ToolLayer?
 
-Un **ToolLayer** est une structure qui organise les outils disponibles pour l'agent en **couches typees**. Chaque couche porte un protocole (`mcp` ou `webmcp`), un nom de serveur, et la liste de ses outils.
+A **ToolLayer** is a structure that organizes the tools available to an agent into **typed layers**. Each layer carries a protocol (`mcp` or `webmcp`), a server name, and the list of its tools.
 
-Ce systeme remplace l'ancien passage plat d'un tableau `mcpTools[]` et apporte :
-- Le **prefixage automatique** des noms d'outils (`tricoteuses_mcp_query_sql`)
-- La **decouverte progressive** (lazy loading des outils)
-- La **resolution canonique** des outils de recettes (un meme role, des noms differents)
-- Le **prompt structure** en sections par serveur
+This system replaces the older flat `mcpTools[]` passing pattern and brings:
+- **Automatic prefixing** of tool names (`tricoteuses_mcp_query_sql`)
+- **Progressive discovery** (lazy loading of tools)
+- **Canonical resolution** of recipe tools (same role, different names)
+- **Structured prompt** with sections per server
 
-## Pourquoi les couches existent
+## Why layers exist
 
-Sans couches, un agent connecte a 3 serveurs aurait un probleme de collision : si deux serveurs exposent un outil `search`, lequel appeler ? Les ToolLayers resolvent cela en **prefixant** chaque outil avec le nom du serveur et le protocole :
+Without layers, an agent connected to 3 servers would face a collision problem: if two servers expose a tool named `search`, which one gets called? ToolLayers solve this by **prefixing** every tool with the server name and protocol:
 
 ```
-query_sql              → tricoteuses_mcp_query_sql
-search_observations    → inaturalist_mcp_search_observations
-widget_display         → autoui_webmcp_widget_display
+query_sql              -> tricoteuses_mcp_query_sql
+search_observations    -> inaturalist_mcp_search_observations
+widget_display         -> autoui_webmcp_widget_display
 ```
 
-:::tip[Convention de nommage]
-Le format est toujours : `{serveur}_{protocole}_{outil}`
-Le nom du serveur est normalise : minuscules, underscores, sans les mots "mcp"/"server".
+:::tip[Naming convention]
+The format is always: `{server}_{protocol}_{tool}`
+The server name is normalized: lowercase, underscores, with "mcp"/"server" noise words removed.
 :::
 
-## Les deux types de couches
+## The two types of layers
 
-### McpLayer : la couche donnees
+### McpLayer: the data layer
 
-Un `McpLayer` est cree pour **chaque serveur MCP connecte**. Il porte les outils DATA (ceux qui interrogent des bases de donnees, des API, des fichiers) et les recettes serveur.
+An `McpLayer` is created for **each connected MCP server**. It carries DATA tools (those that query databases, APIs, files) and server recipes.
 
 ```ts
 import type { McpLayer } from '@webmcp-auto-ui/agent';
@@ -47,14 +47,14 @@ const mcpLayer: McpLayer = {
   serverName: 'Tricoteuses',
   tools: await client.listTools(),
   recipes: [
-    { name: 'profil-depute', description: 'Fiche complete depute' },
-    { name: 'scrutin-detail', description: 'Analyse scrutin public' },
+    { name: 'profil-depute', description: 'Full deputy profile' },
+    { name: 'scrutin-detail', description: 'Detailed vote analysis' },
   ],
 };
 ```
 
 ```ts
-// Interface TypeScript
+// TypeScript interface
 interface McpLayer {
   protocol: 'mcp';
   serverUrl?: string;
@@ -65,15 +65,15 @@ interface McpLayer {
 }
 ```
 
-### WebMcpLayer : la couche affichage
+### WebMcpLayer: the display layer
 
-Le serveur `autoui` fournit une `WebMcpLayer` pre-configuree avec tous les widgets natifs (stat, chart, table, carte...) et les outils d'interaction (canvas, recall).
+The `autoui` server provides a pre-configured `WebMcpLayer` with all native widgets (stat, chart, table, map...) and interaction tools (canvas, recall).
 
 ```ts
 import { autoui } from '@webmcp-auto-ui/agent';
 
 const uiLayer = autoui.layer();
-// Resultat :
+// Result:
 // {
 //   protocol: 'webmcp',
 //   serverName: 'autoui',
@@ -90,7 +90,7 @@ const uiLayer = autoui.layer();
 ```
 
 ```ts
-// Interface TypeScript
+// TypeScript interface
 interface WebMcpLayer {
   protocol: 'webmcp';
   serverName: string;
@@ -99,35 +99,35 @@ interface WebMcpLayer {
 }
 ```
 
-## Comment les couches se combinent
+## How layers combine
 
 ```mermaid
 graph TD
     subgraph "ToolLayer[]"
-        ML1["McpLayer<br/>Tricoteuses<br/>12 outils DATA<br/>2 recettes serveur"]
-        ML2["McpLayer<br/>iNaturalist<br/>8 outils DATA"]
-        WL["WebMcpLayer<br/>autoui<br/>widget_display + canvas + recall<br/>24 recettes widgets"]
+        ML1["McpLayer<br/>Tricoteuses<br/>12 DATA tools<br/>2 server recipes"]
+        ML2["McpLayer<br/>iNaturalist<br/>8 DATA tools"]
+        WL["WebMcpLayer<br/>autoui<br/>widget_display + canvas + recall<br/>24 widget recipes"]
     end
 
     ML1 --> BSP["buildSystemPrompt()"]
     ML2 --> BSP
     WL --> BSP
-    BSP --> P["Prompt systeme structure"]
+    BSP --> P["Structured system prompt"]
 
     ML1 --> BTL["buildToolsFromLayers()"]
     ML2 --> BTL
     WL --> BTL
-    BTL --> T["ProviderTool[]<br/>(envoyes au LLM)"]
+    BTL --> T["ProviderTool[]<br/>(sent to the LLM)"]
 ```
 
 ```ts
-// Assembler les couches
+// Assemble the layers
 const layers: ToolLayer[] = [mcpLayer1, mcpLayer2, autoui.layer()];
 ```
 
-## Le prompt systeme genere
+## The generated system prompt
 
-`buildSystemPrompt()` transforme les couches en un prompt structure qui guide le LLM a travers un flux en 4 etapes :
+`buildSystemPrompt()` transforms layers into a structured prompt that guides the LLM through a 4-step flow:
 
 ```ts
 import { buildSystemPrompt } from '@webmcp-auto-ui/agent';
@@ -135,45 +135,45 @@ import { buildSystemPrompt } from '@webmcp-auto-ui/agent';
 const prompt = buildSystemPrompt(layers);
 ```
 
-Le prompt genere contient :
+The generated prompt contains:
 
 ```
-ETAPE 1 -- Recherche de recette
+STEP 1 -- Recipe search
 autoui_webmcp_search_recipes()
 tricoteuses_mcp_search_recipes()
 
-ETAPE 1b -- Liste des recettes (si aucun resultat)
+STEP 1b -- List recipes (if no results)
 autoui_webmcp_list_recipes()
 tricoteuses_mcp_list_recipes()
 
-ETAPE 1c -- Recherche d'outils (si aucune recette)
+STEP 1c -- Tool search (if no recipe)
 autoui_webmcp_search_tools(query)
 tricoteuses_mcp_search_tools(query)
 
-ETAPE 2 -- Lecture de la recette selectionnee
+STEP 2 -- Read the selected recipe
 autoui_webmcp_get_recipe()
 tricoteuses_mcp_get_recipe()
 
-ETAPE 3 -- Execution des outils
+STEP 3 -- Execute tools
 
-ETAPE 4 -- Affichage UI
+STEP 4 -- UI display
 autoui_webmcp_widget_display
 autoui_webmcp_canvas
 ```
 
-:::note[Prompt en francais]
-Le prompt systeme est en francais par defaut. C'est un choix delibere : les tests montrent que Claude suit mieux des instructions de workflow en francais quand les utilisateurs francophones interagissent avec lui.
+:::note[Prompt language]
+The system prompt is generated in French by default. This is a deliberate choice: testing shows Claude follows workflow instructions in French more reliably when interacting with French-speaking users.
 :::
 
-## buildToolsFromLayers : les outils envoyes au LLM
+## buildToolsFromLayers: tools sent to the LLM
 
-Cette fonction convertit les couches en `ProviderTool[]` -- le format attendu par les providers LLM. Chaque outil est prefixe et son schema est assaini pour le mode strict.
+This function converts layers into `ProviderTool[]` -- the format expected by LLM providers. Each tool is prefixed and its schema is sanitized for strict mode.
 
 ```ts
 import { buildToolsFromLayers } from '@webmcp-auto-ui/agent';
 
 const tools = buildToolsFromLayers(layers);
-// Resultat :
+// Result:
 // [
 //   { name: "tricoteuses_mcp_query_sql", description: "...", input_schema: {...} },
 //   { name: "tricoteuses_mcp_search_deputes", ... },
@@ -183,115 +183,115 @@ const tools = buildToolsFromLayers(layers);
 // ]
 ```
 
-### Transformation des schemas
+### Schema transformations
 
-Lors de la conversion, les schemas d'entree sont automatiquement assainis :
+During conversion, input schemas are automatically sanitized:
 
-| Transformation | Comportement |
-|---------------|-------------|
-| `oneOf`/`anyOf`/`allOf` | Supprimes (mode strict incompatible) |
-| `additionalProperties` manquant | Ajoute a `false` (requis par le mode strict) |
-| Schemas invalides | Rapportes via le callback `onSchemaPatch` |
-| Aplatissement (optionnel) | `center.lat` → `center__lat` pour les LLM locaux |
+| Transformation | Behavior |
+|---------------|----------|
+| `oneOf`/`anyOf`/`allOf` | Removed (strict mode incompatible) |
+| Missing `additionalProperties` | Set to `false` (required by strict mode) |
+| Invalid schemas | Reported via `onSchemaPatch` callback |
+| Flattening (optional) | `center.lat` -> `center__lat` for local LLMs |
 
-## Resolution canonique des outils (4 couches)
+## Canonical tool resolution (4 layers)
 
-Les serveurs MCP nomment leurs outils librement. Un serveur peut appeler sa liste de recettes `browse_skills`, un autre `list_recipes`, un autre `discover_workflows`. Le systeme a besoin de les identifier pour construire le prompt.
+MCP servers name their tools freely. One server might call its recipe list `browse_skills`, another `list_recipes`, another `discover_workflows`. The system needs to identify them to build the prompt.
 
-La **resolution canonique** identifie 3 roles parmi les outils d'un serveur :
+**Canonical resolution** identifies 3 roles among a server's tools:
 
-| Role canonique | Ce qu'il fait |
-|---------------|---------------|
-| `search_recipes` | Chercher des recettes par mot-cle |
-| `list_recipes` | Lister toutes les recettes |
-| `get_recipe` | Obtenir le detail d'une recette |
+| Canonical role | What it does |
+|---------------|--------------|
+| `search_recipes` | Search recipes by keyword |
+| `list_recipes` | List all recipes |
+| `get_recipe` | Get recipe details |
 
-La resolution se fait en 4 couches successives :
+Resolution happens in 4 successive layers:
 
 ```mermaid
 graph TD
-    T["Outils du serveur MCP"] --> L1["Couche 1 -- Correspondance exacte<br/>search_recipes → search_recipes"]
-    L1 -->|non trouve| L2["Couche 2 -- Decomposition action+ressource<br/>browse_skills → list_recipes"]
-    L2 -->|non trouve| L3["Couche 3 -- Scan de la description<br/>description contient 'recipe' ?"]
-    L3 -->|non trouve| L4["Couche 4 -- Fallback<br/>Aucun outil de recette"]
+    T["MCP server tools"] --> L1["Layer 1 -- Exact match<br/>search_recipes -> search_recipes"]
+    L1 -->|not found| L2["Layer 2 -- Action+resource decomposition<br/>browse_skills -> list_recipes"]
+    L2 -->|not found| L3["Layer 3 -- Description scan<br/>description contains 'recipe'?"]
+    L3 -->|not found| L4["Layer 4 -- Fallback<br/>No recipe tools found"]
 
-    L1 -->|trouve| R["Role identifie"]
-    L2 -->|trouve| R
-    L3 -->|trouve| R
+    L1 -->|found| R["Role identified"]
+    L2 -->|found| R
+    L3 -->|found| R
 ```
 
-**Couche 1** : le nom correspond exactement (`search_recipes`, `list_recipes`, `get_recipe`).
+**Layer 1**: the name matches exactly (`search_recipes`, `list_recipes`, `get_recipe`).
 
-**Couche 2** : le nom est decompose en tokens. Les paires (action, ressource) sont testees :
-- Actions de recherche : `search`, `find`, `query`
-- Actions de liste : `list`, `browse`, `explore`, `discover`
-- Actions de lecture : `get`, `read`, `fetch`, `show`, `describe`
-- Ressources : `recipe`, `skill`, `template`, `workflow`, `playbook`, `pattern`
+**Layer 2**: the name is decomposed into tokens. (Action, resource) pairs are tested:
+- Search actions: `search`, `find`, `query`
+- List actions: `list`, `browse`, `explore`, `discover`
+- Get actions: `get`, `read`, `fetch`, `show`, `describe`
+- Resources: `recipe`, `skill`, `template`, `workflow`, `playbook`, `pattern`
 
-Ainsi `browse_skills` → action `browse` (liste) + ressource `skills` → role `list_recipes`.
+So `browse_skills` -> action `browse` (list) + resource `skills` -> role `list_recipes`.
 
-**Couche 3** : si le nom ne match pas, la description est scannee pour des mots-cles (`recipe`, `skill`, `template`...).
+**Layer 3**: if the name doesn't match, the description is scanned for keywords (`recipe`, `skill`, `template`...).
 
-**Couche 4** : aucun outil de recette identifie -- le serveur n'en propose pas.
+**Layer 4**: no recipe tool identified -- the server doesn't provide any.
 
-### Alias et routage
+### Aliases and routing
 
-Quand un outil porte un nom different de son role canonique, un **alias** est cree :
+When a tool has a different name from its canonical role, an **alias** is created:
 
 ```ts
-// Le serveur expose "browse_skills", mais le prompt dit "list_recipes"
+// The server exposes "browse_skills", but the prompt says "list_recipes"
 aliasMap.set('tricoteuses_mcp_list_recipes', 'tricoteuses_mcp_browse_skills');
 
-// Quand le LLM appelle tricoteuses_mcp_list_recipes,
-// la boucle agent le route vers tricoteuses_mcp_browse_skills
+// When the LLM calls tricoteuses_mcp_list_recipes,
+// the agent loop routes it to tricoteuses_mcp_browse_skills
 ```
 
-## Decouverte progressive (lazy loading)
+## Progressive discovery (lazy loading)
 
-Par defaut, le LLM ne recoit **pas** tous les outils de tous les serveurs. Il recoit uniquement les outils de **decouverte** :
+By default, the LLM does **not** receive all tools from all servers. It only receives **discovery** tools:
 
 ```ts
 import { buildDiscoveryTools } from '@webmcp-auto-ui/agent';
 
 const discoveryTools = buildDiscoveryTools(layers);
-// Uniquement :
-// - search_recipes, list_recipes, get_recipe (par serveur)
-// - search_tools, list_tools (par serveur)
+// Only:
+// - search_recipes, list_recipes, get_recipe (per server)
+// - search_tools, list_tools (per server)
 // - widget_display, canvas, recall (WebMCP)
 ```
 
-Quand le LLM "touche" un serveur pour la premiere fois (en appelant un de ses outils), la fonction `activateServerTools()` ajoute tous les outils de ce serveur :
+When the LLM "touches" a server for the first time (by calling one of its tools), `activateServerTools()` adds all that server's tools:
 
 ```ts
 import { activateServerTools } from '@webmcp-auto-ui/agent';
 
-// Apres le premier appel a tricoteuses_mcp_search_recipes :
+// After the first call to tricoteuses_mcp_search_recipes:
 currentTools = activateServerTools(currentTools, tricoteusesLayer);
-// → tous les outils DATA de Tricoteuses sont maintenant disponibles
+// -> all DATA tools from Tricoteuses are now available
 ```
 
 ```mermaid
 sequenceDiagram
     participant LLM
     participant Loop as Agent Loop
-    participant Tools as Outils actifs
+    participant Tools as Active tools
 
-    Note over Tools: Debut : outils de decouverte seulement
-    LLM->>Loop: search_recipes("depute")
-    Loop->>Loop: Premier contact avec Tricoteuses
+    Note over Tools: Start: discovery tools only
+    LLM->>Loop: search_recipes("deputy")
+    Loop->>Loop: First contact with Tricoteuses
     Loop->>Tools: activateServerTools(tricoteusesLayer)
-    Note over Tools: +12 outils DATA de Tricoteuses
-    Loop-->>LLM: Resultats de search_recipes
+    Note over Tools: +12 DATA tools from Tricoteuses
+    Loop-->>LLM: search_recipes results
     LLM->>Loop: tricoteuses_mcp_query_sql(...)
-    Note over LLM: Maintenant le LLM peut utiliser<br/>tous les outils du serveur
+    Note over LLM: Now the LLM can use<br/>all server tools
 ```
 
-## Utilisation avec runAgentLoop
+## Usage with runAgentLoop
 
 ```ts
 import { runAgentLoop, autoui } from '@webmcp-auto-ui/agent';
 
-const result = await runAgentLoop('Liste les deputes ecologistes', {
+const result = await runAgentLoop('List the green party deputies', {
   provider,
   layers: [mcpLayer1, mcpLayer2, autoui.layer()],
   callbacks: {
@@ -303,35 +303,35 @@ const result = await runAgentLoop('Liste les deputes ecologistes', {
 });
 ```
 
-La boucle agent :
-1. Appelle `buildSystemPrompt(layers)` pour generer le prompt
-2. Appelle `buildDiscoveryTools(layers)` pour les outils initiaux
-3. Ecoute les `tool_use` du LLM et les route vers le bon serveur
-4. Active les outils complets d'un serveur au premier contact
-5. Repete jusqu'a `end_turn`
+The agent loop:
+1. Calls `buildSystemPrompt(layers)` to generate the prompt
+2. Calls `buildDiscoveryTools(layers)` for the initial tool set
+3. Listens for `tool_use` from the LLM and routes them to the right server
+4. Activates full server tools on first contact
+5. Repeats until `end_turn`
 
-## Variantes parallel-safe
+## Parallel-safe variants
 
-Pour les applications qui executent **plusieurs boucles agent en parallele**, les fonctions classiques partagent un `toolAliasMap` global (deprecated). Utilisez les variantes avec suffixe `WithAliases` :
+For applications running **multiple agent loops in parallel**, the classic functions share a global `toolAliasMap` (deprecated). Use the `WithAliases` variants instead:
 
 ```ts
-// ❌ Pas safe en parallele (alias map global)
+// Not parallel-safe (global alias map)
 const prompt = buildSystemPrompt(layers);
 const tools = buildDiscoveryTools(layers);
 
-// ✅ Safe en parallele (alias map locale)
+// Parallel-safe (local alias map)
 const { prompt, aliasMap } = buildSystemPromptWithAliases(layers);
 const { tools, aliasMap: toolAliasMap } = buildDiscoveryToolsWithAliases(layers);
 ```
 
-## Resume visuel
+## Summary
 
-| Concept | Type | Contient | Role |
+| Concept | Type | Contains | Role |
 |---------|------|----------|------|
-| `McpLayer` | Couche DATA | Outils MCP + recettes serveur | Interroger des sources de donnees |
-| `WebMcpLayer` | Couche UI | widget_display + canvas + recall | Rendre les donnees en widgets |
-| `buildSystemPrompt()` | Fonction | Prompt en 4 etapes | Guider le LLM dans son workflow |
-| `buildToolsFromLayers()` | Fonction | ProviderTool[] prefixes | Envoyer les outils au LLM |
-| `buildDiscoveryTools()` | Fonction | Outils de decouverte seuls | Lazy loading des outils |
-| `activateServerTools()` | Fonction | Ajout d'outils a chaud | Activer un serveur au premier contact |
-| `resolveCanonicalTools()` | Fonction | Mapping role → vrai nom | Identifier les outils de recettes |
+| `McpLayer` | DATA layer | MCP tools + server recipes | Query data sources |
+| `WebMcpLayer` | UI layer | widget_display + canvas + recall | Render data as widgets |
+| `buildSystemPrompt()` | Function | 4-step prompt | Guide the LLM workflow |
+| `buildToolsFromLayers()` | Function | Prefixed ProviderTool[] | Send tools to the LLM |
+| `buildDiscoveryTools()` | Function | Discovery tools only | Lazy loading of tools |
+| `activateServerTools()` | Function | Hot tool addition | Activate server on first contact |
+| `resolveCanonicalTools()` | Function | Role-to-name mapping | Identify recipe tools |

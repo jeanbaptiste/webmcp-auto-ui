@@ -1,23 +1,23 @@
 ---
 title: Boilerplate
-description: Template SvelteKit avec 3 widgets Tricoteuses (FicheDepute, ResultatScrutin, Amendement) — point de depart pour integrer webmcp-auto-ui
+description: SvelteKit template with 3 Tricoteuses widgets (FicheDepute, ResultatScrutin, Amendement) — starting point for integrating webmcp-auto-ui
 sidebar:
   order: 0
 ---
 
-Boilerplate (`apps/boilerplate/`) est le template de demarrage pour integrer webmcp-auto-ui dans un projet SvelteKit. Il montre comment enregistrer des widgets custom via `createWebMcpServer`, connecter un ou plusieurs serveurs MCP distants, et piloter un agent IA pour generer automatiquement des interfaces. C'est le point de depart recommande pour tout nouveau projet.
+Boilerplate (`apps/boilerplate/`) is the starter template for integrating webmcp-auto-ui into a SvelteKit project. It shows how to register custom widgets via `createWebMcpServer`, connect to remote MCP servers, and drive an AI agent to automatically generate interfaces. This is the recommended starting point for any new project.
 
-## Ce que vous voyez quand vous ouvrez l'app
+## What you see when you open the app
 
-Quand vous ouvrez le Boilerplate, vous decouvrez une interface epuree avec une barre d'outils en haut. A gauche, le titre "Boilerplate Tricoteuses" en monospace. A droite, le statut de connexion MCP (avec la liste des serveurs connectes et le nombre d'outils), une checkbox Nano-RAG, un selecteur de modele LLM, et un toggle de theme clair/sombre.
+When you open the Boilerplate, you'll see a clean interface with a toolbar at the top. On the left, the title "Boilerplate Tricoteuses" in monospace. On the right, the MCP connection status (with connected servers and tool count), a Nano-RAG checkbox, an LLM model selector, and a light/dark theme toggle.
 
-Juste en dessous, un champ de saisie permet d'entrer l'URL d'un serveur MCP avec un bouton "Connecter". L'app se connecte automatiquement au serveur Tricoteuses (`mcp.code4code.eu/mcp`) au demarrage.
+Below that, an input field lets you enter an MCP server URL with a "Connect" button. The app auto-connects to the Tricoteuses server (`mcp.code4code.eu/mcp`) on startup.
 
-En dessous, une rangee de boutons permet d'activer ou desactiver les serveurs WebMCP locaux (Tricoteuses et AutoUI), chacun affichant le nombre de widgets qu'il expose.
+Below that, a row of buttons lets you enable/disable local WebMCP servers (Tricoteuses and AutoUI), each showing how many widgets they expose.
 
-Au centre, un etat vide accueille l'utilisateur avec trois boutons de suggestions : "Fiche depute", "Scrutin" et "Amendement". Quand l'agent genere des widgets, ils s'affichent dans une grille responsive 2 colonnes.
+In the center, an empty state greets you with three suggestion buttons: "Fiche depute", "Scrutin", and "Amendement". When the agent generates widgets, they appear in a responsive 2-column grid.
 
-Tout en bas, une barre de saisie permet de poser des questions en langage naturel, et un indicateur `AgentProgress` montre le temps ecoule, le nombre d'appels d'outils et le dernier outil utilise.
+At the bottom, an input bar lets you ask questions in natural language, and an `AgentProgress` indicator shows elapsed time, tool call count, and the last tool used.
 
 ## Architecture
 
@@ -25,14 +25,14 @@ Tout en bas, une barre de saisie permet de poser des questions en langage nature
 graph TD
     subgraph Frontend
         Page["+page.svelte<br/>Chat + Widgets + Config"]
-        Widgets["lib/widgets/<br/>3 composants Svelte"]
+        Widgets["lib/widgets/<br/>3 Svelte components"]
         Register["register.ts<br/>createWebMcpServer"]
     end
 
-    subgraph "Widgets Custom"
-        FD["FicheDepute.svelte<br/>Photo, groupe, votes"]
-        RS["ResultatScrutin.svelte<br/>Barre pour/contre"]
-        AM["Amendement.svelte<br/>Article, motifs, sort"]
+    subgraph "Custom Widgets"
+        FD["FicheDepute.svelte<br/>Photo, group, votes"]
+        RS["ResultatScrutin.svelte<br/>For/against bar"]
+        AM["Amendement.svelte<br/>Article, motives, outcome"]
     end
 
     subgraph Packages
@@ -57,86 +57,86 @@ graph TD
     Agent --> Proxy
 ```
 
-## Stack technique
+## Tech stack
 
-| Composant | Detail |
+| Component | Detail |
 |-----------|--------|
 | Framework | SvelteKit + Svelte 5 |
 | Styles | TailwindCSS 3.4 |
-| Icones | lucide-svelte |
-| LLM provider | `RemoteLLMProvider` (LLM distant via proxy) |
-| MCP | `McpMultiClient` (multi-serveurs) |
-| Widgets custom | 3 composants Svelte via `createWebMcpServer` |
+| Icons | lucide-svelte |
+| LLM provider | `RemoteLLMProvider` (remote LLM via proxy) |
+| MCP | `McpMultiClient` (multi-server) |
+| Custom widgets | 3 Svelte components via `createWebMcpServer` |
 | RAG | `ContextRAG` (experimental) |
 | Adapter | `@sveltejs/adapter-node` |
 
-**Packages utilises :**
-- `@webmcp-auto-ui/core` : `createWebMcpServer`, `McpMultiClient`
-- `@webmcp-auto-ui/agent` : `runAgentLoop`, `RemoteLLMProvider`, `buildSystemPrompt`, `fromMcpTools`, `autoui`, `buildDiscoveryCache`, `ContextRAG`
-- `@webmcp-auto-ui/sdk` : `canvas` store
-- `@webmcp-auto-ui/ui` : `LLMSelector`, `McpStatus`, `AgentProgress`, `WidgetRenderer`, `getTheme`
+**Packages used:**
+- `@webmcp-auto-ui/core`: `createWebMcpServer`, `McpMultiClient`
+- `@webmcp-auto-ui/agent`: `runAgentLoop`, `RemoteLLMProvider`, `buildSystemPrompt`, `fromMcpTools`, `autoui`, `buildDiscoveryCache`, `ContextRAG`
+- `@webmcp-auto-ui/sdk`: `canvas` store
+- `@webmcp-auto-ui/ui`: `LLMSelector`, `McpStatus`, `AgentProgress`, `WidgetRenderer`, `getTheme`
 
-## Lancement
+## Getting started
 
-| Environnement | Port | Commande |
-|---------------|------|----------|
+| Environment | Port | Command |
+|-------------|------|---------|
 | Dev | 5179 | `npm -w apps/boilerplate run dev` |
 | Production | 3011 | `node index.js` (via systemd) |
 
 ```bash
 npm -w apps/boilerplate run dev
-# Accessible sur http://localhost:5179
+# Available at http://localhost:5179
 ```
 
-## Fonctionnalites
+## Features
 
-### 3 widgets Tricoteuses
+### 3 Tricoteuses widgets
 
-Les widgets sont enregistres dans `src/lib/widgets/register.ts` via `createWebMcpServer`. Chaque widget est defini par un frontmatter YAML (nom, description, schema JSON) et un composant Svelte :
+Widgets are registered in `src/lib/widgets/register.ts` via `createWebMcpServer`. Each widget is defined by a YAML frontmatter (name, description, JSON schema) and a Svelte component:
 
-1. **FicheDepute** (`fiche-depute`) : fiche complete d'un depute de l'Assemblee nationale avec photo, groupe politique (couleur), circonscription, dates de mandat, taux de participation et repartition des votes (pour/contre/abstention)
-2. **ResultatScrutin** (`resultat-scrutin`) : resultat d'un scrutin avec titre, numero, date, barre proportionnelle pour/contre/abstention, nombre de votants, badge "Adopte" ou "Rejete"
-3. **Amendement** (`amendement`) : amendement parlementaire avec numero, article vise, auteur, groupe, expose des motifs et sort (adopte, rejete, retire, non soutenu)
+1. **FicheDepute** (`fiche-depute`): complete profile of a French National Assembly deputy with photo, political group (color), constituency, mandate dates, participation rate, and vote breakdown (for/against/abstention)
+2. **ResultatScrutin** (`resultat-scrutin`): vote result with title, number, date, proportional for/against/abstention bar, voter count, "Adopted" or "Rejected" badge
+3. **Amendement** (`amendement`): parliamentary amendment with number, targeted article, author, group, explanatory statement, and outcome (adopted, rejected, withdrawn, unsupported)
 
-### Agent IA multi-MCP
+### Multi-MCP AI agent
 
-L'agent utilise une architecture en couches (layers) :
-- **MCP layers** : un layer par serveur MCP distant connecte, avec ses outils convertis via `fromMcpTools`
-- **WebMCP layers** : un layer par serveur WebMCP local active (Tricoteuses, AutoUI)
+The agent uses a layered architecture:
+- **MCP layers**: one layer per connected remote MCP server, with tools converted via `fromMcpTools`
+- **WebMCP layers**: one layer per enabled local WebMCP server (Tricoteuses, AutoUI)
 
-Les layers sont recalcules reactionnement a chaque changement de connexion.
+Layers are reactively recomputed on every connection change.
 
-### Suggestions pre-remplies
+### Pre-filled suggestions
 
-Trois boutons declenchent des requetes types qui demontrent les capacites des widgets :
-- "Montre-moi la fiche de Jean-Luc Melenchon avec ses stats de vote"
-- "Affiche le resultat du scrutin sur la reforme des retraites"
-- "Montre un amendement adopte sur l'article 7 du projet de loi finances"
+Three buttons trigger sample queries that demonstrate widget capabilities:
+- "Show me Jean-Luc Melenchon's profile with his voting stats"
+- "Display the vote result on pension reform"
+- "Show an adopted amendment on article 7 of the finance bill"
 
-### Optimisation LLM automatique
+### Automatic LLM optimization
 
-Les options d'optimisation (sanitize, flatten, truncate, compress) s'ajustent automatiquement via un `$effect` quand le modele LLM change. Les petits modeles (Gemma, local) obtiennent des schemas aplatis et des resultats tronques pour rester dans leur fenetre de contexte.
+Optimization options (sanitize, flatten, truncate, compress) automatically adjust via `$effect` when the LLM model changes. Small models (Gemma, local) get flattened schemas and truncated results to fit their context window.
 
 ## Configuration
 
-| Variable | Description | Defaut |
-|----------|-------------|--------|
-| `LLM_API_KEY` | Cle API du provider LLM distant (`.env` server-side) | requis |
-| `mcpUrl` | URL du serveur MCP par defaut | `https://mcp.code4code.eu/mcp` |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LLM_API_KEY` | Remote LLM provider API key (server-side `.env`) | required |
+| `mcpUrl` | Default MCP server URL | `https://mcp.code4code.eu/mcp` |
 
 ## Code walkthrough
 
 ### `src/lib/widgets/register.ts`
-Le fichier cle du Boilerplate. Il cree un serveur WebMCP nomme `tricoteuses-widgets` avec `createWebMcpServer`, puis enregistre chaque widget via `registerWidget()`. Chaque enregistrement prend un frontmatter YAML (schema JSON Schema complet) et un composant Svelte.
+The key file in the Boilerplate. It creates a WebMCP server named `tricoteuses-widgets` with `createWebMcpServer`, then registers each widget via `registerWidget()`. Each registration takes a YAML frontmatter (complete JSON Schema) and a Svelte component.
 
 ```typescript
 export const tricoteusesServer = createWebMcpServer('tricoteuses-widgets', {
-  description: 'Widgets parlementaires francais...',
+  description: 'French parliamentary widgets...',
 });
 
 tricoteusesServer.registerWidget(`---
 widget: fiche-depute
-description: Fiche d'un depute...
+description: Deputy profile...
 schema:
   type: object
   required: [nom, prenom, groupe]
@@ -144,35 +144,35 @@ schema:
     nom: { type: string }
     ...
 ---
-Affiche la fiche d'un depute...
+Displays a deputy profile...
 `, FicheDepute);
 ```
 
 ### `src/routes/+page.svelte`
-Le composant principal. Il gere :
-- La connexion MCP via `McpMultiClient` (avec auto-connect au mount)
-- La construction reactive des layers (`$derived`)
-- La boucle agent avec callbacks `onWidget`, `onClear`, `onText`, `onToolCall`
-- L'affichage des widgets via `WidgetRenderer` dans une grille responsive
-- Les serveurs WebMCP locaux activables/desactivables
+The main component. It manages:
+- MCP connection via `McpMultiClient` (with auto-connect on mount)
+- Reactive layer construction (`$derived`)
+- Agent loop with `onWidget`, `onClear`, `onText`, `onToolCall` callbacks
+- Widget display via `WidgetRenderer` in a responsive grid
+- Toggleable local WebMCP servers
 
 ### `src/routes/api/chat/+server.ts`
-Proxy server-side identique a celui de Flex : utilise `llmProxy` du package agent.
+Server-side proxy identical to Flex: uses `llmProxy` from the agent package.
 
-## Utilisation comme template
+## Using as a template
 
-### Depuis le monorepo
+### From the monorepo
 
 ```bash
-cp -r apps/boilerplate apps/mon-app
+cp -r apps/boilerplate apps/my-app
 ```
 
-Modifier :
-1. `package.json` : changer le nom (`@webmcp-auto-ui/mon-app`) et le port dans le script dev
-2. `src/lib/widgets/register.ts` : remplacer les 3 widgets par les votres
-3. `+page.svelte` : adapter l'UI, les suggestions, le titre
+Modify:
+1. `package.json`: change the name (`@webmcp-auto-ui/my-app`) and port in the dev script
+2. `src/lib/widgets/register.ts`: replace the 3 widgets with your own
+3. `+page.svelte`: adapt the UI, suggestions, and title
 
-### Depuis un projet externe
+### From an external project
 
 ```bash
 npx degit jeanbaptiste/webmcp-auto-ui/apps/boilerplate my-app
@@ -181,30 +181,30 @@ npm install
 npm run dev
 ```
 
-### Creer un nouveau widget
+### Creating a new widget
 
-1. Creer un composant Svelte dans `src/lib/widgets/`
-2. L'enregistrer dans `register.ts` avec un frontmatter YAML definissant le schema
-3. Le serveur WebMCP local expose automatiquement le widget au LLM
+1. Create a Svelte component in `src/lib/widgets/`
+2. Register it in `register.ts` with a YAML frontmatter defining the schema
+3. The local WebMCP server automatically exposes the widget to the LLM
 
 :::tip
-Le schema JSON dans le frontmatter est critique : c'est ce que le LLM voit pour comprendre quels parametres passer au widget. Soyez precis dans les descriptions et les types.
+The JSON schema in the frontmatter is critical -- it's what the LLM sees to understand which parameters to pass to the widget. Be precise with descriptions and types.
 :::
 
-## Deploiement
+## Deployment
 
-| Chemin sur le serveur | `/opt/webmcp-demos/boilerplate/` (racine) |
-|----------------------|-------------------------------------------|
-| Service systemd | `webmcp-boilerplate` |
+| Server path | `/opt/webmcp-demos/boilerplate/` (root) |
+|------------|-------------------------------------------|
+| systemd service | `webmcp-boilerplate` |
 | ExecStart | `node index.js` |
 
 ```bash
 ./scripts/deploy.sh boilerplate
 ```
 
-## Liens
+## Links
 
-- [Demo live](https://demos.hyperskills.net/boilerplate/)
-- [Package core](/webmcp-auto-ui/packages/core/) -- `createWebMcpServer`
-- [Package agent](/webmcp-auto-ui/packages/agent/) -- `runAgentLoop`
-- [Flex (app complete)](/webmcp-auto-ui/apps/flex/) -- pour voir toutes les fonctionnalites avancees
+- [Live demo](https://demos.hyperskills.net/boilerplate/)
+- [Core package](/webmcp-auto-ui/packages/core/) -- `createWebMcpServer`
+- [Agent package](/webmcp-auto-ui/packages/agent/) -- `runAgentLoop`
+- [Flex (full app)](/webmcp-auto-ui/apps/flex/) -- for all advanced features

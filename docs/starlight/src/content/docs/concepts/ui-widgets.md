@@ -1,36 +1,36 @@
 ---
-title: Widgets UI
-description: Les 31 composants renderable, BlockRenderer, et interfaces de donnees
+title: UI Widgets
+description: The 31 renderable components, BlockRenderer, and data interfaces
 sidebar:
   order: 4
 ---
 
-Imaginez un jeu de LEGO specialise : chaque brique a une forme precise (un graphique, un tableau, une carte) et s'emboite naturellement avec les autres. L'agent IA est le constructeur : il choisit les briques et les assemble pour creer un dashboard complet. Les **widgets UI** sont ces briques.
+Think of a specialized LEGO set: each brick has a precise shape (a chart, a table, a map) and snaps together naturally with others. The AI agent is the builder: it picks the bricks and assembles them to create a complete dashboard. **UI widgets** are those bricks.
 
-## Qu'est-ce qu'un widget ?
+## What is a widget?
 
-Un widget est un **composant visuel declaratif** que l'agent IA peut instancier en un seul appel d'outil. L'agent n'ecrit pas de HTML, pas de CSS, pas de JavaScript : il envoie un `type` et un objet `data`, et le widget se rend tout seul.
+A widget is a **declarative visual component** that the AI agent can instantiate with a single tool call. The agent writes no HTML, no CSS, no JavaScript: it sends a `type` and a `data` object, and the widget renders itself.
 
 ```ts
-// L'agent appelle :
+// The agent calls:
 widget_display({ name: "stat", params: { label: "Revenue", value: "$142K", trend: "+12.4%", trendDir: "up" } })
 
-// Le canvas affiche instantanement une carte KPI avec une fleche verte vers le haut
+// The canvas instantly displays a KPI card with a green up arrow
 ```
 
-## Pourquoi les widgets existent
+## Why widgets exist
 
-Sans widgets, un agent IA devrait generer du HTML brut pour afficher des donnees. Cela poserait trois problemes :
+Without widgets, an AI agent would need to generate raw HTML to display data. This would create three problems:
 
-1. **Securite** : du HTML genere par un LLM pourrait contenir du code malveillant
-2. **Coherence** : chaque dashboard aurait un style different
-3. **Tokens** : decrire du HTML consomme enormement de tokens
+1. **Security**: LLM-generated HTML could contain malicious code
+2. **Consistency**: every dashboard would look different
+3. **Tokens**: describing HTML consumes enormous amounts of tokens
 
-Les widgets resolvent tout cela : l'agent envoie des **donnees structurees** (JSON valide un schema), et le framework se charge du rendu.
+Widgets solve all three: the agent sends **structured data** (JSON validated against a schema), and the framework handles rendering.
 
-## Comment l'agent choisit un widget
+## How the agent chooses a widget
 
-Le flux de selection suit le systeme de recettes et de decouverte :
+The selection flow follows the recipe and discovery system:
 
 ```mermaid
 sequenceDiagram
@@ -40,29 +40,29 @@ sequenceDiagram
     participant WD as widget_display
 
     LLM->>SR: search_recipes("kpi")
-    SR-->>LLM: [{name: "stat", desc: "KPI..."}, {name: "stat-card", desc: "KPI enrichi..."}]
+    SR-->>LLM: [{name: "stat", desc: "Key statistic..."}, {name: "stat-card", desc: "Enhanced KPI..."}]
     LLM->>GR: get_recipe("stat-card")
-    GR-->>LLM: {schema: {...}, recipe: "## Quand utiliser\nPour un KPI enrichi..."}
+    GR-->>LLM: {schema: {...}, recipe: "## When to use\nFor an enhanced KPI..."}
     LLM->>WD: widget_display({name: "stat-card", params: {label: "Uptime", value: "99.9%"}})
     WD-->>LLM: {widget: "stat-card", id: "w_a3f2"}
 ```
 
-L'agent peut aussi utiliser les **recettes WebMCP** (fichiers `.md`) qui lui indiquent quel widget utiliser en fonction du type de donnees. Par exemple, la recette `dashboard-kpi` recommande : `stat-card` pour les metriques, `chart` pour les series temporelles, `data-table` pour les details.
+The agent can also use **WebMCP recipes** (`.md` files) that indicate which widget to use based on the data type. For example, the `dashboard-kpi` recipe recommends: `stat-card` for metrics, `chart` for time series, `data-table` for details.
 
-## Le systeme de rendu
+## The rendering system
 
-### Deux moteurs de rendu
+### Two rendering engines
 
-Le projet supporte deux modes de rendu :
+The project supports two rendering modes:
 
-| Mode | Technologie | Usage |
-|------|------------|-------|
-| **Svelte** | `<BlockRenderer>` / `<WidgetRenderer>` | Apps SvelteKit (flex, viewer) |
-| **Vanilla** | `mountWidget()` | Apps sans framework, integration externe |
+| Mode | Technology | Usage |
+|------|-----------|-------|
+| **Svelte** | `<BlockRenderer>` / `<WidgetRenderer>` | SvelteKit apps (flex, viewer) |
+| **Vanilla** | `mountWidget()` | Framework-free apps, external integration |
 
 ### BlockRenderer (Svelte)
 
-Le composant `BlockRenderer` recoit `{ type, data }` et dispatche vers le widget Svelte correspondant :
+The `BlockRenderer` component receives `{ type, data }` and dispatches to the matching Svelte widget:
 
 ```svelte
 <script>
@@ -72,13 +72,13 @@ Le composant `BlockRenderer` recoit `{ type, data }` et dispatche vers le widget
 <BlockRenderer type="stat" data={{ label: 'Revenue', value: '$142K' }} />
 ```
 
-- **Blocs simples** (stat, kv, list...) : donnees via la prop `data`
-- **Blocs riches** (stat-card, data-table...) : donnees via la prop `spec`
-- **Types inconnus** : affiche un placeholder `[type]`
+- **Simple blocks** (stat, kv, list...): data via the `data` prop
+- **Rich blocks** (stat-card, data-table...): data via the `spec` prop
+- **Unknown types**: renders a `[type]` placeholder
 
 ### mountWidget (Vanilla)
 
-Pour les apps sans framework :
+For framework-free apps:
 
 ```ts
 import { mountWidget } from '@webmcp-auto-ui/core';
@@ -86,43 +86,43 @@ import { mountWidget } from '@webmcp-auto-ui/core';
 const container = document.getElementById('my-widget');
 const cleanup = mountWidget(container, 'stat', { label: 'Revenue', value: '$142K' }, [autoui]);
 
-// Nettoyer a la destruction
+// Clean up on destroy
 cleanup?.();
 ```
 
-### Reactivity et canvas
+### Reactivity and canvas
 
-Chaque bloc rendu sur le canvas s'auto-enregistre comme outil WebMCP (via `navigator.modelContext`). Cela permet a l'agent de **modifier** les widgets deja affiches :
+Each block rendered on the canvas auto-registers as a WebMCP tool (via `navigator.modelContext`). This lets the agent **modify** widgets already on display:
 
 ```
-block_<id>_get      → lire les donnees actuelles du widget
-block_<id>_update   → mettre a jour les donnees
-block_<id>_remove   → retirer le widget du canvas
+block_<id>_get      -> read the widget's current data
+block_<id>_update   -> update the widget's data
+block_<id>_remove   -> remove the widget from canvas
 ```
 
-Ce mecanisme cree une boucle de retro-action : l'agent affiche, l'utilisateur interagit, l'agent reagit.
+This creates a feedback loop: the agent displays, the user interacts, the agent reacts.
 
-## Catalogue des widgets
+## Widget catalog
 
-### Groupes
+### Groups
 
-Les widgets sont organises en 5 groupes :
+Widgets are organized into 5 groups:
 
-| Groupe | Widgets | Usage |
-|--------|---------|-------|
-| **simple** | stat, kv, list, chart, alert, code, text, actions, tags | Blocs de base, donnees simples |
-| **rich** | stat-card, data-table, timeline, profile, trombinoscope, json-viewer, hemicycle, chart-rich, cards, grid-data, sankey, log | Visualisations complexes |
-| **media** | gallery, carousel, map | Images et geographie |
-| **advanced** | d3, js-sandbox | Visualisations custom D3, code arbitraire |
-| **canvas** | clear, update, move, resize, style | Actions sur les widgets existants |
+| Group | Widgets | Usage |
+|-------|---------|-------|
+| **simple** | stat, kv, list, chart, alert, code, text, actions, tags | Basic blocks, simple data |
+| **rich** | stat-card, data-table, timeline, profile, trombinoscope, json-viewer, hemicycle, chart-rich, cards, grid-data, sankey, log | Complex visualizations |
+| **media** | gallery, carousel, map | Images and geography |
+| **advanced** | d3, js-sandbox | Custom D3 visualizations, arbitrary code |
+| **canvas** | clear, update, move, resize, style | Actions on existing widgets |
 
 ---
 
-### Blocs simples (9)
+### Simple blocks (9)
 
-#### stat -- Metrique unique
+#### stat -- Single metric
 
-Un chiffre cle avec tendance optionnelle. Le widget le plus simple et le plus utilise.
+A key number with optional trend. The simplest and most-used widget.
 
 ```ts
 interface StatBlockData {
@@ -137,20 +137,20 @@ interface StatBlockData {
 { "type": "stat", "data": { "label": "Revenue", "value": "$142K", "trend": "+12.4%", "trendDir": "up" } }
 ```
 
-#### kv -- Paires cle-valeur
+#### kv -- Key-value pairs
 
-Ideal pour les metadonnees, les proprietes d'une entite, les details d'un enregistrement.
+Ideal for metadata, entity properties, record details.
 
 ```ts
 interface KVBlockData {
   title?: string;
-  rows: [string, string][];   // [["Nom", "Dupont"], ["Age", "42"]]
+  rows: [string, string][];   // [["Name", "Dupont"], ["Age", "42"]]
 }
 ```
 
-#### list -- Liste texte
+#### list -- Text list
 
-Une liste simple a puces.
+A simple bulleted list.
 
 ```ts
 interface ListBlockData {
@@ -159,20 +159,20 @@ interface ListBlockData {
 }
 ```
 
-#### chart -- Bar chart simple
+#### chart -- Simple bar chart
 
-Pour un graphique a barres rapide. Pour des graphiques plus riches (pie, line, area), utiliser `chart-rich`.
+For a quick bar chart. For richer charts (pie, line, area), use `chart-rich`.
 
 ```ts
 interface ChartBlockData {
   title?: string;
-  bars: [string, number][];   // [["Jan", 10], ["Fev", 20]]
+  bars: [string, number][];   // [["Jan", 10], ["Feb", 20]]
 }
 ```
 
-#### alert -- Banniere d'alerte
+#### alert -- Alert banner
 
-Notification avec trois niveaux de severite.
+Notification with three severity levels.
 
 ```ts
 interface AlertBlockData {
@@ -182,9 +182,9 @@ interface AlertBlockData {
 }
 ```
 
-#### code -- Bloc de code
+#### code -- Code block
 
-Code source avec coloration syntaxique.
+Source code with syntax highlighting.
 
 ```ts
 interface CodeBlockData {
@@ -193,9 +193,9 @@ interface CodeBlockData {
 }
 ```
 
-#### text -- Paragraphe texte
+#### text -- Text paragraph
 
-Texte libre, sans mise en forme complexe.
+Free text with no complex formatting.
 
 ```ts
 interface TextBlockData {
@@ -203,9 +203,9 @@ interface TextBlockData {
 }
 ```
 
-#### actions -- Boutons d'action
+#### actions -- Action buttons
 
-Rangee de boutons cliquables. Un bouton `primary` est mis en evidence.
+A row of clickable buttons. A `primary` button is visually emphasized.
 
 ```ts
 interface ActionsBlockData {
@@ -213,9 +213,9 @@ interface ActionsBlockData {
 }
 ```
 
-#### tags -- Collection de tags
+#### tags -- Tag collection
 
-Groupe de badges/etiquettes, avec etat actif optionnel.
+A group of badges/labels with optional active state.
 
 ```ts
 interface TagsBlockData {
@@ -226,11 +226,11 @@ interface TagsBlockData {
 
 ---
 
-### Widgets riches (16)
+### Rich widgets (16)
 
-#### stat-card -- KPI enrichi
+#### stat-card -- Enhanced KPI
 
-Version avancee de `stat` avec unite, delta, couleur de variante (success/warning/error/info).
+Advanced version of `stat` with unit, delta, and color variant (success/warning/error/info).
 
 ```ts
 interface StatCardSpec {
@@ -249,12 +249,12 @@ interface StatCardSpec {
 ```
 
 :::tip[stat vs stat-card]
-Utiliser `stat` pour un chiffre simple sans decoration. Utiliser `stat-card` quand vous avez des unites, des deltas, ou un code couleur.
+Use `stat` for a plain number with no decoration. Use `stat-card` when you have units, deltas, or a color code.
 :::
 
-#### data-table -- Table triable
+#### data-table -- Sortable table
 
-Tableau avec colonnes configurables, tri par clic, mode compact et raye.
+Table with configurable columns, click-to-sort, compact and striped modes.
 
 ```ts
 interface DataTableSpec {
@@ -266,13 +266,13 @@ interface DataTableSpec {
 }
 ```
 
-:::caution[Limite de lignes]
-Maximum 200 lignes affichees. Au-dela, le tableau est tronque.
+:::caution[Row limit]
+Maximum 200 rows displayed. Beyond that, the table is truncated.
 :::
 
-#### timeline -- Chronologie
+#### timeline -- Event timeline
 
-Sequence d'evenements avec dates et statuts visuels.
+Sequence of events with dates and visual statuses.
 
 ```ts
 interface TimelineSpec {
@@ -286,9 +286,9 @@ interface TimelineSpec {
 }
 ```
 
-#### profile -- Fiche profil
+#### profile -- Profile card
 
-Carte de presentation avec avatar (initiales automatiques si pas d'URL), champs structures et statistiques.
+Presentation card with avatar (automatic initials if no URL), structured fields and statistics.
 
 ```ts
 interface ProfileSpec {
@@ -301,13 +301,13 @@ interface ProfileSpec {
 }
 ```
 
-:::caution[Pas d'URLs inventees]
-Ne jamais fabriquer d'URL pour l'avatar. Le widget affiche les initiales automatiquement si aucune URL valide n'est fournie.
+:::caution[No fabricated URLs]
+Never fabricate avatar URLs. The widget automatically displays initials if no valid URL is provided.
 :::
 
-#### trombinoscope -- Grille de portraits
+#### trombinoscope -- Portrait grid
 
-Grille de personnes avec nom, sous-titre et badge. Ideal pour les equipes, assemblees, jurys.
+Grid of people with name, subtitle and badge. Ideal for teams, assemblies, panels.
 
 ```ts
 interface TrombinoscopeSpec {
@@ -317,9 +317,9 @@ interface TrombinoscopeSpec {
 }
 ```
 
-#### json-viewer -- Arbre JSON interactif
+#### json-viewer -- Interactive JSON tree
 
-Explore une structure JSON complexe avec deplier/replier par niveau.
+Explore a complex JSON structure with fold/unfold by level.
 
 ```ts
 interface JsonViewerSpec {
@@ -330,9 +330,9 @@ interface JsonViewerSpec {
 }
 ```
 
-#### hemicycle -- Hemicycle parlementaire
+#### hemicycle -- Parliament hemicycle
 
-Visualisation SVG de la composition d'une assemblee, avec couleurs par groupe politique.
+SVG visualization of an assembly's composition with colors by political group.
 
 ```ts
 interface HemicycleSpec {
@@ -343,13 +343,13 @@ interface HemicycleSpec {
 }
 ```
 
-:::caution[id obligatoire]
-Chaque groupe **doit** avoir un `id` unique. Sans lui, les evenements de clic ne fonctionnent pas.
+:::caution[id required]
+Each group **must** have a unique `id`. Without it, click events won't work.
 :::
 
-#### chart-rich -- Graphique multi-type
+#### chart-rich -- Multi-type chart
 
-Graphique avance supportant bar, line, area, pie et donut, avec plusieurs series de donnees.
+Advanced chart supporting bar, line, area, pie and donut, with multiple data series.
 
 ```ts
 interface ChartSpec {
@@ -361,9 +361,9 @@ interface ChartSpec {
 }
 ```
 
-#### cards -- Grille de cartes
+#### cards -- Card grid
 
-Affichage en grille de resultats, dossiers ou entites, avec titre, description et tags.
+Grid display of results, records, or entities with title, description and tags.
 
 ```ts
 interface CardsSpec {
@@ -372,9 +372,9 @@ interface CardsSpec {
 }
 ```
 
-#### grid-data -- Grille spreadsheet
+#### grid-data -- Spreadsheet grid
 
-Grille de donnees tabulaires avec possibilite de colorer des cellules (heatmap).
+Tabular data grid with optional cell highlighting (heatmap).
 
 ```ts
 interface GridDataSpec {
@@ -386,12 +386,12 @@ interface GridDataSpec {
 ```
 
 :::tip[grid-data vs data-table]
-`data-table` attend des objets (`{name: "Alice"}`), `grid-data` attend des tableaux (`["Alice", 42]`). Utiliser `data-table` pour des donnees nommees, `grid-data` pour des matrices numeriques.
+`data-table` expects objects (`{name: "Alice"}`), `grid-data` expects arrays (`["Alice", 42]`). Use `data-table` for named data, `grid-data` for numeric matrices.
 :::
 
-#### sankey -- Diagramme de flux
+#### sankey -- Flow diagram
 
-Visualise des flux entre noeuds : votes, co-signatures, parcours.
+Visualizes flows between nodes: votes, co-signatures, journeys.
 
 ```ts
 interface SankeySpec {
@@ -401,23 +401,23 @@ interface SankeySpec {
 }
 ```
 
-#### map -- Carte interactive
+#### map -- Interactive map
 
-Carte Leaflet avec marqueurs, fond sombre CARTO. Le module Leaflet est charge dynamiquement.
+Leaflet map with markers and CARTO dark basemap. The Leaflet module loads dynamically.
 
 ```ts
 interface MapSpec {
   title?: string;
   center?: { lat: number; lng: number };
   zoom?: number;                  // 1-18
-  height?: string;                // CSS, ex: "400px"
+  height?: string;                // CSS, e.g.: "400px"
   markers?: { lat: number; lng: number; label?: string; color?: string }[];
 }
 ```
 
-#### d3 -- Visualisation D3
+#### d3 -- D3 visualization
 
-Widget D3.js avec 4 presets integres : `hex-heatmap`, `radial`, `treemap`, `force`.
+D3.js widget with 4 built-in presets: `hex-heatmap`, `radial`, `treemap`, `force`.
 
 ```ts
 interface D3Spec {
@@ -428,23 +428,23 @@ interface D3Spec {
 }
 ```
 
-#### js-sandbox -- Sandbox JavaScript
+#### js-sandbox -- JavaScript sandbox
 
-Iframe securise qui execute du code JS arbitraire avec acces au DOM et a fetch.
+Secure iframe that executes arbitrary JS code with DOM and fetch access.
 
 ```ts
 interface JsSandboxSpec {
   title?: string;
-  code: string;           // JS a executer
-  html?: string;          // HTML initial dans div#root
-  css?: string;           // CSS injecte dans le head
-  height?: string;        // Hauteur CSS de l'iframe
+  code: string;           // JS to execute
+  html?: string;          // initial HTML in div#root
+  css?: string;           // CSS injected in head
+  height?: string;        // CSS height of the iframe
 }
 ```
 
-#### log -- Viewer de logs
+#### log -- Log viewer
 
-Flux de logs avec niveau de severite, timestamp et source.
+Log stream with severity level, timestamp and source.
 
 ```ts
 interface LogViewerSpec {
@@ -458,9 +458,9 @@ interface LogViewerSpec {
 }
 ```
 
-#### gallery -- Galerie d'images
+#### gallery -- Image gallery
 
-Collection d'images avec lightbox navigable au clavier (Escape, fleches).
+Image collection with keyboard-navigable lightbox (Escape, arrows).
 
 ```ts
 interface GallerySpec {
@@ -470,38 +470,38 @@ interface GallerySpec {
 }
 ```
 
-#### carousel -- Carousel de slides
+#### carousel -- Slide carousel
 
-Diaporama avec navigation et auto-play optionnel.
+Slideshow with navigation and optional auto-play.
 
 ```ts
 interface CarouselSpec {
   title?: string;
   slides?: { src?: string; content?: string; title?: string; subtitle?: string }[];
   autoPlay?: boolean;
-  interval?: number;         // ms entre slides
+  interval?: number;         // ms between slides
 }
 ```
 
-#### recipe-browser -- Navigateur de recettes
+#### recipe-browser -- Recipe browser
 
-Affiche les recettes disponibles sous forme de cartes cliquables. Le clic declenche une interaction qui charge le detail de la recette.
+Displays available recipes as clickable cards. Clicking loads the recipe detail and the agent can then execute it.
 
 ---
 
-### Actions canvas (5)
+### Canvas actions (5)
 
-Ces widgets ne creent pas de nouveaux blocs -- ils **modifient** les blocs existants.
+These widgets don't create new blocks -- they **modify** existing ones.
 
-| Action | Description | Parametres |
+| Action | Description | Parameters |
 |--------|-------------|-----------|
-| `clear` | Vider le canvas entierement | aucun |
-| `update` | Mettre a jour les donnees d'un bloc | `{id, data}` |
-| `move` | Deplacer un bloc | `{id, x, y}` |
-| `resize` | Redimensionner un bloc | `{id, width, height}` |
-| `style` | Appliquer des styles CSS | `{id, styles}` |
+| `clear` | Clear the entire canvas | none |
+| `update` | Update a block's data | `{id, data}` |
+| `move` | Move a block | `{id, x, y}` |
+| `resize` | Resize a block | `{id, width, height}` |
+| `style` | Apply CSS styles | `{id, styles}` |
 
-L'outil `canvas` agrege ces 5 actions :
+The `canvas` tool aggregates these 5 actions:
 
 ```ts
 canvas({ action: 'update', id: 'w_a3f2', params: { data: { value: "$155K" } } })
@@ -509,29 +509,29 @@ canvas({ action: 'move', id: 'w_a3f2', params: { x: 100, y: 200 } })
 canvas({ action: 'clear' })
 ```
 
-## Relations avec les autres concepts
+## How widgets relate to other concepts
 
 ```mermaid
 graph LR
-    R["Recettes WebMCP"] -->|recommandent| W["Widgets UI"]
-    CT["widget_display()"] -->|instancie| W
-    W -->|s'affichent sur| C["Canvas"]
-    C -->|expose| T["Outils par bloc<br/>block_id_get/update/remove"]
-    T -->|permettent a| LLM["Agent LLM<br/>de modifier les widgets"]
+    R["WebMCP Recipes"] -->|recommend| W["UI Widgets"]
+    CT["widget_display()"] -->|instantiates| W
+    W -->|render on| C["Canvas"]
+    C -->|exposes| T["Per-block tools<br/>block_id_get/update/remove"]
+    T -->|let| LLM["Agent LLM<br/>modify widgets"]
 ```
 
-- **Recettes** : les recettes WebMCP indiquent a l'agent quel widget utiliser en fonction des donnees
-- **widget_display** : l'outil qui instancie un widget sur le canvas
-- **ToolLayers** : les widgets sont exposes via la `WebMcpLayer` du serveur autoui
-- **Canvas** : la surface reactive ou les widgets sont rendus et mis a jour
+- **Recipes**: WebMCP recipes tell the agent which widget to use based on the data
+- **widget_display**: the tool that instantiates a widget on the canvas
+- **ToolLayers**: widgets are exposed via the autoui server's `WebMcpLayer`
+- **Canvas**: the reactive surface where widgets are rendered and updated
 
-## Erreurs courantes
+## Common mistakes
 
-| Erreur | Consequence | Correction |
-|--------|-------------|-----------|
-| `chart` pour pie/donut | `chart` ne fait que des barres | Utiliser `chart-rich` avec `type: "pie"` |
-| Objets dans `rows` de `grid-data` | Grid attend `unknown[][]` | Utiliser `data-table` pour des objets |
-| Pas d'`id` sur les groups d'hemicycle | Evenements de clic casses | Toujours inclure `id` |
-| `columns.key` ne correspond pas aux rows | Cellules vides | `key` doit correspondre aux cles des objets |
-| URL d'avatar inventee par le LLM | Image cassee | Ne jamais fabriquer d'URLs -- le widget affiche les initiales |
-| Plus de 200 lignes dans data-table | Tableau tronque sans avertissement | Paginer ou filtrer les donnees avant |
+| Mistake | Consequence | Fix |
+|---------|-------------|-----|
+| `chart` for pie/donut | `chart` only does bars | Use `chart-rich` with `type: "pie"` |
+| Objects in `grid-data` rows | Grid expects `unknown[][]` | Use `data-table` for objects |
+| No `id` on hemicycle groups | Click events break | Always include `id` |
+| `columns.key` doesn't match rows | Empty cells | `key` must match row object keys |
+| LLM-fabricated avatar URL | Broken image | Never fabricate URLs -- widget shows initials |
+| More than 200 data-table rows | Table truncated silently | Paginate or filter data first |

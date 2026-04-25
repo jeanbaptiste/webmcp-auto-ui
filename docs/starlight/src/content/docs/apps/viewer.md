@@ -1,31 +1,31 @@
 ---
 title: Viewer
-description: Lecteur HyperSkills read-only avec CRUD, DAG de versions, et paste URI
+description: Read-only HyperSkills viewer with CRUD, version DAG, and paste URI
 sidebar:
   order: 2
 ---
 
-Viewer (`apps/viewer/`) est le lecteur de HyperSkills du projet. Il decode les URLs compressees `?hs=`, affiche les widgets dans une interface de lecture, et permet de creer, modifier et exporter des skills. C'est l'outil de consultation et de partage : quand quelqu'un vous envoie un lien HyperSkill, c'est le Viewer qui l'affiche.
+Viewer (`apps/viewer/`) is the project's HyperSkills reader. It decodes compressed `?hs=` URLs, displays widgets in a reading interface, and lets you create, edit, and export skills. It's the consultation and sharing tool: when someone sends you a HyperSkill link, the Viewer is what displays it.
 
-## Ce que vous voyez quand vous ouvrez l'app
+## What you see when you open the app
 
-Quand vous ouvrez le Viewer sans parametre `?hs=`, vous voyez un ecran vide avec un hexagone grise et le message "Aucun parametre `?hs=` dans l'URL". Une barre "Paste URI" en haut vous invite a coller un lien HyperSkill, avec un bouton "Nouvelle" pour creer une skill vierge.
+When you open the Viewer without a `?hs=` parameter, you'll see an empty screen with a grayed-out hexagon and the message "No `?hs=` parameter in the URL". A "Paste URI" bar at the top invites you to paste a HyperSkill link, with a "New" button to create a blank skill.
 
-Quand une skill est chargee (via URL ou paste), l'interface se transforme :
+When a skill is loaded (via URL or paste), the interface transforms:
 
-- **En-tete** : le titre de la skill, sa description, et des boutons d'action -- "DAG" pour voir l'arbre de versions, "Tester dans Recipes" pour lancer un test live, "Modifier" pour ouvrir la skill dans Flex
-- **Barre paste** : toujours visible pour charger une autre skill, plus un bouton "Exporter URL" pour copier le lien dans le presse-papier
-- **Carte meta** : titre, description, serveur MCP d'origine, hash SHA, version
-- **Widgets** : chaque bloc est rendu via `WidgetRenderer` dans un conteneur avec une barre d'outils au survol (modifier JSON, supprimer)
-- **Bouton "Ajouter un widget"** : en bas, un bouton en pointille permet d'ajouter manuellement un widget de type `text`
-- **Panneau DAG** : quand active, affiche une timeline horizontale des versions avec des noeuds cliquables relies par des fleches SVG
+- **Header**: the skill's title, description, and action buttons -- "DAG" to view the version tree, "Test in Recipes" to launch a live test, "Edit" to open the skill in Flex
+- **Paste bar**: always visible for loading another skill, plus an "Export URL" button to copy the link to the clipboard
+- **Meta card**: title, description, source MCP server, SHA hash, version
+- **Widgets**: each block is rendered via `WidgetRenderer` in a container with a hover toolbar (edit JSON, delete)
+- **"Add widget" button**: at the bottom, a dashed button lets you manually add a `text` widget
+- **DAG panel**: when enabled, displays a horizontal version timeline with clickable nodes connected by SVG arrows
 
 ## Architecture
 
 ```mermaid
 graph TD
     subgraph Frontend
-        Page["+page.svelte<br/>Decodage URL + rendu"]
+        Page["+page.svelte<br/>URL decoding + rendering"]
     end
 
     subgraph Packages
@@ -38,112 +38,112 @@ graph TD
     Page -->|export URL| SDK
 ```
 
-## Stack technique
+## Tech stack
 
-| Composant | Detail |
+| Component | Detail |
 |-----------|--------|
 | Framework | SvelteKit + Svelte 5 |
 | Styles | TailwindCSS 3.4 |
-| Icones | lucide-svelte (ExternalLink, Pencil, Plus, Trash2, FlaskConical, GitBranch, Github) |
+| Icons | lucide-svelte (ExternalLink, Pencil, Plus, Trash2, FlaskConical, GitBranch, Github) |
 | Adapter | `@sveltejs/adapter-node` |
 
-**Packages utilises :**
-- `@webmcp-auto-ui/sdk` : `decodeHyperSkill`, `encodeHyperSkill`, `getHsParam`
-- `@webmcp-auto-ui/ui` : `WidgetRenderer`, `Button`, `Input`
+**Packages used:**
+- `@webmcp-auto-ui/sdk`: `decodeHyperSkill`, `encodeHyperSkill`, `getHsParam`
+- `@webmcp-auto-ui/ui`: `WidgetRenderer`, `Button`, `Input`
 
 :::note
-Le Viewer n'utilise pas le package `agent` et n'a pas de connexion MCP. C'est une app de consultation pure.
+The Viewer doesn't use the `agent` package and has no MCP connection. It's a pure consultation app.
 :::
 
-## Lancement
+## Getting started
 
-| Environnement | Port | Commande |
-|---------------|------|----------|
+| Environment | Port | Command |
+|-------------|------|---------|
 | Dev | 3008 | `npm -w apps/viewer run dev` |
 | Production | 3008 | `node build/index.js` (via systemd) |
 
 ```bash
 npm -w apps/viewer run dev
-# Accessible sur http://localhost:3008
+# Available at http://localhost:3008
 ```
 
-## Fonctionnalites
+## Features
 
-### Decodage HyperSkill URL
+### HyperSkill URL decoding
 
-Le Viewer decode automatiquement le parametre `?hs=` au chargement. Le parametre contient une skill encodee en base64 gzip avec metadonnees (titre, description, hash, version) et contenu (liste de blocs type + data).
+The Viewer automatically decodes the `?hs=` parameter on load. The parameter contains a base64 gzip-encoded skill with metadata (title, description, hash, version) and content (list of type + data blocks).
 
 ### Paste URI
 
-Collez n'importe quelle URL HyperSkill (ou directement la valeur du parametre `hs`) dans la barre de saisie. Le Viewer la decode et met a jour l'URL du navigateur via `history.pushState`.
+Paste any HyperSkill URL (or just the raw `hs` parameter value) in the input bar. The Viewer decodes it and updates the browser URL via `history.pushState`.
 
-### CRUD de widgets
+### Widget CRUD
 
-Chaque widget est editable :
-- **Modifier** : ouvre un editeur JSON inline pour modifier le `data` du widget
-- **Supprimer** : retire le widget de la liste
-- **Ajouter** : cree un nouveau widget de type `text` avec un contenu par defaut
-- **Changer le type** : dans l'editeur, le champ type est modifiable
+Each widget is editable:
+- **Edit**: opens an inline JSON editor to modify the widget's `data`
+- **Delete**: removes the widget from the list
+- **Add**: creates a new `text` widget with default content
+- **Change type**: in the editor, the type field is editable
 
-### DAG de versions
+### Version DAG
 
-Le graphe de versions affiche la chaine de hash SHA. Chaque skill peut reference un `previousHash`, formant un arbre oriente (DAG). Les noeuds sont affiches comme des boutons cliquables avec des fleches SVG entre eux.
+The version graph displays the SHA hash chain. Each skill can reference a `previousHash`, forming a directed acyclic graph (DAG). Nodes are displayed as clickable buttons connected by SVG arrows.
 
-### Navigation inter-apps
+### Cross-app navigation
 
-Deux boutons permettent de naviguer :
-- **"Modifier"** : ouvre la skill dans Flex pour l'editer avec l'agent IA
-- **"Tester dans Recipes"** : ouvre la skill dans l'explorateur de recettes
+Two buttons enable navigation:
+- **"Edit"**: opens the skill in Flex for editing with the AI agent
+- **"Test in Recipes"**: opens the skill in the recipe explorer
 
-### Export URL
+### URL export
 
-Le bouton "Exporter URL" re-encode la skill (avec toutes les modifications) en URL HyperSkill et la copie dans le presse-papier.
+The "Export URL" button re-encodes the skill (with all modifications) as a HyperSkill URL and copies it to the clipboard.
 
 ## Configuration
 
-Le Viewer n'a pas de variable d'environnement. Il fonctionne entierement cote client.
+The Viewer has no environment variables. It works entirely client-side.
 
 ## Code walkthrough
 
 ### `+page.svelte`
-Fichier unique de l'app. Il gere :
-- Le decodage de l'URL via `getHsParam` + `decodeHyperSkill` au `onMount`
-- L'extraction des blocs depuis la structure HyperSkill decodee
-- La construction du DAG de versions depuis les metadonnees `hash` / `previousHash`
-- L'edition inline JSON avec validation (le bouton "Sauvegarder" est bloque si le JSON est invalide)
-- L'export via `encodeHyperSkill` avec copie dans le presse-papier
+Single file for the app. It handles:
+- URL decoding via `getHsParam` + `decodeHyperSkill` on `onMount`
+- Block extraction from the decoded HyperSkill structure
+- Version DAG construction from `hash` / `previousHash` metadata
+- Inline JSON editing with validation (the "Save" button is blocked on invalid JSON)
+- Export via `encodeHyperSkill` with clipboard copy
 
-### URL d'exemple
+### Example URL
 
 ```
 http://localhost:3008/?hs=eyJtZXRhIjp7InRpdGxlIjoiV2VhdGhlciJ9LCJjb250ZW50IjpbeyJ0eXBlIjoic3RhdCIsImRhdGEiOnsibGFiZWwiOiJUZW1wIiwidmFsdWUiOiIxNEMifX1dfQ==
 ```
 
-## Personnalisation
+## Customization
 
-Pour etendre le Viewer :
-1. **Ajouter des types de blocs** : les widgets sont rendus par `WidgetRenderer`, qui supporte tous les types du package UI
-2. **Modifier le DAG** : etendre la logique `buildDag()` pour afficher un arbre complet avec navigation
-3. **Ajouter un mode collaboratif** : integrer un backend pour stocker les skills et partager les URLs
+To extend the Viewer:
+1. **Add block types**: widgets are rendered by `WidgetRenderer`, which supports all types from the UI package
+2. **Extend the DAG**: extend the `buildDag()` logic to display a full tree with navigation
+3. **Add collaboration**: integrate a backend to store skills and share URLs
 
-## Deploiement
+## Deployment
 
-| Chemin sur le serveur | `/opt/webmcp-demos/viewer/build/` (sous-dossier) |
-|----------------------|---------------------------------------------------|
-| Service systemd | `webmcp-viewer` |
+| Server path | `/opt/webmcp-demos/viewer/build/` (subdirectory) |
+|------------|------------------------------------------------------|
+| systemd service | `webmcp-viewer` |
 | ExecStart | `node build/index.js` |
 
 :::caution
-Le Viewer est deploye dans le sous-dossier `build/`, pas a la racine. Le script `deploy.sh` gere ce chemin automatiquement.
+The Viewer is deployed in the `build/` subdirectory, not at the root. The `deploy.sh` script handles this path automatically.
 :::
 
 ```bash
 ./scripts/deploy.sh viewer
 ```
 
-## Liens
+## Links
 
-- [Demo live](https://demos.hyperskills.net/viewer/)
-- [Package SDK](/webmcp-auto-ui/packages/sdk/) -- `decodeHyperSkill`, `encodeHyperSkill`
-- [Flex](/webmcp-auto-ui/apps/flex/) -- pour editer avec l'agent IA
-- [Recipes](/webmcp-auto-ui/apps/recipes/) -- pour tester les recettes
+- [Live demo](https://demos.hyperskills.net/viewer/)
+- [SDK package](/webmcp-auto-ui/packages/sdk/) -- `decodeHyperSkill`, `encodeHyperSkill`
+- [Flex](/webmcp-auto-ui/apps/flex/) -- for editing with the AI agent
+- [Recipes](/webmcp-auto-ui/apps/recipes/) -- for testing recipes

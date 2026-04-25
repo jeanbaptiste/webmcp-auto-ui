@@ -1,27 +1,27 @@
 ---
-title: Tool Calling et Dispatch
-description: Comment les outils MCP et WebMCP sont appeles, routes et executes
+title: Tool Calling and Dispatch
+description: How MCP and WebMCP tools are called, routed, and executed
 sidebar:
   order: 3
 ---
 
-Le **tool calling** est le mecanisme central de WebMCP Auto-UI. L'agent LLM genere des blocs `tool_use`, et le dispatcher les achemine vers le bon serveur -- MCP distant ou WebMCP local. Cette page decrit le parcours complet d'un appel d'outil, du LLM jusqu'au resultat.
+**Tool calling** is the central mechanism of WebMCP Auto-UI. The LLM agent generates `tool_use` blocks, and the dispatcher routes them to the right server -- remote MCP or local WebMCP. This page traces the complete journey of a tool call, from the LLM to the result.
 
-## Vue d'ensemble du flux
+## Flow Overview
 
 ```mermaid
 sequenceDiagram
-    participant LLM as Agent LLM
+    participant LLM as LLM Agent
     participant DISP as Dispatcher
     participant ALIAS as Alias Map
-    participant MCP as Serveur MCP (distant)
-    participant WMCP as Serveur WebMCP (local)
+    participant MCP as MCP Server (remote)
+    participant WMCP as WebMCP Server (local)
     participant CANVAS as Canvas
 
     LLM->>DISP: tool_use: weather_mcp_get_forecast
-    DISP->>ALIAS: Resoudre alias
+    DISP->>ALIAS: Resolve alias
     ALIAS-->>DISP: weather_mcp_get_weather_data
-    DISP->>DISP: Parser prefixe :<br/>server=weather, proto=mcp, tool=get_weather_data
+    DISP->>DISP: Parse prefix:<br/>server=weather, proto=mcp, tool=get_weather_data
     DISP->>MCP: callTool("get_weather_data", {location: "Paris"})
     MCP-->>DISP: {temp: 18, wind: 12}
     DISP-->>LLM: tool_result
@@ -33,63 +33,63 @@ sequenceDiagram
     DISP-->>LLM: tool_result
 ```
 
-## Anatomie d'un appel d'outil
+## Anatomy of a Tool Call
 
-### 1. L'agent genere un bloc tool_use
+### 1. Agent Generates a tool_use Block
 
-Quand le LLM decide d'utiliser un outil, il produit un bloc structuree :
+When the LLM decides to use a tool, it produces a structured block:
 
 ```typescript
 {
   type: 'tool_use',
-  id: 'toolu_1234',                    // Identifiant unique de l'appel
-  name: 'weather_mcp_get_forecast',    // Nom canonique avec prefixe
-  input: { location: 'Paris', days: 3 } // Parametres de l'outil
+  id: 'toolu_1234',                    // Unique call identifier
+  name: 'weather_mcp_get_forecast',    // Canonical name with prefix
+  input: { location: 'Paris', days: 3 } // Tool parameters
 }
 ```
 
-Le nom suit la convention `{serverName}_{protocol}_{toolName}`. Ce format permet au dispatcher de savoir immediatement :
-- **Quel serveur** contacter (`weather`)
-- **Quel protocole** utiliser (`mcp` = distant, `webmcp` = local)
-- **Quel outil** appeler (`get_forecast`)
+The name follows the `{serverName}_{protocol}_{toolName}` convention. This format tells the dispatcher immediately:
+- **Which server** to contact (`weather`)
+- **Which protocol** to use (`mcp` = remote, `webmcp` = local)
+- **Which tool** to call (`get_forecast`)
 
-### 2. Le dispatcher route l'appel
+### 2. Dispatcher Routes the Call
 
-Le dispatcher est le coeur du routage. Pour chaque bloc `tool_use`, il :
+The dispatcher is the routing core. For each `tool_use` block, it:
 
-1. Resout les alias (noms canoniques → noms reels du serveur)
-2. Parse le prefixe pour identifier serveur, protocole et outil
-3. Route vers MCP ou WebMCP
+1. Resolves aliases (canonical names to actual server names)
+2. Parses the prefix to identify server, protocol, and tool
+3. Routes to MCP or WebMCP
 
 ```typescript
 for (const block of toolBlocks) {
-  // Etape 1 : Resoudre alias
+  // Step 1: Resolve alias
   const resolvedName = aliasMap.get(block.name) ?? block.name;
 
-  // Etape 2 : Parser le prefixe
+  // Step 2: Parse prefix
   const match = resolvedName.match(/^(.+?)_(mcp|webmcp)_(.+)$/);
   if (!match) {
     result = `Error: unknown tool format`;
   } else {
     const [, serverName, protocol, realToolName] = match;
 
-    // Etape 3 : Routing
+    // Step 3: Routing
     if (protocol === 'mcp') {
-      // → Appel reseau via MCP client
+      // → Network call via MCP client
     } else if (protocol === 'webmcp') {
-      // → Execution locale via WebMCP server
+      // → Local execution via WebMCP server
     }
   }
 }
 ```
 
-:::note[Format du prefixe]
-La regex `^(.+?)_(mcp|webmcp)_(.+)$` est volontairement gourmande sur la premiere partie (`(.+?)`) pour supporter les noms de serveurs avec des underscores (ex: `my_weather_mcp_get_forecast`).
+:::note[Prefix format]
+The regex `^(.+?)_(mcp|webmcp)_(.+)$` uses a non-greedy match on the first group (`(.+?)`) to support server names containing underscores (e.g., `my_weather_mcp_get_forecast`).
 :::
 
-### 3. Intercepteur (pseudo-outils)
+### 3. Interceptor (Pseudo-Tools)
 
-Avant le dispatch normal, deux **pseudo-outils** sont interceptes localement. Ils ne declenchent pas d'activation serveur :
+Before normal dispatch, two **pseudo-tools** are intercepted locally. They do not trigger server activation:
 
 ```typescript
 if (toolMatch[3] === 'list_tools' || toolMatch[3] === 'search_tools') {
@@ -99,10 +99,10 @@ if (toolMatch[3] === 'list_tools' || toolMatch[3] === 'search_tools') {
   );
 
   if (pseudoTool === 'list_tools') {
-    // Retourner la liste complete des outils du serveur
+    // Return the complete tool list for the server
     result = JSON.stringify(layer.tools);
   } else {
-    // Filtrer par mot-cle dans le nom ou la description
+    // Filter by keyword in name or description
     const query = String(block.input.query ?? '').toLowerCase();
     const matches = layer.tools.filter(t =>
       t.name.toLowerCase().includes(query) ||
@@ -113,11 +113,11 @@ if (toolMatch[3] === 'list_tools' || toolMatch[3] === 'search_tools') {
 }
 ```
 
-**Pourquoi intercepter ?** Pour permettre a l'agent d'explorer les outils disponibles sans declencher de connexion reseau. L'agent peut appeler `list_tools()` autant de fois qu'il veut sans cout reseau.
+**Why intercept?** So the agent can explore available tools without triggering a network connection. The agent can call `list_tools()` as often as it wants with zero network cost.
 
-### 4. Activation lazy du serveur
+### 4. Lazy Server Activation
 
-Lors du **premier appel reel** a un outil d'un serveur :
+On the **first real call** to a server's tool:
 
 ```typescript
 const serverKey = `${serverName}_${protocol}`;
@@ -129,35 +129,35 @@ if (!activatedServers.has(serverKey)) {
     l.protocol === protocol
   );
   if (layer) {
-    // Ajouter TOUS les outils du serveur aux outils actifs
+    // Add ALL server tools to active tools
     activeTools = activateServerTools(activeTools, layer);
   }
 }
 ```
 
-Apres activation, le LLM recoit la liste complete des outils du serveur dans son prochain appel. L'activation est un one-shot : elle ne se produit qu'une fois par session.
+After activation, the LLM receives the full tool list for the server on its next call. Activation is a one-shot operation: it happens once per session.
 
-## Dispatch MCP
+## MCP Dispatch
 
 <img src="/webmcp-auto-ui/diagrams/tool-calling-1.svg" alt="MCP dispatch flow from tool_use block to agent messages" />
 
-Le dispatch MCP passe par un client SSE (Server-Sent Events) connecte au serveur distant :
+MCP dispatch goes through an SSE (Server-Sent Events) client connected to the remote server:
 
 ```typescript
 if (protocol === 'mcp') {
   if (!client) {
     result = `Error: no MCP client available for tool ${name}`;
   } else {
-    // Appeler l'outil sur le serveur distant
+    // Call the tool on the remote server
     const mcpResult = await client.callTool(realToolName, block.input);
 
-    // Extraire le contenu texte de la reponse MCP
+    // Extract text content from the MCP response
     const textContent = mcpResult.content?.find(
       (c) => c.type === 'text'
     ) as { text?: string } | undefined;
     const rawResult = textContent?.text ?? JSON.stringify(mcpResult);
 
-    // Tronquer si le resultat depasse la limite (defaut: 10 000 caracteres)
+    // Truncate if result exceeds limit (default: 10,000 chars)
     result = truncateResults
       ? truncateResult(rawResult, maxResultLength)
       : rawResult;
@@ -165,27 +165,27 @@ if (protocol === 'mcp') {
 }
 ```
 
-La troncature evite qu'un resultat volumineux (une table de 10 000 lignes, par exemple) ne sature la fenetre de contexte. Le resultat complet est stocke dans le `resultBuffer` et accessible via `recall()`.
+Truncation prevents a large result (a 10,000-row table, for example) from filling the context window. The full result is stored in the `resultBuffer` and accessible via `recall()`.
 
-:::caution[Latence reseau]
-Les appels MCP impliquent un aller-retour reseau. Si le serveur est lent ou injoignable, le dispatcher attend indefiniment (sauf si un `AbortSignal` est fourni via les options de l'agent).
+:::caution[Network latency]
+MCP calls involve a network round trip. If the server is slow or unreachable, the dispatcher waits indefinitely (unless an `AbortSignal` is provided via agent options).
 :::
 
-## Dispatch WebMCP
+## WebMCP Dispatch
 
 <img src="/webmcp-auto-ui/diagrams/tool-calling-2.svg" alt="WebMCP dispatch flow with recall, widget_display, canvas and executeTool branches" />
 
-Le dispatch WebMCP execute l'outil localement dans le navigateur :
+WebMCP dispatch executes the tool locally in the browser:
 
 ```typescript
 if (protocol === 'webmcp') {
-  // Cas special : recall (relire un resultat compresse)
+  // Special case: recall (re-read a compressed result)
   if (realToolName === 'recall' && resultBuffer.size > 0) {
     const recallId = (block.input as { id: string }).id;
     result = resultBuffer.get(recallId)
-      ?? `Aucun resultat trouve pour l'id '${recallId}'.`;
+      ?? `No result found for id '${recallId}'.`;
   } else {
-    // Dispatch normal vers le serveur WebMCP
+    // Normal dispatch to WebMCP server
     const webmcpServer = webmcpServers.get(serverName);
     if (!webmcpServer) {
       result = `Error: no WebMCP server "${serverName}" found.`;
@@ -202,11 +202,11 @@ if (protocol === 'webmcp') {
 }
 ```
 
-Le dispatch WebMCP gere trois cas speciaux en plus de l'execution standard :
+WebMCP dispatch handles three special cases beyond standard execution:
 
-### Cas special : widget_display
+### Special Case: widget_display
 
-Quand l'outil appele est `widget_display`, le dispatcher detecte le resultat et declenche le callback de rendu :
+When the called tool is `widget_display`, the dispatcher detects the result and triggers the rendering callback:
 
 ```typescript
 if (realToolName === 'widget_display') {
@@ -223,11 +223,11 @@ if (realToolName === 'widget_display') {
 }
 ```
 
-Le callback `onWidget` est responsable d'ajouter le widget au canvas. Le `id` retourne permet a l'agent de manipuler le widget dans les iterations suivantes (move, resize, update).
+The `onWidget` callback is responsible for adding the widget to the canvas. The returned `id` lets the agent manipulate the widget in subsequent iterations (move, resize, update).
 
-### Cas special : canvas
+### Special Case: canvas
 
-L'outil `canvas` permet a l'agent de manipuler les widgets existants :
+The `canvas` tool lets the agent manipulate existing widgets:
 
 ```typescript
 if (realToolName === 'canvas') {
@@ -245,35 +245,35 @@ if (realToolName === 'canvas') {
 }
 ```
 
-| Action | Description | Exemple d'utilisation |
-|--------|-------------|----------------------|
-| `clear` | Vider tout le canvas | "Recommence depuis zero" |
-| `update` | Modifier les donnees d'un widget | Changer la valeur d'un stat |
-| `move` | Repositionner un widget (CSS transform) | Reorganiser la mise en page |
-| `resize` | Redimensionner un widget | Agrandir un graphique |
-| `style` | Appliquer des styles CSS | Changer la couleur de fond |
+| Action | Description | Example Use |
+|--------|-------------|-------------|
+| `clear` | Empty the entire canvas | "Start from scratch" |
+| `update` | Modify a widget's data | Change a stat's value |
+| `move` | Reposition a widget (CSS transform) | Rearrange layout |
+| `resize` | Resize a widget | Enlarge a chart |
+| `style` | Apply CSS styles | Change background color |
 
-### Cas special : recall
+### Special Case: recall
 
-`recall` est un pseudo-outil qui relit un resultat compresse. Il est intercepte avant le dispatch normal :
+`recall` is a pseudo-tool that re-reads a compressed result. It is intercepted before normal dispatch:
 
 ```typescript
 if (realToolName === 'recall' && resultBuffer.size > 0) {
   const recallId = (block.input as { id: string }).id;
-  result = resultBuffer.get(recallId) ?? `Aucun resultat trouve...`;
+  result = resultBuffer.get(recallId) ?? `No result found...`;
 }
 ```
 
-## Widget Display en detail
+## Widget Display in Detail
 
-`widget_display()` est l'outil principal pour le rendu UI. Voici le parcours complet d'un appel :
+`widget_display()` is the primary tool for UI rendering. Here is the complete journey of a call:
 
 <img src="/webmcp-auto-ui/diagrams/tool-calling-3.svg" alt="widget_display validation, sanitization and rendering pipeline" />
 
-### Exemple end-to-end
+### End-to-End Example
 
 ```typescript
-// 1. L'agent appelle widget_display
+// 1. Agent calls widget_display
 {
   type: 'tool_use',
   id: 'toolu_5678',
@@ -290,36 +290,36 @@ if (realToolName === 'recall' && resultBuffer.size > 0) {
 }
 ```
 
-Le dispatcher execute ces etapes en sequence :
+The dispatcher executes these steps in sequence:
 
-1. **Resolution** : trouver la definition du widget `stat-card` dans le registre.
-2. **Validation** : verifier que `params` respecte le JSON Schema (`label` et `value` requis, `trend` parmi `[up, down, stable]`).
-3. **Sanitisation** : verifier les URL d'images (si presentes) contre une liste de domaines autorises.
-4. **Generation d'ID** : creer un identifiant unique `w_1a2b3c`.
-5. **Callback** : appeler `onWidget('stat-card', {...params})` pour ajouter le widget au canvas.
-6. **Canvas store** : le store ajoute `{ id: 'w_1a2b3c', type: 'stat-card', data: {...} }` a la liste des blocs.
-7. **Rendu Svelte** : le `WidgetRenderer` detecte le nouveau bloc et monte le composant `StatCard` avec les props.
-8. **Affichage** : le widget apparait sur le canvas.
+1. **Resolution**: find the `stat-card` widget definition in the registry.
+2. **Validation**: check that `params` matches the JSON Schema (`label` and `value` required, `trend` must be one of `[up, down, stable]`).
+3. **Sanitization**: verify image URLs (if present) against an allowlist of domains.
+4. **ID generation**: create a unique identifier `w_1a2b3c`.
+5. **Callback**: call `onWidget('stat-card', {...params})` to add the widget to the canvas.
+6. **Canvas store**: the store adds `{ id: 'w_1a2b3c', type: 'stat-card', data: {...} }` to the block list.
+7. **Svelte rendering**: `WidgetRenderer` detects the new block and mounts the `StatCard` component with props.
+8. **Display**: the widget appears on the canvas.
 
-:::tip[Auto-reparation]
-Si la validation echoue, le dispatcher retourne l'erreur **et** le schema attendu. Les LLM modernes (Claude, Gemma 4) sont capables de corriger leurs parametres et de retenter l'appel automatiquement. Le module `autoRepairParams` peut aussi tenter une reparation automatique avant de retourner l'erreur.
+:::tip[Auto-repair]
+If validation fails, the dispatcher returns the error **and** the expected schema. Modern LLMs (Claude, Gemma 4) can correct their parameters and retry automatically. The `autoRepairParams` module can also attempt automatic repair before returning the error.
 :::
 
-## Gestion des erreurs
+## Error Handling
 
-### Erreur de validation schema
+### Schema Validation Error
 
 ```typescript
-// L'agent oublie un champ requis
+// Agent omits a required field
 {
   name: 'autoui_webmcp_widget_display',
   input: {
     name: 'stat',
-    params: { label: 'Sales' }  // Manque 'value' (requis)
+    params: { label: 'Sales' }  // Missing 'value' (required)
   }
 }
 
-// Le dispatcher retourne l'erreur + le schema
+// Dispatcher returns error + schema
 {
   type: 'tool_result',
   content: JSON.stringify({
@@ -330,23 +330,23 @@ Si la validation echoue, le dispatcher retourne l'erreur **et** le schema attend
 }
 ```
 
-L'agent recoit le schema attendu et peut retenter avec les bons champs. Ce pattern d'erreur-correction est naturel pour les LLM.
+The agent receives the expected schema and can retry with the correct fields. This error-correction pattern is natural for LLMs.
 
-### Outil introuvable
+### Tool Not Found
 
 ```typescript
-// Serveur MCP non connecte
+// MCP server not connected
 if (!client) {
   result = `Error: no MCP client available for tool ${name}`;
 }
 
-// Serveur WebMCP non enregistre
+// WebMCP server not registered
 if (!webmcpServer) {
   result = `Error: no WebMCP server "${serverName}" found.`;
 }
 ```
 
-### Echec d'execution
+### Execution Failure
 
 ```typescript
 try {
@@ -362,105 +362,105 @@ try {
 }
 ```
 
-Les erreurs d'execution sont capturees et retournees a l'agent comme des `tool_result` normaux. L'agent peut decider de retenter, d'utiliser un autre outil ou de signaler l'echec a l'utilisateur.
+Execution errors are caught and returned to the agent as normal `tool_result` messages. The agent can decide to retry, use a different tool, or report the failure to the user.
 
-## Metriques et monitoring
+## Metrics and Monitoring
 
-Chaque appel d'outil est trace avec des metriques :
+Every tool call is tracked with metrics:
 
 ```typescript
 const call: ToolCall = {
-  id: block.id,          // ID unique de l'appel
-  name: block.name,      // Nom canonique de l'outil
-  args: block.input,     // Parametres
-  result: result,        // Resultat (ou erreur)
-  error: undefined,      // Message d'erreur si echec
-  elapsed: Math.round(performance.now() - t1),  // Duree en ms
-  guided: wasDiscovering, // true si precede par un outil de decouverte
+  id: block.id,          // Unique call ID
+  name: block.name,      // Canonical tool name
+  args: block.input,     // Parameters
+  result: result,        // Result (or error)
+  error: undefined,      // Error message if failed
+  elapsed: Math.round(performance.now() - t1),  // Duration in ms
+  guided: wasDiscovering, // true if preceded by a discovery tool
 };
 
 metrics.toolCalls++;
 callbacks.onToolCall?.(call);
 ```
 
-Le callback `onToolCall` permet de :
-- **Logger** chaque appel pour le debug
-- **Mesurer** la latence des serveurs MCP
-- **Compter** le nombre d'outils appeles par iteration
-- **Detecter** les boucles (meme outil appele plusieurs fois avec les memes parametres)
+The `onToolCall` callback enables:
+- **Logging** every call for debugging
+- **Measuring** MCP server latency
+- **Counting** tools called per iteration
+- **Detecting** loops (same tool called repeatedly with same parameters)
 
-Le composant `<AgentConsole>` de `@webmcp-auto-ui/ui` affiche ces metriques en temps reel dans l'interface.
+The `<AgentConsole>` component from `@webmcp-auto-ui/ui` displays these metrics in real time in the interface.
 
-## Compression des resultats
+## Result Compression
 
-Apres environ 2 iterations, les anciens `tool_result` sont compresses pour economiser le contexte :
+After approximately 2 iterations, old `tool_result` messages are compressed to save context:
 
 ```typescript
-// Avant compression
+// Before compression
 {
   type: 'tool_result',
   tool_use_id: 'toolu_1234',
   content: '{"data": [item1, item2, ... item1000], "total": 1000}'
-  // 5000 caracteres
+  // 5000 characters
 }
 
-// Apres compression (mute en place dans le tableau messages)
+// After compression (mutated in place in the messages array)
 {
   type: 'tool_result',
   tool_use_id: 'toolu_1234',
-  content: '{"data": [item1, item2... [recall(\'toolu_1234\') pour le complet, 5000 chars]'
-  // 200 caracteres
+  content: '{"data": [item1, item2... [recall(\'toolu_1234\') for full result, 5000 chars]'
+  // 200 characters
 }
 
-// Le resultat complet est stocke dans le buffer
+// Full result stored in buffer
 resultBuffer.set('toolu_1234', '{"data": [item1, item2, ... item1000]}');
 ```
 
-L'agent peut relire le resultat complet a tout moment en appelant `recall('toolu_1234')`. Ce mecanisme est transparent : l'agent decide seul s'il a besoin du resultat complet ou si l'apercu suffit.
+The agent can re-read the full result at any time by calling `recall('toolu_1234')`. This mechanism is transparent: the agent decides whether it needs the full result or if the preview is enough.
 
-## Resume du flux
+## Flow Summary
 
 ```mermaid
 flowchart TD
-    A[LLM genere tool_use] --> B{Format valide ?}
-    B -->|Non| ERR1[Erreur: format inconnu]
-    B -->|Oui| C[Resoudre alias]
-    C --> D{Pseudo-outil ?}
-    D -->|Oui| E[Reponse locale<br/>list/search_tools]
-    D -->|Non| F{Premier appel<br/>a ce serveur ?}
-    F -->|Oui| G[Activer tous les<br/>outils du serveur]
-    F -->|Non| H{Protocole ?}
+    A[LLM generates tool_use] --> B{Valid format?}
+    B -->|No| ERR1[Error: unknown format]
+    B -->|Yes| C[Resolve alias]
+    C --> D{Pseudo-tool?}
+    D -->|Yes| E[Local response<br/>list/search_tools]
+    D -->|No| F{First call<br/>to this server?}
+    F -->|Yes| G[Activate all<br/>server tools]
+    F -->|No| H{Protocol?}
     G --> H
-    H -->|MCP| I[Appel reseau<br/>via SSE]
-    H -->|WebMCP| J{Outil special ?}
-    J -->|recall| K[Relire depuis<br/>resultBuffer]
-    J -->|widget_display| L[Valider + monter<br/>widget sur canvas]
-    J -->|canvas| M[Manipuler<br/>widgets existants]
+    H -->|MCP| I[Network call<br/>via SSE]
+    H -->|WebMCP| J{Special tool?}
+    J -->|recall| K[Read from<br/>resultBuffer]
+    J -->|widget_display| L[Validate + mount<br/>widget on canvas]
+    J -->|canvas| M[Manipulate<br/>existing widgets]
     J -->|Standard| N[executeTool]
-    I --> O[Tronquer si necessaire]
+    I --> O[Truncate if needed]
     K --> O
     L --> O
     M --> O
     N --> O
     E --> O
-    O --> P[Compresser anciens<br/>resultats]
-    P --> Q[Retourner tool_result<br/>a l'agent]
+    O --> P[Compress old<br/>results]
+    P --> Q[Return tool_result<br/>to agent]
 ```
 
 ## FAQ
 
-### Pourquoi le format `{server}_{proto}_{tool}` et pas juste le nom de l'outil ?
+### Why the `{server}_{proto}_{tool}` format instead of just the tool name?
 
-Parce qu'un meme nom d'outil peut exister sur plusieurs serveurs. Par exemple, `list_items` pourrait etre defini a la fois sur un serveur `database` et un serveur `filesystem`. Le prefixe desambigue.
+Because the same tool name can exist on multiple servers. For example, `list_items` could be defined on both a `database` and a `filesystem` server. The prefix disambiguates.
 
-### Combien d'outils un agent peut-il gerer ?
+### How many tools can an agent handle?
 
-En theorie, autant que la fenetre de contexte le permet. En pratique, au-dela de 50 outils actifs, la qualite des choix du LLM degrade. Le mecanisme de lazy loading limite les outils aux seuls serveurs reellement utilises.
+In theory, as many as the context window allows. In practice, beyond 50 active tools, LLM choice quality degrades. The lazy loading mechanism limits tools to only the servers actually used.
 
-### Que se passe-t-il si un serveur MCP ne repond pas ?
+### What happens if an MCP server does not respond?
 
-L'appel reste en attente jusqu'a un timeout (configurable via `AbortSignal`). L'agent recoit une erreur et peut decider de la suite (retenter, utiliser un autre outil, informer l'utilisateur).
+The call waits until a timeout (configurable via `AbortSignal`). The agent receives an error and can decide what to do next (retry, use a different tool, inform the user).
 
-### Comment ajouter un pseudo-outil custom ?
+### How do I add a custom pseudo-tool?
 
-Les pseudo-outils sont geres dans le dispatcher. Pour en ajouter un, il faut modifier la logique d'interception dans `loop.ts`. C'est volontairement limite : les pseudo-outils doivent etre rares et bien definis.
+Pseudo-tools are managed in the dispatcher. To add one, you need to modify the interception logic in `loop.ts`. This is intentionally limited: pseudo-tools should be rare and well-defined.

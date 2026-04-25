@@ -1,36 +1,36 @@
 ---
 title: Home
-description: Landing page statique avec liens vers toutes les demos webmcp-auto-ui et liste des serveurs MCP disponibles
+description: Static landing page with links to all webmcp-auto-ui demos and list of available MCP servers
 sidebar:
   order: 6
 ---
 
-Home (`apps/home/`) est la page d'accueil du site de demos. C'est une page statique qui catalogue toutes les applications disponibles et liste les serveurs MCP connectables. C'est la premiere chose que les visiteurs voient sur `demos.hyperskills.net`.
+Home (`apps/home/`) is the landing page for the demo site. It's a static page that catalogs all available applications and lists connectable MCP servers. It's the first thing visitors see at `demos.hyperskills.net`.
 
-## Ce que vous voyez quand vous ouvrez l'app
+## What you see when you open the app
 
-Quand vous ouvrez Home, vous decouvrez une page sobre et verticale, centree sur un maximum de 3 colonnes.
+When you open Home, you'll see a clean, vertical page centered within a max-width of 3 columns.
 
-En haut, le titre **WEBMCP Auto-UI** en gras avec un sous-titre en gris expliquant le projet : "Interactive demos of the webmcp-auto-ui framework -- Svelte 5 components, W3C WebMCP protocol, AI-driven UI composition, and portable HyperSkills URLs." Trois liens : hyperskills.net, GitHub, et un toggle de theme (soleil/lune).
+At the top, the title **WEBMCP Auto-UI** in bold with a gray subtitle explaining the project: "Interactive demos of the webmcp-auto-ui framework -- Svelte 5 components, W3C WebMCP protocol, AI-driven UI composition, and portable HyperSkills URLs." Three links: hyperskills.net, GitHub, and a theme toggle (sun/moon).
 
-En dessous, une liste verticale de cartes cliquables presente chaque app avec :
-- Un trait de couleur vertical a gauche (chaque app a sa couleur distinctive)
-- Le titre de l'app
-- Une description courte
-- Le chemin URL (`/flex`, `/viewer`, etc.)
+Below, a vertical list of clickable cards presents each app with:
+- A vertical color stripe on the left (each app has its distinctive color)
+- The app title
+- A short description
+- The URL path (`/flex`, `/viewer`, etc.)
 
-Les apps listees sont : Flex, Viewer, Showcase, Todo-WebMCP, Recipes, Multi-WebMCP-UI, et Boilerplate.
+The apps listed are: Flex, Viewer, Showcase, Todo-WebMCP, Recipes, Multi-WebMCP-UI, and Boilerplate.
 
-En bas, un encadre "Serveurs MCP disponibles" affiche une grille 4 colonnes avec les 8 serveurs MCP de demo : Tricoteuses (Parlement francais), Hacker News (Stories & commentaires), Met Museum (Collections d'art), Open-Meteo (Donnees meteo), Wikipedia (Articles & recherche), iNaturalist (Biodiversite), data.gouv.fr (Open data FR), et NASA (Donnees spatiales).
+At the bottom, a bordered section "Available MCP Servers" displays a 4-column grid with the 8 demo MCP servers: Tricoteuses (French Parliament), Hacker News (Stories & comments), Met Museum (Art collections), Open-Meteo (Weather data), Wikipedia (Articles & search), iNaturalist (Biodiversity), data.gouv.fr (French open data), and NASA (Space data).
 
-Un footer affiche la licence AGPL-3.0, la version et le hash du commit.
+A footer shows the AGPL-3.0 license, version, and commit hash.
 
 ## Architecture
 
 ```mermaid
 graph TD
     subgraph Frontend
-        Page["+page.svelte<br/>Catalogue demos + serveurs MCP"]
+        Page["+page.svelte<br/>Demo catalog + MCP servers"]
     end
 
     subgraph Packages
@@ -38,98 +38,98 @@ graph TD
     end
 
     subgraph Build
-        Static["@sveltejs/adapter-static<br/>Fichiers HTML/CSS/JS"]
+        Static["@sveltejs/adapter-static<br/>HTML/CSS/JS files"]
     end
 
     Page --> UI
     Page --> Static
 ```
 
-## Stack technique
+## Tech stack
 
-| Composant | Detail |
+| Component | Detail |
 |-----------|--------|
 | Framework | SvelteKit + Svelte 5 |
 | Styles | TailwindCSS 3.4 |
-| Adapter | `@sveltejs/adapter-static` (build statique) |
+| Adapter | `@sveltejs/adapter-static` (static build) |
 
-**Packages utilises :**
-- `@webmcp-auto-ui/ui` : `getTheme` pour le toggle dark/light
+**Packages used:**
+- `@webmcp-auto-ui/ui`: `getTheme` for dark/light toggle
 
 :::note
-Home est la seule app de demo qui utilise `adapter-static`. Elle ne necessite pas de serveur Node.js en production -- elle est servie directement par nginx comme fichiers statiques.
+Home is the only demo app using `adapter-static`. It doesn't need a Node.js server in production -- it's served directly by nginx as static files.
 :::
 
-## Lancement
+## Getting started
 
-| Environnement | Port | Commande |
-|---------------|------|----------|
+| Environment | Port | Command |
+|-------------|------|---------|
 | Dev | 5173 | `npm -w apps/home run dev` |
-| Production | -- | Fichiers statiques (nginx) |
+| Production | -- | Static files (nginx) |
 
 ```bash
 npm -w apps/home run dev
-# Accessible sur http://localhost:5173
+# Available at http://localhost:5173
 ```
 
-### Build de production
+### Production build
 
 ```bash
 PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/home run build
 ```
 
 :::caution
-La variable `PUBLIC_BASE_URL` est obligatoire pour le build de production. Sans elle, tous les liens vers les demos pointent vers des chemins relatifs qui ne fonctionnent pas sur le serveur. Ce n'est pas necessaire en developpement.
+The `PUBLIC_BASE_URL` variable is required for the production build. Without it, all demo links point to relative paths that don't work on the server. It's not needed in development.
 :::
 
-## Fonctionnalites
+## Features
 
-### Catalogue des demos
+### Demo catalog
 
-Chaque app est representee par un objet avec titre, description, URL et couleur d'accent. L'URL est construite en prefixant `PUBLIC_BASE_URL` (ou vide en dev). Les cartes sont cliquables et menent directement a l'app.
+Each app is represented by an object with title, description, URL, and accent color. The URL is built by prefixing `PUBLIC_BASE_URL` (or empty in dev). Cards are clickable and lead directly to the app.
 
-### Serveurs MCP
+### MCP servers
 
-La grille des serveurs MCP est purement informative -- elle montre les serveurs disponibles pour les apps qui supportent la connexion MCP (Flex, Boilerplate, Showcase, Multi-Svelte, Recipes).
+The MCP server grid is purely informational -- it shows available servers for apps that support MCP connections (Flex, Boilerplate, Showcase, Multi-Svelte, Recipes).
 
-### Theme dark/light
+### Dark/light theme
 
-Le toggle utilise `getTheme()` du package UI. Le mode est persiste en localStorage.
+The toggle uses `getTheme()` from the UI package. The mode is persisted in localStorage.
 
 ## Configuration
 
-| Variable | Description | Obligatoire |
-|----------|-------------|-------------|
-| `PUBLIC_BASE_URL` | Prefixe des URLs de demo (ex: `https://demos.hyperskills.net`) | Production uniquement |
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `PUBLIC_BASE_URL` | Demo URL prefix (e.g., `https://demos.hyperskills.net`) | Production only |
 
 ## Code walkthrough
 
 ### `+page.svelte`
-Fichier unique de l'app. Deux tableaux de donnees statiques :
-- `demos` : 7 objets `{title, desc, url, accent}` pour les cartes d'apps
-- `mcpServers` : 8 objets `{name, desc}` pour la grille de serveurs
+Single file for the app. Two static data arrays:
+- `demos`: 7 objects `{title, desc, url, accent}` for app cards
+- `mcpServers`: 8 objects `{name, desc}` for the server grid
 
-La variable `base` est derivee de `PUBLIC_BASE_URL` et sert de prefixe pour toutes les URLs.
+The `base` variable is derived from `PUBLIC_BASE_URL` and serves as a prefix for all URLs.
 
-## Personnalisation
+## Customization
 
-Pour ajouter une nouvelle app au catalogue :
-1. Ajouter un objet dans le tableau `demos` avec `title`, `desc`, `url` et `accent` (couleur hex)
-2. Rebuild avec `PUBLIC_BASE_URL` en production
+To add a new app to the catalog:
+1. Add an object to the `demos` array with `title`, `desc`, `url`, and `accent` (hex color)
+2. Rebuild with `PUBLIC_BASE_URL` in production
 
-## Deploiement
+## Deployment
 
-| Chemin sur le serveur | `/opt/webmcp-demos/home/` (racine) |
-|----------------------|-------------------------------------|
-| Servi par | nginx (fichiers statiques) |
+| Server path | `/opt/webmcp-demos/home/` (root) |
+|------------|-------------------------------------|
+| Served by | nginx (static files) |
 
 ```bash
 PUBLIC_BASE_URL=https://demos.hyperskills.net npm -w apps/home run build
 ./scripts/deploy.sh home
 ```
 
-## Liens
+## Links
 
-- [Demo live](https://demos.hyperskills.net)
-- [Flex](/webmcp-auto-ui/apps/flex/) -- app principale
-- [Package UI](/webmcp-auto-ui/packages/ui/) -- `getTheme`
+- [Live demo](https://demos.hyperskills.net)
+- [Flex](/webmcp-auto-ui/apps/flex/) -- main app
+- [UI package](/webmcp-auto-ui/packages/ui/) -- `getTheme`

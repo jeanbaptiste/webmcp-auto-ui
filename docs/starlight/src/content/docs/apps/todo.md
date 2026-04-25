@@ -1,54 +1,54 @@
 ---
 title: Todo
-description: Todo app WebMCP avec la nouvelle architecture layers, template minimal
+description: WebMCP todo app with the new layers architecture, minimal template
 sidebar:
   order: 5
 ---
 
-Todo (`apps/todo/`) est une application de gestion de taches qui expose ses operations via le protocole W3C WebMCP. Contrairement aux autres apps du projet, elle n'utilise pas d'agent LLM ni de connexion MCP distante -- elle **est** elle-meme un serveur WebMCP. C'est une demonstration de la facon dont une app existante peut devenir "MCP-ready" en enregistrant ses fonctions comme outils WebMCP.
+Todo (`apps/todo/`) is a task management app that exposes its operations via the W3C WebMCP protocol. Unlike other apps in the project, it doesn't use an LLM agent or remote MCP connection -- it **is** a WebMCP server itself. It demonstrates how an existing app can become "MCP-ready" by registering its functions as WebMCP tools.
 
-## Ce que vous voyez quand vous ouvrez l'app
+## What you see when you open the app
 
-Quand vous ouvrez Todo, vous voyez une interface de todo-list classique et bien finie, dans un style sombre monospace.
+When you open Todo, you'll see a polished todo-list interface in a dark monospace style.
 
-En haut, une barre affiche "Todo WebMCP" avec un indicateur vert "6 tools" qui confirme que l'app a enregistre ses outils WebMCP dans le navigateur.
+At the top, a bar displays "Todo WebMCP" with a green "6 tools" indicator confirming the app has registered its WebMCP tools in the browser.
 
-Juste en dessous, 4 cartes `StatCard` affichent les metriques en temps reel :
-- **Total** : nombre total de taches
-- **Actifs** : taches non terminees
-- **Faits** : taches completees
-- **Urgents** : taches de priorite haute non terminees
+Below that, 4 `StatCard` widgets display real-time metrics:
+- **Total**: total task count
+- **Active**: incomplete tasks
+- **Done**: completed tasks
+- **Urgent**: high-priority incomplete tasks
 
-Un formulaire d'ajout propose un champ texte, un selecteur de priorite (low/normal/high) et un bouton "Ajouter".
+An add form provides a text field, a priority selector (low/normal/high), and an "Add" button.
 
-Trois boutons filtres (Tous, Actifs, Faits) permettent de filtrer la liste. Un bouton rouge "Effacer faits" apparait quand il y a des taches completees.
+Three filter buttons (All, Active, Done) let you filter the list. A red "Clear done" button appears when there are completed tasks.
 
-La liste de taches affiche chaque tache avec :
-- Un bouton check/circle pour basculer l'etat
-- Un point de couleur (rouge pour high, gris pour normal, gris fonce pour low)
-- Le texte de la tache (barre si completee)
-- Un badge de priorite
-- Un bouton poubelle au survol pour supprimer
+The task list shows each task with:
+- A check/circle button to toggle state
+- A color dot (red for high, gray for normal, dark gray for low)
+- The task text (strikethrough if completed)
+- A priority badge
+- A trash button on hover to delete
 
-L'app demarre avec 3 taches pre-remplies : "Activer WebMCP dans chrome://flags", "Tester les outils dans l'extension", et "Lire la doc WebMCP W3C" (deja completee).
+The app starts with 3 pre-filled tasks: "Enable WebMCP in chrome://flags", "Test the tools in the extension", and "Read the WebMCP W3C docs" (already completed).
 
 ## Architecture
 
 ```mermaid
 graph TD
     subgraph Frontend
-        Page["+page.svelte<br/>UI Todo + WebMCP tools"]
-        StatCards["StatCard x4<br/>Total, Actifs, Faits, Urgents"]
-        TodoList["Liste de taches<br/>Check, delete, filter"]
+        Page["+page.svelte<br/>Todo UI + WebMCP tools"]
+        StatCards["StatCard x4<br/>Total, Active, Done, Urgent"]
+        TodoList["Task list<br/>Check, delete, filter"]
     end
 
     subgraph "WebMCP Tools (navigator.modelContext)"
-        T1["add_todo<br/>Ajouter une tache"]
-        T2["list_todos<br/>Lister (filtre)"]
-        T3["toggle_todo<br/>Basculer fait/actif"]
-        T4["delete_todo<br/>Supprimer"]
-        T5["clear_done<br/>Effacer completees"]
-        T6["get_stats<br/>Statistiques"]
+        T1["add_todo<br/>Add a task"]
+        T2["list_todos<br/>List (filtered)"]
+        T3["toggle_todo<br/>Toggle done/active"]
+        T4["delete_todo<br/>Delete"]
+        T5["clear_done<br/>Clear completed"]
+        T6["get_stats<br/>Statistics"]
     end
 
     subgraph Packages
@@ -63,125 +63,125 @@ graph TD
     Page --> UI
 ```
 
-## Stack technique
+## Tech stack
 
-| Composant | Detail |
+| Component | Detail |
 |-----------|--------|
 | Framework | SvelteKit + Svelte 5 |
 | Styles | TailwindCSS 3.4 |
-| Icones | lucide-svelte (Check, Trash2, Plus, Circle) |
+| Icons | lucide-svelte (Check, Trash2, Plus, Circle) |
 | Adapter | `@sveltejs/adapter-static` |
 | WebMCP | `navigator.modelContext.registerTool()` |
 
-**Packages utilises :**
-- `@webmcp-auto-ui/core` : `jsonResult` (helper pour formater les reponses d'outils)
-- `@webmcp-auto-ui/ui` : `Button`, `Input`, `Badge`, `NativeSelect`, `StatCard`
+**Packages used:**
+- `@webmcp-auto-ui/core`: `jsonResult` (helper for formatting tool responses)
+- `@webmcp-auto-ui/ui`: `Button`, `Input`, `Badge`, `NativeSelect`, `StatCard`
 
 :::note
-Todo n'utilise pas les packages `agent` ni `sdk`. C'est l'app la plus simple du projet -- elle ne fait qu'exposer ses fonctions via l'API W3C WebMCP du navigateur.
+Todo doesn't use the `agent` or `sdk` packages. It's the simplest app in the project -- it only exposes its functions via the browser's W3C WebMCP API.
 :::
 
-## Lancement
+## Getting started
 
-| Environnement | Port | Commande |
-|---------------|------|----------|
+| Environment | Port | Command |
+|-------------|------|---------|
 | Dev | 5176 | `npm -w apps/todo run dev` |
-| Production | -- | Fichiers statiques (nginx) |
+| Production | -- | Static files (nginx) |
 
 ```bash
 npm -w apps/todo run dev
-# Accessible sur http://localhost:5176
+# Available at http://localhost:5176
 ```
 
-## Fonctionnalites
+## Features
 
-### 6 outils WebMCP
+### 6 WebMCP tools
 
-Les outils sont enregistres au `onMount` via `navigator.modelContext.registerTool()` et desenregistres au `onDestroy` :
+Tools are registered on `onMount` via `navigator.modelContext.registerTool()` and unregistered on `onDestroy`:
 
-| Outil | Description | Annotations |
-|-------|-------------|-------------|
-| `add_todo` | Ajoute une tache avec texte et priorite optionnelle | -- |
-| `list_todos` | Liste les taches avec filtre optionnel (all/active/done) | `readOnlyHint: true` |
-| `toggle_todo` | Bascule une tache entre fait et actif | -- |
-| `delete_todo` | Supprime une tache par ID | `destructiveHint: true` |
-| `clear_done` | Supprime toutes les taches completees | `destructiveHint: true` |
-| `get_stats` | Retourne les statistiques (total, active, done, high) | `readOnlyHint: true` |
+| Tool | Description | Annotations |
+|------|-------------|-------------|
+| `add_todo` | Add a task with text and optional priority | -- |
+| `list_todos` | List tasks with optional filter (all/active/done) | `readOnlyHint: true` |
+| `toggle_todo` | Toggle a task between done and active | -- |
+| `delete_todo` | Delete a task by ID | `destructiveHint: true` |
+| `clear_done` | Remove all completed tasks | `destructiveHint: true` |
+| `get_stats` | Return statistics (total, active, done, high) | `readOnlyHint: true` |
 
-Les annotations `readOnlyHint` et `destructiveHint` informent le LLM du comportement de l'outil pour une meilleure prise de decision.
+The `readOnlyHint` and `destructiveHint` annotations inform the LLM about tool behavior for better decision-making.
 
-### Composants UI du package
+### UI package components
 
-L'app utilise exclusivement les composants du package `@webmcp-auto-ui/ui` :
-- `StatCard` pour les 4 metriques avec variantes (default, info, success, error)
-- `Button` avec variantes (default, outline, ghost, destructive) et tailles (sm, icon)
-- `Input` pour le champ de saisie
-- `NativeSelect` pour le selecteur de priorite
-- `Badge` avec variante secondary pour les labels de priorite
+The app exclusively uses components from `@webmcp-auto-ui/ui`:
+- `StatCard` for the 4 metrics with variants (default, info, success, error)
+- `Button` with variants (default, outline, ghost, destructive) and sizes (sm, icon)
+- `Input` for the text field
+- `NativeSelect` for the priority selector
+- `Badge` with secondary variant for priority labels
 
-### Etat reactif Svelte 5
+### Svelte 5 reactive state
 
-L'app utilise les runes Svelte 5 (`$state`, `$derived`) pour un etat entierement reactif :
-- `todos` : liste reactive des taches
-- `filter` : filtre actif
-- `stats` : statistiques derivees automatiquement
-- `filtered` : liste filtree derivee
+The app uses Svelte 5 runes (`$state`, `$derived`) for fully reactive state:
+- `todos`: reactive task list
+- `filter`: active filter
+- `stats`: automatically derived statistics
+- `filtered`: derived filtered list
 
 ## Configuration
 
-L'app n'a pas de variable d'environnement. Toutes les donnees sont en memoire (pas de persistance).
+The app has no environment variables. All data is in-memory (no persistence).
 
 ## Code walkthrough
 
 ### `+page.svelte`
-Fichier unique de l'app (~200 lignes). Il contient :
+Single file for the app (~200 lines). It contains:
 
-**Types et etat** (lignes 1-30) : interface `Todo` avec id, text, done, priority, createdAt. Trois taches pre-remplies.
+**Types and state** (lines 1-30): `Todo` interface with id, text, done, priority, createdAt. Three pre-filled tasks.
 
-**CRUD** (lignes 30-50) : fonctions `addTodo`, `toggleTodo`, `deleteTodo`, `clearDone` qui manipulent le tableau reactif.
+**CRUD** (lines 30-50): `addTodo`, `toggleTodo`, `deleteTodo`, `clearDone` functions that manipulate the reactive array.
 
-**WebMCP** (lignes 72-116) : au `onMount`, les 6 outils sont enregistres via `navigator.modelContext.registerTool()`. Chaque outil definit un `inputSchema` (JSON Schema) et une fonction `execute` qui appelle la fonction CRUD correspondante et retourne le resultat via `jsonResult`.
+**WebMCP** (lines 72-116): on `onMount`, all 6 tools are registered via `navigator.modelContext.registerTool()`. Each tool defines an `inputSchema` (JSON Schema) and an `execute` function that calls the corresponding CRUD function and returns the result via `jsonResult`.
 
-**UI** (lignes 120-206) : le template Svelte avec header, stats, formulaire, filtres et liste.
+**UI** (lines 120-206): the Svelte template with header, stats, form, filters, and list.
 
-## Personnalisation
+## Customization
 
-### Comme template minimal
+### As a minimal template
 
-Todo est le point de depart le plus simple pour creer une app WebMCP :
+Todo is the simplest starting point for creating a WebMCP app:
 
 ```bash
-cp -r apps/todo apps/mon-app
+cp -r apps/todo apps/my-app
 ```
 
-Modifier :
-1. `package.json` : changer le nom et le port
-2. `+page.svelte` : remplacer le type `Todo` par votre modele de donnees
-3. Adapter les fonctions CRUD et les outils WebMCP
+Modify:
+1. `package.json`: change the name and port
+2. `+page.svelte`: replace the `Todo` type with your data model
+3. Adapt the CRUD functions and WebMCP tools
 
-### Ajouter de la persistance
+### Adding persistence
 
-L'app stocke tout en memoire. Pour persister :
-- **localStorage** : ajouter un `$effect` qui sauvegarde `todos` a chaque changement
-- **Backend** : ajouter un endpoint API et remplacer les fonctions CRUD par des appels fetch
+The app stores everything in memory. To persist:
+- **localStorage**: add an `$effect` that saves `todos` on every change
+- **Backend**: add an API endpoint and replace CRUD functions with fetch calls
 
-### Connecter a un agent
+### Connecting to an agent
 
-Pour piloter les outils via un agent LLM (au lieu du navigateur), voir l'architecture du [Boilerplate](/webmcp-auto-ui/apps/boilerplate/) qui integre `runAgentLoop`.
+To drive tools via an LLM agent (instead of the browser), see the [Boilerplate](/webmcp-auto-ui/apps/boilerplate/) architecture which integrates `runAgentLoop`.
 
-## Deploiement
+## Deployment
 
-| Chemin sur le serveur | `/opt/webmcp-demos/todo/` (racine) |
-|----------------------|--------------------------------------|
-| Servi par | nginx (fichiers statiques) |
+| Server path | `/opt/webmcp-demos/todo/` (root) |
+|------------|--------------------------------------|
+| Served by | nginx (static files) |
 
 ```bash
 ./scripts/deploy.sh todo
 ```
 
-## Liens
+## Links
 
-- [Demo live](https://demos.hyperskills.net/todo/)
-- [Package core](/webmcp-auto-ui/packages/core/) -- `jsonResult`
-- [Package UI](/webmcp-auto-ui/packages/ui/) -- composants utilises
-- [Boilerplate](/webmcp-auto-ui/apps/boilerplate/) -- version avec agent IA
+- [Live demo](https://demos.hyperskills.net/todo/)
+- [Core package](/webmcp-auto-ui/packages/core/) -- `jsonResult`
+- [UI package](/webmcp-auto-ui/packages/ui/) -- used components
+- [Boilerplate](/webmcp-auto-ui/apps/boilerplate/) -- version with AI agent

@@ -53,8 +53,8 @@ for (const pre of pres) {
       ],
       defaultLocale: 'root',
       locales: {
-        root: { label: 'Français', lang: 'fr' },
-        en: { label: 'English', lang: 'en' },
+        root: { label: 'English', lang: 'en' },
+        fr: { label: 'Français', lang: 'fr' },
       },
       social: [
         { icon: 'github', label: 'GitHub', href: 'https://github.com/jeanbaptiste/webmcp-auto-ui' },

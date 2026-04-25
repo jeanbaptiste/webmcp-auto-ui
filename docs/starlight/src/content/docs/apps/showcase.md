@@ -1,32 +1,32 @@
 ---
 title: Showcase
-description: Demo dynamique avec agent IA, connexion MCP et 3 themes
+description: Dynamic demo with AI agent, MCP connection and 3 themes
 sidebar:
   order: 3
 ---
 
-Showcase (`apps/showcase/`) est la vitrine interactive de tous les composants UI du projet. Elle fonctionne en deux modes : un mode **demo statique** qui affiche chaque type de widget avec des donnees d'exemple, et un mode **agent** ou un LLM genere les widgets a partir de donnees reelles d'un serveur MCP. Trois themes prealables transforment completement l'apparence de tous les composants.
+Showcase (`apps/showcase/`) is the interactive showcase of all UI components in the project. It works in two modes: a **static demo** mode that displays each widget type with sample data, and an **agent** mode where an LLM generates widgets from real MCP server data. Three preset themes completely transform the appearance of every component.
 
-## Ce que vous voyez quand vous ouvrez l'app
+## What you see when you open the app
 
-Quand vous ouvrez Showcase, vous voyez une page plein ecran avec un header sticky et translucide.
+When you open Showcase, you'll see a full-screen page with a sticky, translucent header.
 
-**Header** : a gauche, "WebMCP Auto-UI" en gras avec un sous-titre "Component Showcase -- Corporate" (le theme actif). Au centre, trois boutons de theme : Corporate, Pastel, Cyberpunk. A droite, un lien GitHub.
+**Header**: on the left, "WebMCP Auto-UI" in bold with a subtitle "Component Showcase -- Corporate" (the active theme). In the center, three theme buttons: Corporate, Pastel, Cyberpunk. On the right, a GitHub link.
 
-**Barre de controles agent** : juste en dessous, une rangee de controles permet de piloter l'agent :
-- Un selecteur de serveur MCP (dropdown avec les serveurs de demo)
-- Un selecteur de modele LLM (haiku, sonnet, opus, Gemma E2B/E4B)
-- Une checkbox Nano-RAG (experimentale)
-- Un bouton "Generate" qui connecte le serveur MCP selectionne et lance l'agent
-- Un indicateur de connexion MCP une fois connecte
+**Agent controls bar**: just below, a row of controls drives the agent:
+- An MCP server selector (dropdown with demo servers)
+- An LLM model selector (haiku, sonnet, opus, Gemma E2B/E4B)
+- A Nano-RAG checkbox (experimental)
+- A "Generate" button that connects the selected MCP server and launches the agent
+- An MCP connection indicator once connected
 
-**Mode demo (par defaut)** : la page affiche tous les widgets en deux sections :
-- **Simple Widgets** : grille 3 colonnes avec stat, kv, list, chart, alert, code, text, actions, tags
-- **Rich Widgets** : colonne unique pour les widgets larges (table, cards, gallery, carousel, timeline, profile, hemicycle, map, etc.)
+**Demo mode (default)**: the page displays all widgets in two sections:
+- **Simple Widgets**: 3-column grid with stat, kv, list, chart, alert, code, text, actions, tags
+- **Rich Widgets**: single column for wide widgets (table, cards, gallery, carousel, timeline, profile, hemicycle, map, etc.)
 
-Chaque widget est encadre dans un conteneur avec un bandeau superieur affichant son label et son `type` en code colore.
+Each widget is framed in a container with a top banner showing its label and color-coded `type`.
 
-**Mode agent** : quand vous cliquez "Generate", l'agent se connecte au serveur MCP, interroge les donnees, et genere des widgets adaptes. La page passe en mode agent et affiche les widgets generes a la place des demos statiques.
+**Agent mode**: when you click "Generate", the agent connects to the MCP server, queries data, and generates appropriate widgets. The page switches to agent mode and displays generated widgets instead of static demos.
 
 ## Architecture
 
@@ -34,9 +34,9 @@ Chaque widget est encadre dans un conteneur avec un bandeau superieur affichant 
 graph TD
     subgraph Frontend
         Page["+page.svelte<br/>Demo / Agent mode"]
-        Themes["themes.ts<br/>3 presets CSS"]
-        DemoData["demo-data.ts<br/>Donnees statiques"]
-        AgentStore["agent-store.svelte.ts<br/>Etat agent reactif"]
+        Themes["themes.ts<br/>3 CSS presets"]
+        DemoData["demo-data.ts<br/>Static data"]
+        AgentStore["agent-store.svelte.ts<br/>Reactive agent state"]
     end
 
     subgraph Packages
@@ -60,99 +60,99 @@ graph TD
     Agent --> Proxy
 ```
 
-## Stack technique
+## Tech stack
 
-| Composant | Detail |
+| Component | Detail |
 |-----------|--------|
 | Framework | SvelteKit + Svelte 5 |
 | Styles | TailwindCSS 3.4 |
-| LLM providers | `RemoteLLMProvider` (LLM distant), `WasmProvider` (Gemma) |
+| LLM providers | `RemoteLLMProvider` (remote LLM), `WasmProvider` (Gemma) |
 | MCP | `McpMultiClient` |
-| Themes | 3 presets avec CSS custom properties |
+| Themes | 3 presets with CSS custom properties |
 | Adapter | `@sveltejs/adapter-node` |
 
-**Packages utilises :**
-- `@webmcp-auto-ui/agent` : `runAgentLoop`, `RemoteLLMProvider`, `WasmProvider`, `buildSystemPrompt`, `fromMcpTools`, `autoui`, `buildDiscoveryCache`, `ContextRAG`
-- `@webmcp-auto-ui/core` : `McpMultiClient`
-- `@webmcp-auto-ui/sdk` : `canvas`, `MCP_DEMO_SERVERS`
-- `@webmcp-auto-ui/ui` : `WidgetRenderer`, `LLMSelector`, `ModelLoader`, `AgentProgress`, `McpStatus`, `getTheme`
+**Packages used:**
+- `@webmcp-auto-ui/agent`: `runAgentLoop`, `RemoteLLMProvider`, `WasmProvider`, `buildSystemPrompt`, `fromMcpTools`, `autoui`, `buildDiscoveryCache`, `ContextRAG`
+- `@webmcp-auto-ui/core`: `McpMultiClient`
+- `@webmcp-auto-ui/sdk`: `canvas`, `MCP_DEMO_SERVERS`
+- `@webmcp-auto-ui/ui`: `WidgetRenderer`, `LLMSelector`, `ModelLoader`, `AgentProgress`, `McpStatus`, `getTheme`
 
-## Lancement
+## Getting started
 
-| Environnement | Port | Commande |
-|---------------|------|----------|
+| Environment | Port | Command |
+|-------------|------|---------|
 | Dev | 5178 | `npm -w apps/showcase run dev` |
 | Production | 3010 | `PORT=3010 node build/index.js` |
 
 ```bash
 npm -w apps/showcase run dev
-# Accessible sur http://localhost:5178
+# Available at http://localhost:5178
 ```
 
-## Fonctionnalites
+## Features
 
-### 3 themes dynamiques
+### 3 dynamic themes
 
-Les themes modifient les CSS custom properties du document en temps reel :
+Themes modify the document's CSS custom properties in real time:
 
 | Theme | Mode | Accent | Style |
 |-------|------|--------|-------|
-| **Corporate** | dark | bleu `#3b82f6` | Professionnel, gris ardoise |
-| **Pastel** | light | violet `#8b5cf6` | Fond creme, tons chauds |
-| **Cyberpunk** | dark | vert neon `#00ffaa` | Noir profond, neon rose/vert |
+| **Corporate** | dark | blue `#3b82f6` | Professional, slate grays |
+| **Pastel** | light | purple `#8b5cf6` | Cream background, warm tones |
+| **Cyberpunk** | dark | neon green `#00ffaa` | Deep black, pink/green neon |
 
-Chaque theme definit 11 variables CSS (bg, surface, surface2, border, border2, accent, accent2, amber, teal, text1, text2). Le changement de theme est instantane et affecte tous les widgets simultanément.
+Each theme defines 11 CSS variables (bg, surface, surface2, border, border2, accent, accent2, amber, teal, text1, text2). Theme changes are instant and affect all widgets simultaneously.
 
-### Mode demo statique
+### Static demo mode
 
-Le fichier `demo-data.ts` fournit des donnees d'exemple pour chaque type de widget. Les widgets sont repartis en deux categories :
-- **Simple** (grille 3 colonnes) : stat, kv, list, chart, alert, code, text, actions, tags
-- **Rich** (pleine largeur) : table, cards, gallery, carousel, timeline, profile, hemicycle, map, etc.
+The `demo-data.ts` file provides sample data for every widget type. Widgets are split into two categories:
+- **Simple** (3-column grid): stat, kv, list, chart, alert, code, text, actions, tags
+- **Rich** (full width): table, cards, gallery, carousel, timeline, profile, hemicycle, map, etc.
 
-### Mode agent genere
+### Agent-generated mode
 
-Quand vous cliquez "Generate" :
-1. L'app se connecte au serveur MCP selectionne
-2. L'agent construit les layers (MCP + autoui)
-3. `runAgentLoop` genere des widgets a partir des donnees reelles
-4. Les widgets remplacement les demos statiques
-5. Les metriques s'affichent : nombre de widgets, tool calls, temps
+When you click "Generate":
+1. The app connects to the selected MCP server
+2. The agent builds layers (MCP + autoui)
+3. `runAgentLoop` generates widgets from real data
+4. Widgets replace the static demos
+5. Metrics display: widget count, tool calls, elapsed time
 
-Un bouton "Demo mode" permet de revenir aux widgets statiques.
+A "Demo mode" button lets you switch back to static widgets.
 
 ### Gemma WASM in-browser
 
-En selectionnant Gemma E2B ou E4B, le modele est charge directement dans le navigateur. Le composant `ModelLoader` affiche la progression du telechargement avec les MB charges/total et le temps ecoule.
+By selecting Gemma E2B or E4B, the model loads directly in the browser. The `ModelLoader` component shows download progress with loaded/total MB and elapsed time.
 
-### Nano-RAG experimental
+### Experimental Nano-RAG
 
-Activable via une checkbox. Utilise `ContextRAG` pour compacter le contexte de l'agent via des embeddings.
+Toggleable via checkbox. Uses `ContextRAG` to compact the agent's context via embeddings.
 
 ## Configuration
 
-| Variable | Description | Defaut |
-|----------|-------------|--------|
-| `LLM_API_KEY` | Cle API du provider LLM distant (`.env` server-side) | requis |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LLM_API_KEY` | Remote LLM provider API key (server-side `.env`) | required |
 
 ## Code walkthrough
 
 ### `src/lib/themes.ts`
-Definit l'interface `ThemePreset` et les 3 presets. Chaque preset est un objet avec `id`, `label`, `mode` (light/dark) et `overrides` (map de variables CSS).
+Defines the `ThemePreset` interface and the 3 presets. Each preset is an object with `id`, `label`, `mode` (light/dark), and `overrides` (CSS variable map).
 
 ### `src/lib/demo-data.ts`
-Exporte `SIMPLE_BLOCKS` et `RICH_BLOCKS`, deux tableaux de `DemoBlock` avec type, label et data. Les donnees sont realistes : metriques serveur, configuration reseau, liste de projets, historique de prix, etc.
+Exports `SIMPLE_BLOCKS` and `RICH_BLOCKS`, two arrays of `DemoBlock` with type, label, and data. The data is realistic: server metrics, network configuration, project lists, price history, etc.
 
 ### `src/lib/agent-store.svelte.ts`
-Store reactif Svelte 5 qui encapsule toute la logique agent : connexion MCP, initialisation Gemma, generation de widgets, suivi des metriques. Separe du composant principal pour une meilleure lisibilite.
+Svelte 5 reactive store encapsulating all agent logic: MCP connection, Gemma initialization, widget generation, metrics tracking. Separated from the main component for better readability.
 
 ### `+page.svelte`
-Orchestre les deux modes (demo/agent), les themes, et les composants UI. Le `$derived` `displayBlocks` determine quels widgets afficher selon le mode actif.
+Orchestrates both modes (demo/agent), themes, and UI components. The `$derived` `displayBlocks` determines which widgets to show based on the active mode.
 
-## Personnalisation
+## Customization
 
-### Ajouter un theme
+### Adding a theme
 
-Ajouter un objet dans le tableau `PRESETS` de `themes.ts` :
+Add an object to the `PRESETS` array in `themes.ts`:
 
 ```typescript
 {
@@ -162,28 +162,28 @@ Ajouter un objet dans le tableau `PRESETS` de `themes.ts` :
   overrides: {
     'color-bg': '#0a1628',
     'color-accent': '#0ea5e9',
-    // ... 9 autres variables
+    // ... 9 more variables
   },
 }
 ```
 
-### Ajouter des widgets de demo
+### Adding demo widgets
 
-Ajouter un objet dans `SIMPLE_BLOCKS` ou `RICH_BLOCKS` de `demo-data.ts` avec le `type` correspondant a un widget supporte par `WidgetRenderer`.
+Add an object to `SIMPLE_BLOCKS` or `RICH_BLOCKS` in `demo-data.ts` with the `type` matching a widget supported by `WidgetRenderer`.
 
-## Deploiement
+## Deployment
 
-| Chemin sur le serveur | `/opt/webmcp-demos/showcase/` (racine) |
-|----------------------|------------------------------------------|
-| Service systemd | `webmcp-showcase` |
+| Server path | `/opt/webmcp-demos/showcase/` (root) |
+|------------|------------------------------------------|
+| systemd service | `webmcp-showcase` |
 | ExecStart | `node build/index.js` |
 
 ```bash
 ./scripts/deploy.sh showcase
 ```
 
-## Liens
+## Links
 
-- [Demo live](https://demos.hyperskills.net/showcase/)
-- [Package UI](/webmcp-auto-ui/packages/ui/) -- tous les widgets
-- [Flex](/webmcp-auto-ui/apps/flex/) -- utilisation complete avec agent
+- [Live demo](https://demos.hyperskills.net/showcase/)
+- [UI package](/webmcp-auto-ui/packages/ui/) -- all widgets
+- [Flex](/webmcp-auto-ui/apps/flex/) -- full agent usage

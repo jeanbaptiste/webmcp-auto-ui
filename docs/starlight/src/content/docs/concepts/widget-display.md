@@ -1,81 +1,81 @@
 ---
 title: "widget_display()"
-description: Tool unifie exposant les composants au LLM, widget_display, et le pont agent-UI
+description: Unified tool exposing components to the LLM, widget_display, and the agent-UI bridge
 sidebar:
   order: 2
 ---
 
-Imaginez un telecommande universelle : au lieu d'avoir une telecommande par appareil (TV, sono, lumieres), vous avez un seul bouton "affiche ca". Vous dites ce que vous voulez voir et avec quels parametres, et la telecommande se debrouille. C'est exactement le role de `widget_display` : un **outil unique** qui permet a l'agent de rendre n'importe lequel des 24+ widgets natifs.
+Think of a universal remote control: instead of having one remote per device (TV, speakers, lights), you have a single "show this" button. You say what you want to see and with what parameters, and the remote figures it out. That's exactly what `widget_display` does: a **single tool** that lets the agent render any of the 24+ native widgets.
 
-## Qu'est-ce que l'outil widget_display ?
+## What is the widget_display tool?
 
-`widget_display` est l'outil WebMCP central qui permet a l'agent IA d'**afficher un widget sur le canvas**. L'agent envoie un nom de widget et ses parametres, et le systeme :
-1. Valide les parametres contre le schema JSON du widget
-2. Assainit les URLs d'images (supprime les URLs hallucinées)
-3. Rend le widget sur le canvas
-4. Retourne un identifiant unique pour les modifications ulterieures
+`widget_display` is the central WebMCP tool that lets the AI agent **display a widget on the canvas**. The agent sends a widget name and its parameters, and the system:
+1. Validates parameters against the widget's JSON schema
+2. Sanitizes image URLs (strips hallucinated URLs)
+3. Renders the widget on the canvas
+4. Returns a unique identifier for later modifications
 
 ```ts
-// L'agent appelle :
+// The agent calls:
 widget_display({
   name: "stat-card",
   params: { label: "Uptime", value: "99.9", unit: "%", variant: "success" }
 })
 
-// Le systeme retourne :
+// The system returns:
 { widget: "stat-card", data: { label: "Uptime", value: "99.9", unit: "%", variant: "success" }, id: "w_a3f2" }
 ```
 
-:::note[Evolution historique]
-L'outil s'appelait `component()` dans les versions anterieures (avant la Phase 8). Il a ete renomme en `widget_display` lors de l'adoption du serveur WebMCP `autoui`. L'ancienne API `component()` / `componentRegistry` a ete supprimee. Le concept reste le meme : un outil unique pour rendre n'importe quel widget.
+:::note[Historical evolution]
+The tool was called `component()` in earlier versions (before Phase 8). It was renamed to `widget_display` when the WebMCP `autoui` server was adopted. The old `component()` / `componentRegistry` API has been removed. The concept remains the same: a single tool to render any widget.
 :::
 
-## Pourquoi un outil unique ?
+## Why a single tool?
 
-L'alternative serait d'exposer un outil **par widget** : `render_stat`, `render_chart`, `render_table`... soit 31 outils. Comparez :
+The alternative would be to expose one tool **per widget**: `render_stat`, `render_chart`, `render_table`... that's 31 tools. Compare:
 
-| Approche | Outils visibles | Tokens de schema | Decouverte |
-|----------|----------------|-----------------|------------|
-| 1 outil par widget | 31 `render_*` | ~3000 tokens | Le LLM voit tout d'emblee |
-| Outil unique `widget_display` | 1 outil | ~200 tokens | Le LLM decouvre via les recettes |
+| Approach | Visible tools | Schema tokens | Discovery |
+|----------|--------------|--------------|-----------|
+| 1 tool per widget | 31 `render_*` | ~3000 tokens | LLM sees everything upfront |
+| Single `widget_display` | 1 tool | ~200 tokens | LLM discovers via recipes |
 
-L'outil unique consomme **15x moins de tokens** de schema. Avec un LLM distant (e.g. Claude, Gemini, ChatGPT), c'est une economie significative a chaque requete.
+The single tool uses **15x fewer** schema tokens. With a remote LLM (e.g. Claude, Gemini, ChatGPT), that's a significant saving on every request.
 
-## Les 6 outils du serveur autoui
+## The 6 tools of the autoui server
 
-Le serveur `autoui` expose 6 outils au total. Les 4 premiers forment le systeme de decouverte et de rendu, les 2 derniers sont des outils utilitaires :
+The `autoui` server exposes 6 tools in total. The first 4 form the discovery and rendering system, the last 2 are utility tools:
 
-### search_recipes() -- Recherche
+### search_recipes() -- Search
 
 ```
 autoui_webmcp_search_recipes({ query: "kpi" })
 ```
 
-Retourne les widgets et recettes dont le nom ou la description contient le terme recherche.
+Returns widgets and recipes whose name or description contains the search term.
 
-### list_recipes() -- Liste complete
+### list_recipes() -- Full list
 
 ```
 autoui_webmcp_list_recipes()
 ```
 
-Retourne la liste de tous les widgets enregistres avec nom, description et groupe.
+Returns the list of all registered widgets with name, description and group.
 
-### get_recipe() -- Schema detaille
+### get_recipe() -- Detailed schema
 
 ```
 autoui_webmcp_get_recipe({ name: "stat-card" })
 ```
 
-Retourne le **schema JSON complet** du widget, sa description, et sa **recette d'usage** (un guide en Markdown). C'est la que l'agent apprend les parametres attendus.
+Returns the widget's **full JSON schema**, its description, and its **usage recipe** (a Markdown guide). This is where the agent learns expected parameters.
 
-### widget_display() -- Rendu
+### widget_display() -- Rendering
 
 ```
 autoui_webmcp_widget_display({ name: "stat-card", params: { label: "Uptime", value: "99.9%" } })
 ```
 
-**L'outil principal.** Valide les parametres, assainit les URLs, et rend le widget sur le canvas. Retourne `{ widget, data, id }`.
+**The main tool.** Validates parameters, sanitizes URLs, and renders the widget on the canvas. Returns `{ widget, data, id }`.
 
 ### canvas() -- Manipulation
 
@@ -83,17 +83,17 @@ autoui_webmcp_widget_display({ name: "stat-card", params: { label: "Uptime", val
 autoui_webmcp_canvas({ action: "update", id: "w_a3f2", params: { data: { value: "99.8%" } } })
 ```
 
-5 actions pour modifier les widgets existants : `clear`, `update`, `move`, `resize`, `style`.
+5 actions to modify existing widgets: `clear`, `update`, `move`, `resize`, `style`.
 
-### recall() -- Relecture
+### recall() -- Result re-read
 
 ```
 autoui_webmcp_recall({ id: "toolu_xxx" })
 ```
 
-Relit le resultat complet d'un appel d'outil precedent (utile quand le resultat a ete tronque a 10 000 caracteres par la boucle agent).
+Re-reads the full result of a previous tool call (useful when the result was truncated to 10,000 characters by the agent loop).
 
-## Le flux complet : de la decouverte au rendu
+## The complete flow: from discovery to render
 
 ```mermaid
 sequenceDiagram
@@ -103,55 +103,55 @@ sequenceDiagram
     participant WD as widget_display
     participant C as Canvas
 
-    Note over LLM: L'agent a des donnees a afficher
+    Note over LLM: The agent has data to display
     LLM->>SR: search_recipes("table")
-    SR-->>LLM: [{name: "data-table", desc: "Tableau triable"}, {name: "grid-data", desc: "Grille spreadsheet"}]
+    SR-->>LLM: [{name: "data-table", desc: "Sortable table"}, {name: "grid-data", desc: "Spreadsheet grid"}]
 
     LLM->>GR: get_recipe("data-table")
-    GR-->>LLM: {schema: {columns: [...], rows: [...]}, recipe: "## Quand utiliser..."}
+    GR-->>LLM: {schema: {columns: [...], rows: [...]}, recipe: "## When to use..."}
 
-    Note over LLM: L'agent connait maintenant le schema exact
-    LLM->>WD: widget_display({name: "data-table", params: {columns: [{key: "nom", label: "Nom"}], rows: [{nom: "Alice"}]}})
+    Note over LLM: The agent now knows the exact schema
+    LLM->>WD: widget_display({name: "data-table", params: {columns: [{key: "name", label: "Name"}], rows: [{name: "Alice"}]}})
     WD-->>LLM: {widget: "data-table", id: "w_b7c1"}
-    WD->>C: Rend le tableau sur le canvas
+    WD->>C: Renders the table on canvas
 
-    Note over LLM: Plus tard, mise a jour du widget
-    LLM->>WD: canvas({action: "update", id: "w_b7c1", params: {data: {rows: [{nom: "Alice"}, {nom: "Bob"}]}}})
+    Note over LLM: Later, update the widget
+    LLM->>WD: canvas({action: "update", id: "w_b7c1", params: {data: {rows: [{name: "Alice"}, {name: "Bob"}]}}})
 ```
 
-## Le pont bidirectionnel agent-UI
+## The bidirectional agent-UI bridge
 
-Le systeme cree un **pont bidirectionnel** entre l'agent et l'interface :
+The system creates a **bidirectional bridge** between the agent and the interface:
 
 ```mermaid
 graph LR
-    subgraph "Agent → UI"
-        A1["widget_display()"] -->|"cree"| W["Widget sur le canvas"]
-        A2["canvas(update)"] -->|"modifie"| W
+    subgraph "Agent -> UI"
+        A1["widget_display()"] -->|creates| W["Widget on canvas"]
+        A2["canvas(update)"] -->|modifies| W
     end
 
-    subgraph "UI → Agent"
-        W -->|"auto-enregistre"| T["Outils WebMCP par bloc"]
-        T -->|"block_id_get"| A3["Agent lit les donnees"]
-        I["Interaction utilisateur"] -->|"evenement"| A4["Agent reagit"]
+    subgraph "UI -> Agent"
+        W -->|auto-registers| T["Per-block WebMCP tools"]
+        T -->|block_id_get| A3["Agent reads data"]
+        I["User interaction"] -->|event| A4["Agent reacts"]
     end
 ```
 
-### Direction agent → UI
+### Agent -> UI direction
 
-L'agent cree et modifie les widgets :
+The agent creates and modifies widgets:
 
-1. `widget_display()` cree un nouveau widget
-2. `canvas(update)` met a jour les donnees d'un widget existant
-3. `canvas(move/resize/style)` change la position et le style
-4. `canvas(clear)` vide tout le canvas
+1. `widget_display()` creates a new widget
+2. `canvas(update)` updates an existing widget's data
+3. `canvas(move/resize/style)` changes position and styling
+4. `canvas(clear)` clears the entire canvas
 
-### Direction UI → agent
+### UI -> Agent direction
 
-Chaque widget rendu s'auto-enregistre comme source d'outils WebMCP via `navigator.modelContext` :
+Each rendered widget auto-registers as a WebMCP tool source via `navigator.modelContext`:
 
 ```ts
-// Quand un widget "stat-card" avec id "w_a3f2" est monte :
+// When a "stat-card" widget with id "w_a3f2" is mounted:
 navigator.modelContext.registerTool('block_w_a3f2_get', {
   description: 'Read current data of stat-card widget',
   execute: () => currentData,
@@ -159,28 +159,28 @@ navigator.modelContext.registerTool('block_w_a3f2_get', {
 
 navigator.modelContext.registerTool('block_w_a3f2_update', {
   description: 'Update stat-card widget data',
-  execute: (newData) => { /* met a jour le widget */ },
+  execute: (newData) => { /* updates the widget */ },
 });
 
 navigator.modelContext.registerTool('block_w_a3f2_remove', {
   description: 'Remove this widget from the canvas',
-  execute: () => { /* retire le widget */ },
+  execute: () => { /* removes the widget */ },
 });
 ```
 
-Les interactions utilisateur (clic sur un bouton, selection dans un tableau) remontent aussi a l'agent sous forme d'evenements.
+User interactions (button clicks, table selections) also bubble up to the agent as events.
 
-## Validation et securite
+## Validation and security
 
-### Validation JSON Schema
+### JSON Schema validation
 
-Chaque appel a `widget_display` est valide contre le schema du widget cible. Si les parametres ne correspondent pas, le serveur retourne une erreur avec le schema attendu :
+Every `widget_display` call is validated against the target widget's schema. If parameters don't match, the server returns an error with the expected schema:
 
 ```ts
-// L'agent envoie des parametres invalides :
+// The agent sends invalid parameters:
 widget_display({ name: "stat", params: { valeur: "42" } })
 
-// Le serveur retourne :
+// The server returns:
 {
   error: "Validation failed",
   details: [{ path: "/label", message: "required property missing" }],
@@ -188,99 +188,99 @@ widget_display({ name: "stat", params: { valeur: "42" } })
 }
 ```
 
-L'agent corrige alors son appel automatiquement (le prompt systeme inclut des regles de gestion d'erreurs).
+The agent then automatically corrects its call (the system prompt includes error handling rules).
 
-### Assainissement des URLs d'images
+### Image URL sanitization
 
-Les LLMs ont tendance a inventer des URLs d'images. Le serveur `autoui` **supprime automatiquement** les URLs invalides dans les champs d'image (`src`, `avatar`, `image`, `thumbnail`...) :
+LLMs tend to fabricate image URLs. The `autoui` server **automatically strips** invalid URLs from image fields (`src`, `avatar`, `image`, `thumbnail`...):
 
 ```ts
-// L'agent hallucine une URL :
+// The agent hallucinates a URL:
 widget_display({ name: "profile", params: {
   name: "Alice",
-  avatar: { src: "portrait-alice.jpg" }   // URL relative, invalide
+  avatar: { src: "portrait-alice.jpg" }   // relative URL, invalid
 } })
 
-// Le serveur supprime l'avatar invalide avant le rendu
-// Le widget ProfileCard affiche les initiales "A" a la place
+// The server strips the invalid avatar before rendering
+// The ProfileCard widget displays the initials "A" instead
 ```
 
-Seules les URLs commencant par `http://`, `https://`, `data:` ou `/` sont conservees.
+Only URLs starting with `http://`, `https://`, `data:` or `/` are preserved.
 
-## Noms de widgets et retrocompatibilite
+## Widget names and backward compatibility
 
-Les noms de widgets utilisent des tirets : `stat-card`, `data-table`, `chart-rich`. Les anciens noms avec prefixe `render_*` sont acceptes pour la retrocompatibilite :
+Widget names use dashes: `stat-card`, `data-table`, `chart-rich`. Legacy `render_*` prefixed names are still accepted for backward compatibility:
 
-| Nom actuel | Ancien nom (legacy) |
-|-----------|---------------------|
+| Current name | Legacy name |
+|-------------|-------------|
 | `stat-card` | `render_stat_card` |
 | `data-table` | `render_data_table` |
 | `chart-rich` | `render_chart_rich` |
 
-## Relations avec les autres concepts
+## How this relates to other concepts
 
 ```mermaid
 graph TD
-    TL["ToolLayers"] -->|"WebMcpLayer"| AU["Serveur autoui"]
-    AU -->|"expose"| WD["widget_display()"]
-    AU -->|"expose"| CV["canvas()"]
-    AU -->|"expose"| RC["recall()"]
-    AU -->|"expose"| SR["search/list/get_recipe()"]
+    TL["ToolLayers"] -->|WebMcpLayer| AU["autoui server"]
+    AU -->|exposes| WD["widget_display()"]
+    AU -->|exposes| CV["canvas()"]
+    AU -->|exposes| RC["recall()"]
+    AU -->|exposes| SR["search/list/get_recipe()"]
 
-    SR -->|"decouverte"| R["Recettes widget"]
-    R -->|"guide"| WD
-    WD -->|"rend"| W["Widgets UI"]
-    W -->|"sur le"| C["Canvas"]
-    CV -->|"modifie"| W
+    SR -->|discovery| R["Widget recipes"]
+    R -->|guides| WD
+    WD -->|renders| W["UI Widgets"]
+    W -->|on the| C["Canvas"]
+    CV -->|modifies| W
 ```
 
-- **ToolLayers** : le serveur autoui produit une `WebMcpLayer` qui porte tous ces outils
-- **Recettes** : les recettes widget (inline dans autoui) et les recettes WebMCP (fichiers `.md`) guident le choix des widgets
-- **Widgets** : le catalogue des 24+ composants visuels rendus par `widget_display`
-- **MCP** : les outils MCP fournissent les donnees que `widget_display` affiche
+- **ToolLayers**: the autoui server produces a `WebMcpLayer` carrying all these tools
+- **Recipes**: widget recipes (inline in autoui) and WebMCP recipes (`.md` files) guide widget selection
+- **Widgets**: the catalog of 24+ visual components rendered by `widget_display`
+- **MCP**: MCP tools provide the data that `widget_display` displays
 
-## Patterns avances
+## Advanced patterns
 
-### Composition multi-widgets
+### Multi-widget composition
 
-L'agent peut enchainer plusieurs `widget_display` pour composer un dashboard complet :
-
-```
-// L'agent suit une recette "dashboard-kpi"
-widget_display({ name: "stat-card", params: { label: "Revenue", value: "$142K" } })  → w_1
-widget_display({ name: "stat-card", params: { label: "Users", value: "3.2K" } })     → w_2
-widget_display({ name: "chart-rich", params: { type: "line", ... } })                → w_3
-widget_display({ name: "data-table", params: { columns: [...], rows: [...] } })      → w_4
-```
-
-### Mise a jour reactive
-
-L'agent peut modifier un widget sans le recréer :
+The agent can chain multiple `widget_display` calls to compose a complete dashboard:
 
 ```
-// Premiere creation
-widget_display({ name: "stat", params: { label: "Prix", value: "$100" } }) → w_5
+// The agent follows a "dashboard-kpi" recipe
+widget_display({ name: "stat-card", params: { label: "Revenue", value: "$142K" } })  -> w_1
+widget_display({ name: "stat-card", params: { label: "Users", value: "3.2K" } })     -> w_2
+widget_display({ name: "chart-rich", params: { type: "line", ... } })                -> w_3
+widget_display({ name: "data-table", params: { columns: [...], rows: [...] } })      -> w_4
+```
 
-// Plus tard, mise a jour
+### Reactive updates
+
+The agent can modify a widget without recreating it:
+
+```
+// Initial creation
+widget_display({ name: "stat", params: { label: "Price", value: "$100" } }) -> w_5
+
+// Later, update
 canvas({ action: "update", id: "w_5", params: { data: { value: "$105" } } })
 ```
 
-### Gestion d'erreurs en cascade
+### Cascading error handling
 
-Le prompt systeme inclut des regles strictes de gestion d'erreurs :
+The system prompt includes strict error handling rules:
 
-1. Si un appel echoue : analyser le message d'erreur et le schema attendu
-2. Corriger l'appel en respectant strictement le schema
-3. Retenter au moins une fois avant de changer de strategie
-4. Apres deux echecs identiques : chercher une autre recette
+1. If a call fails: analyze the error message and expected schema
+2. Correct the call in strict compliance with the schema
+3. Retry at least once before changing strategy
+4. After two identical failures: search for a different recipe
 
-## Resume : les 6 outils en un tableau
+## Summary: the 6 tools at a glance
 
-| Outil | Role | Quand l'utiliser |
-|-------|------|-----------------|
-| `search_recipes` | Chercher des widgets/recettes | Au debut, pour trouver le bon widget |
-| `list_recipes` | Lister tous les widgets | Si la recherche ne donne rien |
-| `get_recipe` | Obtenir le schema complet | Avant le premier appel a widget_display |
-| `widget_display` | Rendre un widget | Pour afficher des donnees |
-| `canvas` | Modifier un widget existant | Pour mettre a jour, deplacer, styler |
-| `recall` | Relire un resultat tronque | Quand un resultat MCP depasse 10K chars |
+| Tool | Role | When to use |
+|------|------|-------------|
+| `search_recipes` | Search widgets/recipes | At the start, to find the right widget |
+| `list_recipes` | List all widgets | If search yields nothing |
+| `get_recipe` | Get full schema | Before the first widget_display call |
+| `widget_display` | Render a widget | To display data |
+| `canvas` | Modify an existing widget | To update, move, or style |
+| `recall` | Re-read a truncated result | When an MCP result exceeds 10K chars |

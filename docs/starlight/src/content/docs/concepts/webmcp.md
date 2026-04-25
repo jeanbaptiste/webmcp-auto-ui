@@ -1,26 +1,26 @@
 ---
 title: WebMCP
-description: Protocole WebMCP pour les widgets cote client, serveurs locaux, et integration navigateur via navigator.modelContext
+description: WebMCP protocol for client-side widgets, local servers, and browser integration via navigator.modelContext
 sidebar:
   order: 6
 ---
 
-Si MCP est le "USB" pour brancher des **sources de donnees**, WebMCP est le "USB" pour brancher des **interfaces utilisateur**. Un serveur WebMCP tourne dans le navigateur et expose des widgets, des renderers et des actions UI que l'agent peut appeler exactement comme il appelle un outil MCP distant.
+If MCP is the "USB" for connecting **data sources**, WebMCP is the "USB" for connecting **user interfaces**. A WebMCP server runs in the browser and exposes widgets, renderers, and UI actions that the agent can call exactly like a remote MCP tool.
 
-## Qu'est-ce que WebMCP ?
+## What is WebMCP?
 
-**WebMCP** est un protocole complementaire a MCP, concu pour le rendu cote client. Il repose sur deux piliers :
+**WebMCP** is a protocol complementary to MCP, designed for client-side rendering. It rests on two pillars:
 
-1. **Une API navigateur** (`navigator.modelContext`) standardisee par le W3C WebMCP Draft CG Report (2026-03-27), qui permet a toute page web d'enregistrer des outils accessibles par les agents IA.
-2. **Un framework de serveurs locaux** (`createWebMcpServer`) qui structure ces outils en serveurs thematiques avec widgets, recettes et schemas JSON.
+1. **A browser API** (`navigator.modelContext`) standardized by the W3C WebMCP Draft CG Report (2026-03-27), allowing any web page to register tools accessible by AI agents.
+2. **A local server framework** (`createWebMcpServer`) that structures these tools into thematic servers with widgets, recipes, and JSON schemas.
 
 ```mermaid
 graph LR
-    subgraph "Navigateur"
-        WM1["autoui<br/>24+ widgets natifs"]
-        WM2["chartjs<br/>Graphiques interactifs"]
-        WM3["cytoscape<br/>Graphes & reseaux"]
-        WM4["leaflet<br/>Cartes interactives"]
+    subgraph "Browser"
+        WM1["autoui<br/>24+ native widgets"]
+        WM2["chartjs<br/>Interactive charts"]
+        WM3["cytoscape<br/>Graphs & networks"]
+        WM4["leaflet<br/>Interactive maps"]
         MC["navigator.modelContext"]
     end
     subgraph "Agent"
@@ -34,25 +34,25 @@ graph LR
     WM2 -.->|registerTool| MC
 ```
 
-## MCP vs WebMCP : la distinction fondamentale
+## MCP vs WebMCP: the fundamental distinction
 
 | | MCP | WebMCP |
 |--|-----|--------|
-| **Role** | Recuperer les **donnees** | **Afficher** les donnees |
-| **Ou ca tourne** | Serveur distant (HTTP/SSE) | Dans le navigateur (en memoire) |
-| **Transport** | JSON-RPC 2.0 sur HTTP POST | Appels de fonctions JavaScript |
-| **Outils typiques** | `query_sql`, `search`, `list_tables` | `widget_display`, `canvas`, `recall` |
-| **Exemples de serveurs** | Tricoteuses, iNaturalist, Hacker News | `autoui`, `chartjs`, `cytoscape`, `leaflet` |
+| **Role** | Retrieve **data** | **Display** the data |
+| **Where it runs** | Remote server (HTTP/SSE) | In the browser (in-memory) |
+| **Transport** | JSON-RPC 2.0 over HTTP POST | JavaScript function calls |
+| **Typical tools** | `query_sql`, `search`, `list_tables` | `widget_display`, `canvas`, `recall` |
+| **Example servers** | Tricoteuses, iNaturalist, Hacker News | `autoui`, `chartjs`, `cytoscape`, `leaflet` |
 | **Spec** | Anthropic MCP specification | W3C WebMCP Draft CG Report |
 
-:::tip[La regle d'or]
-**MCP** = "qu'est-ce que je vais chercher ?" (donnees distantes)
-**WebMCP** = "comment est-ce que je l'affiche ?" (rendu local)
+:::tip[The golden rule]
+**MCP** = "what do I fetch?" (remote data)
+**WebMCP** = "how do I display it?" (local rendering)
 :::
 
-## Creer un serveur WebMCP
+## Creating a WebMCP server
 
-Un serveur WebMCP se cree avec `createWebMcpServer` du package `@webmcp-auto-ui/core`. Il enregistre des **widgets** — des renderers qui prennent des donnees JSON et produisent du HTML/SVG/Canvas.
+A WebMCP server is created with `createWebMcpServer` from the `@webmcp-auto-ui/core` package. It registers **widgets** — renderers that take JSON data and produce HTML/SVG/Canvas.
 
 ```ts
 import { createWebMcpServer } from '@webmcp-auto-ui/core';
@@ -84,32 +84,32 @@ const myServer = createWebMcpServer('my-charts', {
 const layer = myServer.layer();
 ```
 
-### Deux modes de rendu
+### Two rendering modes
 
-| Mode | Flag | Quand l'utiliser |
-|------|------|------------------|
-| **Vanilla** | `vanilla: true` | Librairies tierces (Chart.js, Cytoscape, D3, Plotly, Three.js) — le renderer recoit un `HTMLElement` et dessine dedans |
-| **Svelte** | `vanilla: false` (defaut) | Composants Svelte 5 — le renderer est un composant `.svelte` avec des props |
+| Mode | Flag | When to use |
+|------|------|-------------|
+| **Vanilla** | `vanilla: true` | Third-party libraries (Chart.js, Cytoscape, D3, Plotly, Three.js) — the renderer receives an `HTMLElement` and draws into it |
+| **Svelte** | `vanilla: false` (default) | Svelte 5 components — the renderer is a `.svelte` component with props |
 
-Les renderers vanilla recoivent une copie deep-clonee des donnees (via `JSON.parse(JSON.stringify(data))`) pour eviter les conflits entre les proxies `$state` de Svelte 5 et les librairies qui utilisent `Object.defineProperty`.
+Vanilla renderers receive a deep-cloned copy of the data (via `JSON.parse(JSON.stringify(data))`) to avoid conflicts between Svelte 5 `$state` proxies and libraries that use `Object.defineProperty`.
 
-## Le serveur `autoui`
+## The `autoui` server
 
-Le package `@webmcp-auto-ui/agent` fournit un serveur WebMCP pre-configure nomme `autoui` avec 24+ widgets natifs :
+The `@webmcp-auto-ui/agent` package provides a pre-configured WebMCP server named `autoui` with 24+ native widgets:
 
-| Categorie | Widgets |
-|-----------|---------|
+| Category | Widgets |
+|----------|---------|
 | **Simple** | `stat`, `kv`, `list`, `chart`, `alert`, `code`, `text`, `actions`, `tags` |
-| **Riche** | `stat-card`, `data-table`, `timeline`, `profile`, `trombinoscope`, `json-viewer`, `hemicycle`, `chart-rich`, `cards`, `grid-data`, `sankey`, `log`, `gallery`, `carousel`, `map`, `d3`, `js-sandbox` |
+| **Rich** | `stat-card`, `data-table`, `timeline`, `profile`, `trombinoscope`, `json-viewer`, `hemicycle`, `chart-rich`, `cards`, `grid-data`, `sankey`, `log`, `gallery`, `carousel`, `map`, `d3`, `js-sandbox` |
 
-L'agent appelle `widget_display({ name, params })` pour rendre n'importe lequel de ces widgets.
+The agent calls `widget_display({ name, params })` to render any of these widgets.
 
-## Serveurs WebMCP specialises
+## Specialized WebMCP servers
 
-En plus de `autoui`, le projet inclut 10+ serveurs WebMCP thematiques dans `packages/servers/` :
+Beyond `autoui`, the project includes 10+ thematic WebMCP servers in `packages/servers/`:
 
-| Serveur | Librairie | Widgets |
-|---------|-----------|---------|
+| Server | Library | Widgets |
+|--------|---------|---------|
 | `chartjs` | Chart.js | bar, line, pie, radar, doughnut, scatter, polar-area |
 | `cytoscape` | Cytoscape.js | force-graph, concentric-rings, spread-layout, physics-simulation |
 | `d3` | D3.js | treemap, force-directed, chord, sunburst |
@@ -121,14 +121,14 @@ En plus de `autoui`, le projet inclut 10+ serveurs WebMCP thematiques dans `pack
 | `rough` | Rough.js | hand-drawn style sketches |
 | `canvas2d` | Canvas API | custom 2D drawings |
 
-Chaque serveur expose ses propres widgets et recettes. L'agent les decouvre via `search_recipes()` et `get_recipe()`.
+Each server exposes its own widgets and recipes. The agent discovers them via `search_recipes()` and `get_recipe()`.
 
-## `navigator.modelContext` : l'API navigateur
+## `navigator.modelContext`: the browser API
 
-Le protocole W3C WebMCP definit une API navigateur standard pour que les pages web exposent des outils aux agents IA :
+The W3C WebMCP protocol defines a standard browser API for web pages to expose tools to AI agents:
 
 ```ts
-// Enregistrer un outil accessible par l'agent
+// Register a tool accessible by the agent
 navigator.modelContext.registerTool({
   name: 'todo_add',
   description: 'Add a new todo item',
@@ -139,24 +139,24 @@ navigator.modelContext.registerTool({
   },
 });
 
-// Desenregistrer un outil
+// Unregister a tool
 navigator.modelContext.unregisterTool('todo_add');
 ```
 
-Dans webmcp-auto-ui, chaque widget rendu sur le canvas s'auto-enregistre via cette API avec trois outils :
-- `widget_{id}_get` — lire les donnees actuelles du widget
-- `widget_{id}_update` — mettre a jour les donnees
-- `widget_{id}_remove` — supprimer le widget
+In webmcp-auto-ui, each widget rendered on the canvas auto-registers via this API with three tools:
+- `widget_{id}_get` — read the widget's current data
+- `widget_{id}_update` — update the data
+- `widget_{id}_remove` — remove the widget
 
-Cela permet a l'agent (ou a une extension navigateur) d'interagir avec les widgets deja rendus.
+This allows the agent (or a browser extension) to interact with already-rendered widgets.
 
-:::note[Activation dans Chrome]
-L'API `navigator.modelContext` est disponible dans Chrome 146+ avec le flag `chrome://flags/#enable-webmcp-testing`. L'extension [Model Context Tool Inspector](https://chromewebstore.google.com/) permet de visualiser les outils enregistres.
+:::note[Activation in Chrome]
+The `navigator.modelContext` API is available in Chrome 146+ with the flag `chrome://flags/#enable-webmcp-testing`. The [Model Context Tool Inspector](https://chromewebstore.google.com/) extension lets you visualize registered tools.
 :::
 
-## `mountWidget` : rendu sans framework
+## `mountWidget`: framework-agnostic rendering
 
-Pour les cas ou Svelte n'est pas disponible (vanilla JS, React, Vue), le package `@webmcp-auto-ui/core` fournit `mountWidget()` :
+For cases where Svelte is not available (vanilla JS, React, Vue), the `@webmcp-auto-ui/core` package provides `mountWidget()`:
 
 ```ts
 import { mountWidget } from '@webmcp-auto-ui/core';
@@ -167,37 +167,37 @@ const cleanup = mountWidget(container, myServer, 'bar-chart', {
   values: [120, 340, 250],
 });
 
-// Plus tard, nettoyer
+// Later, clean up
 cleanup?.();
 ```
 
-`mountWidget` deep-clone les donnees, resout le renderer du serveur, et l'appelle avec le container DOM. C'est le point d'entree framework-agnostic pour le rendu WebMCP.
+`mountWidget` deep-clones the data, resolves the server's renderer, and calls it with the DOM container. It is the framework-agnostic entry point for WebMCP rendering.
 
-## Architecture complete : MCP + WebMCP
+## Full architecture: MCP + WebMCP
 
 ```mermaid
 sequenceDiagram
-    participant U as Utilisateur
-    participant A as Agent LLM
-    participant MCP as Serveur MCP<br/>(donnees distantes)
-    participant WM as Serveur WebMCP<br/>(rendu local)
+    participant U as User
+    participant A as LLM Agent
+    participant MCP as MCP Server<br/>(remote data)
+    participant WM as WebMCP Server<br/>(local rendering)
     participant C as Canvas
 
-    U->>A: "Montre les ventes par region"
+    U->>A: "Show sales by region"
     A->>MCP: query_sql({sql: "SELECT region, total FROM sales"})
-    MCP-->>A: [{region: "Nord", total: 42000}, ...]
+    MCP-->>A: [{region: "North", total: 42000}, ...]
     A->>WM: widget_display({name: "chart-rich", params: {type: "bar", labels: [...], data: [...]}})
     WM-->>A: {widget: "chart-rich", id: "w_a3f2"}
     A->>WM: widget_display({name: "data-table", params: {columns: [...], rows: [...]}})
     WM-->>A: {widget: "data-table", id: "w_b7c1"}
-    A-->>C: Deux widgets rendus sur le canvas
-    C-->>U: Dashboard ventes par region
+    A-->>C: Two widgets rendered on canvas
+    C-->>U: Sales by region dashboard
 ```
 
-## Relations avec les autres concepts
+## Relationships with other concepts
 
-- **[MCP](/webmcp-auto-ui/concepts/mcp/)** : recupere les donnees que WebMCP affiche
-- **[Tool Layers](/webmcp-auto-ui/concepts/tool-layers/)** : les serveurs WebMCP produisent des `WebMcpLayer`
-- **[Recettes](/webmcp-auto-ui/concepts/recipes/)** : chaque serveur WebMCP embarque des recettes qui guident l'agent
-- **[widget_display](/webmcp-auto-ui/concepts/widget-display/)** : l'outil unifie qui dispatch vers le bon renderer WebMCP
-- **[Widgets UI](/webmcp-auto-ui/concepts/ui-widgets/)** : les composants Svelte qui rendent les widgets
+- **[MCP](/webmcp-auto-ui/concepts/mcp/)** — retrieves the data that WebMCP displays
+- **[Tool Layers](/webmcp-auto-ui/concepts/tool-layers/)** — WebMCP servers produce `WebMcpLayer` entries
+- **[Recipes](/webmcp-auto-ui/concepts/recipes/)** — each WebMCP server ships recipes to guide the agent
+- **[widget_display](/webmcp-auto-ui/concepts/widget-display/)** — the unified tool that dispatches to the right WebMCP renderer
+- **[UI Widgets](/webmcp-auto-ui/concepts/ui-widgets/)** — the Svelte components that render widgets
