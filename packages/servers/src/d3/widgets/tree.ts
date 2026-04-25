@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { loadD3 } from './_d3.js';
 // ---------------------------------------------------------------------------
 // Tree widget — hierarchical data as a tidy tree layout
 // ---------------------------------------------------------------------------
@@ -7,7 +8,7 @@ export async function render(
   container: HTMLElement,
   data: Record<string, unknown>,
 ): Promise<void | (() => void)> {
-  const d3 = await import('d3');
+  const d3 = await loadD3();
 
   // Beautiful system-UI stack — renders crisp at any size, no web-font roundtrip.
   const FONT_FAMILY = 'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif';

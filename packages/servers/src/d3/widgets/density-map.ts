@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { loadD3 } from './_d3.js';
 // ---------------------------------------------------------------------------
 // Density map widget — heatmap-style 2D binning
 // ---------------------------------------------------------------------------
@@ -7,7 +8,7 @@ export async function render(
   container: HTMLElement,
   data: Record<string, unknown>,
 ): Promise<void | (() => void)> {
-  const d3 = await import('d3');
+  const d3 = await loadD3();
   const { points, title, binsX = 30, binsY = 30, colorScheme = 'YlOrRd' } = data as any;
 
   container.style.position = 'relative';

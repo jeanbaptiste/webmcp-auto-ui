@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { loadD3 } from './_d3.js';
 // ---------------------------------------------------------------------------
 // Voronoi tessellation widget — partition space by nearest point
 // ---------------------------------------------------------------------------
@@ -7,7 +8,7 @@ export async function render(
   container: HTMLElement,
   data: Record<string, unknown>,
 ): Promise<void | (() => void)> {
-  const d3 = await import('d3');
+  const d3 = await loadD3();
   const { points, title, showPoints = true, showLabels = true, colorScheme } = data as any;
 
   container.style.position = 'relative';

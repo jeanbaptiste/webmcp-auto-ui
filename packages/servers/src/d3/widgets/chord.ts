@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { loadD3 } from './_d3.js';
 // ---------------------------------------------------------------------------
 // Chord diagram widget — flows between groups in a circular layout
 // ---------------------------------------------------------------------------
@@ -7,7 +8,7 @@ export async function render(
   container: HTMLElement,
   data: Record<string, unknown>,
 ): Promise<void | (() => void)> {
-  const d3 = await import('d3');
+  const d3 = await loadD3();
   const { labels, matrix, title, colorScheme } = data as any;
 
   container.style.position = 'relative';
