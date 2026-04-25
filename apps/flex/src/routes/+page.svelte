@@ -20,11 +20,12 @@
   import { autoui } from '@webmcp-auto-ui/agent';
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import {
-    agChartsServer, canvas2dServer, chartjsServer, cytoscapeServer, d3server,
-    deckglServer, echartsServer, g6Server, leafletServer, maplibreServer,
-    mermaidServer, nivoServer, observablePlotServer, perspectiveServer,
-    pixijsServer, plotlyServer, rechartsServer, roughServer, sigmaServer,
-    threejsServer, tremorServer, vegaServer, vegaLiteServer,
+    agChartsServer, canvas2dServer, cesiumServer, chartjsServer, cytoscapeServer,
+    d3server, deckglServer, echartsServer, g6Server, h3Server, harpServer,
+    leafletServer, maplibreServer, mermaidServer, nivoServer, observablePlotServer,
+    openLayersServer, perspectiveServer, pixijsServer, plotlyServer,
+    protomapsServer, rechartsServer, roughServer, s2Server, sigmaServer,
+    threejsServer, tremorServer, turfServer, vegaServer, vegaLiteServer,
   } from '@webmcp-auto-ui/servers';
   import { McpStatus, ModelLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter, HeaderControls, DiagnosticModal, DiagnosticIcon } from '@webmcp-auto-ui/ui';
   import { Menu, Terminal, LayoutGrid, Paperclip, X as XIcon } from 'lucide-svelte';
@@ -111,8 +112,8 @@
     { id: 'deckgl', label: 'deck.gl', description: 'WebGL geo data viz sur MapLibre (scatterplot, hexagon, heatmap, H3, MVT, trips, terrain, 24 widgets)', server: deckglServer },
     { id: 'echarts', label: 'Apache ECharts', description: 'Charts Apache ECharts (bar, radar, sankey, funnel, gauge, calendar, graph, 22 widgets)', server: echartsServer },
     { id: 'g6', label: 'G6 (AntV)', description: 'Graphes AntV G6 v5 (force, dagre, mindmap, ego-network, chord, combo, 21 widgets)', server: g6Server },
+    { id: 'h3', label: 'H3', description: 'Indexation hexagonale H3 (Uber) sur MapLibre (grid, polyfill, compact, edges, 14 widgets visuels)', server: h3Server },
     { id: 'harp', label: 'Harp.gl', description: 'Cartes 3D HERE Harp (archived 2023 — globe, mercator, OMV, themes, 8 widgets)', server: harpServer },
-    { id: 'kepler', label: 'Kepler.gl', description: 'Geo data exploration Kepler.gl (points, arcs, hexbin, trip, H3, 13 widgets)', server: keplerServer },
     { id: 'leaflet', label: 'Leaflet', description: 'Cartes interactives Leaflet (markers, GeoJSON, heatmap)', server: leafletServer },
     { id: 'maplibre', label: 'MapLibre GL', description: 'Cartes vectorielles WebGL (markers, heatmap, 3D buildings, terrain, clusters, vector tiles)', server: maplibreServer },
     { id: 'mermaid', label: 'Mermaid', description: 'Diagrammes Mermaid (flowchart, sequence, gantt...)', server: mermaidServer },
@@ -125,9 +126,11 @@
     { id: 'protomaps', label: 'Protomaps', description: 'pmtiles vector basemaps (light/dark/grayscale, Overture, 3D buildings, hillshading, 14 widgets)', server: protomapsServer },
     { id: 'recharts', label: 'Recharts', description: 'Charts Recharts React (line, bar, area, composed, pie, sankey, funnel, 12 widgets)', server: rechartsServer },
     { id: 'rough', label: 'Rough.js', description: 'Dessins style croquis (hand-drawn look)', server: roughServer },
+    { id: 's2', label: 'S2', description: 'Cells S2 sphériques (Google) sur MapLibre (cell, cover, region-coverer, 11 widgets visuels)', server: s2Server },
     { id: 'sigma', label: 'Sigma + Graphology', description: 'Graphes WebGL Sigma.js + générateurs Graphology (force, clusters, multi-modal, 14 widgets)', server: sigmaServer },
     { id: 'threejs', label: 'Three.js', description: 'Scenes 3D Three.js (mesh, lights, animations)', server: threejsServer },
     { id: 'tremor', label: 'Tremor', description: 'Dashboards Tremor React (KPI cards, metrics, sparklines, progress, 20 widgets)', server: tremorServer },
+    { id: 'turf', label: 'Turf.js', description: 'Geospatial analysis Turf.js (buffer, union, intersect, clusters, grids, booleans, 37 widgets visuels)', server: turfServer },
     { id: 'vega', label: 'Vega', description: 'Vega full — force, contour, wordcloud, chord, geo (17 widgets bas niveau)', server: vegaServer },
     { id: 'vegalite', label: 'Vega-Lite', description: 'Vega-Lite — grammaire concise (26 widgets : marks, transforms, facets, SPLOM)', server: vegaLiteServer },
   ];

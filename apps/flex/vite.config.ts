@@ -20,7 +20,11 @@ export default defineConfig({
   build: {
     target: 'es2022',  // top-level await needed by perspective-viewer-d3fc and others
     rollupOptions: {
-      external: ['onnxruntime-web', '@huggingface/transformers'],  // loaded from CDN at runtime (~70MB savings)
+      external: [
+        'onnxruntime-web',
+        '@huggingface/transformers',  // loaded from CDN at runtime (~70MB savings)
+        '@here/harp-features-datasource',  // optional Harp peer not installed; widget try/catches at runtime
+      ],
     },
   },
   optimizeDeps: {
