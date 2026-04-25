@@ -20,6 +20,9 @@
     onrecipeclick?: (url: string) => void;
     toolCountByServer?: Record<string, number>;
     ontoolclick?: (url: string) => void;
+    /** Hide the built-in "Available MCP servers" header (when caller wraps the
+     * list in its own disclosure/section that already provides a title). */
+    hideHeader?: boolean;
   }
 
   let {
@@ -33,6 +36,7 @@
     onrecipeclick,
     toolCountByServer,
     ontoolclick,
+    hideHeader = false,
   }: Props = $props();
 
   const allConnected = $derived(
@@ -51,9 +55,11 @@
 </script>
 
 <div class="flex flex-col gap-2">
-  <span class="text-[9px] font-mono uppercase tracking-wider text-text2">
-    Available MCP servers
-  </span>
+  {#if !hideHeader}
+    <span class="text-[9px] font-mono uppercase tracking-wider text-text2">
+      Available MCP servers
+    </span>
+  {/if}
 
   <div class="flex flex-col gap-1">
     {#each servers as server (server.id)}

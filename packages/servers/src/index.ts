@@ -31,3 +31,11 @@ export { tremorServer } from './tremor/server.js';
 export { turfServer } from './turf/server.js';
 export { vegaServer } from './vega/server.js';
 export { vegaLiteServer } from './vegalite/server.js';
+
+export {
+  WEBMCP_SERVER_REGISTRY,
+  WEBMCP_CATEGORY_ORDER,
+  WEBMCP_CATEGORY_LABELS,
+  type WebMcpCategory,
+  type WebMcpRegistryEntry,
+} from './registry.js';

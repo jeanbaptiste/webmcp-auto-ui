@@ -5,10 +5,35 @@
   import { onMount, untrack } from 'svelte';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
-  import { WidgetRenderer, getTheme, LLMSelector, ModelLoader, AgentProgress, McpStatus, HeaderControls, MCPserversList } from '@webmcp-auto-ui/ui';
+  import { WidgetRenderer, getTheme, LLMSelector, ModelLoader, AgentProgress, McpStatus, HeaderControls, MCPserversList, WebMCPserversList } from '@webmcp-auto-ui/ui';
+  import { autoui } from '@webmcp-auto-ui/agent';
+  import {
+    WEBMCP_SERVER_REGISTRY,
+    WEBMCP_CATEGORY_ORDER,
+    WEBMCP_CATEGORY_LABELS,
+  } from '@webmcp-auto-ui/servers';
   import { PRESETS, type ThemePreset } from '$lib/themes';
   import { SIMPLE_BLOCKS, RICH_BLOCKS } from '$lib/demo-data';
   import { agentStore } from '$lib/agent-store.svelte';
+
+  // WebMCP servers — autoui (built-in) + 29 third-party packs
+  const WEBMCP_REGISTRY = [
+    { id: 'autoui', label: 'Auto-UI (natif)', description: 'Widgets natifs WebMCP (stat, table, galerie, timeline...)', category: 'generic' as const, server: autoui },
+    ...WEBMCP_SERVER_REGISTRY,
+  ];
+  const webmcpServerList = WEBMCP_REGISTRY.map(s => ({
+    id: s.id, label: s.label, description: s.description, category: s.category,
+    widgetCount: s.server.listWidgets().length,
+  }));
+  const webmcpCategories = WEBMCP_CATEGORY_ORDER.map(key => ({ key, label: WEBMCP_CATEGORY_LABELS[key] }));
+
+  function toggleWebmcpServer(id: string) {
+    const next = new Set(canvas.enabledServerIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    canvas.setEnabledServers([...next]);
+  }
+  const enabledWebmcpServers = $derived(new Set(canvas.enabledServerIds));
 
   const theme = getTheme();
 
@@ -110,15 +135,32 @@
     </div>
   </header>
 
-  <!-- Available MCP servers -->
+  <!-- Available servers (MCP remote + WebMCP local) -->
   <div class="border-b border-border bg-surface/30">
-    <div class="max-w-7xl mx-auto px-4 py-3">
-      <MCPserversList
-        servers={MCP_DEMO_SERVERS}
-        connectedUrls={agentStore.connectedUrl ? [agentStore.connectedUrl] : []}
-        loading={agentStore.connecting && selectedServerUrl ? [selectedServerUrl] : []}
-        onconnect={(url) => { selectedServerUrl = url; agentStore.connect(url); }}
-        ondisconnect={() => agentStore.disconnect()}
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col gap-3">
+      <details open class="group">
+        <summary class="flex items-center gap-1 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+          <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">MCP servers</span>
+          <span class="text-[9px] text-text2/60 font-mono">({agentStore.connectedUrl ? 1 : 0}/{MCP_DEMO_SERVERS.length})</span>
+          <span class="text-[10px] text-text2 ml-auto transition-transform group-open:rotate-90">&#x25B6;</span>
+        </summary>
+        <div class="mt-2">
+          <MCPserversList
+            servers={MCP_DEMO_SERVERS}
+            connectedUrls={agentStore.connectedUrl ? [agentStore.connectedUrl] : []}
+            loading={agentStore.connecting && selectedServerUrl ? [selectedServerUrl] : []}
+            onconnect={(url) => { selectedServerUrl = url; agentStore.connect(url); }}
+            ondisconnect={() => agentStore.disconnect()}
+            hideHeader
+          />
+        </div>
+      </details>
+
+      <WebMCPserversList
+        servers={webmcpServerList}
+        enabledServers={enabledWebmcpServers}
+        onToggle={toggleWebmcpServer}
+        categories={webmcpCategories}
       />
     </div>
   </div>

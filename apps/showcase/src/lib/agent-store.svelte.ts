@@ -17,7 +17,14 @@ import {
 import { createAgentLoop } from '@webmcp-auto-ui/ui/agent';
 import type { ChatMessage, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
 import { autoui } from '@webmcp-auto-ui/agent';
+import { WEBMCP_SERVER_REGISTRY } from '@webmcp-auto-ui/servers';
 import { base } from '$app/paths';
+
+// Built-in autoui + third-party packs, keyed by id for O(1) lookup in the loop.
+const WEBMCP_BY_ID = new Map<string, { layer: () => ToolLayer }>([
+  ['autoui', autoui],
+  ...WEBMCP_SERVER_REGISTRY.map(s => [s.id, s.server] as const),
+]);
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export interface GeneratedBlock {
@@ -215,7 +222,12 @@ export const agentStore = {
       }
     }
 
-    layers.push(autoui.layer());
+    // Push every enabled WebMCP server's layer (defaults to ['autoui']).
+    const enabledIds = canvas.enabledServerIds.length > 0 ? canvas.enabledServerIds : ['autoui'];
+    for (const id of enabledIds) {
+      const srv = WEBMCP_BY_ID.get(id);
+      if (srv) layers.push(srv.layer());
+    }
 
     // Gemma (WasmProvider) expects native `<|tool_call>…<tool_call|>` syntax in the prompt.
     const providerKind = canvas.llm.startsWith('gemma') ? 'gemma' : 'generic';
