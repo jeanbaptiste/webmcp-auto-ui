@@ -37,8 +37,8 @@ Aucune édition nécessaire.
 | `packages/ui/src/wm/FloatingLayout.svelte`, `FlexLayout.svelte` | `const mobile = $derived(cw < 640)` | Légitime (responsive layout) |
 | `packages/servers/src/rough/recipes/*.md`, `canvas2d/recipes/line-chart.md` | Labels de séries (`'Mobile'`) dans exemples de charts | Légitime (data) |
 | `packages/sdk/src/hyperskills.ts:7` | Commentaire "on mobile for large payloads" | Légitime (perf comment) |
-| `docs-site/src/content/docs/apps/recipes.md` (fr+en) | Documentation du layout mobile de Recipes | Légitime (docs produit) |
-| `docs/site/index.html` | CSS "mobile overlay" de la doc statique | Légitime (responsive) |
+| `docs/starlight/src/content/docs/apps/recipes.md` (fr+en) | Documentation du layout mobile de Recipes | Légitime (docs produit) |
+| `docs/site/index.html (supprimé — voir commit fe51f94)` | CSS "mobile overlay" de la doc statique | Légitime (responsive) |
 | `package-lock.json` | `ismobilejs` — dépendance transitive | Légitime (lockfile) |
 
 ## VM — à supprimer

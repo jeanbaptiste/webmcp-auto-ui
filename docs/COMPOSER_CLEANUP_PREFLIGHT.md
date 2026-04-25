@@ -20,7 +20,7 @@ Scope : nettoyer toute référence résiduelle à une ancienne app `composer` (e
 
 ### Présence directe
 - `apps/composer/` : **N'EXISTE PAS**.
-- `package.json` racine : **aucune** référence (workspaces = home, flex, viewer, todo, showcase, recipes, boilerplate + docs-site ; scripts dev/build idem).
+- `package.json` racine : **aucune** référence (workspaces = home, flex, viewer, todo, showcase, recipes, boilerplate + docs/starlight ; scripts dev/build idem).
 - `scripts/deploy.sh` : **aucune** référence (case statement ligne 226-238 = flex, viewer, recipes, home, todo, boilerplate, showcase).
 - `.github/workflows/` (ci.yml, deploy-docs.yml, docs-sync.yml, publish.yml) : **aucune** référence à `composer` ni à `mobile`.
 - `CLAUDE.md` local (projet) : **aucune** référence à `composer` comme app. La table ligne 11-18 liste flex, boilerplate, viewer, home/todo/showcase, recipes. OK.
@@ -38,16 +38,16 @@ Scope : nettoyer toute référence résiduelle à une ancienne app `composer` (e
 | `docs/contributing.md` | 202 | `playwright test --grep "Composer"` (nom suite Playwright — à vérifier si suite toujours pertinente) |
 | `docs/theming.md` | 313, 336 | « exported from the Composer » = rôle flex (historique) |
 | `docs/tutorials/use-existing-widgets.md` | 360 | « Composer un dashboard » (verbe) |
-| `docs-site/src/content/docs/en/apps/flex.md` | 3, 113, 115 | Description flex: mode composer/consumer |
-| `docs-site/src/content/docs/en/guide/getting-started.mdx` | 188 | « flex/ Main SvelteKit app (composer) » |
-| `docs-site/src/content/docs/en/guide/contributing.mdx` | 22, 223 | Même chose, FR/EN |
-| `docs-site/src/content/docs/guide/contributing.mdx` | 223 | Idem |
-| `docs-site/src/content/docs/en/guide/deploy.mdx` | 54 | Table deploy : « flex = Main composer » |
-| `docs-site/src/content/docs/concepts/recipes.md` | 91, 92, 149 | ID recette |
-| `docs-site/src/content/docs/en/concepts/recipes.md` | 149 | Idem EN |
-| `docs-site/src/content/docs/concepts/widget-display.md` | 246 | Verbe « composer un dashboard » |
+| `docs/starlight/src/content/docs/en/apps/flex.md` | 3, 113, 115 | Description flex: mode composer/consumer |
+| `docs/starlight/src/content/docs/en/guide/getting-started.mdx` | 188 | « flex/ Main SvelteKit app (composer) » |
+| `docs/starlight/src/content/docs/en/guide/contributing.mdx` | 22, 223 | Même chose, FR/EN |
+| `docs/starlight/src/content/docs/guide/contributing.mdx` | 223 | Idem |
+| `docs/starlight/src/content/docs/en/guide/deploy.mdx` | 54 | Table deploy : « flex = Main composer » |
+| `docs/starlight/src/content/docs/concepts/recipes.md` | 91, 92, 149 | ID recette |
+| `docs/starlight/src/content/docs/en/concepts/recipes.md` | 149 | Idem EN |
+| `docs/starlight/src/content/docs/concepts/widget-display.md` | 246 | Verbe « composer un dashboard » |
 | `packages/sdk/README.md` | 52 | « composer canvas » (nom du store SDK) |
-| `docs/site/index.html` | 3005, 3028, 3367, 3369, 3492, 3521, 4361, 4362, 4414, 4440 | HTML rendu des pages ci-dessus |
+| `docs/site/index.html (supprimé — voir commit fe51f94)` | 3005, 3028, 3367, 3369, 3492, 3521, 4361, 4362, 4414, 4440 | HTML rendu des pages ci-dessus |
 | `.docs-snapshot-light.txt` | 1905, 5128, 5614, 5617, 5655, 5663, 5668, 5672, 5673, 5707 | Snapshot docs (regen auto) |
 
 **Conclusion** : toutes légitimes. Aucune à supprimer côté code/docs.
@@ -209,7 +209,7 @@ Avantage : une seule source de vérité (CLAUDE.md local), plus de dérive entre
 
 1. **`~/.claude/CLAUDE.md` est HORS du répertoire courant du projet** (`/Users/m3/.claude/CLAUDE.md`). Cette édition sort du scope « working directory » défini par la règle globale de l'utilisateur. **Autorisation explicite nécessaire** avant toute modification.
 2. **`docs/contributing.md:202`** : `playwright test --grep "Composer"` — à vérifier si cette suite Playwright existe encore dans les tests actuels ou si c'est un vestige.
-3. **`docs/theming.md`** et pages docs-site parlent de « the Composer » avec une majuscule, comme si c'était un produit distinct. À harmoniser peut-être (« flex » ou « le composer flex ») — mais c'est une question éditoriale, pas un nettoyage technique.
+3. **`docs/theming.md`** et pages docs/starlight parlent de « the Composer » avec une majuscule, comme si c'était un produit distinct. À harmoniser peut-être (« flex » ou « le composer flex ») — mais c'est une question éditoriale, pas un nettoyage technique.
 4. **`.docs-snapshot-light.txt`** est regénéré automatiquement (`npm run docs:sync`). Pas besoin d'y toucher à la main.
 5. **Option A vs B** : choix utilisateur. B est plus propre (DRY), A est moins disruptif.
 
