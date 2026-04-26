@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 5178",
-    "build": "vite build",
+    "build": "NODE_OPTIONS='--max-old-space-size=8192' vite build",
     "preview": "PORT=3010 node build/index.js",
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
