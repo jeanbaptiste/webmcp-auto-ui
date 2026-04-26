@@ -221,9 +221,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
           rerender();
         });
       } else if (which === 'recipe') {
-        const mcpServers = (Array.isArray((data as any)?.servers) ? (data as any).servers : [])
-          .map((s: any) => ({ name: String(s?.name ?? ''), url: s?.url ? String(s.url) : undefined }))
-          .filter((s: any) => s.name);
+        const mcpServers = collectDataServers(data)
+          .map((s) => ({ name: s.name, url: s.url }));
         openAddRecipeModal({
           mcpServers,
           scope: 'data',

@@ -55,19 +55,15 @@ type ModalEl = HTMLElement & {
 let _modal: ModalEl | null = null;
 let _cleanup: (() => void) | null = null;
 
-function ensureModal(): ModalEl {
+async function ensureModal(): Promise<ModalEl> {
   if (_modal && document.contains(_modal)) return _modal;
-
-  // Register the CE if not already done (Svelte registers it on first import
-  // but we ensure it here for safety).
-  if (!customElements.get('auto-import-modal')) {
-    // Dynamic import triggers CE registration via Svelte's customElement decorator.
-    // Since this module is already bundled with the CE, it's already registered.
-    // If somehow not registered, fall back gracefully.
-  }
 
   const el = document.createElement('auto-import-modal') as ModalEl;
   document.body.appendChild(el);
+  // Svelte 5's connectedCallback is async (awaits a microtask before creating
+  // $$c), and exported methods are exposed via getters that read $$c. Yield
+  // one microtask so el.openModal/closeModal are defined when we call them.
+  await Promise.resolve();
   _modal = el;
   return el;
 }
@@ -84,8 +80,8 @@ export function closeImportModal(): void {
 // openAddMdModal
 // ---------------------------------------------------------------------------
 
-export function openAddMdModal(onPick: (content: string) => void): void {
-  const el = ensureModal();
+export async function openAddMdModal(onPick: (content: string) => void): Promise<void> {
+  const el = await ensureModal();
 
   // Clean up previous listener
   _cleanup?.();
@@ -111,8 +107,8 @@ export function openAddMdModal(onPick: (content: string) => void): void {
 // openAddRecipeModal
 // ---------------------------------------------------------------------------
 
-export function openAddRecipeModal(opts: AddRecipeModalOptions): void {
-  const el = ensureModal();
+export async function openAddRecipeModal(opts: AddRecipeModalOptions): Promise<void> {
+  const el = await ensureModal();
 
   _cleanup?.();
 
@@ -141,11 +137,11 @@ export function openAddRecipeModal(opts: AddRecipeModalOptions): void {
 // openRecipeViewerModal
 // ---------------------------------------------------------------------------
 
-export function openRecipeViewerModal(
+export async function openRecipeViewerModal(
   recipe: ImportedRecipe,
   onInjectCell: (cell: NotebookCell) => void,
-): void {
-  const el = ensureModal();
+): Promise<void> {
+  const el = await ensureModal();
 
   _cleanup?.();
 
@@ -184,11 +180,11 @@ export function openRecipeViewerModal(
 // openToolViewerModal
 // ---------------------------------------------------------------------------
 
-export function openToolViewerModal(
+export async function openToolViewerModal(
   tool: McpToolLike,
   onInjectCells: (cells: NotebookCell[]) => void,
-): void {
-  const el = ensureModal();
+): Promise<void> {
+  const el = await ensureModal();
 
   _cleanup?.();
 
