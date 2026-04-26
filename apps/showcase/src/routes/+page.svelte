@@ -138,7 +138,7 @@
   <!-- Available servers (MCP remote + WebMCP local) -->
   <div class="border-b border-border bg-surface/30">
     <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col gap-3">
-      <details open class="group">
+      <details class="group">
         <summary class="flex items-center gap-1 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
           <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">MCP servers</span>
           <span class="text-[9px] text-text2/60 font-mono">({agentStore.connectedUrl ? 1 : 0}/{MCP_DEMO_SERVERS.length})</span>
