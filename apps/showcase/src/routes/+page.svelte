@@ -13,7 +13,7 @@
     WEBMCP_CATEGORY_LABELS,
   } from '@webmcp-auto-ui/servers';
   import { PRESETS, type ThemePreset } from '$lib/themes';
-  import { SIMPLE_BLOCKS, RICH_BLOCKS } from '$lib/demo-data';
+  import { extractSampleFromRecipe } from '$lib/recipe-sample';
   import { agentStore } from '$lib/agent-store.svelte';
 
   // WebMCP servers — autoui (built-in) + 29 third-party packs
@@ -83,6 +83,35 @@
     mode === 'agent' && agentStore.generatedBlocks.length > 0
       ? agentStore.generatedBlocks
       : null
+  );
+
+  // ── Demo mode: enabled WebMCP servers + sample data extracted from recipes ──
+  const enabledServersList = $derived(
+    WEBMCP_REGISTRY.filter(s => enabledWebmcpServers.has(s.id)),
+  );
+
+  type DemoServerGroup = {
+    id: string;
+    label: string;
+    server: typeof WEBMCP_REGISTRY[number]['server'];
+    widgets: { name: string; sample: Record<string, unknown> }[];
+    skipped: number;
+  };
+  const demoGroups = $derived<DemoServerGroup[]>(
+    enabledServersList.map(s => {
+      const widgets: { name: string; sample: Record<string, unknown> }[] = [];
+      let skipped = 0;
+      for (const w of s.server.listWidgets()) {
+        const sample = extractSampleFromRecipe(w.recipe);
+        if (sample) widgets.push({ name: w.name, sample });
+        else skipped++;
+      }
+      return { id: s.id, label: s.label, server: s.server, widgets, skipped };
+    }),
+  );
+  const demoServersForRenderer = $derived(enabledServersList.map(s => s.server));
+  const demoTotalWidgets = $derived(
+    demoGroups.reduce((acc, g) => acc + g.widgets.length, 0),
   );
 
   onMount(() => {
@@ -314,42 +343,47 @@
       {/if}
 
     {:else}
-      <!-- ═══ Static demo blocks ═══ -->
-      <section class="mb-12">
-        <h2 class="text-sm font-mono text-text2 uppercase tracking-widest mb-6 border-b border-border pb-2">
-          Simple Widgets
-        </h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {#each SIMPLE_BLOCKS as block}
-            <div class="bg-surface border border-border rounded-lg overflow-hidden">
-              <div class="bg-surface2 px-3 py-1.5 border-b border-border">
-                <span class="text-[10px] font-mono text-text2 uppercase tracking-widest">{block.label}</span>
-                <code class="text-[10px] font-mono text-accent ml-2">type="{block.type}"</code>
-              </div>
-              <WidgetRenderer type={block.type} data={block.data} />
-            </div>
-          {/each}
-        </div>
-      </section>
+      <!-- ═══ Demo blocks: every enabled WebMCP server's widgets, sampled from recipes ═══ -->
+      {#if demoGroups.length === 0}
+        <section class="text-center py-16">
+          <p class="text-xs font-mono text-text2">
+            No WebMCP server enabled. Toggle one above to see its widgets.
+          </p>
+        </section>
+      {/if}
 
-      <section>
-        <h2 class="text-sm font-mono text-text2 uppercase tracking-widest mb-6 border-b border-border pb-2">
-          Rich Widgets
-        </h2>
-        <div class="flex flex-col gap-6">
-          {#each RICH_BLOCKS as block}
-            <div class="bg-surface border border-border rounded-lg overflow-hidden">
-              <div class="bg-surface2 px-3 py-1.5 border-b border-border flex items-center gap-2">
-                <span class="text-[10px] font-mono text-text2 uppercase tracking-widest">{block.label}</span>
-                <code class="text-[10px] font-mono text-accent">type="{block.type}"</code>
-              </div>
-              <div class="p-4">
-                <WidgetRenderer type={block.type} data={block.data} />
-              </div>
+      {#each demoGroups as group (group.id)}
+        <section class="mb-12">
+          <div class="flex items-baseline justify-between mb-6 border-b border-border pb-2">
+            <h2 class="text-sm font-mono text-text2 uppercase tracking-widest">
+              {group.label}
+            </h2>
+            <span class="text-[10px] font-mono text-text2/60">
+              {group.widgets.length} widgets{group.skipped > 0 ? ` · ${group.skipped} skipped` : ''}
+            </span>
+          </div>
+
+          {#if group.widgets.length === 0}
+            <p class="text-xs font-mono text-text2/60 italic">
+              No sample data available for this server's widgets.
+            </p>
+          {:else}
+            <div class="flex flex-col gap-6">
+              {#each group.widgets as w (group.id + '/' + w.name)}
+                <div class="bg-surface border border-border rounded-lg overflow-hidden">
+                  <div class="bg-surface2 px-3 py-1.5 border-b border-border flex items-center gap-2">
+                    <span class="text-[10px] font-mono text-text2 uppercase tracking-widest">{w.name}</span>
+                    <code class="text-[10px] font-mono text-accent">type="{w.name}"</code>
+                  </div>
+                  <div class="p-4">
+                    <WidgetRenderer type={w.name} data={w.sample} servers={demoServersForRenderer} />
+                  </div>
+                </div>
+              {/each}
             </div>
-          {/each}
-        </div>
-      </section>
+          {/if}
+        </section>
+      {/each}
     {/if}
   </main>
 
@@ -360,7 +394,7 @@
         {#if displayBlocks}
           WebMCP Auto-UI — {displayBlocks.length} agent-generated widgets — {activePreset.label}
         {:else}
-          WebMCP Auto-UI — {SIMPLE_BLOCKS.length + RICH_BLOCKS.length} components — 3 themes
+          WebMCP Auto-UI — {demoTotalWidgets} widgets across {demoGroups.length} server{demoGroups.length === 1 ? '' : 's'} — 3 themes
         {/if}
       </p>
       <span class="font-mono text-[8px] text-text2/40">v{__APP_VERSION__} · {__GIT_HASH__ ?? ''} · {__BUILD_TIME__?.replace('T', ' ').replace('Z', '').slice(0, 23)}</span>
