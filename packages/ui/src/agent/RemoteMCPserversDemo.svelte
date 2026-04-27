@@ -4,7 +4,7 @@
 
   interface Server {
     id: string;
-    name: string;
+    label: string;
     description: string;
     url: string;
     tags?: string[];

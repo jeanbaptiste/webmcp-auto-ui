@@ -6,7 +6,7 @@
 
 <script lang="ts">
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-  import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
+  import { REMOTE_MCP_REGISTRY } from '@webmcp-auto-ui/sdk';
   import { McpConnector, LLMSelector, SettingsPanel, MCPserversList, DiagnosticModal, DiagnosticIcon, ModelCacheManager } from '@webmcp-auto-ui/ui';
 
   const buildStamp = typeof __BUILD_TIME__ === 'string'
@@ -202,7 +202,7 @@
       <!-- MCP demo servers -->
       <section class="flex flex-col gap-2">
         <MCPserversList
-          servers={MCP_DEMO_SERVERS}
+          servers={REMOTE_MCP_REGISTRY}
           {connectedUrls}
           loading={loadingUrls}
           onconnect={(url) => onaddserver?.(url)}

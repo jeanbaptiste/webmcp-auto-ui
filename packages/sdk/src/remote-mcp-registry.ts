@@ -1,72 +1,71 @@
-// @webmcp-auto-ui/sdk — MCP demo servers registry
-// Lists all MCP servers available on the production VM (demos.hyperskills.net)
+// @webmcp-auto-ui/sdk — Remote MCP server registry
+// Single source of truth for the demo MCP servers exposed by the project.
+// Convention aligned with WEBMCP_SERVER_REGISTRY (packages/servers/src/registry.ts):
+// stable `id` as identity, `label` as display name.
 
-export interface McpDemoServer {
+export interface RemoteMcpRegistryEntry {
   id: string;
-  name: string;
+  label: string;
   description: string;
   url: string;
   tags?: string[];
+  /** Optional auth headers passed to McpClient on handshake (e.g. Bearer token). */
+  headers?: Record<string, string>;
 }
 
-/**
- * MCP demo servers available for webmcp-auto-ui demos.
- * tricoteuses has its own domain; others follow the pattern
- * https://demos.hyperskills.net/<id>/mcp
- */
-export const MCP_DEMO_SERVERS: McpDemoServer[] = [
+export const REMOTE_MCP_REGISTRY: RemoteMcpRegistryEntry[] = [
   {
     id: 'tricoteuses',
-    name: 'Tricoteuses',
+    label: 'Tricoteuses',
     description: 'French parliamentary database — amendments, votes, MPs, political groups.',
     url: 'https://mcp.code4code.eu/mcp',
     tags: ['politics', 'france', 'parliament', 'open-data'],
   },
   {
     id: 'hackernews',
-    name: 'Hacker News',
+    label: 'Hacker News',
     description: 'Hacker News stories, comments, and rankings.',
     url: 'https://demos.hyperskills.net/mcp-hackernews/mcp',
     tags: ['tech', 'news', 'community'],
   },
   {
     id: 'metmuseum',
-    name: 'Met Museum',
+    label: 'Met Museum',
     description: 'Metropolitan Museum of Art — collections, artworks, artists.',
     url: 'https://demos.hyperskills.net/mcp-metmuseum/mcp',
     tags: ['art', 'museum', 'culture', 'collections'],
   },
   {
     id: 'openmeteo',
-    name: 'Open-Meteo',
+    label: 'Open-Meteo',
     description: 'Weather data — forecasts, history, geolocation.',
     url: 'https://demos.hyperskills.net/mcp-openmeteo/mcp',
     tags: ['weather', 'climate', 'forecasts', 'geo'],
   },
   {
     id: 'wikipedia',
-    name: 'Wikipedia',
+    label: 'Wikipedia',
     description: 'Wikipedia search and content — articles, summaries, categories.',
     url: 'https://demos.hyperskills.net/mcp-wikipedia/mcp',
     tags: ['encyclopedia', 'knowledge', 'search'],
   },
   {
     id: 'inaturalist',
-    name: 'iNaturalist',
+    label: 'iNaturalist',
     description: 'Nature observations — species, taxa, biodiversity statistics.',
     url: 'https://demos.hyperskills.net/mcp-inaturalist/mcp',
     tags: ['nature', 'biodiversity', 'observations', 'citizen-science'],
   },
   {
     id: 'datagouv',
-    name: 'data.gouv.fr',
+    label: 'data.gouv.fr',
     description: 'French open data — public datasets, statistics, reference data.',
     url: 'https://demos.hyperskills.net/mcp-datagouv/mcp',
     tags: ['open-data', 'france', 'government', 'statistics'],
   },
   {
     id: 'nasa',
-    name: 'NASA',
+    label: 'NASA',
     description: 'NASA — space imagery, astronomical data, Mars rovers, asteroids.',
     url: 'https://demos.hyperskills.net/mcp-nasa/mcp',
   },

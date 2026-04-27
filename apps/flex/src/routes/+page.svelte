@@ -650,8 +650,8 @@
   });
 
   async function addAllServers() {
-    const { MCP_DEMO_SERVERS } = await import('@webmcp-auto-ui/sdk');
-    for (const server of MCP_DEMO_SERVERS) {
+    const { REMOTE_MCP_REGISTRY } = await import('@webmcp-auto-ui/sdk');
+    for (const server of REMOTE_MCP_REGISTRY) {
       if (!connectedUrls.includes(server.url)) await addMcpServer(server.url);
     }
   }

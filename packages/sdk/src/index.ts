@@ -83,9 +83,9 @@ export {
 } from './skills/registry.js';
 export type { Skill, SkillBlock } from './skills/registry.js';
 
-// MCP demo servers
-export { MCP_DEMO_SERVERS } from './mcp-demo-servers.js';
-export type { McpDemoServer } from './mcp-demo-servers.js';
+// Remote MCP server registry
+export { REMOTE_MCP_REGISTRY } from './remote-mcp-registry.js';
+export type { RemoteMcpRegistryEntry } from './remote-mcp-registry.js';
 
 // Canvas store — browser-only (Svelte 5 runes), import directly from src:
 // import { canvas } from '@webmcp-auto-ui/sdk/canvas'

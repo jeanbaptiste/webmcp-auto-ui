@@ -8,7 +8,7 @@
   import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
   import { installMultiMcpBridge, MultiMcpBridge } from '@webmcp-auto-ui/core';
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
-  import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
+  import { REMOTE_MCP_REGISTRY } from '@webmcp-auto-ui/sdk';
   import {
     runAgentLoop, buildSystemPrompt,
     WEBMCP_RECIPES, recipeRegistry,
@@ -234,7 +234,7 @@
   }
 
   async function addAllServers() {
-    for (const server of MCP_DEMO_SERVERS) {
+    for (const server of REMOTE_MCP_REGISTRY) {
       if (!connectedUrls.includes(server.url)) {
         await addMcpServer(server.url);
       }
@@ -528,7 +528,7 @@
   {#if settingsOpen}
     <div class="border-b border-border bg-surface p-3 flex-shrink-0 overflow-y-auto max-h-[300px]">
       <RemoteMCPserversDemo
-        servers={MCP_DEMO_SERVERS}
+        servers={REMOTE_MCP_REGISTRY}
         {connectedUrls}
         loading={loadingUrls}
         onconnect={addMcpServer}

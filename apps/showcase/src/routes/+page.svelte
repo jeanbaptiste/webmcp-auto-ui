@@ -4,7 +4,7 @@
 
   import { onMount, untrack } from 'svelte';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-  import { MCP_DEMO_SERVERS } from '@webmcp-auto-ui/sdk';
+  import { REMOTE_MCP_REGISTRY } from '@webmcp-auto-ui/sdk';
   import { WidgetRenderer, getTheme, LLMSelector, ModelLoader, AgentProgress, McpStatus, HeaderControls, MCPserversList, WebMCPserversList } from '@webmcp-auto-ui/ui';
   import { autoui } from '@webmcp-auto-ui/agent';
   import {
@@ -53,7 +53,7 @@
 
   // ── Mode: demo (static) vs agent (generated) ────────────────────────────
   let mode = $state<'demo' | 'agent'>('demo');
-  let selectedServerUrl = $state(MCP_DEMO_SERVERS[0]?.url ?? '');
+  let selectedServerUrl = $state(REMOTE_MCP_REGISTRY[0]?.url ?? '');
 
   function onLlmChange(llm: string) {
     canvas.setLlm(llm as Parameters<typeof canvas.setLlm>[0]);
@@ -170,12 +170,12 @@
       <details class="group">
         <summary class="flex items-center gap-1 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
           <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">MCP servers</span>
-          <span class="text-[9px] text-text2/60 font-mono">({agentStore.connectedUrl ? 1 : 0}/{MCP_DEMO_SERVERS.length})</span>
+          <span class="text-[9px] text-text2/60 font-mono">({agentStore.connectedUrl ? 1 : 0}/{REMOTE_MCP_REGISTRY.length})</span>
           <span class="text-[10px] text-text2 ml-auto transition-transform group-open:rotate-90">&#x25B6;</span>
         </summary>
         <div class="mt-2">
           <MCPserversList
-            servers={MCP_DEMO_SERVERS}
+            servers={REMOTE_MCP_REGISTRY}
             connectedUrls={agentStore.connectedUrl ? [agentStore.connectedUrl] : []}
             loading={agentStore.connecting && selectedServerUrl ? [selectedServerUrl] : []}
             onconnect={(url) => { selectedServerUrl = url; agentStore.connect(url); }}

@@ -3,7 +3,7 @@
 <script lang="ts">
   interface Server {
     id: string;
-    name: string;
+    label: string;
     description: string;
     url: string;
     tags?: string[];
@@ -79,7 +79,7 @@
 
         <!-- info -->
         <div class="flex-1 min-w-0 flex flex-col">
-          <span class="font-mono text-xs font-medium text-text1">{server.name}</span>
+          <span class="font-mono text-xs font-medium text-text1">{server.label}</span>
           <span class="text-[10px] text-text2 truncate">{server.description}</span>
           {#if connected && (recipeCountByServer?.[server.url] || toolCountByServer?.[server.url])}
             <span class="flex items-center gap-1.5 mt-0.5">
