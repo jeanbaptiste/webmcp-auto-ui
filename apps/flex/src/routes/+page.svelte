@@ -4,7 +4,6 @@
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { listSkills, encodeHyperSkill } from '@webmcp-auto-ui/sdk';
   import type { Skill, HyperSkill, RecipeData } from '@webmcp-auto-ui/sdk';
-  import { installMultiMcpBridge, MultiMcpBridge } from '@webmcp-auto-ui/core';
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
   import {
@@ -471,9 +470,8 @@
   let allToolsUsed = $state<string[]>([]);
 
   // ── Multi-MCP ─────────────────────────────────────────────────────
-  // The real McpMultiClient is owned by the singleton bridge at
-  // globalThis.__multiMcp (installed in onMount below). We keep a local
-  // nullable reference, assigned once the bridge is ready, so downstream
+  // The McpMultiClient is owned by the canvas store's internal sync. We
+  // keep a local nullable reference, assigned at mount, so downstream
   // $derived / template code can read it directly.
   let multiClient = $state<McpMultiClient | null>(null);
   /** Single discovery cache shared between UI and agent loop */
@@ -1156,18 +1154,9 @@
     }
   }
 
-  // Multi-MCP bridge: reconciles canvas.dataServers with real connections.
-  // Exposed via globalThis.__canvasVanilla so the bridge (and any other helper)
-  // can access the framework-agnostic store.
-  let multiMcpBridge: MultiMcpBridge | null = null;
-
   onMount(() => {
     (globalThis as any).__canvasVanilla = canvasVanilla;
-    multiMcpBridge = installMultiMcpBridge({
-      getCanvas: () => (globalThis as any).__canvasVanilla ?? canvasVanilla,
-      log: (msg: string, data?: unknown) => { try { console.log(msg, data ?? ''); } catch {} },
-    });
-    multiClient = multiMcpBridge.multiClient;
+    multiClient = canvas.multiClient as McpMultiClient;
 
     const param = new URLSearchParams(window.location.search).get('hs');
     if (param) {
@@ -1201,7 +1190,6 @@
     if (typeof document !== 'undefined') {
       document.removeEventListener('widget:node-dblclick', onTraceNodeDblClick as EventListener);
     }
-    if (multiMcpBridge) { try { multiMcpBridge.stop(); } catch {} multiMcpBridge = null; }
   });
 </script>
 

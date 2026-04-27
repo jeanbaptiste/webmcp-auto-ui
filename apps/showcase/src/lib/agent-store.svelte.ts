@@ -5,7 +5,6 @@
  */
 import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
-import { installMultiMcpBridge, MultiMcpBridge } from '@webmcp-auto-ui/core';
 import type { McpMultiClient } from '@webmcp-auto-ui/core';
 import {
   runAgentLoop,
@@ -35,22 +34,16 @@ export interface GeneratedBlock {
 }
 
 // ── Singleton state ────────────────────────────────────────────────────────
-// The McpMultiClient is owned by the global bridge at globalThis.__multiMcp.
-// It is installed lazily on first access (ensureBridge) — this store module
-// may load before the first component mount.
-let multiMcpBridge: MultiMcpBridge | null = null;
-function ensureBridge(): MultiMcpBridge {
-  if (multiMcpBridge) return multiMcpBridge;
+// The McpMultiClient is owned by the canvas store's internal sync. We expose
+// the global canvasVanilla reference for any helper that wants direct access.
+function ensureCanvasGlobal(): void {
   if (typeof globalThis !== 'undefined') {
-    (globalThis as any).__canvasVanilla = canvasVanilla;
+    (globalThis as { __canvasVanilla?: unknown }).__canvasVanilla = canvasVanilla;
   }
-  multiMcpBridge = installMultiMcpBridge({
-    getCanvas: () => (globalThis as any).__canvasVanilla ?? canvasVanilla,
-  });
-  return multiMcpBridge;
 }
 function getMultiClient(): McpMultiClient {
-  return ensureBridge().multiClient;
+  ensureCanvasGlobal();
+  return canvas.multiClient as McpMultiClient;
 }
 let connectedUrl = $state('');
 let connecting = $state(false);
@@ -140,9 +133,8 @@ export const agentStore = {
   get compressPreview() { return agentLoop.compressPreview; },
   set compressPreview(v: number) { agentLoop.compressPreview = v; },
 
-  /** Connect to an MCP server — routed through the canvas store so the global
-   * MultiMcpBridge performs the handshake. Connection state mirrored back via
-   * the bridge's writes to `canvas.dataServers`. */
+  /** Connect to an MCP server — routed through the canvas store; its internal
+   * sync performs the handshake and writes back to `canvas.dataServers`. */
   async connect(url: string) {
     if (!url.trim() || connecting) return;
     // Disconnect previous if any
@@ -151,9 +143,7 @@ export const agentStore = {
     }
     connecting = true;
     connectError = '';
-    // Make sure the bridge is installed before mutating the store so its
-    // subscription is in place when the data-server appears.
-    ensureBridge();
+    ensureCanvasGlobal();
     const provisionalName = canvas.addMcpServer(url.trim());
     connectedUrl = url;
 

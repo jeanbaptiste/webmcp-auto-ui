@@ -286,7 +286,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   });
 
   // Auto-connect data servers declared in the recipe frontmatter (data.servers).
-  // The notebook reads MCP state passively from globalThis.__multiMcp (singleton).
+  // The notebook reads MCP state passively from canvas.dataServers.
   autoConnectFrontmatterServers(data, () => pane.setServers(collectDataServers(data)));
 
   // Keep pane servers in sync with canvas changes

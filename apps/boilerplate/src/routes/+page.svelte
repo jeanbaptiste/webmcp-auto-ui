@@ -6,7 +6,6 @@
   import { base } from '$app/paths';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
-  import { installMultiMcpBridge, MultiMcpBridge } from '@webmcp-auto-ui/core';
   import type { McpMultiClient, WebMcpServer } from '@webmcp-auto-ui/core';
   import {
     runAgentLoop, buildSystemPrompt,
@@ -42,7 +41,6 @@
   ]);
 
   // ── Multi-MCP ─────────────────────────────────────────────────────────
-  let multiMcpBridge: MultiMcpBridge | null = null;
   let multiClient = $state<McpMultiClient | null>(null);
   let connected = $state(false);
   let connecting = $state(false);
@@ -104,10 +102,9 @@
   const servers = $derived(localWebMcpServers.filter(e => e.enabled).map(e => e.server));
 
   // ── MCP connect ───────────────────────────────────────────────────────
-  // Route through the canvas store; the global MultiMcpBridge handles the
-  // handshake and populates tools/recipes on the data-server entry. The
-  // `$effect` below mirrors the result into the local `connected`/`mcpName`
-  // state for template consumption.
+  // Route through the canvas store; its internal sync handles the handshake
+  // and populates tools/recipes on the data-server entry. The `$effect`
+  // below mirrors the result into the local `connected`/`mcpName` state.
   async function connectMcp() {
     if (!mcpUrl.trim() || connecting) return;
     connecting = true;
@@ -179,16 +176,12 @@
 
   onMount(() => {
     (globalThis as any).__canvasVanilla = canvasVanilla;
-    multiMcpBridge = installMultiMcpBridge({
-      getCanvas: () => (globalThis as any).__canvasVanilla ?? canvasVanilla,
-    });
-    multiClient = multiMcpBridge.multiClient;
+    multiClient = canvas.multiClient as McpMultiClient;
     if (mcpUrl) connectMcp();
   });
 
   onDestroy(() => {
     agent.destroy();
-    if (multiMcpBridge) { try { multiMcpBridge.stop(); } catch {} multiMcpBridge = null; }
   });
 </script>
 

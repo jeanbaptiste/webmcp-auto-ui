@@ -4,7 +4,6 @@
 // Used by the four notebook layout renderers (compact/workspace/document/editorial)
 // ---------------------------------------------------------------------------
 
-import { installMultiMcpBridge } from '@webmcp-auto-ui/core';
 
 export const NB_PUBLISH_HOST: string = (() => {
   try {
@@ -348,22 +347,17 @@ export function lastRefreshedAt(overlay: RuntimeOverlay | null | undefined): num
 }
 
 /**
- * Build a CellRunner backed by a MultiMcpBridge. Discovers a SQL-capable tool
- * on the connected servers (matching `*_query_sql` then `query|run|execute`),
- * calls it with `{ sql: cell.content }`, parses content-array into a table.
+ * Build a CellRunner that issues SQL via `callTool`. Discovers a SQL-capable
+ * tool on the connected servers (matching `*_query_sql` then
+ * `query|run|execute`), calls it with `{ sql: cell.content }`, parses the
+ * content-array into a table.
  *
- * Throws if no server is reachable / no SQL tool found. Callers are expected
- * to surface this as a 'stale' status, not crash.
+ * Returns a runtime error result if no server is reachable / no SQL tool found.
  */
-export function createBridgeSqlRunner(bridge: {
-  hasServer?: (name: string) => boolean;
-  connectedServers?: () => string[];
-  multiClient: {
-    listTools?: (url: string) => Promise<{ name: string }[]>;
-    getToolsForUrl?: (url: string) => { name: string }[];
-  };
-  callTool: (serverName: string, toolName: string, args: unknown) => Promise<unknown>;
-}, getServerDescriptors: () => DataServerDescriptor[]): CellRunner {
+export function createBridgeSqlRunner(
+  callTool: (serverName: string, toolName: string, args: unknown) => Promise<unknown>,
+  getServerDescriptors: () => DataServerDescriptor[],
+): CellRunner {
   const PATTERN_PRIMARY = /^.*query_sql$/i;
   const PATTERN_FALLBACK = /^(query|run|execute)(_sql)?$/i;
 
@@ -423,20 +417,18 @@ export function createBridgeSqlRunner(bridge: {
     if (!hit) {
       return { ok: false, error: 'No SQL tool exposed by reachable servers', errorKind: 'schema', durationMs: 0 };
     }
-    const raw = await bridge.callTool(hit.serverName, hit.toolName, { sql: cell.content });
+    const raw = await callTool(hit.serverName, hit.toolName, { sql: cell.content });
     return parseResult(raw, startedAt);
   };
 }
 
 /**
- * High-level bootstrap: auto-connect declared servers, wait for handshake, build
- * a bridge-backed runner, fire runAutoRefresh. Safe to call from any layout at
- * mount time when `state.autoRun && state.mode === 'view'`. Returns a cleanup.
+ * High-level bootstrap: auto-connect declared servers, wait for handshake,
+ * build a SQL runner, fire runAutoRefresh. Safe to call from any layout at
+ * mount time when `state.autoRun && state.mode === 'view'`. Returns cleanup.
  *
- * Reuses the global singleton bridge on `globalThis.__multiMcp` (installed via
- * `installMultiMcpBridge` from @webmcp-auto-ui/core) — never creates a parallel
- * bridge. If no singleton exists yet we install it here, and only the installer
- * is allowed to stop it on cleanup.
+ * Drives connection state through the canvas store; the store's internal
+ * sync owns the McpMultiClient and reconciles handshakes on every mutation.
  */
 export interface BootstrapLiveRefreshOptions {
   state: NotebookState;
@@ -447,36 +439,42 @@ export interface BootstrapLiveRefreshOptions {
   timeoutMs?: number;
 }
 
+interface CanvasLike {
+  dataServers: { name: string; url: string; enabled?: boolean; connected?: boolean }[];
+  callTool: (name: string, toolName: string, args: unknown) => Promise<unknown>;
+}
+
+async function waitForEnabledServers(canvas: CanvasLike, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + Math.max(0, timeoutMs);
+  while (Date.now() < deadline) {
+    const enabled = (canvas.dataServers ?? []).filter((s) => s.enabled !== false);
+    if (enabled.length === 0) return;
+    if (enabled.every((s) => s.connected)) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
+
 export function bootstrapLiveRefresh(opts: BootstrapLiveRefreshOptions): () => void {
   const { state, data, overlay, onCellChange, onTick, timeoutMs } = opts;
   const ac = new AbortController();
-  let weCreatedBridge = false;
-  let bridgeRef: any = null;
 
   void (async () => {
     try {
       autoConnectFrontmatterServers(data);
-      const canvas: any = (globalThis as { __canvasVanilla?: unknown; canvasVanilla?: unknown })
-        .__canvasVanilla ?? (globalThis as { canvasVanilla?: unknown }).canvasVanilla;
+      const canvas = ((globalThis as { __canvasVanilla?: CanvasLike; canvasVanilla?: CanvasLike })
+        .__canvasVanilla ?? (globalThis as { canvasVanilla?: CanvasLike }).canvasVanilla) as CanvasLike | undefined;
       if (!canvas) {
         overlay.error = 'No canvas available';
         overlay.finishedAt = Date.now();
         onTick?.(overlay);
         return;
       }
-      const existing = (globalThis as any).__multiMcp;
-      const bridge = existing ?? installMultiMcpBridge({ getCanvas: () => canvas });
-      weCreatedBridge = !existing;
-      bridgeRef = bridge;
-      // `installMultiMcpBridge` already starts the bridge; a pre-existing
-      // singleton is assumed to be running.
-      await bridge.waitForEnabledServers(timeoutMs ?? 5000);
+      await waitForEnabledServers(canvas, timeoutMs ?? 5000);
 
-      const runner = createBridgeSqlRunner(bridge, () => {
-        // filter collectDataServers to only connected ones
-        const all = collectDataServers(data);
-        return all.filter((s) => bridge.hasServer(s.name));
-      });
+      const runner = createBridgeSqlRunner(
+        canvas.callTool.bind(canvas),
+        () => collectDataServers(data).filter((s) => canvas.dataServers.find((d) => d.name === s.name)?.connected),
+      );
 
       await runAutoRefresh({ state, overlay, runner, onCellChange, onTick, signal: ac.signal });
     } catch (err) {
@@ -486,16 +484,7 @@ export function bootstrapLiveRefresh(opts: BootstrapLiveRefreshOptions): () => v
     }
   })();
 
-  return () => {
-    ac.abort();
-    if (weCreatedBridge && bridgeRef && typeof bridgeRef.stop === 'function') {
-      try { bridgeRef.stop(); } catch { /* ignore */ }
-      try {
-        const g: any = globalThis as any;
-        if (g.__multiMcp === bridgeRef) g.__multiMcp = undefined;
-      } catch { /* ignore */ }
-    }
-  };
+  return () => { ac.abort(); };
 }
 
 export function registerExecutor(state: NotebookState, type: CellType, fn: CellExecutor): void {

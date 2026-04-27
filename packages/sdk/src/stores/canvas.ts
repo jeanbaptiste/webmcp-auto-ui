@@ -5,24 +5,21 @@
  * Reactivity: subscribe(fn) / getSnapshot() pattern (useSyncExternalStore compatible).
  *
  * ---------------------------------------------------------------------------
- * Unified server model (2026-04-23 debloat)
+ * Unified server model
  * ---------------------------------------------------------------------------
- *
- * Historically this store had TWO parallel surfaces for MCP servers:
- *   - `mcpUrl` / `mcpName` / `mcpConnected` / `mcpConnecting` / `mcpTools`
- *     (flat, single-server or comma-joined multi) driven by legacy
- *     `setMcpConnected`/`setMcpConnecting`/`setMcpError` setters.
- *   - `dataServers: DataServer[]` (list, managed by MultiMcpBridge)
- *
- * They were the same concept. The legacy setters and the `primary` flag have
- * been removed; writes go through `addDataServer` / `setDataServerMeta` /
- * `setDataServerEnabled` / `addMcpServer` (url shorthand) exclusively. Flat
- * getters (`mcpConnected`, `mcpName`, `mcpUrl`, `mcpConnecting`, `mcpTools`)
- * remain as read-only derivations over the server list for UI back-compat.
+ * `dataServers: DataServer[]` is the single source of truth for MCP servers.
+ * The store owns an internal McpMultiClient and reconciles real connections
+ * with user intent (`enabled`) on every mutation. Writes go through
+ * `addDataServer` / `setDataServerMeta` / `setDataServerEnabled` /
+ * `addMcpServer` (url shorthand) exclusively. Flat getters
+ * (`mcpConnected`, `mcpName`, `mcpUrl`, `mcpConnecting`, `mcpTools`) remain
+ * as read-only derivations over the server list for UI back-compat.
  */
 
 import { encode, decode } from '../hyperskills.js';
 import { REMOTE_MCP_REGISTRY } from '../remote-mcp-registry.js';
+import { McpMultiClient } from '@webmcp-auto-ui/core';
+import type { McpTool } from '@webmcp-auto-ui/core';
 
 export type WidgetType =
   | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
@@ -61,8 +58,8 @@ export interface McpToolInfo {
 
 /**
  * Single MCP server entry — the one true shape.
- * All servers are equal; there is no "primary" concept. The MultiMcpBridge
- * singleton reconciles connection state across all entries.
+ * All servers are equal; there is no "primary" concept. The store's internal
+ * sync reconciles real connection state with `enabled` on every mutation.
  */
 export interface DataServer {
   /** Stable identity key. Convention aligned with WEBMCP_SERVER_REGISTRY:
@@ -116,6 +113,43 @@ function stableHash(s: string): string {
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
   return (h >>> 0).toString(36);
+}
+
+/** Extract `{ name, description?, body? }` items from an MCP tool response.
+ * Looks for a text chunk whose payload parses as JSON and contains either an
+ * array or an object with an `items`/`recipes` array. */
+function parseRecipesFromToolResponse(res: unknown): { name: string; description?: string; body?: string }[] | null {
+  if (!res || typeof res !== 'object') return null;
+  const content = (res as { content?: unknown }).content;
+  if (!Array.isArray(content)) return null;
+  for (const chunk of content) {
+    if (!chunk || typeof chunk !== 'object') continue;
+    const c = chunk as { type?: unknown; text?: unknown };
+    if (c.type !== 'text' || typeof c.text !== 'string') continue;
+    let parsed: unknown;
+    try { parsed = JSON.parse(c.text); } catch { continue; }
+    const candidate = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray((parsed as { items?: unknown })?.items)
+        ? (parsed as { items: unknown[] }).items
+        : Array.isArray((parsed as { recipes?: unknown })?.recipes)
+          ? (parsed as { recipes: unknown[] }).recipes
+          : null;
+    if (!candidate) continue;
+    const out: { name: string; description?: string; body?: string }[] = [];
+    for (const it of candidate) {
+      if (!it || typeof it !== 'object') continue;
+      const o = it as { name?: unknown; id?: unknown; description?: unknown; body?: unknown };
+      const name = typeof o.name === 'string' ? o.name : typeof o.id === 'string' ? o.id : null;
+      if (!name) continue;
+      const entry: { name: string; description?: string; body?: string } = { name };
+      if (typeof o.description === 'string') entry.description = o.description;
+      if (typeof o.body === 'string') entry.body = o.body;
+      out.push(entry);
+    }
+    if (out.length > 0) return out;
+  }
+  return null;
 }
 
 const NAME_ALIAS: Record<string, string> = { 'moulineuse': 'Tricoteuses' };
@@ -243,11 +277,66 @@ function createCanvasVanilla() {
     return setDataServerEnabled(name, !s.enabled);
   }
 
-  /**
-   * Call a tool on a connected MCP server, addressed by canvas name (= id).
-   * Routes through the global MultiMcpBridge transport during the migration;
-   * the bridge will be internalised into the store at étape 4 of the refactor.
-   */
+  // ── Internal MCP transport + sync ──────────────────────────────────────
+  const multiClient = new McpMultiClient();
+  const inFlight = new Set<string>();
+
+  async function syncServer(name: string): Promise<void> {
+    const srv = _servers.find((s) => s.name === name);
+    if (!srv) return;
+    if (inFlight.has(name)) return;
+
+    const liveUrls = new Set(multiClient.listServers().map((s) => s.url));
+
+    if (srv.enabled && !srv.connected && !liveUrls.has(srv.url)) {
+      inFlight.add(name);
+      try {
+        const opts = srv.headers ? { headers: srv.headers } : undefined;
+        const { name: actualName, tools } = await multiClient.addServer(srv.url, opts);
+        let recipes: { name: string; description?: string; body?: string }[] = [];
+        if (tools.some((t: McpTool) => t.name === 'list_recipes')) {
+          try {
+            const res = await multiClient.callToolOn(srv.url, 'list_recipes', {});
+            recipes = parseRecipesFromToolResponse(res) ?? [];
+          } catch { /* no recipes */ }
+        }
+        setDataServerMeta(name, {
+          connected: true, connecting: false,
+          tools: tools as McpToolInfo[],
+          recipes,
+          serverName: actualName,
+          error: undefined,
+        });
+      } catch (err) {
+        setDataServerMeta(name, {
+          connected: false, connecting: false,
+          tools: [],
+          error: err instanceof Error ? err.message : String(err),
+        });
+      } finally {
+        inFlight.delete(name);
+      }
+    } else if (!srv.enabled && (srv.connected || liveUrls.has(srv.url))) {
+      try { await multiClient.removeServer(srv.url); } catch { /* ignore */ }
+      setDataServerMeta(name, { connected: false });
+    }
+  }
+
+  function reconcile(): void {
+    for (const srv of _servers) void syncServer(srv.name);
+    // Drop transport entries for servers removed from the store entirely.
+    const storedUrls = new Set(_servers.map((s) => s.url));
+    for (const live of multiClient.listServers()) {
+      if (!storedUrls.has(live.url)) void multiClient.removeServer(live.url);
+    }
+  }
+
+  // Internal subscriber — fires reconcile() after every store mutation.
+  // The `inFlight` guard and the `srv.connected` checks prevent loops when
+  // syncServer itself triggers a notify via setDataServerMeta.
+  listeners.add(() => { reconcile(); });
+
+  /** Call a tool on a connected MCP server, addressed by canvas name (= id). */
   async function callTool(
     name: string,
     toolName: string,
@@ -255,15 +344,7 @@ function createCanvasVanilla() {
   ): Promise<unknown> {
     const srv = _servers.find((s) => s.name === name);
     if (!srv) throw new Error(`canvas.callTool: no server "${name}"`);
-    const bridge = (globalThis as { __multiMcp?: { multiClient?: { callToolOn: (u: string, t: string, a: Record<string, unknown>) => Promise<unknown> } } }).__multiMcp;
-    if (!bridge?.multiClient) throw new Error('canvas.callTool: MCP bridge not installed');
-    return bridge.multiClient.callToolOn(srv.url, toolName, args);
-  }
-
-  /** Transitional accessor — returns the multi-client owned by the global
-   * bridge. Removed at étape 4 once the transport is internalised. */
-  function getMultiClient(): unknown {
-    return (globalThis as { __multiMcp?: { multiClient?: unknown } }).__multiMcp?.multiClient;
+    return multiClient.callToolOn(srv.url, toolName, args);
   }
 
   // ── Widget actions ─────────────────────────────────────────────────────
@@ -475,7 +556,7 @@ function createCanvasVanilla() {
     setDataServerEnabled,
     toggleDataServer,
     callTool,
-    get multiClient() { return getMultiClient(); },
+    get multiClient() { return multiClient; },
 
     buildSkillJSON, buildHyperskillParam, loadFromParam, loadFromUrl,
 

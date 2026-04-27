@@ -6,7 +6,6 @@
   import { base } from '$app/paths';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
-  import { installMultiMcpBridge, MultiMcpBridge } from '@webmcp-auto-ui/core';
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import { REMOTE_MCP_REGISTRY } from '@webmcp-auto-ui/sdk';
   import {
@@ -27,11 +26,10 @@
   let selectedId = $state<string | null>(null);
   let selectedSource = $state<'local' | 'mcp'>('local');
 
-  // MCP — singleton McpMultiClient owned by the global bridge.
-  let multiMcpBridge: MultiMcpBridge | null = null;
+  // MCP — McpMultiClient owned by the canvas store's internal sync.
   let multiClient = $state<McpMultiClient | null>(null);
   // Connected/loading server ids (= canvas data-server names) — derived from
-  // the canvas store, the single source of truth populated by the bridge.
+  // the canvas store, the single source of truth.
   const enabledServers = $derived(
     new Set(canvas.dataServers.filter(s => s.connected).map(s => s.name))
   );
@@ -39,9 +37,8 @@
     new Set(canvas.dataServers.filter(s => s.connecting).map(s => s.name))
   );
   // Recipes are derived from the canvas data-servers (source of truth —
-  // populated by the global MultiMcpBridge on handshake). This automatically
-  // reflects per-server disconnects: a server dropping out of `dataServers`
-  // (or flipping `connected` to false) removes its recipes from the list.
+  // populated by the store's internal sync on handshake). Per-server
+  // disconnects automatically remove recipes from the list.
   const mcpRecipes = $derived.by((): McpRecipe[] => {
     const out: McpRecipe[] = [];
     const seen = new Set<string>();
@@ -170,13 +167,10 @@
   });
 
   // ── MCP ────────────────────────────────────────────────────────────────────
-  // All connect / disconnect flows go through the canvas store. The global
-  // MultiMcpBridge watches the store, performs the MCP handshake, and writes
-  // back `connected`, `tools`, and `recipes` on each data-server entry.
   // Connect / disconnect flows go through the canvas store, addressed by
-  // registry id (= canvas data-server name). The global MultiMcpBridge
-  // watches the store, performs the MCP handshake, and writes back
-  // `connected`, `tools`, and `recipes` on each data-server entry.
+  // registry id (= canvas data-server name). The store's internal sync
+  // performs the MCP handshake and writes back `connected`, `tools`, and
+  // `recipes` on each data-server entry.
   async function addMcpServerById(id: string) {
     const reg = REMOTE_MCP_REGISTRY.find(e => e.id === id);
     if (!reg) return;
@@ -404,15 +398,11 @@
 
   onDestroy(() => {
     agent.destroy();
-    if (multiMcpBridge) { try { multiMcpBridge.stop(); } catch {} multiMcpBridge = null; }
   });
 
   onMount(() => {
     (globalThis as any).__canvasVanilla = canvasVanilla;
-    multiMcpBridge = installMultiMcpBridge({
-      getCanvas: () => (globalThis as any).__canvasVanilla ?? canvasVanilla,
-    });
-    multiClient = multiMcpBridge.multiClient;
+    multiClient = canvas.multiClient as McpMultiClient;
   });
 </script>
 
