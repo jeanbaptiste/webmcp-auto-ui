@@ -73,7 +73,7 @@ export function mountLeftPane(
       section.innerHTML = `
         <header class="nb-lp-srv-head">
           <span class="nb-lp-srv-dot"></span>
-          <span class="nb-lp-srv-name">${escapeHtml(srv.name)}</span>
+          <span class="nb-lp-srv-name">${escapeHtml(srv.serverName ?? srv.label ?? srv.name)}</span>
         </header>
         <div class="nb-lp-srv-groups">
           ${srv.recipes?.length ? `

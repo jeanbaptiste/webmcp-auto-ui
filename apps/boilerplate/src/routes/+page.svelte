@@ -59,7 +59,8 @@
   const layers = $derived.by((): ToolLayer[] => {
     const result: ToolLayer[] = [];
     if (connected) {
-      for (const server of (multiClient?.listServers() ?? [])) {
+      for (const server of canvas.dataServers) {
+        if (!server.connected || !Array.isArray(server.tools)) continue;
         const mcpLayer: McpLayer = {
           protocol: 'mcp',
           serverName: server.name,
@@ -205,7 +206,7 @@
       connecting={canvas.mcpConnecting}
       connected={canvas.mcpConnected}
       name={mcpName || 'non connecte'}
-      servers={(multiClient?.listServers() ?? []).map(s => ({ url: s.url, name: s.name, toolCount: s.tools.length }))}
+      servers={canvas.dataServers.filter(s => s.connected).map(s => ({ url: s.url, name: s.name, toolCount: Array.isArray(s.tools) ? s.tools.length : 0 }))}
     />
     <label class="flex items-center gap-1.5 font-mono text-xs text-text2 cursor-pointer flex-shrink-0">
       <input type="checkbox" bind:checked={contextRAGEnabled} class="accent-accent w-3.5 h-3.5" />

@@ -2,6 +2,7 @@
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import type { RunResult } from '@webmcp-auto-ui/sdk';
   import { runCode, estimateTokens } from '@webmcp-auto-ui/sdk';
+  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { highlightCode } from '../primitives/markdown-renderer.js';
   import type { RecipeBlockAction } from './types.js';
 
@@ -84,7 +85,7 @@
     const t0 = performance.now();
     startTimer(t0);
 
-    const multi = (globalThis as unknown as { __multiMcp?: { multiClient: McpMultiClient } }).__multiMcp?.multiClient;
+    const multi = canvas.multiClient as McpMultiClient | undefined;
     const result = await runCode(editable, lang, multi);
 
     stopTimer();

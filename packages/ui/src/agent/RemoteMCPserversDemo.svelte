@@ -12,15 +12,15 @@
 
   interface Props {
     servers: Server[];
-    connectedUrls?: string[];
-    loading?: string[];
-    onconnect?: (url: string) => void;
+    enabledServers?: Set<string>;
+    loading?: Set<string>;
+    onconnect?: (id: string) => void;
     onconnectall?: () => void;
-    ondisconnect?: (url: string) => void;
+    ondisconnect?: (id: string) => void;
     recipeCountByServer?: Record<string, number>;
-    onrecipeclick?: (url: string) => void;
+    onrecipeclick?: (id: string) => void;
     toolCountByServer?: Record<string, number>;
-    ontoolclick?: (url: string) => void;
+    ontoolclick?: (id: string) => void;
   }
 
   let props: Props = $props();

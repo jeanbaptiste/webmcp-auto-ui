@@ -176,9 +176,14 @@
         <div class="mt-2">
           <MCPserversList
             servers={REMOTE_MCP_REGISTRY}
-            connectedUrls={agentStore.connectedUrl ? [agentStore.connectedUrl] : []}
-            loading={agentStore.connecting && selectedServerUrl ? [selectedServerUrl] : []}
-            onconnect={(url) => { selectedServerUrl = url; agentStore.connect(url); }}
+            enabledServers={new Set(canvas.dataServers.filter(s => s.connected).map(s => s.name))}
+            loading={new Set(canvas.dataServers.filter(s => s.connecting).map(s => s.name))}
+            onconnect={(id) => {
+              const reg = REMOTE_MCP_REGISTRY.find(r => r.id === id);
+              if (!reg) return;
+              selectedServerUrl = reg.url;
+              agentStore.connect(reg.url);
+            }}
             ondisconnect={() => agentStore.disconnect()}
             hideHeader
           />
@@ -250,7 +255,7 @@
           connecting={agentStore.connecting}
           connected={!!agentStore.connectedUrl}
           name={canvas.mcpName ?? ''}
-          servers={agentStore.multiClient.listServers().map(s => ({ url: s.url, name: s.name, toolCount: s.tools.length }))}
+          servers={canvas.dataServers.filter(s => s.connected).map(s => ({ url: s.url, name: s.serverName ?? s.label ?? s.name, toolCount: (s.tools ?? []).length }))}
         />
       {/if}
     </div>

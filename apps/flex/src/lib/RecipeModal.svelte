@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, MarkdownView, RecipeCodeBlock } from '@webmcp-auto-ui/ui';
-  import type { McpMultiClient } from '@webmcp-auto-ui/core';
+  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { parseBody, runCode } from '@webmcp-auto-ui/sdk';
   import type { RecipeData, RunResult, RunTab } from '@webmcp-auto-ui/sdk';
   import RecipeRunModal from './RecipeRunModal.svelte';
@@ -113,7 +113,7 @@
       result: { status: 'running', logs: [], startedAt: performance.now() },
     };
     runs = [...runs];
-    const multi = (globalThis as unknown as { __multiMcp?: { multiClient: McpMultiClient } }).__multiMcp?.multiClient;
+    const multi = canvas.multiClient as Parameters<typeof runCode>[2];
     const result = await runCode(tab.code, tab.lang, multi);
     runs[idx] = { ...tab, result };
     runs = [...runs];

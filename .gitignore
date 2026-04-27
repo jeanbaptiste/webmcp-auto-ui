@@ -61,3 +61,6 @@ docs/generated/
 
 # Lockfile fantôme (le repo utilise npm — voir .npmrc + package-lock.json)
 pnpm-lock.yaml
+
+# Sub-agent refactor reports (artefacts internes, hors scope du repo)
+.refactor-reports/

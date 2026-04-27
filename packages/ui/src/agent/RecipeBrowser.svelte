@@ -4,8 +4,8 @@
   import { fade, fly } from 'svelte/transition';
   import { filterRecipes, sortRecipes, recipeToMarkdown, recipeToDownloadBlob } from '@webmcp-auto-ui/agent';
   import { encode } from '@webmcp-auto-ui/sdk';
+  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { extractCellsFromRecipe } from '@webmcp-auto-ui/ui';
-  import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import type { RecipeData } from '@webmcp-auto-ui/sdk';
 
   interface RecipeItem {
@@ -46,8 +46,10 @@
     onOpenRecipe,
   }: Props = $props();
 
-  function getMultiClient(): McpMultiClient | undefined {
-    return (globalThis as unknown as { __multiMcp?: { multiClient: McpMultiClient } }).__multiMcp?.multiClient;
+  /** Look up the canvas server name (= registry id) matching the given URL. */
+  function findServerNameByUrl(url: string | undefined): string | undefined {
+    if (!url) return undefined;
+    return canvas.dataServers.find((s) => s.url === url)?.name;
   }
 
   let query = $state('');
@@ -111,15 +113,16 @@
   }
 
   async function ensureBody(recipe: RecipeItem) {
-    const multiClient = getMultiClient();
-    if (recipe.body || !recipe.serverUrl || !multiClient) return;
+    if (recipe.body || !recipe.serverUrl) return;
+    const serverName = findServerNameByUrl(recipe.serverUrl);
+    if (!serverName) return;
     try {
       const identifier = recipe.originalName ?? recipe.name;
-      const res = await multiClient.callToolOn(recipe.serverUrl, 'get_recipe', {
+      const res = await canvas.callTool(serverName, 'get_recipe', {
         name: identifier,
         id: (recipe as any).id ?? identifier,
-      });
-      const text = res.content?.find((c: { type: string }) => c.type === 'text') as { text?: string } | undefined;
+      }) as { content?: { type: string; text?: string }[] };
+      const text = res?.content?.find((c: { type: string }) => c.type === 'text') as { text?: string } | undefined;
       if (text?.text) {
         let body = text.text;
         try {
@@ -144,11 +147,11 @@
       description: recipe.description,
     });
 
-    const connected = getMultiClient()?.listServers() ?? [];
+    const connected = canvas.dataServers ?? [];
     const serverNames = Array.isArray(recipe.servers) ? recipe.servers : [];
     const servers = serverNames
       .map((name) => {
-        const hit = connected.find((s) => s.name === name);
+        const hit = connected.find((s) => s.name === name || s.serverName === name || s.label === name);
         const url = hit?.url ?? (typeof recipe.serverUrl === 'string' ? recipe.serverUrl : undefined);
         return url ? { name, url, kind: 'data' as const } : null;
       })

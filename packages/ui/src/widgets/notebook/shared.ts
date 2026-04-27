@@ -672,7 +672,12 @@ export interface DataServerRecipe {
 }
 
 export interface DataServerDescriptor {
+  /** Canvas key (= registry id, e.g. 'wikipedia'). Stable identity used for routing. */
   name: string;
+  /** Display label (registry label, or URL host for manual entries). */
+  label?: string;
+  /** Real server name from MCP handshake (initResult.serverInfo.name, aliased). */
+  serverName?: string;
   url?: string;
   kind?: string;
   tools?: DataServerTool[];
@@ -704,6 +709,8 @@ export function collectDataServers(data: Record<string, unknown>): DataServerDes
       .filter((s) => !isUiServer(String(s?.name ?? ''), s?.kind))
       .map((s) => ({
         name: String(s.name),
+        label: typeof s.label === 'string' ? s.label : undefined,
+        serverName: typeof s.serverName === 'string' ? s.serverName : undefined,
         url: s.url ? String(s.url) : undefined,
         recipes: Array.isArray(s.recipes) ? s.recipes : [],
         tools: Array.isArray(s.tools) ? s.tools : [],
@@ -715,6 +722,8 @@ export function collectDataServers(data: Record<string, unknown>): DataServerDes
     .filter((s) => s?.name && !isUiServer(String(s.name), s?.kind))
     .map((s) => ({
       name: String(s.name),
+      label: typeof s.label === 'string' ? s.label : undefined,
+      serverName: typeof s.serverName === 'string' ? s.serverName : undefined,
       url: s.url ? String(s.url) : undefined,
       recipes: Array.isArray(s.recipes) ? s.recipes : [],
       tools: Array.isArray(s.tools) ? s.tools : [],

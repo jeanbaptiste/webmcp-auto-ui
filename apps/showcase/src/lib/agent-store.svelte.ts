@@ -212,11 +212,11 @@ export const agentStore = {
     const layers: ToolLayer[] = [];
 
     if (canvas.mcpConnected) {
-      for (const server of getMultiClient().listServers()) {
+      for (const server of canvas.dataServers.filter(s => s.connected)) {
         const mcpLayer: McpLayer = {
           protocol: 'mcp',
           serverName: server.name,
-          tools: fromMcpTools(server.tools as Parameters<typeof fromMcpTools>[0]),
+          tools: fromMcpTools((server.tools ?? []) as Parameters<typeof fromMcpTools>[0]),
         };
         layers.push(mcpLayer);
       }

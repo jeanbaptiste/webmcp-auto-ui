@@ -47,11 +47,13 @@
     schemaStrict?: boolean;
     providerKind?: 'remote' | 'wasm' | 'gemma' | 'local';
     onconnect: () => void;
-    connectedUrls?: string[];
-    loadingUrls?: string[];
-    onaddserver?: (url: string) => void;
+    /** Set of REMOTE_MCP_REGISTRY ids currently connected (= canvas data-server names). */
+    enabledRemoteServers?: Set<string>;
+    /** Set of REMOTE_MCP_REGISTRY ids currently in a connecting state. */
+    loadingRemoteServers?: Set<string>;
+    onaddserver?: (id: string) => void;
     onaddall?: () => void;
-    onremoveserver?: (url: string) => void;
+    onremoveserver?: (id: string) => void;
     mcpRecipes?: McpRecipe[];
     webmcpRecipes?: WebmcpRecipe[];
     localUrl?: string;
@@ -60,10 +62,12 @@
     serverRegistry?: Array<{ id: string; label: string; description: string; widgetCount: number; category?: 'generic' | '2d3d' | 'charts' | 'graph' | 'dashboard' | 'geo' }>;
     enabledServers?: Set<string>;
     onbrowserecipes?: () => void;
+    /** Keyed by canvas name (= registry id). */
     recipeCountByServer?: Record<string, number>;
-    onrecipeclick?: (url: string) => void;
+    onrecipeclick?: (id: string) => void;
+    /** Keyed by canvas name (= registry id). */
     toolCountByServer?: Record<string, number>;
-    ontoolclick?: (url: string) => void;
+    ontoolclick?: (id: string) => void;
     webmcpRecipeCountByServer?: Record<string, number>;
     webmcpToolCountByServer?: Record<string, number>;
     onwebmcprecipeclick?: (id: string) => void;
@@ -100,8 +104,8 @@
     schemaStrict = $bindable(false),
     providerKind = 'remote',
     onconnect,
-    connectedUrls = [],
-    loadingUrls = [],
+    enabledRemoteServers = new Set<string>(),
+    loadingRemoteServers = new Set<string>(),
     onaddserver,
     onaddall,
     onremoveserver,
@@ -203,15 +207,15 @@
       <section class="flex flex-col gap-2">
         <MCPserversList
           servers={REMOTE_MCP_REGISTRY}
-          {connectedUrls}
-          loading={loadingUrls}
-          onconnect={(url) => onaddserver?.(url)}
+          enabledServers={enabledRemoteServers}
+          loading={loadingRemoteServers}
+          onconnect={(id) => onaddserver?.(id)}
           onconnectall={() => onaddall?.()}
-          ondisconnect={(url) => onremoveserver?.(url)}
+          ondisconnect={(id) => onremoveserver?.(id)}
           {recipeCountByServer}
-          {onrecipeclick}
+          onrecipeclick={(id) => onrecipeclick?.(id)}
           {toolCountByServer}
-          ontoolclick={(url) => ontoolclick?.(url)}
+          ontoolclick={(id) => ontoolclick?.(id)}
         />
       </section>
 

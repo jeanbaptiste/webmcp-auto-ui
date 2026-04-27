@@ -17,7 +17,7 @@
   } from '@webmcp-auto-ui/agent';
   import type { ChatMessage, Recipe, McpRecipe, ToolLayer, McpLayer } from '@webmcp-auto-ui/agent';
   import { autoui } from '@webmcp-auto-ui/agent';
-  import { McpStatus, LLMSelector, ModelLoader, RemoteMCPserversDemo, AgentConsole, HeaderControls } from '@webmcp-auto-ui/ui';
+  import { McpStatus, LLMSelector, ModelLoader, MCPserversList, AgentConsole, HeaderControls } from '@webmcp-auto-ui/ui';
   import { createAgentLoop } from '@webmcp-auto-ui/ui/agent';
   import RecipeList from '$lib/RecipeList.svelte';
   import RecipeDetail from '$lib/RecipeDetail.svelte';
@@ -30,8 +30,14 @@
   // MCP — singleton McpMultiClient owned by the global bridge.
   let multiMcpBridge: MultiMcpBridge | null = null;
   let multiClient = $state<McpMultiClient | null>(null);
-  let connectedUrls = $state<string[]>([]);
-  let loadingUrls = $state<string[]>([]);
+  // Connected/loading server ids (= canvas data-server names) — derived from
+  // the canvas store, the single source of truth populated by the bridge.
+  const enabledServers = $derived(
+    new Set(canvas.dataServers.filter(s => s.connected).map(s => s.name))
+  );
+  const loadingServers = $derived(
+    new Set(canvas.dataServers.filter(s => s.connecting).map(s => s.name))
+  );
   // Recipes are derived from the canvas data-servers (source of truth —
   // populated by the global MultiMcpBridge on handshake). This automatically
   // reflects per-server disconnects: a server dropping out of `dataServers`
@@ -167,76 +173,27 @@
   // All connect / disconnect flows go through the canvas store. The global
   // MultiMcpBridge watches the store, performs the MCP handshake, and writes
   // back `connected`, `tools`, and `recipes` on each data-server entry.
-  async function addMcpServer(url: string) {
-    if (!url.trim()) return;
-    const trimmed = url.trim();
-
-    // Auth header fallback: MultiMcpBridge does not yet support per-server
-    // headers. When a bearer token is set, we bypass the bridge and call the
-    // multi-client directly. The canvas store is still updated so the UI
-    // observes a consistent state.
-    // TODO: bridge doesn't yet support per-server auth.
-    if (mcpToken.trim()) {
-      loadingUrls = [...loadingUrls, url];
-      // Add as disabled so the bridge's auto-handshake (without auth) doesn't
-      // race with our authed direct call.
-      let provisionalName: string;
-      try {
-        provisionalName = new URL(trimmed, 'http://local').host || trimmed;
-      } catch { provisionalName = trimmed; }
-      canvas.addDataServer({ name: provisionalName, url: trimmed });
-      canvas.setDataServerEnabled(provisionalName, false);
-      canvas.setDataServerMeta(provisionalName, { connecting: true, error: undefined });
-      try {
-        const opts = { headers: { Authorization: `Bearer ${mcpToken.trim()}` } };
-        if (!multiClient) throw new Error('MCP bridge not ready');
-        const { tools } = await multiClient.addServer(trimmed, opts);
-        connectedUrls = [...connectedUrls, url];
-        let recipes: any[] = [];
-        if (tools.some(t => t.name === 'list_recipes')) {
-          try {
-            const r = await multiClient.callToolOn(trimmed, 'list_recipes', {});
-            const text = r.content?.find((c: any) => c.type === 'text') as any;
-            if (text?.text) {
-              const parsed = JSON.parse(text.text);
-              recipes = Array.isArray(parsed) ? parsed : (parsed?.recipes ?? []);
-            }
-          } catch { /* no recipes */ }
-        }
-        canvas.setDataServerMeta(provisionalName, {
-          connected: true, connecting: false,
-          tools: tools as any,
-          recipes,
-          error: undefined,
-        });
-      } catch (e) {
-        canvas.setDataServerMeta(provisionalName, {
-          connected: false, connecting: false,
-          error: e instanceof Error ? e.message : String(e),
-        });
-      } finally {
-        loadingUrls = loadingUrls.filter(u => u !== url);
-      }
-      return;
-    }
-
-    // Default path: the bridge owns the handshake.
-    loadingUrls = [...loadingUrls, url];
-    canvas.addMcpServer(trimmed);
-    if (!connectedUrls.includes(url)) connectedUrls = [...connectedUrls, url];
-    loadingUrls = loadingUrls.filter(u => u !== url);
+  // Connect / disconnect flows go through the canvas store, addressed by
+  // registry id (= canvas data-server name). The global MultiMcpBridge
+  // watches the store, performs the MCP handshake, and writes back
+  // `connected`, `tools`, and `recipes` on each data-server entry.
+  async function addMcpServerById(id: string) {
+    const reg = REMOTE_MCP_REGISTRY.find(e => e.id === id);
+    if (!reg) return;
+    const headers = mcpToken.trim()
+      ? { Authorization: `Bearer ${mcpToken.trim()}` }
+      : undefined;
+    canvas.addMcpServer(reg.url, headers ? { headers } : undefined);
   }
 
-  async function removeMcpServer(url: string) {
-    connectedUrls = connectedUrls.filter(u => u !== url);
-    const entry = canvas.dataServers.find(s => s.url === url);
-    if (entry) canvas.removeDataServer(entry.name);
+  async function removeMcpServerById(id: string) {
+    canvas.removeDataServer(id);
   }
 
   async function addAllServers() {
     for (const server of REMOTE_MCP_REGISTRY) {
-      if (!connectedUrls.includes(server.url)) {
-        await addMcpServer(server.url);
+      if (!enabledServers.has(server.id)) {
+        await addMcpServerById(server.id);
       }
     }
   }
@@ -246,7 +203,8 @@
     const result: ToolLayer[] = [];
     if (canvas.mcpConnected) {
       let recipesAttached = false;
-      for (const server of (multiClient?.listServers() ?? [])) {
+      for (const server of canvas.dataServers) {
+        if (!server.connected || !Array.isArray(server.tools)) continue;
         const mcpLayer: McpLayer = {
           protocol: 'mcp',
           serverName: server.name,
@@ -527,13 +485,13 @@
   <!-- Settings Panel (collapsible, full-width) -->
   {#if settingsOpen}
     <div class="border-b border-border bg-surface p-3 flex-shrink-0 overflow-y-auto max-h-[300px]">
-      <RemoteMCPserversDemo
+      <MCPserversList
         servers={REMOTE_MCP_REGISTRY}
-        {connectedUrls}
-        loading={loadingUrls}
-        onconnect={addMcpServer}
+        {enabledServers}
+        loading={loadingServers}
+        onconnect={addMcpServerById}
         onconnectall={addAllServers}
-        ondisconnect={removeMcpServer}
+        ondisconnect={removeMcpServerById}
       />
     </div>
   {/if}

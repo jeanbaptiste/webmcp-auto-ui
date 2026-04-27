@@ -21,11 +21,10 @@
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (!/not found/i.test(msg)) throw err;
-        const multi = (globalThis as unknown as { __multiMcp?: { multiClient: { listServers: () => Array<{ url: string; name: string; tools: Array<{ name: string }> }>; callToolOn: (url: string, t: string, a: unknown) => Promise<unknown> } } }).__multiMcp;
-        if (!multi) throw err;
-        const server = multi.multiClient.listServers().find(s => s.tools.some(t => t.name === name));
+        // Look up the canvas server hosting the requested tool.
+        const server = canvas.dataServers.find(s => s.connected && (s.tools ?? []).some((t: { name: string }) => t.name === name));
         if (!server) throw err;
-        return multi.multiClient.callToolOn(server.url, name, args) as ReturnType<typeof executeToolInternal>;
+        return canvas.callTool(server.name, name, args as Record<string, unknown>) as ReturnType<typeof executeToolInternal>;
       }
     });
 
