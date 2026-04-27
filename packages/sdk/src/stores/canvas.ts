@@ -22,6 +22,7 @@
  */
 
 import { encode, decode } from '../hyperskills.js';
+import { REMOTE_MCP_REGISTRY } from '../remote-mcp-registry.js';
 
 export type WidgetType =
   | 'stat' | 'kv' | 'list' | 'chart' | 'alert' | 'code' | 'text' | 'actions' | 'tags'
@@ -64,7 +65,11 @@ export interface McpToolInfo {
  * singleton reconciles connection state across all entries.
  */
 export interface DataServer {
-  name: string;         // user-chosen label
+  /** Stable identity key. Convention aligned with WEBMCP_SERVER_REGISTRY:
+   * registry id when matched (e.g. 'wikipedia'), or 'manual-<hash>' for
+   * arbitrary URLs. Replaces the previous URL-host derivation, which
+   * collided across servers sharing a host (e.g. demos.hyperskills.net). */
+  name: string;
   url: string;
   kind: 'data';         // legacy field, kept for schema stability
   enabled: boolean;     // user intent
@@ -73,8 +78,11 @@ export interface DataServer {
   tools?: McpToolInfo[];
   recipes?: { name: string; description?: string; body?: string }[];
   error?: string;
-  /** Real server name from MCP handshake (initResult.serverInfo.name, aliased).
-   * Canvas `.name` is URL-host; `.serverName` is what to display. */
+  /** Display label (registry label, or URL host for manual entries). */
+  label?: string;
+  /** Optional auth headers passed to the MCP transport on handshake. */
+  headers?: Record<string, string>;
+  /** Real server name from MCP handshake (initResult.serverInfo.name, aliased). */
   serverName?: string;
 }
 
@@ -102,6 +110,13 @@ type Listener = () => void;
 
 function uuid() { return 'w_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 function msgId() { return 'm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+
+/** Deterministic short hash for synthesizing stable ids from URLs. */
+function stableHash(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
 
 const NAME_ALIAS: Record<string, string> = { 'moulineuse': 'Tricoteuses' };
 function aliasName(n: string): string { return NAME_ALIAS[n] ?? n; }
@@ -158,7 +173,7 @@ function createCanvasVanilla() {
   }
 
   // ── Server list actions (public, stable) ───────────────────────────────
-  function addDataServer(desc: { name: string; url: string }): DataServer {
+  function addDataServer(desc: { name: string; url: string; label?: string; headers?: Record<string, string> }): DataServer {
     const existing = _servers.find((s) => s.name === desc.name);
     if (existing) return existing;
     const srv: DataServer = {
@@ -167,6 +182,8 @@ function createCanvasVanilla() {
       kind: 'data',
       enabled: true,
       connected: false,
+      ...(desc.label ? { label: desc.label } : {}),
+      ...(desc.headers ? { headers: desc.headers } : {}),
     };
     _servers = [..._servers, srv];
     notify();
@@ -174,15 +191,21 @@ function createCanvasVanilla() {
   }
 
   /**
-   * Add a server by URL alone (derives name from the URL host). Returns the
-   * canvas name so callers can reference it later.
+   * Add a server by URL. Resolves identity from REMOTE_MCP_REGISTRY (by URL):
+   * matched entries get the registry `id` as canvas key and `label` as display;
+   * unmatched URLs get a stable synthetic id. Returns the canvas name (= id).
    */
-  function addMcpServer(url: string): string {
+  function addMcpServer(url: string, opts?: { headers?: Record<string, string> }): string {
     if (!url) return '';
-    let name: string;
-    try { name = new URL(url, 'http://local').host || url; }
-    catch { name = url; }
-    addDataServer({ name, url });
+    const reg = REMOTE_MCP_REGISTRY.find((e) => e.url === url);
+    const name = reg?.id ?? `manual-${stableHash(url)}`;
+    let label = reg?.label;
+    if (!label) {
+      try { label = new URL(url, 'http://local').host || url; }
+      catch { label = url; }
+    }
+    const headers = opts?.headers ?? reg?.headers;
+    addDataServer({ name, url, label, headers });
     setDataServerEnabled(name, true);
     return name;
   }
@@ -218,6 +241,29 @@ function createCanvasVanilla() {
     const s = _servers.find((x) => x.name === name);
     if (!s) return false;
     return setDataServerEnabled(name, !s.enabled);
+  }
+
+  /**
+   * Call a tool on a connected MCP server, addressed by canvas name (= id).
+   * Routes through the global MultiMcpBridge transport during the migration;
+   * the bridge will be internalised into the store at étape 4 of the refactor.
+   */
+  async function callTool(
+    name: string,
+    toolName: string,
+    args: Record<string, unknown> = {},
+  ): Promise<unknown> {
+    const srv = _servers.find((s) => s.name === name);
+    if (!srv) throw new Error(`canvas.callTool: no server "${name}"`);
+    const bridge = (globalThis as { __multiMcp?: { multiClient?: { callToolOn: (u: string, t: string, a: Record<string, unknown>) => Promise<unknown> } } }).__multiMcp;
+    if (!bridge?.multiClient) throw new Error('canvas.callTool: MCP bridge not installed');
+    return bridge.multiClient.callToolOn(srv.url, toolName, args);
+  }
+
+  /** Transitional accessor — returns the multi-client owned by the global
+   * bridge. Removed at étape 4 once the transport is internalised. */
+  function getMultiClient(): unknown {
+    return (globalThis as { __multiMcp?: { multiClient?: unknown } }).__multiMcp?.multiClient;
   }
 
   // ── Widget actions ─────────────────────────────────────────────────────
@@ -428,6 +474,8 @@ function createCanvasVanilla() {
     setDataServerMeta,
     setDataServerEnabled,
     toggleDataServer,
+    callTool,
+    get multiClient() { return getMultiClient(); },
 
     buildSkillJSON, buildHyperskillParam, loadFromParam, loadFromUrl,
 

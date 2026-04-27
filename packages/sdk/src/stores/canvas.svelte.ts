@@ -118,6 +118,8 @@ function createCanvas() {
     setDataServerMeta: canvasVanilla.setDataServerMeta.bind(canvasVanilla),
     setDataServerEnabled: canvasVanilla.setDataServerEnabled.bind(canvasVanilla),
     toggleDataServer: canvasVanilla.toggleDataServer.bind(canvasVanilla),
+    callTool: canvasVanilla.callTool.bind(canvasVanilla),
+    get multiClient() { return canvasVanilla.multiClient; },
 
     // HyperSkill
     buildSkillJSON: canvasVanilla.buildSkillJSON.bind(canvasVanilla),
