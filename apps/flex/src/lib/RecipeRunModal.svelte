@@ -2,6 +2,8 @@
   import { fly } from 'svelte/transition';
   import type { RunTab } from '@webmcp-auto-ui/sdk';
   import { safeStringify } from '@webmcp-auto-ui/sdk';
+  import { WidgetRenderer } from '@webmcp-auto-ui/ui';
+  import type { WebMcpServer } from '@webmcp-auto-ui/core';
 
   interface Props {
     open: boolean;
@@ -12,6 +14,8 @@
     onselectTab: (tabId: string) => void;
     /** When true, render as an inline panel inside the host modal instead of a floating side panel. */
     inline?: boolean;
+    /** Connected WebMCP servers — needed for custom widget renderers (e.g. canvas2d). */
+    servers?: WebMcpServer[];
   }
 
   let {
@@ -22,6 +26,7 @@
     onreplay,
     onselectTab,
     inline = false,
+    servers = [],
   }: Props = $props();
 
   const active = $derived(runs.find((r) => r.id === activeTabId) ?? runs[runs.length - 1] ?? null);
@@ -125,23 +130,37 @@
         <div>
           <div class="flex items-center mb-1">
             <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">
-              {active.result.status === 'error' ? 'Error' : 'Output'}
+              {active.result.status === 'error' ? 'Error' : active.result.widget ? 'Widget' : 'Output'}
             </span>
-            <button
-              class="ml-auto font-mono text-[10px] px-2 py-0.5 rounded border transition-colors
-                     {copyState === 'copied' ? 'border-teal/40 text-teal' : 'border-border2 text-text2 hover:text-text1'}"
-              onclick={copyOutput}
-            >
-              {copyState === 'copied' ? 'copied' : 'copy'}
-            </button>
+            {#if !active.result.widget}
+              <button
+                class="ml-auto font-mono text-[10px] px-2 py-0.5 rounded border transition-colors
+                       {copyState === 'copied' ? 'border-teal/40 text-teal' : 'border-border2 text-text2 hover:text-text1'}"
+                onclick={copyOutput}
+              >
+                {copyState === 'copied' ? 'copied' : 'copy'}
+              </button>
+            {/if}
           </div>
-          <pre class="output-pre font-mono"><code>{
-            active.result.status === 'running'
-              ? '...'
-              : active.result.status === 'error'
-                ? (active.result.error ?? '(unknown error)')
-                : safeStringify(active.result.output)
-          }</code></pre>
+          {#if active.result.status === 'done' && active.result.widget}
+            <div class="widget-host">
+              {#key active.id}
+                <WidgetRenderer
+                  type={active.result.widget.name}
+                  data={active.result.widget.params}
+                  {servers}
+                />
+              {/key}
+            </div>
+          {:else}
+            <pre class="output-pre font-mono"><code>{
+              active.result.status === 'running'
+                ? '...'
+                : active.result.status === 'error'
+                  ? (active.result.error ?? '(unknown error)')
+                  : safeStringify(active.result.output)
+            }</code></pre>
+          {/if}
         </div>
 
         <!-- Logs -->
@@ -184,6 +203,19 @@
   .run-panel.inline {
     width: 100%;
     max-height: 50vh;
+  }
+  .widget-host {
+    background: #0d1117;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.375rem;
+    padding: 0.6rem 0.7rem;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+  }
+  .widget-host :global(> *) {
+    flex: 1;
+    min-height: 0;
   }
   .output-pre {
     background: #0d1117;

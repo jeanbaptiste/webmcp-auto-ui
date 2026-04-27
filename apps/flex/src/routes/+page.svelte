@@ -1436,6 +1436,7 @@
   bind:open={detailOpen}
   recipe={detailRecipe}
   anchorText={detailAnchor}
+  servers={activeServers}
   onclose={() => { detailOpen = false; detailAnchor = undefined; }}
 />
 

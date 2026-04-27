@@ -4,6 +4,7 @@
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { parseBody, runCode } from '@webmcp-auto-ui/sdk';
   import type { RecipeData, RunResult, RunTab } from '@webmcp-auto-ui/sdk';
+  import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import RecipeRunModal from './RecipeRunModal.svelte';
 
   interface Props {
@@ -12,9 +13,11 @@
     onclose: () => void;
     /** If provided and found in a segment's content, scroll to and briefly highlight that segment. */
     anchorText?: string;
+    /** Connected WebMCP servers — forwarded to the run panel for live widget rendering. */
+    servers?: WebMcpServer[];
   }
 
-  let { open = $bindable(false), recipe, onclose, anchorText = undefined }: Props = $props();
+  let { open = $bindable(false), recipe, onclose, anchorText = undefined, servers = [] }: Props = $props();
 
   /** True when the recipe is an MCP recipe (no body/when/layout — only name+description) */
   const isMcpRecipe = $derived(
@@ -220,6 +223,7 @@
                   open={runModalOpen}
                   {runs}
                   {activeTabId}
+                  {servers}
                   inline={true}
                   onclose={closeRunModal}
                   onreplay={handleReplay}
@@ -259,6 +263,7 @@
           open={runModalOpen}
           {runs}
           {activeTabId}
+          {servers}
           inline={false}
           onclose={closeRunModal}
           onreplay={handleReplay}

@@ -210,9 +210,57 @@ async function runViaMcp(
   return res;
 }
 
+function findBalancedBraces(text: string, fromIndex: number): string | null {
+  let depth = 0;
+  let start = -1;
+  for (let i = fromIndex; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '{') {
+      if (start === -1) start = i;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+/**
+ * Detect calls of the form `widget_display({name, params})` or
+ * `<server>_webmcp_widget_display({name, params})` in a recipe snippet.
+ * Recipes are bundled at build time from our own source, so `new Function`
+ * eval of the object literal is acceptable.
+ */
+export function parseWidgetDisplayCall(
+  code: string,
+): { name: string; params: Record<string, unknown> } | null {
+  const m = /(?:^|\W)(?:[a-zA-Z_]\w*_)?widget_display\s*\(/m.exec(code);
+  if (!m) return null;
+  const objStart = code.indexOf('{', m.index + m[0].length - 1);
+  if (objStart === -1) return null;
+  const objLiteral = findBalancedBraces(code, objStart);
+  if (!objLiteral) return null;
+  try {
+    const fn = new Function(`return (${objLiteral});`);
+    const value = fn();
+    if (value && typeof value === 'object') {
+      const v = value as { name?: unknown; params?: unknown };
+      if (typeof v.name === 'string' && v.params && typeof v.params === 'object') {
+        return { name: v.name, params: v.params as Record<string, unknown> };
+      }
+    }
+  } catch {
+    /* parse error — fall through */
+  }
+  return null;
+}
+
 /**
  * Run a snippet of code in a given language.
  *
+ * - `widget_display(...)` (in a `text`/untagged block): parsed locally and
+ *   surfaced via `result.widget` so the host can mount the widget live.
  * - JS / TS: executed inline via AsyncFunction (TS is NOT transpiled; code must
  *   be valid JS or the caller should keep type annotations minimal).
  * - SQL: dispatched to `query_sql` on any connected MCP server that exposes it.
@@ -228,6 +276,21 @@ export async function runCode(
   const normLang = (lang || '').toLowerCase();
   const startedAt = ctx.start;
   try {
+    if (normLang === '' || normLang === 'text') {
+      const widget = parseWidgetDisplayCall(code);
+      if (widget) {
+        ctx.log(`widget_display: ${widget.name}`);
+        const durationMs = Math.round(performance.now() - ctx.start);
+        return {
+          status: 'done',
+          startedAt,
+          durationMs,
+          tokens: estimateTokens(code),
+          widget,
+          logs: ctx.logs,
+        };
+      }
+    }
     let output: unknown;
     if (JS_LANGS.has(normLang) || TS_LANGS.has(normLang) || normLang === '') {
       output = await runJsLike(code, ctx);

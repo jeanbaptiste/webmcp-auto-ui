@@ -44,6 +44,12 @@ export interface RunResult {
   output?: unknown;
   error?: string;
   logs: RunLog[];
+  /**
+   * Set when the executed snippet was a `*widget_display({name, params})`
+   * call. The runner does not call the MCP tool in that case — instead it
+   * exposes the parsed widget to the host so it can be mounted live.
+   */
+  widget?: { name: string; params: Record<string, unknown> };
 }
 
 export interface RunTab {
