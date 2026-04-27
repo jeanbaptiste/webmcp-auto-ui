@@ -373,7 +373,7 @@
               No sample data available for this server's widgets.
             </p>
           {:else}
-            <div class="flex flex-col gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {#each group.widgets as w (group.id + '/' + w.name)}
                 <div class="bg-surface border border-border rounded-lg overflow-hidden">
                   <div class="bg-surface2 px-3 py-1.5 border-b border-border flex items-center gap-2">
