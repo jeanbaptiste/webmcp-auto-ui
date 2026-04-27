@@ -261,10 +261,9 @@ export function toProviderTools(tools: McpToolDef[], schemaOptions?: SchemaTrans
         }
       }
     }
-    const schemaObj = schema as Record<string, unknown>;
-    // Ensure root schema has additionalProperties for strict mode
+    let schemaObj = schema as Record<string, unknown>;
     if (schemaObj.type === 'object' && !('additionalProperties' in schemaObj)) {
-      schemaObj.additionalProperties = false;
+      schemaObj = { ...schemaObj, additionalProperties: false };
     }
     return {
       name: t.name,
