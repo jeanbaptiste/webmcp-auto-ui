@@ -231,29 +231,43 @@ function findBalancedBraces(text: string, fromIndex: number): string | null {
  * `<server>_webmcp_widget_display({name, params})` in a recipe snippet.
  * Recipes are bundled at build time from our own source, so `new Function`
  * eval of the object literal is acceptable.
+ *
+ * Some recipes contain placeholders (`data: [...]`, `params: {...}`) that
+ * are not valid JS. We extract `name` via a separate regex so the widget can
+ * always render, even if the `params` literal cannot be eval'd; in that case
+ * we return `params: {}` rather than falling through to `run_script`.
  */
 export function parseWidgetDisplayCall(
   code: string,
-): { name: string; params: Record<string, unknown> } | null {
+): { name: string; params: Record<string, unknown>; paramsParseFailed?: boolean } | null {
   const m = /(?:^|\W)(?:[a-zA-Z_]\w*_)?widget_display\s*\(/m.exec(code);
   if (!m) return null;
   const objStart = code.indexOf('{', m.index + m[0].length - 1);
   if (objStart === -1) return null;
   const objLiteral = findBalancedBraces(code, objStart);
   if (!objLiteral) return null;
+  // `name` is extracted independently so a broken `params` placeholder doesn't
+  // disqualify the call.
+  const nameMatch = /\bname\s*:\s*['"]([^'"]+)['"]/.exec(objLiteral);
+  if (!nameMatch) return null;
+  const name = nameMatch[1];
+  // Sanitize common placeholder forms before eval.
+  const sanitized = objLiteral
+    .replace(/\[\s*\.\.\.\s*\]/g, '[]')
+    .replace(/\{\s*\.\.\.\s*\}/g, '{}');
   try {
-    const fn = new Function(`return (${objLiteral});`);
+    const fn = new Function(`return (${sanitized});`);
     const value = fn();
     if (value && typeof value === 'object') {
-      const v = value as { name?: unknown; params?: unknown };
-      if (typeof v.name === 'string' && v.params && typeof v.params === 'object') {
-        return { name: v.name, params: v.params as Record<string, unknown> };
+      const v = value as { params?: unknown };
+      if (v.params && typeof v.params === 'object') {
+        return { name, params: v.params as Record<string, unknown> };
       }
     }
+    return { name, params: {} };
   } catch {
-    /* parse error — fall through */
+    return { name, params: {}, paramsParseFailed: true };
   }
-  return null;
 }
 
 /**
@@ -277,16 +291,19 @@ export async function runCode(
   const startedAt = ctx.start;
   try {
     if (normLang === '' || normLang === 'text') {
-      const widget = parseWidgetDisplayCall(code);
-      if (widget) {
-        ctx.log(`widget_display: ${widget.name}`);
+      const parsed = parseWidgetDisplayCall(code);
+      if (parsed) {
+        ctx.log(`widget_display: ${parsed.name}`);
+        if (parsed.paramsParseFailed) {
+          ctx.log('params placeholder — rendering with empty params');
+        }
         const durationMs = Math.round(performance.now() - ctx.start);
         return {
           status: 'done',
           startedAt,
           durationMs,
           tokens: estimateTokens(code),
-          widget,
+          widget: { name: parsed.name, params: parsed.params },
           logs: ctx.logs,
         };
       }
