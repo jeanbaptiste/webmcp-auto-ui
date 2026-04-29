@@ -27,30 +27,35 @@ The Tabular API returns the schema and a paged sample without downloading the fi
 
 1. **Verify Tabular API availability**:
    ```js
-   const info = await call('get_resource_info', { resource_id });
+   const info = await call('get_resource_info', { resource_id }).catch(() => null);
+   if (!info) {
+     await widget('text', { content: 'Ressource introuvable.' });
+     return;
+   }
    if (!info.tabular_api_available) {
-     throw new Error('Tabular API not available for this resource — fetch the URL directly.');
+     await widget('text', { content: 'API Tabular indisponible pour cette ressource — télécharger directement.' });
+     return;
    }
    ```
 
 2. **Query a small page**:
    ```js
-   const sample = await call('query_resource_data', { resource_id, page_size: 20 });
+   const sample = await call('query_resource_data', { resource_id, page_size: 20 }).catch(() => ({ rows: [], columns: [], total: 0 }));
    ```
 
 3. **Render schema + preview**:
    ```js
    await widget('text', {
-     title: info.title,
-     content: `Format ${info.format} · ${info.size_human}`
+     title: info.title ?? '—',
+     content: `Format ${info.format ?? '—'} · ${info.size_human ?? '—'}`
    });
-   await widget('stat-card', { label: 'Colonnes', value: sample.columns?.length ?? 0, icon: 'columns' });
-   await widget('stat-card', { label: 'Lignes (total)', value: sample.total ?? '—', icon: 'list' });
-   await widget('stat-card', { label: 'Format', value: info.format, icon: 'file' });
+   await widget('stat-card', { label: 'Colonnes', value: sample?.columns?.length ?? 0, icon: 'columns' });
+   await widget('stat-card', { label: 'Lignes (total)', value: sample?.total ?? '—', icon: 'list' });
+   await widget('stat-card', { label: 'Format', value: info.format ?? '—', icon: 'file' });
 
    await widget('table', {
-     columns: sample.columns,
-     rows: sample.rows
+     columns: sample?.columns ?? [],
+     rows: sample?.rows ?? []
    });
    ```
 
@@ -59,17 +64,18 @@ The Tabular API returns the schema and a paged sample without downloading the fi
 ### Preview the DVF 2023 file
 ```js
 const resource_id = '0ab442c4-5fe3-4a78-bdde-ed10073cf69c'; // DVF 2023 CSV
-const info = await call('get_resource_info', { resource_id });
-const sample = await call('query_resource_data', { resource_id, page_size: 20 });
-await widget('table', { columns: sample.columns, rows: sample.rows });
-await widget('stat-card', { label: 'Total transactions', value: sample.total });
+const info = await call('get_resource_info', { resource_id }).catch(() => null);
+if (!info) { await widget('text', { content: 'Ressource introuvable.' }); return; }
+const sample = await call('query_resource_data', { resource_id, page_size: 20 }).catch(() => ({ rows: [], columns: [], total: 0 }));
+await widget('table', { columns: sample?.columns ?? [], rows: sample?.rows ?? [] });
+await widget('stat-card', { label: 'Total transactions', value: sample?.total ?? 0 });
 ```
 
 ### Preview a subventions associatives CSV
 ```js
-const sample = await call('query_resource_data', { resource_id: 'abc-123-def', page_size: 30 });
-await widget('text', { title: 'Subventions associatives', content: `${sample.total} lignes au total` });
-await widget('table', { columns: sample.columns, rows: sample.rows });
+const sample = await call('query_resource_data', { resource_id: 'abc-123-def', page_size: 30 }).catch(() => ({ rows: [], columns: [], total: 0 }));
+await widget('text', { title: 'Subventions associatives', content: `${sample?.total ?? 0} lignes au total` });
+await widget('table', { columns: sample?.columns ?? [], rows: sample?.rows ?? [] });
 ```
 
 ### Preview filtered to a single column value
@@ -79,8 +85,8 @@ const sample = await call('query_resource_data', {
   filter_column: 'departement',
   filter_value: '75',
   page_size: 25
-});
-await widget('table', { columns: sample.columns, rows: sample.rows });
+}).catch(() => ({ rows: [], columns: [] }));
+await widget('table', { columns: sample?.columns ?? [], rows: sample?.rows ?? [] });
 ```
 
 ## Common mistakes

@@ -33,24 +33,38 @@ Decision en temps quasi-reel pour activites plein-air.
 
 ```js
 const geo = await call('geocoding', { name: 'Bordeaux', count: 1 });
-const { latitude, longitude, timezone, name } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone, name } = place;
 
 const w = await call('weather_forecast', {
   latitude, longitude, timezone,
   hourly: ['precipitation', 'precipitation_probability', 'cape', 'lifted_index', 'weather_code'],
   forecast_days: 2
-});
+}).catch(() => null);
+
+if (!w?.hourly?.time?.length) {
+  await widget('text', { content: 'Donnees orages indisponibles.' });
+  return;
+}
 
 const h = w.hourly;
+const cape = h.cape ?? [];
+const lifted = h.lifted_index ?? [];
+const wcode = h.weather_code ?? [];
+const precip = h.precipitation ?? [];
 const stormHours = h.time.map((t, i) => ({
   time: t,
-  storm: (h.cape[i] > 1000 && h.lifted_index[i] < -3) || (h.weather_code[i] >= 95 && h.weather_code[i] <= 99)
+  storm: (Number.isFinite(cape[i]) && cape[i] > 1000 && Number.isFinite(lifted[i]) && lifted[i] < -3) || (wcode[i] >= 95 && wcode[i] <= 99)
 }));
 
 // Detecter creneau sec consecutif le plus long
 let dryStart = -1, bestStart = 0, bestLen = 0, curLen = 0;
-h.precipitation.forEach((p, i) => {
-  if (p < 0.1) { if (dryStart < 0) dryStart = i; curLen++; if (curLen > bestLen) { bestLen = curLen; bestStart = dryStart; } }
+precip.forEach((p, i) => {
+  if (Number.isFinite(p) && p < 0.1) { if (dryStart < 0) dryStart = i; curLen++; if (curLen > bestLen) { bestLen = curLen; bestStart = dryStart; } }
   else { dryStart = -1; curLen = 0; }
 });
 
@@ -62,22 +76,22 @@ stormHours.forEach((s, i) => {
 });
 
 await widget('chart-rich', {
-  title: `Probabilite orages 48h - ${name}`,
+  title: `Probabilite orages 48h - ${name ?? ''}`,
   type: 'line',
-  xAxis: { label: 'Heure', data: h.time },
+  xAxis: { label: 'Heure', data: h.time ?? [] },
   series: [
-    { label: 'Prob. precip (%)', data: h.precipitation_probability, color: '#3498db' },
-    { label: 'CAPE (J/kg)', data: h.cape, color: '#e74c3c' },
-    { label: 'Precip (mm)', data: h.precipitation, type: 'bar', color: '#7f8c8d' }
+    { label: 'Prob. precip (%)', data: h.precipitation_probability ?? [], color: '#3498db' },
+    { label: 'CAPE (J/kg)', data: h.cape ?? [], color: '#e74c3c' },
+    { label: 'Precip (mm)', data: h.precipitation ?? [], type: 'bar', color: '#7f8c8d' }
   ]
 });
 
 await widget('timeline', {
   title: 'Creneaux a risque',
   events: stormEpisodes.map(e => ({
-    date: h.time[e.start],
+    date: h.time[e.start] ?? '—',
     label: 'Risque orage',
-    detail: `${h.time[e.start].slice(11, 16)} -> ${h.time[e.end].slice(11, 16)}`,
+    detail: `${h.time[e.start]?.slice(11, 16) ?? '—'} -> ${h.time[e.end]?.slice(11, 16) ?? '—'}`,
     color: '#e74c3c'
   }))
 });
@@ -85,15 +99,15 @@ await widget('timeline', {
 await widget('stat-card', {
   items: [
     { label: 'Fenetre sans pluie max', value: `${bestLen}h`, icon: 'sun' },
-    { label: 'Demarre le', value: bestLen ? h.time[bestStart] : '-', icon: 'clock' },
+    { label: 'Demarre le', value: bestLen > 0 ? (h.time[bestStart] ?? '—') : '-', icon: 'clock' },
     { label: 'Episodes orageux 48h', value: String(stormEpisodes.length), icon: 'cloud-lightning' }
   ]
 });
 
 await widget('map', {
-  title: name,
+  title: name ?? '',
   center: { lat: latitude, lng: longitude }, zoom: 9,
-  markers: [{ lat: latitude, lng: longitude, label: name }]
+  markers: [{ lat: latitude, lng: longitude, label: name ?? '' }]
 });
 ```
 

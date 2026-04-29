@@ -28,8 +28,17 @@ Many public datasets are distributed at the commune mesh — this recipe makes t
 1. **Find the right resource**:
    ```js
    const search = await call('search_datasets', { query: 'ANAH aides commune', page_size: 5 });
-   const resList = await call('list_dataset_resources', { dataset_id: search.datasets[0].id });
-   const csv = resList.resources.find(r => r.format === 'csv');
+   const ds = search?.datasets?.[0];
+   if (!ds) {
+     await widget('text', { content: 'Aucun dataset trouvé.' });
+     return;
+   }
+   const resList = await call('list_dataset_resources', { dataset_id: ds.id });
+   const csv = (resList?.resources ?? []).find(r => r.format === 'csv');
+   if (!csv) {
+     await widget('text', { content: 'Aucune ressource CSV disponible.' });
+     return;
+   }
    ```
 
 2. **Read the indicator sorted descending**:
@@ -39,8 +48,12 @@ Many public datasets are distributed at the commune mesh — this recipe makes t
      sort_column: 'montant_aide',
      sort_direction: 'desc',
      page_size: 500
-   });
-   const rows = data.rows;
+   }).catch(() => ({ rows: [], total: 0 }));
+   const rows = data?.rows ?? [];
+   if (rows.length === 0) {
+     await widget('text', { content: 'Aucune donnée pour cet indicateur.' });
+     return;
+   }
    ```
 
 3. **Render national map (points colored by value), ranking, distribution, median**:
@@ -48,12 +61,12 @@ Many public datasets are distributed at the commune mesh — this recipe makes t
    await widget('map', {
      center: [46.6, 2.5],
      zoom: 6,
-     markers: rows.filter(r => r.latitude && r.longitude).map(r => ({
+     markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({
        lat: Number(r.latitude),
        lon: Number(r.longitude),
        value: Number(r.montant_aide),
-       label: r.nom_commune,
-       popup: `${r.nom_commune} · ${Number(r.montant_aide).toLocaleString('fr-FR')} €`
+       label: r.nom_commune ?? '',
+       popup: `${r.nom_commune ?? '—'} · ${Number.isFinite(Number(r.montant_aide)) ? Number(r.montant_aide).toLocaleString('fr-FR') : '—'} €`
      })),
      color_field: 'value',
      color_scale: 'viridis'
@@ -61,14 +74,14 @@ Many public datasets are distributed at the commune mesh — this recipe makes t
 
    await widget('table', {
      columns: ['Rang', 'Commune', 'INSEE', 'Valeur'],
-     rows: rows.slice(0, 10).map((r, i) => [i + 1, r.nom_commune, r.code_commune, Number(r.montant_aide).toLocaleString('fr-FR')])
+     rows: rows.slice(0, 10).map((r, i) => [i + 1, r.nom_commune ?? '—', r.code_commune ?? '—', Number.isFinite(Number(r.montant_aide)) ? Number(r.montant_aide).toLocaleString('fr-FR') : '—'])
    });
 
    const values = rows.map(r => Number(r.montant_aide)).filter(Number.isFinite).sort((a, b) => a - b);
-   const median = values[Math.floor(values.length / 2)] ?? 0;
+   const median = values.length > 0 ? values[Math.floor(values.length / 2)] : 0;
    await widget('stat-card', { label: 'Médiane nationale', value: median.toLocaleString('fr-FR'), icon: 'target' });
    await widget('stat-card', { label: 'Communes', value: rows.length, icon: 'map-pin' });
-   await widget('stat-card', { label: 'Top / médiane', value: values.length ? (values.at(-1) / median).toFixed(1) + 'x' : '—', icon: 'gap' });
+   await widget('stat-card', { label: 'Top / médiane', value: (values.length > 0 && median > 0) ? (values.at(-1) / median).toFixed(1) + 'x' : '—', icon: 'gap' });
 
    const buckets = [0, 1000, 5000, 20_000, 100_000, Infinity];
    const counts = buckets.slice(0, -1).map((lo, i) => values.filter(v => v >= lo && v < buckets[i + 1]).length);
@@ -87,9 +100,10 @@ const data = await call('query_resource_data', {
   sort_column: 'montant_aide',
   sort_direction: 'desc',
   page_size: 500
-});
-await widget('map', { center: [46.6, 2.5], zoom: 6, markers: data.rows.map(r => ({ lat: r.latitude, lon: r.longitude, value: r.montant_aide })) });
-await widget('table', { columns: ['Commune', 'Aide'], rows: data.rows.slice(0, 10).map(r => [r.nom_commune, r.montant_aide]) });
+}).catch(() => ({ rows: [] }));
+const rows = data?.rows ?? [];
+await widget('map', { center: [46.6, 2.5], zoom: 6, markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({ lat: Number(r.latitude), lon: Number(r.longitude), value: Number(r.montant_aide) })) });
+await widget('table', { columns: ['Commune', 'Aide'], rows: rows.slice(0, 10).map(r => [r.nom_commune ?? '—', r.montant_aide ?? '—']) });
 ```
 
 ### Election results by commune (Ministère Intérieur)
@@ -99,8 +113,9 @@ const data = await call('query_resource_data', {
   filter_column: 'code_departement',
   filter_value: '75',
   page_size: 100
-});
-await widget('map', { center: [48.85, 2.35], zoom: 11, markers: data.rows.map(r => ({ lat: r.latitude, lon: r.longitude, label: r.nom_commune })) });
+}).catch(() => ({ rows: [] }));
+const rows = data?.rows ?? [];
+await widget('map', { center: [48.85, 2.35], zoom: 11, markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({ lat: Number(r.latitude), lon: Number(r.longitude), label: r.nom_commune ?? '' })) });
 ```
 
 ## Common mistakes

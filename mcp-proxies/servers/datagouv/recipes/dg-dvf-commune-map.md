@@ -28,9 +28,13 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
 1. **Locate the DVF dataset and its yearly resource**:
    ```js
    const dataset_id = '5cc1b94a634f4165e96436c1'; // DVF
-   const resList = await call('list_dataset_resources', { dataset_id });
+   const resList = await call('list_dataset_resources', { dataset_id }).catch(() => ({ resources: [] }));
    // Pick the resource for the year of interest (e.g. 2023)
-   const resource = resList.resources.find(r => r.title.includes('2023') && r.format === 'csv');
+   const resource = (resList?.resources ?? []).find(r => r.title?.includes('2023') && r.format === 'csv');
+   if (!resource) {
+     await widget('text', { content: 'Ressource DVF 2023 introuvable.' });
+     return;
+   }
    ```
 
 2. **Filter by commune code**:
@@ -40,24 +44,28 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
      filter_column: 'code_commune',
      filter_value: '13055', // Marseille
      page_size: 200
-   });
-   const rows = tx.rows ?? [];
+   }).catch(() => ({ rows: [] }));
+   const rows = tx?.rows ?? [];
+   if (rows.length === 0) {
+     await widget('text', { content: 'Aucune transaction trouvée.' });
+     return;
+   }
    ```
 
 3. **Compute aggregates and render**:
    ```js
-   const prices = rows.map(r => Number(r.valeur_fonciere)).filter(Boolean).sort((a, b) => a - b);
-   const median = prices[Math.floor(prices.length / 2)];
-   const avg = prices.reduce((s, x) => s + x, 0) / (prices.length || 1);
+   const prices = rows.map(r => Number(r.valeur_fonciere)).filter(Number.isFinite).sort((a, b) => a - b);
+   const median = prices.length > 0 ? prices[Math.floor(prices.length / 2)] : 0;
+   const avg = prices.length > 0 ? prices.reduce((s, x) => s + x, 0) / prices.length : 0;
 
    await widget('map', {
      center: [43.2965, 5.3698],
      zoom: 12,
-     markers: rows.filter(r => r.latitude && r.longitude).map(r => ({
+     markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({
        lat: Number(r.latitude),
        lon: Number(r.longitude),
-       label: `${Math.round(r.valeur_fonciere).toLocaleString('fr-FR')} €`,
-       popup: `${r.type_local} · ${r.surface_reelle_bati} m² · ${r.date_mutation}`
+       label: Number.isFinite(Number(r.valeur_fonciere)) ? `${Math.round(Number(r.valeur_fonciere)).toLocaleString('fr-FR')} €` : '—',
+       popup: `${r.type_local ?? '—'} · ${r.surface_reelle_bati ?? '—'} m² · ${r.date_mutation ?? '—'}`
      }))
    });
 
@@ -67,10 +75,10 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
 
    await widget('table', {
      columns: ['Date', 'Type', 'Surface', 'Prix', 'Adresse'],
-     rows: rows
-       .sort((a, b) => Number(b.valeur_fonciere) - Number(a.valeur_fonciere))
+     rows: [...rows]
+       .sort((a, b) => (Number(b.valeur_fonciere) || 0) - (Number(a.valeur_fonciere) || 0))
        .slice(0, 10)
-       .map(r => [r.date_mutation, r.type_local, `${r.surface_reelle_bati} m²`, `${Number(r.valeur_fonciere).toLocaleString('fr-FR')} €`, `${r.adresse_numero ?? ''} ${r.adresse_nom_voie ?? ''}`])
+       .map(r => [r.date_mutation ?? '—', r.type_local ?? '—', `${r.surface_reelle_bati ?? '—'} m²`, Number.isFinite(Number(r.valeur_fonciere)) ? `${Number(r.valeur_fonciere).toLocaleString('fr-FR')} €` : '—', `${r.adresse_numero ?? ''} ${r.adresse_nom_voie ?? ''}`.trim() || '—'])
    });
 
    // Price distribution histogram
@@ -91,8 +99,8 @@ const tx = await call('query_resource_data', {
   filter_column: 'code_commune',
   filter_value: '13055',
   page_size: 200
-});
-await widget('map', { center: [43.2965, 5.3698], zoom: 12, markers: tx.rows.map(r => ({ lat: r.latitude, lon: r.longitude })) });
+}).catch(() => ({ rows: [] }));
+await widget('map', { center: [43.2965, 5.3698], zoom: 12, markers: (tx?.rows ?? []).filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({ lat: Number(r.latitude), lon: Number(r.longitude) })) });
 ```
 
 ### Top 10 sales in Bordeaux 2023
@@ -104,8 +112,8 @@ const tx = await call('query_resource_data', {
   sort_column: 'valeur_fonciere',
   sort_direction: 'desc',
   page_size: 10
-});
-await widget('table', { columns: ['Date', 'Type', 'Prix'], rows: tx.rows.map(r => [r.date_mutation, r.type_local, r.valeur_fonciere]) });
+}).catch(() => ({ rows: [] }));
+await widget('table', { columns: ['Date', 'Type', 'Prix'], rows: (tx?.rows ?? []).map(r => [r.date_mutation ?? '—', r.type_local ?? '—', r.valeur_fonciere ?? '—']) });
 ```
 
 ## Common mistakes

@@ -27,9 +27,13 @@ Useful for editorial dashboards and SHS researchers tracking publication pattern
 
 1. **Search and sort by recency client-side** (the API search has limited sort options):
    ```js
-   const res = await call('search_datasets', { query: 'transport', page_size: 50 });
-   const sorted = [...res.datasets].sort((a, b) => (b.last_modified ?? '').localeCompare(a.last_modified ?? ''));
+   const res = await call('search_datasets', { query: 'transport', page_size: 50 }).catch(() => ({ datasets: [] }));
+   const sorted = [...(res?.datasets ?? [])].sort((a, b) => (b.last_modified ?? '').localeCompare(a.last_modified ?? ''));
    const recent = sorted.slice(0, 12);
+   if (recent.length === 0) {
+     await widget('text', { content: 'Aucun dataset récent.' });
+     return;
+   }
    ```
 
 2. **Build the monthly timeline** of MAJ from the 50 results:
@@ -47,10 +51,10 @@ Useful for editorial dashboards and SHS researchers tracking publication pattern
    ```js
    await widget('cards', {
      items: recent.map(d => ({
-       title: d.title,
-       subtitle: d.organization?.name,
-       description: d.description?.slice(0, 160),
-       badge: d.last_modified
+       title: d.title ?? '—',
+       subtitle: d.organization?.name ?? '',
+       description: d.description?.slice(0, 160) ?? '',
+       badge: d.last_modified ?? ''
      }))
    });
 
@@ -66,16 +70,16 @@ Useful for editorial dashboards and SHS researchers tracking publication pattern
 
 ### Latest education datasets
 ```js
-const res = await call('search_datasets', { query: 'éducation', page_size: 50 });
-const recent = [...res.datasets].sort((a, b) => (b.last_modified ?? '').localeCompare(a.last_modified ?? '')).slice(0, 12);
-await widget('cards', { items: recent.map(d => ({ title: d.title, subtitle: d.organization?.name, badge: d.last_modified })) });
+const res = await call('search_datasets', { query: 'éducation', page_size: 50 }).catch(() => ({ datasets: [] }));
+const recent = [...(res?.datasets ?? [])].sort((a, b) => (b.last_modified ?? '').localeCompare(a.last_modified ?? '')).slice(0, 12);
+await widget('cards', { items: recent.map(d => ({ title: d.title ?? '—', subtitle: d.organization?.name ?? '', badge: d.last_modified ?? '' })) });
 ```
 
 ### Transport open data this month
 ```js
-const res = await call('search_datasets', { query: 'transport', page_size: 50 });
-const thisMonth = res.datasets.filter(d => (d.last_modified ?? '').startsWith('2026-04'));
-await widget('cards', { items: thisMonth.map(d => ({ title: d.title, subtitle: d.organization?.name })) });
+const res = await call('search_datasets', { query: 'transport', page_size: 50 }).catch(() => ({ datasets: [] }));
+const thisMonth = (res?.datasets ?? []).filter(d => (d.last_modified ?? '').startsWith('2026-04'));
+await widget('cards', { items: thisMonth.map(d => ({ title: d.title ?? '—', subtitle: d.organization?.name ?? '' })) });
 await widget('stat-card', { label: 'Publiés ce mois', value: thisMonth.length });
 ```
 

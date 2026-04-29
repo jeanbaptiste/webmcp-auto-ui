@@ -27,44 +27,48 @@ This recipe gives an editorial view of the catalog — it valorises producers an
 
 1. **Aggregate orgs from a broad search**:
    ```js
-   const res = await call('search_datasets', { query: 'santé', page_size: 50 });
+   const res = await call('search_datasets', { query: 'santé', page_size: 50 }).catch(() => ({ datasets: [] }));
    const byOrg = new Map();
-   for (const d of res.datasets) {
+   for (const d of (res?.datasets ?? [])) {
      const o = d.organization;
-     if (!o) continue;
+     if (!o?.id) continue;
      if (!byOrg.has(o.id)) byOrg.set(o.id, { ...o, count: 0, latest: [] });
      const entry = byOrg.get(o.id);
      entry.count += 1;
      entry.latest.push(d);
    }
    const ranking = [...byOrg.values()].sort((a, b) => b.count - a.count);
+   if (ranking.length === 0) {
+     await widget('text', { content: 'Aucune organisation trouvée.' });
+     return;
+   }
    ```
 
 2. **Optionally enrich the top org** with metrics on its top dataset:
    ```js
    const topDataset = ranking[0].latest[0];
-   const metrics = await call('get_metrics', { dataset_id: topDataset.id, limit: 6 });
-   const totalDl = (metrics.metrics ?? []).reduce((s, m) => s + (m.monthly_download ?? 0), 0);
+   const metrics = topDataset ? await call('get_metrics', { dataset_id: topDataset.id, limit: 6 }).catch(() => ({ metrics: [] })) : { metrics: [] };
+   const totalDl = (metrics?.metrics ?? []).reduce((s, m) => s + (m.monthly_download ?? 0), 0);
    ```
 
 3. **Render leaderboard, profile and latest cards**:
    ```js
    await widget('table', {
      columns: ['Rang', 'Organisation', 'Datasets', 'ID'],
-     rows: ranking.slice(0, 10).map((o, i) => [i + 1, o.name, o.count, o.id])
+     rows: ranking.slice(0, 10).map((o, i) => [i + 1, o.name ?? '—', o.count ?? 0, o.id ?? '—'])
    });
 
    await widget('profile', {
-     name: ranking[0].name,
+     name: ranking[0].name ?? '—',
      avatar: ranking[0].logo,
-     description: `${ranking[0].count} datasets sur ce thème`,
-     href: `https://www.data.gouv.fr/fr/organizations/${ranking[0].slug}/`
+     description: `${ranking[0].count ?? 0} datasets sur ce thème`,
+     href: ranking[0].slug ? `https://www.data.gouv.fr/fr/organizations/${ranking[0].slug}/` : undefined
    });
 
    await widget('stat-card', { label: 'Téléchargements 6 mois (top dataset)', value: totalDl, icon: 'download' });
 
    await widget('cards', {
-     items: ranking[0].latest.slice(0, 5).map(d => ({ title: d.title, subtitle: d.last_modified, description: d.description?.slice(0, 140) }))
+     items: (ranking[0].latest ?? []).slice(0, 5).map(d => ({ title: d.title ?? '—', subtitle: d.last_modified ?? '', description: d.description?.slice(0, 140) ?? '' }))
    });
    ```
 
@@ -72,23 +76,23 @@ This recipe gives an editorial view of the catalog — it valorises producers an
 
 ### Top producers on the theme "santé"
 ```js
-const res = await call('search_datasets', { query: 'santé', page_size: 50 });
-const ranking = Object.values(res.datasets.reduce((acc, d) => {
+const res = await call('search_datasets', { query: 'santé', page_size: 50 }).catch(() => ({ datasets: [] }));
+const ranking = Object.values((res?.datasets ?? []).reduce((acc, d) => {
   const id = d.organization?.id;
   if (!id) return acc;
-  acc[id] ??= { name: d.organization.name, count: 0 };
+  acc[id] ??= { name: d.organization.name ?? '—', count: 0 };
   acc[id].count += 1;
   return acc;
 }, {})).sort((a, b) => b.count - a.count);
-await widget('table', { columns: ['Organisation', 'Datasets'], rows: ranking.slice(0, 10).map(o => [o.name, o.count]) });
+await widget('table', { columns: ['Organisation', 'Datasets'], rows: ranking.slice(0, 10).map(o => [o.name ?? '—', o.count ?? 0]) });
 ```
 
 ### Profile INSEE
 ```js
-const res = await call('search_datasets', { query: 'INSEE', page_size: 50 });
-const insee = res.datasets.filter(d => d.organization?.slug === 'institut-national-de-la-statistique-et-des-etudes-economiques-insee');
+const res = await call('search_datasets', { query: 'INSEE', page_size: 50 }).catch(() => ({ datasets: [] }));
+const insee = (res?.datasets ?? []).filter(d => d.organization?.slug === 'institut-national-de-la-statistique-et-des-etudes-economiques-insee');
 await widget('profile', { name: 'INSEE', description: `${insee.length} datasets visibles dans cette recherche` });
-await widget('cards', { items: insee.slice(0, 5).map(d => ({ title: d.title, subtitle: d.last_modified })) });
+await widget('cards', { items: insee.slice(0, 5).map(d => ({ title: d.title ?? '—', subtitle: d.last_modified ?? '' })) });
 ```
 
 ## Common mistakes

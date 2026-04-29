@@ -33,7 +33,12 @@ Pedagogique : sensibilise au rechauffement LOCAL (qui peut etre superieur au glo
 
 ```js
 const geo = await call('geocoding', { name: 'Marseille', count: 1 });
-const { latitude, longitude } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude } = place;
 
 const c = await call('climate_projection', {
   latitude, longitude,
@@ -41,23 +46,36 @@ const c = await call('climate_projection', {
   start_date: '2025-01-01',
   end_date: '2100-12-31',
   models: ['EC_Earth3P_HR', 'MRI_AGCM3_2_S', 'CMCC_CM2_VHR4']
-});
+}).catch(() => null);
+
+if (!c?.daily?.time?.length) {
+  await widget('text', { content: 'Donnees climatiques indisponibles.' });
+  return;
+}
 
 // Resample en moyenne annuelle
 function annualize(times, values) {
   const byYear = {};
-  times.forEach((t, i) => {
+  (times ?? []).forEach((t, i) => {
+    const v = values?.[i];
+    if (!Number.isFinite(v)) return;
     const y = t.slice(0, 4);
-    (byYear[y] = byYear[y] || []).push(values[i]);
+    (byYear[y] = byYear[y] || []).push(v);
   });
   return Object.entries(byYear).map(([y, arr]) => ({ year: +y, mean: arr.reduce((a,b)=>a+b,0)/arr.length }));
 }
 
-const annual = annualize(c.daily.time, c.daily.temperature_2m_mean);
-const baseline = annual.slice(0, 10).reduce((a, b) => a + b.mean, 0) / 10;
+const annual = annualize(c.daily.time, c.daily.temperature_2m_mean ?? []);
+if (annual.length === 0) {
+  await widget('text', { content: 'Aucune donnee annuelle exploitable.' });
+  return;
+}
+const baselineSlice = annual.slice(0, 10);
+const baseline = baselineSlice.reduce((a, b) => a + b.mean, 0) / baselineSlice.length;
 
 const decades = [2030, 2050, 2070, 2090].map(d => {
   const slice = annual.filter(a => a.year >= d && a.year < d + 10);
+  if (slice.length === 0) return { decade: `${d}-${d+9}`, tMean: '—', delta: '—' };
   const m = slice.reduce((a, b) => a + b.mean, 0) / slice.length;
   return { decade: `${d}-${d+9}`, tMean: m.toFixed(2), delta: (m - baseline).toFixed(2) };
 });
@@ -72,7 +90,7 @@ await widget('chart-rich', {
 await widget('table', {
   title: 'Derive par decennie vs 2025-2034',
   columns: ['Decennie', 'Tmoy (C)', 'Delta (+ C)'],
-  rows: decades.map(d => [d.decade, d.tMean, `+${d.delta}`])
+  rows: decades.map(d => [d.decade, d.tMean, d.delta === '—' ? '—' : `+${d.delta}`])
 });
 
 await widget('text', {

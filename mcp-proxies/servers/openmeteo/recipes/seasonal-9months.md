@@ -32,29 +32,47 @@ Decision agricole, planification touristique grande saison, contrats meteo.
 
 ```js
 const geo = await call('geocoding', { name: 'Bordeaux', count: 1 });
-const { latitude, longitude, timezone } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone } = place;
 
 const s = await call('seasonal_forecast', {
   latitude, longitude,
   six_hourly: ['temperature_2m'],
   forecast_days: 270
-});
+}).catch(() => null);
+
+if (!s?.six_hourly?.time?.length) {
+  await widget('text', { content: 'Donnees saisonnieres indisponibles.' });
+  return;
+}
 
 // Mediane sur les membres puis moyenne mensuelle
-const memberKeys = Object.keys(s.six_hourly).filter(k => k.startsWith('temperature_2m_member'));
-const medianSeries = s.six_hourly.time.map((_, i) => {
-  const vals = memberKeys.map(k => s.six_hourly[k][i]).filter(v => v != null).sort((a, b) => a - b);
-  return vals[Math.floor(vals.length / 2)];
+const sh = s.six_hourly;
+const memberKeys = Object.keys(sh).filter(k => k.startsWith('temperature_2m_member'));
+const medianSeries = sh.time.map((_, i) => {
+  const vals = memberKeys.map(k => sh[k]?.[i]).filter(v => Number.isFinite(v)).sort((a, b) => a - b);
+  return vals.length > 0 ? vals[Math.floor(vals.length / 2)] : null;
 });
 
 const monthly = {};
-s.six_hourly.time.forEach((t, i) => {
+sh.time.forEach((t, i) => {
+  const v = medianSeries[i];
+  if (!Number.isFinite(v)) return;
   const m = t.slice(0, 7);
-  (monthly[m] = monthly[m] || []).push(medianSeries[i]);
+  (monthly[m] = monthly[m] || []).push(v);
 });
 const months = Object.entries(monthly).map(([m, arr]) => ({
   month: m, t: arr.reduce((a, b) => a + b, 0) / arr.length
 }));
+
+if (months.length === 0) {
+  await widget('text', { content: 'Aucune donnee saisonniere exploitable.' });
+  return;
+}
 
 // Climatologie locale tres simplifiee (a remplacer par appel weather_archive en prod)
 const climato = months.map(m => ({ month: m.month, normal: 14 + 8 * Math.cos((parseInt(m.month.slice(5)) - 7) * Math.PI / 6) }));

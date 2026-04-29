@@ -33,41 +33,57 @@ Critique pour montagne / alpinisme. Les valeurs `weather_forecast` standard sont
 
 ```js
 const geo = await call('geocoding', { name: 'Pic du Midi de Bigorre', count: 1 });
-const { latitude, longitude, timezone, name } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Sommet introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone, name } = place;
 
-const elev = await call('elevation', { latitudes: [latitude], longitudes: [longitude] });
-const altitude = elev.elevation[0];
+const [elev, w] = await Promise.all([
+  call('elevation', { latitudes: [latitude], longitudes: [longitude] }).catch(() => null),
+  call('weather_forecast', {
+    latitude, longitude, timezone,
+    hourly: ['temperature_2m', 'wind_speed_120m', 'wind_gusts_10m', 'freezing_level_height', 'visibility', 'snowfall', 'apparent_temperature'],
+    forecast_days: 3
+  }).catch(() => null)
+]);
 
-const w = await call('weather_forecast', {
-  latitude, longitude, timezone,
-  hourly: ['temperature_2m', 'wind_speed_120m', 'wind_gusts_10m', 'freezing_level_height', 'visibility', 'snowfall', 'apparent_temperature'],
-  forecast_days: 3
-});
+if (!w?.hourly?.time?.length) {
+  await widget('text', { content: 'Donnees meteo indisponibles.' });
+  return;
+}
+
+const altitude = elev?.elevation?.[0] ?? null;
 
 // Tranches 6h pour eviter 72 points illisibles
 function downsample6h(arr, times) {
   const out = [], outT = [];
-  for (let i = 0; i < arr.length; i += 6) {
+  for (let i = 0; i < (arr?.length ?? 0); i += 6) {
     out.push(arr[i]);
     outT.push(times[i]);
   }
   return { values: out, times: outT };
 }
 
-const tDS = downsample6h(w.hourly.temperature_2m, w.hourly.time);
-const windDS = downsample6h(w.hourly.wind_speed_120m, w.hourly.time);
-const apparentNow = w.hourly.apparent_temperature[0];
-const windNow = w.hourly.wind_speed_120m[0];
-const isoZero = w.hourly.freezing_level_height[0];
-const visKm = (w.hourly.visibility[0] / 1000).toFixed(1);
+const hourly = w.hourly;
+const tDS = downsample6h(hourly.temperature_2m ?? [], hourly.time ?? []);
+const windDS = downsample6h(hourly.wind_speed_120m ?? [], hourly.time ?? []);
+const apparentNow = hourly.apparent_temperature?.[0];
+const windNow = hourly.wind_speed_120m?.[0];
+const isoZero = hourly.freezing_level_height?.[0];
+const visM = hourly.visibility?.[0];
+const tNow = hourly.temperature_2m?.[0];
+const gustArr = (hourly.wind_gusts_10m ?? []).filter(v => Number.isFinite(v));
+const snowArr = (hourly.snowfall ?? []).filter(v => Number.isFinite(v));
 
 await widget('stat-card', {
-  title: `Conditions ${name} (${altitude}m)`,
+  title: `Conditions ${name ?? ''}${altitude != null ? ` (${altitude}m)` : ''}`,
   items: [
-    { label: 'T sommet', value: `${w.hourly.temperature_2m[0].toFixed(1)}C`, icon: 'thermometer' },
-    { label: 'Ressenti', value: `${apparentNow.toFixed(1)}C`, icon: 'wind' },
-    { label: 'Vent (120m)', value: `${windNow.toFixed(0)} km/h`, icon: 'wind' },
-    { label: 'Iso 0C', value: `${isoZero.toFixed(0)} m`, icon: 'snowflake' }
+    { label: 'T sommet', value: Number.isFinite(tNow) ? `${tNow.toFixed(1)}C` : '—', icon: 'thermometer' },
+    { label: 'Ressenti', value: Number.isFinite(apparentNow) ? `${apparentNow.toFixed(1)}C` : '—', icon: 'wind' },
+    { label: 'Vent (120m)', value: Number.isFinite(windNow) ? `${windNow.toFixed(0)} km/h` : '—', icon: 'wind' },
+    { label: 'Iso 0C', value: Number.isFinite(isoZero) ? `${isoZero.toFixed(0)} m` : '—', icon: 'snowflake' }
   ]
 });
 
@@ -84,11 +100,11 @@ await widget('chart-rich', {
 await widget('kv', {
   title: 'Donnees complementaires',
   pairs: [
-    ['Altitude', `${altitude} m`],
-    ['Visibilite actuelle', `${visKm} km`],
-    ['Iso 0C actuelle', `${isoZero.toFixed(0)} m`],
-    ['Rafale max prevue 3j', `${Math.max(...w.hourly.wind_gusts_10m).toFixed(0)} km/h`],
-    ['Neige prevue 3j', `${w.hourly.snowfall.reduce((s,v)=>s+v,0).toFixed(1)} cm`]
+    ['Altitude', altitude != null ? `${altitude} m` : '—'],
+    ['Visibilite actuelle', Number.isFinite(visM) ? `${(visM / 1000).toFixed(1)} km` : '—'],
+    ['Iso 0C actuelle', Number.isFinite(isoZero) ? `${isoZero.toFixed(0)} m` : '—'],
+    ['Rafale max prevue 3j', gustArr.length > 0 ? `${Math.max(...gustArr).toFixed(0)} km/h` : '—'],
+    ['Neige prevue 3j', `${snowArr.reduce((s,v)=>s+v,0).toFixed(1)} cm`]
   ]
 });
 ```

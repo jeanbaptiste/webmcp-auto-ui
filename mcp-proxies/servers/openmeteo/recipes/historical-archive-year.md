@@ -32,46 +32,61 @@ Recherche climat, journalisme, memoire meteo, etudes regionales.
 
 ```js
 const geo = await call('geocoding', { name: 'Lyon', count: 1 });
-const { latitude, longitude, timezone } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone } = place;
 
 const a = await call('weather_archive', {
   latitude, longitude, timezone,
   start_date: '2003-06-01',
   end_date: '2003-08-31',
   daily: ['temperature_2m_max', 'temperature_2m_min', 'temperature_2m_mean', 'precipitation_sum']
-});
+}).catch(() => null);
 
-const tmax = a.daily.temperature_2m_max;
-const recordIdx = tmax.indexOf(Math.max(...tmax));
-const heatDays = tmax.filter(t => t > 35).length;
-const meanT = a.daily.temperature_2m_mean.reduce((s, v) => s + v, 0) / a.daily.temperature_2m_mean.length;
-const totalRain = a.daily.precipitation_sum.reduce((s, v) => s + v, 0);
+if (!a?.daily?.time?.length) {
+  await widget('text', { content: 'Donnees archives indisponibles.' });
+  return;
+}
+
+const tmax = (a.daily.temperature_2m_max ?? []).map(v => Number.isFinite(v) ? v : null);
+const tmaxFinite = tmax.filter(v => v != null);
+const recordVal = tmaxFinite.length > 0 ? Math.max(...tmaxFinite) : null;
+const recordIdx = recordVal != null ? tmax.indexOf(recordVal) : -1;
+const heatDays = tmaxFinite.filter(t => t > 35).length;
+const tmean = (a.daily.temperature_2m_mean ?? []).filter(v => Number.isFinite(v));
+const meanT = tmean.length > 0 ? tmean.reduce((s, v) => s + v, 0) / tmean.length : null;
+const rainArr = (a.daily.precipitation_sum ?? []).filter(v => Number.isFinite(v));
+const totalRain = rainArr.reduce((s, v) => s + v, 0);
 
 await widget('chart-rich', {
   title: 'Ete 2003 - Lyon (archive ERA5)',
   type: 'line',
-  xAxis: { label: 'Date', data: a.daily.time },
+  xAxis: { label: 'Date', data: a.daily.time ?? [] },
   series: [
-    { label: 'Tmax (C)', data: tmax, color: '#e74c3c' },
-    { label: 'Tmin (C)', data: a.daily.temperature_2m_min, color: '#3498db' },
-    { label: 'Tmoy (C)', data: a.daily.temperature_2m_mean, color: '#2c3e50' }
+    { label: 'Tmax (C)', data: a.daily.temperature_2m_max ?? [], color: '#e74c3c' },
+    { label: 'Tmin (C)', data: a.daily.temperature_2m_min ?? [], color: '#3498db' },
+    { label: 'Tmoy (C)', data: a.daily.temperature_2m_mean ?? [], color: '#2c3e50' }
   ]
 });
 
 await widget('stat-card', {
   items: [
-    { label: 'Tmax absolu', value: `${tmax[recordIdx]}C le ${a.daily.time[recordIdx]}`, icon: 'thermometer' },
+    { label: 'Tmax absolu', value: recordVal != null ? `${recordVal}C le ${a.daily.time?.[recordIdx] ?? '—'}` : '—', icon: 'thermometer' },
     { label: 'Jours > 35C', value: String(heatDays), icon: 'flame' },
-    { label: 'Tmoy periode', value: `${meanT.toFixed(2)}C`, icon: 'trending-up' },
+    { label: 'Tmoy periode', value: meanT != null ? `${meanT.toFixed(2)}C` : '—', icon: 'trending-up' },
     { label: 'Pluie totale', value: `${totalRain.toFixed(0)} mm`, icon: 'cloud-rain' }
   ]
 });
 
+const times = a.daily.time ?? [];
 await widget('kv', {
   pairs: [
     ['Source', 'ERA5 (Copernicus / ECMWF)'],
-    ['Periode', `${a.daily.time[0]} -> ${a.daily.time[a.daily.time.length - 1]}`],
-    ['Nb jours', String(a.daily.time.length)],
+    ['Periode', times.length > 0 ? `${times[0]} -> ${times[times.length - 1]}` : '—'],
+    ['Nb jours', String(times.length)],
     ['Resolution', '~25 km (interpolee)']
   ]
 });

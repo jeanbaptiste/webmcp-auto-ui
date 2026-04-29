@@ -26,43 +26,51 @@ layout:
 ```js
 // 1. Resolve the target species
 const taxa = await call('search_taxa', { q: 'Aquila chrysaetos', per_page: 1, locale: 'en' });
-const target = taxa.results[0];
-const targetDetail = await call('get_taxon', { id: target.id });
+const target = taxa?.results?.[0];
+if (!target) {
+  await widget('text', { content: 'Species not found.' });
+  return;
+}
+const targetDetail = await call('get_taxon', { id: target.id }).catch(() => null);
 
 // 2. Get the look-alikes (ranked by misidentification frequency)
-const sim = await call('similar_species', { taxon_id: target.id, per_page: 6 });
+const sim = await call('similar_species', { taxon_id: target.id, per_page: 6 }).catch(() => ({ results: [] }));
 
 // 3. Hydrate each look-alike
-const lookAlikes = await Promise.all(
-  sim.results.map(r => call('get_taxon', { id: r.taxon.id })),
-);
+const lookAlikes = (await Promise.all(
+  (sim?.results ?? []).filter(r => r.taxon?.id).map(r => call('get_taxon', { id: r.taxon.id }).catch(() => null)),
+)).filter(Boolean);
+
+const allTaxa = [targetDetail, ...lookAlikes].filter(Boolean);
 
 // 4. Comparison gallery (target + 3-5 alternatives)
 await widget('gallery', {
-  images: [targetDetail, ...lookAlikes].map(t => ({
-    src: t.default_photo?.medium_url,
-    caption: `${t.preferred_common_name} — ${t.name}`,
-  })),
+  images: allTaxa
+    .filter(t => t.default_photo?.medium_url)
+    .map(t => ({
+      src: t.default_photo.medium_url,
+      caption: `${t.preferred_common_name ?? t.name ?? '—'} — ${t.name ?? ''}`,
+    })),
 });
 
 // 5. Cards per species
 await widget('cards', {
-  items: [targetDetail, ...lookAlikes].map(t => ({
-    title: t.preferred_common_name || t.name,
-    subtitle: t.name,
+  items: allTaxa.map(t => ({
+    title: t.preferred_common_name ?? t.name ?? 'Unknown',
+    subtitle: t.name ?? '',
     image: t.default_photo?.square_url,
-    description: (t.wikipedia_summary || '').slice(0, 220),
+    description: (t.wikipedia_summary ?? '').slice(0, 220),
   })),
 });
 
 // 6. Diagnostic table
 await widget('table', {
   columns: ['Species', 'Family', 'Observations', 'Conservation'],
-  rows: [targetDetail, ...lookAlikes].map(t => [
-    t.preferred_common_name || t.name,
-    t.ancestors?.find(a => a.rank === 'family')?.name || '—',
-    t.observations_count,
-    t.conservation_status?.status_name || 'LC',
+  rows: allTaxa.map(t => [
+    t.preferred_common_name ?? t.name ?? '—',
+    t.ancestors?.find(a => a.rank === 'family')?.name ?? '—',
+    t.observations_count ?? 0,
+    t.conservation_status?.status_name ?? 'LC',
   ]),
 });
 await widget('text', { content: `Look-alikes are ranked by how often iNaturalist identifiers confuse them with the target species. Use the gallery + Wikipedia summaries above to refine your ID.` });
@@ -72,16 +80,18 @@ await widget('text', { content: `Look-alikes are ranked by how often iNaturalist
 
 ### Blue tit vs great tit
 ```js
-const t = (await call('search_taxa', { q: 'Cyanistes caeruleus', per_page: 1 })).results[0];
-const sim = await call('similar_species', { taxon_id: t.id, per_page: 4 });
-await widget('cards', { items: sim.results.map(r => ({ title: r.taxon.preferred_common_name, subtitle: r.taxon.name, image: r.taxon.default_photo?.square_url })) });
+const t = (await call('search_taxa', { q: 'Cyanistes caeruleus', per_page: 1 }))?.results?.[0];
+if (!t) { await widget('text', { content: 'Species not found.' }); return; }
+const sim = await call('similar_species', { taxon_id: t.id, per_page: 4 }).catch(() => ({ results: [] }));
+await widget('cards', { items: (sim?.results ?? []).filter(r => r.taxon).map(r => ({ title: r.taxon?.preferred_common_name ?? r.taxon?.name ?? 'Unknown', subtitle: r.taxon?.name ?? '', image: r.taxon?.default_photo?.square_url })) });
 ```
 
 ### Look-alikes of the European hare
 ```js
-const t = (await call('search_taxa', { q: 'Lepus europaeus', per_page: 1 })).results[0];
-const sim = await call('similar_species', { taxon_id: t.id });
-await widget('gallery', { images: sim.results.map(r => ({ src: r.taxon.default_photo?.medium_url, caption: r.taxon.preferred_common_name })) });
+const t = (await call('search_taxa', { q: 'Lepus europaeus', per_page: 1 }))?.results?.[0];
+if (!t) { await widget('text', { content: 'Species not found.' }); return; }
+const sim = await call('similar_species', { taxon_id: t.id }).catch(() => ({ results: [] }));
+await widget('gallery', { images: (sim?.results ?? []).filter(r => r.taxon?.default_photo?.medium_url).map(r => ({ src: r.taxon.default_photo.medium_url, caption: r.taxon.preferred_common_name ?? r.taxon.name ?? '' })) });
 ```
 
 ## Common mistakes

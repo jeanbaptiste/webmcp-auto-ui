@@ -26,7 +26,11 @@ layout:
 ```js
 // 1. Resolve the place
 const places = await call('search_places', { q: 'Vanoise', per_page: 1 });
-const place = places.results[0];
+const place = places?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Place not found.' });
+  return;
+}
 
 // 2. Pick the clade root (3 = birds, 47126 = plants, 40151 = mammals, 47158 = insects, 1 = all life)
 const cladeId = 40151; // mammals
@@ -36,40 +40,46 @@ const gap = await call('unobserved_taxa', {
   taxon_id: cladeId,
   place_id: place.id,
   per_page: 12,
-});
+}).catch(() => ({ results: [] }));
+
+const gapResults = gap?.results ?? [];
 
 // 4. Hydrate each missing species with photos
-const detailed = await Promise.all(
-  gap.results.map(t => call('get_taxon', { id: t.id })),
-);
+const detailed = (await Promise.all(
+  gapResults.map(t => call('get_taxon', { id: t.id }).catch(() => null)),
+)).filter(Boolean);
 
 // 5. Render
 await widget('text', {
-  content: `These species are listed for ${place.display_name} but have no iNaturalist observation there yet — they make great prospection targets.`,
+  content: `These species are listed for ${place.display_name ?? 'this place'} but have no iNaturalist observation there yet — they make great prospection targets.`,
 });
+if (detailed.length === 0) {
+  await widget('text', { content: 'No unobserved species found.' });
+  return;
+}
 await widget('cards', {
   items: detailed.slice(0, 6).map(t => ({
-    title: t.preferred_common_name || t.name,
-    subtitle: t.name,
+    title: t.preferred_common_name ?? t.name ?? 'Unknown',
+    subtitle: t.name ?? '',
     image: t.default_photo?.medium_url,
-    description: (t.wikipedia_summary || '').slice(0, 200),
+    description: (t.wikipedia_summary ?? '').slice(0, 200),
   })),
 });
 await widget('table', {
   columns: ['Species', 'Family', 'Conservation', 'Global obs.'],
   rows: detailed.map(t => [
-    t.preferred_common_name || t.name,
-    t.ancestors?.find(a => a.rank === 'family')?.name || '—',
-    t.conservation_status?.status_name || 'LC',
-    t.observations_count,
+    t.preferred_common_name ?? t.name ?? '—',
+    t.ancestors?.find(a => a.rank === 'family')?.name ?? '—',
+    t.conservation_status?.status_name ?? 'LC',
+    t.observations_count ?? 0,
   ]),
 });
 await widget('gallery', {
   images: detailed
-    .filter(t => t.default_photo)
+    .filter(t => t.default_photo?.medium_url)
     .map(t => ({
       src: t.default_photo.medium_url,
-      caption: t.preferred_common_name || t.name,
+      caption: t.preferred_common_name ?? t.name ?? '',
     })),
 });
 ```
@@ -78,17 +88,19 @@ await widget('gallery', {
 
 ### Birds never observed in Brocéliande
 ```js
-const place = (await call('search_places', { q: 'Brocéliande', per_page: 1 })).results[0];
-const gap = await call('unobserved_taxa', { taxon_id: 3, place_id: place.id, per_page: 12 });
-await widget('cards', { items: gap.results.map(t => ({ title: t.preferred_common_name || t.name, subtitle: t.name, image: t.default_photo?.medium_url })) });
+const place = (await call('search_places', { q: 'Brocéliande', per_page: 1 }))?.results?.[0];
+if (!place) { await widget('text', { content: 'Place not found.' }); return; }
+const gap = await call('unobserved_taxa', { taxon_id: 3, place_id: place.id, per_page: 12 }).catch(() => ({ results: [] }));
+await widget('cards', { items: (gap?.results ?? []).map(t => ({ title: t.preferred_common_name ?? t.name ?? '—', subtitle: t.name ?? '', image: t.default_photo?.medium_url })) });
 ```
 
 ### Missing orchids in Pyrenees
 ```js
-const place = (await call('search_places', { q: 'Pyrenees', per_page: 1 })).results[0];
-const orchid = (await call('search_taxa', { q: 'Orchidaceae', rank: 'family', per_page: 1 })).results[0];
-const gap = await call('unobserved_taxa', { taxon_id: orchid.id, place_id: place.id, per_page: 10 });
-await widget('table', { columns: ['Species', 'Common name'], rows: gap.results.map(t => [t.name, t.preferred_common_name || '—']) });
+const place = (await call('search_places', { q: 'Pyrenees', per_page: 1 }))?.results?.[0];
+const orchid = (await call('search_taxa', { q: 'Orchidaceae', rank: 'family', per_page: 1 }))?.results?.[0];
+if (!place || !orchid) { await widget('text', { content: 'Place or clade not found.' }); return; }
+const gap = await call('unobserved_taxa', { taxon_id: orchid.id, place_id: place.id, per_page: 10 }).catch(() => ({ results: [] }));
+await widget('table', { columns: ['Species', 'Common name'], rows: (gap?.results ?? []).map(t => [t.name ?? '—', t.preferred_common_name ?? '—']) });
 ```
 
 ## Common mistakes

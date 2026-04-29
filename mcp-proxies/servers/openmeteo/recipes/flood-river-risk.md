@@ -32,43 +32,54 @@ Outil rare en grand public ; alerte preventive utile en zone inondable.
 
 ```js
 const geo = await call('geocoding', { name: 'Tours', count: 1 });
-const { latitude, longitude, timezone, name } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone, name } = place;
 
 const f = await call('flood_forecast', {
   latitude, longitude,
   daily: ['river_discharge', 'river_discharge_mean', 'river_discharge_max', 'river_discharge_p50'],
   forecast_days: 30
-});
+}).catch(() => null);
 
-const peak = Math.max(...f.daily.river_discharge);
-const peakIdx = f.daily.river_discharge.indexOf(peak);
-const meanClimato = f.daily.river_discharge_mean.reduce((a, b) => a + b, 0) / f.daily.river_discharge_mean.length;
-const ratio = peak / meanClimato;
-const status = ratio > 3 ? 'Crue probable' : ratio > 2 ? 'Vigilance' : ratio > 1.3 ? 'Au-dessus normale' : 'Normal';
+const discharge = (f?.daily?.river_discharge ?? []).filter(v => Number.isFinite(v));
+const climato = (f?.daily?.river_discharge_mean ?? []).filter(v => Number.isFinite(v));
+if (discharge.length === 0) {
+  await widget('text', { content: `Aucune donnee hydrologique pour ${name} (le point n'est probablement pas sur un grand cours d'eau GloFAS).` });
+  return;
+}
+const peak = Math.max(...discharge);
+const peakIdx = (f.daily.river_discharge ?? []).indexOf(peak);
+const meanClimato = climato.length > 0 ? climato.reduce((a, b) => a + b, 0) / climato.length : null;
+const ratio = meanClimato ? peak / meanClimato : null;
+const status = ratio == null ? 'Sans reference' : ratio > 3 ? 'Crue probable' : ratio > 2 ? 'Vigilance' : ratio > 1.3 ? 'Au-dessus normale' : 'Normal';
 
 await widget('chart-rich', {
-  title: `Debit ${name} - prevision 30 jours (m3/s)`,
+  title: `Debit ${name ?? ''} - prevision 30 jours (m3/s)`,
   type: 'line',
-  xAxis: { label: 'Date', data: f.daily.time },
+  xAxis: { label: 'Date', data: f.daily.time ?? [] },
   series: [
-    { label: 'Prevision', data: f.daily.river_discharge, color: '#2980b9' },
-    { label: 'Mediane (p50)', data: f.daily.river_discharge_p50, color: '#7f8c8d' },
-    { label: 'Climatologie', data: f.daily.river_discharge_mean, color: '#bdc3c7', dashed: true }
+    { label: 'Prevision', data: f.daily.river_discharge ?? [], color: '#2980b9' },
+    { label: 'Mediane (p50)', data: f.daily.river_discharge_p50 ?? [], color: '#7f8c8d' },
+    { label: 'Climatologie', data: f.daily.river_discharge_mean ?? [], color: '#bdc3c7', dashed: true }
   ]
 });
 
 await widget('stat-card', {
   items: [
     { label: 'Debit max prevu', value: `${peak.toFixed(0)} m3/s`, icon: 'trending-up' },
-    { label: 'Date du pic', value: f.daily.time[peakIdx], icon: 'calendar' },
-    { label: 'Ratio vs normale', value: `x${ratio.toFixed(2)} (${status})`, icon: 'alert-triangle' }
+    { label: 'Date du pic', value: peakIdx >= 0 ? (f.daily.time?.[peakIdx] ?? '—') : '—', icon: 'calendar' },
+    { label: 'Ratio vs normale', value: ratio != null ? `x${ratio.toFixed(2)} (${status})` : status, icon: 'alert-triangle' }
   ]
 });
 
 await widget('map', {
-  title: `Point hydro - ${name}`,
+  title: `Point hydro - ${name ?? ''}`,
   center: { lat: latitude, lng: longitude }, zoom: 11,
-  markers: [{ lat: latitude, lng: longitude, label: name, popup: `Pic ${peak.toFixed(0)} m3/s le ${f.daily.time[peakIdx]}` }]
+  markers: [{ lat: latitude, lng: longitude, label: name ?? '', popup: `Pic ${peak.toFixed(0)} m3/s le ${peakIdx >= 0 ? (f.daily.time?.[peakIdx] ?? '—') : '—'}` }]
 });
 ```
 

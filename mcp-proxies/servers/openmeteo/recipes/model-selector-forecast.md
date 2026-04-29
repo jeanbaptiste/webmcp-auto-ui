@@ -43,31 +43,49 @@ const modelMap = {
 
 const userModel = 'jma'; // resolu depuis la requete utilisateur
 const m = modelMap[userModel];
+if (!m) {
+  await widget('text', { content: `Modele inconnu: ${userModel}` });
+  return;
+}
 
 const geo = await call('geocoding', { name: 'Tokyo', count: 1 });
-const { latitude, longitude, timezone } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone } = place;
 
 const w = await call(m.tool, {
   latitude, longitude, timezone,
   daily: ['temperature_2m_max', 'temperature_2m_min', 'precipitation_sum', 'wind_speed_10m_max'],
   forecast_days: 7
-});
+}).catch(() => null);
+
+if (!w?.daily?.time?.length) {
+  await widget('text', { content: `Donnees indisponibles pour ${m.label} (couverture geographique limitee ?).` });
+  return;
+}
+
+const tmax = (w.daily.temperature_2m_max ?? []).filter(v => Number.isFinite(v));
+const tmin = (w.daily.temperature_2m_min ?? []).filter(v => Number.isFinite(v));
+const rain = (w.daily.precipitation_sum ?? []).filter(v => Number.isFinite(v));
 
 await widget('chart-rich', {
   title: `Previsions Tokyo - ${m.label}`,
   type: 'line',
-  xAxis: { label: 'Date', data: w.daily.time },
+  xAxis: { label: 'Date', data: w.daily.time ?? [] },
   series: [
-    { label: 'Tmax (C)', data: w.daily.temperature_2m_max, color: '#e74c3c' },
-    { label: 'Tmin (C)', data: w.daily.temperature_2m_min, color: '#3498db' }
+    { label: 'Tmax (C)', data: w.daily.temperature_2m_max ?? [], color: '#e74c3c' },
+    { label: 'Tmin (C)', data: w.daily.temperature_2m_min ?? [], color: '#3498db' }
   ]
 });
 
 await widget('stat-card', {
   items: [
-    { label: 'Tmax 7j', value: `${Math.max(...w.daily.temperature_2m_max)}C` },
-    { label: 'Tmin 7j', value: `${Math.min(...w.daily.temperature_2m_min)}C` },
-    { label: 'Pluie totale', value: `${w.daily.precipitation_sum.reduce((a,b)=>a+b,0).toFixed(1)} mm` }
+    { label: 'Tmax 7j', value: tmax.length > 0 ? `${Math.max(...tmax)}C` : '—' },
+    { label: 'Tmin 7j', value: tmin.length > 0 ? `${Math.min(...tmin)}C` : '—' },
+    { label: 'Pluie totale', value: `${rain.reduce((a,b)=>a+b,0).toFixed(1)} mm` }
   ]
 });
 

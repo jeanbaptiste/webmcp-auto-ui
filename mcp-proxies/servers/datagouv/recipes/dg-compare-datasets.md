@@ -27,49 +27,49 @@ Open data has a lot of overlap — this recipe helps the user pick.
 
 1. **Fetch both profiles in parallel**:
    ```js
-   const [a, b] = await Promise.all([
-     call('get_dataset_info', { dataset_id: id_a }),
-     call('get_dataset_info', { dataset_id: id_b })
+   const [a, b, resA, resB, mA, mB] = await Promise.all([
+     call('get_dataset_info', { dataset_id: id_a }).catch(() => null),
+     call('get_dataset_info', { dataset_id: id_b }).catch(() => null),
+     call('list_dataset_resources', { dataset_id: id_a }).catch(() => ({ resources: [] })),
+     call('list_dataset_resources', { dataset_id: id_b }).catch(() => ({ resources: [] })),
+     call('get_metrics', { dataset_id: id_a, limit: 12 }).catch(() => ({ metrics: [] })),
+     call('get_metrics', { dataset_id: id_b, limit: 12 }).catch(() => ({ metrics: [] }))
    ]);
-   const [resA, resB] = await Promise.all([
-     call('list_dataset_resources', { dataset_id: id_a }),
-     call('list_dataset_resources', { dataset_id: id_b })
-   ]);
-   const [mA, mB] = await Promise.all([
-     call('get_metrics', { dataset_id: id_a, limit: 12 }),
-     call('get_metrics', { dataset_id: id_b, limit: 12 })
-   ]);
+   if (!a || !b) {
+     await widget('text', { content: 'Un ou les deux datasets sont introuvables.' });
+     return;
+   }
    ```
 
 2. **Render side-by-side**:
    ```js
    await widget('cards', {
      items: [
-       { title: a.title, subtitle: a.organization?.name, description: a.description?.slice(0, 200) },
-       { title: b.title, subtitle: b.organization?.name, description: b.description?.slice(0, 200) }
+       { title: a.title ?? '—', subtitle: a.organization?.name ?? '', description: a.description?.slice(0, 200) ?? '' },
+       { title: b.title ?? '—', subtitle: b.organization?.name ?? '', description: b.description?.slice(0, 200) ?? '' }
      ]
    });
 
    await widget('kv', {
      items: [
-       { key: 'Licence', valueA: a.license, valueB: b.license },
-       { key: 'Fréquence', valueA: a.frequency, valueB: b.frequency },
-       { key: 'Fichiers', valueA: resA.resources.length, valueB: resB.resources.length },
-       { key: 'Créé', valueA: a.created_at, valueB: b.created_at },
-       { key: 'MAJ', valueA: a.last_modified, valueB: b.last_modified }
+       { key: 'Licence', valueA: a.license ?? '—', valueB: b.license ?? '—' },
+       { key: 'Fréquence', valueA: a.frequency ?? '—', valueB: b.frequency ?? '—' },
+       { key: 'Fichiers', valueA: resA?.resources?.length ?? 0, valueB: resB?.resources?.length ?? 0 },
+       { key: 'Créé', valueA: a.created_at ?? '—', valueB: b.created_at ?? '—' },
+       { key: 'MAJ', valueA: a.last_modified ?? '—', valueB: b.last_modified ?? '—' }
      ]
    });
 
-   const dlA = (mA.metrics ?? []).reduce((s, m) => s + (m.monthly_download ?? 0), 0);
-   const dlB = (mB.metrics ?? []).reduce((s, m) => s + (m.monthly_download ?? 0), 0);
+   const dlA = (mA?.metrics ?? []).reduce((s, m) => s + (m.monthly_download ?? 0), 0);
+   const dlB = (mB?.metrics ?? []).reduce((s, m) => s + (m.monthly_download ?? 0), 0);
    await widget('chart', {
      type: 'bar',
-     data: { labels: [a.title, b.title], values: [dlA, dlB] },
+     data: { labels: [a.title ?? 'A', b.title ?? 'B'], values: [dlA, dlB] },
      options: { yLabel: 'Téléchargements 12 mois' }
    });
 
-   const fieldsA = new Set(resA.resources.flatMap(r => r.schema?.fields?.map(f => f.name) ?? []));
-   const fieldsB = new Set(resB.resources.flatMap(r => r.schema?.fields?.map(f => f.name) ?? []));
+   const fieldsA = new Set((resA?.resources ?? []).flatMap(r => r.schema?.fields?.map(f => f.name) ?? []));
+   const fieldsB = new Set((resB?.resources ?? []).flatMap(r => r.schema?.fields?.map(f => f.name) ?? []));
    const all = [...new Set([...fieldsA, ...fieldsB])];
    await widget('table', {
      columns: ['Champ', 'Dataset A', 'Dataset B'],
@@ -82,24 +82,26 @@ Open data has a lot of overlap — this recipe helps the user pick.
 ### INSEE vs DREES on poverty
 ```js
 const [a, b] = await Promise.all([
-  call('get_dataset_info', { dataset_id: '<insee-pauvrete-id>' }),
-  call('get_dataset_info', { dataset_id: '<drees-pauvrete-id>' })
+  call('get_dataset_info', { dataset_id: '<insee-pauvrete-id>' }).catch(() => null),
+  call('get_dataset_info', { dataset_id: '<drees-pauvrete-id>' }).catch(() => null)
 ]);
-await widget('cards', { items: [{ title: a.title, subtitle: a.organization?.name }, { title: b.title, subtitle: b.organization?.name }] });
-await widget('kv', { items: [{ key: 'Licence', valueA: a.license, valueB: b.license }, { key: 'Fréquence', valueA: a.frequency, valueB: b.frequency }] });
+if (!a || !b) { await widget('text', { content: 'Datasets introuvables.' }); return; }
+await widget('cards', { items: [{ title: a.title ?? '—', subtitle: a.organization?.name ?? '' }, { title: b.title ?? '—', subtitle: b.organization?.name ?? '' }] });
+await widget('kv', { items: [{ key: 'Licence', valueA: a.license ?? '—', valueB: b.license ?? '—' }, { key: 'Fréquence', valueA: a.frequency ?? '—', valueB: b.frequency ?? '—' }] });
 ```
 
 ### Two versions of energy consumption
 ```js
 const [a, b] = await Promise.all([
-  call('get_dataset_info', { dataset_id: '<rte-conso-id>' }),
-  call('get_dataset_info', { dataset_id: '<sdes-conso-id>' })
+  call('get_dataset_info', { dataset_id: '<rte-conso-id>' }).catch(() => null),
+  call('get_dataset_info', { dataset_id: '<sdes-conso-id>' }).catch(() => null)
 ]);
+if (!a || !b) { await widget('text', { content: 'Datasets introuvables.' }); return; }
 const [mA, mB] = await Promise.all([
-  call('get_metrics', { dataset_id: a.id, limit: 12 }),
-  call('get_metrics', { dataset_id: b.id, limit: 12 })
+  call('get_metrics', { dataset_id: a.id, limit: 12 }).catch(() => ({ metrics: [] })),
+  call('get_metrics', { dataset_id: b.id, limit: 12 }).catch(() => ({ metrics: [] }))
 ]);
-await widget('chart', { type: 'bar', data: { labels: [a.title, b.title], values: [mA.metrics?.[0]?.monthly_download ?? 0, mB.metrics?.[0]?.monthly_download ?? 0] } });
+await widget('chart', { type: 'bar', data: { labels: [a.title ?? 'A', b.title ?? 'B'], values: [mA?.metrics?.[0]?.monthly_download ?? 0, mB?.metrics?.[0]?.monthly_download ?? 0] } });
 ```
 
 ## Common mistakes

@@ -32,23 +32,21 @@ const radius = 5; // km
 // 2. Nearby iNaturalist places (rough bounding box from radius)
 const dLat = radius / 110;
 const dLng = radius / (110 * Math.cos(lat * Math.PI / 180));
-const places = await call('nearby_places', {
-  swlat: lat - dLat, swlng: lng - dLng,
-  nelat: lat + dLat, nelng: lng + dLng,
-  per_page: 6,
-});
-
-// 3. Recent observations within the radius
-const obs = await call('search_observations', {
-  lat, lng, radius,
-  per_page: 60, quality_grade: 'research',
-});
-
-// 4. AI taxon suggestions for here-and-now
+const [places, obs, sugg] = await Promise.all([
+  call('nearby_places', {
+    swlat: lat - dLat, swlng: lng - dLng,
+    nelat: lat + dLat, nelng: lng + dLng,
+    per_page: 6,
+  }).catch(() => ({ results: [] })),
+  call('search_observations', {
+    lat, lng, radius,
+    per_page: 60, quality_grade: 'research',
+  }).catch(() => ({ results: [], total_results: 0 })),
+  call('taxon_suggestions', {
+    lat, lng, observed_on: new Date().toISOString().slice(0, 10), limit: 6,
+  }).catch(() => ({ results: [] })),
+]);
 const today = new Date().toISOString().slice(0, 10);
-const sugg = await call('taxon_suggestions', {
-  lat, lng, observed_on: today, limit: 6,
-});
 
 // 5. Render map (radius center + place markers + obs)
 await widget('map', {
@@ -56,36 +54,40 @@ await widget('map', {
   zoom: 13,
   markers: [
     { lat, lon: lng, label: 'You are here', popup: today },
-    ...places.results.map(p => ({
-      lat: Number(p.location?.split(',')[0]),
-      lon: Number(p.location?.split(',')[1]),
-      label: p.display_name,
-    })),
+    ...(places?.results ?? [])
+      .filter(p => p.location)
+      .map(p => {
+        const [pLat, pLng] = p.location.split(',').map(Number);
+        return { lat: pLat, lon: pLng, label: p.display_name ?? '' };
+      }),
   ],
 });
 
 // 6. Recent observations gallery
 await widget('gallery', {
-  images: obs.results.filter(o => o.photos?.length).slice(0, 12).map(o => ({
-    src: o.photos[0].url.replace('square', 'medium'),
-    caption: `${o.species_guess} — ${o.observed_on}`,
-  })),
+  images: (obs?.results ?? [])
+    .filter(o => o.photos?.length > 0 && o.photos[0]?.url)
+    .slice(0, 12)
+    .map(o => ({
+      src: o.photos[0].url.replace('square', 'medium'),
+      caption: `${o.species_guess ?? o.taxon?.name ?? 'Unknown'} — ${o.observed_on ?? '—'}`,
+    })),
 });
 
 // 7. AI suggestions cards
 await widget('cards', {
-  items: sugg.results.map(s => ({
-    title: s.taxon.preferred_common_name || s.taxon.name,
-    subtitle: s.taxon.name,
-    image: s.taxon.default_photo?.medium_url,
+  items: (sugg?.results ?? []).filter(s => s.taxon).map(s => ({
+    title: s.taxon?.preferred_common_name ?? s.taxon?.name ?? 'Unknown',
+    subtitle: s.taxon?.name ?? '',
+    image: s.taxon?.default_photo?.medium_url,
     description: `Frequency: ${s.frequency_score?.toFixed(2) ?? '—'}`,
   })),
 });
 
 // 8. Stats
-await widget('stat-card', { label: 'Places nearby', value: places.results.length, icon: 'map' });
-await widget('stat-card', { label: 'Recent obs', value: obs.total_results, icon: 'eye' });
-await widget('stat-card', { label: 'AI suggestions', value: sugg.results.length, icon: 'sparkles' });
+await widget('stat-card', { label: 'Places nearby', value: places?.results?.length ?? 0, icon: 'map' });
+await widget('stat-card', { label: 'Recent obs', value: obs?.total_results ?? 0, icon: 'eye' });
+await widget('stat-card', { label: 'AI suggestions', value: sugg?.results?.length ?? 0, icon: 'sparkles' });
 ```
 
 ## Examples
@@ -93,14 +95,14 @@ await widget('stat-card', { label: 'AI suggestions', value: sugg.results.length,
 ### Around a Nantes park
 ```js
 const lat = 47.21, lng = -1.55;
-const obs = await call('search_observations', { lat, lng, radius: 3, per_page: 30, quality_grade: 'research' });
-await widget('map', { center: [lat, lng], zoom: 14, markers: obs.results.map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0], label: o.species_guess })) });
+const obs = await call('search_observations', { lat, lng, radius: 3, per_page: 30, quality_grade: 'research' }).catch(() => ({ results: [] }));
+await widget('map', { center: [lat, lng], zoom: 14, markers: (obs?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0], label: o.species_guess ?? o.taxon?.name ?? '' })) });
 ```
 
 ### Trail suggestions in the Vosges
 ```js
-const sugg = await call('taxon_suggestions', { lat: 48.27, lng: 7.10, observed_on: '2025-06-12', limit: 8 });
-await widget('cards', { items: sugg.results.map(s => ({ title: s.taxon.preferred_common_name, subtitle: s.taxon.name, image: s.taxon.default_photo?.medium_url })) });
+const sugg = await call('taxon_suggestions', { lat: 48.27, lng: 7.10, observed_on: '2025-06-12', limit: 8 }).catch(() => ({ results: [] }));
+await widget('cards', { items: (sugg?.results ?? []).filter(s => s.taxon).map(s => ({ title: s.taxon?.preferred_common_name ?? s.taxon?.name ?? 'Unknown', subtitle: s.taxon?.name ?? '', image: s.taxon?.default_photo?.medium_url })) });
 ```
 
 ## Common mistakes

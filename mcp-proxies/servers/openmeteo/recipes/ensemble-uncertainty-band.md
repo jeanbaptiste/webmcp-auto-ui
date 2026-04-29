@@ -33,20 +33,31 @@ Indispensable au-dela de J+5. Le forecast deterministe seul est trompeur a long 
 
 ```js
 const geo = await call('geocoding', { name: 'Lille', count: 1 });
-const { latitude, longitude, timezone } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone } = place;
 
 const e = await call('ensemble_forecast', {
   latitude, longitude, timezone,
   hourly: ['temperature_2m', 'precipitation'],
   forecast_days: 14
-});
+}).catch(() => null);
+
+if (!e?.hourly?.time?.length) {
+  await widget('text', { content: 'Donnees ensemble indisponibles.' });
+  return;
+}
 
 // e.hourly contient temperature_2m_member01..N + temperature_2m (controle)
-const memberKeys = Object.keys(e.hourly).filter(k => k.startsWith('temperature_2m_member'));
-const N = e.hourly.time.length;
+const hourly = e.hourly;
+const memberKeys = Object.keys(hourly).filter(k => k.startsWith('temperature_2m_member'));
 
-const stats = e.hourly.time.map((t, i) => {
-  const vals = memberKeys.map(k => e.hourly[k][i]).filter(v => v != null);
+const stats = hourly.time.map((t, i) => {
+  const vals = memberKeys.map(k => hourly[k]?.[i]).filter(v => Number.isFinite(v));
+  if (vals.length === 0) return { time: t, min: null, max: null, median: null };
   const sorted = [...vals].sort((a, b) => a - b);
   return {
     time: t,
@@ -56,15 +67,17 @@ const stats = e.hourly.time.map((t, i) => {
   };
 });
 
-const precipKeys = Object.keys(e.hourly).filter(k => k.startsWith('precipitation_member'));
-const probRain5mm = e.hourly.time.map((_, i) => {
-  const vals = precipKeys.map(k => e.hourly[k][i]);
+const precipKeys = Object.keys(hourly).filter(k => k.startsWith('precipitation_member'));
+const probRain5mm = hourly.time.map((_, i) => {
+  const vals = precipKeys.map(k => hourly[k]?.[i]).filter(v => Number.isFinite(v));
+  if (vals.length === 0) return 0;
   return vals.filter(v => v > 5).length / vals.length * 100;
 });
 
-const maxSpread = Math.max(...stats.map(s => s.max - s.min));
-const idxMaxSpread = stats.findIndex(s => s.max - s.min === maxSpread);
-const peakRainProb = Math.max(...probRain5mm);
+const spreads = stats.filter(s => s.max != null && s.min != null).map(s => s.max - s.min);
+const maxSpread = spreads.length > 0 ? Math.max(...spreads) : 0;
+const idxMaxSpread = stats.findIndex(s => s.max != null && s.min != null && (s.max - s.min) === maxSpread);
+const peakRainProb = probRain5mm.length > 0 ? Math.max(...probRain5mm) : 0;
 
 await widget('chart-rich', {
   title: 'Temperature - bande d\'incertitude (ensemble)',
@@ -80,7 +93,7 @@ await widget('chart-rich', {
 await widget('stat-card', {
   items: [
     { label: 'Spread max', value: `${maxSpread.toFixed(1)} C`, icon: 'activity' },
-    { label: 'Pic incertitude', value: stats[idxMaxSpread].time.slice(0, 10), icon: 'calendar' },
+    { label: 'Pic incertitude', value: idxMaxSpread >= 0 ? stats[idxMaxSpread].time.slice(0, 10) : '—', icon: 'calendar' },
     { label: 'Prob. pluie > 5mm', value: `${peakRainProb.toFixed(0)}%`, icon: 'cloud-rain' }
   ]
 });

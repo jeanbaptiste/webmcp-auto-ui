@@ -25,53 +25,54 @@ layout:
 
 ```js
 // 1. Place + year
-const place = (await call('search_places', { q: 'France', per_page: 1 })).results[0];
+const place = (await call('search_places', { q: 'France', per_page: 1 }))?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Place not found.' });
+  return;
+}
 const year = 2025;
 const d1 = `${year}-01-01`, d2 = `${year}-12-31`;
 
-// 2. Headline counters
-const allObs = await call('search_observations', { place_id: place.id, d1, d2, per_page: 1, quality_grade: 'research' });
-
-// 3. Monthly histogram
-const hist = await call('observations_histogram', { place_id: place.id, d1, d2, interval: 'month', quality_grade: 'research' });
-
-// 4. Iconic group split
-const breakdown = await call('iconic_taxa_counts', { place_id: place.id, d1, d2, quality_grade: 'research' });
-
-// 5. Top contributors
-const board = await call('observers_leaderboard', { place_id: place.id, d1, d2, per_page: 5 });
-
-// 6. Best-of photos
-const best = await call('search_observations', { place_id: place.id, d1, d2, per_page: 30, quality_grade: 'research' });
+// 2. Aggregations in parallel
+const [allObs, hist, breakdown, board, best] = await Promise.all([
+  call('search_observations', { place_id: place.id, d1, d2, per_page: 1, quality_grade: 'research' }).catch(() => ({ total_results: 0 })),
+  call('observations_histogram', { place_id: place.id, d1, d2, interval: 'month', quality_grade: 'research' }).catch(() => ({ results: { month: {} } })),
+  call('iconic_taxa_counts', { place_id: place.id, d1, d2, quality_grade: 'research' }).catch(() => ({ results: [] })),
+  call('observers_leaderboard', { place_id: place.id, d1, d2, per_page: 5 }).catch(() => ({ results: [] })),
+  call('search_observations', { place_id: place.id, d1, d2, per_page: 30, quality_grade: 'research' }).catch(() => ({ results: [] })),
+]);
 
 // 7. Render KPIs
-const totalSpecies = breakdown.results.reduce((s, r) => s + r.count, 0);
-await widget('stat-card', { label: `Observations ${year}`, value: allObs.total_results, icon: 'eye' });
+const totalSpecies = (breakdown?.results ?? []).reduce((s, r) => s + (r.count ?? 0), 0);
+await widget('stat-card', { label: `Observations ${year}`, value: allObs?.total_results ?? 0, icon: 'eye' });
 await widget('stat-card', { label: 'Unique species', value: totalSpecies, icon: 'leaf' });
-await widget('stat-card', { label: 'Top contributor', value: board.results[0]?.user.login || '—', icon: 'star' });
-await widget('stat-card', { label: 'Place', value: place.display_name, icon: 'map' });
+await widget('stat-card', { label: 'Top contributor', value: board?.results?.[0]?.user?.login ?? '—', icon: 'star' });
+await widget('stat-card', { label: 'Place', value: place.display_name ?? '—', icon: 'map' });
 
 // 8. Monthly chart
+const monthData = hist?.results?.month ?? {};
 await widget('chart-rich', {
   type: 'bar',
-  title: `${place.display_name} — observations per month in ${year}`,
-  labels: Object.keys(hist.results.month),
-  data: Object.values(hist.results.month),
-  caption: `${allObs.total_results} research-grade observations across the year.`,
+  title: `${place.display_name ?? 'Region'} — observations per month in ${year}`,
+  labels: Object.keys(monthData),
+  data: Object.values(monthData),
+  caption: `${allObs?.total_results ?? 0} research-grade observations across the year.`,
 });
 
 // 9. Best-of gallery
 await widget('gallery', {
-  images: best.results.filter(o => o.photos?.length).map(o => ({
-    src: o.photos[0].url.replace('square', 'large'),
-    caption: `${o.species_guess} — ${o.observed_on}`,
-  })),
+  images: (best?.results ?? [])
+    .filter(o => o.photos?.length > 0 && o.photos[0]?.url)
+    .map(o => ({
+      src: o.photos[0].url.replace('square', 'large'),
+      caption: `${o.species_guess ?? o.taxon?.name ?? 'Unknown'} — ${o.observed_on ?? '—'}`,
+    })),
 });
 
 // 10. Contributor leaderboard
 await widget('table', {
   columns: ['Rank', 'User', 'Species', 'Observations'],
-  rows: board.results.map((r, i) => [i + 1, r.user.login, r.species_count, r.observation_count]),
+  rows: (board?.results ?? []).map((r, i) => [i + 1, r.user?.login ?? '—', r.species_count ?? 0, r.observation_count ?? 0]),
 });
 ```
 
@@ -79,16 +80,19 @@ await widget('table', {
 
 ### Belgium 2024
 ```js
-const place = (await call('search_places', { q: 'Belgium', per_page: 1 })).results[0];
-const hist = await call('observations_histogram', { place_id: place.id, d1: '2024-01-01', d2: '2024-12-31', interval: 'month' });
-await widget('chart-rich', { type: 'bar', labels: Object.keys(hist.results.month), data: Object.values(hist.results.month) });
+const place = (await call('search_places', { q: 'Belgium', per_page: 1 }))?.results?.[0];
+if (!place) { await widget('text', { content: 'Place not found.' }); return; }
+const hist = await call('observations_histogram', { place_id: place.id, d1: '2024-01-01', d2: '2024-12-31', interval: 'month' }).catch(() => ({ results: { month: {} } }));
+const m = hist?.results?.month ?? {};
+await widget('chart-rich', { type: 'bar', labels: Object.keys(m), data: Object.values(m) });
 ```
 
 ### Cevennes wrapped
 ```js
-const place = (await call('search_places', { q: 'Cévennes', per_page: 1 })).results[0];
-const board = await call('observers_leaderboard', { place_id: place.id, d1: '2025-01-01', d2: '2025-12-31', per_page: 10 });
-await widget('table', { columns: ['User', 'Species', 'Obs'], rows: board.results.map(r => [r.user.login, r.species_count, r.observation_count]) });
+const place = (await call('search_places', { q: 'Cévennes', per_page: 1 }))?.results?.[0];
+if (!place) { await widget('text', { content: 'Place not found.' }); return; }
+const board = await call('observers_leaderboard', { place_id: place.id, d1: '2025-01-01', d2: '2025-12-31', per_page: 10 }).catch(() => ({ results: [] }));
+await widget('table', { columns: ['User', 'Species', 'Obs'], rows: (board?.results ?? []).map(r => [r.user?.login ?? '—', r.species_count ?? 0, r.observation_count ?? 0]) });
 ```
 
 ## Common mistakes

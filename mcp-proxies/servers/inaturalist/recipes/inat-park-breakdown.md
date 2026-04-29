@@ -25,52 +25,51 @@ layout:
 
 ```js
 // 1. Resolve the park
-const place = (await call('search_places', { q: 'Cévennes National Park', per_page: 1 })).results[0];
+const place = (await call('search_places', { q: 'Cévennes National Park', per_page: 1 }))?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Park not found.' });
+  return;
+}
 
 // 2. Iconic taxa breakdown (Animalia, Plantae, Fungi, Aves, etc.)
-const breakdown = await call('iconic_taxa_counts', {
-  place_id: place.id,
-  quality_grade: 'research',
-});
+const [breakdown, top, obs] = await Promise.all([
+  call('iconic_taxa_counts', { place_id: place.id, quality_grade: 'research' }).catch(() => ({ results: [] })),
+  call('species_counts', { place_id: place.id, per_page: 12, quality_grade: 'research' }).catch(() => ({ results: [] })),
+  call('search_observations', { place_id: place.id, quality_grade: 'research', per_page: 24 }).catch(() => ({ results: [] })),
+]);
 
-// 3. Top species across the park
-const top = await call('species_counts', {
-  place_id: place.id, per_page: 12, quality_grade: 'research',
-});
-
-// 4. Gallery sample
-const obs = await call('search_observations', {
-  place_id: place.id, quality_grade: 'research', per_page: 24,
-});
+const breakdownResults = (breakdown?.results ?? []).filter(r => r.taxon);
 
 // 5. Pie chart of iconic groups
 await widget('chart-rich', {
   type: 'pie',
-  title: `${place.display_name} — biodiversity by group`,
-  labels: breakdown.results.map(r => r.taxon.preferred_common_name || r.taxon.name),
-  data: breakdown.results.map(r => r.count),
+  title: `${place.display_name ?? 'Park'} — biodiversity by group`,
+  labels: breakdownResults.map(r => r.taxon?.preferred_common_name ?? r.taxon?.name ?? 'Unknown'),
+  data: breakdownResults.map(r => r.count ?? 0),
   caption: 'Counts are unique species at research grade.',
 });
 
 // 6. Headline stats
-const total = breakdown.results.reduce((s, r) => s + r.count, 0);
-const dominant = breakdown.results.sort((a, b) => b.count - a.count)[0];
-await widget('stat-card', { label: 'Place', value: place.display_name, icon: 'map' });
+const total = breakdownResults.reduce((s, r) => s + (r.count ?? 0), 0);
+const dominant = [...breakdownResults].sort((a, b) => (b.count ?? 0) - (a.count ?? 0))[0];
+await widget('stat-card', { label: 'Place', value: place.display_name ?? '—', icon: 'map' });
 await widget('stat-card', { label: 'Total species', value: total, icon: 'leaf' });
-await widget('stat-card', { label: 'Dominant group', value: dominant.taxon.preferred_common_name || dominant.taxon.name, icon: 'star' });
+await widget('stat-card', { label: 'Dominant group', value: dominant?.taxon?.preferred_common_name ?? dominant?.taxon?.name ?? '—', icon: 'star' });
 
 // 7. Top species table
 await widget('table', {
   columns: ['Species', 'Common name', 'Observations'],
-  rows: top.results.map(r => [r.taxon.name, r.taxon.preferred_common_name || '—', r.count]),
+  rows: (top?.results ?? []).map(r => [r.taxon?.name ?? '—', r.taxon?.preferred_common_name ?? '—', r.count ?? 0]),
 });
 
 // 8. Photo gallery
 await widget('gallery', {
-  images: obs.results.filter(o => o.photos?.length).map(o => ({
-    src: o.photos[0].url.replace('square', 'medium'),
-    caption: o.species_guess,
-  })),
+  images: (obs?.results ?? [])
+    .filter(o => o.photos?.length > 0 && o.photos[0]?.url)
+    .map(o => ({
+      src: o.photos[0].url.replace('square', 'medium'),
+      caption: o.species_guess ?? o.taxon?.name ?? '',
+    })),
 });
 ```
 
@@ -78,16 +77,18 @@ await widget('gallery', {
 
 ### Écrins park breakdown
 ```js
-const place = (await call('search_places', { q: 'Écrins National Park', per_page: 1 })).results[0];
-const b = await call('iconic_taxa_counts', { place_id: place.id });
-await widget('chart-rich', { type: 'pie', labels: b.results.map(r => r.taxon.name), data: b.results.map(r => r.count) });
+const place = (await call('search_places', { q: 'Écrins National Park', per_page: 1 }))?.results?.[0];
+if (!place) { await widget('text', { content: 'Park not found.' }); return; }
+const b = await call('iconic_taxa_counts', { place_id: place.id }).catch(() => ({ results: [] }));
+await widget('chart-rich', { type: 'pie', labels: (b?.results ?? []).map(r => r.taxon?.name ?? 'Unknown'), data: (b?.results ?? []).map(r => r.count ?? 0) });
 ```
 
 ### Camargue split
 ```js
-const place = (await call('search_places', { q: 'Camargue', per_page: 1 })).results[0];
-const b = await call('iconic_taxa_counts', { place_id: place.id, quality_grade: 'research' });
-await widget('table', { columns: ['Group', 'Species'], rows: b.results.map(r => [r.taxon.preferred_common_name || r.taxon.name, r.count]) });
+const place = (await call('search_places', { q: 'Camargue', per_page: 1 }))?.results?.[0];
+if (!place) { await widget('text', { content: 'Place not found.' }); return; }
+const b = await call('iconic_taxa_counts', { place_id: place.id, quality_grade: 'research' }).catch(() => ({ results: [] }));
+await widget('table', { columns: ['Group', 'Species'], rows: (b?.results ?? []).map(r => [r.taxon?.preferred_common_name ?? r.taxon?.name ?? 'Unknown', r.count ?? 0]) });
 ```
 
 ## Common mistakes

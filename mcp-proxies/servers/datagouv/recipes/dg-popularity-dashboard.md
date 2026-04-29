@@ -28,11 +28,15 @@ This recipe is great for public communication and inter-agency benchmarking.
 1. **Fetch info, metrics, resources**:
    ```js
    const [info, metrics, resList] = await Promise.all([
-     call('get_dataset_info', { dataset_id }),
-     call('get_metrics', { dataset_id, limit: 24 }),
-     call('list_dataset_resources', { dataset_id })
+     call('get_dataset_info', { dataset_id }).catch(() => null),
+     call('get_metrics', { dataset_id, limit: 24 }).catch(() => ({ metrics: [] })),
+     call('list_dataset_resources', { dataset_id }).catch(() => ({ resources: [] }))
    ]);
-   const series = (metrics.metrics ?? []).slice().reverse(); // chronological
+   if (!info) {
+     await widget('text', { content: 'Dataset introuvable.' });
+     return;
+   }
+   const series = (metrics?.metrics ?? []).slice().reverse(); // chronological
    ```
 
 2. **Compute aggregates**:
@@ -60,15 +64,15 @@ This recipe is great for public communication and inter-agency benchmarking.
 
    await widget('table', {
      columns: ['Fichier', 'Format', 'Taille'],
-     rows: resList.resources.slice(0, 10).map(r => [r.title, r.format, r.size_human])
+     rows: (resList?.resources ?? []).slice(0, 10).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—'])
    });
 
    await widget('kv', {
      items: [
-       { key: 'Titre', value: info.title },
-       { key: 'Organisation', value: info.organization?.name },
-       { key: 'Licence', value: info.license },
-       { key: 'Fréquence', value: info.frequency }
+       { key: 'Titre', value: info.title ?? '—' },
+       { key: 'Organisation', value: info.organization?.name ?? '—' },
+       { key: 'Licence', value: info.license ?? '—' },
+       { key: 'Fréquence', value: info.frequency ?? '—' }
      ]
    });
    ```
@@ -78,22 +82,22 @@ This recipe is great for public communication and inter-agency benchmarking.
 ### DVF popularity
 ```js
 const dataset_id = '5cc1b94a634f4165e96436c1';
-const metrics = await call('get_metrics', { dataset_id, limit: 24 });
-const series = metrics.metrics.slice().reverse();
+const metrics = await call('get_metrics', { dataset_id, limit: 24 }).catch(() => ({ metrics: [] }));
+const series = (metrics?.metrics ?? []).slice().reverse();
 await widget('chart-rich', {
   type: 'area-stacked',
-  labels: series.map(m => m.month),
+  labels: series.map(m => m.month ?? '—'),
   series: [
-    { name: 'Visites', values: series.map(m => m.monthly_visit) },
-    { name: 'Téléchargements', values: series.map(m => m.monthly_download) }
+    { name: 'Visites', values: series.map(m => m.monthly_visit ?? 0) },
+    { name: 'Téléchargements', values: series.map(m => m.monthly_download ?? 0) }
   ]
 });
 ```
 
 ### RNA downloads this year
 ```js
-const metrics = await call('get_metrics', { dataset_id: '58e53811c751df03df38f42d', limit: 12 });
-const total = metrics.metrics.reduce((s, m) => s + (m.monthly_download ?? 0), 0);
+const metrics = await call('get_metrics', { dataset_id: '58e53811c751df03df38f42d', limit: 12 }).catch(() => ({ metrics: [] }));
+const total = (metrics?.metrics ?? []).reduce((s, m) => s + (m.monthly_download ?? 0), 0);
 await widget('stat-card', { label: 'Téléchargements 12 mois', value: total.toLocaleString('fr-FR') });
 ```
 

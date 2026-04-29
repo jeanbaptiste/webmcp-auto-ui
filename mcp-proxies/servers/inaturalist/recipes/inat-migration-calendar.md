@@ -25,9 +25,13 @@ layout:
 
 ```js
 // 1. Resolve species + place
-const t = (await call('search_taxa', { q: 'Grus grus', per_page: 1 })).results[0];
-const detail = await call('get_taxon', { id: t.id });
-const place = (await call('search_places', { q: 'France', per_page: 1 })).results[0];
+const t = (await call('search_taxa', { q: 'Grus grus', per_page: 1 }))?.results?.[0];
+const place = (await call('search_places', { q: 'France', per_page: 1 }))?.results?.[0];
+if (!t || !place) {
+  await widget('text', { content: 'Species or place not found.' });
+  return;
+}
+const detail = await call('get_taxon', { id: t.id }).catch(() => null);
 
 // 2. Weekly histogram
 const hist = await call('observations_histogram', {
@@ -35,16 +39,17 @@ const hist = await call('observations_histogram', {
   place_id: place.id,
   interval: 'week',
   quality_grade: 'research',
-});
+}).catch(() => ({ results: { week: {} } }));
 
 // 3. Recent observations (for hotspot map)
 const recent = await call('search_observations', {
   taxon_id: t.id, place_id: place.id,
   per_page: 200, quality_grade: 'research',
-});
+}).catch(() => ({ results: [], total_results: 0 }));
 
 // 4. Detect migration peaks (top 3 weeks)
-const weeks = Object.entries(hist.results.week)
+const weekObj = hist?.results?.week ?? {};
+const weeks = Object.entries(weekObj)
   .map(([k, v]) => ({ week: k, count: v }))
   .sort((a, b) => b.count - a.count);
 const peaks = weeks.slice(0, 3).sort((a, b) => a.week.localeCompare(b.week));
@@ -59,40 +64,45 @@ await widget('timeline', {
 });
 await widget('chart', {
   type: 'line',
-  title: `${detail.preferred_common_name || detail.name} — weekly observations`,
-  labels: Object.keys(hist.results.week),
-  data: Object.values(hist.results.week),
+  title: `${detail?.preferred_common_name ?? detail?.name ?? t.name ?? 'Species'} — weekly observations`,
+  labels: Object.keys(weekObj),
+  data: Object.values(weekObj),
 });
 await widget('map', {
   zoom: 6,
   cluster: true,
-  markers: recent.results.map(o => ({
-    lat: o.geojson.coordinates[1],
-    lon: o.geojson.coordinates[0],
-    label: o.observed_on,
-  })),
+  markers: (recent?.results ?? [])
+    .filter(o => o.geojson?.coordinates)
+    .map(o => ({
+      lat: o.geojson.coordinates[1],
+      lon: o.geojson.coordinates[0],
+      label: o.observed_on ?? '',
+    })),
 });
 await widget('stat-card', { label: 'Migration peaks', value: peaks.length, icon: 'trending-up' });
-await widget('stat-card', { label: 'Top week', value: peaks[0]?.week || '—', icon: 'calendar' });
-await widget('stat-card', { label: 'Total observations', value: recent.total_results, icon: 'eye' });
+await widget('stat-card', { label: 'Top week', value: peaks[0]?.week ?? '—', icon: 'calendar' });
+await widget('stat-card', { label: 'Total observations', value: recent?.total_results ?? 0, icon: 'eye' });
 ```
 
 ## Examples
 
 ### White stork in France
 ```js
-const t = (await call('search_taxa', { q: 'Ciconia ciconia', per_page: 1 })).results[0];
-const place = (await call('search_places', { q: 'France', per_page: 1 })).results[0];
-const hist = await call('observations_histogram', { taxon_id: t.id, place_id: place.id, interval: 'week' });
-await widget('chart', { type: 'line', labels: Object.keys(hist.results.week), data: Object.values(hist.results.week) });
+const t = (await call('search_taxa', { q: 'Ciconia ciconia', per_page: 1 }))?.results?.[0];
+const place = (await call('search_places', { q: 'France', per_page: 1 }))?.results?.[0];
+if (!t || !place) { await widget('text', { content: 'Species or place not found.' }); return; }
+const hist = await call('observations_histogram', { taxon_id: t.id, place_id: place.id, interval: 'week' }).catch(() => ({ results: { week: {} } }));
+const week = hist?.results?.week ?? {};
+await widget('chart', { type: 'line', labels: Object.keys(week), data: Object.values(week) });
 ```
 
 ### Bee-eater calendar
 ```js
-const t = (await call('search_taxa', { q: 'Merops apiaster', per_page: 1 })).results[0];
-const hist = await call('observations_histogram', { taxon_id: t.id, interval: 'week' });
-const obs = await call('search_observations', { taxon_id: t.id, per_page: 100, quality_grade: 'research' });
-await widget('map', { zoom: 4, cluster: true, markers: obs.results.map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })) });
+const t = (await call('search_taxa', { q: 'Merops apiaster', per_page: 1 }))?.results?.[0];
+if (!t) { await widget('text', { content: 'Species not found.' }); return; }
+const hist = await call('observations_histogram', { taxon_id: t.id, interval: 'week' }).catch(() => ({ results: { week: {} } }));
+const obs = await call('search_observations', { taxon_id: t.id, per_page: 100, quality_grade: 'research' }).catch(() => ({ results: [] }));
+await widget('map', { zoom: 4, cluster: true, markers: (obs?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })) });
 ```
 
 ## Common mistakes

@@ -38,19 +38,20 @@ const waypoints = [
   { name: 'Aoste', lat: 45.7372, lon: 7.3206 }
 ];
 
-const elev = await call('elevation', {
-  latitudes: waypoints.map(w => w.lat),
-  longitudes: waypoints.map(w => w.lon)
-});
-// elev.elevation -> [number]
-
-const meteos = await Promise.all(waypoints.map(w =>
-  call('weather_forecast', {
-    latitude: w.lat, longitude: w.lon,
-    current: ['temperature_2m', 'wind_speed_10m', 'wind_direction_10m'],
-    timezone: 'auto'
-  })
-));
+const [elev, meteos] = await Promise.all([
+  call('elevation', {
+    latitudes: waypoints.map(w => w.lat),
+    longitudes: waypoints.map(w => w.lon)
+  }).catch(() => null),
+  Promise.all(waypoints.map(w =>
+    call('weather_forecast', {
+      latitude: w.lat, longitude: w.lon,
+      current: ['temperature_2m', 'wind_speed_10m', 'wind_direction_10m'],
+      timezone: 'auto'
+    }).catch(() => null)
+  ))
+]);
+const elevations = elev?.elevation ?? waypoints.map(() => null);
 
 function haversine(a, b) {
   const R = 6371;
@@ -67,14 +68,18 @@ const distances = waypoints.map((w, i) => {
   return cum;
 });
 
+const centerWp = waypoints[Math.floor(waypoints.length / 2)] ?? waypoints[0];
 await widget('map', {
   title: 'Itineraire',
-  center: { lat: waypoints[1].lat, lng: waypoints[1].lon },
+  center: { lat: centerWp.lat, lng: centerWp.lon },
   zoom: 10,
-  markers: waypoints.map((w, i) => ({
-    lat: w.lat, lng: w.lon, label: w.name,
-    popup: `${w.name} - alt ${elev.elevation[i]}m, T ${meteos[i].current.temperature_2m}C`
-  })),
+  markers: waypoints.map((w, i) => {
+    const t = meteos[i]?.current?.temperature_2m;
+    return {
+      lat: w.lat, lng: w.lon, label: w.name,
+      popup: `${w.name} - alt ${elevations[i] ?? '—'}m, T ${Number.isFinite(t) ? t : '—'}C`
+    };
+  }),
   paths: [{ points: waypoints.map(w => [w.lat, w.lon]), color: '#e74c3c' }]
 });
 
@@ -82,19 +87,22 @@ await widget('chart-rich', {
   title: 'Profil d\'altitude',
   type: 'line',
   xAxis: { label: 'Distance (km)', data: distances.map(d => d.toFixed(1)) },
-  series: [{ label: 'Altitude (m)', data: elev.elevation, color: '#27ae60' }]
+  series: [{ label: 'Altitude (m)', data: elevations, color: '#27ae60' }]
 });
 
 await widget('table', {
   title: 'Meteo aux waypoints',
   columns: ['Point', 'Altitude (m)', 'T (C)', 'Vent (km/h)', 'Direction'],
-  rows: waypoints.map((w, i) => [
-    w.name,
-    elev.elevation[i],
-    meteos[i].current.temperature_2m.toFixed(1),
-    meteos[i].current.wind_speed_10m.toFixed(0),
-    `${meteos[i].current.wind_direction_10m}°`
-  ])
+  rows: waypoints.map((w, i) => {
+    const cur = meteos[i]?.current ?? {};
+    return [
+      w.name,
+      elevations[i] ?? '—',
+      Number.isFinite(cur.temperature_2m) ? cur.temperature_2m.toFixed(1) : '—',
+      Number.isFinite(cur.wind_speed_10m) ? cur.wind_speed_10m.toFixed(0) : '—',
+      cur.wind_direction_10m != null ? `${cur.wind_direction_10m}°` : '—'
+    ];
+  })
 });
 ```
 

@@ -33,29 +33,43 @@ Public croissant (prosumers PV) ; openmeteo expose des variables solaires riches
 
 ```js
 const geo = await call('geocoding', { name: 'Montpellier', count: 1 });
-const { latitude, longitude, timezone } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone } = place;
 
 const w = await call('weather_forecast', {
   latitude, longitude, timezone,
   hourly: ['shortwave_radiation', 'direct_radiation', 'diffuse_radiation', 'temperature_2m'],
   daily: ['sunshine_duration', 'shortwave_radiation_sum'],
   forecast_days: 5
-});
+}).catch(() => null);
 
-const dailyKWh = w.daily.shortwave_radiation_sum.map(v => (v / 1000).toFixed(2)); // MJ/m2 -> kWh/m2
-const totalKWh = w.daily.shortwave_radiation_sum.reduce((s, v) => s + v, 0) / 1000;
-const totalSunHours = w.daily.sunshine_duration.reduce((s, v) => s + v, 0) / 3600;
+if (!w?.daily?.time?.length) {
+  await widget('text', { content: 'Donnees solaires indisponibles.' });
+  return;
+}
+
+const radSums = (w.daily.shortwave_radiation_sum ?? []).filter(v => Number.isFinite(v));
+const sunDur = (w.daily.sunshine_duration ?? []).filter(v => Number.isFinite(v));
+const dailyKWh = radSums.map(v => v / 1000); // MJ/m2 -> kWh/m2 (selon convention)
+const totalKWh = dailyKWh.reduce((s, v) => s + v, 0);
+const totalSunHours = sunDur.reduce((s, v) => s + v, 0) / 3600;
 const optimalTilt = Math.round(latitude); // regle de pouce
 const optimalAzimuth = latitude > 0 ? 'Sud (180°)' : 'Nord (0°)';
+const bestIdx = dailyKWh.length > 0 ? dailyKWh.indexOf(Math.max(...dailyKWh)) : -1;
+const days = dailyKWh.length || 1;
 
 await widget('chart-rich', {
   title: 'Radiation solaire 5 jours - Montpellier',
   type: 'line',
-  xAxis: { label: 'Heure', data: w.hourly.time },
+  xAxis: { label: 'Heure', data: w.hourly?.time ?? [] },
   series: [
-    { label: 'Globale (W/m2)', data: w.hourly.shortwave_radiation, color: '#f39c12' },
-    { label: 'Directe', data: w.hourly.direct_radiation, color: '#e67e22' },
-    { label: 'Diffuse', data: w.hourly.diffuse_radiation, color: '#3498db' }
+    { label: 'Globale (W/m2)', data: w.hourly?.shortwave_radiation ?? [], color: '#f39c12' },
+    { label: 'Directe', data: w.hourly?.direct_radiation ?? [], color: '#e67e22' },
+    { label: 'Diffuse', data: w.hourly?.diffuse_radiation ?? [], color: '#3498db' }
   ]
 });
 
@@ -63,8 +77,8 @@ await widget('stat-card', {
   items: [
     { label: 'Energie 5j', value: `${totalKWh.toFixed(1)} kWh/m2`, icon: 'sun' },
     { label: 'Soleil cumule', value: `${totalSunHours.toFixed(1)} h`, icon: 'clock' },
-    { label: 'Meilleure journee', value: w.daily.time[dailyKWh.indexOf(Math.max(...dailyKWh.map(Number)).toFixed(2))] || w.daily.time[0], icon: 'star' },
-    { label: 'kWh/m2/jour moyen', value: `${(totalKWh / 5).toFixed(2)}`, icon: 'trending-up' }
+    { label: 'Meilleure journee', value: bestIdx >= 0 ? (w.daily.time?.[bestIdx] ?? '—') : '—', icon: 'star' },
+    { label: 'kWh/m2/jour moyen', value: `${(totalKWh / days).toFixed(2)}`, icon: 'trending-up' }
   ]
 });
 

@@ -28,35 +28,39 @@ This recipe condenses metadata + files + popularity into a single view so the us
 1. **Fetch dataset metadata, resources and metrics in parallel**:
    ```js
    const [info, resList, metrics] = await Promise.all([
-     call('get_dataset_info', { dataset_id }),
-     call('list_dataset_resources', { dataset_id }),
-     call('get_metrics', { dataset_id, limit: 12 })
+     call('get_dataset_info', { dataset_id }).catch(() => null),
+     call('list_dataset_resources', { dataset_id }).catch(() => ({ resources: [] })),
+     call('get_metrics', { dataset_id, limit: 12 }).catch(() => ({ metrics: [] }))
    ]);
+   if (!info) {
+     await widget('text', { content: 'Dataset introuvable.' });
+     return;
+   }
    ```
 
 2. **Render the profile**:
    ```js
    await widget('text', {
-     title: info.title,
-     subtitle: info.organization?.name,
-     content: info.description
+     title: info.title ?? '—',
+     subtitle: info.organization?.name ?? '',
+     content: info.description ?? ''
    });
 
-   const last30 = (metrics.metrics ?? []).slice(0, 1)[0] ?? {};
+   const last30 = (metrics?.metrics ?? [])[0] ?? {};
    await widget('stat-card', { label: 'Visites 30j', value: last30.monthly_visit ?? 0, icon: 'eye' });
    await widget('stat-card', { label: 'Téléchargements 30j', value: last30.monthly_download ?? 0, icon: 'download' });
-   await widget('stat-card', { label: 'Fichiers', value: resList.resources?.length ?? 0, icon: 'file' });
-   await widget('stat-card', { label: 'Licence', value: info.license, icon: 'shield' });
+   await widget('stat-card', { label: 'Fichiers', value: resList?.resources?.length ?? 0, icon: 'file' });
+   await widget('stat-card', { label: 'Licence', value: info.license ?? '—', icon: 'shield' });
 
    await widget('table', {
      columns: ['Titre', 'Format', 'Taille', 'MAJ'],
-     rows: (resList.resources ?? []).map(r => [r.title, r.format, r.size_human ?? r.filesize, r.last_modified])
+     rows: (resList?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? r.filesize ?? '—', r.last_modified ?? '—'])
    });
 
    await widget('timeline', {
-     items: (metrics.metrics ?? []).map(m => ({
-       date: m.month,
-       label: `${m.monthly_visit} visites · ${m.monthly_download} téléchargements`
+     items: (metrics?.metrics ?? []).map(m => ({
+       date: m.month ?? '—',
+       label: `${m.monthly_visit ?? 0} visites · ${m.monthly_download ?? 0} téléchargements`
      }))
    });
    ```
@@ -67,22 +71,24 @@ This recipe condenses metadata + files + popularity into a single view so the us
 ```js
 const dataset_id = '5cc1b94a634f4165e96436c1';
 const [info, resList, metrics] = await Promise.all([
-  call('get_dataset_info', { dataset_id }),
-  call('list_dataset_resources', { dataset_id }),
-  call('get_metrics', { dataset_id, limit: 12 })
+  call('get_dataset_info', { dataset_id }).catch(() => null),
+  call('list_dataset_resources', { dataset_id }).catch(() => ({ resources: [] })),
+  call('get_metrics', { dataset_id, limit: 12 }).catch(() => ({ metrics: [] }))
 ]);
-await widget('text', { title: info.title, content: info.description });
-await widget('stat-card', { label: 'Téléchargements 30j', value: metrics.metrics?.[0]?.monthly_download ?? 0 });
-await widget('table', { columns: ['Titre', 'Format', 'Taille'], rows: resList.resources.map(r => [r.title, r.format, r.size_human]) });
+if (!info) { await widget('text', { content: 'Dataset introuvable.' }); return; }
+await widget('text', { title: info.title ?? '—', content: info.description ?? '' });
+await widget('stat-card', { label: 'Téléchargements 30j', value: metrics?.metrics?.[0]?.monthly_download ?? 0 });
+await widget('table', { columns: ['Titre', 'Format', 'Taille'], rows: (resList?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—']) });
 ```
 
 ### RNA — Répertoire national des associations
 ```js
 const dataset_id = '58e53811c751df03df38f42d';
-const info = await call('get_dataset_info', { dataset_id });
-const resList = await call('list_dataset_resources', { dataset_id });
-await widget('text', { title: info.title, subtitle: info.organization?.name, content: info.description });
-await widget('table', { columns: ['Fichier', 'Format', 'MAJ'], rows: resList.resources.map(r => [r.title, r.format, r.last_modified]) });
+const info = await call('get_dataset_info', { dataset_id }).catch(() => null);
+const resList = await call('list_dataset_resources', { dataset_id }).catch(() => ({ resources: [] }));
+if (!info) { await widget('text', { content: 'Dataset introuvable.' }); return; }
+await widget('text', { title: info.title ?? '—', subtitle: info.organization?.name ?? '', content: info.description ?? '' });
+await widget('table', { columns: ['Fichier', 'Format', 'MAJ'], rows: (resList?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.last_modified ?? '—']) });
 ```
 
 ## Common mistakes

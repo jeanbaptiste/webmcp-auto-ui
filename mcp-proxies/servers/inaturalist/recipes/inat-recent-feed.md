@@ -29,41 +29,48 @@ const feed = await call('recent_taxa', {
   rank: 'species',
   quality_grade: 'research',
   per_page: 30,
-});
+}).catch(() => ({ results: [] }));
+
+const feedResults = feed?.results ?? [];
+if (feedResults.length === 0) {
+  await widget('text', { content: 'No recent activity.' });
+  return;
+}
 
 // 2. Sample observations for each taxon to populate the gallery
 const samples = await Promise.all(
-  feed.results.slice(0, 12).map(t =>
-    call('search_observations', { taxon_id: t.id, per_page: 1, quality_grade: 'research' }),
+  feedResults.slice(0, 12).map(t =>
+    call('search_observations', { taxon_id: t.id, per_page: 1, quality_grade: 'research' }).catch(() => ({ results: [] })),
   ),
 );
 
 // 3. Timeline of recent IDs
 await widget('timeline', {
-  events: feed.results.slice(0, 20).map(t => ({
-    title: t.preferred_common_name || t.name,
-    subtitle: t.name,
+  events: feedResults.slice(0, 20).map(t => ({
+    title: t.preferred_common_name ?? t.name ?? 'Unknown',
+    subtitle: t.name ?? '',
     icon: 'leaf',
     image: t.default_photo?.square_url,
-    meta: t.rank,
+    meta: t.rank ?? '',
   })),
 });
 
 // 4. Photo strip
 const images = samples
   .map((s, i) => {
-    const o = s.results?.[0];
-    if (!o?.photos?.length) return null;
+    const o = s?.results?.[0];
+    if (!o?.photos?.length || !o.photos[0]?.url) return null;
+    const t = feedResults[i];
     return {
       src: o.photos[0].url.replace('square', 'medium'),
-      caption: `${feed.results[i].preferred_common_name || feed.results[i].name} — ${o.place_guess}`,
+      caption: `${t?.preferred_common_name ?? t?.name ?? 'Unknown'} — ${o.place_guess ?? ''}`,
     };
   })
   .filter(Boolean);
 await widget('gallery', { images });
 
 // 5. Pace stats
-await widget('stat-card', { label: 'Recent species', value: feed.results.length, icon: 'sparkles' });
+await widget('stat-card', { label: 'Recent species', value: feedResults.length, icon: 'sparkles' });
 await widget('stat-card', { label: 'Quality grade', value: 'research', icon: 'check-circle' });
 await widget('stat-card', { label: 'Snapshot taken', value: new Date().toISOString().slice(0, 16).replace('T', ' '), icon: 'clock' });
 ```
@@ -72,14 +79,14 @@ await widget('stat-card', { label: 'Snapshot taken', value: new Date().toISOStri
 
 ### Latest fungi this week
 ```js
-const feed = await call('recent_taxa', { taxon_id: 47170, per_page: 20, rank: 'species' }); // 47170 = Fungi
-await widget('timeline', { events: feed.results.map(t => ({ title: t.preferred_common_name || t.name, subtitle: t.name, image: t.default_photo?.square_url })) });
+const feed = await call('recent_taxa', { taxon_id: 47170, per_page: 20, rank: 'species' }).catch(() => ({ results: [] })); // 47170 = Fungi
+await widget('timeline', { events: (feed?.results ?? []).map(t => ({ title: t.preferred_common_name ?? t.name ?? 'Unknown', subtitle: t.name ?? '', image: t.default_photo?.square_url })) });
 ```
 
 ### Live bird IDs
 ```js
-const feed = await call('recent_taxa', { taxon_id: 3, per_page: 15, quality_grade: 'research' });
-await widget('gallery', { images: feed.results.filter(t => t.default_photo).map(t => ({ src: t.default_photo.medium_url, caption: t.preferred_common_name })) });
+const feed = await call('recent_taxa', { taxon_id: 3, per_page: 15, quality_grade: 'research' }).catch(() => ({ results: [] }));
+await widget('gallery', { images: (feed?.results ?? []).filter(t => t.default_photo?.medium_url).map(t => ({ src: t.default_photo.medium_url, caption: t.preferred_common_name ?? t.name ?? '' })) });
 ```
 
 ## Common mistakes

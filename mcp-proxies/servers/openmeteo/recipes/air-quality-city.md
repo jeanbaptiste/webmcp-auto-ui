@@ -32,44 +32,61 @@ Critique pour asthmatiques, allergiques, parents jeunes enfants, personnes agees
 
 ```js
 const geo = await call('geocoding', { name: 'Lyon', count: 1 });
-const { latitude, longitude, timezone } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone } = place;
 
 const a = await call('air_quality', {
   latitude, longitude, timezone,
   current: ['european_aqi', 'pm2_5', 'pm10', 'ozone'],
   hourly: ['grass_pollen', 'birch_pollen', 'olive_pollen', 'ragweed_pollen', 'uv_index'],
   forecast_days: 5
-});
+}).catch(() => null);
 
-const aqi = a.current.european_aqi;
-const aqiLabel = aqi < 20 ? 'Bon' : aqi < 40 ? 'Correct' : aqi < 60 ? 'Moyen' : aqi < 80 ? 'Mauvais' : 'Tres mauvais';
+if (!a) {
+  await widget('text', { content: 'Donnees qualite de l\'air indisponibles.' });
+  return;
+}
+
+const aqi = a.current?.european_aqi ?? null;
+const aqiLabel = aqi == null ? '—' : aqi < 20 ? 'Bon' : aqi < 40 ? 'Correct' : aqi < 60 ? 'Moyen' : aqi < 80 ? 'Mauvais' : 'Tres mauvais';
 
 await widget('stat-card', {
   title: 'Qualite de l\'air - Lyon',
   items: [
-    { label: 'AQI europeen', value: `${aqi} (${aqiLabel})`, icon: 'wind' },
-    { label: 'PM2.5', value: `${a.current.pm2_5.toFixed(1)} ug/m3`, icon: 'circle' },
-    { label: 'PM10', value: `${a.current.pm10.toFixed(1)} ug/m3`, icon: 'circle' },
-    { label: 'Ozone', value: `${a.current.ozone.toFixed(0)} ug/m3`, icon: 'sun' }
+    { label: 'AQI europeen', value: aqi == null ? '—' : `${aqi} (${aqiLabel})`, icon: 'wind' },
+    { label: 'PM2.5', value: Number.isFinite(a.current?.pm2_5) ? `${a.current.pm2_5.toFixed(1)} ug/m3` : '—', icon: 'circle' },
+    { label: 'PM10', value: Number.isFinite(a.current?.pm10) ? `${a.current.pm10.toFixed(1)} ug/m3` : '—', icon: 'circle' },
+    { label: 'Ozone', value: Number.isFinite(a.current?.ozone) ? `${a.current.ozone.toFixed(0)} ug/m3` : '—', icon: 'sun' }
   ]
 });
 
+const hourly = a.hourly ?? {};
+const times = hourly.time ?? [];
 await widget('chart-rich', {
   title: 'Pollens sur 5 jours (grains/m3)',
   type: 'line',
-  xAxis: { label: 'Heure', data: a.hourly.time },
+  xAxis: { label: 'Heure', data: times },
   series: [
-    { label: 'Graminees', data: a.hourly.grass_pollen, color: '#27ae60' },
-    { label: 'Bouleau', data: a.hourly.birch_pollen, color: '#8e44ad' },
-    { label: 'Olivier', data: a.hourly.olive_pollen, color: '#f39c12' },
-    { label: 'Ambroisie', data: a.hourly.ragweed_pollen, color: '#c0392b' }
+    { label: 'Graminees', data: hourly.grass_pollen ?? [], color: '#27ae60' },
+    { label: 'Bouleau', data: hourly.birch_pollen ?? [], color: '#8e44ad' },
+    { label: 'Olivier', data: hourly.olive_pollen ?? [], color: '#f39c12' },
+    { label: 'Ambroisie', data: hourly.ragweed_pollen ?? [], color: '#c0392b' }
   ]
 });
 
-const uvNoon = a.hourly.uv_index.filter((_, i) => a.hourly.time[i].endsWith('T12:00')).slice(0, 5);
+const uvSeries = hourly.uv_index ?? [];
+const noonIdx = times.map((t, i) => t.endsWith('T12:00') ? i : -1).filter(i => i >= 0).slice(0, 5);
 await widget('kv', {
   title: 'UV index midi (5j)',
-  pairs: a.hourly.time.filter(t => t.endsWith('T12:00')).slice(0, 5).map((t, i) => [t.slice(0, 10), `${uvNoon[i]} (${uvNoon[i] < 3 ? 'faible' : uvNoon[i] < 6 ? 'modere' : uvNoon[i] < 8 ? 'fort' : 'tres fort'})`])
+  pairs: noonIdx.map(i => {
+    const v = uvSeries[i];
+    const label = !Number.isFinite(v) ? '—' : `${v} (${v < 3 ? 'faible' : v < 6 ? 'modere' : v < 8 ? 'fort' : 'tres fort'})`;
+    return [times[i].slice(0, 10), label];
+  })
 });
 ```
 

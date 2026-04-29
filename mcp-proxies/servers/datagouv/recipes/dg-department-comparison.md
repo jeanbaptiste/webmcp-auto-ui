@@ -28,9 +28,17 @@ These questions all share the same shape: one indicator, 101 departments, rankin
 1. **Find a per-department resource**:
    ```js
    const search = await call('search_datasets', { query: 'pauvreté département INSEE', page_size: 5 });
-   const dataset = search.datasets[0];
+   const dataset = search?.datasets?.[0];
+   if (!dataset) {
+     await widget('text', { content: 'Aucun dataset trouvé.' });
+     return;
+   }
    const resList = await call('list_dataset_resources', { dataset_id: dataset.id });
-   const csv = resList.resources.find(r => r.format === 'csv');
+   const csv = (resList?.resources ?? []).find(r => r.format === 'csv');
+   if (!csv) {
+     await widget('text', { content: 'Aucune ressource CSV.' });
+     return;
+   }
    ```
 
 2. **Fetch the indicator sorted descending**:
@@ -40,8 +48,12 @@ These questions all share the same shape: one indicator, 101 departments, rankin
      sort_column: 'taux_pauvrete',
      sort_direction: 'desc',
      page_size: 101
-   });
-   const rows = data.rows;
+   }).catch(() => ({ rows: [] }));
+   const rows = data?.rows ?? [];
+   if (rows.length === 0) {
+     await widget('text', { content: 'Aucune donnée.' });
+     return;
+   }
    ```
 
 3. **Render map + ranking**:
@@ -56,14 +68,14 @@ These questions all share the same shape: one indicator, 101 departments, rankin
 
    await widget('table', {
      columns: ['Rang', 'Département', 'Code', 'Valeur'],
-     rows: rows.slice(0, 10).map((r, i) => [i + 1, r.nom_departement, r.code_departement, r.taux_pauvrete])
+     rows: rows.slice(0, 10).map((r, i) => [i + 1, r.nom_departement ?? '—', r.code_departement ?? '—', r.taux_pauvrete ?? '—'])
    });
 
    await widget('chart', {
      type: 'bar',
      data: {
-       labels: rows.slice(0, 15).map(r => r.nom_departement),
-       values: rows.slice(0, 15).map(r => Number(r.taux_pauvrete))
+       labels: rows.slice(0, 15).map(r => r.nom_departement ?? '—'),
+       values: rows.slice(0, 15).map(r => Number(r.taux_pauvrete)).filter(Number.isFinite)
      },
      options: { xLabel: 'Département', yLabel: 'Taux %' }
    });
@@ -78,8 +90,8 @@ const data = await call('query_resource_data', {
   sort_column: 'taux_pauvrete',
   sort_direction: 'desc',
   page_size: 10
-});
-await widget('table', { columns: ['Département', 'Taux %'], rows: data.rows.map(r => [r.nom_departement, r.taux_pauvrete]) });
+}).catch(() => ({ rows: [] }));
+await widget('table', { columns: ['Département', 'Taux %'], rows: (data?.rows ?? []).map(r => [r.nom_departement ?? '—', r.taux_pauvrete ?? '—']) });
 ```
 
 ### Top 10 departments for renewable energy share
@@ -89,9 +101,10 @@ const data = await call('query_resource_data', {
   sort_column: 'part_enr',
   sort_direction: 'desc',
   page_size: 101
-});
-await widget('map', { mode: 'choropleth', geo_level: 'department', code_field: 'code_dep', value_field: 'part_enr', features: data.rows });
-await widget('chart', { type: 'bar', data: { labels: data.rows.slice(0, 10).map(r => r.nom_dep), values: data.rows.slice(0, 10).map(r => r.part_enr) } });
+}).catch(() => ({ rows: [] }));
+const rows = data?.rows ?? [];
+await widget('map', { mode: 'choropleth', geo_level: 'department', code_field: 'code_dep', value_field: 'part_enr', features: rows });
+await widget('chart', { type: 'bar', data: { labels: rows.slice(0, 10).map(r => r.nom_dep ?? '—'), values: rows.slice(0, 10).map(r => Number(r.part_enr)).filter(Number.isFinite) } });
 ```
 
 ## Common mistakes

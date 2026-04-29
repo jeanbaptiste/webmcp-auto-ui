@@ -29,49 +29,60 @@ const res = await call('search', {
   q: 'otter',
   sources: 'taxa,places,projects,users',
   per_page: 12,
-});
+}).catch(() => ({ results: [] }));
+
+const allResults = (res?.results ?? []).filter(r => r.record);
 
 // 2. Group results by source
 const groups = { taxa: [], places: [], projects: [], users: [] };
-for (const r of res.results) {
+for (const r of allResults) {
   if (groups[r.type]) groups[r.type].push(r);
+}
+
+if (allResults.length === 0) {
+  await widget('text', { content: 'No results.' });
+  return;
 }
 
 // 3. Render entity cards
 await widget('cards', {
-  items: res.results.slice(0, 8).map(r => ({
-    title: r.record.preferred_common_name || r.record.title || r.record.display_name || r.record.login,
-    subtitle: `${r.type} · ${r.record.name || r.record.slug || ''}`,
-    image: r.record.default_photo?.medium_url || r.record.icon || r.record.icon_url,
-    description: (r.record.wikipedia_summary || r.record.description || '').slice(0, 200),
+  items: allResults.slice(0, 8).map(r => ({
+    title: r.record?.preferred_common_name ?? r.record?.title ?? r.record?.display_name ?? r.record?.login ?? 'Unknown',
+    subtitle: `${r.type ?? ''} · ${r.record?.name ?? r.record?.slug ?? ''}`,
+    image: r.record?.default_photo?.medium_url ?? r.record?.icon ?? r.record?.icon_url,
+    description: (r.record?.wikipedia_summary ?? r.record?.description ?? '').slice(0, 200),
   })),
 });
 
 // 4. Hydrate the dominant taxon if any
 const topTaxon = groups.taxa[0];
-if (topTaxon) {
-  const detail = await call('get_taxon', { id: topTaxon.record.id });
-  await widget('kv', {
-    title: detail.preferred_common_name || detail.name,
-    items: {
-      'Scientific name': detail.name,
-      Rank: detail.rank,
-      Family: detail.ancestors?.find(a => a.rank === 'family')?.name,
-      'Conservation': detail.conservation_status?.status_name || 'LC',
-      'iNat observations': detail.observations_count,
-    },
-  });
+if (topTaxon?.record?.id) {
+  const detail = await call('get_taxon', { id: topTaxon.record.id }).catch(() => null);
+  if (detail) {
+    await widget('kv', {
+      title: detail.preferred_common_name ?? detail.name ?? 'Taxon',
+      items: {
+        'Scientific name': detail.name ?? '—',
+        Rank: detail.rank ?? '—',
+        Family: detail.ancestors?.find(a => a.rank === 'family')?.name ?? '—',
+        'Conservation': detail.conservation_status?.status_name ?? 'LC',
+        'iNat observations': detail.observations_count ?? 0,
+      },
+    });
 
-  // 5. Sample observations gallery
-  const obs = await call('search_observations', {
-    taxon_id: detail.id, per_page: 12, quality_grade: 'research',
-  });
-  await widget('gallery', {
-    images: obs.results.filter(o => o.photos?.length).map(o => ({
-      src: o.photos[0].url.replace('square', 'medium'),
-      caption: o.place_guess,
-    })),
-  });
+    // 5. Sample observations gallery
+    const obs = await call('search_observations', {
+      taxon_id: detail.id, per_page: 12, quality_grade: 'research',
+    }).catch(() => ({ results: [] }));
+    await widget('gallery', {
+      images: (obs?.results ?? [])
+        .filter(o => o.photos?.length > 0 && o.photos[0]?.url)
+        .map(o => ({
+          src: o.photos[0].url.replace('square', 'medium'),
+          caption: o.place_guess ?? '',
+        })),
+    });
+  }
 }
 ```
 
@@ -79,14 +90,14 @@ if (topTaxon) {
 
 ### Cevennes keyword
 ```js
-const res = await call('search', { q: 'cévennes', sources: 'places,projects', per_page: 8 });
-await widget('cards', { items: res.results.map(r => ({ title: r.record.display_name || r.record.title, subtitle: r.type, image: r.record.icon })) });
+const res = await call('search', { q: 'cévennes', sources: 'places,projects', per_page: 8 }).catch(() => ({ results: [] }));
+await widget('cards', { items: (res?.results ?? []).filter(r => r.record).map(r => ({ title: r.record?.display_name ?? r.record?.title ?? '—', subtitle: r.type ?? '', image: r.record?.icon })) });
 ```
 
 ### Eagle (taxa-focused)
 ```js
-const res = await call('search', { q: 'eagle', sources: 'taxa', per_page: 5 });
-await widget('cards', { items: res.results.map(r => ({ title: r.record.preferred_common_name, subtitle: r.record.name, image: r.record.default_photo?.medium_url })) });
+const res = await call('search', { q: 'eagle', sources: 'taxa', per_page: 5 }).catch(() => ({ results: [] }));
+await widget('cards', { items: (res?.results ?? []).filter(r => r.record).map(r => ({ title: r.record?.preferred_common_name ?? r.record?.name ?? '—', subtitle: r.record?.name ?? '', image: r.record?.default_photo?.medium_url })) });
 ```
 
 ## Common mistakes

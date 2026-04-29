@@ -33,7 +33,12 @@ Met en perspective la meteo actuelle face au climat de reference (typiquement 19
 
 ```js
 const geo = await call('geocoding', { name: 'Paris', count: 1 });
-const { latitude, longitude, timezone } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone } = place;
 
 // Periode actuelle : 16 prochains jours
 const today = new Date().toISOString().slice(0, 10);
@@ -46,46 +51,57 @@ const [now, archive] = await Promise.all([
     latitude, longitude, timezone,
     daily: ['temperature_2m_mean', 'temperature_2m_max', 'temperature_2m_min'],
     forecast_days: 16
-  }),
+  }).catch(() => null),
   call('weather_archive', {
     latitude, longitude, timezone,
     start_date: '1995-01-01',
     end_date: '2024-12-31',
     daily: ['temperature_2m_mean']
-  })
+  }).catch(() => null)
 ]);
+
+if (!now?.daily?.time?.length || !archive?.daily?.time?.length) {
+  await widget('text', { content: 'Donnees indisponibles (forecast ou archive).' });
+  return;
+}
 
 // Moyenne climatologique pour chaque MM-DD de la periode actuelle
 function dayKey(d) { return d.slice(5); } // MM-DD
 const climByDay = {};
-archive.daily.time.forEach((t, i) => {
+const archTimes = archive.daily.time ?? [];
+const archMeans = archive.daily.temperature_2m_mean ?? [];
+archTimes.forEach((t, i) => {
+  const v = archMeans[i];
+  if (!Number.isFinite(v)) return;
   const k = dayKey(t);
-  (climByDay[k] = climByDay[k] || []).push(archive.daily.temperature_2m_mean[i]);
+  (climByDay[k] = climByDay[k] || []).push(v);
 });
 
-const climSeries = now.daily.time.map(t => {
+const nowTimes = now.daily.time ?? [];
+const nowMeans = now.daily.temperature_2m_mean ?? [];
+const climSeries = nowTimes.map(t => {
   const arr = climByDay[dayKey(t)] || [];
-  return arr.reduce((s, v) => s + v, 0) / arr.length;
+  return arr.length > 0 ? arr.reduce((s, v) => s + v, 0) / arr.length : null;
 });
 
-const anomalies = now.daily.temperature_2m_mean.map((t, i) => t - climSeries[i]);
-const meanAnom = anomalies.reduce((s, v) => s + v, 0) / anomalies.length;
+const anomalies = nowMeans.map((t, i) => climSeries[i] != null && Number.isFinite(t) ? t - climSeries[i] : null).filter(v => v != null);
+const meanAnom = anomalies.length > 0 ? anomalies.reduce((s, v) => s + v, 0) / anomalies.length : 0;
 
 await widget('chart-rich', {
   title: 'Tmoy actuelle vs normale 1995-2024 - Paris',
   type: 'line',
-  xAxis: { label: 'Date', data: now.daily.time },
+  xAxis: { label: 'Date', data: nowTimes },
   series: [
-    { label: 'Tmoy actuelle (C)', data: now.daily.temperature_2m_mean, color: '#e74c3c' },
-    { label: 'Normale 30 ans (C)', data: climSeries.map(v => v.toFixed(2)), color: '#bdc3c7', dashed: true }
+    { label: 'Tmoy actuelle (C)', data: nowMeans, color: '#e74c3c' },
+    { label: 'Normale 30 ans (C)', data: climSeries.map(v => v == null ? null : Number(v.toFixed(2))), color: '#bdc3c7', dashed: true }
   ]
 });
 
 await widget('stat-card', {
   items: [
-    { label: 'Anomalie moyenne', value: `${meanAnom >= 0 ? '+' : ''}${meanAnom.toFixed(2)} C`, icon: 'trending-up' },
-    { label: 'Anomalie max', value: `${Math.max(...anomalies).toFixed(2)} C`, icon: 'flame' },
-    { label: 'Anomalie min', value: `${Math.min(...anomalies).toFixed(2)} C`, icon: 'snowflake' }
+    { label: 'Anomalie moyenne', value: anomalies.length > 0 ? `${meanAnom >= 0 ? '+' : ''}${meanAnom.toFixed(2)} C` : '—', icon: 'trending-up' },
+    { label: 'Anomalie max', value: anomalies.length > 0 ? `${Math.max(...anomalies).toFixed(2)} C` : '—', icon: 'flame' },
+    { label: 'Anomalie min', value: anomalies.length > 0 ? `${Math.min(...anomalies).toFixed(2)} C` : '—', icon: 'snowflake' }
   ]
 });
 

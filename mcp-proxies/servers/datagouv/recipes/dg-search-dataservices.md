@@ -27,16 +27,20 @@ The user is looking for a programmatic data source:
 
 1. **Search the dataservices catalog**:
    ```js
-   const res = await call('search_dataservices', { query: 'sirene', page_size: 20 });
-   const services = res.dataservices ?? [];
+   const res = await call('search_dataservices', { query: 'sirene', page_size: 20 }).catch(() => ({ dataservices: [] }));
+   const services = res?.dataservices ?? [];
+   if (services.length === 0) {
+     await widget('text', { content: 'Aucune API trouvée.' });
+     return;
+   }
    ```
 
 2. **Render**:
    ```js
    await widget('cards', {
      items: services.map(s => ({
-       title: s.title,
-       subtitle: s.organization?.name,
+       title: s.title ?? '—',
+       subtitle: s.organization?.name ?? '',
        description: (s.description ?? '').slice(0, 180),
        href: s.base_api_url,
        badge: s.machine_documentation_url ? 'OpenAPI' : 'sans spec'
@@ -45,7 +49,7 @@ The user is looking for a programmatic data source:
 
    await widget('table', {
      columns: ['API', 'Org.', 'Licence', 'OpenAPI', 'MAJ'],
-     rows: services.map(s => [s.title, s.organization?.name, s.license, s.machine_documentation_url ? '✓' : '—', s.last_modified])
+     rows: services.map(s => [s.title ?? '—', s.organization?.name ?? '—', s.license ?? '—', s.machine_documentation_url ? '✓' : '—', s.last_modified ?? '—'])
    });
 
    const withSpec = services.filter(s => s.machine_documentation_url).length;
@@ -58,20 +62,20 @@ The user is looking for a programmatic data source:
 
 ### Find SIRENE APIs
 ```js
-const res = await call('search_dataservices', { query: 'sirene', page_size: 10 });
-await widget('cards', { items: res.dataservices.map(s => ({ title: s.title, subtitle: s.organization?.name, href: s.base_api_url })) });
+const res = await call('search_dataservices', { query: 'sirene', page_size: 10 }).catch(() => ({ dataservices: [] }));
+await widget('cards', { items: (res?.dataservices ?? []).map(s => ({ title: s.title ?? '—', subtitle: s.organization?.name ?? '', href: s.base_api_url })) });
 ```
 
 ### Find an address API
 ```js
-const res = await call('search_dataservices', { query: 'adresse', page_size: 10 });
-await widget('table', { columns: ['API', 'Org.', 'OpenAPI'], rows: res.dataservices.map(s => [s.title, s.organization?.name, s.machine_documentation_url ? '✓' : '—']) });
+const res = await call('search_dataservices', { query: 'adresse', page_size: 10 }).catch(() => ({ dataservices: [] }));
+await widget('table', { columns: ['API', 'Org.', 'OpenAPI'], rows: (res?.dataservices ?? []).map(s => [s.title ?? '—', s.organization?.name ?? '—', s.machine_documentation_url ? '✓' : '—']) });
 ```
 
 ### Postal codes API
 ```js
-const res = await call('search_dataservices', { query: 'code postal', page_size: 10 });
-await widget('cards', { items: res.dataservices.map(s => ({ title: s.title, subtitle: s.organization?.name, description: s.description?.slice(0, 200) })) });
+const res = await call('search_dataservices', { query: 'code postal', page_size: 10 }).catch(() => ({ dataservices: [] }));
+await widget('cards', { items: (res?.dataservices ?? []).map(s => ({ title: s.title ?? '—', subtitle: s.organization?.name ?? '', description: s.description?.slice(0, 200) ?? '' })) });
 ```
 
 ## Common mistakes

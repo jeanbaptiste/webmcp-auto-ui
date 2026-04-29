@@ -25,65 +25,68 @@ layout:
 
 ```js
 // 1. Resolve the place if the user named one
-const places = await call('search_places', { q: 'Brittany', per_page: 1 });
-const place = places.results[0];
+const places = await call('search_places', { q: 'Brittany', per_page: 1 }).catch(() => ({ results: [] }));
+const place = places?.results?.[0];
 
 // 2. Leaderboard (ranked by species count by default for diversity)
-const board = await call('observers_leaderboard', {
-  place_id: place?.id,
-  taxon_name: 'Aves',
-  order_by: 'species_count',
-  per_page: 10,
-});
+const [board, obs] = await Promise.all([
+  call('observers_leaderboard', { place_id: place?.id, taxon_name: 'Aves', order_by: 'species_count', per_page: 10 }).catch(() => ({ results: [] })),
+  call('search_observations', { place_id: place?.id, taxon_name: 'Aves', per_page: 1 }).catch(() => ({ total_results: 0 })),
+]);
 
-// 3. Aggregate stats over the whole region/taxon
-const obs = await call('search_observations', {
-  place_id: place?.id, taxon_name: 'Aves', per_page: 1,
-});
+const boardResults = board?.results ?? [];
+
+if (boardResults.length === 0) {
+  await widget('text', { content: 'No observers found for this area/taxon.' });
+  return;
+}
 
 // 4. Render leaderboard
 await widget('table', {
   columns: ['Rank', 'Observer', 'Species', 'Observations'],
-  rows: board.results.map((row, i) => [
+  rows: boardResults.map((row, i) => [
     i + 1,
-    row.user.login,
-    row.species_count,
-    row.observation_count,
+    row.user?.login ?? '—',
+    row.species_count ?? 0,
+    row.observation_count ?? 0,
   ]),
 });
 
 // 5. Stat cards
-await widget('stat-card', { label: 'Total observations', value: obs.total_results, icon: 'eye' });
-await widget('stat-card', { label: 'Top observer', value: board.results[0].user.login, icon: 'star' });
-await widget('stat-card', { label: '#1 species count', value: board.results[0].species_count, icon: 'leaf' });
+await widget('stat-card', { label: 'Total observations', value: obs?.total_results ?? 0, icon: 'eye' });
+await widget('stat-card', { label: 'Top observer', value: boardResults[0].user?.login ?? '—', icon: 'star' });
+await widget('stat-card', { label: '#1 species count', value: boardResults[0].species_count ?? 0, icon: 'leaf' });
 
 // 6. Profile of the #1 contributor
-const champ = board.results[0].user;
-await widget('profile', {
-  title: champ.name || champ.login,
-  subtitle: '@' + champ.login,
-  image: champ.icon_url,
-  fields: {
-    'Species observed': board.results[0].species_count,
-    Observations: board.results[0].observation_count,
-    Joined: champ.created_at?.slice(0, 10),
-  },
-});
+const champ = boardResults[0].user;
+if (champ) {
+  await widget('profile', {
+    title: champ.name ?? champ.login ?? 'Observer',
+    subtitle: '@' + (champ.login ?? '—'),
+    image: champ.icon_url,
+    fields: {
+      'Species observed': boardResults[0].species_count ?? 0,
+      Observations: boardResults[0].observation_count ?? 0,
+      Joined: champ.created_at?.slice(0, 10) ?? '—',
+    },
+  });
+}
 ```
 
 ## Examples
 
 ### Top 10 mammal observers in Switzerland
 ```js
-const place = (await call('search_places', { q: 'Switzerland', per_page: 1 })).results[0];
-const board = await call('observers_leaderboard', { place_id: place.id, taxon_name: 'Mammalia', per_page: 10 });
-await widget('table', { columns: ['Rank', 'User', 'Species', 'Obs.'], rows: board.results.map((r, i) => [i + 1, r.user.login, r.species_count, r.observation_count]) });
+const place = (await call('search_places', { q: 'Switzerland', per_page: 1 }))?.results?.[0];
+if (!place) { await widget('text', { content: 'Place not found.' }); return; }
+const board = await call('observers_leaderboard', { place_id: place.id, taxon_name: 'Mammalia', per_page: 10 }).catch(() => ({ results: [] }));
+await widget('table', { columns: ['Rank', 'User', 'Species', 'Obs.'], rows: (board?.results ?? []).map((r, i) => [i + 1, r.user?.login ?? '—', r.species_count ?? 0, r.observation_count ?? 0]) });
 ```
 
 ### World leaderboard for sharks
 ```js
-const board = await call('observers_leaderboard', { taxon_name: 'Selachimorpha', order_by: 'observation_count', per_page: 20 });
-await widget('table', { columns: ['Rank', 'User', 'Obs.'], rows: board.results.map((r, i) => [i + 1, r.user.login, r.observation_count]) });
+const board = await call('observers_leaderboard', { taxon_name: 'Selachimorpha', order_by: 'observation_count', per_page: 20 }).catch(() => ({ results: [] }));
+await widget('table', { columns: ['Rank', 'User', 'Obs.'], rows: (board?.results ?? []).map((r, i) => [i + 1, r.user?.login ?? '—', r.observation_count ?? 0]) });
 ```
 
 ## Common mistakes

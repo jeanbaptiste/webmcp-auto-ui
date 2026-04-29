@@ -32,7 +32,12 @@ Indispensable au-dela de J+5 ou en situation meteo tendue.
 
 ```js
 const geo = await call('geocoding', { name: 'Megeve', count: 1 });
-const { latitude, longitude, timezone } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone } = place;
 
 const args = {
   latitude, longitude, timezone,
@@ -41,54 +46,58 @@ const args = {
 };
 
 const [ecmwf, gfs, icon, mf] = await Promise.all([
-  call('ecmwf_forecast', args),
-  call('gfs_forecast', args),
-  call('dwd_icon_forecast', args),
-  call('meteofrance_forecast', args)
+  call('ecmwf_forecast', args).catch(() => null),
+  call('gfs_forecast', args).catch(() => null),
+  call('dwd_icon_forecast', args).catch(() => null),
+  call('meteofrance_forecast', args).catch(() => null)
 ]);
 
-const days = ecmwf.daily.time;
+const models = [
+  { name: 'ECMWF', data: ecmwf, color: '#e74c3c' },
+  { name: 'GFS', data: gfs, color: '#3498db' },
+  { name: 'ICON', data: icon, color: '#27ae60' },
+  { name: 'Meteo-France', data: mf, color: '#9b59b6' }
+].filter(m => m.data?.daily?.time?.length);
+
+if (models.length === 0) {
+  await widget('text', { content: 'Aucun modele disponible.' });
+  return;
+}
+
+const days = models[0].data.daily.time ?? [];
 const spreads = days.map((_, i) => {
-  const vals = [
-    ecmwf.daily.temperature_2m_max[i],
-    gfs.daily.temperature_2m_max[i],
-    icon.daily.temperature_2m_max[i],
-    mf.daily.temperature_2m_max[i]
-  ];
+  const vals = models.map(m => m.data.daily.temperature_2m_max?.[i]).filter(v => Number.isFinite(v));
+  if (vals.length < 2) return 0;
   return Math.max(...vals) - Math.min(...vals);
 });
 
-const maxSpread = Math.max(...spreads);
+const maxSpread = spreads.length > 0 ? Math.max(...spreads) : 0;
 const verdict = maxSpread < 2 ? 'Forte concordance' : maxSpread < 4 ? 'Concordance moyenne' : 'Forte divergence';
 
 await widget('chart-rich', {
-  title: 'Tmax 7j - 4 modeles compares',
+  title: 'Tmax 7j - modeles compares',
   type: 'line',
   xAxis: { label: 'Date', data: days },
-  series: [
-    { label: 'ECMWF', data: ecmwf.daily.temperature_2m_max, color: '#e74c3c' },
-    { label: 'GFS', data: gfs.daily.temperature_2m_max, color: '#3498db' },
-    { label: 'ICON', data: icon.daily.temperature_2m_max, color: '#27ae60' },
-    { label: 'Meteo-France', data: mf.daily.temperature_2m_max, color: '#9b59b6' }
-  ]
+  series: models.map(m => ({ label: m.name, data: m.data.daily.temperature_2m_max ?? [], color: m.color }))
 });
 
 await widget('table', {
   title: 'Ecart max entre modeles (C)',
   columns: ['Date', 'Spread Tmax', 'Min', 'Max'],
   rows: days.map((t, i) => {
-    const vals = [ecmwf.daily.temperature_2m_max[i], gfs.daily.temperature_2m_max[i],
-                  icon.daily.temperature_2m_max[i], mf.daily.temperature_2m_max[i]];
+    const vals = models.map(m => m.data.daily.temperature_2m_max?.[i]).filter(v => Number.isFinite(v));
+    if (vals.length === 0) return [t, '—', '—', '—'];
     return [t, spreads[i].toFixed(1), Math.min(...vals).toFixed(1), Math.max(...vals).toFixed(1)];
   })
 });
 
+const idxMax = spreads.indexOf(maxSpread);
 await widget('kv', {
   title: 'Consensus',
   pairs: [
     ['Verdict', verdict],
     ['Ecart max sur 7j', `${maxSpread.toFixed(1)} C`],
-    ['Jour le plus incertain', days[spreads.indexOf(maxSpread)]]
+    ['Jour le plus incertain', idxMax >= 0 ? (days[idxMax] ?? '—') : '—']
   ]
 });
 ```

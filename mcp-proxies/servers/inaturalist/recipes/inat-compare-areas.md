@@ -25,41 +25,47 @@ layout:
 
 ```js
 // 1. Resolve both places
-const a = (await call('search_places', { q: 'Camargue', per_page: 1 })).results[0];
-const b = (await call('search_places', { q: 'Brenne', per_page: 1 })).results[0];
+const a = (await call('search_places', { q: 'Camargue', per_page: 1 }))?.results?.[0];
+const b = (await call('search_places', { q: 'Brenne', per_page: 1 }))?.results?.[0];
+if (!a || !b) {
+  await widget('text', { content: 'One or both places not found.' });
+  return;
+}
 
 // 2. Top species per area for the same clade
 const [topA, topB] = await Promise.all([
-  call('species_counts', { place_id: a.id, taxon_name: 'Aves', per_page: 50 }),
-  call('species_counts', { place_id: b.id, taxon_name: 'Aves', per_page: 50 }),
+  call('species_counts', { place_id: a.id, taxon_name: 'Aves', per_page: 50 }).catch(() => ({ results: [], total_results: 0 })),
+  call('species_counts', { place_id: b.id, taxon_name: 'Aves', per_page: 50 }).catch(() => ({ results: [], total_results: 0 })),
 ]);
-const namesA = new Set(topA.results.map(r => r.taxon.name));
-const namesB = new Set(topB.results.map(r => r.taxon.name));
+const namesA = new Set((topA?.results ?? []).map(r => r.taxon?.name).filter(Boolean));
+const namesB = new Set((topB?.results ?? []).map(r => r.taxon?.name).filter(Boolean));
 const shared = [...namesA].filter(n => namesB.has(n));
 const onlyA = [...namesA].filter(n => !namesB.has(n));
 const onlyB = [...namesB].filter(n => !namesA.has(n));
 
 // 3. Observations sample for each map
 const [obsA, obsB] = await Promise.all([
-  call('search_observations', { place_id: a.id, taxon_name: 'Aves', per_page: 80, quality_grade: 'research' }),
-  call('search_observations', { place_id: b.id, taxon_name: 'Aves', per_page: 80, quality_grade: 'research' }),
+  call('search_observations', { place_id: a.id, taxon_name: 'Aves', per_page: 80, quality_grade: 'research' }).catch(() => ({ results: [] })),
+  call('search_observations', { place_id: b.id, taxon_name: 'Aves', per_page: 80, quality_grade: 'research' }).catch(() => ({ results: [] })),
 ]);
 
 // 4. Render comparison chart
 await widget('chart', {
   type: 'bar',
-  labels: [a.display_name, b.display_name],
-  data: [topA.total_results, topB.total_results],
+  labels: [a.display_name ?? 'Area A', b.display_name ?? 'Area B'],
+  data: [topA?.total_results ?? 0, topB?.total_results ?? 0],
   title: 'Species count (Aves)',
 });
 
 // 5. Maps side-by-side
-await widget('map', { center: [a.location?.split(',').map(Number)[0], a.location?.split(',').map(Number)[1]], zoom: 9, markers: obsA.results.map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })), title: a.display_name });
-await widget('map', { center: [b.location?.split(',').map(Number)[0], b.location?.split(',').map(Number)[1]], zoom: 9, markers: obsB.results.map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })), title: b.display_name });
+const locA = a.location?.split(',').map(Number) ?? [];
+const locB = b.location?.split(',').map(Number) ?? [];
+await widget('map', { center: [locA[0], locA[1]], zoom: 9, markers: (obsA?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })), title: a.display_name ?? '' });
+await widget('map', { center: [locB[0], locB[1]], zoom: 9, markers: (obsB?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })), title: b.display_name ?? '' });
 
 // 6. Stats
-await widget('stat-card', { label: a.display_name, value: topA.total_results + ' species', icon: 'leaf' });
-await widget('stat-card', { label: b.display_name, value: topB.total_results + ' species', icon: 'leaf' });
+await widget('stat-card', { label: a.display_name ?? 'Area A', value: (topA?.total_results ?? 0) + ' species', icon: 'leaf' });
+await widget('stat-card', { label: b.display_name ?? 'Area B', value: (topB?.total_results ?? 0) + ' species', icon: 'leaf' });
 await widget('stat-card', { label: 'Shared species', value: shared.length, icon: 'shuffle' });
 
 // 7. Shared / exclusive table
@@ -67,8 +73,8 @@ await widget('table', {
   columns: ['Species', 'Status'],
   rows: [
     ...shared.slice(0, 10).map(s => [s, 'shared']),
-    ...onlyA.slice(0, 5).map(s => [s, `only ${a.display_name}`]),
-    ...onlyB.slice(0, 5).map(s => [s, `only ${b.display_name}`]),
+    ...onlyA.slice(0, 5).map(s => [s, `only ${a.display_name ?? 'A'}`]),
+    ...onlyB.slice(0, 5).map(s => [s, `only ${b.display_name ?? 'B'}`]),
   ],
 });
 ```
@@ -77,24 +83,26 @@ await widget('table', {
 
 ### Sologne vs Dombes
 ```js
-const a = (await call('search_places', { q: 'Sologne', per_page: 1 })).results[0];
-const b = (await call('search_places', { q: 'Dombes', per_page: 1 })).results[0];
+const a = (await call('search_places', { q: 'Sologne', per_page: 1 }))?.results?.[0];
+const b = (await call('search_places', { q: 'Dombes', per_page: 1 }))?.results?.[0];
+if (!a || !b) { await widget('text', { content: 'Place not found.' }); return; }
 const [ca, cb] = await Promise.all([
-  call('species_counts', { place_id: a.id, taxon_name: 'Aves', per_page: 1 }),
-  call('species_counts', { place_id: b.id, taxon_name: 'Aves', per_page: 1 }),
+  call('species_counts', { place_id: a.id, taxon_name: 'Aves', per_page: 1 }).catch(() => ({ total_results: 0 })),
+  call('species_counts', { place_id: b.id, taxon_name: 'Aves', per_page: 1 }).catch(() => ({ total_results: 0 })),
 ]);
-await widget('chart', { type: 'bar', labels: [a.display_name, b.display_name], data: [ca.total_results, cb.total_results] });
+await widget('chart', { type: 'bar', labels: [a.display_name ?? 'A', b.display_name ?? 'B'], data: [ca?.total_results ?? 0, cb?.total_results ?? 0] });
 ```
 
 ### Pyrenees vs Alps orchids
 ```js
-const a = (await call('search_places', { q: 'Pyrenees', per_page: 1 })).results[0];
-const b = (await call('search_places', { q: 'Alps', per_page: 1 })).results[0];
+const a = (await call('search_places', { q: 'Pyrenees', per_page: 1 }))?.results?.[0];
+const b = (await call('search_places', { q: 'Alps', per_page: 1 }))?.results?.[0];
+if (!a || !b) { await widget('text', { content: 'Place not found.' }); return; }
 const [ca, cb] = await Promise.all([
-  call('species_counts', { place_id: a.id, taxon_name: 'Orchidaceae' }),
-  call('species_counts', { place_id: b.id, taxon_name: 'Orchidaceae' }),
+  call('species_counts', { place_id: a.id, taxon_name: 'Orchidaceae' }).catch(() => ({ total_results: 0 })),
+  call('species_counts', { place_id: b.id, taxon_name: 'Orchidaceae' }).catch(() => ({ total_results: 0 })),
 ]);
-await widget('table', { columns: ['Place', 'Orchid species'], rows: [[a.display_name, ca.total_results], [b.display_name, cb.total_results]] });
+await widget('table', { columns: ['Place', 'Orchid species'], rows: [[a.display_name ?? 'A', ca?.total_results ?? 0], [b.display_name ?? 'B', cb?.total_results ?? 0]] });
 ```
 
 ## Common mistakes

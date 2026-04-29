@@ -33,29 +33,45 @@ Aide a la decision concrete pour jardiniers, marachers, viticulteurs.
 
 ```js
 const geo = await call('geocoding', { name: 'Toulouse', count: 1 });
-const { latitude, longitude, timezone } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone } = place;
 
 const w = await call('weather_forecast', {
   latitude, longitude, timezone,
   daily: ['temperature_2m_min', 'precipitation_sum', 'et0_fao_evapotranspiration', 'uv_index_max', 'wind_speed_10m_max'],
   forecast_days: 7
-});
+}).catch(() => null);
+
+if (!w?.daily?.time?.length) {
+  await widget('text', { content: 'Donnees meteo indisponibles.' });
+  return;
+}
 
 const d = w.daily;
-const frostNights = d.temperature_2m_min.filter(t => t < 0).length;
-const totalRain = d.precipitation_sum.reduce((s, v) => s + v, 0);
-const totalETP = d.et0_fao_evapotranspiration.reduce((s, v) => s + v, 0);
+const tmin = (d.temperature_2m_min ?? []).filter(v => Number.isFinite(v));
+const rain = (d.precipitation_sum ?? []).filter(v => Number.isFinite(v));
+const etpArr = (d.et0_fao_evapotranspiration ?? []).filter(v => Number.isFinite(v));
+const uvArr = (d.uv_index_max ?? []).filter(v => Number.isFinite(v));
+const wndArr = (d.wind_speed_10m_max ?? []).filter(v => Number.isFinite(v));
+
+const frostNights = tmin.filter(t => t < 0).length;
+const totalRain = rain.reduce((s, v) => s + v, 0);
+const totalETP = etpArr.reduce((s, v) => s + v, 0);
 const deficit = totalETP - totalRain;
 let dryRun = 0, maxDryRun = 0;
-d.precipitation_sum.forEach(p => { if (p < 0.5) { dryRun++; maxDryRun = Math.max(maxDryRun, dryRun); } else dryRun = 0; });
+rain.forEach(p => { if (p < 0.5) { dryRun++; maxDryRun = Math.max(maxDryRun, dryRun); } else dryRun = 0; });
 
 const advice = [];
 if (frostNights > 0) advice.push(`Gel prevu ${frostNights} nuit(s) -- proteger plants sensibles`);
 if (deficit > 10) advice.push(`Deficit hydrique ${deficit.toFixed(1)}mm -- arroser`);
 else if (totalRain > 30) advice.push(`Pluie abondante ${totalRain.toFixed(1)}mm -- pas besoin d'arroser`);
 if (maxDryRun >= 3) advice.push(`${maxDryRun}j consecutifs sans pluie -- fenetre de traitement OK`);
-if (Math.max(...d.uv_index_max) >= 8) advice.push('UV intense -- traiter tot matin ou soir');
-if (Math.max(...d.wind_speed_10m_max) > 30) advice.push('Vent fort prevu -- eviter pulverisation');
+if (uvArr.length > 0 && Math.max(...uvArr) >= 8) advice.push('UV intense -- traiter tot matin ou soir');
+if (wndArr.length > 0 && Math.max(...wndArr) > 30) advice.push('Vent fort prevu -- eviter pulverisation');
 
 await widget('stat-card', {
   title: 'Jardin / agriculture - 7 jours',
@@ -70,11 +86,11 @@ await widget('stat-card', {
 await widget('chart-rich', {
   title: 'Tmin nocturne et precipitations',
   type: 'line',
-  xAxis: { label: 'Date', data: d.time },
+  xAxis: { label: 'Date', data: d.time ?? [] },
   series: [
-    { label: 'Tmin (C)', data: d.temperature_2m_min, color: '#3498db' },
-    { label: 'Pluie (mm)', data: d.precipitation_sum, type: 'bar', color: '#27ae60' },
-    { label: 'Seuil gel', data: d.time.map(() => 0), color: '#e74c3c', dashed: true }
+    { label: 'Tmin (C)', data: d.temperature_2m_min ?? [], color: '#3498db' },
+    { label: 'Pluie (mm)', data: d.precipitation_sum ?? [], type: 'bar', color: '#27ae60' },
+    { label: 'Seuil gel', data: (d.time ?? []).map(() => 0), color: '#e74c3c', dashed: true }
   ]
 });
 

@@ -32,24 +32,37 @@ layout:
 ```js
 const cities = ['Paris', 'Bordeaux', 'Strasbourg', 'Marseille'];
 
-const geos = await Promise.all(cities.map(c => call('geocoding', { name: c, count: 1 })));
-const points = geos.map(g => g.results[0]);
+const geos = await Promise.all(cities.map(c => call('geocoding', { name: c, count: 1 }).catch(() => null)));
+const points = geos.map(g => g?.results?.[0]).filter(Boolean);
+
+if (points.length === 0) {
+  await widget('text', { content: 'Aucune ville trouvee.' });
+  return;
+}
 
 const meteos = await Promise.all(points.map(p => call('weather_forecast', {
   latitude: p.latitude, longitude: p.longitude, timezone: p.timezone,
   current_weather: true,
   daily: ['precipitation_sum'],
   forecast_days: 1
-})));
+}).catch(() => null)));
 
-const data = points.map((p, i) => ({
-  name: p.name,
-  lat: p.latitude,
-  lng: p.longitude,
-  temp: meteos[i].current_weather.temperature,
-  wind: meteos[i].current_weather.windspeed,
-  rain: meteos[i].daily.precipitation_sum[0]
-}));
+const data = points.map((p, i) => {
+  const m = meteos[i];
+  return {
+    name: p.name ?? '—',
+    lat: p.latitude,
+    lng: p.longitude,
+    temp: m?.current_weather?.temperature,
+    wind: m?.current_weather?.windspeed,
+    rain: m?.daily?.precipitation_sum?.[0]
+  };
+}).filter(d => Number.isFinite(d.temp));
+
+if (data.length === 0) {
+  await widget('text', { content: 'Donnees meteo indisponibles pour les villes demandees.' });
+  return;
+}
 
 const center = {
   lat: data.reduce((s, d) => s + d.lat, 0) / data.length,
@@ -61,25 +74,26 @@ await widget('map', {
   center, zoom: 6,
   markers: data.map(d => ({
     lat: d.lat, lng: d.lng, label: d.name,
-    popup: `${d.name} : ${d.temp}C, vent ${d.wind} km/h, pluie 24h ${d.rain} mm`
+    popup: `${d.name} : ${d.temp}C, vent ${d.wind ?? '—'} km/h, pluie 24h ${d.rain ?? '—'} mm`
   }))
 });
 
 const hottest = data.reduce((a, b) => a.temp > b.temp ? a : b);
 const coldest = data.reduce((a, b) => a.temp < b.temp ? a : b);
-const wettest = data.reduce((a, b) => a.rain > b.rain ? a : b);
+const withRain = data.filter(d => Number.isFinite(d.rain));
+const wettest = withRain.length > 0 ? withRain.reduce((a, b) => a.rain > b.rain ? a : b) : null;
 
 await widget('stat-card', {
   items: [
     { label: 'Plus chaude', value: `${hottest.name} (${hottest.temp}C)`, icon: 'sun' },
     { label: 'Plus froide', value: `${coldest.name} (${coldest.temp}C)`, icon: 'snowflake' },
-    { label: 'Plus pluvieuse', value: `${wettest.name} (${wettest.rain}mm)`, icon: 'cloud-rain' }
+    { label: 'Plus pluvieuse', value: wettest ? `${wettest.name} (${wettest.rain}mm)` : '—', icon: 'cloud-rain' }
   ]
 });
 
 await widget('table', {
   columns: ['Ville', 'T (C)', 'Vent (km/h)', 'Pluie 24h (mm)'],
-  rows: data.map(d => [d.name, d.temp, d.wind, d.rain.toFixed(1)])
+  rows: data.map(d => [d.name, d.temp, d.wind ?? '—', Number.isFinite(d.rain) ? d.rain.toFixed(1) : '—'])
 });
 ```
 

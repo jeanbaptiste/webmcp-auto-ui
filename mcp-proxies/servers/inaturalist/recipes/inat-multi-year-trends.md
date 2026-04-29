@@ -25,51 +25,57 @@ layout:
 
 ```js
 // 1. Resolve the species
-const t = (await call('search_taxa', { q: 'Vespa velutina', per_page: 1 })).results[0];
-const detail = await call('get_taxon', { id: t.id });
+const t = (await call('search_taxa', { q: 'Vespa velutina', per_page: 1 }))?.results?.[0];
+if (!t) {
+  await widget('text', { content: 'Species not found.' });
+  return;
+}
+const detail = await call('get_taxon', { id: t.id }).catch(() => null);
 
 // 2. Place context (optional but improves trend signal)
-const place = (await call('search_places', { q: 'France', per_page: 1 })).results[0];
+const place = (await call('search_places', { q: 'France', per_page: 1 }))?.results?.[0];
 
 // 3. Annual histogram (10-year window)
 const hist = await call('observations_histogram', {
-  taxon_id: t.id, place_id: place.id,
+  taxon_id: t.id, place_id: place?.id,
   interval: 'year',
   d1: '2015-01-01', d2: '2025-12-31',
-});
+}).catch(() => ({ results: { year: {} } }));
 
 // 4. Recent observations for the map
 const recent = await call('search_observations', {
-  taxon_id: t.id, place_id: place.id,
+  taxon_id: t.id, place_id: place?.id,
   d1: '2024-01-01',
   per_page: 200, quality_grade: 'research',
-});
+}).catch(() => ({ results: [], total_results: 0 }));
 
 // 5. Render the trend
-const years = Object.entries(hist.results.year).sort((a, b) => Number(a[0]) - Number(b[0]));
+const years = Object.entries(hist?.results?.year ?? {}).sort((a, b) => Number(a[0]) - Number(b[0]));
 const first = years[0]?.[1] ?? 0;
 const last = years.at(-1)?.[1] ?? 0;
 const growth = first ? Math.round(((last - first) / first) * 100) : 0;
 await widget('chart-rich', {
   type: 'bar',
-  title: `${detail.preferred_common_name || detail.name} — annual observations in ${place.display_name}`,
+  title: `${detail?.preferred_common_name ?? detail?.name ?? t.name ?? 'Species'} — annual observations in ${place?.display_name ?? 'region'}`,
   labels: years.map(([y]) => y),
   data: years.map(([, n]) => n),
-  caption: `${growth >= 0 ? '+' : ''}${growth}% from ${years[0][0]} to ${years.at(-1)[0]}.`,
+  caption: years.length > 1 ? `${growth >= 0 ? '+' : ''}${growth}% from ${years[0][0]} to ${years.at(-1)[0]}.` : 'Insufficient data for a trend.',
 });
 await widget('map', {
   zoom: 6,
   cluster: true,
-  markers: recent.results.map(o => ({
-    lat: o.geojson.coordinates[1],
-    lon: o.geojson.coordinates[0],
-    label: o.place_guess,
-  })),
+  markers: (recent?.results ?? [])
+    .filter(o => o.geojson?.coordinates)
+    .map(o => ({
+      lat: o.geojson.coordinates[1],
+      lon: o.geojson.coordinates[0],
+      label: o.place_guess ?? '',
+    })),
 });
 await widget('stat-card', { label: 'Trend (10 yrs)', value: `${growth >= 0 ? '+' : ''}${growth}%`, icon: 'trending-up' });
-await widget('stat-card', { label: 'Recent obs (1y)', value: recent.total_results, icon: 'eye' });
+await widget('stat-card', { label: 'Recent obs (1y)', value: recent?.total_results ?? 0, icon: 'eye' });
 await widget('text', {
-  content: detail.wikipedia_summary
+  content: detail?.wikipedia_summary
     ? detail.wikipedia_summary.slice(0, 400) + '…'
     : 'No Wikipedia summary available.',
 });
@@ -79,17 +85,21 @@ await widget('text', {
 
 ### Pine processionary moth in France
 ```js
-const t = (await call('search_taxa', { q: 'Thaumetopoea pityocampa', per_page: 1 })).results[0];
-const place = (await call('search_places', { q: 'France', per_page: 1 })).results[0];
-const hist = await call('observations_histogram', { taxon_id: t.id, place_id: place.id, interval: 'year', d1: '2010-01-01' });
-await widget('chart-rich', { type: 'bar', labels: Object.keys(hist.results.year), data: Object.values(hist.results.year) });
+const t = (await call('search_taxa', { q: 'Thaumetopoea pityocampa', per_page: 1 }))?.results?.[0];
+const place = (await call('search_places', { q: 'France', per_page: 1 }))?.results?.[0];
+if (!t || !place) { await widget('text', { content: 'Species or place not found.' }); return; }
+const hist = await call('observations_histogram', { taxon_id: t.id, place_id: place.id, interval: 'year', d1: '2010-01-01' }).catch(() => ({ results: { year: {} } }));
+const yr = hist?.results?.year ?? {};
+await widget('chart-rich', { type: 'bar', labels: Object.keys(yr), data: Object.values(yr) });
 ```
 
 ### Otter recovery
 ```js
-const t = (await call('search_taxa', { q: 'Lutra lutra', per_page: 1 })).results[0];
-const hist = await call('observations_histogram', { taxon_id: t.id, interval: 'year', d1: '2015-01-01' });
-await widget('chart-rich', { type: 'line', labels: Object.keys(hist.results.year), data: Object.values(hist.results.year) });
+const t = (await call('search_taxa', { q: 'Lutra lutra', per_page: 1 }))?.results?.[0];
+if (!t) { await widget('text', { content: 'Species not found.' }); return; }
+const hist = await call('observations_histogram', { taxon_id: t.id, interval: 'year', d1: '2015-01-01' }).catch(() => ({ results: { year: {} } }));
+const yr = hist?.results?.year ?? {};
+await widget('chart-rich', { type: 'line', labels: Object.keys(yr), data: Object.values(yr) });
 ```
 
 ## Common mistakes

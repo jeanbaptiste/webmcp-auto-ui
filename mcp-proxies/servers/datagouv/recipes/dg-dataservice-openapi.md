@@ -28,34 +28,41 @@ This recipe is the "dev landing page" for a public API.
 1. **Fetch info + OpenAPI spec**:
    ```js
    const [info, spec] = await Promise.all([
-     call('get_dataservice_info', { dataservice_id }),
-     call('get_dataservice_openapi_spec', { dataservice_id })
+     call('get_dataservice_info', { dataservice_id }).catch(() => null),
+     call('get_dataservice_openapi_spec', { dataservice_id }).catch(() => null)
    ]);
+   if (!info) {
+     await widget('text', { content: 'Dataservice introuvable.' });
+     return;
+   }
    ```
 
 2. **Render**:
    ```js
    await widget('text', {
-     title: info.title,
-     subtitle: info.organization?.name,
-     content: info.description
+     title: info.title ?? '—',
+     subtitle: info.organization?.name ?? '',
+     content: info.description ?? ''
    });
 
+   const endpoints = spec?.endpoints ?? [];
    await widget('table', {
      columns: ['Méthode', 'Path', 'Description', 'Auth'],
-     rows: spec.endpoints.map(e => [e.method, e.path, e.summary ?? '—', e.security ? '🔒' : '—'])
+     rows: endpoints.map(e => [e.method ?? '—', e.path ?? '—', e.summary ?? '—', e.security ? '🔒' : '—'])
    });
 
-   const sample = spec.endpoints[0];
-   const curl = `curl -X ${sample.method} '${info.base_api_url}${sample.path}' \\\n  -H 'Accept: application/json'`;
-   await widget('code', { language: 'bash', code: curl });
+   const sample = endpoints[0];
+   if (sample) {
+     const curl = `curl -X ${sample.method ?? 'GET'} '${info.base_api_url ?? ''}${sample.path ?? ''}' \\\n  -H 'Accept: application/json'`;
+     await widget('code', { language: 'bash', code: curl });
+   }
 
    await widget('cards', {
-     items: (spec.common_errors ?? [
+     items: (spec?.common_errors ?? [
        { code: 401, message: 'Token manquant ou invalide' },
        { code: 429, message: 'Quota dépassé — backoff exponentiel' },
        { code: 503, message: 'Service indisponible — retry' }
-     ]).map(e => ({ title: `${e.code}`, description: e.message }))
+     ]).map(e => ({ title: `${e.code}`, description: e.message ?? '' }))
    });
    ```
 
@@ -64,22 +71,24 @@ This recipe is the "dev landing page" for a public API.
 ### SIRENE API by INSEE
 ```js
 const [info, spec] = await Promise.all([
-  call('get_dataservice_info', { dataservice_id: '<sirene-dataservice-id>' }),
-  call('get_dataservice_openapi_spec', { dataservice_id: '<sirene-dataservice-id>' })
+  call('get_dataservice_info', { dataservice_id: '<sirene-dataservice-id>' }).catch(() => null),
+  call('get_dataservice_openapi_spec', { dataservice_id: '<sirene-dataservice-id>' }).catch(() => null)
 ]);
-await widget('text', { title: info.title, content: info.description });
-await widget('table', { columns: ['Méthode', 'Path', 'Description'], rows: spec.endpoints.map(e => [e.method, e.path, e.summary]) });
-await widget('code', { language: 'bash', code: `curl '${info.base_api_url}/siret/12345678900012' -H 'Authorization: Bearer YOUR_TOKEN'` });
+if (!info) { await widget('text', { content: 'Dataservice introuvable.' }); return; }
+await widget('text', { title: info.title ?? '—', content: info.description ?? '' });
+await widget('table', { columns: ['Méthode', 'Path', 'Description'], rows: (spec?.endpoints ?? []).map(e => [e.method ?? '—', e.path ?? '—', e.summary ?? '—']) });
+await widget('code', { language: 'bash', code: `curl '${info.base_api_url ?? ''}/siret/12345678900012' -H 'Authorization: Bearer YOUR_TOKEN'` });
 ```
 
 ### adresse.data.gouv.fr API
 ```js
 const [info, spec] = await Promise.all([
-  call('get_dataservice_info', { dataservice_id: '<adresse-dataservice-id>' }),
-  call('get_dataservice_openapi_spec', { dataservice_id: '<adresse-dataservice-id>' })
+  call('get_dataservice_info', { dataservice_id: '<adresse-dataservice-id>' }).catch(() => null),
+  call('get_dataservice_openapi_spec', { dataservice_id: '<adresse-dataservice-id>' }).catch(() => null)
 ]);
-await widget('table', { columns: ['Méthode', 'Path'], rows: spec.endpoints.map(e => [e.method, e.path]) });
-await widget('code', { language: 'bash', code: `curl '${info.base_api_url}/search/?q=8+rue+de+la+paix+Paris'` });
+if (!info) { await widget('text', { content: 'Dataservice introuvable.' }); return; }
+await widget('table', { columns: ['Méthode', 'Path'], rows: (spec?.endpoints ?? []).map(e => [e.method ?? '—', e.path ?? '—']) });
+await widget('code', { language: 'bash', code: `curl '${info.base_api_url ?? ''}/search/?q=8+rue+de+la+paix+Paris'` });
 ```
 
 ## Common mistakes

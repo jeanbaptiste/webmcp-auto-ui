@@ -37,34 +37,37 @@ const obs = await call('search_observations', {
 });
 
 // 2. Map markers (replace "square" thumbnail with "medium" for better photos)
-const markers = obs.results.map(o => ({
-  lat: o.geojson.coordinates[1],
-  lon: o.geojson.coordinates[0],
-  label: o.species_guess || o.taxon?.preferred_common_name,
-  popup: `${o.species_guess} — ${o.observed_on}`,
-}));
+const results = obs?.results ?? [];
+const markers = results
+  .filter(o => o.geojson?.coordinates)
+  .map(o => ({
+    lat: o.geojson.coordinates[1],
+    lon: o.geojson.coordinates[0],
+    label: o.species_guess ?? o.taxon?.preferred_common_name ?? o.taxon?.name ?? '',
+    popup: `${o.species_guess ?? o.taxon?.name ?? 'Unknown'} — ${o.observed_on ?? '—'}`,
+  }));
 await widget('map', { center: [48.8566, 2.3522], zoom: 12, markers, cluster: true });
 
 // 3. Stat cards
-const species = new Set(obs.results.map(o => o.taxon?.id).filter(Boolean));
-const observers = new Set(obs.results.map(o => o.user?.id).filter(Boolean));
-await widget('stat-card', { label: 'Observations', value: obs.total_results, icon: 'eye' });
+const species = new Set(results.map(o => o.taxon?.id).filter(Boolean));
+const observers = new Set(results.map(o => o.user?.id).filter(Boolean));
+await widget('stat-card', { label: 'Observations', value: obs?.total_results ?? 0, icon: 'eye' });
 await widget('stat-card', { label: 'Unique species', value: species.size, icon: 'leaf' });
 await widget('stat-card', { label: 'Observers', value: observers.size, icon: 'users' });
 
 // 4. Photo gallery (medium-sized thumbnails)
-const images = obs.results
-  .filter(o => o.photos?.length)
+const images = results
+  .filter(o => o.photos?.length > 0 && o.photos[0]?.url)
   .map(o => ({
     src: o.photos[0].url.replace('square', 'medium'),
-    alt: o.species_guess,
-    caption: `${o.place_guess} — ${o.observed_on}`,
+    alt: o.species_guess ?? '',
+    caption: `${o.place_guess ?? ''} — ${o.observed_on ?? '—'}`,
   }));
 await widget('gallery', { images });
 
 // 5. Species summary table
 const counts = {};
-for (const o of obs.results) {
+for (const o of results) {
   const k = o.taxon?.name; if (!k) continue;
   counts[k] = (counts[k] || 0) + 1;
 }
@@ -83,7 +86,7 @@ const obs = await call('search_observations', {
   lat: 48.8566, lng: 2.3522, radius: 10,
   taxon_name: 'Aves', quality_grade: 'research', per_page: 100,
 });
-await widget('map', { center: [48.8566, 2.3522], zoom: 12, markers: obs.results.map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0], label: o.species_guess })) });
+await widget('map', { center: [48.8566, 2.3522], zoom: 12, markers: (obs?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0], label: o.species_guess ?? o.taxon?.name ?? '' })) });
 ```
 
 ### Butterflies around Chamonix
@@ -92,13 +95,13 @@ const obs = await call('search_observations', {
   lat: 45.9237, lng: 6.8694, radius: 30,
   taxon_name: 'Lepidoptera', per_page: 100,
 });
-await widget('map', { center: [45.9237, 6.8694], zoom: 10, cluster: true, markers: obs.results.map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0], label: o.species_guess })) });
+await widget('map', { center: [45.9237, 6.8694], zoom: 10, cluster: true, markers: (obs?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0], label: o.species_guess ?? o.taxon?.name ?? '' })) });
 ```
 
 ### Reptiles around Montpellier
 ```js
 const obs = await call('search_observations', { lat: 43.6, lng: 3.9, radius: 20, taxon_name: 'Reptilia', per_page: 80 });
-await widget('gallery', { images: obs.results.filter(o => o.photos?.length).map(o => ({ src: o.photos[0].url.replace('square', 'medium'), caption: o.species_guess })) });
+await widget('gallery', { images: (obs?.results ?? []).filter(o => o.photos?.length > 0 && o.photos[0]?.url).map(o => ({ src: o.photos[0].url.replace('square', 'medium'), caption: o.species_guess ?? o.taxon?.name ?? '' })) });
 ```
 
 ## Common mistakes

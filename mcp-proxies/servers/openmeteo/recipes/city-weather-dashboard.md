@@ -32,7 +32,12 @@ Cette recette remplace 3 onglets d'une app meteo classique : KPI actuels, courbe
 
 ```js
 const geo = await call('geocoding', { name: 'Lille', count: 1 });
-const { latitude, longitude, timezone } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone } = place;
 
 const w = await call('weather_forecast', {
   latitude, longitude, timezone,
@@ -40,18 +45,25 @@ const w = await call('weather_forecast', {
   hourly: ['temperature_2m', 'precipitation', 'wind_speed_10m', 'relative_humidity_2m'],
   daily: ['sunrise', 'sunset', 'uv_index_max', 'precipitation_sum'],
   forecast_days: 2
-});
+}).catch(() => null);
 
-const cur = w.current_weather;
-const hourly48 = w.hourly.time.slice(0, 48);
+if (!w) {
+  await widget('text', { content: 'Donnees meteo indisponibles.' });
+  return;
+}
+
+const cur = w.current_weather ?? {};
+const hourly = w.hourly ?? {};
+const daily = w.daily ?? {};
+const hourly48 = (hourly.time ?? []).slice(0, 48);
 
 await widget('stat-card', {
   title: 'Meteo actuelle - Lille',
   items: [
-    { label: 'Temperature', value: `${cur.temperature}C`, icon: 'thermometer' },
-    { label: 'Vent', value: `${cur.windspeed} km/h`, icon: 'wind' },
-    { label: 'Humidite', value: `${w.hourly.relative_humidity_2m[0]}%`, icon: 'droplets' },
-    { label: 'Pluie 24h', value: `${w.daily.precipitation_sum[0]} mm`, icon: 'cloud-rain' }
+    { label: 'Temperature', value: cur.temperature != null ? `${cur.temperature}C` : '—', icon: 'thermometer' },
+    { label: 'Vent', value: cur.windspeed != null ? `${cur.windspeed} km/h` : '—', icon: 'wind' },
+    { label: 'Humidite', value: hourly.relative_humidity_2m?.[0] != null ? `${hourly.relative_humidity_2m[0]}%` : '—', icon: 'droplets' },
+    { label: 'Pluie 24h', value: daily.precipitation_sum?.[0] != null ? `${daily.precipitation_sum[0]} mm` : '—', icon: 'cloud-rain' }
   ]
 });
 
@@ -60,17 +72,17 @@ await widget('chart-rich', {
   type: 'line',
   xAxis: { label: 'Heure', data: hourly48 },
   series: [
-    { label: 'Temperature (C)', data: w.hourly.temperature_2m.slice(0, 48), color: '#e74c3c' },
-    { label: 'Precipitation (mm)', data: w.hourly.precipitation.slice(0, 48), type: 'bar', color: '#3498db' }
+    { label: 'Temperature (C)', data: (hourly.temperature_2m ?? []).slice(0, 48), color: '#e74c3c' },
+    { label: 'Precipitation (mm)', data: (hourly.precipitation ?? []).slice(0, 48), type: 'bar', color: '#3498db' }
   ]
 });
 
 await widget('kv', {
   title: 'Infos pratiques',
   pairs: [
-    ['Lever du soleil', w.daily.sunrise[0].slice(11, 16)],
-    ['Coucher du soleil', w.daily.sunset[0].slice(11, 16)],
-    ['UV max aujourd\'hui', String(w.daily.uv_index_max[0])]
+    ['Lever du soleil', daily.sunrise?.[0]?.slice(11, 16) ?? '—'],
+    ['Coucher du soleil', daily.sunset?.[0]?.slice(11, 16) ?? '—'],
+    ['UV max aujourd\'hui', daily.uv_index_max?.[0] != null ? String(daily.uv_index_max[0]) : '—']
   ]
 });
 ```
@@ -80,16 +92,19 @@ await widget('kv', {
 ### Paris maintenant
 ```js
 const geo = await call('geocoding', { name: 'Paris', count: 1 });
+const p = geo?.results?.[0];
+if (!p) { await widget('text', { content: 'Ville introuvable.' }); return; }
 const w = await call('weather_forecast', {
-  latitude: geo.results[0].latitude,
-  longitude: geo.results[0].longitude,
-  timezone: geo.results[0].timezone,
+  latitude: p.latitude,
+  longitude: p.longitude,
+  timezone: p.timezone,
   current_weather: true,
   hourly: ['temperature_2m', 'precipitation'],
   daily: ['sunrise', 'sunset', 'uv_index_max'],
   forecast_days: 2
-});
-await widget('stat-card', { title: 'Paris', items: [{ label: 'T', value: `${w.current_weather.temperature}C` }] });
+}).catch(() => null);
+const t = w?.current_weather?.temperature;
+await widget('stat-card', { title: 'Paris', items: [{ label: 'T', value: t != null ? `${t}C` : '—' }] });
 ```
 
 ### Toulouse cet apres-midi

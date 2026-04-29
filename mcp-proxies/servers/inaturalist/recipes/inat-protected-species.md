@@ -25,19 +25,23 @@ layout:
 
 ```js
 // 1. Resolve the region
-const place = (await call('search_places', { q: 'Pyrenees', per_page: 1 })).results[0];
+const place = (await call('search_places', { q: 'Pyrenees', per_page: 1 }))?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Region not found.' });
+  return;
+}
 
 // 2. Top species observed there
 const top = await call('species_counts', {
   place_id: place.id, per_page: 100, quality_grade: 'research',
-});
+}).catch(() => ({ results: [] }));
 
 // 3. Hydrate species and keep only the protected ones
 const detailed = await Promise.all(
-  top.results.slice(0, 60).map(r => call('get_taxon', { id: r.taxon.id })),
+  (top?.results ?? []).slice(0, 60).map(r => call('get_taxon', { id: r.taxon?.id }).catch(() => null)),
 );
 const protectedTaxa = detailed.filter(t => {
-  const s = t.conservation_status?.status?.toLowerCase();
+  const s = t?.conservation_status?.status?.toLowerCase();
   return s && !['lc', 'least_concern', 'nt'].includes(s);
 });
 
@@ -47,56 +51,64 @@ const obs = ids
   ? await call('search_observations', {
       place_id: place.id, taxon_id: ids,
       per_page: 100, quality_grade: 'research',
-    })
+    }).catch(() => ({ results: [], total_results: 0 }))
   : { results: [], total_results: 0 };
 
 // 5. Render
-await widget('table', {
-  columns: ['Species', 'Common name', 'Status', 'Family'],
-  rows: protectedTaxa.map(t => [
-    t.name,
-    t.preferred_common_name || '—',
-    t.conservation_status?.status_name || t.conservation_status?.status,
-    t.ancestors?.find(a => a.rank === 'family')?.name || '—',
-  ]),
-});
+if (protectedTaxa.length === 0) {
+  await widget('text', { content: 'No protected species found in this region.' });
+} else {
+  await widget('table', {
+    columns: ['Species', 'Common name', 'Status', 'Family'],
+    rows: protectedTaxa.map(t => [
+      t.name ?? '—',
+      t.preferred_common_name ?? '—',
+      t.conservation_status?.status_name ?? t.conservation_status?.status ?? '—',
+      t.ancestors?.find(a => a.rank === 'family')?.name ?? '—',
+    ]),
+  });
+}
 await widget('map', {
   zoom: 7,
   cluster: true,
-  markers: obs.results.map(o => ({
-    lat: o.geojson.coordinates[1],
-    lon: o.geojson.coordinates[0],
-    label: o.species_guess,
-    popup: o.observed_on,
-  })),
+  markers: (obs?.results ?? [])
+    .filter(o => o.geojson?.coordinates)
+    .map(o => ({
+      lat: o.geojson.coordinates[1],
+      lon: o.geojson.coordinates[0],
+      label: o.species_guess ?? o.taxon?.name ?? '',
+      popup: o.observed_on ?? '',
+    })),
 });
 await widget('gallery', {
   images: protectedTaxa
-    .filter(t => t.default_photo)
-    .map(t => ({ src: t.default_photo.medium_url, caption: t.preferred_common_name || t.name })),
+    .filter(t => t?.default_photo?.medium_url)
+    .map(t => ({ src: t.default_photo.medium_url, caption: t.preferred_common_name ?? t.name ?? '' })),
 });
 await widget('stat-card', { label: 'Protected species found', value: protectedTaxa.length, icon: 'shield' });
-await widget('stat-card', { label: 'Observations mapped', value: obs.total_results, icon: 'eye' });
-await widget('stat-card', { label: 'Place', value: place.display_name, icon: 'map' });
+await widget('stat-card', { label: 'Observations mapped', value: obs?.total_results ?? 0, icon: 'eye' });
+await widget('stat-card', { label: 'Place', value: place.display_name ?? '—', icon: 'map' });
 ```
 
 ## Examples
 
 ### Endangered species in Corsica
 ```js
-const place = (await call('search_places', { q: 'Corsica', per_page: 1 })).results[0];
-const top = await call('species_counts', { place_id: place.id, per_page: 50 });
-const det = await Promise.all(top.results.slice(0, 30).map(r => call('get_taxon', { id: r.taxon.id })));
-const prot = det.filter(t => t.conservation_status && t.conservation_status.status !== 'LC');
-await widget('table', { columns: ['Species', 'Status'], rows: prot.map(t => [t.name, t.conservation_status.status_name]) });
+const place = (await call('search_places', { q: 'Corsica', per_page: 1 }))?.results?.[0];
+if (!place) { await widget('text', { content: 'Place not found.' }); return; }
+const top = await call('species_counts', { place_id: place.id, per_page: 50 }).catch(() => ({ results: [] }));
+const det = await Promise.all((top?.results ?? []).slice(0, 30).map(r => call('get_taxon', { id: r.taxon?.id }).catch(() => null)));
+const prot = det.filter(t => t?.conservation_status && t.conservation_status.status !== 'LC');
+await widget('table', { columns: ['Species', 'Status'], rows: prot.map(t => [t.name ?? '—', t.conservation_status?.status_name ?? '—']) });
 ```
 
 ### Red list flora in the Alps
 ```js
-const place = (await call('search_places', { q: 'Alps', per_page: 1 })).results[0];
-const top = await call('species_counts', { place_id: place.id, taxon_name: 'Plantae', per_page: 60 });
-const det = await Promise.all(top.results.slice(0, 30).map(r => call('get_taxon', { id: r.taxon.id })));
-await widget('gallery', { images: det.filter(t => t.conservation_status && t.default_photo).map(t => ({ src: t.default_photo.medium_url, caption: `${t.name} — ${t.conservation_status.status_name}` })) });
+const place = (await call('search_places', { q: 'Alps', per_page: 1 }))?.results?.[0];
+if (!place) { await widget('text', { content: 'Place not found.' }); return; }
+const top = await call('species_counts', { place_id: place.id, taxon_name: 'Plantae', per_page: 60 }).catch(() => ({ results: [] }));
+const det = await Promise.all((top?.results ?? []).slice(0, 30).map(r => call('get_taxon', { id: r.taxon?.id }).catch(() => null)));
+await widget('gallery', { images: det.filter(t => t?.conservation_status && t?.default_photo?.medium_url).map(t => ({ src: t.default_photo.medium_url, caption: `${t.name ?? '—'} — ${t.conservation_status?.status_name ?? '—'}` })) });
 ```
 
 ## Common mistakes

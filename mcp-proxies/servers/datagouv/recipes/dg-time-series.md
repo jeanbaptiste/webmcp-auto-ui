@@ -28,8 +28,17 @@ INSEE and SDES publish many long series on data.gouv.fr — this recipe wraps th
 1. **Find a series resource**:
    ```js
    const search = await call('search_datasets', { query: 'salaire moyen INSEE série', page_size: 5 });
-   const resList = await call('list_dataset_resources', { dataset_id: search.datasets[0].id });
-   const csv = resList.resources.find(r => r.format === 'csv');
+   const ds = search?.datasets?.[0];
+   if (!ds) {
+     await widget('text', { content: 'Aucun dataset trouvé.' });
+     return;
+   }
+   const resList = await call('list_dataset_resources', { dataset_id: ds.id });
+   const csv = (resList?.resources ?? []).find(r => r.format === 'csv');
+   if (!csv) {
+     await widget('text', { content: 'Aucune ressource CSV.' });
+     return;
+   }
    ```
 
 2. **Read the series sorted by year**:
@@ -39,29 +48,35 @@ INSEE and SDES publish many long series on data.gouv.fr — this recipe wraps th
      sort_column: 'annee',
      sort_direction: 'asc',
      page_size: 100
-   });
-   const rows = data.rows;
+   }).catch(() => ({ rows: [] }));
+   const rows = (data?.rows ?? []).filter(r => Number.isFinite(Number(r.valeur)));
+   if (rows.length === 0) {
+     await widget('text', { content: 'Aucune donnée temporelle.' });
+     return;
+   }
    ```
 
 3. **Render line chart + KPIs + recent-years table**:
    ```js
    const first = rows[0];
    const last = rows[rows.length - 1];
-   const change = ((Number(last.valeur) - Number(first.valeur)) / Number(first.valeur) * 100).toFixed(1);
+   const firstVal = Number(first.valeur);
+   const lastVal = Number(last.valeur);
+   const change = firstVal !== 0 ? ((lastVal - firstVal) / firstVal * 100).toFixed(1) : 'n/a';
 
    await widget('chart', {
      type: 'line',
-     data: { labels: rows.map(r => r.annee), values: rows.map(r => Number(r.valeur)) },
+     data: { labels: rows.map(r => r.annee ?? '—'), values: rows.map(r => Number(r.valeur)) },
      options: { xLabel: 'Année', yLabel: 'Valeur' }
    });
 
-   await widget('stat-card', { label: `Valeur ${first.annee}`, value: first.valeur, icon: 'flag' });
-   await widget('stat-card', { label: `Valeur ${last.annee}`, value: last.valeur, icon: 'flag-checkered' });
-   await widget('stat-card', { label: 'Variation', value: `${change} %`, icon: 'trending-up' });
+   await widget('stat-card', { label: `Valeur ${first.annee ?? '—'}`, value: first.valeur ?? '—', icon: 'flag' });
+   await widget('stat-card', { label: `Valeur ${last.annee ?? '—'}`, value: last.valeur ?? '—', icon: 'flag-checkered' });
+   await widget('stat-card', { label: 'Variation', value: change === 'n/a' ? '—' : `${change} %`, icon: 'trending-up' });
 
    await widget('table', {
      columns: ['Année', 'Valeur'],
-     rows: rows.slice(-10).reverse().map(r => [r.annee, r.valeur])
+     rows: rows.slice(-10).reverse().map(r => [r.annee ?? '—', r.valeur ?? '—'])
    });
    ```
 
@@ -73,8 +88,9 @@ const data = await call('query_resource_data', {
   resource_id: '<insee-salaire-moyen-resource-id>',
   sort_column: 'annee',
   page_size: 30
-});
-await widget('chart', { type: 'line', data: { labels: data.rows.map(r => r.annee), values: data.rows.map(r => r.salaire_moyen) } });
+}).catch(() => ({ rows: [] }));
+const rows = data?.rows ?? [];
+await widget('chart', { type: 'line', data: { labels: rows.map(r => r.annee ?? '—'), values: rows.map(r => Number(r.salaire_moyen)).filter(Number.isFinite) } });
 ```
 
 ### Vacant housing in France
@@ -83,9 +99,13 @@ const data = await call('query_resource_data', {
   resource_id: '<sdes-logements-vacants-resource-id>',
   sort_column: 'annee',
   page_size: 50
-});
-await widget('chart', { type: 'line', data: { labels: data.rows.map(r => r.annee), values: data.rows.map(r => r.logements_vacants) } });
-await widget('stat-card', { label: 'Variation 10 ans', value: `${(((data.rows.at(-1).logements_vacants - data.rows.at(-10).logements_vacants) / data.rows.at(-10).logements_vacants) * 100).toFixed(1)} %` });
+}).catch(() => ({ rows: [] }));
+const rows = data?.rows ?? [];
+await widget('chart', { type: 'line', data: { labels: rows.map(r => r.annee ?? '—'), values: rows.map(r => Number(r.logements_vacants)).filter(Number.isFinite) } });
+const a = Number(rows.at(-1)?.logements_vacants);
+const b = Number(rows.at(-10)?.logements_vacants);
+const pct = (Number.isFinite(a) && Number.isFinite(b) && b !== 0) ? (((a - b) / b) * 100).toFixed(1) : null;
+await widget('stat-card', { label: 'Variation 10 ans', value: pct != null ? `${pct} %` : '—' });
 ```
 
 ## Common mistakes

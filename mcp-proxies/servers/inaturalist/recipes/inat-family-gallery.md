@@ -26,51 +26,60 @@ layout:
 ```js
 // 1. Resolve the clade
 const taxa = await call('search_taxa', { q: 'Hesperiidae', rank: 'family', per_page: 1 });
-const clade = taxa.results[0];
-const detail = await call('get_taxon', { id: clade.id });
+const clade = taxa?.results?.[0];
+if (!clade) {
+  await widget('text', { content: 'Clade not found.' });
+  return;
+}
+const detail = await call('get_taxon', { id: clade.id }).catch(() => null);
 
 // 2. Pull research-grade observations with photos
 const obs = await call('search_observations', {
   taxon_id: clade.id,
   quality_grade: 'research',
   per_page: 80,
-});
+}).catch(() => ({ results: [] }));
 
 // 3. Group photos by species and pick the best per species
 const bySpecies = new Map();
-for (const o of obs.results) {
-  if (!o.photos?.length) continue;
+for (const o of (obs?.results ?? [])) {
+  if (!o.photos?.length || !o.photos[0]?.url) continue;
   const k = o.taxon?.id;
   if (!k || bySpecies.has(k)) continue;
   bySpecies.set(k, o);
 }
 const species = [...bySpecies.values()].slice(0, 24);
 
+if (species.length === 0) {
+  await widget('text', { content: 'No research-grade photos found for this clade.' });
+  return;
+}
+
 // 4. Render the curated gallery
 await widget('gallery', {
   images: species.map(o => ({
     src: o.photos[0].url.replace('square', 'large'),
-    caption: `${o.species_guess || o.taxon?.preferred_common_name} — ${o.place_guess}`,
+    caption: `${o.species_guess ?? o.taxon?.preferred_common_name ?? o.taxon?.name ?? 'Unknown'} — ${o.place_guess ?? ''}`,
   })),
 });
 
 // 5. Descriptive cards for the top 6 species
 await widget('cards', {
   items: species.slice(0, 6).map(o => ({
-    title: o.taxon?.preferred_common_name || o.species_guess,
-    subtitle: o.taxon?.name,
+    title: o.taxon?.preferred_common_name ?? o.species_guess ?? o.taxon?.name ?? 'Unknown',
+    subtitle: o.taxon?.name ?? '',
     image: o.photos[0].url.replace('square', 'medium'),
-    description: `Observed in ${o.place_guess} on ${o.observed_on}`,
+    description: `Observed in ${o.place_guess ?? '—'} on ${o.observed_on ?? '—'}`,
   })),
 });
 
 // 6. Clade summary
 await widget('kv', {
-  title: detail.preferred_common_name || detail.name,
+  title: detail?.preferred_common_name ?? detail?.name ?? clade.name ?? 'Clade',
   items: {
-    'Scientific name': detail.name,
-    Rank: detail.rank,
-    'Total iNat observations': detail.observations_count,
+    'Scientific name': detail?.name ?? clade.name ?? '—',
+    Rank: detail?.rank ?? clade.rank ?? '—',
+    'Total iNat observations': detail?.observations_count ?? 0,
     'Species displayed': species.length,
   },
 });
@@ -80,17 +89,19 @@ await widget('kv', {
 
 ### European wild orchids
 ```js
-const t = (await call('search_taxa', { q: 'Orchidaceae', rank: 'family', per_page: 1 })).results[0];
-const place = (await call('search_places', { q: 'Europe', per_page: 1 })).results[0];
-const obs = await call('search_observations', { taxon_id: t.id, place_id: place.id, per_page: 80, quality_grade: 'research' });
-await widget('gallery', { images: obs.results.filter(o => o.photos?.length).slice(0, 24).map(o => ({ src: o.photos[0].url.replace('square', 'large'), caption: o.species_guess })) });
+const t = (await call('search_taxa', { q: 'Orchidaceae', rank: 'family', per_page: 1 }))?.results?.[0];
+const place = (await call('search_places', { q: 'Europe', per_page: 1 }))?.results?.[0];
+if (!t || !place) { await widget('text', { content: 'Clade or place not found.' }); return; }
+const obs = await call('search_observations', { taxon_id: t.id, place_id: place.id, per_page: 80, quality_grade: 'research' }).catch(() => ({ results: [] }));
+await widget('gallery', { images: (obs?.results ?? []).filter(o => o.photos?.length > 0 && o.photos[0]?.url).slice(0, 24).map(o => ({ src: o.photos[0].url.replace('square', 'large'), caption: o.species_guess ?? o.taxon?.name ?? '' })) });
 ```
 
 ### Marine nudibranchs
 ```js
-const t = (await call('search_taxa', { q: 'Nudibranchia', rank: 'order', per_page: 1 })).results[0];
-const obs = await call('search_observations', { taxon_id: t.id, per_page: 60, quality_grade: 'research' });
-await widget('gallery', { images: obs.results.filter(o => o.photos?.length).map(o => ({ src: o.photos[0].url.replace('square', 'large'), caption: o.species_guess })) });
+const t = (await call('search_taxa', { q: 'Nudibranchia', rank: 'order', per_page: 1 }))?.results?.[0];
+if (!t) { await widget('text', { content: 'Clade not found.' }); return; }
+const obs = await call('search_observations', { taxon_id: t.id, per_page: 60, quality_grade: 'research' }).catch(() => ({ results: [] }));
+await widget('gallery', { images: (obs?.results ?? []).filter(o => o.photos?.length > 0 && o.photos[0]?.url).map(o => ({ src: o.photos[0].url.replace('square', 'large'), caption: o.species_guess ?? o.taxon?.name ?? '' })) });
 ```
 
 ## Common mistakes

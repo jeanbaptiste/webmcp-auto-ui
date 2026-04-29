@@ -25,9 +25,12 @@ layout:
 
 ```js
 // 1. Resolve the user via cross-entity search
-const res = await call('search', { q: 'tela-botanica', sources: 'users', per_page: 1 });
-const user = res.results[0]?.record;
-if (!user) throw new Error('User not found');
+const res = await call('search', { q: 'tela-botanica', sources: 'users', per_page: 1 }).catch(() => ({ results: [] }));
+const user = res?.results?.[0]?.record;
+if (!user) {
+  await widget('text', { content: 'User not found.' });
+  return;
+}
 
 // 2. Their observations (the inaturalist MCP doesn't expose user_id directly,
 //    but a place_id-less search by per_page returns nothing — fall back to
@@ -35,19 +38,19 @@ if (!user) throw new Error('User not found');
 const obs = await call('search_observations', {
   per_page: 100,
   quality_grade: 'research',
-});
-const myObs = obs.results.filter(o => o.user?.id === user.id).slice(0, 50);
+}).catch(() => ({ results: [] }));
+const myObs = (obs?.results ?? []).filter(o => o.user?.id === user.id).slice(0, 50);
 
 // 3. Profile
 await widget('profile', {
-  title: user.name || user.login,
-  subtitle: '@' + user.login,
-  image: user.icon_url || user.icon,
+  title: user.name ?? user.login ?? 'User',
+  subtitle: '@' + (user.login ?? '—'),
+  image: user.icon_url ?? user.icon,
   fields: {
-    'Joined': user.created_at?.slice(0, 10),
-    'Total observations': user.observations_count,
-    'Identifications': user.identifications_count,
-    'Species observed': user.species_count,
+    'Joined': user.created_at?.slice(0, 10) ?? '—',
+    'Total observations': user.observations_count ?? 0,
+    'Identifications': user.identifications_count ?? 0,
+    'Species observed': user.species_count ?? 0,
   },
 });
 
@@ -55,26 +58,30 @@ await widget('profile', {
 await widget('map', {
   zoom: 5,
   cluster: true,
-  markers: myObs.map(o => ({
-    lat: o.geojson.coordinates[1],
-    lon: o.geojson.coordinates[0],
-    label: o.species_guess,
-    popup: o.observed_on,
-  })),
+  markers: myObs
+    .filter(o => o.geojson?.coordinates)
+    .map(o => ({
+      lat: o.geojson.coordinates[1],
+      lon: o.geojson.coordinates[0],
+      label: o.species_guess ?? o.taxon?.name ?? '',
+      popup: o.observed_on ?? '',
+    })),
 });
 
 // 5. Photo gallery of their work
 await widget('gallery', {
-  images: myObs.filter(o => o.photos?.length).map(o => ({
-    src: o.photos[0].url.replace('square', 'medium'),
-    caption: `${o.species_guess} — ${o.place_guess}`,
-  })),
+  images: myObs
+    .filter(o => o.photos?.length > 0 && o.photos[0]?.url)
+    .map(o => ({
+      src: o.photos[0].url.replace('square', 'medium'),
+      caption: `${o.species_guess ?? o.taxon?.name ?? 'Unknown'} — ${o.place_guess ?? ''}`,
+    })),
 });
 
 // 6. Top species they've observed (count by taxon)
 const counts = {};
 for (const o of myObs) {
-  const k = o.taxon?.preferred_common_name || o.taxon?.name;
+  const k = o.taxon?.preferred_common_name ?? o.taxon?.name;
   if (k) counts[k] = (counts[k] || 0) + 1;
 }
 const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 15);
@@ -88,17 +95,19 @@ await widget('table', {
 
 ### Resolve a specific user
 ```js
-const res = await call('search', { q: 'jb-photo', sources: 'users', per_page: 1 });
-const u = res.results[0]?.record;
-await widget('profile', { title: u.name || u.login, subtitle: '@' + u.login, image: u.icon_url, fields: { Joined: u.created_at?.slice(0, 10), 'Total obs': u.observations_count } });
+const res = await call('search', { q: 'jb-photo', sources: 'users', per_page: 1 }).catch(() => ({ results: [] }));
+const u = res?.results?.[0]?.record;
+if (!u) { await widget('text', { content: 'User not found.' }); return; }
+await widget('profile', { title: u.name ?? u.login ?? 'User', subtitle: '@' + (u.login ?? '—'), image: u.icon_url, fields: { Joined: u.created_at?.slice(0, 10) ?? '—', 'Total obs': u.observations_count ?? 0 } });
 ```
 
 ### Map a user's hotspots
 ```js
-const res = await call('search', { q: 'naturalist42', sources: 'users', per_page: 1 });
-const u = res.results[0].record;
-const all = await call('search_observations', { per_page: 200, quality_grade: 'research' });
-const mine = all.results.filter(o => o.user?.id === u.id);
+const res = await call('search', { q: 'naturalist42', sources: 'users', per_page: 1 }).catch(() => ({ results: [] }));
+const u = res?.results?.[0]?.record;
+if (!u) { await widget('text', { content: 'User not found.' }); return; }
+const all = await call('search_observations', { per_page: 200, quality_grade: 'research' }).catch(() => ({ results: [] }));
+const mine = (all?.results ?? []).filter(o => o.user?.id === u.id && o.geojson?.coordinates);
 await widget('map', { zoom: 5, cluster: true, markers: mine.map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })) });
 ```
 

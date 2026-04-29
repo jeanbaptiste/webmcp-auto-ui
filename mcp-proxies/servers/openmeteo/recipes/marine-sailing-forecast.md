@@ -30,53 +30,65 @@ layout:
 
 ```js
 const geo = await call('geocoding', { name: 'La Rochelle', count: 1 });
-const { latitude, longitude, timezone, name } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone, name } = place;
 
 const [marine, atmo] = await Promise.all([
   call('marine_weather', {
     latitude, longitude, timezone,
     hourly: ['wave_height', 'wave_period', 'wave_direction', 'sea_surface_temperature'],
     forecast_days: 3
-  }),
+  }).catch(() => null),
   call('weather_forecast', {
     latitude, longitude, timezone,
     hourly: ['wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'],
     forecast_days: 3
-  })
+  }).catch(() => null)
 ]);
 
-const waves = marine.hourly.wave_height;
-const maxWave = Math.max(...waves);
-const idxMax = waves.indexOf(maxWave);
-const seaT = marine.hourly.sea_surface_temperature[0];
-const period = marine.hourly.wave_period[idxMax];
-const maxWind = Math.max(...atmo.hourly.wind_speed_10m);
+if (!marine?.hourly?.time?.length) {
+  await widget('text', { content: 'Donnees marines indisponibles (point probablement non cotier).' });
+  return;
+}
+
+const waves = (marine.hourly.wave_height ?? []).filter(v => Number.isFinite(v));
+const wavesRaw = marine.hourly.wave_height ?? [];
+const maxWave = waves.length > 0 ? Math.max(...waves) : null;
+const idxMax = maxWave != null ? wavesRaw.indexOf(maxWave) : -1;
+const seaT = marine.hourly.sea_surface_temperature?.[0];
+const period = idxMax >= 0 ? marine.hourly.wave_period?.[idxMax] : null;
+const windArr = (atmo?.hourly?.wind_speed_10m ?? []).filter(v => Number.isFinite(v));
+const maxWind = windArr.length > 0 ? Math.max(...windArr) : null;
 
 await widget('stat-card', {
-  title: `Meteo marine - ${name}`,
+  title: `Meteo marine - ${name ?? ''}`,
   items: [
-    { label: 'Vagues max 72h', value: `${maxWave.toFixed(1)} m`, icon: 'waves' },
-    { label: 'Periode', value: `${period.toFixed(0)} s`, icon: 'clock' },
-    { label: 'Temperature eau', value: `${seaT.toFixed(1)} C`, icon: 'thermometer' },
-    { label: 'Vent max', value: `${maxWind.toFixed(0)} km/h`, icon: 'wind' }
+    { label: 'Vagues max 72h', value: maxWave != null ? `${maxWave.toFixed(1)} m` : '—', icon: 'waves' },
+    { label: 'Periode', value: Number.isFinite(period) ? `${period.toFixed(0)} s` : '—', icon: 'clock' },
+    { label: 'Temperature eau', value: Number.isFinite(seaT) ? `${seaT.toFixed(1)} C` : '—', icon: 'thermometer' },
+    { label: 'Vent max', value: maxWind != null ? `${maxWind.toFixed(0)} km/h` : '—', icon: 'wind' }
   ]
 });
 
 await widget('chart-rich', {
   title: 'Vagues et vent sur 72h',
   type: 'line',
-  xAxis: { label: 'Heure', data: marine.hourly.time },
+  xAxis: { label: 'Heure', data: marine.hourly.time ?? [] },
   series: [
-    { label: 'Hauteur vagues (m)', data: waves, color: '#3498db' },
-    { label: 'Vent (km/h)', data: atmo.hourly.wind_speed_10m, color: '#e67e22' },
-    { label: 'Rafales (km/h)', data: atmo.hourly.wind_gusts_10m, color: '#c0392b' }
+    { label: 'Hauteur vagues (m)', data: marine.hourly.wave_height ?? [], color: '#3498db' },
+    { label: 'Vent (km/h)', data: atmo?.hourly?.wind_speed_10m ?? [], color: '#e67e22' },
+    { label: 'Rafales (km/h)', data: atmo?.hourly?.wind_gusts_10m ?? [], color: '#c0392b' }
   ]
 });
 
 await widget('map', {
-  title: name,
+  title: name ?? '',
   center: { lat: latitude, lng: longitude }, zoom: 10,
-  markers: [{ lat: latitude, lng: longitude, label: name, popup: `Vagues max ${maxWave.toFixed(1)}m, eau ${seaT.toFixed(1)}C` }]
+  markers: [{ lat: latitude, lng: longitude, label: name ?? '', popup: `Vagues max ${maxWave != null ? maxWave.toFixed(1) : '—'}m, eau ${Number.isFinite(seaT) ? seaT.toFixed(1) : '—'}C` }]
 });
 ```
 

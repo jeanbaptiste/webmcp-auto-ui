@@ -33,13 +33,23 @@ Alerte sante / securite, utile pour personnes vulnerables (agees, asthmatiques, 
 
 ```js
 const geo = await call('geocoding', { name: 'Avignon', count: 1 });
-const { latitude, longitude, timezone } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone } = place;
 
 const w = await call('weather_forecast', {
   latitude, longitude, timezone,
   daily: ['temperature_2m_max', 'temperature_2m_min'],
   forecast_days: 16
-});
+}).catch(() => null);
+
+if (!w?.daily?.time?.length) {
+  await widget('text', { content: 'Donnees meteo indisponibles.' });
+  return;
+}
 
 const heatThreshold = 32;
 const coldThreshold = -5;
@@ -47,7 +57,8 @@ const coldThreshold = -5;
 function detectEpisodes(values, threshold, mode) {
   const episodes = [];
   let start = -1;
-  values.forEach((v, i) => {
+  (values ?? []).forEach((v, i) => {
+    if (!Number.isFinite(v)) return;
     const hit = mode === 'heat' ? v > threshold : v < threshold;
     if (hit && start < 0) start = i;
     else if (!hit && start >= 0) {
@@ -55,21 +66,24 @@ function detectEpisodes(values, threshold, mode) {
       start = -1;
     }
   });
-  if (start >= 0 && values.length - start >= 3) episodes.push({ start, end: values.length - 1, length: values.length - start });
+  if (start >= 0 && (values?.length ?? 0) - start >= 3) episodes.push({ start, end: values.length - 1, length: values.length - start });
   return episodes;
 }
 
-const heatEps = detectEpisodes(w.daily.temperature_2m_max, heatThreshold, 'heat');
-const coldEps = detectEpisodes(w.daily.temperature_2m_min, coldThreshold, 'cold');
-const heatDays = w.daily.temperature_2m_max.filter(t => t > heatThreshold).length;
+const tmax = w.daily.temperature_2m_max ?? [];
+const tmin = w.daily.temperature_2m_min ?? [];
+const times = w.daily.time ?? [];
+const heatEps = detectEpisodes(tmax, heatThreshold, 'heat');
+const coldEps = detectEpisodes(tmin, coldThreshold, 'cold');
+const heatDays = tmax.filter(t => Number.isFinite(t) && t > heatThreshold).length;
 
 await widget('chart-rich', {
   title: 'Tmax 16j - seuil canicule (32 C)',
   type: 'line',
-  xAxis: { label: 'Date', data: w.daily.time },
+  xAxis: { label: 'Date', data: times },
   series: [
-    { label: 'Tmax (C)', data: w.daily.temperature_2m_max, color: '#e74c3c' },
-    { label: 'Seuil canicule', data: w.daily.time.map(() => heatThreshold), color: '#f39c12', dashed: true }
+    { label: 'Tmax (C)', data: tmax, color: '#e74c3c' },
+    { label: 'Seuil canicule', data: times.map(() => heatThreshold), color: '#f39c12', dashed: true }
   ]
 });
 
@@ -77,15 +91,15 @@ await widget('timeline', {
   title: 'Episodes detectes',
   events: [
     ...heatEps.map(e => ({
-      date: w.daily.time[e.start],
+      date: times[e.start] ?? '—',
       label: `Canicule ${e.length}j`,
-      detail: `${w.daily.time[e.start]} -> ${w.daily.time[e.end]}`,
+      detail: `${times[e.start] ?? '—'} -> ${times[e.end] ?? '—'}`,
       color: '#e74c3c'
     })),
     ...coldEps.map(e => ({
-      date: w.daily.time[e.start],
+      date: times[e.start] ?? '—',
       label: `Froid ${e.length}j`,
-      detail: `${w.daily.time[e.start]} -> ${w.daily.time[e.end]}`,
+      detail: `${times[e.start] ?? '—'} -> ${times[e.end] ?? '—'}`,
       color: '#3498db'
     }))
   ]
@@ -95,7 +109,7 @@ await widget('stat-card', {
   items: [
     { label: 'Jours > 32C', value: String(heatDays), icon: 'flame' },
     { label: 'Episodes canicule', value: String(heatEps.length), icon: 'alert-triangle' },
-    { label: 'Plus long episode', value: heatEps.length ? `${Math.max(...heatEps.map(e => e.length))} jours` : '-', icon: 'clock' }
+    { label: 'Plus long episode', value: heatEps.length > 0 ? `${Math.max(...heatEps.map(e => e.length))} jours` : '-', icon: 'clock' }
   ]
 });
 ```

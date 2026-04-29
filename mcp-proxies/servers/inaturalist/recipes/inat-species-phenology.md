@@ -26,50 +26,49 @@ layout:
 ```js
 // 1. Resolve the taxon
 const taxa = await call('search_taxa', { q: 'Alcedo atthis', per_page: 1, locale: 'en' });
-const taxon = taxa.results[0];
+const taxon = taxa?.results?.[0];
+if (!taxon) {
+  await widget('text', { content: 'Species not found.' });
+  return;
+}
 
-// 2. Monthly histogram (aggregated across years)
-const hist = await call('observations_histogram', {
-  taxon_id: taxon.id,
-  interval: 'month',
-  quality_grade: 'research',
-});
-
-// 3. Taxon detail
-const detail = await call('get_taxon', { id: taxon.id, locale: 'en' });
-
-// 4. Sample photos
-const obs = await call('search_observations', {
-  taxon_id: taxon.id, quality_grade: 'research', per_page: 24,
-});
+// 2. Monthly histogram, taxon detail, sample photos in parallel
+const [hist, detail, obs] = await Promise.all([
+  call('observations_histogram', { taxon_id: taxon.id, interval: 'month', quality_grade: 'research' }).catch(() => ({ results: { month: {} } })),
+  call('get_taxon', { id: taxon.id, locale: 'en' }).catch(() => null),
+  call('search_observations', { taxon_id: taxon.id, quality_grade: 'research', per_page: 24 }).catch(() => ({ results: [] })),
+]);
 
 // 5. Identify peak
-const months = Object.entries(hist.results.month);
-const peak = months.sort((a, b) => b[1] - a[1])[0];
-const total = months.reduce((s, [, n]) => s + n, 0);
+const months = Object.entries(hist?.results?.month ?? {});
+const sortedMonths = [...months].sort((a, b) => b[1] - a[1]);
+const peak = sortedMonths[0];
+const total = months.reduce((s, [, n]) => s + (n ?? 0), 0);
 
 // 6. Render
 await widget('chart', {
   type: 'bar',
-  labels: months.map(([m]) => ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(m) - 1]),
+  labels: months.map(([m]) => ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(m) - 1] ?? m),
   data: months.map(([, n]) => n),
-  title: `Monthly observations of ${taxon.preferred_common_name || taxon.name}`,
+  title: `Monthly observations of ${taxon.preferred_common_name ?? taxon.name ?? 'species'}`,
 });
-await widget('stat-card', { label: 'Peak month', value: peak[0], icon: 'calendar' });
+await widget('stat-card', { label: 'Peak month', value: peak?.[0] ?? '—', icon: 'calendar' });
 await widget('stat-card', { label: 'Total observations', value: total, icon: 'eye' });
 await widget('kv', {
-  title: taxon.preferred_common_name,
+  title: taxon.preferred_common_name ?? taxon.name ?? 'Species',
   items: {
-    'Scientific name': taxon.name,
-    Rank: taxon.rank,
-    'Conservation': detail.conservation_status?.status_name || 'Least concern',
+    'Scientific name': taxon.name ?? '—',
+    Rank: taxon.rank ?? '—',
+    'Conservation': detail?.conservation_status?.status_name ?? 'Least concern',
   },
 });
 await widget('gallery', {
-  images: obs.results.filter(o => o.photos?.length).map(o => ({
-    src: o.photos[0].url.replace('square', 'medium'),
-    caption: `${o.place_guess} — ${o.observed_on}`,
-  })),
+  images: (obs?.results ?? [])
+    .filter(o => o.photos?.length > 0 && o.photos[0]?.url)
+    .map(o => ({
+      src: o.photos[0].url.replace('square', 'medium'),
+      caption: `${o.place_guess ?? ''} — ${o.observed_on ?? '—'}`,
+    })),
 });
 ```
 
@@ -77,17 +76,22 @@ await widget('gallery', {
 
 ### Kingfisher in Ile-de-France
 ```js
-const place = (await call('search_places', { q: 'Ile-de-France', per_page: 1 })).results[0];
+const place = (await call('search_places', { q: 'Ile-de-France', per_page: 1 }))?.results?.[0];
 const taxa = await call('search_taxa', { q: 'martin-pêcheur', locale: 'fr', per_page: 1 });
-const hist = await call('observations_histogram', { taxon_id: taxa.results[0].id, place_id: place.id, interval: 'month' });
-await widget('chart', { type: 'bar', labels: Object.keys(hist.results.month), data: Object.values(hist.results.month) });
+const t = taxa?.results?.[0];
+if (!place || !t) { await widget('text', { content: 'Place or species not found.' }); return; }
+const hist = await call('observations_histogram', { taxon_id: t.id, place_id: place.id, interval: 'month' }).catch(() => ({ results: { month: {} } }));
+const m = hist?.results?.month ?? {};
+await widget('chart', { type: 'bar', labels: Object.keys(m), data: Object.values(m) });
 ```
 
 ### Cicada peak
 ```js
-const t = (await call('search_taxa', { q: 'Cicadidae', rank: 'family', per_page: 1 })).results[0];
-const hist = await call('observations_histogram', { taxon_id: t.id, interval: 'month' });
-await widget('chart', { type: 'bar', labels: Object.keys(hist.results.month), data: Object.values(hist.results.month), title: 'Cicadas — global phenology' });
+const t = (await call('search_taxa', { q: 'Cicadidae', rank: 'family', per_page: 1 }))?.results?.[0];
+if (!t) { await widget('text', { content: 'Clade not found.' }); return; }
+const hist = await call('observations_histogram', { taxon_id: t.id, interval: 'month' }).catch(() => ({ results: { month: {} } }));
+const m = hist?.results?.month ?? {};
+await widget('chart', { type: 'bar', labels: Object.keys(m), data: Object.values(m), title: 'Cicadas — global phenology' });
 ```
 
 ## Common mistakes

@@ -26,66 +26,82 @@ layout:
 ```js
 // 1. Resolve the species
 const taxa = await call('search_taxa', { q: 'Salamandra salamandra', per_page: 1, locale: 'en' });
-const t = taxa.results[0];
+const t = taxa?.results?.[0];
+if (!t) {
+  await widget('text', { content: 'Species not found.' });
+  return;
+}
 
 // 2. Detailed taxon info (Wikipedia, conservation, ancestors)
 const detail = await call('get_taxon', { id: t.id, locale: 'en' });
+if (!detail) {
+  await widget('text', { content: 'Could not load taxon details.' });
+  return;
+}
 
 // 3. Distribution: spread observations worldwide
 const obs = await call('search_observations', {
   taxon_id: t.id, quality_grade: 'research', per_page: 200,
-});
+}).catch(() => ({ results: [], total_results: 0 }));
 
 // 4. Aggregate counts (population strongholds)
-const top = await call('species_counts', { taxon_id: t.id, per_page: 5 });
+const top = await call('species_counts', { taxon_id: t.id, per_page: 5 }).catch(() => ({ results: [] }));
 
 // 5. Render
 await widget('profile', {
-  title: detail.preferred_common_name || detail.name,
-  subtitle: detail.name,
+  title: detail.preferred_common_name ?? detail.name ?? 'Unknown species',
+  subtitle: detail.name ?? '',
   image: detail.default_photo?.medium_url,
   fields: {
-    Rank: detail.rank,
-    Family: detail.ancestors?.find(a => a.rank === 'family')?.name,
-    'Conservation status': detail.conservation_status?.status_name || 'Least concern',
-    'Total observations': detail.observations_count,
+    Rank: detail.rank ?? '—',
+    Family: detail.ancestors?.find(a => a.rank === 'family')?.name ?? '—',
+    'Conservation status': detail.conservation_status?.status_name ?? 'Least concern',
+    'Total observations': detail.observations_count ?? 0,
   },
 });
 await widget('text', { content: detail.wikipedia_summary || 'No Wikipedia summary available.' });
-await widget('map', {
-  zoom: 2,
-  markers: obs.results.map(o => ({
+const mapMarkers = (obs?.results ?? [])
+  .filter(o => o.geojson?.coordinates)
+  .map(o => ({
     lat: o.geojson.coordinates[1],
     lon: o.geojson.coordinates[0],
-    label: o.place_guess,
-  })),
+    label: o.place_guess ?? '',
+  }));
+await widget('map', {
+  zoom: 2,
+  markers: mapMarkers,
   cluster: true,
 });
 await widget('gallery', {
-  images: obs.results.filter(o => o.photos?.length).slice(0, 24).map(o => ({
-    src: o.photos[0].url.replace('square', 'large'),
-    caption: o.place_guess,
-  })),
+  images: (obs?.results ?? [])
+    .filter(o => o.photos?.length > 0 && o.photos[0]?.url)
+    .slice(0, 24)
+    .map(o => ({
+      src: o.photos[0].url.replace('square', 'large'),
+      caption: o.place_guess ?? '',
+    })),
 });
-await widget('stat-card', { label: 'iNat observations', value: detail.observations_count, icon: 'eye' });
+await widget('stat-card', { label: 'iNat observations', value: detail.observations_count ?? 0, icon: 'eye' });
 ```
 
 ## Examples
 
 ### Fire salamander
 ```js
-const t = (await call('search_taxa', { q: 'fire salamander', per_page: 1 })).results[0];
+const t = (await call('search_taxa', { q: 'fire salamander', per_page: 1 }))?.results?.[0];
+if (!t) { await widget('text', { content: 'Species not found.' }); return; }
 const d = await call('get_taxon', { id: t.id });
-await widget('profile', { title: d.preferred_common_name, subtitle: d.name, image: d.default_photo?.medium_url, fields: { Rank: d.rank, Conservation: d.conservation_status?.status_name } });
+await widget('profile', { title: d?.preferred_common_name ?? d?.name ?? 'Unknown', subtitle: d?.name ?? '', image: d?.default_photo?.medium_url, fields: { Rank: d?.rank ?? '—', Conservation: d?.conservation_status?.status_name ?? 'Least concern' } });
 ```
 
 ### Red panda
 ```js
-const t = (await call('search_taxa', { q: 'red panda', per_page: 1 })).results[0];
+const t = (await call('search_taxa', { q: 'red panda', per_page: 1 }))?.results?.[0];
+if (!t) { await widget('text', { content: 'Species not found.' }); return; }
 const d = await call('get_taxon', { id: t.id });
-const obs = await call('search_observations', { taxon_id: t.id, per_page: 100, quality_grade: 'research' });
-await widget('text', { content: d.wikipedia_summary });
-await widget('map', { zoom: 3, markers: obs.results.map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })), cluster: true });
+const obs = await call('search_observations', { taxon_id: t.id, per_page: 100, quality_grade: 'research' }).catch(() => ({ results: [] }));
+await widget('text', { content: d?.wikipedia_summary || 'No Wikipedia summary available.' });
+await widget('map', { zoom: 3, markers: (obs?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })), cluster: true });
 ```
 
 ## Common mistakes

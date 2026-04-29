@@ -32,46 +32,59 @@ Aide a planifier sortie, jardinage, lessive, voyage court.
 
 ```js
 const geo = await call('geocoding', { name: 'Toulouse', count: 1 });
-const { latitude, longitude, timezone } = geo.results[0];
+const place = geo?.results?.[0];
+if (!place) {
+  await widget('text', { content: 'Ville introuvable.' });
+  return;
+}
+const { latitude, longitude, timezone } = place;
 
 const w = await call('weather_forecast', {
   latitude, longitude, timezone,
   daily: ['temperature_2m_max', 'temperature_2m_min', 'precipitation_sum',
           'precipitation_probability_max', 'wind_speed_10m_max'],
   forecast_days: 7
-});
+}).catch(() => null);
+
+if (!w?.daily?.time?.length) {
+  await widget('text', { content: 'Donnees meteo indisponibles.' });
+  return;
+}
 
 const d = w.daily;
-const hottestIdx = d.temperature_2m_max.indexOf(Math.max(...d.temperature_2m_max));
-const totalRain = d.precipitation_sum.reduce((a, b) => a + b, 0);
+const tmaxArr = (d.temperature_2m_max ?? []).map(v => Number.isFinite(v) ? v : null);
+const tmaxFinite = tmaxArr.filter(v => v != null);
+const hottestVal = tmaxFinite.length > 0 ? Math.max(...tmaxFinite) : null;
+const hottestIdx = hottestVal != null ? tmaxArr.indexOf(hottestVal) : -1;
+const totalRain = (d.precipitation_sum ?? []).filter(v => Number.isFinite(v)).reduce((a, b) => a + b, 0);
 
 await widget('chart-rich', {
   title: 'Previsions 7 jours - Toulouse',
   type: 'line',
-  xAxis: { label: 'Date', data: d.time },
+  xAxis: { label: 'Date', data: d.time ?? [] },
   series: [
-    { label: 'Tmax (C)', data: d.temperature_2m_max, color: '#e74c3c' },
-    { label: 'Tmin (C)', data: d.temperature_2m_min, color: '#3498db' },
-    { label: 'Pluie (mm)', data: d.precipitation_sum, type: 'bar', color: '#95a5a6' }
+    { label: 'Tmax (C)', data: d.temperature_2m_max ?? [], color: '#e74c3c' },
+    { label: 'Tmin (C)', data: d.temperature_2m_min ?? [], color: '#3498db' },
+    { label: 'Pluie (mm)', data: d.precipitation_sum ?? [], type: 'bar', color: '#95a5a6' }
   ]
 });
 
 await widget('table', {
   title: 'Detail jour par jour',
   columns: ['Jour', 'Tmax', 'Tmin', 'Pluie (mm)', 'Prob. pluie', 'Vent max'],
-  rows: d.time.map((t, i) => [
+  rows: (d.time ?? []).map((t, i) => [
     t,
-    `${d.temperature_2m_max[i]}C`,
-    `${d.temperature_2m_min[i]}C`,
-    d.precipitation_sum[i].toFixed(1),
-    `${d.precipitation_probability_max[i]}%`,
-    `${d.wind_speed_10m_max[i]} km/h`
+    d.temperature_2m_max?.[i] != null ? `${d.temperature_2m_max[i]}C` : '—',
+    d.temperature_2m_min?.[i] != null ? `${d.temperature_2m_min[i]}C` : '—',
+    Number.isFinite(d.precipitation_sum?.[i]) ? d.precipitation_sum[i].toFixed(1) : '—',
+    d.precipitation_probability_max?.[i] != null ? `${d.precipitation_probability_max[i]}%` : '—',
+    d.wind_speed_10m_max?.[i] != null ? `${d.wind_speed_10m_max[i]} km/h` : '—'
   ])
 });
 
 await widget('stat-card', {
   items: [
-    { label: 'Jour le plus chaud', value: `${d.time[hottestIdx]} (${d.temperature_2m_max[hottestIdx]}C)`, icon: 'sun' },
+    { label: 'Jour le plus chaud', value: hottestIdx >= 0 ? `${d.time?.[hottestIdx] ?? '—'} (${hottestVal}C)` : '—', icon: 'sun' },
     { label: 'Total pluie 7j', value: `${totalRain.toFixed(1)} mm`, icon: 'cloud-rain' }
   ]
 });
