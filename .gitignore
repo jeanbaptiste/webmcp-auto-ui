@@ -21,6 +21,12 @@ build/
 # Healthcheck credentials (basic auth for deploy.sh)
 .netrc
 
+# Canary test artefacts (Hawk Gemma tool-call validation)
+scripts/test-hawk-gemma-canary.mjs
+scripts/test-hawk-gemma-toolcall.mjs
+scripts/canary-screenshots/
+scripts/canary-results.json
+
 # Logs
 *.log
 npm-debug.log*
