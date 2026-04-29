@@ -18,7 +18,7 @@ export async function render(
 
   const features = polygons
     .map((p: any) => {
-      const rings = (p.coordinates ?? []).map((ring: any) => ring.map(toLonLat).filter(Boolean).map(fromLonLat));
+      const rings = (p.coordinates ?? []).map((ring: any) => ring.map(toLonLat).filter(Boolean).map((c: any) => fromLonLat(c)));
       if (!rings.length) return null;
       const f = new Feature({ geometry: new Polygon(rings) });
       f.set('color', p.color ?? '#3388ff');

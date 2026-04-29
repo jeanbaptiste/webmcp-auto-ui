@@ -20,7 +20,7 @@ schema:
 ## Example
 ```
 openlayers_webmcp_widget_display({name: "openlayers-topojson", params: {
-  url: "https://openlayers.org/en/latest/examples/data/topojson/world-110m.json",
+  url: "https://raw.githubusercontent.com/openlayers/openlayers/main/examples/data/topojson/world-110m.json",
   zoom: 1
 }})
 ```

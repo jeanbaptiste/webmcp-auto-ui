@@ -18,7 +18,7 @@ export async function render(
 
   const features = lines
     .map((l: any) => {
-      const coords = (l.coordinates ?? []).map(toLonLat).filter(Boolean).map(fromLonLat);
+      const coords = (l.coordinates ?? []).map(toLonLat).filter(Boolean).map((c: any) => fromLonLat(c));
       if (coords.length < 2) return null;
       const f = new Feature({ geometry: new LineString(coords) });
       f.set('color', l.color ?? '#3388ff');

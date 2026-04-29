@@ -14,7 +14,7 @@ schema:
 ## Example
 ```
 openlayers_webmcp_widget_display({name: "openlayers-gpx", params: {
-  url: "https://openlayers.org/en/latest/examples/data/gpx/fells_loop.gpx",
+  url: "https://raw.githubusercontent.com/openlayers/openlayers/main/examples/data/gpx/fells_loop.gpx",
   center: [-71.1, 42.4], zoom: 13
 }})
 ```

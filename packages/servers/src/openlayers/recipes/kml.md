@@ -14,7 +14,7 @@ schema:
 ## Example
 ```
 openlayers_webmcp_widget_display({name: "openlayers-kml", params: {
-  url: "https://openlayers.org/en/latest/examples/data/kml/2012-02-10.kml",
+  url: "https://raw.githubusercontent.com/openlayers/openlayers/main/examples/data/kml/2012-02-10.kml",
   zoom: 2
 }})
 ```

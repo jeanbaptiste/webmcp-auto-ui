@@ -23,7 +23,7 @@ Visualize a GeoJSON feature collection with default or custom styling.
 ## Example
 ```
 openlayers_webmcp_widget_display({name: "openlayers-geojson", params: {
-  url: "https://openlayers.org/en/latest/examples/data/geojson/countries.geojson",
+  url: "https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson",
   zoom: 2, center: [0, 30]
 }})
 ```

@@ -8,6 +8,26 @@
  *     we extract just the `params` substring with balanced-brace matching.
  *  3. Returns null when nothing usable is found.
  */
+// Recipes use illustrative URLs (example.com, https://.../, …) that 404 in the
+// showcase. Filter them so the widget falls back to its empty state.
+const PLACEHOLDER_URL_PATTERNS = [
+  /https?:\/\/example\.com\b/i,
+  /https?:\/\/\.\.\.[\/]/,
+  /https?:\/\/your-/i,
+  /https?:\/\/<[^>]+>/,
+];
+
+function containsPlaceholderUrl(value: unknown): boolean {
+  if (typeof value === 'string') {
+    return PLACEHOLDER_URL_PATTERNS.some((re) => re.test(value));
+  }
+  if (Array.isArray(value)) return value.some(containsPlaceholderUrl);
+  if (value && typeof value === 'object') {
+    return Object.values(value).some(containsPlaceholderUrl);
+  }
+  return false;
+}
+
 export function extractSampleFromRecipe(markdown: string): Record<string, unknown> | null {
   if (!markdown) return null;
 
@@ -22,7 +42,7 @@ export function extractSampleFromRecipe(markdown: string): Record<string, unknow
   for (const c of candidates) {
     if (c.lang !== 'json') continue;
     const obj = tryParseJson(c.body);
-    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+    if (obj && typeof obj === 'object' && !Array.isArray(obj) && !containsPlaceholderUrl(obj)) {
       return obj as Record<string, unknown>;
     }
   }
@@ -30,7 +50,7 @@ export function extractSampleFromRecipe(markdown: string): Record<string, unknow
   for (const c of candidates) {
     if (c.lang === 'json') continue;
     const obj = tryParseJson(c.body);
-    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+    if (obj && typeof obj === 'object' && !Array.isArray(obj) && !containsPlaceholderUrl(obj)) {
       return obj as Record<string, unknown>;
     }
   }
@@ -43,9 +63,8 @@ export function extractSampleFromRecipe(markdown: string): Record<string, unknow
     const start = cm.index + cm[0].length - 1; // points at the opening `{` of the call's first arg
     const objStr = extractBalanced(markdown, start, '{', '}');
     if (!objStr) continue;
-    // Find params: <expr> inside objStr
     const paramsObj = extractParamsField(objStr);
-    if (paramsObj) return paramsObj;
+    if (paramsObj && !containsPlaceholderUrl(paramsObj)) return paramsObj;
   }
 
   return null;
