@@ -76,8 +76,13 @@ export async function createViewer(
 
   if (useOSM && !rest.imageryProvider) {
     try {
-      viewerOptions.imageryProvider = new Cesium.OpenStreetMapImageryProvider({
-        url: 'https://tile.openstreetmap.org/',
+      // Esri World Street Map: CORS-friendly, no throttling, no Ion key needed.
+      // OSM tile.openstreetmap.org throws InvalidStateError in Cesium because
+      // createImageBitmap fails on rate-limited HTML error responses.
+      viewerOptions.imageryProvider = new Cesium.UrlTemplateImageryProvider({
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+        credit: '© Esri',
+        maximumLevel: 19,
       });
     } catch {
       // fallback: leave default
