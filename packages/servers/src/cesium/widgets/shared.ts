@@ -14,7 +14,9 @@ export async function loadCesium(): Promise<any> {
   // Cesium consumes assets relative to a global base url. Default to /cesium/
   // (apps must serve cesium static assets there). Safe to set repeatedly.
   if (typeof window !== 'undefined' && !(window as any).CESIUM_BASE_URL) {
-    (window as any).CESIUM_BASE_URL = '/cesium/';
+    // CDN-hosted Cesium assets (Workers, Textures/SkyBox, IAU2006_XYS, ...).
+    // Local '/cesium/' path requires deploying ~30MB of static assets per app.
+    (window as any).CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.140.0/Build/Cesium/';
   }
   return _cesium;
 }

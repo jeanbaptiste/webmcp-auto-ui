@@ -52,6 +52,12 @@ export async function plotly(
   config?: any,
 ): Promise<() => void> {
   const Plotly = await loadPlotly();
+  // Plotly auto-sizes to container; without an explicit height the CSS %-chain
+  // collapses through ancestors and the chart renders ~50px tall. Mirrors the
+  // OL viewport fix.
+  if (!container.style.height) container.style.height = '420px';
+  container.style.minHeight = container.style.minHeight || '400px';
+  container.style.width = container.style.width || '100%';
   const mergedLayout = { ...darkLayout(layout?.title), ...layout };
   const mergedConfig = { ...responsiveConfig(), ...config };
   await Plotly.newPlot(container, traces, mergedLayout, mergedConfig);
