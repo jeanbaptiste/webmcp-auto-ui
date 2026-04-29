@@ -300,6 +300,26 @@ function createCanvasVanilla() {
             recipes = parseRecipesFromToolResponse(res) ?? [];
           } catch { /* no recipes */ }
         }
+        // Prefetch full bodies in parallel so apps can render markdown / run
+        // code blocks without re-calling get_recipe per surface.
+        if (recipes.length && tools.some((t: McpTool) => t.name === 'get_recipe')) {
+          recipes = await Promise.all(recipes.map(async (r) => {
+            try {
+              const res = await multiClient.callToolOn(srv.url, 'get_recipe', { name: r.name, id: r.name });
+              const text = (res as { content?: { type?: string; text?: string }[] })
+                .content?.find((c) => c?.type === 'text')?.text;
+              if (!text) return r;
+              let body = text;
+              try {
+                const p = JSON.parse(text);
+                if (p && typeof p === 'object' && typeof (p as { content?: unknown }).content === 'string') {
+                  body = (p as { content: string }).content;
+                }
+              } catch { /* raw markdown */ }
+              return { ...r, body };
+            } catch { return r; }
+          }));
+        }
         setDataServerMeta(name, {
           connected: true, connecting: false,
           tools: tools as McpToolInfo[],
