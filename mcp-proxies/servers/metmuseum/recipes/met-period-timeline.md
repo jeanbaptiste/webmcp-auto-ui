@@ -32,22 +32,24 @@ layout:
      dateEnd: -1070,
      hasImages: true,
      pageSize: 40
-   });
+   }).catch(() => null);
+   const ids = search?.objectIDs ?? [];
+   if (ids.length === 0) return widget('text', { content: 'No objects in this period.' });
    ```
 
 2. **Fetch a representative sample** (8-12 detailed objects):
    ```js
-   const sampled = search.objectIDs.slice(0, 12);
-   const details = await Promise.all(sampled.map(id => call('get-museum-object', { objectId: id })));
-   const works = details.map(d => d.object).filter(o => o.primaryImageSmall);
+   const sampled = ids.slice(0, 12);
+   const details = await Promise.all(sampled.map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const works = details.filter(d => d?.object).map(d => d.object).filter(o => o?.primaryImageSmall);
    ```
 
 3. **Timeline** sorted by `objectBeginDate`:
    ```js
    await widget('timeline', {
-     items: works
-       .sort((a, b) => (a.objectBeginDate || 0) - (b.objectBeginDate || 0))
-       .map(w => ({ date: w.objectDate, title: w.title, description: w.medium, image: w.primaryImageSmall }))
+     items: [...works]
+       .sort((a, b) => (a?.objectBeginDate || 0) - (b?.objectBeginDate || 0))
+       .map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', description: w?.medium ?? '—', image: w?.primaryImageSmall }))
    });
    ```
 
@@ -55,7 +57,7 @@ layout:
    ```js
    const buckets = {};
    for (const w of works) {
-     const c = Math.floor((w.objectBeginDate || 0) / 100) * 100;
+     const c = Math.floor((w?.objectBeginDate || 0) / 100) * 100;
      buckets[c] = (buckets[c] || 0) + 1;
    }
    await widget('chart', {
@@ -66,7 +68,7 @@ layout:
 
 5. **Stats** (span covered, cultures represented):
    ```js
-   const cultures = [...new Set(works.map(w => w.culture).filter(Boolean))];
+   const cultures = [...new Set(works.map(w => w?.culture).filter(Boolean))];
    await widget('stat-card', { label: 'Objects sampled', value: works.length, icon: 'archive' });
    await widget('stat-card', { label: 'Cultures', value: cultures.length, icon: 'globe' });
    ```
@@ -74,7 +76,7 @@ layout:
 6. **Illustrated gallery**:
    ```js
    await widget('gallery', {
-     images: works.map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: w.objectDate }))
+     images: works.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.objectDate ?? '—' }))
    });
    ```
 
@@ -82,17 +84,20 @@ layout:
 
 ### Italian Renaissance (1400-1600)
 ```js
-const r = await call('search-museum-objects', { q: 'Italy', departmentId: 11, dateBegin: 1400, dateEnd: 1600, hasImages: true, pageSize: 40 });
-const objs = await Promise.all(r.objectIDs.slice(0, 12).map(id => call('get-museum-object', { objectId: id })));
-const works = objs.map(o => o.object);
-await widget('timeline', { items: works.map(w => ({ date: w.objectDate, title: w.title, image: w.primaryImageSmall })) });
+const r = await call('search-museum-objects', { q: 'Italy', departmentId: 11, dateBegin: 1400, dateEnd: 1600, hasImages: true, pageSize: 40 }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object);
+await widget('timeline', { items: works.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall })) });
 ```
 
 ### Tang dynasty
 ```js
-const r = await call('search-museum-objects', { q: 'Tang', departmentId: 6, dateBegin: 618, dateEnd: 907, hasImages: true });
-const objs = await Promise.all(r.objectIDs.slice(0, 10).map(id => call('get-museum-object', { objectId: id })));
-await widget('gallery', { images: objs.map(o => o.object).map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: w.objectDate })) });
+const r = await call('search-museum-objects', { q: 'Tang', departmentId: 6, dateBegin: 618, dateEnd: 907, hasImages: true }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+await widget('gallery', { images: works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.objectDate ?? '—' })) });
 ```
 
 ## Common mistakes

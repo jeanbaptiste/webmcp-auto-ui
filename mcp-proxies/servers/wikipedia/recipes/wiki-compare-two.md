@@ -26,34 +26,36 @@ The user wants a side-by-side comparison:
 1. **Fetch both summaries + key facts in parallel**:
    ```js
    const [sumA, sumB, factsA, factsB] = await Promise.all([
-     call('get_summary', { title: 'Isaac Newton' }),
-     call('get_summary', { title: 'Albert Einstein' }),
-     call('extract_key_facts', { title: 'Isaac Newton', count: 5 }),
-     call('extract_key_facts', { title: 'Albert Einstein', count: 5 })
+     call('get_summary', { title: 'Isaac Newton' }).catch(() => null),
+     call('get_summary', { title: 'Albert Einstein' }).catch(() => null),
+     call('extract_key_facts', { title: 'Isaac Newton', count: 5 }).catch(() => null),
+     call('extract_key_facts', { title: 'Albert Einstein', count: 5 }).catch(() => null)
    ]);
+   const fA = factsA?.facts ?? [];
+   const fB = factsB?.facts ?? [];
    ```
 
 2. **Render header stats**:
    ```js
-   await widget('stat-card', { label: 'A', value: sumA.title, icon: 'user' });
-   await widget('stat-card', { label: 'B', value: sumB.title, icon: 'user' });
-   await widget('stat-card', { label: 'Facts compared', value: Math.min(factsA.facts.length, factsB.facts.length), icon: 'columns' });
+   await widget('stat-card', { label: 'A', value: sumA?.title ?? '—', icon: 'user' });
+   await widget('stat-card', { label: 'B', value: sumB?.title ?? '—', icon: 'user' });
+   await widget('stat-card', { label: 'Facts compared', value: Math.min(fA.length, fB.length), icon: 'columns' });
    ```
 
 3. **Render two summary blocks**:
    ```js
-   await widget('text', { content: `**${sumA.title}** — ${sumA.summary}` });
-   await widget('text', { content: `**${sumB.title}** — ${sumB.summary}` });
+   await widget('text', { content: `**${sumA?.title ?? '—'}** — ${sumA?.summary ?? '(no summary)'}` });
+   await widget('text', { content: `**${sumB?.title ?? '—'}** — ${sumB?.summary ?? '(no summary)'}` });
    ```
 
 4. **Render the comparison table** by aligning facts row by row:
    ```js
    const rows = [];
-   const n = Math.max(factsA.facts.length, factsB.facts.length);
+   const n = Math.max(fA.length, fB.length);
    for (let i = 0; i < n; i++) {
-     rows.push([`Fact ${i + 1}`, factsA.facts[i] || '—', factsB.facts[i] || '—']);
+     rows.push([`Fact ${i + 1}`, fA[i] ?? '—', fB[i] ?? '—']);
    }
-   await widget('table', { columns: ['#', sumA.title, sumB.title], rows });
+   await widget('table', { columns: ['#', sumA?.title ?? 'A', sumB?.title ?? 'B'], rows });
    ```
 
 ## Examples
@@ -61,27 +63,29 @@ The user wants a side-by-side comparison:
 ### Newton vs Einstein
 ```js
 const [a, b, fa, fb] = await Promise.all([
-  call('get_summary', { title: 'Isaac Newton' }),
-  call('get_summary', { title: 'Albert Einstein' }),
-  call('extract_key_facts', { title: 'Isaac Newton', count: 5 }),
-  call('extract_key_facts', { title: 'Albert Einstein', count: 5 })
+  call('get_summary', { title: 'Isaac Newton' }).catch(() => null),
+  call('get_summary', { title: 'Albert Einstein' }).catch(() => null),
+  call('extract_key_facts', { title: 'Isaac Newton', count: 5 }).catch(() => null),
+  call('extract_key_facts', { title: 'Albert Einstein', count: 5 }).catch(() => null)
 ]);
-await widget('text', { content: a.summary });
-await widget('text', { content: b.summary });
+await widget('text', { content: a?.summary ?? '(no summary)' });
+await widget('text', { content: b?.summary ?? '(no summary)' });
+const fAll = fa?.facts ?? [];
+const fBall = fb?.facts ?? [];
 await widget('table', {
-  columns: ['#', a.title, b.title],
-  rows: fa.facts.map((f, i) => [i + 1, f, fb.facts[i] || '—'])
+  columns: ['#', a?.title ?? 'A', b?.title ?? 'B'],
+  rows: fAll.map((f, i) => [i + 1, f, fBall[i] ?? '—'])
 });
 ```
 
 ### Python vs Ruby
 ```js
 const [a, b] = await Promise.all([
-  call('get_summary', { title: 'Python (programming language)' }),
-  call('get_summary', { title: 'Ruby (programming language)' })
+  call('get_summary', { title: 'Python (programming language)' }).catch(() => null),
+  call('get_summary', { title: 'Ruby (programming language)' }).catch(() => null)
 ]);
-await widget('text', { content: a.summary });
-await widget('text', { content: b.summary });
+await widget('text', { content: a?.summary ?? '(no summary)' });
+await widget('text', { content: b?.summary ?? '(no summary)' });
 ```
 
 ## Common mistakes

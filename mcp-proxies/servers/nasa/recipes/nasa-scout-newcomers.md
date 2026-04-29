@@ -26,32 +26,32 @@ Scout follows the Minor Planet Center's NEO Confirmation Page in real time, comp
 
 ```js
 // 1. Get the current Scout list
-const list = await call('jpl_scout', { limit: 30, summary: true });
-const objects = list.data || [];
+const list = await call('jpl_scout', { limit: 30, summary: true }).catch(() => null);
+const objects = (list?.data ?? []).filter(o => o);
+if (objects.length === 0) return widget('text', { content: 'No active Scout candidates.' });
 
 // 2. KPI stat-cards
-const risky = objects.filter(o => +o.ip > 0).length;
+const risky = objects.filter(o => +(o?.ip ?? 0) > 0).length;
 const newest = objects[0];
 await widget('stat-card', { label: 'Active candidates', value: objects.length, icon: 'sparkles' });
 await widget('stat-card', { label: 'With non-zero IP', value: risky, icon: 'alert' });
-await widget('stat-card', { label: 'Latest', value: newest?.tdes, icon: 'clock' });
+await widget('stat-card', { label: 'Latest', value: newest?.tdes ?? '—', icon: 'clock' });
 
 // 3. Candidate cards
 await widget('cards', {
   items: objects.slice(0, 8).map(o => ({
-    title: o.tdes,
-    subtitle: `H ≈ ${o.h} · rate ${o.rate} arcsec/min`,
-    description: `${o.nobs || '?'} observations · IP ${o.ip || 0}`
+    title: o?.tdes ?? '—',
+    subtitle: `H ≈ ${o?.h ?? '—'} · rate ${o?.rate ?? '—'} arcsec/min`,
+    description: `${o?.nobs ?? '?'} observations · IP ${o?.ip ?? 0}`
   }))
 });
 
 // 4. Detail call for the most observed candidate (ephemerides)
-const focus = objects[0];
-const detail = await call('jpl_scout', { tdes: focus.tdes, file: 'summary' });
+const detail = newest?.tdes ? await call('jpl_scout', { tdes: newest.tdes, file: 'summary' }).catch(() => null) : null;
 
 await widget('table', {
   columns: ['UT date', 'RA', 'Dec', 'V mag', 'Rate'],
-  rows: (detail.eph || []).slice(0, 10).map(e => [e.utc, e.ra, e.dec, e.vmag, e.rate])
+  rows: (detail?.eph ?? []).slice(0, 10).map(e => [e?.utc ?? '—', e?.ra ?? '—', e?.dec ?? '—', e?.vmag ?? '—', e?.rate ?? '—'])
 });
 
 // 5. Selection criteria + caveats
@@ -68,16 +68,18 @@ await widget('kv', {
 
 ### Active list
 ```js
-const list = await call('jpl_scout', { limit: 20, summary: true });
-await widget('stat-card', { label: 'Candidates', value: list.data.length });
-await widget('cards', { items: list.data.slice(0, 5).map(o => ({ title: o.tdes, subtitle: 'H ' + o.h })) });
+const list = await call('jpl_scout', { limit: 20, summary: true }).catch(() => null);
+const data = (list?.data ?? []).filter(o => o);
+await widget('stat-card', { label: 'Candidates', value: data.length });
+await widget('cards', { items: data.slice(0, 5).map(o => ({ title: o?.tdes ?? '—', subtitle: 'H ' + (o?.h ?? '—') })) });
 ```
 
 ### Drill into one candidate
 ```js
-const det = await call('jpl_scout', { tdes: 'P21Eolo', file: 'all' });
-await widget('table', { columns: ['UT', 'RA', 'Dec', 'V'], rows: det.eph.slice(0, 12).map(e => [e.utc, e.ra, e.dec, e.vmag]) });
-await widget('kv', { items: [{ label: 'Object', value: 'P21Eolo' }, { label: 'Observations', value: det.nobs }] });
+const det = await call('jpl_scout', { tdes: 'P21Eolo', file: 'all' }).catch(() => null);
+const eph = (det?.eph ?? []).filter(e => e);
+await widget('table', { columns: ['UT', 'RA', 'Dec', 'V'], rows: eph.slice(0, 12).map(e => [e?.utc ?? '—', e?.ra ?? '—', e?.dec ?? '—', e?.vmag ?? '—']) });
+await widget('kv', { items: [{ label: 'Object', value: 'P21Eolo' }, { label: 'Observations', value: det?.nobs ?? '—' }] });
 ```
 
 ## Common mistakes

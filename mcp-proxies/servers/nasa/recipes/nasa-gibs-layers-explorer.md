@@ -36,7 +36,7 @@ const layers = [
 
 // 1. Fetch tile metadata for each layer
 const responses = await Promise.all(
-  layers.map(l => call('nasa_gibs', { layer: l.id, date, format: 'png', resolution: 250 }))
+  layers.map(l => call('nasa_gibs', { layer: l.id, date, format: 'png', resolution: 250 }).catch(() => null))
 );
 
 // 2. Multi-layer map (toggleable layers)
@@ -44,10 +44,10 @@ await widget('map', {
   center: [20, 0],
   zoom: 2,
   tileLayers: responses.map((r, i) => ({
-    name: layers[i].label,
-    url: r.tileUrl || r.url,
+    name: layers[i]?.label ?? '—',
+    url: r?.tileUrl || r?.url,
     opacity: i === 0 ? 1 : 0.6
-  }))
+  })).filter(t => t.url)
 });
 
 // 3. Cards describing each layer
@@ -74,19 +74,21 @@ await widget('kv', {
 
 ### Daily true colour
 ```js
-const r = await call('nasa_gibs', { layer: 'MODIS_Terra_CorrectedReflectance_TrueColor', date: '2026-04-28' });
-await widget('map', { center: [0, 0], zoom: 2, tileLayers: [{ name: 'True colour', url: r.tileUrl }] });
+const r = await call('nasa_gibs', { layer: 'MODIS_Terra_CorrectedReflectance_TrueColor', date: '2026-04-28' }).catch(() => null);
+const url = r?.tileUrl || r?.url;
+if (url) await widget('map', { center: [0, 0], zoom: 2, tileLayers: [{ name: 'True colour', url }] });
 await widget('kv', { items: [{ label: 'Layer', value: 'MODIS Terra TrueColor' }, { label: 'Date', value: '2026-04-28' }] });
 ```
 
 ### Fires + aerosols overlay
 ```js
-const fires = await call('nasa_gibs', { layer: 'VIIRS_SNPP_Thermal_Anomalies_375m_Day', date: '2026-04-28' });
-const aero  = await call('nasa_gibs', { layer: 'MODIS_Aqua_Aerosol',                    date: '2026-04-28' });
-await widget('map', { center: [-5, 25], zoom: 4, tileLayers: [
-  { name: 'Aerosol', url: aero.tileUrl, opacity: 0.5 },
-  { name: 'Fires',   url: fires.tileUrl, opacity: 1.0 }
-]});
+const fires = await call('nasa_gibs', { layer: 'VIIRS_SNPP_Thermal_Anomalies_375m_Day', date: '2026-04-28' }).catch(() => null);
+const aero  = await call('nasa_gibs', { layer: 'MODIS_Aqua_Aerosol',                    date: '2026-04-28' }).catch(() => null);
+const tileLayers = [
+  aero?.tileUrl ? { name: 'Aerosol', url: aero.tileUrl, opacity: 0.5 } : null,
+  fires?.tileUrl ? { name: 'Fires', url: fires.tileUrl, opacity: 1.0 } : null
+].filter(Boolean);
+await widget('map', { center: [-5, 25], zoom: 4, tileLayers });
 ```
 
 ## Common mistakes

@@ -30,19 +30,21 @@ layout:
      dateBegin: year, dateEnd: year,
      hasImages: true,
      pageSize: 40
-   });
+   }).catch(() => null);
+   const ids = search?.objectIDs ?? [];
+   if (ids.length === 0) return widget('text', { content: `No objects in ${year}.` });
    ```
 
 2. **Fetch a sample**:
    ```js
-   const objs = await Promise.all(search.objectIDs.slice(0, 20).map(id => call('get-museum-object', { objectId: id })));
-   const works = objs.map(o => o.object).filter(w => w.primaryImageSmall);
+   const objs = await Promise.all(ids.slice(0, 20).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
    ```
 
 3. **Stats**:
    ```js
-   const continents = [...new Set(works.map(w => w.country).filter(Boolean))];
-   await widget('stat-card', { label: `Met objects from ${year}`, value: search.total, icon: 'calendar' });
+   const continents = [...new Set(works.map(w => w?.country).filter(Boolean))];
+   await widget('stat-card', { label: `Met objects from ${year}`, value: search?.total ?? works.length, icon: 'calendar' });
    await widget('stat-card', { label: 'Countries represented', value: continents.length, icon: 'globe' });
    ```
 
@@ -53,7 +55,7 @@ layout:
        ['Year', `${year}`],
        ['Hint', 'French Revolution begins; US Constitution ratified'],
        ['Sample size', works.length],
-       ['First object', works[0]?.title]
+       ['First object', works[0]?.title ?? '—']
      ]
    });
    ```
@@ -61,17 +63,17 @@ layout:
 5. **Cross-cultural gallery**:
    ```js
    await widget('gallery', {
-     images: works.map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: `${w.country || w.culture} — ${w.medium}` }))
+     images: works.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.country || w?.culture || '—'} — ${w?.medium ?? '—'}` }))
    });
    ```
 
 6. **Timeline + cards by continent**:
    ```js
-   await widget('timeline', { items: works.map(w => ({ date: w.objectDate, title: w.title, image: w.primaryImageSmall })) });
-   const byCountry = works.reduce((acc, w) => { (acc[w.country || 'Unknown'] = acc[w.country || 'Unknown'] || []).push(w); return acc; }, {});
+   await widget('timeline', { items: works.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall })) });
+   const byCountry = works.reduce((acc, w) => { const k = w?.country || 'Unknown'; (acc[k] = acc[k] || []).push(w); return acc; }, {});
    await widget('cards', {
      items: Object.entries(byCountry).flatMap(([c, ws]) => ws.slice(0, 1).map(w => ({
-       title: c, subtitle: w.title, image: w.primaryImageSmall, body: w.artistDisplayName || w.culture
+       title: c, subtitle: w?.title ?? '(untitled)', image: w?.primaryImageSmall, body: w?.artistDisplayName || w?.culture || '—'
      })))
    });
    ```
@@ -80,17 +82,20 @@ layout:
 
 ### Snapshot of 1789
 ```js
-const r = await call('search-museum-objects', { q: '*', dateBegin: 1789, dateEnd: 1789, hasImages: true, pageSize: 30 });
-const objs = await Promise.all(r.objectIDs.slice(0, 12).map(id => call('get-museum-object', { objectId: id })));
-const works = objs.map(o => o.object);
-await widget('gallery', { images: works.map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: w.country })) });
+const r = await call('search-museum-objects', { q: '*', dateBegin: 1789, dateEnd: 1789, hasImages: true, pageSize: 30 }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+await widget('gallery', { images: works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.country ?? '—' })) });
 ```
 
 ### 1968 across cultures
 ```js
-const r = await call('search-museum-objects', { q: '*', dateBegin: 1968, dateEnd: 1968, hasImages: true });
-const objs = await Promise.all(r.objectIDs.slice(0, 10).map(id => call('get-museum-object', { objectId: id })));
-await widget('timeline', { items: objs.map(o => ({ date: o.object.objectDate, title: o.object.title })) });
+const r = await call('search-museum-objects', { q: '*', dateBegin: 1968, dateEnd: 1968, hasImages: true }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object);
+await widget('timeline', { items: works.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)' })) });
 ```
 
 ## Common mistakes

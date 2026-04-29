@@ -24,22 +24,24 @@ layout:
 
 1. **List all departments**:
    ```js
-   const { departments } = await call('list-departments', {});
+   const resp = await call('list-departments', {}).catch(() => null);
+   const departments = resp?.departments ?? [];
+   if (departments.length === 0) return widget('text', { content: 'No departments returned.' });
    ```
 
 2. **For each department, fetch a `total` and a signature-piece ID**:
    ```js
    const stats = await Promise.all(departments.map(async d => {
      const r = await call('search-museum-objects', {
-       q: '*', departmentId: d.departmentId, isHighlight: true, hasImages: true, pageSize: 1
-     });
-     return { ...d, total: r.total, sampleId: r.objectIDs[0] };
+       q: '*', departmentId: d?.departmentId, isHighlight: true, hasImages: true, pageSize: 1
+     }).catch(() => null);
+     return { ...d, total: r?.total ?? 0, sampleId: (r?.objectIDs ?? [])[0] };
    }));
    ```
 
 3. **Stats**:
    ```js
-   const totalObjects = stats.reduce((s, d) => s + d.total, 0);
+   const totalObjects = stats.reduce((s, d) => s + (d?.total ?? 0), 0);
    await widget('stat-card', { label: 'Departments', value: stats.length, icon: 'building' });
    await widget('stat-card', { label: 'Highlight objects', value: totalObjects, icon: 'archive' });
    ```
@@ -48,45 +50,48 @@ layout:
    ```js
    await widget('chart', {
      type: 'bar',
-     data: stats.map(d => ({ label: d.displayName, value: d.total }))
+     data: stats.map(d => ({ label: d?.displayName ?? '—', value: d?.total ?? 0 }))
    });
    ```
 
 5. **Cards with a signature piece per department**:
    ```js
-   const samples = await Promise.all(stats.filter(d => d.sampleId).map(d => call('get-museum-object', { objectId: d.sampleId })));
+   const sampled = stats.filter(d => d?.sampleId);
+   const samples = await Promise.all(sampled.map(d => call('get-museum-object', { objectId: d.sampleId }).catch(() => null)));
    await widget('cards', {
      items: samples.map((s, i) => ({
-       title: stats[i].displayName,
-       subtitle: s.object.title,
-       image: s.object.primaryImageSmall,
-       body: `${s.object.objectDate || '—'}`
+       title: sampled[i]?.displayName ?? '—',
+       subtitle: s?.object?.title ?? '—',
+       image: s?.object?.primaryImageSmall,
+       body: `${s?.object?.objectDate || '—'}`
      }))
    });
    ```
 
 6. **KV directory**:
    ```js
-   await widget('kv', { pairs: stats.map(d => [d.displayName, `${d.total} highlights`]) });
+   await widget('kv', { pairs: stats.map(d => [d?.displayName ?? '—', `${d?.total ?? 0} highlights`]) });
    ```
 
 ## Examples
 
 ### Full overview
 ```js
-const { departments } = await call('list-departments', {});
+const resp = await call('list-departments', {}).catch(() => null);
+const departments = resp?.departments ?? [];
 const stats = await Promise.all(departments.map(async d => {
-  const r = await call('search-museum-objects', { q: '*', departmentId: d.departmentId, isHighlight: true, pageSize: 1 });
-  return { ...d, total: r.total };
+  const r = await call('search-museum-objects', { q: '*', departmentId: d?.departmentId, isHighlight: true, pageSize: 1 }).catch(() => null);
+  return { ...d, total: r?.total ?? 0 };
 }));
-await widget('chart', { type: 'bar', data: stats.map(d => ({ label: d.displayName, value: d.total })) });
-await widget('kv', { pairs: stats.map(d => [d.displayName, `${d.total}`]) });
+await widget('chart', { type: 'bar', data: stats.map(d => ({ label: d?.displayName ?? '—', value: d?.total ?? 0 })) });
+await widget('kv', { pairs: stats.map(d => [d?.displayName ?? '—', `${d?.total ?? 0}`]) });
 ```
 
 ### Pick a department to dive into
 ```js
-const { departments } = await call('list-departments', {});
-await widget('cards', { items: departments.map(d => ({ title: d.displayName, body: `Department #${d.departmentId}` })) });
+const resp = await call('list-departments', {}).catch(() => null);
+const departments = resp?.departments ?? [];
+await widget('cards', { items: departments.map(d => ({ title: d?.displayName ?? '—', body: `Department #${d?.departmentId ?? '—'}` })) });
 ```
 
 ## Common mistakes

@@ -28,38 +28,40 @@ layout:
      q: 'Buddha',
      hasImages: true,
      pageSize: 30
-   });
+   }).catch(() => null);
+   const ids = search?.objectIDs ?? [];
+   if (ids.length === 0) return widget('text', { content: 'No matches.' });
    ```
 
 2. **Fetch a wide sample**:
    ```js
-   const objs = await Promise.all(search.objectIDs.slice(0, 18).map(id => call('get-museum-object', { objectId: id })));
-   const works = objs.map(o => o.object).filter(w => w.primaryImageSmall);
+   const objs = await Promise.all(ids.slice(0, 18).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
    ```
 
 3. **Iconic gallery** (visual catechism):
    ```js
    await widget('gallery', {
-     images: works.map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: `${w.culture || w.country} — ${w.objectDate}` }))
+     images: works.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.culture || w?.country || '—'} — ${w?.objectDate ?? '—'}` }))
    });
    ```
 
 4. **Cards per school/tradition** (grouped by culture):
    ```js
-   const bySchool = works.reduce((acc, w) => { (acc[w.culture || w.department] = acc[w.culture || w.department] || []).push(w); return acc; }, {});
+   const bySchool = works.reduce((acc, w) => { const k = w?.culture || w?.department || '—'; (acc[k] = acc[k] || []).push(w); return acc; }, {});
    await widget('cards', {
      items: Object.entries(bySchool).flatMap(([school, ws]) => ws.slice(0, 2).map(w => ({
-       title: w.title, subtitle: school, image: w.primaryImageSmall, body: w.medium
+       title: w?.title ?? '(untitled)', subtitle: school, image: w?.primaryImageSmall, body: w?.medium ?? '—'
      })))
    });
    ```
 
 5. **Map of production centers**:
    ```js
-   const places = works.filter(w => w.country).map(w => ({
+   const places = works.filter(w => w?.country).map(w => ({
      lat: 0, lon: 0,
-     label: w.city || w.country,
-     popup: `${w.title} (${w.culture})`
+     label: w?.city || w?.country || '—',
+     popup: `${w?.title ?? '(untitled)'} (${w?.culture ?? '—'})`
    }));
    await widget('map', { center: [25, 80], zoom: 3, markers: places });
    ```
@@ -67,7 +69,10 @@ layout:
 6. **KV of recurring symbols** (from tags):
    ```js
    const tags = {};
-   for (const w of works) for (const t of (w.tags || [])) tags[t.term] = (tags[t.term] || 0) + 1;
+   for (const w of works) for (const t of (w?.tags ?? [])) {
+     const term = t?.term;
+     if (term) tags[term] = (tags[term] || 0) + 1;
+   }
    const top = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 6);
    await widget('kv', { pairs: top.map(([t, n]) => [t, `${n} occurrences`]) });
    ```
@@ -76,17 +81,20 @@ layout:
 
 ### Buddhist art
 ```js
-const r = await call('search-museum-objects', { q: 'Buddha', departmentId: 6, hasImages: true });
-const objs = await Promise.all(r.objectIDs.slice(0, 12).map(id => call('get-museum-object', { objectId: id })));
-const works = objs.map(o => o.object);
-await widget('gallery', { images: works.map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: w.culture })) });
+const r = await call('search-museum-objects', { q: 'Buddha', departmentId: 6, hasImages: true }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+await widget('gallery', { images: works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.culture ?? '—' })) });
 ```
 
 ### Islamic sacred art
 ```js
-const r = await call('search-museum-objects', { q: 'Quran calligraphy', departmentId: 14, hasImages: true });
-const objs = await Promise.all(r.objectIDs.slice(0, 10).map(id => call('get-museum-object', { objectId: id })));
-await widget('cards', { items: objs.map(o => ({ title: o.object.title, subtitle: o.object.culture, image: o.object.primaryImageSmall })) });
+const r = await call('search-museum-objects', { q: 'Quran calligraphy', departmentId: 14, hasImages: true }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object);
+await widget('cards', { items: works.map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.culture ?? '—', image: w?.primaryImageSmall })) });
 ```
 
 ## Common mistakes

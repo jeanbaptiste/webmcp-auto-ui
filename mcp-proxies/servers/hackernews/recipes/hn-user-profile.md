@@ -28,7 +28,8 @@ This recipe combines `get-user` (static profile) with `search-posts` (their cont
 
 1. **Fetch the user profile**:
    ```js
-   const user = await call('get-user', { username: 'pg' });
+   const user = await call('get-user', { username: 'pg' }).catch(() => null);
+   if (!user || !user.username) return widget('text', { content: 'User not found.' });
    ```
 
 2. **Fetch their recent stories** via the `author_USERNAME` tag:
@@ -38,27 +39,31 @@ This recipe combines `get-user` (static profile) with `search-posts` (their cont
      tags: [`author_${user.username}`, 'story'],
      numericFilters: ['points>=20'],
      hitsPerPage: 50
-   });
-   const posts = res.hits;
+   }).catch(() => null);
+   const posts = (res?.hits ?? []).filter(p => p);
    ```
 
 3. **Profile card** (bio, karma, since):
    ```js
-   const since = new Date(user.created_at_i * 1000).getFullYear();
+   const createdMs = (user?.created_at_i ?? 0) * 1000;
+   const since = createdMs > 0 ? new Date(createdMs).getFullYear() : '—';
    await widget('profile', {
-     name: user.username,
-     subtitle: `${user.karma} karma · since ${since}`,
-     body: (user.about || '(no bio)').replace(/<[^>]+>/g, ''),
-     url: `https://news.ycombinator.com/user?id=${user.username}`
+     name: user?.username ?? '—',
+     subtitle: `${user?.karma ?? 0} karma · since ${since}`,
+     body: (user?.about ?? '(no bio)').replace(/<[^>]+>/g, ''),
+     url: `https://news.ycombinator.com/user?id=${user?.username ?? ''}`
    });
    ```
 
 4. **KPI stat-cards**:
    ```js
-   await widget('stat-card', { label: 'Karma', value: user.karma, icon: 'star' });
-   await widget('stat-card', { label: 'Account age (yrs)', value: new Date().getFullYear() - new Date(user.created_at_i * 1000).getFullYear(), icon: 'calendar' });
+   const createdMs = (user?.created_at_i ?? 0) * 1000;
+   const ageYears = createdMs > 0 ? new Date().getFullYear() - new Date(createdMs).getFullYear() : 0;
+   const scores = posts.map(p => p?.points || 0).filter(Number.isFinite);
+   await widget('stat-card', { label: 'Karma', value: user?.karma ?? 0, icon: 'star' });
+   await widget('stat-card', { label: 'Account age (yrs)', value: ageYears, icon: 'calendar' });
    await widget('stat-card', { label: 'Recent stories', value: posts.length, icon: 'file-text' });
-   await widget('stat-card', { label: 'Top score', value: Math.max(0, ...posts.map(p => p.points || 0)), icon: 'flame' });
+   await widget('stat-card', { label: 'Top score', value: scores.length > 0 ? Math.max(...scores) : 0, icon: 'flame' });
    ```
 
 5. **Recent posts table**:
@@ -66,10 +71,10 @@ This recipe combines `get-user` (static profile) with `search-posts` (their cont
    await widget('table', {
      columns: ['Title', 'Points', 'Comments', 'Date'],
      rows: posts.map(p => [
-       p.title,
-       p.points || 0,
-       p.num_comments || 0,
-       p.created_at.slice(0, 10)
+       p?.title ?? '(untitled)',
+       p?.points ?? 0,
+       p?.num_comments ?? 0,
+       p?.created_at?.slice(0, 10) ?? '—'
      ])
    });
    ```
@@ -78,10 +83,10 @@ This recipe combines `get-user` (static profile) with `search-posts` (their cont
    ```js
    await widget('chart-rich', {
      type: 'line',
-     title: `Score timeline — ${user.username}`,
+     title: `Score timeline — ${user?.username ?? '—'}`,
      data: [...posts]
-       .sort((a, b) => a.created_at_i - b.created_at_i)
-       .map(p => ({ label: p.created_at.slice(0, 7), value: p.points || 0 }))
+       .sort((a, b) => (a?.created_at_i ?? 0) - (b?.created_at_i ?? 0))
+       .map(p => ({ label: p?.created_at?.slice(0, 7) ?? '—', value: p?.points ?? 0 }))
    });
    ```
 
@@ -89,41 +94,45 @@ This recipe combines `get-user` (static profile) with `search-posts` (their cont
 
 ### Profile pg
 ```js
-const user = await call('get-user', { username: 'pg' });
-const { hits } = await call('search-posts', {
+const user = await call('get-user', { username: 'pg' }).catch(() => null);
+if (!user) return widget('text', { content: 'User not found.' });
+const res = await call('search-posts', {
   query: '',
   tags: ['author_pg', 'story'],
   numericFilters: ['points>=50'],
   hitsPerPage: 50
-});
+}).catch(() => null);
+const hits = (res?.hits ?? []).filter(p => p);
 await widget('profile', {
-  name: user.username,
-  subtitle: `${user.karma} karma`,
-  body: (user.about || '').replace(/<[^>]+>/g, '')
+  name: user?.username ?? '—',
+  subtitle: `${user?.karma ?? 0} karma`,
+  body: (user?.about ?? '').replace(/<[^>]+>/g, '')
 });
-await widget('stat-card', { label: 'Karma', value: user.karma, icon: 'star' });
+await widget('stat-card', { label: 'Karma', value: user?.karma ?? 0, icon: 'star' });
 await widget('table', {
   columns: ['Title', 'Points', 'Date'],
-  rows: hits.slice(0, 20).map(p => [p.title, p.points, p.created_at.slice(0, 10)])
+  rows: hits.slice(0, 20).map(p => [p?.title ?? '(untitled)', p?.points ?? 0, p?.created_at?.slice(0, 10) ?? '—'])
 });
 ```
 
 ### Profile dang (moderator)
 ```js
-const user = await call('get-user', { username: 'dang' });
+const user = await call('get-user', { username: 'dang' }).catch(() => null);
+if (!user) return widget('text', { content: 'User not found.' });
 await widget('profile', {
-  name: user.username,
-  subtitle: `${user.karma} karma · moderator`,
-  body: (user.about || '(no bio)').replace(/<[^>]+>/g, '')
+  name: user?.username ?? '—',
+  subtitle: `${user?.karma ?? 0} karma · moderator`,
+  body: (user?.about ?? '(no bio)').replace(/<[^>]+>/g, '')
 });
-const { hits } = await call('search-posts', {
+const res = await call('search-posts', {
   query: '',
   tags: ['author_dang', 'comment'],
   hitsPerPage: 20
-});
+}).catch(() => null);
+const hits = (res?.hits ?? []).filter(p => p);
 await widget('table', {
   columns: ['Comment on', 'Points', 'Date'],
-  rows: hits.map(c => [c.story_title || '?', c.points || 0, c.created_at.slice(0, 10)])
+  rows: hits.map(c => [c?.story_title ?? '?', c?.points ?? 0, c?.created_at?.slice(0, 10) ?? '—'])
 });
 ```
 

@@ -31,13 +31,14 @@ const data = await call('nasa_eonet', {
   status: 'open',
   days: 30,
   limit: 100
-});
-const events = data.events || [];
+}).catch(() => null);
+const events = (data?.events ?? []).filter(e => e);
+if (events.length === 0) return widget('text', { content: 'No open events.' });
 
 // 2. Group by category
 const byCat = {};
 for (const e of events) {
-  const c = e.categories?.[0]?.title || 'Other';
+  const c = e?.categories?.[0]?.title || 'Other';
   (byCat[c] = byCat[c] || []).push(e);
 }
 
@@ -52,11 +53,12 @@ await widget('map', {
   center: [20, 0],
   zoom: 2,
   markers: events.map(e => {
-    const g = e.geometry?.[e.geometry.length - 1];
-    const cat = e.categories?.[0]?.title;
+    const geom = e?.geometry ?? [];
+    const g = geom.length > 0 ? geom[geom.length - 1] : null;
+    const cat = e?.categories?.[0]?.title;
     const c = g?.coordinates;
-    if (!c) return null;
-    return { lat: c[1], lon: c[0], label: e.title, color: COLOR[cat] || '#6b7280', popup: cat };
+    if (!c || !Array.isArray(c) || c.length < 2) return null;
+    return { lat: c[1], lon: c[0], label: e?.title ?? '—', color: COLOR[cat] || '#6b7280', popup: cat ?? '—' };
   }).filter(Boolean)
 });
 
@@ -65,16 +67,16 @@ await widget('cards', {
   items: Object.entries(byCat).map(([cat, list]) => ({
     title: cat,
     subtitle: `${list.length} events`,
-    description: list[0]?.title
+    description: list[0]?.title ?? '—'
   }))
 });
 
 // 6. Timeline of starts
 await widget('timeline', {
   events: events.slice(0, 25).map(e => ({
-    date: e.geometry?.[0]?.date?.slice(0, 10),
-    title: e.title,
-    description: e.categories?.[0]?.title
+    date: e?.geometry?.[0]?.date?.slice(0, 10) ?? '—',
+    title: e?.title ?? '—',
+    description: e?.categories?.[0]?.title ?? '—'
   }))
 });
 ```
@@ -83,16 +85,24 @@ await widget('timeline', {
 
 ### Volcanoes only
 ```js
-const data = await call('nasa_eonet', { category: 'volcanoes', status: 'open', limit: 50 });
-const events = data.events || [];
-await widget('map', { center: [0, 120], zoom: 3, markers: events.map(e => ({ lat: e.geometry.at(-1).coordinates[1], lon: e.geometry.at(-1).coordinates[0], label: e.title })) });
+const data = await call('nasa_eonet', { category: 'volcanoes', status: 'open', limit: 50 }).catch(() => null);
+const events = (data?.events ?? []).filter(e => e);
+const markers = events.map(e => {
+  const geom = e?.geometry ?? [];
+  const last = geom.length > 0 ? geom[geom.length - 1] : null;
+  const c = last?.coordinates;
+  if (!c || !Array.isArray(c) || c.length < 2) return null;
+  return { lat: c[1], lon: c[0], label: e?.title ?? '—' };
+}).filter(Boolean);
+await widget('map', { center: [0, 120], zoom: 3, markers });
 await widget('stat-card', { label: 'Active volcanoes', value: events.length });
 ```
 
 ### Closed wildfires last 90 days
 ```js
-const data = await call('nasa_eonet', { category: 'wildfires', status: 'closed', days: 90, limit: 100 });
-await widget('timeline', { events: (data.events || []).map(e => ({ date: e.geometry[0].date, title: e.title })) });
+const data = await call('nasa_eonet', { category: 'wildfires', status: 'closed', days: 90, limit: 100 }).catch(() => null);
+const events = (data?.events ?? []).filter(e => e);
+await widget('timeline', { events: events.map(e => ({ date: e?.geometry?.[0]?.date ?? '—', title: e?.title ?? '—' })) });
 ```
 
 ## Common mistakes

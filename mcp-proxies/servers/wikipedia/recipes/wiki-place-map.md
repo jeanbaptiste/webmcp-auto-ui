@@ -27,14 +27,16 @@ Combines coordinates with encyclopedic content in a single view.
 
 1. **Get coordinates** (may return multiple — primary first):
    ```js
-   const c = await call('get_coordinates', { title: 'Petra' });
-   const primary = (c.coordinates || []).find(x => x.primary) || c.coordinates?.[0];
+   const c = await call('get_coordinates', { title: 'Petra' }).catch(() => null);
+   const coords = c?.coordinates ?? [];
+   const primary = coords.find(x => x?.primary) || coords[0];
+   if (!primary || !Number.isFinite(primary?.latitude)) return widget('text', { content: 'Place not geolocated.' });
    ```
 
 2. **Get the summary in parallel**:
    ```js
-   const sum = await call('get_summary', { title: 'Petra' });
-   const facts = await call('extract_key_facts', { title: 'Petra', count: 5 });
+   const sum = await call('get_summary', { title: 'Petra' }).catch(() => null);
+   const facts = await call('extract_key_facts', { title: 'Petra', count: 5 }).catch(() => null);
    ```
 
 3. **Render the map**:
@@ -42,51 +44,54 @@ Combines coordinates with encyclopedic content in a single view.
    await widget('map', {
      center: [primary.latitude, primary.longitude],
      zoom: 13,
-     markers: [{ lat: primary.latitude, lon: primary.longitude, label: c.title, popup: sum.summary.slice(0, 140) }]
+     markers: [{ lat: primary.latitude, lon: primary.longitude, label: c?.title ?? '—', popup: (sum?.summary ?? '').slice(0, 140) }]
    });
    ```
 
 4. **Render summary + metadata + facts**:
    ```js
-   await widget('text', { content: sum.summary });
+   await widget('text', { content: sum?.summary ?? '(no summary)' });
    await widget('kv', {
      items: [
-       { label: 'Country', value: primary.country || '—' },
-       { label: 'Region', value: primary.region || '—' },
-       { label: 'Type', value: primary.type || '—' },
+       { label: 'Country', value: primary?.country ?? '—' },
+       { label: 'Region', value: primary?.region ?? '—' },
+       { label: 'Type', value: primary?.type ?? '—' },
        { label: 'Lat / Lon', value: `${primary.latitude.toFixed(4)}, ${primary.longitude.toFixed(4)}` }
      ]
    });
-   await widget('stat-card', { label: 'Key facts', value: facts.facts.length, icon: 'star' });
+   await widget('stat-card', { label: 'Key facts', value: (facts?.facts ?? []).length, icon: 'star' });
    ```
 
 ## Examples
 
 ### Locate the Pyramids of Giza
 ```js
-const c = await call('get_coordinates', { title: 'Giza pyramid complex' });
-const sum = await call('get_summary', { title: 'Giza pyramid complex' });
-const p = c.coordinates[0];
+const c = await call('get_coordinates', { title: 'Giza pyramid complex' }).catch(() => null);
+const sum = await call('get_summary', { title: 'Giza pyramid complex' }).catch(() => null);
+const p = (c?.coordinates ?? [])[0];
+if (!p) return widget('text', { content: 'Not geolocated.' });
 await widget('map', {
-  center: [p.latitude, p.longitude],
+  center: [p?.latitude, p?.longitude],
   zoom: 14,
-  markers: [{ lat: p.latitude, lon: p.longitude, label: c.title }]
+  markers: [{ lat: p?.latitude, lon: p?.longitude, label: c?.title ?? '—' }]
 });
-await widget('text', { content: sum.summary });
-await widget('kv', { items: [{ label: 'Country', value: p.country }, { label: 'Lat', value: p.latitude }, { label: 'Lon', value: p.longitude }] });
+await widget('text', { content: sum?.summary ?? '(no summary)' });
+await widget('kv', { items: [{ label: 'Country', value: p?.country ?? '—' }, { label: 'Lat', value: p?.latitude ?? '—' }, { label: 'Lon', value: p?.longitude ?? '—' }] });
 ```
 
 ### Locate Chambord with key facts
 ```js
 const [c, sum, facts] = await Promise.all([
-  call('get_coordinates', { title: 'Château de Chambord' }),
-  call('get_summary', { title: 'Château de Chambord' }),
-  call('extract_key_facts', { title: 'Château de Chambord', count: 6 })
+  call('get_coordinates', { title: 'Château de Chambord' }).catch(() => null),
+  call('get_summary', { title: 'Château de Chambord' }).catch(() => null),
+  call('extract_key_facts', { title: 'Château de Chambord', count: 6 }).catch(() => null)
 ]);
-const p = c.coordinates.find(x => x.primary);
-await widget('map', { center: [p.latitude, p.longitude], zoom: 14, markers: [{ lat: p.latitude, lon: p.longitude, label: c.title }] });
-await widget('text', { content: sum.summary });
-await widget('kv', { items: facts.facts.map((f, i) => ({ label: `Fact ${i + 1}`, value: f })) });
+const coords = c?.coordinates ?? [];
+const p = coords.find(x => x?.primary) || coords[0];
+if (!p) return widget('text', { content: 'Not geolocated.' });
+await widget('map', { center: [p?.latitude, p?.longitude], zoom: 14, markers: [{ lat: p?.latitude, lon: p?.longitude, label: c?.title ?? '—' }] });
+await widget('text', { content: sum?.summary ?? '(no summary)' });
+await widget('kv', { items: (facts?.facts ?? []).map((f, i) => ({ label: `Fact ${i + 1}`, value: f })) });
 ```
 
 ## Common mistakes

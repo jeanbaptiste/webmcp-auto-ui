@@ -26,27 +26,29 @@ The user wants to see the skeleton of a long article:
 1. **Fetch sections + summary in parallel**:
    ```js
    const [secs, sum] = await Promise.all([
-     call('get_sections', { title: 'Roman Empire' }),
-     call('get_summary', { title: 'Roman Empire' })
+     call('get_sections', { title: 'Roman Empire' }).catch(() => null),
+     call('get_summary', { title: 'Roman Empire' }).catch(() => null)
    ]);
+   const sections = secs?.sections ?? [];
    ```
 
 2. **Compute structure stats**:
    ```js
-   const n = secs.sections.length;
-   const maxLevel = Math.max(...secs.sections.map(s => s.level || 1));
-   const topLevel = secs.sections.filter(s => s.level === 1).length;
+   const n = sections.length;
+   const levels = sections.map(s => s?.level || 1).filter(Number.isFinite);
+   const maxLevel = levels.length > 0 ? Math.max(...levels) : 1;
+   const topLevel = sections.filter(s => s?.level === 1).length;
    ```
 
 3. **Render**:
    ```js
-   await widget('text', { content: sum.summary });
+   await widget('text', { content: sum?.summary ?? '(no summary)' });
    await widget('stat-card', { label: 'Sections', value: n, icon: 'list' });
    await widget('stat-card', { label: 'Top-level', value: topLevel, icon: 'layers' });
    await widget('stat-card', { label: 'Max depth', value: maxLevel, icon: 'arrow-down' });
    await widget('table', {
      columns: ['Section', 'Level'],
-     rows: secs.sections.map(s => [`${'  '.repeat((s.level || 1) - 1)}${s.title}`, s.level])
+     rows: sections.map(s => [`${'  '.repeat((s?.level || 1) - 1)}${s?.title ?? '—'}`, s?.level ?? 1])
    });
    ```
 
@@ -55,21 +57,23 @@ The user wants to see the skeleton of a long article:
 ### Roman Empire
 ```js
 const [secs, sum] = await Promise.all([
-  call('get_sections', { title: 'Roman Empire' }),
-  call('get_summary', { title: 'Roman Empire' })
+  call('get_sections', { title: 'Roman Empire' }).catch(() => null),
+  call('get_summary', { title: 'Roman Empire' }).catch(() => null)
 ]);
-await widget('text', { content: sum.summary });
-await widget('stat-card', { label: 'Sections', value: secs.sections.length, icon: 'list' });
-await widget('table', { columns: ['Section', 'Level'], rows: secs.sections.map(s => [s.title, s.level]) });
+const sections = secs?.sections ?? [];
+await widget('text', { content: sum?.summary ?? '(no summary)' });
+await widget('stat-card', { label: 'Sections', value: sections.length, icon: 'list' });
+await widget('table', { columns: ['Section', 'Level'], rows: sections.map(s => [s?.title ?? '—', s?.level ?? 1]) });
 ```
 
 ### String theory plan
 ```js
-const secs = await call('get_sections', { title: 'String theory' });
-await widget('stat-card', { label: 'Sections', value: secs.sections.length, icon: 'list' });
+const secs = await call('get_sections', { title: 'String theory' }).catch(() => null);
+const sections = secs?.sections ?? [];
+await widget('stat-card', { label: 'Sections', value: sections.length, icon: 'list' });
 await widget('table', {
   columns: ['#', 'Section', 'Level'],
-  rows: secs.sections.map((s, i) => [i + 1, s.title, s.level])
+  rows: sections.map((s, i) => [i + 1, s?.title ?? '—', s?.level ?? 1])
 });
 ```
 

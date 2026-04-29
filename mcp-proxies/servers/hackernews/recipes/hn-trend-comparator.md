@@ -37,16 +37,16 @@ The agent loops over each term, fetches its results, and composes a comparative 
        numericFilters: ['points>=100'],
        hitsPerPage: 100
      });
-     buckets[term] = res.hits;
+     buckets[term] = (res?.hits ?? []).filter(p => p);
    }
    ```
 
 2. **Compute per-term KPIs**:
    ```js
    const summary = terms.map(t => {
-     const posts = buckets[t];
-     const avgPoints = Math.round(posts.reduce((s, x) => s + x.points, 0) / Math.max(posts.length, 1));
-     const avgComments = Math.round(posts.reduce((s, x) => s + x.num_comments, 0) / Math.max(posts.length, 1));
+     const posts = buckets[t] ?? [];
+     const avgPoints = Math.round(posts.reduce((s, x) => s + (x?.points || 0), 0) / Math.max(posts.length, 1));
+     const avgComments = Math.round(posts.reduce((s, x) => s + (x?.num_comments || 0), 0) / Math.max(posts.length, 1));
      return { term: t, count: posts.length, avgPoints, avgComments };
    });
    ```
@@ -91,8 +91,9 @@ The agent loops over each term, fetches its results, and composes a comparative 
    await widget('table', {
      columns: ['Term', 'Top post', 'Points'],
      rows: terms.map(t => {
-       const top = [...buckets[t]].sort((a, b) => b.points - a.points)[0];
-       return [t, top?.title || '—', top?.points || 0];
+       const arr = buckets[t] ?? [];
+       const top = arr.length > 0 ? [...arr].sort((a, b) => (b?.points ?? 0) - (a?.points ?? 0))[0] : null;
+       return [t, top?.title ?? '—', top?.points ?? 0];
      })
    });
    ```
@@ -104,13 +105,13 @@ The agent loops over each term, fetches its results, and composes a comparative 
 const terms = ['AI', 'crypto', 'web3'];
 const buckets = {};
 for (const t of terms) {
-  const { hits } = await call('search-posts', { query: t, tags: ['story'], numericFilters: ['points>=100'], hitsPerPage: 100 });
-  buckets[t] = hits;
+  const res = await call('search-posts', { query: t, tags: ['story'], numericFilters: ['points>=100'], hitsPerPage: 100 }).catch(() => null);
+  buckets[t] = (res?.hits ?? []).filter(p => p);
 }
 await widget('chart-rich', {
   type: 'bar',
   title: 'High-score posts (100+)',
-  data: terms.map(t => ({ label: t, value: buckets[t].length }))
+  data: terms.map(t => ({ label: t, value: (buckets[t] ?? []).length }))
 });
 ```
 
@@ -119,8 +120,9 @@ await widget('chart-rich', {
 const terms = ['Rust', 'Golang', 'Zig'];
 const summary = [];
 for (const t of terms) {
-  const { hits } = await call('search-posts', { query: t, tags: ['story'], numericFilters: ['points>=50'], hitsPerPage: 50 });
-  summary.push({ term: t, count: hits.length, avg: Math.round(hits.reduce((s, x) => s + x.points, 0) / Math.max(hits.length, 1)) });
+  const res = await call('search-posts', { query: t, tags: ['story'], numericFilters: ['points>=50'], hitsPerPage: 50 }).catch(() => null);
+  const hits = (res?.hits ?? []).filter(p => p);
+  summary.push({ term: t, count: hits.length, avg: Math.round(hits.reduce((s, x) => s + (x?.points || 0), 0) / Math.max(hits.length, 1)) });
 }
 await widget('table', {
   columns: ['Language', 'Posts', 'Avg score'],

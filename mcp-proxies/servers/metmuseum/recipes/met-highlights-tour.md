@@ -30,37 +30,39 @@ layout:
      isOnView: true,
      hasImages: true,
      pageSize: 20
-   });
+   }).catch(() => null);
+   const ids = search?.objectIDs ?? [];
+   if (ids.length === 0) return widget('text', { content: 'No highlights on view.' });
    ```
 
 2. **Fetch detailed objects** (6-10):
    ```js
-   const objs = await Promise.all(search.objectIDs.slice(0, 8).map(id => call('get-museum-object', { objectId: id })));
-   const works = objs.map(o => o.object);
+   const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const works = objs.filter(o => o?.object).map(o => o.object);
    ```
 
 3. **Stats**:
    ```js
    await widget('stat-card', { label: 'Highlights on view', value: works.length, icon: 'star' });
-   await widget('stat-card', { label: 'Public domain', value: works.filter(w => w.isPublicDomain).length, icon: 'unlock' });
+   await widget('stat-card', { label: 'Public domain', value: works.filter(w => w?.isPublicDomain).length, icon: 'unlock' });
    ```
 
 4. **Narrative cards** (one masterpiece per card with gallery number):
    ```js
    await widget('cards', {
      items: works.map(w => ({
-       title: w.title,
-       subtitle: `${w.artistDisplayName || w.culture} — ${w.objectDate}`,
-       image: w.primaryImageSmall,
-       body: `Gallery ${w.GalleryNumber || '?'} — ${w.medium}`
+       title: w?.title ?? '(untitled)',
+       subtitle: `${w?.artistDisplayName || w?.culture || '—'} — ${w?.objectDate ?? '—'}`,
+       image: w?.primaryImageSmall,
+       body: `Gallery ${w?.GalleryNumber || '?'} — ${w?.medium ?? '—'}`
      }))
    });
    ```
 
 5. **HD gallery + KV directory**:
    ```js
-   await widget('gallery', { images: works.map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: `Gallery ${w.GalleryNumber}` })) });
-   await widget('kv', { pairs: works.map(w => [w.title, `Gallery ${w.GalleryNumber || '?'}`]) });
+   await widget('gallery', { images: works.filter(w => w?.primaryImageSmall).map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `Gallery ${w?.GalleryNumber ?? '?'}` })) });
+   await widget('kv', { pairs: works.map(w => [w?.title ?? '(untitled)', `Gallery ${w?.GalleryNumber || '?'}`]) });
    ```
 
 6. **Handoff to the Met Explorer**:
@@ -72,18 +74,21 @@ layout:
 
 ### Impressionist must-sees
 ```js
-const r = await call('search-museum-objects', { q: 'impressionism', isHighlight: true, isOnView: true, hasImages: true });
-const objs = await Promise.all(r.objectIDs.slice(0, 6).map(id => call('get-museum-object', { objectId: id })));
-const works = objs.map(o => o.object);
-await widget('cards', { items: works.map(w => ({ title: w.title, subtitle: w.artistDisplayName, image: w.primaryImageSmall, body: `Gallery ${w.GalleryNumber}` })) });
+const r = await call('search-museum-objects', { q: 'impressionism', isHighlight: true, isOnView: true, hasImages: true }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 6).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object);
+await widget('cards', { items: works.map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.artistDisplayName ?? '—', image: w?.primaryImageSmall, body: `Gallery ${w?.GalleryNumber ?? '?'}` })) });
 await call('open-met-explorer', { q: 'impressionism' });
 ```
 
 ### Egyptian highlights
 ```js
-const r = await call('search-museum-objects', { q: 'pharaoh', departmentId: 10, isHighlight: true, hasImages: true });
-const objs = await Promise.all(r.objectIDs.slice(0, 6).map(id => call('get-museum-object', { objectId: id })));
-await widget('gallery', { images: objs.map(o => ({ src: o.object.primaryImageSmall, alt: o.object.title })) });
+const r = await call('search-museum-objects', { q: 'pharaoh', departmentId: 10, isHighlight: true, hasImages: true }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 6).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object);
+await widget('gallery', { images: works.filter(w => w?.primaryImageSmall).map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)' })) });
 ```
 
 ## Examples — common mistakes

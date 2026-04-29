@@ -31,12 +31,14 @@ const data = await call('nasa_firms', {
   latitude: -3.4,
   longitude: -62.2,
   days: 7
-});
-const fires = data.fires || data || [];
+}).catch(() => null);
+const fires = (data?.fires ?? (Array.isArray(data) ? data : [])).filter(f => f);
+if (fires.length === 0) return widget('text', { content: 'No active fires detected.' });
 
 // 2. KPI stats
-const highConf = fires.filter(f => +f.confidence > 80).length;
-const avgBright = fires.reduce((s, f) => s + (+f.brightness || 0), 0) / Math.max(1, fires.length);
+const highConf = fires.filter(f => +(f?.confidence ?? 0) > 80).length;
+const brights = fires.map(f => +(f?.brightness || 0)).filter(Number.isFinite);
+const avgBright = brights.length > 0 ? brights.reduce((s, b) => s + b, 0) / brights.length : 0;
 await widget('stat-card', { label: 'Detections', value: fires.length, icon: 'flame' });
 await widget('stat-card', { label: 'High confidence', value: highConf, icon: 'check' });
 await widget('stat-card', { label: 'Avg brightness (K)', value: Math.round(avgBright), icon: 'thermometer' });
@@ -46,31 +48,35 @@ await widget('stat-card', { label: 'Days', value: 7, icon: 'calendar' });
 await widget('map', {
   center: [-3.4, -62.2],
   zoom: 6,
-  markers: fires.map(f => ({
+  markers: fires.filter(f => Number.isFinite(+f?.latitude) && Number.isFinite(+f?.longitude)).map(f => ({
     lat: +f.latitude,
     lon: +f.longitude,
-    label: `${f.acq_date} ${f.acq_time}`,
-    color: +f.confidence > 80 ? '#dc2626' : '#f97316',
-    radius: Math.max(3, Math.min(15, +f.frp / 5))
+    label: `${f?.acq_date ?? '—'} ${f?.acq_time ?? ''}`,
+    color: +(f?.confidence ?? 0) > 80 ? '#dc2626' : '#f97316',
+    radius: Math.max(3, Math.min(15, +(f?.frp ?? 0) / 5))
   })),
   cluster: true
 });
 
 // 4. Hottest table
-const hottest = [...fires].sort((a, b) => +b.brightness - +a.brightness).slice(0, 20);
+const hottest = [...fires].sort((a, b) => +(b?.brightness ?? 0) - +(a?.brightness ?? 0)).slice(0, 20);
 await widget('table', {
   columns: ['Date', 'Time UTC', 'Lat', 'Lon', 'Brightness (K)', 'FRP (MW)', 'Confidence'],
-  rows: hottest.map(f => [f.acq_date, f.acq_time, f.latitude, f.longitude, f.brightness, f.frp, f.confidence])
+  rows: hottest.map(f => [f?.acq_date ?? '—', f?.acq_time ?? '—', f?.latitude ?? '—', f?.longitude ?? '—', f?.brightness ?? '—', f?.frp ?? '—', f?.confidence ?? '—'])
 });
 
 // 5. Cluster summary (group by date)
 const byDate = {};
-for (const f of fires) (byDate[f.acq_date] = byDate[f.acq_date] || []).push(f);
+for (const f of fires) {
+  const d = f?.acq_date;
+  if (!d) continue;
+  (byDate[d] = byDate[d] || []).push(f);
+}
 await widget('cards', {
   items: Object.entries(byDate).slice(0, 6).map(([d, list]) => ({
     title: d,
     subtitle: `${list.length} detections`,
-    description: `Avg confidence ${Math.round(list.reduce((s, f) => s + +f.confidence, 0) / list.length)}%`
+    description: `Avg confidence ${Math.round(list.reduce((s, f) => s + +(f?.confidence ?? 0), 0) / Math.max(1, list.length))}%`
   }))
 });
 ```
@@ -79,17 +85,17 @@ await widget('cards', {
 
 ### Amazon basin
 ```js
-const data = await call('nasa_firms', { latitude: -3.4, longitude: -62.2, days: 7 });
-const fires = data.fires || data;
-await widget('map', { center: [-3.4, -62.2], zoom: 5, markers: fires.map(f => ({ lat: +f.latitude, lon: +f.longitude })) });
+const data = await call('nasa_firms', { latitude: -3.4, longitude: -62.2, days: 7 }).catch(() => null);
+const fires = (data?.fires ?? (Array.isArray(data) ? data : [])).filter(f => f);
+await widget('map', { center: [-3.4, -62.2], zoom: 5, markers: fires.filter(f => Number.isFinite(+f?.latitude)).map(f => ({ lat: +f.latitude, lon: +f.longitude })) });
 await widget('stat-card', { label: 'Hotspots', value: fires.length });
 ```
 
 ### Mediterranean summer
 ```js
-const data = await call('nasa_firms', { latitude: 38.0, longitude: 23.7, days: 3 });
-const fires = data.fires || data;
-await widget('table', { columns: ['Date', 'Lat', 'Lon', 'FRP'], rows: fires.slice(0, 15).map(f => [f.acq_date, f.latitude, f.longitude, f.frp]) });
+const data = await call('nasa_firms', { latitude: 38.0, longitude: 23.7, days: 3 }).catch(() => null);
+const fires = (data?.fires ?? (Array.isArray(data) ? data : [])).filter(f => f);
+await widget('table', { columns: ['Date', 'Lat', 'Lon', 'FRP'], rows: fires.slice(0, 15).map(f => [f?.acq_date ?? '—', f?.latitude ?? '—', f?.longitude ?? '—', f?.frp ?? '—']) });
 ```
 
 ## Common mistakes

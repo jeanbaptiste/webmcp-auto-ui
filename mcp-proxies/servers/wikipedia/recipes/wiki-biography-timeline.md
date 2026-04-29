@@ -25,35 +25,36 @@ The user wants a structured biography rather than a flat article:
 
 1. **Fetch the article + sections** (sections drive the chrono structure):
    ```js
-   const art = await call('get_article', { title: 'Leonardo da Vinci' });
-   const secs = await call('get_sections', { title: 'Leonardo da Vinci' });
+   const art = await call('get_article', { title: 'Leonardo da Vinci' }).catch(() => null);
+   if (!art || art?.exists === false) return widget('text', { content: 'Page not found.' });
+   const secs = await call('get_sections', { title: 'Leonardo da Vinci' }).catch(() => null);
    ```
 
 2. **Extract chronological facts** for two-three "phase" sections:
    ```js
-   const earlyFacts = await call('extract_key_facts', { title: 'Leonardo da Vinci', topic_within_article: 'Early life', count: 4 });
-   const careerFacts = await call('extract_key_facts', { title: 'Leonardo da Vinci', topic_within_article: 'Career', count: 4 });
+   const earlyFacts = await call('extract_key_facts', { title: 'Leonardo da Vinci', topic_within_article: 'Early life', count: 4 }).catch(() => null);
+   const careerFacts = await call('extract_key_facts', { title: 'Leonardo da Vinci', topic_within_article: 'Career', count: 4 }).catch(() => null);
    ```
 
 3. **Render the profile + summary**:
    ```js
-   await widget('profile', { name: art.title, subtitle: art.categories?.[0] || '', url: art.url });
-   await widget('text', { content: art.summary });
+   await widget('profile', { name: art?.title ?? '—', subtitle: (art?.categories ?? [])[0] || '', url: art?.url });
+   await widget('text', { content: art?.summary ?? '' });
    ```
 
 4. **Render the timeline** by combining facts with phase labels:
    ```js
    const events = [
-     ...earlyFacts.facts.map(f => ({ phase: 'Early life', text: f })),
-     ...careerFacts.facts.map(f => ({ phase: 'Career', text: f }))
+     ...((earlyFacts?.facts ?? []).map(f => ({ phase: 'Early life', text: f }))),
+     ...((careerFacts?.facts ?? []).map(f => ({ phase: 'Career', text: f })))
    ];
    await widget('timeline', {
      events: events.map((e, i) => ({ date: `#${i + 1}`, title: e.phase, description: e.text }))
    });
    await widget('kv', {
      items: [
-       { label: 'Sections', value: secs.sections.length },
-       { label: 'Categories', value: art.categories.length }
+       { label: 'Sections', value: (secs?.sections ?? []).length },
+       { label: 'Categories', value: (art?.categories ?? []).length }
      ]
    });
    ```
@@ -62,27 +63,32 @@ The user wants a structured biography rather than a flat article:
 
 ### Leonardo da Vinci
 ```js
-const art = await call('get_article', { title: 'Leonardo da Vinci' });
-const early = await call('extract_key_facts', { title: 'Leonardo da Vinci', topic_within_article: 'Early life', count: 3 });
-const career = await call('extract_key_facts', { title: 'Leonardo da Vinci', topic_within_article: 'Career', count: 3 });
-await widget('profile', { name: art.title, url: art.url });
-await widget('text', { content: art.summary });
+const art = await call('get_article', { title: 'Leonardo da Vinci' }).catch(() => null);
+if (!art || art?.exists === false) return widget('text', { content: 'Page not found.' });
+const early = await call('extract_key_facts', { title: 'Leonardo da Vinci', topic_within_article: 'Early life', count: 3 }).catch(() => null);
+const career = await call('extract_key_facts', { title: 'Leonardo da Vinci', topic_within_article: 'Career', count: 3 }).catch(() => null);
+await widget('profile', { name: art?.title ?? '—', url: art?.url });
+await widget('text', { content: art?.summary ?? '' });
 await widget('timeline', {
   events: [
-    ...early.facts.map(f => ({ title: 'Early life', description: f })),
-    ...career.facts.map(f => ({ title: 'Career', description: f }))
+    ...((early?.facts ?? []).map(f => ({ title: 'Early life', description: f }))),
+    ...((career?.facts ?? []).map(f => ({ title: 'Career', description: f })))
   ]
 });
 ```
 
 ### Nelson Mandela
 ```js
-const art = await call('get_article', { title: 'Nelson Mandela' });
-const f1 = await call('extract_key_facts', { title: 'Nelson Mandela', topic_within_article: 'Activism', count: 4 });
-const f2 = await call('extract_key_facts', { title: 'Nelson Mandela', topic_within_article: 'Presidency', count: 4 });
-await widget('profile', { name: art.title, url: art.url });
+const art = await call('get_article', { title: 'Nelson Mandela' }).catch(() => null);
+if (!art || art?.exists === false) return widget('text', { content: 'Page not found.' });
+const f1 = await call('extract_key_facts', { title: 'Nelson Mandela', topic_within_article: 'Activism', count: 4 }).catch(() => null);
+const f2 = await call('extract_key_facts', { title: 'Nelson Mandela', topic_within_article: 'Presidency', count: 4 }).catch(() => null);
+await widget('profile', { name: art?.title ?? '—', url: art?.url });
 await widget('timeline', {
-  events: [...f1.facts.map(f => ({ title: 'Activism', description: f })), ...f2.facts.map(f => ({ title: 'Presidency', description: f }))]
+  events: [
+    ...((f1?.facts ?? []).map(f => ({ title: 'Activism', description: f }))),
+    ...((f2?.facts ?? []).map(f => ({ title: 'Presidency', description: f })))
+  ]
 });
 ```
 

@@ -24,8 +24,9 @@ layout:
 
 1. **Resolve the relevant department** (optional but useful):
    ```js
-   const { departments } = await call('list-departments', {});
-   const dept = departments.find(d => d.displayName.includes('Asian')) || null;
+   const resp = await call('list-departments', {}).catch(() => null);
+   const departments = resp?.departments ?? [];
+   const dept = departments.find(d => d?.displayName?.includes('Asian')) || null;
    ```
 
 2. **Preview the search count** with `pageSize: 1`:
@@ -35,13 +36,13 @@ layout:
      departmentId: dept?.departmentId,
      hasImages: true,
      pageSize: 1
-   });
+   }).catch(() => null);
    ```
 
 3. **Short text intro** (UI-focused, narrative-light):
    ```js
    await widget('text', {
-     content: `About to open the Met Explorer pre-loaded for "ukiyo-e" in ${dept?.displayName || 'all departments'}. ${preview.total} objects match.`
+     content: `About to open the Met Explorer pre-loaded for "ukiyo-e" in ${dept?.displayName || 'all departments'}. ${preview?.total ?? 0} objects match.`
    });
    ```
 
@@ -52,14 +53,14 @@ layout:
        ['Query', 'ukiyo-e'],
        ['Department', dept?.displayName || 'All'],
        ['With images', 'Yes'],
-       ['Expected matches', preview.total]
+       ['Expected matches', preview?.total ?? 0]
      ]
    });
    ```
 
 5. **Stat-card emphasizing the count**:
    ```js
-   await widget('stat-card', { label: 'Objects to explore', value: preview.total, icon: 'compass' });
+   await widget('stat-card', { label: 'Objects to explore', value: preview?.total ?? 0, icon: 'compass' });
    ```
 
 6. **Hand off** (last step — opens the Explorer UI):
@@ -75,17 +76,19 @@ layout:
 
 ### Ukiyo-e exploration
 ```js
-const { departments } = await call('list-departments', {});
-const asian = departments.find(d => d.displayName.includes('Asian'));
-const preview = await call('search-museum-objects', { q: 'ukiyo-e', departmentId: asian.departmentId, pageSize: 1 });
-await widget('stat-card', { label: 'Match', value: preview.total, icon: 'compass' });
+const resp = await call('list-departments', {}).catch(() => null);
+const departments = resp?.departments ?? [];
+const asian = departments.find(d => d?.displayName?.includes('Asian'));
+if (!asian) return widget('text', { content: 'Department not found.' });
+const preview = await call('search-museum-objects', { q: 'ukiyo-e', departmentId: asian.departmentId, pageSize: 1 }).catch(() => null);
+await widget('stat-card', { label: 'Match', value: preview?.total ?? 0, icon: 'compass' });
 await call('open-met-explorer', { q: 'ukiyo-e', departmentId: asian.departmentId });
 ```
 
 ### Free-form by title
 ```js
-const preview = await call('search-museum-objects', { q: 'sunflower', title: true, pageSize: 1 });
-await widget('text', { content: `${preview.total} object titles include "sunflower".` });
+const preview = await call('search-museum-objects', { q: 'sunflower', title: true, pageSize: 1 }).catch(() => null);
+await widget('text', { content: `${preview?.total ?? 0} object titles include "sunflower".` });
 await call('open-met-explorer', { q: 'sunflower', title: true });
 ```
 

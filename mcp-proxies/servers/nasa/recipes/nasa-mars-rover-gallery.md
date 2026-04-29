@@ -30,28 +30,29 @@ Rovers have 7 to 10 cameras (FHAZ, RHAZ, MAST, NAVCAM, MAHLI, MARDI, CHEMCAM…)
 const data = await call('nasa_mars_rover', {
   rover: 'curiosity',
   sol: 1000
-});
-const photos = data.photos || [];
+}).catch(() => null);
+const photos = (data?.photos ?? []).filter(p => p);
+if (photos.length === 0) return widget('text', { content: 'No photos for this sol.' });
 
 // 2. Group by camera
 const byCamera = {};
 for (const p of photos) {
-  const c = p.camera.name;
+  const c = p?.camera?.name ?? 'UNKNOWN';
   (byCamera[c] = byCamera[c] || []).push(p);
 }
 const cameras = Object.keys(byCamera);
 
 // 3. Mission KPIs
 await widget('stat-card', { label: 'Photos', value: photos.length, icon: 'camera' });
-await widget('stat-card', { label: 'Sol', value: data.photos?.[0]?.sol ?? 'n/a', icon: 'sun' });
+await widget('stat-card', { label: 'Sol', value: photos[0]?.sol ?? 'n/a', icon: 'sun' });
 await widget('stat-card', { label: 'Cameras active', value: cameras.length, icon: 'aperture' });
 
 // 4. Full-resolution gallery (HD)
 await widget('gallery', {
-  images: photos.slice(0, 60).map(p => ({
+  images: photos.slice(0, 60).filter(p => p?.img_src).map(p => ({
     src: p.img_src,
-    alt: `${p.camera.full_name} — sol ${p.sol}`,
-    caption: `${p.camera.name} — ${p.earth_date}`
+    alt: `${p?.camera?.full_name ?? '—'} — sol ${p?.sol ?? '—'}`,
+    caption: `${p?.camera?.name ?? '—'} — ${p?.earth_date ?? '—'}`
   }))
 });
 
@@ -60,8 +61,8 @@ await widget('cards', {
   items: cameras.map(c => ({
     title: c,
     subtitle: `${byCamera[c].length} photos`,
-    image: byCamera[c][0].img_src,
-    description: byCamera[c][0].camera.full_name
+    image: byCamera[c][0]?.img_src,
+    description: byCamera[c][0]?.camera?.full_name ?? '—'
   }))
 });
 
@@ -69,11 +70,11 @@ await widget('cards', {
 const r = photos[0]?.rover;
 await widget('kv', {
   items: [
-    { label: 'Rover', value: r?.name },
-    { label: 'Status', value: r?.status },
-    { label: 'Landing', value: r?.landing_date },
-    { label: 'Launch', value: r?.launch_date },
-    { label: 'Total photos', value: r?.total_photos }
+    { label: 'Rover', value: r?.name ?? '—' },
+    { label: 'Status', value: r?.status ?? '—' },
+    { label: 'Landing', value: r?.landing_date ?? '—' },
+    { label: 'Launch', value: r?.launch_date ?? '—' },
+    { label: 'Total photos', value: r?.total_photos ?? '—' }
   ]
 });
 ```
@@ -82,16 +83,18 @@ await widget('kv', {
 
 ### Curiosity, sol 1000
 ```js
-const data = await call('nasa_mars_rover', { rover: 'curiosity', sol: 1000 });
-await widget('stat-card', { label: 'Photos', value: data.photos.length });
-await widget('gallery', { images: data.photos.slice(0, 40).map(p => ({ src: p.img_src, caption: p.camera.name })) });
+const data = await call('nasa_mars_rover', { rover: 'curiosity', sol: 1000 }).catch(() => null);
+const photos = (data?.photos ?? []).filter(p => p);
+await widget('stat-card', { label: 'Photos', value: photos.length });
+await widget('gallery', { images: photos.slice(0, 40).filter(p => p?.img_src).map(p => ({ src: p.img_src, caption: p?.camera?.name ?? '—' })) });
 ```
 
 ### Perseverance by earth date
 ```js
-const data = await call('nasa_mars_rover', { rover: 'perseverance', earth_date: '2026-04-15' });
-await widget('gallery', { images: data.photos.slice(0, 60).map(p => ({ src: p.img_src, alt: p.camera.full_name })) });
-await widget('kv', { items: [{ label: 'Rover', value: 'Perseverance' }, { label: 'Sol', value: data.photos[0].sol }] });
+const data = await call('nasa_mars_rover', { rover: 'perseverance', earth_date: '2026-04-15' }).catch(() => null);
+const photos = (data?.photos ?? []).filter(p => p);
+await widget('gallery', { images: photos.slice(0, 60).filter(p => p?.img_src).map(p => ({ src: p.img_src, alt: p?.camera?.full_name ?? '—' })) });
+await widget('kv', { items: [{ label: 'Rover', value: 'Perseverance' }, { label: 'Sol', value: photos[0]?.sol ?? '—' }] });
 ```
 
 ## Common mistakes

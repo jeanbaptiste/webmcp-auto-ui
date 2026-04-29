@@ -25,29 +25,33 @@ The user wants a learning path around a topic, not just one article:
 
 1. **Get the source summary** (anchors the user):
    ```js
-   const sum = await call('get_summary', { title: 'Quantum cryptography' });
+   const sum = await call('get_summary', { title: 'Quantum cryptography' }).catch(() => null);
    ```
 
 2. **Fetch related topics**:
    ```js
-   const rel = await call('get_related_topics', { title: 'Quantum cryptography', limit: 8 });
+   const rel = await call('get_related_topics', { title: 'Quantum cryptography', limit: 8 }).catch(() => null);
+   const related = rel?.related_topics ?? [];
    ```
 
 3. **Fetch short summaries for top 5** (to enrich the cards):
    ```js
-   const top = rel.related_topics.slice(0, 5);
-   const summaries = await Promise.all(top.map(t => call('get_summary', { title: t.title || t })));
+   const top = related.slice(0, 5);
+   const summaries = await Promise.all(top.map(t => {
+     const title = typeof t === 'string' ? t : t?.title;
+     return title ? call('get_summary', { title }).catch(() => null) : Promise.resolve(null);
+   }));
    ```
 
 4. **Render context + cards**:
    ```js
-   await widget('kv', { items: [{ label: 'Source', value: sum.title }] });
-   await widget('text', { content: sum.summary });
+   await widget('kv', { items: [{ label: 'Source', value: sum?.title ?? '—' }] });
+   await widget('text', { content: sum?.summary ?? '(no summary)' });
    await widget('cards', {
-     items: summaries.map((s, i) => ({
-       title: s.title,
-       body: (s.summary || '').slice(0, 200) + '…',
-       url: `https://en.wikipedia.org/wiki/${encodeURIComponent(s.title.replace(/ /g, '_'))}`
+     items: summaries.filter(Boolean).map(s => ({
+       title: s?.title ?? '—',
+       body: (s?.summary ?? '').slice(0, 200) + '…',
+       url: `https://en.wikipedia.org/wiki/${encodeURIComponent((s?.title ?? '').replace(/ /g, '_'))}`
      }))
    });
    ```
@@ -56,23 +60,28 @@ The user wants a learning path around a topic, not just one article:
 
 ### After "Renaissance"
 ```js
-const rel = await call('get_related_topics', { title: 'Renaissance', limit: 10 });
-const top = rel.related_topics.slice(0, 6);
-const sums = await Promise.all(top.map(t => call('get_summary', { title: typeof t === 'string' ? t : t.title })));
+const rel = await call('get_related_topics', { title: 'Renaissance', limit: 10 }).catch(() => null);
+const related = rel?.related_topics ?? [];
+const top = related.slice(0, 6);
+const sums = await Promise.all(top.map(t => {
+  const title = typeof t === 'string' ? t : t?.title;
+  return title ? call('get_summary', { title }).catch(() => null) : Promise.resolve(null);
+}));
 await widget('cards', {
-  items: sums.map(s => ({ title: s.title, body: s.summary.slice(0, 180) }))
+  items: sums.filter(Boolean).map(s => ({ title: s?.title ?? '—', body: (s?.summary ?? '').slice(0, 180) }))
 });
 ```
 
 ### Explore around Photosynthesis
 ```js
 const [src, rel] = await Promise.all([
-  call('get_summary', { title: 'Photosynthesis' }),
-  call('get_related_topics', { title: 'Photosynthesis', limit: 8 })
+  call('get_summary', { title: 'Photosynthesis' }).catch(() => null),
+  call('get_related_topics', { title: 'Photosynthesis', limit: 8 }).catch(() => null)
 ]);
-await widget('text', { content: src.summary });
+await widget('text', { content: src?.summary ?? '(no summary)' });
+const related = (rel?.related_topics ?? []).slice(0, 6);
 await widget('cards', {
-  items: rel.related_topics.slice(0, 6).map(t => ({ title: typeof t === 'string' ? t : t.title }))
+  items: related.map(t => ({ title: typeof t === 'string' ? t : (t?.title ?? '—') }))
 });
 ```
 

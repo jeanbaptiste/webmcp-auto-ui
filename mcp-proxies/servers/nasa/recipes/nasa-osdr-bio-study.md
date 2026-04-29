@@ -27,22 +27,24 @@ OSDR is NASA's repository for life sciences (rodents, plants, microbes flown to 
 ```js
 // 1. List files for a study
 const acc = '87';
-const res = await call('nasa_osdr_files', { accession_number: acc });
+const res = await call('nasa_osdr_files', { accession_number: acc }).catch(() => null);
+if (!res) return widget('text', { content: 'Study not found.' });
 
 // OSDR shape varies; common: studies object with file metadata
-const studyKey = Object.keys(res.studies || res.study || {})[0];
-const study = (res.studies || res.study || {})[studyKey] || {};
-const files = study.study_files || study.files || res.files || [];
+const studyContainer = res?.studies ?? res?.study ?? {};
+const studyKey = Object.keys(studyContainer)[0];
+const study = studyKey ? (studyContainer[studyKey] ?? {}) : {};
+const files = (study?.study_files ?? study?.files ?? res?.files ?? []).filter(f => f);
 
 // 2. Intro text
 await widget('text', {
   title: `OSD-${acc}`,
-  body: study.title || study.identifier || `NASA Open Science study OSD-${acc}. Listed below are the data files associated with the experiment.`
+  body: study?.title || study?.identifier || `NASA Open Science study OSD-${acc}. Listed below are the data files associated with the experiment.`
 });
 
 // 3. KPI stats
-const totalSize = files.reduce((s, f) => s + (+f.file_size || 0), 0);
-const types = new Set(files.map(f => (f.file_name || '').split('.').pop()));
+const totalSize = files.reduce((s, f) => s + (+(f?.file_size) || 0), 0);
+const types = new Set(files.map(f => (f?.file_name ?? '').split('.').pop()).filter(Boolean));
 await widget('stat-card', { label: 'Files', value: files.length, icon: 'file' });
 await widget('stat-card', { label: 'Total volume (MB)', value: (totalSize / 1024 / 1024).toFixed(1), icon: 'database' });
 await widget('stat-card', { label: 'File types', value: types.size, icon: 'layers' });
@@ -51,10 +53,10 @@ await widget('stat-card', { label: 'File types', value: types.size, icon: 'layer
 await widget('kv', {
   items: [
     { label: 'Accession', value: `OSD-${acc}` },
-    { label: 'Title', value: study.title },
-    { label: 'Organism', value: study.organism },
-    { label: 'Mission', value: study.mission },
-    { label: 'Project type', value: study.project_type }
+    { label: 'Title', value: study?.title },
+    { label: 'Organism', value: study?.organism },
+    { label: 'Mission', value: study?.mission },
+    { label: 'Project type', value: study?.project_type }
   ].filter(i => i.value)
 });
 
@@ -62,10 +64,10 @@ await widget('kv', {
 await widget('table', {
   columns: ['File name', 'Category', 'Size (MB)', 'Updated'],
   rows: files.slice(0, 50).map(f => [
-    f.file_name,
-    f.category || f.file_type || '',
-    ((+f.file_size || 0) / 1024 / 1024).toFixed(2),
-    f.date_modified || f.date_created || ''
+    f?.file_name ?? '—',
+    f?.category || f?.file_type || '',
+    ((+(f?.file_size) || 0) / 1024 / 1024).toFixed(2),
+    f?.date_modified || f?.date_created || ''
   ])
 });
 ```
@@ -74,17 +76,17 @@ await widget('table', {
 
 ### OSD-87
 ```js
-const r = await call('nasa_osdr_files', { accession_number: '87' });
-const files = (Object.values(r.studies || {})[0]?.study_files) || r.files || [];
+const r = await call('nasa_osdr_files', { accession_number: '87' }).catch(() => null);
+const files = ((Object.values(r?.studies ?? {})[0])?.study_files ?? r?.files ?? []).filter(f => f);
 await widget('stat-card', { label: 'OSD-87 files', value: files.length });
-await widget('table', { columns: ['Name', 'Size'], rows: files.slice(0, 30).map(f => [f.file_name, f.file_size]) });
+await widget('table', { columns: ['Name', 'Size'], rows: files.slice(0, 30).map(f => [f?.file_name ?? '—', f?.file_size ?? '—']) });
 ```
 
 ### Cross-study summary
 ```js
 const ids = ['87', '102', '120'];
-const all = await Promise.all(ids.map(i => call('nasa_osdr_files', { accession_number: i })));
-const counts = ids.map((id, i) => ({ id, n: ((Object.values(all[i].studies || {})[0]?.study_files) || all[i].files || []).length }));
+const all = await Promise.all(ids.map(i => call('nasa_osdr_files', { accession_number: i }).catch(() => null)));
+const counts = ids.map((id, i) => ({ id, n: ((Object.values(all[i]?.studies ?? {})[0])?.study_files ?? all[i]?.files ?? []).length }));
 await widget('table', { columns: ['Study', 'Files'], rows: counts.map(c => [`OSD-${c.id}`, c.n]) });
 ```
 

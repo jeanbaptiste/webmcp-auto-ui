@@ -31,20 +31,20 @@ const cams  = ['FHAZ', 'RHAZ', 'NAVCAM_LEFT', 'MCZ_LEFT'];
 
 // 1. One call per camera (parallel)
 const results = await Promise.all(
-  cams.map(cam => call('nasa_mars_rover', { rover, sol, camera: cam }))
+  cams.map(cam => call('nasa_mars_rover', { rover, sol, camera: cam }).catch(() => null))
 );
 
 // 2. Productivity chart (count per camera)
 await widget('chart', {
   type: 'bar',
-  data: cams.map((c, i) => ({ label: c, value: results[i].photos?.length || 0 }))
+  data: cams.map((c, i) => ({ label: c, value: (results[i]?.photos ?? []).length }))
 });
 
 // 3. Side-by-side gallery (one row per camera)
 const flat = [];
 cams.forEach((c, i) => {
-  for (const p of (results[i].photos || []).slice(0, 6)) {
-    flat.push({ src: p.img_src, alt: c, caption: c });
+  for (const p of (results[i]?.photos ?? []).slice(0, 6)) {
+    if (p?.img_src) flat.push({ src: p.img_src, alt: c, caption: c });
   }
 });
 await widget('gallery', { images: flat });
@@ -59,9 +59,9 @@ const ROLES = {
 await widget('cards', {
   items: cams.map((c, i) => ({
     title: c,
-    subtitle: `${results[i].photos?.length || 0} photos`,
-    description: ROLES[c],
-    image: results[i].photos?.[0]?.img_src
+    subtitle: `${(results[i]?.photos ?? []).length} photos`,
+    description: ROLES[c] ?? '—',
+    image: results[i]?.photos?.[0]?.img_src
   }))
 });
 ```
@@ -72,19 +72,19 @@ await widget('cards', {
 ```js
 const cams = ['FHAZ', 'NAVCAM', 'MAST', 'CHEMCAM'];
 const results = await Promise.all(cams.map(c =>
-  call('nasa_mars_rover', { rover: 'curiosity', sol: 1500, camera: c })
+  call('nasa_mars_rover', { rover: 'curiosity', sol: 1500, camera: c }).catch(() => null)
 ));
-await widget('chart', { type: 'bar', data: cams.map((c, i) => ({ label: c, value: results[i].photos.length })) });
-await widget('cards', { items: cams.map((c, i) => ({ title: c, subtitle: results[i].photos.length + ' photos' })) });
+await widget('chart', { type: 'bar', data: cams.map((c, i) => ({ label: c, value: (results[i]?.photos ?? []).length })) });
+await widget('cards', { items: cams.map((c, i) => ({ title: c, subtitle: (results[i]?.photos ?? []).length + ' photos' })) });
 ```
 
 ### Perseverance front vs rear hazard
 ```js
-const front = await call('nasa_mars_rover', { rover: 'perseverance', sol: 600, camera: 'FRONT_HAZCAM_LEFT_A' });
-const rear  = await call('nasa_mars_rover', { rover: 'perseverance', sol: 600, camera: 'REAR_HAZCAM_LEFT' });
+const front = await call('nasa_mars_rover', { rover: 'perseverance', sol: 600, camera: 'FRONT_HAZCAM_LEFT_A' }).catch(() => null);
+const rear  = await call('nasa_mars_rover', { rover: 'perseverance', sol: 600, camera: 'REAR_HAZCAM_LEFT' }).catch(() => null);
 await widget('gallery', { images: [
-  ...front.photos.slice(0, 3).map(p => ({ src: p.img_src, caption: 'FRONT' })),
-  ...rear.photos.slice(0, 3).map(p => ({ src: p.img_src, caption: 'REAR' }))
+  ...((front?.photos ?? []).slice(0, 3).filter(p => p?.img_src).map(p => ({ src: p.img_src, caption: 'FRONT' }))),
+  ...((rear?.photos ?? []).slice(0, 3).filter(p => p?.img_src).map(p => ({ src: p.img_src, caption: 'REAR' })))
 ]});
 ```
 

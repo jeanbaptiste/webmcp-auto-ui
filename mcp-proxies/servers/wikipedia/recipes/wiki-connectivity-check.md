@@ -25,24 +25,26 @@ Operations / debug scenario:
 
 1. **Run the diagnostic** (no parameters):
    ```js
-   const c = await call('test_wikipedia_connectivity', {});
+   const c = await call('test_wikipedia_connectivity', {}).catch(() => null);
+   if (!c) return widget('text', { content: 'Connectivity check failed.' });
    ```
 
 2. **Render headline status + detail**:
    ```js
+   const latencyMs = Number.isFinite(c?.response_time_ms) ? c.response_time_ms : 0;
    await widget('stat-card', {
      label: 'Status',
-     value: c.status,
-     icon: c.status === 'success' ? 'check-circle' : 'alert-triangle'
+     value: c?.status ?? '—',
+     icon: c?.status === 'success' ? 'check-circle' : 'alert-triangle'
    });
-   await widget('stat-card', { label: 'Language', value: c.language, icon: 'globe' });
-   await widget('stat-card', { label: 'Latency', value: `${Math.round(c.response_time_ms)} ms`, icon: 'zap' });
+   await widget('stat-card', { label: 'Language', value: c?.language ?? '—', icon: 'globe' });
+   await widget('stat-card', { label: 'Latency', value: `${Math.round(latencyMs)} ms`, icon: 'zap' });
    await widget('kv', {
      items: [
-       { label: 'Site name', value: c.site_name || '—' },
-       { label: 'Server', value: c.server || '—' },
-       { label: 'API URL', value: c.url || '—' },
-       { label: 'Response time', value: `${c.response_time_ms?.toFixed(2)} ms` }
+       { label: 'Site name', value: c?.site_name ?? '—' },
+       { label: 'Server', value: c?.server ?? '—' },
+       { label: 'API URL', value: c?.url ?? '—' },
+       { label: 'Response time', value: `${latencyMs.toFixed(2)} ms` }
      ]
    });
    ```
@@ -51,20 +53,21 @@ Operations / debug scenario:
 
 ### Quick health check
 ```js
-const c = await call('test_wikipedia_connectivity', {});
-await widget('stat-card', { label: 'Status', value: c.status, icon: 'check-circle' });
-await widget('stat-card', { label: 'Lang', value: c.language, icon: 'globe' });
-await widget('kv', { items: [{ label: 'Server', value: c.server }, { label: 'Latency', value: `${c.response_time_ms} ms` }] });
+const c = await call('test_wikipedia_connectivity', {}).catch(() => null);
+if (!c) return widget('text', { content: 'Connectivity check failed.' });
+await widget('stat-card', { label: 'Status', value: c?.status ?? '—', icon: 'check-circle' });
+await widget('stat-card', { label: 'Lang', value: c?.language ?? '—', icon: 'globe' });
+await widget('kv', { items: [{ label: 'Server', value: c?.server ?? '—' }, { label: 'Latency', value: `${c?.response_time_ms ?? '—'} ms` }] });
 ```
 
 ### Pre-batch verification
 ```js
-const c = await call('test_wikipedia_connectivity', {});
-if (c.status !== 'success') {
+const c = await call('test_wikipedia_connectivity', {}).catch(() => null);
+if (!c || c?.status !== 'success') {
   await widget('stat-card', { label: 'Status', value: 'DOWN', icon: 'alert-triangle' });
-  await widget('kv', { items: [{ label: 'Server', value: c.server }, { label: 'Error', value: c.status }] });
+  await widget('kv', { items: [{ label: 'Server', value: c?.server ?? '—' }, { label: 'Error', value: c?.status ?? 'unreachable' }] });
 } else {
-  await widget('stat-card', { label: 'Ready', value: c.language, icon: 'check' });
+  await widget('stat-card', { label: 'Ready', value: c?.language ?? '—', icon: 'check' });
 }
 ```
 

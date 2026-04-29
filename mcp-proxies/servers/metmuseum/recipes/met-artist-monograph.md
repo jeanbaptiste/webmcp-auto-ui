@@ -30,45 +30,48 @@ layout:
      artistOrCulture: true,
      hasImages: true,
      pageSize: 30
-   });
+   }).catch(() => null);
+   const ids = search?.objectIDs ?? [];
+   if (ids.length === 0) return widget('text', { content: 'No works found.' });
    ```
 
 2. **Fetch details** for the first 8-10 results:
    ```js
    const objects = await Promise.all(
-     search.objectIDs.slice(0, 8).map(id => call('get-museum-object', { objectId: id }))
+     ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null))
    );
-   const works = objects.map(r => r.object).filter(o => o.primaryImageSmall);
+   const works = objects.filter(r => r?.object && !r?.message).map(r => r.object).filter(o => o?.primaryImageSmall);
+   if (works.length === 0) return widget('text', { content: 'No works with images found.' });
    ```
 
 3. **Build the artist profile** from any work (bio is on every record):
    ```js
    const ref = works[0];
    await widget('profile', {
-     name: ref.artistDisplayName,
-     subtitle: ref.artistDisplayBio,
+     name: ref?.artistDisplayName ?? '—',
+     subtitle: ref?.artistDisplayBio ?? '',
      stats: [
-       { label: 'Born', value: ref.artistBeginDate },
-       { label: 'Died', value: ref.artistEndDate },
-       { label: 'Nationality', value: ref.artistNationality }
+       { label: 'Born', value: ref?.artistBeginDate ?? '—' },
+       { label: 'Died', value: ref?.artistEndDate ?? '—' },
+       { label: 'Nationality', value: ref?.artistNationality ?? '—' }
      ]
    });
    ```
 
 4. **Stats** (count, on-view, public domain):
    ```js
-   await widget('stat-card', { label: 'Works at the Met', value: search.total, icon: 'palette' });
-   await widget('stat-card', { label: 'Public domain', value: works.filter(w => w.isPublicDomain).length, icon: 'unlock' });
+   await widget('stat-card', { label: 'Works at the Met', value: search?.total ?? works.length, icon: 'palette' });
+   await widget('stat-card', { label: 'Public domain', value: works.filter(w => w?.isPublicDomain).length, icon: 'unlock' });
    ```
 
 5. **Chronological gallery** sorted by `objectBeginDate`:
    ```js
-   const sorted = [...works].sort((a, b) => (a.objectBeginDate || 0) - (b.objectBeginDate || 0));
+   const sorted = [...works].sort((a, b) => (a?.objectBeginDate || 0) - (b?.objectBeginDate || 0));
    await widget('gallery', {
      images: sorted.map(w => ({
-       src: w.primaryImageSmall,
-       alt: `${w.title} (${w.objectDate})`,
-       caption: `${w.objectDate} — ${w.medium}`
+       src: w?.primaryImageSmall,
+       alt: `${w?.title ?? '(untitled)'} (${w?.objectDate ?? '—'})`,
+       caption: `${w?.objectDate ?? '—'} — ${w?.medium ?? '—'}`
      }))
    });
    ```
@@ -77,10 +80,10 @@ layout:
    ```js
    await widget('cards', {
      items: sorted.map(w => ({
-       title: w.title,
-       subtitle: w.objectDate,
-       image: w.primaryImageSmall,
-       body: [w.medium, w.GalleryNumber && `Gallery ${w.GalleryNumber}`].filter(Boolean).join(' — ')
+       title: w?.title ?? '(untitled)',
+       subtitle: w?.objectDate ?? '—',
+       image: w?.primaryImageSmall,
+       body: [w?.medium, w?.GalleryNumber && `Gallery ${w.GalleryNumber}`].filter(Boolean).join(' — ')
      }))
    });
    ```
@@ -89,18 +92,22 @@ layout:
 
 ### Vermeer at the Met
 ```js
-const r = await call('search-museum-objects', { q: 'Johannes Vermeer', artistOrCulture: true, hasImages: true });
-const objs = await Promise.all(r.objectIDs.slice(0, 6).map(id => call('get-museum-object', { objectId: id })));
-const works = objs.map(o => o.object);
-await widget('profile', { name: 'Johannes Vermeer', subtitle: works[0]?.artistDisplayBio });
-await widget('gallery', { images: works.map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: w.objectDate })) });
+const r = await call('search-museum-objects', { q: 'Johannes Vermeer', artistOrCulture: true, hasImages: true }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+if (ids.length === 0) return widget('text', { content: 'No results.' });
+const objs = await Promise.all(ids.slice(0, 6).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+await widget('profile', { name: 'Johannes Vermeer', subtitle: works[0]?.artistDisplayBio ?? '' });
+await widget('gallery', { images: works.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.objectDate ?? '—' })) });
 ```
 
 ### Hokusai prints
 ```js
-const r = await call('search-museum-objects', { q: 'Hokusai', artistOrCulture: true, hasImages: true, departmentId: 6 });
-const objs = await Promise.all(r.objectIDs.slice(0, 10).map(id => call('get-museum-object', { objectId: id })));
-await widget('cards', { items: objs.map(o => o.object).map(w => ({ title: w.title, subtitle: w.objectDate, image: w.primaryImageSmall })) });
+const r = await call('search-museum-objects', { q: 'Hokusai', artistOrCulture: true, hasImages: true, departmentId: 6 }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object);
+await widget('cards', { items: works.map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.objectDate ?? '—', image: w?.primaryImageSmall })) });
 ```
 
 ## Common mistakes

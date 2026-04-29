@@ -30,18 +30,21 @@ layout:
      departmentId: 11,
      hasImages: true,
      pageSize: 30
-   });
+   }).catch(() => null);
+   const ids = search?.objectIDs ?? [];
+   if (ids.length === 0) return widget('text', { content: 'No on-view objects.' });
    ```
 
 2. **Fetch and keep entries with a `GalleryNumber`**:
    ```js
-   const objs = await Promise.all(search.objectIDs.slice(0, 15).map(id => call('get-museum-object', { objectId: id })));
-   const stops = objs.map(o => o.object).filter(w => w.GalleryNumber).sort((a, b) => Number(a.GalleryNumber) - Number(b.GalleryNumber));
+   const objs = await Promise.all(ids.slice(0, 15).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const stops = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.GalleryNumber).sort((a, b) => Number(a?.GalleryNumber || 0) - Number(b?.GalleryNumber || 0));
+   if (stops.length === 0) return widget('text', { content: 'No gallery numbers available.' });
    ```
 
 3. **Stats**:
    ```js
-   const galleries = [...new Set(stops.map(s => s.GalleryNumber))];
+   const galleries = [...new Set(stops.map(s => s?.GalleryNumber).filter(Boolean))];
    await widget('stat-card', { label: 'On-view stops', value: stops.length, icon: 'foot' });
    await widget('stat-card', { label: 'Galleries to visit', value: galleries.length, icon: 'map' });
    await widget('stat-card', { label: 'Estimated time', value: `${galleries.length * 5} min`, icon: 'clock' });
@@ -51,7 +54,7 @@ layout:
    ```js
    await widget('table', {
      columns: ['Gallery', 'Title', 'Artist', 'Date'],
-     rows: stops.map(s => [s.GalleryNumber, s.title, s.artistDisplayName || '—', s.objectDate])
+     rows: stops.map(s => [s?.GalleryNumber ?? '—', s?.title ?? '(untitled)', s?.artistDisplayName || '—', s?.objectDate ?? '—'])
    });
    ```
 
@@ -59,10 +62,10 @@ layout:
    ```js
    await widget('cards', {
      items: stops.map(s => ({
-       title: `Gallery ${s.GalleryNumber}`,
-       subtitle: s.title,
-       image: s.primaryImageSmall,
-       body: `${s.artistDisplayName} — ${s.medium}`
+       title: `Gallery ${s?.GalleryNumber ?? '—'}`,
+       subtitle: s?.title ?? '(untitled)',
+       image: s?.primaryImageSmall,
+       body: `${s?.artistDisplayName ?? '—'} — ${s?.medium ?? '—'}`
      }))
    });
    ```
@@ -71,11 +74,11 @@ layout:
    ```js
    await widget('kv', {
      pairs: [
-       ['Department', stops[0]?.department],
+       ['Department', stops[0]?.department ?? '—'],
        ['Floor', '2 (mostly)'],
        ['Number of stops', stops.length],
-       ['First gallery', stops[0]?.GalleryNumber],
-       ['Last gallery', stops[stops.length - 1]?.GalleryNumber]
+       ['First gallery', stops[0]?.GalleryNumber ?? '—'],
+       ['Last gallery', stops[stops.length - 1]?.GalleryNumber ?? '—']
      ]
    });
    ```
@@ -84,17 +87,20 @@ layout:
 
 ### Rembrandt on view
 ```js
-const r = await call('search-museum-objects', { q: 'rembrandt', isOnView: true, departmentId: 11, hasImages: true });
-const objs = await Promise.all(r.objectIDs.slice(0, 10).map(id => call('get-museum-object', { objectId: id })));
-const stops = objs.map(o => o.object).filter(w => w.GalleryNumber);
-await widget('table', { columns: ['Gallery', 'Title'], rows: stops.map(s => [s.GalleryNumber, s.title]) });
+const r = await call('search-museum-objects', { q: 'rembrandt', isOnView: true, departmentId: 11, hasImages: true }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const stops = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.GalleryNumber);
+await widget('table', { columns: ['Gallery', 'Title'], rows: stops.map(s => [s?.GalleryNumber ?? '—', s?.title ?? '(untitled)']) });
 ```
 
 ### European masterpieces tour
 ```js
-const r = await call('search-museum-objects', { q: 'masterpiece', departmentId: 11, isOnView: true, isHighlight: true });
-const objs = await Promise.all(r.objectIDs.slice(0, 10).map(id => call('get-museum-object', { objectId: id })));
-await widget('cards', { items: objs.map(o => ({ title: `Gallery ${o.object.GalleryNumber}`, subtitle: o.object.title, image: o.object.primaryImageSmall })) });
+const r = await call('search-museum-objects', { q: 'masterpiece', departmentId: 11, isOnView: true, isHighlight: true }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object);
+await widget('cards', { items: works.map(w => ({ title: `Gallery ${w?.GalleryNumber ?? '—'}`, subtitle: w?.title ?? '(untitled)', image: w?.primaryImageSmall })) });
 ```
 
 ## Common mistakes

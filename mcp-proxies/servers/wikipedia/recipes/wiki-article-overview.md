@@ -27,42 +27,43 @@ This recipe combines short summary, full article context, structured sections li
 
 1. **Fetch the short summary** (intro paragraph):
    ```js
-   const sum = await call('get_summary', { title: 'Alan Turing' });
+   const sum = await call('get_summary', { title: 'Alan Turing' }).catch(() => null);
    ```
 
 2. **Fetch the full article** (used for metadata + URL + categories):
    ```js
-   const art = await call('get_article', { title: 'Alan Turing' });
+   const art = await call('get_article', { title: 'Alan Turing' }).catch(() => null);
+   if (!art || art?.exists === false) return widget('text', { content: 'Page not found.' });
    ```
 
 3. **Fetch the sections list** (table of contents):
    ```js
-   const secs = await call('get_sections', { title: 'Alan Turing' });
+   const secs = await call('get_sections', { title: 'Alan Turing' }).catch(() => null);
    ```
 
 4. **Render the profile + summary**:
    ```js
    await widget('profile', {
-     name: art.title,
-     subtitle: (art.categories || []).slice(0, 2).join(' · '),
-     url: art.url
+     name: art?.title ?? '—',
+     subtitle: (art?.categories ?? []).slice(0, 2).join(' · '),
+     url: art?.url
    });
-   await widget('text', { content: sum.summary });
+   await widget('text', { content: sum?.summary ?? '(no summary available)' });
    ```
 
 5. **Metadata as kv + sections as table**:
    ```js
    await widget('kv', {
      items: [
-       { label: 'Page ID', value: String(art.pageid) },
-       { label: 'Categories', value: (art.categories || []).length },
-       { label: 'Outgoing links', value: (art.links || []).length },
-       { label: 'URL', value: art.url }
+       { label: 'Page ID', value: String(art?.pageid ?? '—') },
+       { label: 'Categories', value: (art?.categories ?? []).length },
+       { label: 'Outgoing links', value: (art?.links ?? []).length },
+       { label: 'URL', value: art?.url ?? '—' }
      ]
    });
    await widget('table', {
      columns: ['Section', 'Level'],
-     rows: secs.sections.map(s => [s.title, s.level])
+     rows: (secs?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—'])
    });
    ```
 
@@ -71,31 +72,33 @@ This recipe combines short summary, full article context, structured sections li
 ### Marie Curie factsheet
 ```js
 const [sum, art, secs] = await Promise.all([
-  call('get_summary', { title: 'Marie Curie' }),
-  call('get_article', { title: 'Marie Curie' }),
-  call('get_sections', { title: 'Marie Curie' })
+  call('get_summary', { title: 'Marie Curie' }).catch(() => null),
+  call('get_article', { title: 'Marie Curie' }).catch(() => null),
+  call('get_sections', { title: 'Marie Curie' }).catch(() => null)
 ]);
+if (!art || art?.exists === false) return widget('text', { content: 'Page not found.' });
 
-await widget('profile', { name: art.title, subtitle: 'Physicist · Chemist', url: art.url });
-await widget('text', { content: sum.summary });
+await widget('profile', { name: art?.title ?? '—', subtitle: 'Physicist · Chemist', url: art?.url });
+await widget('text', { content: sum?.summary ?? '(no summary)' });
 await widget('kv', {
   items: [
-    { label: 'Categories', value: art.categories.length },
-    { label: 'Sections', value: secs.sections.length }
+    { label: 'Categories', value: (art?.categories ?? []).length },
+    { label: 'Sections', value: (secs?.sections ?? []).length }
   ]
 });
 await widget('table', {
   columns: ['Section', 'Level'],
-  rows: secs.sections.map(s => [s.title, s.level])
+  rows: (secs?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—'])
 });
 ```
 
 ### Mont Fuji factsheet
 ```js
-const sum = await call('get_summary', { title: 'Mount Fuji' });
-const art = await call('get_article', { title: 'Mount Fuji' });
-await widget('profile', { name: art.title, url: art.url });
-await widget('text', { content: sum.summary });
+const sum = await call('get_summary', { title: 'Mount Fuji' }).catch(() => null);
+const art = await call('get_article', { title: 'Mount Fuji' }).catch(() => null);
+if (!art || art?.exists === false) return widget('text', { content: 'Page not found.' });
+await widget('profile', { name: art?.title ?? '—', url: art?.url });
+await widget('text', { content: sum?.summary ?? '(no summary)' });
 ```
 
 ## Common mistakes

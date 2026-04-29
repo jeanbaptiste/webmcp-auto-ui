@@ -35,19 +35,21 @@ const r = await call('jpl_horizons', {
   STEP_SIZE: '30d',
   OUT_UNITS: 'AU-D',
   format: 'json'
-});
+}).catch(() => null);
+if (!r) return widget('text', { content: 'Horizons request failed.' });
 
 // 2. Parse vectors block
-const block = (r.result || '').split('$$SOE')[1]?.split('$$EOE')[0] || '';
+const block = (r?.result ?? '').split('$$SOE')[1]?.split('$$EOE')[0] ?? '';
 const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
 const points = [];
 for (let i = 0; i < lines.length; i += 4) {
   // Each ephemeris point spans 4 lines: header, X/Y/Z, VX/VY/VZ, LT/RG/RR
-  const xyz = (lines[i + 1] || '').match(/-?\d+\.\d+E[+-]\d+/g);
-  if (xyz?.length >= 3) {
+  const xyz = (lines[i + 1] ?? '').match(/-?\d+\.\d+E[+-]\d+/g);
+  if (xyz && xyz.length >= 3) {
     points.push({ x: +xyz[0], y: +xyz[1], z: +xyz[2] });
   }
 }
+if (points.length === 0) return widget('text', { content: 'No vector data parsed.' });
 
 // 3. Parameter kv
 await widget('kv', {
@@ -92,13 +94,13 @@ await widget('text', {
 
 ### Voyager 1 escape trajectory
 ```js
-const r = await call('jpl_horizons', { COMMAND: '-31', EPHEM_TYPE: 'VECTORS', CENTER: '@10', START_TIME: '1977-09-05', STOP_TIME: '2026-01-01', STEP_SIZE: '180d', OUT_UNITS: 'AU-D' });
+const r = await call('jpl_horizons', { COMMAND: '-31', EPHEM_TYPE: 'VECTORS', CENTER: '@10', START_TIME: '1977-09-05', STOP_TIME: '2026-01-01', STEP_SIZE: '180d', OUT_UNITS: 'AU-D' }).catch(() => null);
 await widget('kv', { items: [{ label: 'Spacecraft', value: 'Voyager 1' }, { label: 'Window', value: '1977-2026' }] });
 ```
 
 ### Long-period comet via file payload
 ```js
-const r = await call('jpl_horizons_file', { COMMAND: 'C/1995 O1', EPHEM_TYPE: 'VECTORS', CENTER: '@10', START_TIME: '1995-01-01', STOP_TIME: '2030-01-01', STEP_SIZE: '30d' });
+const r = await call('jpl_horizons_file', { COMMAND: 'C/1995 O1', EPHEM_TYPE: 'VECTORS', CENTER: '@10', START_TIME: '1995-01-01', STOP_TIME: '2030-01-01', STEP_SIZE: '30d' }).catch(() => null);
 await widget('text', { title: 'Hale-Bopp', body: 'Highly eccentric orbit — perihelion 0.91 au, aphelion ~370 au.' });
 ```
 

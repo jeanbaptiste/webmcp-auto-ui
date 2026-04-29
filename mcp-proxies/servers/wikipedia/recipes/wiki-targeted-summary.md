@@ -30,24 +30,24 @@ The user has a precise sub-question rather than a general lookup:
      title: 'Quantum computing',
      query: "Shor's algorithm",
      max_length: 300
-   });
+   }).catch(() => null);
    ```
 
 2. **Fetch the article's general summary for context** (so the user sees where the snippet comes from):
    ```js
-   const ctx = await call('get_summary', { title: 'Quantum computing' });
+   const ctx = await call('get_summary', { title: 'Quantum computing' }).catch(() => null);
    ```
 
 3. **Render context + focused answer**:
    ```js
    await widget('kv', {
      items: [
-       { label: 'Article', value: res.title },
-       { label: 'Query', value: res.query }
+       { label: 'Article', value: res?.title ?? '—' },
+       { label: 'Query', value: res?.query ?? '—' }
      ]
    });
-   await widget('text', { content: res.summary });
-   await widget('text', { content: `Article context: ${ctx.summary.slice(0, 240)}…` });
+   await widget('text', { content: res?.summary ?? '(no targeted summary)' });
+   await widget('text', { content: `Article context: ${(ctx?.summary ?? '').slice(0, 240)}…` });
    ```
 
 ## Examples
@@ -58,20 +58,20 @@ const res = await call('summarize_article_for_query', {
   title: 'Quantum computing',
   query: "Shor's algorithm",
   max_length: 280
-});
-await widget('kv', { items: [{ label: 'Article', value: res.title }, { label: 'Query', value: res.query }] });
-await widget('text', { content: res.summary });
+}).catch(() => null);
+await widget('kv', { items: [{ label: 'Article', value: res?.title ?? '—' }, { label: 'Query', value: res?.query ?? '—' }] });
+await widget('text', { content: res?.summary ?? '(no targeted summary)' });
 ```
 
 ### Calvin cycle inside Photosynthesis
 ```js
 const [res, ctx] = await Promise.all([
-  call('summarize_article_for_query', { title: 'Photosynthesis', query: 'Calvin cycle', max_length: 250 }),
-  call('get_summary', { title: 'Photosynthesis' })
+  call('summarize_article_for_query', { title: 'Photosynthesis', query: 'Calvin cycle', max_length: 250 }).catch(() => null),
+  call('get_summary', { title: 'Photosynthesis' }).catch(() => null)
 ]);
-await widget('kv', { items: [{ label: 'Article', value: res.title }, { label: 'Query', value: res.query }] });
-await widget('text', { content: res.summary });
-await widget('text', { content: ctx.summary });
+await widget('kv', { items: [{ label: 'Article', value: res?.title ?? '—' }, { label: 'Query', value: res?.query ?? '—' }] });
+await widget('text', { content: res?.summary ?? '(no targeted summary)' });
+await widget('text', { content: ctx?.summary ?? '' });
 ```
 
 ## Common mistakes

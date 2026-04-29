@@ -29,14 +29,18 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
 1. **Fetch the front page** (use the max useful sample):
    ```js
    const res = await call('get-front-page', { hitsPerPage: 100 });
-   const stories = res.hits;
+   const stories = (res?.hits ?? []).filter(s => s);
+   if (stories.length === 0) return widget('text', { content: 'No stories to analyze.' });
    ```
 
 2. **Compute KPIs**:
    ```js
-   const avgScore = Math.round(stories.reduce((s, x) => s + x.points, 0) / stories.length);
-   const avgComments = Math.round(stories.reduce((s, x) => s + x.num_comments, 0) / stories.length);
-   const median = [...stories].map(s => s.points).sort((a, b) => a - b)[Math.floor(stories.length / 2)];
+   const points = stories.map(s => s?.points || 0).filter(Number.isFinite);
+   const comments = stories.map(s => s?.num_comments || 0).filter(Number.isFinite);
+   const avgScore = points.length > 0 ? Math.round(points.reduce((s, x) => s + x, 0) / points.length) : 0;
+   const avgComments = comments.length > 0 ? Math.round(comments.reduce((s, x) => s + x, 0) / comments.length) : 0;
+   const sorted = [...points].sort((a, b) => a - b);
+   const median = sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)] : 0;
    ```
 
 3. **Render KPI stat-cards**:
@@ -51,7 +55,7 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
    ```js
    const buckets = [0, 50, 100, 200, 500, 1000, 5000];
    const counts = buckets.map((b, i) => stories.filter(s =>
-     s.points >= b && (i === buckets.length - 1 || s.points < buckets[i + 1])
+     (s?.points ?? 0) >= b && (i === buckets.length - 1 || (s?.points ?? 0) < buckets[i + 1])
    ).length);
    await widget('chart-rich', {
      type: 'bar',
@@ -64,9 +68,11 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
    ```js
    const domains = {};
    for (const s of stories) {
-     if (!s.url) continue;
-     const host = new URL(s.url).hostname.replace(/^www\./, '');
-     domains[host] = (domains[host] || 0) + 1;
+     if (!s?.url) continue;
+     try {
+       const host = new URL(s.url).hostname.replace(/^www\./, '');
+       domains[host] = (domains[host] || 0) + 1;
+     } catch {}
    }
    const topDomains = Object.entries(domains).sort((a, b) => b[1] - a[1]).slice(0, 10);
    await widget('chart-rich', {
@@ -79,7 +85,12 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
 6. **Hourly publication frequency**:
    ```js
    const hours = Array(24).fill(0);
-   for (const s of stories) hours[new Date(s.created_at).getUTCHours()]++;
+   for (const s of stories) {
+     if (!s?.created_at) continue;
+     const d = new Date(s.created_at);
+     if (!Number.isFinite(d.getTime())) continue;
+     hours[d.getUTCHours()]++;
+   }
    await widget('chart-rich', {
      type: 'line',
      title: 'Publications by hour (UTC)',
@@ -91,10 +102,11 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
    ```js
    await widget('table', {
      columns: ['Rank', 'Title', 'Points', 'Comments', 'Domain'],
-     rows: [...stories].sort((a, b) => b.points - a.points).slice(0, 10).map((s, i) => [
-       i + 1, s.title, s.points, s.num_comments,
-       s.url ? new URL(s.url).hostname.replace(/^www\./, '') : 'HN'
-     ])
+     rows: [...stories].sort((a, b) => (b?.points ?? 0) - (a?.points ?? 0)).slice(0, 10).map((s, i) => {
+       let host = 'HN';
+       try { if (s?.url) host = new URL(s.url).hostname.replace(/^www\./, ''); } catch {}
+       return [i + 1, s?.title ?? '(untitled)', s?.points ?? 0, s?.num_comments ?? 0, host];
+     })
    });
    ```
 
@@ -102,12 +114,18 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
 
 ### Full analytics on 100-story sample
 ```js
-const { hits: stories } = await call('get-front-page', { hitsPerPage: 100 });
-const avg = Math.round(stories.reduce((s, x) => s + x.points, 0) / stories.length);
+const res = await call('get-front-page', { hitsPerPage: 100 });
+const stories = (res?.hits ?? []).filter(s => s);
+if (stories.length === 0) return widget('text', { content: 'No data.' });
+const points = stories.map(s => s?.points || 0).filter(Number.isFinite);
+const avg = points.length > 0 ? Math.round(points.reduce((s, x) => s + x, 0) / points.length) : 0;
 await widget('stat-card', { label: 'Avg score', value: avg, icon: 'arrow-up' });
 
 const domains = {};
-stories.forEach(s => { if (s.url) { const h = new URL(s.url).hostname.replace(/^www\./, ''); domains[h] = (domains[h] || 0) + 1; } });
+stories.forEach(s => {
+  if (!s?.url) return;
+  try { const h = new URL(s.url).hostname.replace(/^www\./, ''); domains[h] = (domains[h] || 0) + 1; } catch {}
+});
 await widget('chart-rich', {
   type: 'bar',
   title: 'Top domains',
@@ -117,10 +135,16 @@ await widget('chart-rich', {
 
 ### Engagement ratio (comments per point)
 ```js
-const { hits } = await call('get-front-page', { hitsPerPage: 30 });
+const res = await call('get-front-page', { hitsPerPage: 30 });
+const hits = (res?.hits ?? []).filter(s => s);
 await widget('table', {
   columns: ['Title', 'Points', 'Comments', 'C/P ratio'],
-  rows: hits.map(s => [s.title, s.points, s.num_comments, (s.num_comments / Math.max(s.points, 1)).toFixed(2)])
+  rows: hits.map(s => {
+    const pts = s?.points ?? 0;
+    const com = s?.num_comments ?? 0;
+    const ratio = (com / Math.max(pts, 1)).toFixed(2);
+    return [s?.title ?? '(untitled)', pts, com, ratio];
+  })
 });
 ```
 

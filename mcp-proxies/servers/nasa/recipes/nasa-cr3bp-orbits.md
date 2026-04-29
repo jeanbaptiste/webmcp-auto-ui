@@ -31,15 +31,16 @@ const fam = await call('jpl_periodic_orbits', {
   family: 'halo',
   libr: 2,
   branch: 'N'
-});
-const orbits = fam.data || [];
+}).catch(() => null);
+const orbits = (fam?.data ?? []).filter(o => o);
+if (orbits.length === 0) return widget('text', { content: 'No orbits returned.' });
 
 // 2. Optional: convert reference Julian Day to a calendar date
-const epoch = fam.epoch_jd;
+const epoch = fam?.epoch_jd;
 let calDate = null;
 if (epoch) {
-  const cal = await call('jpl_jd_cal', { jd: String(epoch) });
-  calDate = cal.cd;
+  const cal = await call('jpl_jd_cal', { jd: String(epoch) }).catch(() => null);
+  calDate = cal?.cd ?? null;
 }
 
 // 3. Didactic text
@@ -54,10 +55,10 @@ await widget('chart-rich', {
   series: [{
     name: 'Halo L2 N',
     data: orbits.map(o => ({
-      x: +o.period,
-      y: +o.jacobi,
-      label: o.id || `orbit-${o.idx}`,
-      color: +o.stability < 1.5 ? '#16a34a' : (+o.stability < 5 ? '#f59e0b' : '#dc2626')
+      x: +(o?.period ?? 0),
+      y: +(o?.jacobi ?? 0),
+      label: o?.id || `orbit-${o?.idx ?? '?'}`,
+      color: +(o?.stability ?? 99) < 1.5 ? '#16a34a' : (+(o?.stability ?? 99) < 5 ? '#f59e0b' : '#dc2626')
     }))
   }],
   xLabel: 'Period (TU)', yLabel: 'Jacobi constant',
@@ -67,7 +68,7 @@ await widget('chart-rich', {
 // 5. Sortable table
 await widget('table', {
   columns: ['#', 'Period', 'Jacobi C', 'Stability', 'Amplitude'],
-  rows: orbits.slice(0, 30).map((o, i) => [i + 1, o.period, o.jacobi, o.stability, o.amplitude])
+  rows: orbits.slice(0, 30).map((o, i) => [i + 1, o?.period ?? '—', o?.jacobi ?? '—', o?.stability ?? '—', o?.amplitude ?? '—'])
 });
 
 // 6. kv with epoch helpers
@@ -76,8 +77,8 @@ await widget('kv', {
     { label: 'System', value: 'Earth-Moon' },
     { label: 'Family', value: 'Halo (L2, N)' },
     { label: 'Orbits', value: orbits.length },
-    { label: 'Reference epoch (JD)', value: epoch || 'n/a' },
-    { label: 'Reference epoch (cal)', value: calDate || 'n/a' }
+    { label: 'Reference epoch (JD)', value: epoch ?? 'n/a' },
+    { label: 'Reference epoch (cal)', value: calDate ?? 'n/a' }
   ]
 });
 ```
@@ -86,16 +87,16 @@ await widget('kv', {
 
 ### Sun-Earth L1 Lyapunov
 ```js
-const fam = await call('jpl_periodic_orbits', { sys: 'sun-earth', family: 'lyapunov', libr: 1 });
+const fam = await call('jpl_periodic_orbits', { sys: 'sun-earth', family: 'lyapunov', libr: 1 }).catch(() => null);
 await widget('text', { title: 'Sun-Earth L1 Lyapunov', body: 'Planar periodic orbits used for solar observatories like SOHO and DSCOVR.' });
-await widget('table', { columns: ['Period', 'Jacobi'], rows: (fam.data || []).slice(0, 20).map(o => [o.period, o.jacobi]) });
+await widget('table', { columns: ['Period', 'Jacobi'], rows: (fam?.data ?? []).slice(0, 20).map(o => [o?.period ?? '—', o?.jacobi ?? '—']) });
 ```
 
 ### Distant Retrograde Orbits (Artemis)
 ```js
-const fam = await call('jpl_periodic_orbits', { sys: 'earth-moon', family: 'dro' });
-const cal = await call('jpl_jd_cal', { jd: String(fam.epoch_jd || 2460676.5) });
-await widget('kv', { items: [{ label: 'Family', value: 'Earth-Moon DRO' }, { label: 'Epoch', value: cal.cd }] });
+const fam = await call('jpl_periodic_orbits', { sys: 'earth-moon', family: 'dro' }).catch(() => null);
+const cal = await call('jpl_jd_cal', { jd: String(fam?.epoch_jd ?? 2460676.5) }).catch(() => null);
+await widget('kv', { items: [{ label: 'Family', value: 'Earth-Moon DRO' }, { label: 'Epoch', value: cal?.cd ?? '—' }] });
 ```
 
 ## Common mistakes

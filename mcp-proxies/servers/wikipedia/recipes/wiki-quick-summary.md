@@ -26,16 +26,16 @@ The most common encyclopedic scenario — a quick lookup:
 1. **Fetch summary + 3 facts in parallel**:
    ```js
    const [sum, facts] = await Promise.all([
-     call('get_summary', { title: 'Photosynthesis' }),
-     call('extract_key_facts', { title: 'Photosynthesis', count: 3 })
+     call('get_summary', { title: 'Photosynthesis' }).catch(() => null),
+     call('extract_key_facts', { title: 'Photosynthesis', count: 3 }).catch(() => null)
    ]);
    ```
 
 2. **Render**:
    ```js
-   await widget('text', { content: sum.summary });
+   await widget('text', { content: sum?.summary ?? 'No summary available' });
    await widget('kv', {
-     items: facts.facts.map((f, i) => ({ label: `Fact ${i + 1}`, value: f }))
+     items: (facts?.facts ?? []).map((f, i) => ({ label: `Fact ${i + 1}`, value: f }))
    });
    ```
 
@@ -44,25 +44,25 @@ The most common encyclopedic scenario — a quick lookup:
 ### Photosynthesis
 ```js
 const [sum, facts] = await Promise.all([
-  call('get_summary', { title: 'Photosynthesis' }),
-  call('extract_key_facts', { title: 'Photosynthesis', count: 3 })
+  call('get_summary', { title: 'Photosynthesis' }).catch(() => null),
+  call('extract_key_facts', { title: 'Photosynthesis', count: 3 }).catch(() => null)
 ]);
-await widget('text', { content: sum.summary });
-await widget('kv', { items: facts.facts.map((f, i) => ({ label: `Fact ${i + 1}`, value: f })) });
+await widget('text', { content: sum?.summary ?? 'No summary available' });
+await widget('kv', { items: (facts?.facts ?? []).map((f, i) => ({ label: `Fact ${i + 1}`, value: f })) });
 ```
 
 ### Mitose
 ```js
-const sum = await call('get_summary', { title: 'Mitosis' });
-const facts = await call('extract_key_facts', { title: 'Mitosis', count: 3 });
-await widget('text', { content: sum.summary });
-await widget('kv', { items: facts.facts.map((f, i) => ({ label: `Fait ${i + 1}`, value: f })) });
+const sum = await call('get_summary', { title: 'Mitosis' }).catch(() => null);
+const facts = await call('extract_key_facts', { title: 'Mitosis', count: 3 }).catch(() => null);
+await widget('text', { content: sum?.summary ?? 'No summary available' });
+await widget('kv', { items: (facts?.facts ?? []).map((f, i) => ({ label: `Fait ${i + 1}`, value: f })) });
 ```
 
 ### Blockchain definition
 ```js
-const sum = await call('get_summary', { title: 'Blockchain' });
-await widget('text', { content: sum.summary });
+const sum = await call('get_summary', { title: 'Blockchain' }).catch(() => null);
+await widget('text', { content: sum?.summary ?? 'No summary available' });
 ```
 
 ## Common mistakes

@@ -29,14 +29,17 @@ layout:
      departmentId: 21,
      hasImages: true,
      pageSize: 40
-   });
+   }).catch(() => null);
+   const ids = search?.objectIDs ?? [];
+   if (ids.length === 0) return widget('text', { content: 'No objects.' });
    ```
 
 2. **Fetch and detect diaspora cases** (`artistNationality` ≠ `country`):
    ```js
-   const objs = await Promise.all(search.objectIDs.slice(0, 25).map(id => call('get-museum-object', { objectId: id })));
-   const diaspora = objs.map(o => o.object).filter(w =>
-     w.artistNationality && w.country &&
+   const objs = await Promise.all(ids.slice(0, 25).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const allWorks = objs.filter(o => o?.object).map(o => o.object);
+   const diaspora = allWorks.filter(w =>
+     w?.artistNationality && w?.country &&
      !w.country.toLowerCase().includes(w.artistNationality.toLowerCase().slice(0, 5))
    );
    ```
@@ -46,8 +49,8 @@ layout:
    await widget('map', {
      center: [40, 0], zoom: 2,
      markers: diaspora.flatMap(w => [
-       { lat: 0, lon: 0, label: `Origin: ${w.artistNationality}`, popup: w.artistDisplayName },
-       { lat: 0, lon: 0, label: `Made in: ${w.country}`, popup: w.title }
+       { lat: 0, lon: 0, label: `Origin: ${w?.artistNationality ?? '—'}`, popup: w?.artistDisplayName ?? '—' },
+       { lat: 0, lon: 0, label: `Made in: ${w?.country ?? '—'}`, popup: w?.title ?? '(untitled)' }
      ])
    });
    ```
@@ -56,10 +59,10 @@ layout:
    ```js
    await widget('cards', {
      items: diaspora.map(w => ({
-       title: w.artistDisplayName,
-       subtitle: `${w.artistNationality} → ${w.country}`,
-       image: w.primaryImageSmall,
-       body: `${w.title} (${w.objectDate})`
+       title: w?.artistDisplayName ?? '—',
+       subtitle: `${w?.artistNationality ?? '—'} → ${w?.country ?? '—'}`,
+       image: w?.primaryImageSmall,
+       body: `${w?.title ?? '(untitled)'} (${w?.objectDate ?? '—'})`
      }))
    });
    ```
@@ -67,7 +70,7 @@ layout:
 5. **Chart of most frequent flows**:
    ```js
    const flows = diaspora.reduce((acc, w) => {
-     const k = `${w.artistNationality} → ${w.country}`;
+     const k = `${w?.artistNationality ?? '—'} → ${w?.country ?? '—'}`;
      acc[k] = (acc[k] || 0) + 1; return acc;
    }, {});
    await widget('chart', {
@@ -78,7 +81,7 @@ layout:
 
 6. **Stats**:
    ```js
-   const ratio = Math.round(diaspora.length / objs.length * 100);
+   const ratio = allWorks.length > 0 ? Math.round(diaspora.length / allWorks.length * 100) : 0;
    await widget('stat-card', { label: 'Diaspora cases', value: diaspora.length, icon: 'globe' });
    await widget('stat-card', { label: 'Diaspora ratio', value: `${ratio}%`, icon: 'percent' });
    ```
@@ -87,17 +90,20 @@ layout:
 
 ### European modernists in the US
 ```js
-const r = await call('search-museum-objects', { q: 'modernism', departmentId: 21, hasImages: true });
-const objs = await Promise.all(r.objectIDs.slice(0, 20).map(id => call('get-museum-object', { objectId: id })));
-const diaspora = objs.map(o => o.object).filter(w => w.artistNationality !== w.country);
-await widget('cards', { items: diaspora.map(w => ({ title: w.artistDisplayName, subtitle: `${w.artistNationality} → ${w.country}` })) });
+const r = await call('search-museum-objects', { q: 'modernism', departmentId: 21, hasImages: true }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 20).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const diaspora = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.artistNationality && w?.country && w.artistNationality !== w.country);
+await widget('cards', { items: diaspora.map(w => ({ title: w?.artistDisplayName ?? '—', subtitle: `${w?.artistNationality ?? '—'} → ${w?.country ?? '—'}` })) });
 ```
 
 ### African-American artists
 ```js
-const r = await call('search-museum-objects', { q: 'African-American', tags: true, hasImages: true });
-const objs = await Promise.all(r.objectIDs.slice(0, 10).map(id => call('get-museum-object', { objectId: id })));
-await widget('chart', { type: 'bar', data: [{ label: 'American (African descent)', value: objs.length }] });
+const r = await call('search-museum-objects', { q: 'African-American', tags: true, hasImages: true }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object);
+await widget('chart', { type: 'bar', data: [{ label: 'American (African descent)', value: works.length }] });
 ```
 
 ## Common mistakes

@@ -28,14 +28,16 @@ layout:
      q: 'Havemeyer',
      hasImages: true,
      pageSize: 50
-   });
+   }).catch(() => null);
+   const ids = search?.objectIDs ?? [];
+   if (ids.length === 0) return widget('text', { content: 'No matching gifts.' });
    ```
 
 2. **Fetch and post-filter on `creditLine`**:
    ```js
-   const objs = await Promise.all(search.objectIDs.slice(0, 25).map(id => call('get-museum-object', { objectId: id })));
-   const gift = objs.map(o => o.object).filter(w =>
-     (w.creditLine || '').includes('Havemeyer') && w.primaryImageSmall
+   const objs = await Promise.all(ids.slice(0, 25).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const gift = objs.filter(o => o?.object).map(o => o.object).filter(w =>
+     (w?.creditLine || '').includes('Havemeyer') && w?.primaryImageSmall
    );
    ```
 
@@ -53,15 +55,15 @@ layout:
 
 4. **Stats**:
    ```js
-   const departments = [...new Set(gift.map(w => w.department))];
-   await widget('stat-card', { label: 'Works given', value: search.total, icon: 'gift' });
+   const departments = [...new Set(gift.map(w => w?.department).filter(Boolean))];
+   await widget('stat-card', { label: 'Works given', value: search?.total ?? gift.length, icon: 'gift' });
    await widget('stat-card', { label: 'Departments touched', value: departments.length, icon: 'building' });
    ```
 
 5. **Gallery of the bequest**:
    ```js
    await widget('gallery', {
-     images: gift.map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: `${w.artistDisplayName} — ${w.objectDate}` }))
+     images: gift.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.artistDisplayName ?? '—'} — ${w?.objectDate ?? '—'}` }))
    });
    ```
 
@@ -69,13 +71,13 @@ layout:
    ```js
    await widget('cards', {
      items: gift.slice(0, 8).map(w => ({
-       title: w.title, subtitle: w.artistDisplayName, image: w.primaryImageSmall, body: w.medium
+       title: w?.title ?? '(untitled)', subtitle: w?.artistDisplayName ?? '—', image: w?.primaryImageSmall, body: w?.medium ?? '—'
      }))
    });
    await widget('kv', {
      pairs: [
        ['Donor', 'Havemeyer'],
-       ['Total works', search.total],
+       ['Total works', search?.total ?? gift.length],
        ['Sampled', gift.length],
        ['Departments', departments.join(', ')]
      ]
@@ -86,18 +88,20 @@ layout:
 
 ### Havemeyer bequest
 ```js
-const r = await call('search-museum-objects', { q: 'Havemeyer', hasImages: true, pageSize: 50 });
-const objs = await Promise.all(r.objectIDs.slice(0, 20).map(id => call('get-museum-object', { objectId: id })));
-const gift = objs.map(o => o.object).filter(w => (w.creditLine || '').includes('Havemeyer'));
-await widget('gallery', { images: gift.map(w => ({ src: w.primaryImageSmall, alt: w.title })) });
+const r = await call('search-museum-objects', { q: 'Havemeyer', hasImages: true, pageSize: 50 }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 20).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const gift = objs.filter(o => o?.object).map(o => o.object).filter(w => (w?.creditLine || '').includes('Havemeyer'));
+await widget('gallery', { images: gift.filter(w => w?.primaryImageSmall).map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)' })) });
 ```
 
 ### Robert Lehman collection
 ```js
-const r = await call('search-museum-objects', { q: 'Robert Lehman', hasImages: true, pageSize: 30 });
-const objs = await Promise.all(r.objectIDs.slice(0, 12).map(id => call('get-museum-object', { objectId: id })));
-const gift = objs.map(o => o.object).filter(w => (w.creditLine || '').includes('Lehman'));
-await widget('cards', { items: gift.map(w => ({ title: w.title, subtitle: w.artistDisplayName, image: w.primaryImageSmall })) });
+const r = await call('search-museum-objects', { q: 'Robert Lehman', hasImages: true, pageSize: 30 }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const gift = objs.filter(o => o?.object).map(o => o.object).filter(w => (w?.creditLine || '').includes('Lehman'));
+await widget('cards', { items: gift.map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.artistDisplayName ?? '—', image: w?.primaryImageSmall })) });
 ```
 
 ## Common mistakes

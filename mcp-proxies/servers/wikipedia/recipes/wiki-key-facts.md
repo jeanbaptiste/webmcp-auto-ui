@@ -25,20 +25,22 @@ The user wants high-density information for a quick read:
 
 1. **Extract the facts** (count is tunable, 5-10 is sweet spot):
    ```js
-   const f = await call('extract_key_facts', { title: 'Eiffel Tower', count: 7 });
+   const f = await call('extract_key_facts', { title: 'Eiffel Tower', count: 7 }).catch(() => null);
+   const facts = f?.facts ?? [];
+   if (facts.length === 0) return widget('text', { content: 'No facts extracted.' });
    ```
 
 2. **Get a contextual summary** (one-line topic intro):
    ```js
-   const sum = await call('get_summary', { title: 'Eiffel Tower' });
+   const sum = await call('get_summary', { title: 'Eiffel Tower' }).catch(() => null);
    ```
 
 3. **Render stat-cards + fact cards**:
    ```js
-   await widget('stat-card', { label: 'Facts', value: f.facts.length, icon: 'list-checks' });
-   await widget('stat-card', { label: 'Topic', value: f.title, icon: 'book-open' });
+   await widget('stat-card', { label: 'Facts', value: facts.length, icon: 'list-checks' });
+   await widget('stat-card', { label: 'Topic', value: f?.title ?? '—', icon: 'book-open' });
    await widget('cards', {
-     items: f.facts.map((fact, i) => ({
+     items: facts.map((fact, i) => ({
        title: `Fact ${i + 1}`,
        body: fact
      }))
@@ -49,21 +51,23 @@ The user wants high-density information for a quick read:
 
 ### 7 facts on the Eiffel Tower
 ```js
-const f = await call('extract_key_facts', { title: 'Eiffel Tower', count: 7 });
-await widget('stat-card', { label: 'Facts', value: f.facts.length, icon: 'list-checks' });
+const f = await call('extract_key_facts', { title: 'Eiffel Tower', count: 7 }).catch(() => null);
+const facts = f?.facts ?? [];
+await widget('stat-card', { label: 'Facts', value: facts.length, icon: 'list-checks' });
 await widget('cards', {
-  items: f.facts.map((fact, i) => ({ title: `#${i + 1}`, body: fact }))
+  items: facts.map((fact, i) => ({ title: `#${i + 1}`, body: fact }))
 });
 ```
 
 ### Briefing on Antarctica with topic focus
 ```js
 const [f, sum] = await Promise.all([
-  call('extract_key_facts', { title: 'Antarctica', topic_within_article: 'Climate', count: 6 }),
-  call('get_summary', { title: 'Antarctica' })
+  call('extract_key_facts', { title: 'Antarctica', topic_within_article: 'Climate', count: 6 }).catch(() => null),
+  call('get_summary', { title: 'Antarctica' }).catch(() => null)
 ]);
-await widget('stat-card', { label: 'Facts', value: f.facts.length, icon: 'snowflake' });
-await widget('cards', { items: f.facts.map((fact, i) => ({ title: `Fact ${i + 1}`, body: fact })) });
+const facts = f?.facts ?? [];
+await widget('stat-card', { label: 'Facts', value: facts.length, icon: 'snowflake' });
+await widget('cards', { items: facts.map((fact, i) => ({ title: `Fact ${i + 1}`, body: fact })) });
 ```
 
 ## Common mistakes

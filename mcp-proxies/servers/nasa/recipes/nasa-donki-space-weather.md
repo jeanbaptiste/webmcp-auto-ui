@@ -26,15 +26,17 @@ DONKI categorises events as FLR, CME, IPS, GST, MPC, RBE, SEP — each with star
 
 ```js
 // 1. Fetch flares for a recent window (other types: CME, GST, SEP, IPS)
-const events = await call('nasa_donki', {
+const raw = await call('nasa_donki', {
   type: 'FLR',
   startDate: '2026-04-01',
   endDate:   '2026-04-29'
-});
+}).catch(() => null);
+const events = (Array.isArray(raw) ? raw : []).filter(e => e);
+if (events.length === 0) return widget('text', { content: 'No DONKI events in this window.' });
 
 // 2. KPI
-const xClass = events.filter(e => (e.classType || '').startsWith('X')).length;
-const mClass = events.filter(e => (e.classType || '').startsWith('M')).length;
+const xClass = events.filter(e => (e?.classType ?? '').startsWith('X')).length;
+const mClass = events.filter(e => (e?.classType ?? '').startsWith('M')).length;
 await widget('stat-card', { label: 'Flares', value: events.length, icon: 'sun' });
 await widget('stat-card', { label: 'X-class', value: xClass, icon: 'zap' });
 await widget('stat-card', { label: 'M-class', value: mClass, icon: 'flash' });
@@ -49,10 +51,10 @@ const score = c => {
 };
 await widget('chart', {
   type: 'scatter',
-  data: events.map(e => ({
-    x: e.beginTime || e.peakTime,
-    y: score(e.classType),
-    label: e.classType
+  data: events.filter(e => e?.classType).map(e => ({
+    x: e?.beginTime || e?.peakTime,
+    y: score(e?.classType),
+    label: e?.classType
   })),
   xLabel: 'Time', yLabel: 'Flare class (encoded)'
 });
@@ -60,19 +62,19 @@ await widget('chart', {
 // 4. Timeline
 await widget('timeline', {
   events: events.map(e => ({
-    date: (e.peakTime || e.beginTime).slice(0, 16),
-    title: `${e.classType || 'Flare'} — ${e.sourceLocation || 'Sun'}`,
-    description: e.activeRegionNum ? `Active region AR${e.activeRegionNum}` : ''
+    date: (e?.peakTime || e?.beginTime || '').slice(0, 16),
+    title: `${e?.classType || 'Flare'} — ${e?.sourceLocation || 'Sun'}`,
+    description: e?.activeRegionNum ? `Active region AR${e.activeRegionNum}` : ''
   }))
 });
 
 // 5. Cards for the strongest flares
-const strongest = [...events].sort((a, b) => score(b.classType) - score(a.classType)).slice(0, 5);
+const strongest = [...events].sort((a, b) => score(b?.classType) - score(a?.classType)).slice(0, 5);
 await widget('cards', {
   items: strongest.map(e => ({
-    title: e.classType || 'Flare',
-    subtitle: (e.peakTime || e.beginTime).slice(0, 16),
-    description: e.note || `Source ${e.sourceLocation || '?'}, AR${e.activeRegionNum ?? '?'}`
+    title: e?.classType || 'Flare',
+    subtitle: (e?.peakTime || e?.beginTime || '').slice(0, 16),
+    description: e?.note || `Source ${e?.sourceLocation ?? '?'}, AR${e?.activeRegionNum ?? '?'}`
   }))
 });
 ```
@@ -81,15 +83,17 @@ await widget('cards', {
 
 ### Recent CMEs
 ```js
-const cmes = await call('nasa_donki', { type: 'CME', startDate: '2026-04-01', endDate: '2026-04-29' });
+const raw = await call('nasa_donki', { type: 'CME', startDate: '2026-04-01', endDate: '2026-04-29' }).catch(() => null);
+const cmes = (Array.isArray(raw) ? raw : []).filter(c => c);
 await widget('stat-card', { label: 'CMEs', value: cmes.length });
-await widget('timeline', { events: cmes.map(c => ({ date: c.startTime?.slice(0, 16), title: 'CME', description: c.sourceLocation })) });
+await widget('timeline', { events: cmes.map(c => ({ date: c?.startTime?.slice(0, 16) ?? '—', title: 'CME', description: c?.sourceLocation ?? '—' })) });
 ```
 
 ### Geomagnetic storms last quarter
 ```js
-const gst = await call('nasa_donki', { type: 'GST', startDate: '2026-01-01', endDate: '2026-03-31' });
-await widget('cards', { items: gst.map(g => ({ title: 'GST', subtitle: g.startTime?.slice(0, 16), description: 'Kp ' + (g.allKpIndex?.[0]?.kpIndex ?? '?') })) });
+const raw = await call('nasa_donki', { type: 'GST', startDate: '2026-01-01', endDate: '2026-03-31' }).catch(() => null);
+const gst = (Array.isArray(raw) ? raw : []).filter(g => g);
+await widget('cards', { items: gst.map(g => ({ title: 'GST', subtitle: g?.startTime?.slice(0, 16) ?? '—', description: 'Kp ' + (g?.allKpIndex?.[0]?.kpIndex ?? '?') })) });
 ```
 
 ## Common mistakes

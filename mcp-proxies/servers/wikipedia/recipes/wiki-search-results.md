@@ -27,15 +27,20 @@ The user runs an open search on Wikipedia:
 
 1. **Run the search** (default 10, max ~50 useful):
    ```js
-   const res = await call('search_wikipedia', { query: 'blockchain', limit: 10 });
-   const hits = res.results;
+   const res = await call('search_wikipedia', { query: 'blockchain', limit: 10 }).catch(() => null);
+   const hits = (res?.results ?? []).filter(h => h);
+   if (hits.length === 0) {
+     await widget('stat-card', { label: 'Results', value: 0, icon: 'search' });
+     return widget('text', { content: 'No matching articles.' });
+   }
    ```
 
 2. **Compute aggregate stats**:
    ```js
    const total = hits.length;
-   const avgWords = Math.round(hits.reduce((s, h) => s + (h.wordcount || 0), 0) / Math.max(1, total));
-   const longest = Math.max(...hits.map(h => h.wordcount || 0));
+   const wordCounts = hits.map(h => h?.wordcount || 0).filter(Number.isFinite);
+   const avgWords = Math.round(wordCounts.reduce((s, w) => s + w, 0) / Math.max(1, wordCounts.length));
+   const longest = wordCounts.length > 0 ? Math.max(...wordCounts) : 0;
    ```
 
 3. **Render stat-cards**:
@@ -49,10 +54,10 @@ The user runs an open search on Wikipedia:
    ```js
    await widget('cards', {
      items: hits.map(h => ({
-       title: h.title,
-       subtitle: `${h.wordcount || 0} words`,
-       body: (h.snippet || '').replace(/<[^>]+>/g, ''),
-       url: `https://en.wikipedia.org/wiki/${encodeURIComponent(h.title.replace(/ /g, '_'))}`
+       title: h?.title ?? '—',
+       subtitle: `${h?.wordcount ?? 0} words`,
+       body: (h?.snippet ?? '').replace(/<[^>]+>/g, ''),
+       url: `https://en.wikipedia.org/wiki/${encodeURIComponent((h?.title ?? '').replace(/ /g, '_'))}`
      }))
    });
    ```
@@ -61,24 +66,25 @@ The user runs an open search on Wikipedia:
 
 ### Search "intelligence artificielle"
 ```js
-const res = await call('search_wikipedia', { query: 'intelligence artificielle', limit: 12 });
-const hits = res.results;
+const res = await call('search_wikipedia', { query: 'intelligence artificielle', limit: 12 }).catch(() => null);
+const hits = (res?.results ?? []).filter(h => h);
 await widget('stat-card', { label: 'Results', value: hits.length, icon: 'search' });
 await widget('cards', {
   items: hits.map(h => ({
-    title: h.title,
-    subtitle: `${h.wordcount} words`,
-    body: h.snippet.replace(/<[^>]+>/g, ''),
-    url: `https://fr.wikipedia.org/wiki/${encodeURIComponent(h.title.replace(/ /g, '_'))}`
+    title: h?.title ?? '—',
+    subtitle: `${h?.wordcount ?? 0} words`,
+    body: (h?.snippet ?? '').replace(/<[^>]+>/g, ''),
+    url: `https://fr.wikipedia.org/wiki/${encodeURIComponent((h?.title ?? '').replace(/ /g, '_'))}`
   }))
 });
 ```
 
 ### Quick disambiguation lookup
 ```js
-const res = await call('search_wikipedia', { query: 'Mercury', limit: 8 });
+const res = await call('search_wikipedia', { query: 'Mercury', limit: 8 }).catch(() => null);
+const hits = (res?.results ?? []).filter(h => h);
 await widget('cards', {
-  items: res.results.map(h => ({ title: h.title, body: h.snippet.replace(/<[^>]+>/g, '') }))
+  items: hits.map(h => ({ title: h?.title ?? '—', body: (h?.snippet ?? '').replace(/<[^>]+>/g, '') }))
 });
 ```
 

@@ -29,27 +29,30 @@ layout:
      departmentId: 11,
      hasImages: true,
      pageSize: 50
-   });
+   }).catch(() => null);
+   const ids = search?.objectIDs ?? [];
+   if (ids.length === 0) return widget('text', { content: 'No objects found.' });
    ```
 
 2. **Fetch and filter on `accessionYear`** (last 5 years):
    ```js
    const cutoff = new Date().getFullYear() - 5;
-   const objs = await Promise.all(search.objectIDs.slice(0, 30).map(id => call('get-museum-object', { objectId: id })));
-   const recent = objs.map(o => o.object).filter(w => Number(w.accessionYear) >= cutoff && w.primaryImageSmall);
+   const objs = await Promise.all(ids.slice(0, 30).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const all = objs.filter(o => o?.object).map(o => o.object);
+   const recent = all.filter(w => Number(w?.accessionYear) >= cutoff && w?.primaryImageSmall);
    ```
 
 3. **Stats**:
    ```js
    await widget('stat-card', { label: 'New since ' + cutoff, value: recent.length, icon: 'plus' });
-   await widget('stat-card', { label: 'Sample size', value: objs.length, icon: 'archive' });
+   await widget('stat-card', { label: 'Sample size', value: all.length, icon: 'archive' });
    ```
 
 4. **Acquisition timeline**:
    ```js
    await widget('timeline', {
-     items: recent.sort((a, b) => Number(a.accessionYear) - Number(b.accessionYear)).map(w => ({
-       date: w.accessionYear, title: w.title, image: w.primaryImageSmall, description: w.creditLine
+     items: [...recent].sort((a, b) => Number(a?.accessionYear || 0) - Number(b?.accessionYear || 0)).map(w => ({
+       date: w?.accessionYear ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall, description: w?.creditLine ?? '—'
      }))
    });
    ```
@@ -58,33 +61,35 @@ layout:
    ```js
    await widget('cards', {
      items: recent.map(w => ({
-       title: w.title, subtitle: `Acquired ${w.accessionYear}`,
-       image: w.primaryImageSmall, body: w.creditLine
+       title: w?.title ?? '(untitled)', subtitle: `Acquired ${w?.accessionYear ?? '—'}`,
+       image: w?.primaryImageSmall, body: w?.creditLine ?? '—'
      }))
    });
    ```
 
 6. **Gallery**:
    ```js
-   await widget('gallery', { images: recent.map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: `Acquired ${w.accessionYear}` })) });
+   await widget('gallery', { images: recent.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `Acquired ${w?.accessionYear ?? '—'}` })) });
    ```
 
 ## Examples
 
 ### American department, last 5 years
 ```js
-const r = await call('search-museum-objects', { q: '*', departmentId: 11, hasImages: true, pageSize: 40 });
-const objs = await Promise.all(r.objectIDs.slice(0, 25).map(id => call('get-museum-object', { objectId: id })));
-const recent = objs.map(o => o.object).filter(w => Number(w.accessionYear) >= 2020);
-await widget('cards', { items: recent.map(w => ({ title: w.title, subtitle: `Acquired ${w.accessionYear}`, image: w.primaryImageSmall })) });
+const r = await call('search-museum-objects', { q: '*', departmentId: 11, hasImages: true, pageSize: 40 }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 25).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const recent = objs.filter(o => o?.object).map(o => o.object).filter(w => Number(w?.accessionYear) >= 2020);
+await widget('cards', { items: recent.map(w => ({ title: w?.title ?? '(untitled)', subtitle: `Acquired ${w?.accessionYear ?? '—'}`, image: w?.primaryImageSmall })) });
 ```
 
 ### Brand-new highlights
 ```js
-const r = await call('search-museum-objects', { q: '*', isHighlight: true, hasImages: true, pageSize: 40 });
-const objs = await Promise.all(r.objectIDs.slice(0, 20).map(id => call('get-museum-object', { objectId: id })));
-const recent = objs.map(o => o.object).filter(w => Number(w.accessionYear) >= 2022);
-await widget('timeline', { items: recent.map(w => ({ date: w.accessionYear, title: w.title })) });
+const r = await call('search-museum-objects', { q: '*', isHighlight: true, hasImages: true, pageSize: 40 }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 20).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const recent = objs.filter(o => o?.object).map(o => o.object).filter(w => Number(w?.accessionYear) >= 2022);
+await widget('timeline', { items: recent.map(w => ({ date: w?.accessionYear ?? '—', title: w?.title ?? '(untitled)' })) });
 ```
 
 ## Common mistakes

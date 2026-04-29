@@ -24,8 +24,10 @@ layout:
 
 1. **Find the right department** via `list-departments`:
    ```js
-   const { departments } = await call('list-departments', {});
-   const dept = departments.find(d => d.displayName.includes('Drawings'));
+   const resp = await call('list-departments', {}).catch(() => null);
+   const departments = resp?.departments ?? [];
+   const dept = departments.find(d => d?.displayName?.includes('Drawings'));
+   if (!dept) return widget('text', { content: 'Department not found.' });
    ```
 
 2. **Search broadly inside the department**:
@@ -35,15 +37,18 @@ layout:
      departmentId: dept.departmentId,
      hasImages: true,
      pageSize: 50
-   });
+   }).catch(() => null);
+   const ids = search?.objectIDs ?? [];
+   if (ids.length === 0) return widget('text', { content: 'No objects found.' });
    ```
 
 3. **Fetch a sample and group by `classification`**:
    ```js
-   const objs = await Promise.all(search.objectIDs.slice(0, 30).map(id => call('get-museum-object', { objectId: id })));
-   const works = objs.map(o => o.object);
+   const objs = await Promise.all(ids.slice(0, 30).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const works = objs.filter(o => o?.object).map(o => o.object);
    const byClass = works.reduce((acc, w) => {
-     (acc[w.classification || 'Uncategorized'] = acc[w.classification || 'Uncategorized'] || []).push(w);
+     const k = w?.classification || 'Uncategorized';
+     (acc[k] = acc[k] || []).push(w);
      return acc;
    }, {});
    ```
@@ -59,17 +64,17 @@ layout:
 5. **Gallery + cards per classification**:
    ```js
    await widget('gallery', {
-     images: Object.values(byClass).flatMap(ws => ws.slice(0, 1)).map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: w.classification }))
+     images: Object.values(byClass).flatMap(ws => ws.slice(0, 1)).filter(w => w?.primaryImageSmall).map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.classification ?? '—' }))
    });
    await widget('cards', {
-     items: Object.entries(byClass).map(([k, ws]) => ({ title: k, subtitle: `${ws.length} objects`, image: ws[0]?.primaryImageSmall, body: ws[0]?.title }))
+     items: Object.entries(byClass).map(([k, ws]) => ({ title: k, subtitle: `${ws.length} objects`, image: ws[0]?.primaryImageSmall, body: ws[0]?.title ?? '—' }))
    });
    ```
 
 6. **KV taxonomy explanation**:
    ```js
    await widget('kv', {
-     pairs: Object.entries(byClass).map(([k, ws]) => [k, `${ws.length} objects — ex. ${ws[0]?.title}`])
+     pairs: Object.entries(byClass).map(([k, ws]) => [k, `${ws.length} objects — ex. ${ws[0]?.title ?? '—'}`])
    });
    ```
 
@@ -77,19 +82,28 @@ layout:
 
 ### Drawings & Prints department
 ```js
-const { departments } = await call('list-departments', {});
-const d = departments.find(x => x.displayName.includes('Drawings'));
-const r = await call('search-museum-objects', { q: '*', departmentId: d.departmentId, hasImages: true, pageSize: 50 });
-const objs = await Promise.all(r.objectIDs.slice(0, 25).map(id => call('get-museum-object', { objectId: id })));
-const grouped = objs.reduce((acc, o) => { (acc[o.object.classification] = acc[o.object.classification] || []).push(o.object); return acc; }, {});
+const dResp = await call('list-departments', {}).catch(() => null);
+const departments = dResp?.departments ?? [];
+const d = departments.find(x => x?.displayName?.includes('Drawings'));
+if (!d) return widget('text', { content: 'Department not found.' });
+const r = await call('search-museum-objects', { q: '*', departmentId: d.departmentId, hasImages: true, pageSize: 50 }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 25).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const grouped = objs.filter(o => o?.object).reduce((acc, o) => {
+  const k = o.object?.classification || 'Uncategorized';
+  (acc[k] = acc[k] || []).push(o.object);
+  return acc;
+}, {});
 await widget('chart-rich', { type: 'bar', data: Object.entries(grouped).map(([k, v]) => ({ label: k, value: v.length })) });
 ```
 
 ### Greek classifications
 ```js
-const r = await call('search-museum-objects', { q: '*', departmentId: 13, hasImages: true, pageSize: 30 });
-const objs = await Promise.all(r.objectIDs.slice(0, 20).map(id => call('get-museum-object', { objectId: id })));
-await widget('cards', { items: objs.slice(0, 5).map(o => ({ title: o.object.classification, subtitle: o.object.title, image: o.object.primaryImageSmall })) });
+const r = await call('search-museum-objects', { q: '*', departmentId: 13, hasImages: true, pageSize: 30 }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 20).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object);
+await widget('cards', { items: works.slice(0, 5).map(w => ({ title: w?.classification ?? '—', subtitle: w?.title ?? '(untitled)', image: w?.primaryImageSmall })) });
 ```
 
 ## Common mistakes

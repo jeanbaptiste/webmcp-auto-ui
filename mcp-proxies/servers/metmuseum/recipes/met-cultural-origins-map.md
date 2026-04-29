@@ -24,23 +24,25 @@ layout:
 
 1. **Search a department** that lends itself to geography:
    ```js
-   const search = await call('search-museum-objects', { q: 'mask', departmentId: 5, hasImages: true, pageSize: 40 });
+   const search = await call('search-museum-objects', { q: 'mask', departmentId: 5, hasImages: true, pageSize: 40 }).catch(() => null);
+   const ids = search?.objectIDs ?? [];
+   if (ids.length === 0) return widget('text', { content: 'No objects found.' });
    ```
 
 2. **Fetch details** to access `country`, `region`, `city`:
    ```js
    const details = await Promise.all(
-     search.objectIDs.slice(0, 15).map(id => call('get-museum-object', { objectId: id }))
+     ids.slice(0, 15).map(id => call('get-museum-object', { objectId: id }).catch(() => null))
    );
-   const works = details.map(d => d.object).filter(o => o.country || o.region);
+   const works = details.filter(d => d?.object).map(d => d.object).filter(o => o?.country || o?.region);
    ```
 
 3. **Geocode** country/city pairs (use a static lookup or the `geoLocation` field):
    ```js
    const geocoded = works.map(w => ({
      ...w,
-     coords: lookupCoords(w.country, w.city) // e.g. { lat: 9.07, lon: 7.48 } for Nigeria
-   })).filter(w => w.coords);
+     coords: lookupCoords(w?.country, w?.city) // e.g. { lat: 9.07, lon: 7.48 } for Nigeria
+   })).filter(w => w?.coords);
    ```
 
 4. **Map of origins**:
@@ -49,26 +51,26 @@ layout:
      center: [0, 20],
      zoom: 2,
      markers: geocoded.map(w => ({
-       lat: w.coords.lat,
-       lon: w.coords.lon,
-       label: w.title,
-       popup: `${w.title} — ${w.culture || w.country}`
+       lat: w?.coords?.lat,
+       lon: w?.coords?.lon,
+       label: w?.title ?? '(untitled)',
+       popup: `${w?.title ?? '(untitled)'} — ${w?.culture || w?.country || '—'}`
      }))
    });
    ```
 
 5. **Gallery + summary table**:
    ```js
-   await widget('gallery', { images: works.map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: w.country })) });
+   await widget('gallery', { images: works.filter(w => w?.primaryImageSmall).map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.country ?? '—' })) });
    await widget('table', {
      columns: ['Title', 'Country', 'Culture', 'Medium'],
-     rows: works.map(w => [w.title, w.country || '—', w.culture || '—', w.medium])
+     rows: works.map(w => [w?.title ?? '(untitled)', w?.country || '—', w?.culture || '—', w?.medium ?? '—'])
    });
    ```
 
 6. **Stats**:
    ```js
-   const countries = [...new Set(works.map(w => w.country).filter(Boolean))];
+   const countries = [...new Set(works.map(w => w?.country).filter(Boolean))];
    await widget('stat-card', { label: 'Objects mapped', value: geocoded.length, icon: 'map-pin' });
    await widget('stat-card', { label: 'Countries', value: countries.length, icon: 'globe' });
    ```
@@ -77,17 +79,20 @@ layout:
 
 ### African masks
 ```js
-const r = await call('search-museum-objects', { q: 'mask', departmentId: 5, hasImages: true });
-const objs = await Promise.all(r.objectIDs.slice(0, 12).map(id => call('get-museum-object', { objectId: id })));
-const works = objs.map(o => o.object);
-await widget('map', { zoom: 3, center: [0, 20], markers: works.filter(w => w.country).map(w => ({ lat: 0, lon: 20, label: w.title })) });
+const r = await call('search-museum-objects', { q: 'mask', departmentId: 5, hasImages: true }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object);
+await widget('map', { zoom: 3, center: [0, 20], markers: works.filter(w => w?.country).map(w => ({ lat: 0, lon: 20, label: w?.title ?? '(untitled)' })) });
 ```
 
 ### Pre-Columbian pottery
 ```js
-const r = await call('search-museum-objects', { q: 'pottery', departmentId: 5, geoLocation: 'Mexico', hasImages: true });
-const objs = await Promise.all(r.objectIDs.slice(0, 10).map(id => call('get-museum-object', { objectId: id })));
-await widget('table', { columns: ['Title', 'Region', 'Culture'], rows: objs.map(o => [o.object.title, o.object.region, o.object.culture]) });
+const r = await call('search-museum-objects', { q: 'pottery', departmentId: 5, geoLocation: 'Mexico', hasImages: true }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object);
+await widget('table', { columns: ['Title', 'Region', 'Culture'], rows: works.map(w => [w?.title ?? '(untitled)', w?.region ?? '—', w?.culture ?? '—']) });
 ```
 
 ## Common mistakes

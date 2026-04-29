@@ -31,23 +31,24 @@ const res = await call('nasa_exoplanet', {
   select: 'pl_name,disc_year,discoverymethod,disc_facility',
   where:  'default_flag=1',
   limit:  6000
-});
-const planets = Array.isArray(res) ? res : (res.data || []);
+}).catch(() => null);
+const planets = (Array.isArray(res) ? res : (res?.data ?? [])).filter(p => p);
+if (planets.length === 0) return widget('text', { content: 'No exoplanet data returned.' });
 
 // 2. Aggregate by year and by method
 const byYear = {};
 const byMethod = {};
 const byFacility = {};
 for (const p of planets) {
-  byYear[p.disc_year] = (byYear[p.disc_year] || 0) + 1;
-  byMethod[p.discoverymethod] = (byMethod[p.discoverymethod] || 0) + 1;
-  byFacility[p.disc_facility] = (byFacility[p.disc_facility] || 0) + 1;
+  if (p?.disc_year != null) byYear[p.disc_year] = (byYear[p.disc_year] || 0) + 1;
+  if (p?.discoverymethod) byMethod[p.discoverymethod] = (byMethod[p.discoverymethod] || 0) + 1;
+  if (p?.disc_facility) byFacility[p.disc_facility] = (byFacility[p.disc_facility] || 0) + 1;
 }
 
 // 3. Headline KPI
 const total = planets.length;
-const peakYear = Object.entries(byYear).sort((a, b) => b[1] - a[1])[0];
-const dominantMethod = Object.entries(byMethod).sort((a, b) => b[1] - a[1])[0];
+const peakYear = Object.entries(byYear).sort((a, b) => b[1] - a[1])[0] ?? ['—', 0];
+const dominantMethod = Object.entries(byMethod).sort((a, b) => b[1] - a[1])[0] ?? ['—', 0];
 await widget('stat-card', { label: 'Confirmed planets', value: total, icon: 'globe' });
 await widget('stat-card', { label: 'Peak year', value: `${peakYear[0]} (${peakYear[1]})`, icon: 'trending-up' });
 await widget('stat-card', { label: 'Dominant method', value: dominantMethod[0], icon: 'eye' });
@@ -80,16 +81,17 @@ await widget('kv', {
 
 ### Year breakdown
 ```js
-const res = await call('nasa_exoplanet', { table: 'ps', select: 'disc_year', where: 'default_flag=1', limit: 6000 });
+const res = await call('nasa_exoplanet', { table: 'ps', select: 'disc_year', where: 'default_flag=1', limit: 6000 }).catch(() => null);
+const planets = (Array.isArray(res) ? res : (res?.data ?? [])).filter(p => p);
 const byYear = {};
-for (const p of (res.data || res)) byYear[p.disc_year] = (byYear[p.disc_year] || 0) + 1;
+for (const p of planets) if (p?.disc_year != null) byYear[p.disc_year] = (byYear[p.disc_year] || 0) + 1;
 await widget('chart', { type: 'bar', data: Object.entries(byYear).map(([y, n]) => ({ label: y, value: n })) });
 ```
 
 ### Kepler harvest specifically
 ```js
-const res = await call('nasa_exoplanet', { table: 'ps', select: 'pl_name', where: "default_flag=1 and disc_facility like '%Kepler%'", limit: 5000 });
-const list = res.data || res;
+const res = await call('nasa_exoplanet', { table: 'ps', select: 'pl_name', where: "default_flag=1 and disc_facility like '%Kepler%'", limit: 5000 }).catch(() => null);
+const list = (Array.isArray(res) ? res : (res?.data ?? [])).filter(p => p);
 await widget('stat-card', { label: 'Kepler discoveries', value: list.length });
 ```
 

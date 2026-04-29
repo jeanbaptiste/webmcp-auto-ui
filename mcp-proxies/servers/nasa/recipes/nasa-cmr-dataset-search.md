@@ -31,28 +31,30 @@ const res = await call('nasa_cmr', {
   search_type: 'collections',
   format: 'json',
   limit: 50
-});
-const items = res.feed?.entry || [];
+}).catch(() => null);
+const items = (res?.feed?.entry ?? []).filter(i => i);
+if (items.length === 0) return widget('text', { content: 'No collections matched.' });
 
 // 2. KPI
-const missions = new Set(items.flatMap(i => i.platforms || []));
+const missions = new Set(items.flatMap(i => i?.platforms ?? []).filter(Boolean));
+const earliest = items.map(i => i?.time_start).filter(Boolean).sort()[0]?.slice(0, 4) ?? 'n/a';
 await widget('stat-card', { label: 'Collections', value: items.length, icon: 'database' });
 await widget('stat-card', { label: 'Distinct missions', value: missions.size, icon: 'satellite' });
-await widget('stat-card', { label: 'Earliest', value: items.map(i => i.time_start).filter(Boolean).sort()[0]?.slice(0, 4) || 'n/a', icon: 'clock' });
+await widget('stat-card', { label: 'Earliest', value: earliest, icon: 'clock' });
 
 // 3. Cards per dataset
 await widget('cards', {
   items: items.slice(0, 12).map(i => ({
-    title: i.title,
-    subtitle: (i.platforms || []).join(', '),
-    description: (i.summary || '').slice(0, 200)
+    title: i?.title ?? '(untitled)',
+    subtitle: (i?.platforms ?? []).join(', '),
+    description: (i?.summary ?? '').slice(0, 200)
   }))
 });
 
 // 4. Sortable table
 await widget('table', {
   columns: ['Short name', 'Version', 'Start', 'End', 'Platforms'],
-  rows: items.map(i => [i.short_name, i.version_id, i.time_start?.slice(0, 10), i.time_end?.slice(0, 10) || 'ongoing', (i.platforms || []).join(',')])
+  rows: items.map(i => [i?.short_name ?? '—', i?.version_id ?? '—', i?.time_start?.slice(0, 10) ?? '—', i?.time_end?.slice(0, 10) || 'ongoing', (i?.platforms ?? []).join(',')])
 });
 
 // 5. Detail kv on the first match
@@ -60,11 +62,11 @@ const top = items[0];
 if (top) {
   await widget('kv', {
     items: [
-      { label: 'Title', value: top.title },
-      { label: 'Short name', value: top.short_name },
-      { label: 'Data center', value: top.data_center },
-      { label: 'Processing level', value: top.processing_level_id },
-      { label: 'DOI', value: top.dataset_id || 'n/a' }
+      { label: 'Title', value: top?.title ?? '—' },
+      { label: 'Short name', value: top?.short_name ?? '—' },
+      { label: 'Data center', value: top?.data_center ?? '—' },
+      { label: 'Processing level', value: top?.processing_level_id ?? '—' },
+      { label: 'DOI', value: top?.dataset_id ?? 'n/a' }
     ]
   });
 }
@@ -74,16 +76,17 @@ if (top) {
 
 ### ICESat-2
 ```js
-const res = await call('nasa_cmr', { keyword: 'ICESat-2', search_type: 'collections', format: 'json', limit: 30 });
-const items = res.feed.entry;
+const res = await call('nasa_cmr', { keyword: 'ICESat-2', search_type: 'collections', format: 'json', limit: 30 }).catch(() => null);
+const items = (res?.feed?.entry ?? []).filter(i => i);
 await widget('stat-card', { label: 'ICESat-2 collections', value: items.length });
-await widget('cards', { items: items.slice(0, 6).map(i => ({ title: i.title, subtitle: i.short_name, description: (i.summary || '').slice(0, 160) })) });
+await widget('cards', { items: items.slice(0, 6).map(i => ({ title: i?.title ?? '—', subtitle: i?.short_name ?? '—', description: (i?.summary ?? '').slice(0, 160) })) });
 ```
 
 ### Granules of a specific dataset
 ```js
-const res = await call('nasa_cmr', { keyword: 'MODIS chlorophyll', search_type: 'granules', format: 'json', limit: 20 });
-await widget('table', { columns: ['Title', 'Start'], rows: (res.feed.entry || []).map(g => [g.title, g.time_start?.slice(0, 10)]) });
+const res = await call('nasa_cmr', { keyword: 'MODIS chlorophyll', search_type: 'granules', format: 'json', limit: 20 }).catch(() => null);
+const items = (res?.feed?.entry ?? []).filter(g => g);
+await widget('table', { columns: ['Title', 'Start'], rows: items.map(g => [g?.title ?? '—', g?.time_start?.slice(0, 10) ?? '—']) });
 ```
 
 ## Common mistakes

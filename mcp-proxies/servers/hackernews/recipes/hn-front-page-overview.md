@@ -29,14 +29,16 @@ The `get-front-page` tool returns 30 stories ranked by the HN algorithm, with ti
 1. **Fetch the front page**:
    ```js
    const res = await call('get-front-page', { hitsPerPage: 30 });
-   const stories = res.hits;
+   const stories = (res?.hits ?? []).filter(s => s);
+   if (stories.length === 0) return widget('text', { content: 'No stories on the front page right now.' });
    ```
 
 2. **Aggregate KPIs** (total points, total comments, top score):
    ```js
-   const totalPoints = stories.reduce((s, x) => s + (x.points || 0), 0);
-   const totalComments = stories.reduce((s, x) => s + (x.num_comments || 0), 0);
-   const topScore = Math.max(...stories.map(s => s.points || 0));
+   const totalPoints = stories.reduce((s, x) => s + (x?.points || 0), 0);
+   const totalComments = stories.reduce((s, x) => s + (x?.num_comments || 0), 0);
+   const scores = stories.map(s => s?.points || 0).filter(Number.isFinite);
+   const topScore = scores.length > 0 ? Math.max(...scores) : 0;
    ```
 
 3. **Render stat-cards**:
@@ -50,12 +52,16 @@ The `get-front-page` tool returns 30 stories ranked by the HN algorithm, with ti
 4. **Top 5 stories in cards** (visual highlight):
    ```js
    await widget('cards', {
-     items: stories.slice(0, 5).map(s => ({
-       title: s.title,
-       subtitle: `${s.points} pts · ${s.num_comments} comments · by ${s.author}`,
-       url: s.url || `https://news.ycombinator.com/item?id=${s.objectID}`,
-       body: new URL(s.url || 'https://news.ycombinator.com').hostname
-     }))
+     items: stories.slice(0, 5).map(s => {
+       let host = 'news.ycombinator.com';
+       try { if (s?.url) host = new URL(s.url).hostname; } catch {}
+       return {
+         title: s?.title ?? '(untitled)',
+         subtitle: `${s?.points ?? 0} pts · ${s?.num_comments ?? 0} comments · by ${s?.author ?? '—'}`,
+         url: s?.url || `https://news.ycombinator.com/item?id=${s?.objectID ?? ''}`,
+         body: host
+       };
+     })
    });
    ```
 
@@ -63,13 +69,17 @@ The `get-front-page` tool returns 30 stories ranked by the HN algorithm, with ti
    ```js
    await widget('table', {
      columns: ['Title', 'Points', 'Comments', 'Author', 'Domain'],
-     rows: stories.map(s => [
-       s.title,
-       s.points || 0,
-       s.num_comments || 0,
-       s.author,
-       s.url ? new URL(s.url).hostname : 'news.ycombinator.com'
-     ])
+     rows: stories.map(s => {
+       let host = 'news.ycombinator.com';
+       try { if (s?.url) host = new URL(s.url).hostname; } catch {}
+       return [
+         s?.title ?? '(untitled)',
+         s?.points || 0,
+         s?.num_comments || 0,
+         s?.author ?? '—',
+         host
+       ];
+     })
    });
    ```
 
@@ -78,31 +88,34 @@ The `get-front-page` tool returns 30 stories ranked by the HN algorithm, with ti
 ### Standard front page snapshot
 ```js
 const res = await call('get-front-page', {});
-const stories = res.hits;
+const stories = (res?.hits ?? []).filter(s => s);
+if (stories.length === 0) return widget('text', { content: 'No stories available.' });
 
+const scores = stories.map(s => s?.points || 0).filter(Number.isFinite);
 await widget('stat-card', { label: 'Stories', value: stories.length, icon: 'list' });
-await widget('stat-card', { label: 'Top score', value: Math.max(...stories.map(s => s.points)), icon: 'flame' });
+await widget('stat-card', { label: 'Top score', value: scores.length > 0 ? Math.max(...scores) : 0, icon: 'flame' });
 
 await widget('cards', {
   items: stories.slice(0, 5).map(s => ({
-    title: s.title,
-    subtitle: `${s.points} pts · by ${s.author}`,
-    url: s.url || `https://news.ycombinator.com/item?id=${s.objectID}`
+    title: s?.title ?? '(untitled)',
+    subtitle: `${s?.points ?? 0} pts · by ${s?.author ?? '—'}`,
+    url: s?.url || `https://news.ycombinator.com/item?id=${s?.objectID ?? ''}`
   }))
 });
 
 await widget('table', {
   columns: ['Title', 'Points', 'Comments', 'Author'],
-  rows: stories.map(s => [s.title, s.points, s.num_comments, s.author])
+  rows: stories.map(s => [s?.title ?? '(untitled)', s?.points ?? 0, s?.num_comments ?? 0, s?.author ?? '—'])
 });
 ```
 
 ### Extended view (50 stories)
 ```js
 const res = await call('get-front-page', { hitsPerPage: 50 });
+const hits = (res?.hits ?? []).filter(s => s);
 await widget('table', {
   columns: ['#', 'Title', 'Points', 'Comments'],
-  rows: res.hits.map((s, i) => [i + 1, s.title, s.points, s.num_comments])
+  rows: hits.map((s, i) => [i + 1, s?.title ?? '(untitled)', s?.points ?? 0, s?.num_comments ?? 0])
 });
 ```
 

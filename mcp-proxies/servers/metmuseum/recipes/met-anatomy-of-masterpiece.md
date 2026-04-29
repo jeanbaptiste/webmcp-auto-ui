@@ -28,31 +28,38 @@ layout:
      q: 'Las Meninas',
      title: true,
      hasImages: true
-   });
-   const top = search.objectIDs[0];
+   }).catch(() => null);
+   const ids = search?.objectIDs ?? [];
+   if (ids.length === 0) return widget('text', { content: 'No matching objects found.' });
+   const top = ids[0];
    ```
 
 2. **Fetch full record with images**:
    ```js
-   const { object: w } = await call('get-museum-object', { objectId: top, returnImage: true });
+   const resp = await call('get-museum-object', { objectId: top, returnImage: true }).catch(() => null);
+   const w = resp?.object;
+   if (!w || resp?.message) return widget('text', { content: 'Object not found.' });
    ```
 
 3. **Carousel of every view** (primary + additional):
    ```js
-   await widget('carousel', {
-     items: [w.primaryImage, ...(w.additionalImages || [])].filter(Boolean).map((src, i) => ({
-       src,
-       caption: i === 0 ? 'Primary view' : `Additional view ${i}`
-     }))
-   });
+   const images = [w?.primaryImage, ...(w?.additionalImages ?? [])].filter(src => src && typeof src === 'string' && src.length > 0);
+   if (images.length > 0) {
+     await widget('carousel', {
+       items: images.map((src, i) => ({
+         src,
+         caption: i === 0 ? 'Primary view' : `Additional view ${i}`
+       }))
+     });
+   }
    ```
 
 4. **Narrative text** with period/dynasty/reign context:
    ```js
    await widget('text', {
-     content: `${w.title}, by ${w.artistDisplayName || w.culture}, ${w.objectDate}. ` +
-       `${w.period ? `Period: ${w.period}. ` : ''}${w.dynasty ? `Dynasty: ${w.dynasty}. ` : ''}` +
-       `${w.reign ? `Reign of ${w.reign}. ` : ''}${w.creditLine || ''}`
+     content: `${w?.title ?? '(untitled)'}, by ${w?.artistDisplayName || w?.culture || '—'}, ${w?.objectDate ?? '—'}. ` +
+       `${w?.period ? `Period: ${w.period}. ` : ''}${w?.dynasty ? `Dynasty: ${w.dynasty}. ` : ''}` +
+       `${w?.reign ? `Reign of ${w.reign}. ` : ''}${w?.creditLine ?? ''}`
    });
    ```
 
@@ -60,31 +67,37 @@ layout:
    ```js
    await widget('kv', {
      pairs: [
-       ['Artist', w.artistDisplayName],
-       ['Bio', w.artistDisplayBio],
-       ['Date', w.objectDate],
-       ['Medium', w.medium],
-       ['Dimensions', w.dimensions],
-       ['Department', w.department],
-       ['Classification', w.classification],
-       ['Culture', w.culture],
-       ['Period', w.period],
-       ['Dynasty', w.dynasty],
-       ['Reign', w.reign],
-       ['Credit', w.creditLine],
-       ['Gallery', w.GalleryNumber],
-       ['Public domain', w.isPublicDomain ? 'Yes' : 'No'],
-       ['Tags', (w.tags || []).map(t => t.term).join(', ')]
+       ['Artist', w?.artistDisplayName],
+       ['Bio', w?.artistDisplayBio],
+       ['Date', w?.objectDate],
+       ['Medium', w?.medium],
+       ['Dimensions', w?.dimensions],
+       ['Department', w?.department],
+       ['Classification', w?.classification],
+       ['Culture', w?.culture],
+       ['Period', w?.period],
+       ['Dynasty', w?.dynasty],
+       ['Reign', w?.reign],
+       ['Credit', w?.creditLine],
+       ['Gallery', w?.GalleryNumber],
+       ['Public domain', w?.isPublicDomain ? 'Yes' : 'No'],
+       ['Tags', (w?.tags ?? []).map(t => t?.term).filter(Boolean).join(', ')]
      ].filter(([_, v]) => v)
    });
    ```
 
 6. **Sister works** (same artist):
    ```js
-   if (w.artistDisplayName) {
-     const sis = await call('search-museum-objects', { q: w.artistDisplayName, artistOrCulture: true, hasImages: true });
-     const sisObjs = await Promise.all(sis.objectIDs.slice(0, 4).filter(id => id !== top).map(id => call('get-museum-object', { objectId: id })));
-     await widget('cards', { items: sisObjs.map(o => ({ title: o.object.title, image: o.object.primaryImageSmall, body: o.object.objectDate })) });
+   if (w?.artistDisplayName) {
+     const sis = await call('search-museum-objects', { q: w.artistDisplayName, artistOrCulture: true, hasImages: true }).catch(() => null);
+     const sisIds = (sis?.objectIDs ?? []).slice(0, 4).filter(id => id !== top);
+     const sisObjs = await Promise.all(sisIds.map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+     const items = sisObjs.filter(o => o?.object && !o?.message).map(o => ({
+       title: o.object?.title ?? '(untitled)',
+       image: o.object?.primaryImageSmall,
+       body: o.object?.objectDate ?? '—'
+     }));
+     if (items.length > 0) await widget('cards', { items });
    }
    ```
 
@@ -92,17 +105,27 @@ layout:
 
 ### A Vermeer with verso/details
 ```js
-const s = await call('search-museum-objects', { q: 'Vermeer', artistOrCulture: true, hasImages: true });
-const { object: w } = await call('get-museum-object', { objectId: s.objectIDs[0], returnImage: true });
-await widget('carousel', { items: [w.primaryImage, ...(w.additionalImages || [])].map(src => ({ src })) });
+const s = await call('search-museum-objects', { q: 'Vermeer', artistOrCulture: true, hasImages: true }).catch(() => null);
+const ids = s?.objectIDs ?? [];
+if (ids.length === 0) return widget('text', { content: 'No results.' });
+const resp = await call('get-museum-object', { objectId: ids[0], returnImage: true }).catch(() => null);
+const w = resp?.object;
+if (!w) return widget('text', { content: 'Object not found.' });
+const images = [w?.primaryImage, ...(w?.additionalImages ?? [])].filter(src => src && src.length > 0);
+if (images.length > 0) await widget('carousel', { items: images.map(src => ({ src })) });
 ```
 
 ### Egyptian fragment with reign context
 ```js
-const s = await call('search-museum-objects', { q: 'Akhenaten', isHighlight: true, hasImages: true });
-const { object: w } = await call('get-museum-object', { objectId: s.objectIDs[0] });
-await widget('text', { content: `Reign: ${w.reign}. Period: ${w.period}.` });
-await widget('carousel', { items: (w.additionalImages || []).map(src => ({ src })) });
+const s = await call('search-museum-objects', { q: 'Akhenaten', isHighlight: true, hasImages: true }).catch(() => null);
+const ids = s?.objectIDs ?? [];
+if (ids.length === 0) return widget('text', { content: 'No results.' });
+const resp = await call('get-museum-object', { objectId: ids[0] }).catch(() => null);
+const w = resp?.object;
+if (!w) return widget('text', { content: 'Object not found.' });
+await widget('text', { content: `Reign: ${w?.reign ?? '—'}. Period: ${w?.period ?? '—'}.` });
+const adds = (w?.additionalImages ?? []).filter(src => src && src.length > 0);
+if (adds.length > 0) await widget('carousel', { items: adds.map(src => ({ src })) });
 ```
 
 ## Common mistakes

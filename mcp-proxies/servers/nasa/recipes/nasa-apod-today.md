@@ -27,29 +27,33 @@ The APOD is a single curated image (or video) with a written explanation by prof
 
 ```js
 // 1. Fetch today's APOD (or a specific date)
-const apod = await call('nasa_apod', { date: '2026-04-29' });
+const apod = await call('nasa_apod', { date: '2026-04-29' }).catch(() => null);
+if (!apod) return widget('text', { content: 'APOD unavailable (rate-limit or future date).' });
 
-// 2. Hero image (single-item gallery, HD URL)
-await widget('gallery', {
-  images: [{
-    src: apod.hdurl || apod.url,
-    alt: apod.title,
-    caption: apod.title
-  }]
-});
+// 2. Hero image (single-item gallery, HD URL — skip when video)
+const heroSrc = apod?.media_type === 'video' ? apod?.thumbnail_url : (apod?.hdurl || apod?.url);
+if (heroSrc) {
+  await widget('gallery', {
+    images: [{
+      src: heroSrc,
+      alt: apod?.title ?? 'APOD',
+      caption: apod?.title ?? 'APOD'
+    }]
+  });
+}
 
 // 3. The scientific explanation as prose
 await widget('text', {
-  title: apod.title,
-  body: apod.explanation
+  title: apod?.title ?? 'APOD',
+  body: apod?.explanation ?? '(no explanation available)'
 });
 
 // 4. Metadata block (date, credits, media type)
 await widget('kv', {
   items: [
-    { label: 'Date', value: apod.date },
-    { label: 'Media', value: apod.media_type },
-    { label: 'Copyright', value: apod.copyright || 'Public domain' }
+    { label: 'Date', value: apod?.date ?? '—' },
+    { label: 'Media', value: apod?.media_type ?? '—' },
+    { label: 'Copyright', value: apod?.copyright ?? 'Public domain' }
   ]
 });
 ```
@@ -60,18 +64,21 @@ When `media_type === 'video'`, set `thumbs: true` in the call to get a thumbnail
 
 ### Today's image (default)
 ```js
-const apod = await call('nasa_apod', { date: new Date().toISOString().slice(0, 10) });
-await widget('gallery', { images: [{ src: apod.hdurl, alt: apod.title, caption: apod.title }] });
-await widget('text', { title: apod.title, body: apod.explanation });
-await widget('kv', { items: [{ label: 'Date', value: apod.date }, { label: 'Copyright', value: apod.copyright }] });
+const apod = await call('nasa_apod', { date: new Date().toISOString().slice(0, 10) }).catch(() => null);
+if (!apod) return widget('text', { content: 'APOD unavailable.' });
+const src = apod?.hdurl || apod?.url;
+if (src) await widget('gallery', { images: [{ src, alt: apod?.title ?? 'APOD', caption: apod?.title ?? 'APOD' }] });
+await widget('text', { title: apod?.title ?? 'APOD', body: apod?.explanation ?? '' });
+await widget('kv', { items: [{ label: 'Date', value: apod?.date ?? '—' }, { label: 'Copyright', value: apod?.copyright ?? 'Public domain' }] });
 ```
 
 ### A specific date (video APOD)
 ```js
-const apod = await call('nasa_apod', { date: '2024-12-25', thumbs: true });
-const src = apod.media_type === 'video' ? apod.thumbnail_url : (apod.hdurl || apod.url);
-await widget('gallery', { images: [{ src, alt: apod.title, caption: apod.title }] });
-await widget('text', { title: apod.title, body: apod.explanation });
+const apod = await call('nasa_apod', { date: '2024-12-25', thumbs: true }).catch(() => null);
+if (!apod) return widget('text', { content: 'APOD unavailable.' });
+const src = apod?.media_type === 'video' ? apod?.thumbnail_url : (apod?.hdurl || apod?.url);
+if (src) await widget('gallery', { images: [{ src, alt: apod?.title ?? 'APOD', caption: apod?.title ?? 'APOD' }] });
+await widget('text', { title: apod?.title ?? 'APOD', body: apod?.explanation ?? '' });
 ```
 
 ## Common mistakes

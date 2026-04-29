@@ -26,40 +26,42 @@ The recipe organises the response so the user can flip through (carousel), scan 
 
 ```js
 // 1. Fetch an explicit range OR a random count
-const apods = await call('nasa_apod', {
+const raw = await call('nasa_apod', {
   start_date: '2026-04-22',
   end_date:   '2026-04-29'
-});
-// Alternative random: await call('nasa_apod', { count: 12 });
+}).catch(() => null);
+const apods = (Array.isArray(raw) ? raw : []).filter(a => a);
+if (apods.length === 0) return widget('text', { content: 'No APOD entries (range too long, future date, or rate-limit).' });
+// Alternative random: const raw = await call('nasa_apod', { count: 12 }).catch(() => null);
 
 // Sort chronologically (API returns ascending already, defensive sort)
-apods.sort((a, b) => a.date.localeCompare(b.date));
+apods.sort((a, b) => (a?.date ?? '').localeCompare(b?.date ?? ''));
 
-// 2. Carousel: HD images, large rotation
+// 2. Carousel: HD images, large rotation (skip videos)
 await widget('carousel', {
-  items: apods.map(a => ({
-    image: a.hdurl || a.url,
-    title: a.title,
-    subtitle: a.date
+  items: apods.filter(a => a?.media_type === 'image').map(a => ({
+    image: a?.hdurl || a?.url,
+    title: a?.title ?? '(untitled)',
+    subtitle: a?.date ?? '—'
   }))
 });
 
 // 3. Cards grid: title + thumbnail + date
 await widget('cards', {
   items: apods.map(a => ({
-    title: a.title,
-    image: a.url,
-    subtitle: a.date,
-    description: a.explanation.slice(0, 140) + '...'
+    title: a?.title ?? '(untitled)',
+    image: a?.url,
+    subtitle: a?.date ?? '—',
+    description: (a?.explanation ?? '').slice(0, 140) + '...'
   }))
 });
 
 // 4. Timeline: one event per APOD
 await widget('timeline', {
   events: apods.map(a => ({
-    date: a.date,
-    title: a.title,
-    description: a.copyright || 'NASA / public domain'
+    date: a?.date ?? '—',
+    title: a?.title ?? '(untitled)',
+    description: a?.copyright ?? 'NASA / public domain'
   }))
 });
 ```
@@ -70,19 +72,21 @@ await widget('timeline', {
 ```js
 const today = new Date();
 const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000);
-const apods = await call('nasa_apod', {
+const raw = await call('nasa_apod', {
   start_date: weekAgo.toISOString().slice(0, 10),
   end_date:   today.toISOString().slice(0, 10)
-});
-await widget('carousel', { items: apods.map(a => ({ image: a.hdurl, title: a.title, subtitle: a.date })) });
-await widget('cards', { items: apods.map(a => ({ title: a.title, image: a.url, subtitle: a.date })) });
+}).catch(() => null);
+const apods = (Array.isArray(raw) ? raw : []).filter(a => a);
+await widget('carousel', { items: apods.filter(a => a?.media_type === 'image' && a?.hdurl).map(a => ({ image: a.hdurl, title: a?.title ?? '(untitled)', subtitle: a?.date ?? '—' })) });
+await widget('cards', { items: apods.map(a => ({ title: a?.title ?? '(untitled)', image: a?.url, subtitle: a?.date ?? '—' })) });
 ```
 
 ### 15 random pictures
 ```js
-const apods = await call('nasa_apod', { count: 15 });
-await widget('carousel', { items: apods.filter(a => a.media_type === 'image').map(a => ({ image: a.hdurl, title: a.title })) });
-await widget('cards', { items: apods.map(a => ({ title: a.title, image: a.url, subtitle: a.date })) });
+const raw = await call('nasa_apod', { count: 15 }).catch(() => null);
+const apods = (Array.isArray(raw) ? raw : []).filter(a => a);
+await widget('carousel', { items: apods.filter(a => a?.media_type === 'image' && a?.hdurl).map(a => ({ image: a.hdurl, title: a?.title ?? '(untitled)' })) });
+await widget('cards', { items: apods.map(a => ({ title: a?.title ?? '(untitled)', image: a?.url, subtitle: a?.date ?? '—' })) });
 ```
 
 ## Common mistakes

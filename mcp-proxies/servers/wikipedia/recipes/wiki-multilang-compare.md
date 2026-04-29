@@ -26,31 +26,32 @@ Note: this recipe assumes the MCP server is running multiple language instances 
 
 1. **Check connectivity** to verify the active language:
    ```js
-   const conn = await call('test_wikipedia_connectivity', {});
+   const conn = await call('test_wikipedia_connectivity', {}).catch(() => null);
    ```
 
 2. **Fetch summary + sections for the configured language**:
    ```js
    const [sum, secs] = await Promise.all([
-     call('get_summary', { title: 'French Revolution' }),
-     call('get_sections', { title: 'French Revolution' })
+     call('get_summary', { title: 'French Revolution' }).catch(() => null),
+     call('get_sections', { title: 'French Revolution' }).catch(() => null)
    ]);
+   if (!sum) return widget('text', { content: 'Page not found in this language.' });
    ```
 
 3. **Render connectivity + headline stats**:
    ```js
-   await widget('stat-card', { label: 'Language', value: conn.language, icon: 'globe' });
-   await widget('stat-card', { label: 'Sections', value: secs.sections.length, icon: 'list' });
-   await widget('stat-card', { label: 'Server', value: conn.server, icon: 'server' });
+   await widget('stat-card', { label: 'Language', value: conn?.language ?? '—', icon: 'globe' });
+   await widget('stat-card', { label: 'Sections', value: (secs?.sections ?? []).length, icon: 'list' });
+   await widget('stat-card', { label: 'Server', value: conn?.server ?? '—', icon: 'server' });
    ```
 
 4. **Render summary + sections table**:
    ```js
-   await widget('kv', { items: [{ label: 'Title', value: sum.title }, { label: 'Language', value: conn.language }] });
-   await widget('text', { content: sum.summary });
+   await widget('kv', { items: [{ label: 'Title', value: sum?.title ?? '—' }, { label: 'Language', value: conn?.language ?? '—' }] });
+   await widget('text', { content: sum?.summary ?? '(no summary)' });
    await widget('table', {
      columns: ['Section', 'Level'],
-     rows: secs.sections.map(s => [s.title, s.level])
+     rows: (secs?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—'])
    });
    ```
 
@@ -60,22 +61,22 @@ Note: this recipe assumes the MCP server is running multiple language instances 
 
 ### French Revolution — current language
 ```js
-const conn = await call('test_wikipedia_connectivity', {});
+const conn = await call('test_wikipedia_connectivity', {}).catch(() => null);
 const [sum, secs] = await Promise.all([
-  call('get_summary', { title: 'French Revolution' }),
-  call('get_sections', { title: 'French Revolution' })
+  call('get_summary', { title: 'French Revolution' }).catch(() => null),
+  call('get_sections', { title: 'French Revolution' }).catch(() => null)
 ]);
-await widget('stat-card', { label: 'Lang', value: conn.language });
-await widget('text', { content: sum.summary });
-await widget('table', { columns: ['Section', 'Level'], rows: secs.sections.map(s => [s.title, s.level]) });
+await widget('stat-card', { label: 'Lang', value: conn?.language ?? '—' });
+await widget('text', { content: sum?.summary ?? '(no summary)' });
+await widget('table', { columns: ['Section', 'Level'], rows: (secs?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—']) });
 ```
 
 ### Sushi article snapshot
 ```js
-const conn = await call('test_wikipedia_connectivity', {});
-const sum = await call('get_summary', { title: 'Sushi' });
-await widget('kv', { items: [{ label: 'Lang', value: conn.language }, { label: 'Title', value: sum.title }] });
-await widget('text', { content: sum.summary });
+const conn = await call('test_wikipedia_connectivity', {}).catch(() => null);
+const sum = await call('get_summary', { title: 'Sushi' }).catch(() => null);
+await widget('kv', { items: [{ label: 'Lang', value: conn?.language ?? '—' }, { label: 'Title', value: sum?.title ?? '—' }] });
+await widget('text', { content: sum?.summary ?? '(no summary)' });
 ```
 
 ## Common mistakes

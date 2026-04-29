@@ -25,8 +25,9 @@ The user wants the network of references from one article:
 
 1. **Fetch the links list**:
    ```js
-   const res = await call('get_links', { title: 'Quantum mechanics' });
-   const links = res.links;
+   const res = await call('get_links', { title: 'Quantum mechanics' }).catch(() => null);
+   const links = (res?.links ?? []).filter(l => typeof l === 'string' && l.length > 0);
+   if (links.length === 0) return widget('text', { content: 'No outgoing links available.' });
    ```
 
 2. **Compute basic stats**:
@@ -47,15 +48,15 @@ The user wants the network of references from one article:
    await widget('stat-card', { label: 'Outgoing links', value: total, icon: 'link' });
    await widget('stat-card', { label: 'Sampled', value: sample.length, icon: 'eye' });
    await widget('cards', {
-     items: summaries.map(s => ({
-       title: s.title,
-       body: (s.summary || '').slice(0, 140),
-       url: `https://en.wikipedia.org/wiki/${encodeURIComponent(s.title.replace(/ /g, '_'))}`
+     items: summaries.filter(s => s).map(s => ({
+       title: s?.title ?? '—',
+       body: (s?.summary ?? '').slice(0, 140),
+       url: `https://en.wikipedia.org/wiki/${encodeURIComponent((s?.title ?? '').replace(/ /g, '_'))}`
      }))
    });
    await widget('table', {
      columns: ['#', 'Linked article'],
-     rows: links.map((l, i) => [i + 1, l])
+     rows: links.slice(0, 200).map((l, i) => [i + 1, l])
    });
    ```
 
@@ -63,21 +64,23 @@ The user wants the network of references from one article:
 
 ### Mécanique quantique
 ```js
-const res = await call('get_links', { title: 'Quantum mechanics' });
-const top = res.links.slice(0, 6);
+const res = await call('get_links', { title: 'Quantum mechanics' }).catch(() => null);
+const links = (res?.links ?? []).filter(l => l);
+const top = links.slice(0, 6);
 const sums = await Promise.all(top.map(l => call('get_summary', { title: l }).catch(() => null)));
-await widget('stat-card', { label: 'Links', value: res.links.length, icon: 'link' });
+await widget('stat-card', { label: 'Links', value: links.length, icon: 'link' });
 await widget('cards', {
-  items: sums.filter(Boolean).map(s => ({ title: s.title, body: s.summary.slice(0, 120) }))
+  items: sums.filter(Boolean).map(s => ({ title: s?.title ?? '—', body: (s?.summary ?? '').slice(0, 120) }))
 });
-await widget('table', { columns: ['#', 'Article'], rows: res.links.map((l, i) => [i + 1, l]) });
+await widget('table', { columns: ['#', 'Article'], rows: links.map((l, i) => [i + 1, l]) });
 ```
 
 ### Internet outgoing links
 ```js
-const res = await call('get_links', { title: 'Internet' });
-await widget('stat-card', { label: 'Outgoing', value: res.links.length, icon: 'link' });
-await widget('table', { columns: ['#', 'Linked article'], rows: res.links.slice(0, 100).map((l, i) => [i + 1, l]) });
+const res = await call('get_links', { title: 'Internet' }).catch(() => null);
+const links = (res?.links ?? []).filter(l => l);
+await widget('stat-card', { label: 'Outgoing', value: links.length, icon: 'link' });
+await widget('table', { columns: ['#', 'Linked article'], rows: links.slice(0, 100).map((l, i) => [i + 1, l]) });
 ```
 
 ## Common mistakes

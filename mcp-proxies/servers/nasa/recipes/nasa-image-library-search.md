@@ -32,32 +32,33 @@ const res = await call('nasa_images', {
   media_type: 'image',
   year_start: '1969',
   year_end: '1969'
-});
-const items = res.collection?.items || [];
+}).catch(() => null);
+const items = (res?.collection?.items ?? []).filter(it => it);
+if (items.length === 0) return widget('text', { content: 'No media found.' });
 
 // 2. Headline stats
-await widget('stat-card', { label: 'Results', value: res.collection?.metadata?.total_hits ?? items.length, icon: 'image' });
+await widget('stat-card', { label: 'Results', value: res?.collection?.metadata?.total_hits ?? items.length, icon: 'image' });
 await widget('stat-card', { label: 'Showing', value: items.length, icon: 'eye' });
 await widget('stat-card', { label: 'Media type', value: 'image', icon: 'camera' });
 
 // 3. Gallery of preview images
 await widget('gallery', {
   images: items
-    .filter(it => (it.links || [])[0]?.href)
+    .filter(it => (it?.links ?? [])[0]?.href)
     .map(it => ({
       src: it.links[0].href,
-      alt: it.data[0]?.title || 'NASA media',
-      caption: it.data[0]?.date_created?.slice(0, 10)
+      alt: it?.data?.[0]?.title ?? 'NASA media',
+      caption: it?.data?.[0]?.date_created?.slice(0, 10) ?? '—'
     }))
 });
 
 // 4. Cards with title + description + center
 await widget('cards', {
   items: items.map(it => ({
-    title: it.data[0]?.title,
-    subtitle: it.data[0]?.center,
-    image: it.links?.[0]?.href,
-    description: (it.data[0]?.description || '').slice(0, 200)
+    title: it?.data?.[0]?.title ?? '—',
+    subtitle: it?.data?.[0]?.center ?? '—',
+    image: it?.links?.[0]?.href,
+    description: (it?.data?.[0]?.description ?? '').slice(0, 200)
   }))
 });
 ```
@@ -66,18 +67,18 @@ await widget('cards', {
 
 ### Apollo 11
 ```js
-const res = await call('nasa_images', { q: 'Apollo 11', media_type: 'image', year_start: '1969', year_end: '1969' });
-const items = res.collection.items;
-await widget('stat-card', { label: 'Apollo 11 photos', value: res.collection.metadata.total_hits });
-await widget('gallery', { images: items.slice(0, 30).map(it => ({ src: it.links[0].href, alt: it.data[0].title })) });
+const res = await call('nasa_images', { q: 'Apollo 11', media_type: 'image', year_start: '1969', year_end: '1969' }).catch(() => null);
+const items = (res?.collection?.items ?? []).filter(it => it);
+await widget('stat-card', { label: 'Apollo 11 photos', value: res?.collection?.metadata?.total_hits ?? items.length });
+await widget('gallery', { images: items.slice(0, 30).filter(it => it?.links?.[0]?.href).map(it => ({ src: it.links[0].href, alt: it?.data?.[0]?.title ?? '—' })) });
 ```
 
 ### JWST videos this year
 ```js
-const res = await call('nasa_images', { q: 'James Webb', media_type: 'video', year_start: '2024', year_end: '2026' });
-const items = res.collection.items;
+const res = await call('nasa_images', { q: 'James Webb', media_type: 'video', year_start: '2024', year_end: '2026' }).catch(() => null);
+const items = (res?.collection?.items ?? []).filter(it => it);
 await widget('stat-card', { label: 'JWST videos', value: items.length });
-await widget('cards', { items: items.map(it => ({ title: it.data[0].title, subtitle: it.data[0].date_created.slice(0, 4), description: (it.data[0].description || '').slice(0, 160) })) });
+await widget('cards', { items: items.map(it => ({ title: it?.data?.[0]?.title ?? '—', subtitle: (it?.data?.[0]?.date_created ?? '').slice(0, 4), description: (it?.data?.[0]?.description ?? '').slice(0, 160) })) });
 ```
 
 ## Common mistakes

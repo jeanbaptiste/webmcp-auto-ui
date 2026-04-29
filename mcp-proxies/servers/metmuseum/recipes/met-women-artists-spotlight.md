@@ -29,23 +29,26 @@ layout:
      departmentId: 11,
      hasImages: true,
      pageSize: 100
-   });
+   }).catch(() => null);
+   const ids = search?.objectIDs ?? [];
+   if (ids.length === 0) return widget('text', { content: 'No objects.' });
    ```
 
 2. **Fetch a wide sample** (the API only labels women artists with `artistGender`):
    ```js
-   const objs = await Promise.all(search.objectIDs.slice(0, 40).map(id => call('get-museum-object', { objectId: id })));
-   const womenWorks = objs.map(o => o.object).filter(w => w.artistGender === 'Female' && w.primaryImageSmall);
+   const objs = await Promise.all(ids.slice(0, 40).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const womenWorks = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.artistGender === 'Female' && w?.primaryImageSmall);
+   if (womenWorks.length === 0) return widget('text', { content: 'No women-attributed works in the sample.' });
    ```
 
 3. **Profile the most-represented woman**:
    ```js
-   const byArtist = womenWorks.reduce((acc, w) => { (acc[w.artistDisplayName] = acc[w.artistDisplayName] || []).push(w); return acc; }, {});
+   const byArtist = womenWorks.reduce((acc, w) => { const k = w?.artistDisplayName ?? '—'; (acc[k] = acc[k] || []).push(w); return acc; }, {});
    const [topName, topWorks] = Object.entries(byArtist).sort((a, b) => b[1].length - a[1].length)[0] || [];
    if (topName) {
      await widget('profile', {
        name: topName,
-       subtitle: topWorks[0].artistDisplayBio,
+       subtitle: topWorks[0]?.artistDisplayBio ?? '',
        stats: [{ label: 'Works in sample', value: topWorks.length }]
      });
    }
@@ -53,21 +56,21 @@ layout:
 
 4. **Stats**:
    ```js
-   const uniqueArtists = new Set(womenWorks.map(w => w.artistDisplayName)).size;
+   const uniqueArtists = new Set(womenWorks.map(w => w?.artistDisplayName).filter(Boolean)).size;
    await widget('stat-card', { label: 'Works by women', value: womenWorks.length, icon: 'palette' });
    await widget('stat-card', { label: 'Unique women artists', value: uniqueArtists, icon: 'users' });
    ```
 
 5. **Multi-artist gallery + cards**:
    ```js
-   await widget('gallery', { images: womenWorks.map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: w.artistDisplayName })) });
-   await widget('cards', { items: womenWorks.slice(0, 10).map(w => ({ title: w.title, subtitle: w.artistDisplayName, image: w.primaryImageSmall, body: w.objectDate })) });
+   await widget('gallery', { images: womenWorks.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.artistDisplayName ?? '—' })) });
+   await widget('cards', { items: womenWorks.slice(0, 10).map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.artistDisplayName ?? '—', image: w?.primaryImageSmall, body: w?.objectDate ?? '—' })) });
    ```
 
 6. **Chart by decade**:
    ```js
    const byDecade = womenWorks.reduce((acc, w) => {
-     const dec = Math.floor((w.objectBeginDate || 0) / 10) * 10;
+     const dec = Math.floor((w?.objectBeginDate || 0) / 10) * 10;
      acc[dec] = (acc[dec] || 0) + 1; return acc;
    }, {});
    await widget('chart', { type: 'bar', data: Object.entries(byDecade).map(([k, v]) => ({ label: `${k}s`, value: v })) });
@@ -77,17 +80,20 @@ layout:
 
 ### American women painters
 ```js
-const r = await call('search-museum-objects', { q: '*', departmentId: 11, hasImages: true, pageSize: 100 });
-const objs = await Promise.all(r.objectIDs.slice(0, 40).map(id => call('get-museum-object', { objectId: id })));
-const women = objs.map(o => o.object).filter(w => w.artistGender === 'Female');
-await widget('cards', { items: women.map(w => ({ title: w.title, subtitle: w.artistDisplayName, image: w.primaryImageSmall })) });
+const r = await call('search-museum-objects', { q: '*', departmentId: 11, hasImages: true, pageSize: 100 }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 40).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const women = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.artistGender === 'Female');
+await widget('cards', { items: women.map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.artistDisplayName ?? '—', image: w?.primaryImageSmall })) });
 ```
 
 ### Mary Cassatt focused
 ```js
-const r = await call('search-museum-objects', { q: 'Cassatt', artistOrCulture: true, hasImages: true });
-const objs = await Promise.all(r.objectIDs.slice(0, 8).map(id => call('get-museum-object', { objectId: id })));
-await widget('profile', { name: 'Mary Cassatt', subtitle: objs[0]?.object.artistDisplayBio });
+const r = await call('search-museum-objects', { q: 'Cassatt', artistOrCulture: true, hasImages: true }).catch(() => null);
+const ids = r?.objectIDs ?? [];
+const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object);
+await widget('profile', { name: 'Mary Cassatt', subtitle: works[0]?.artistDisplayBio ?? '' });
 ```
 
 ## Common mistakes

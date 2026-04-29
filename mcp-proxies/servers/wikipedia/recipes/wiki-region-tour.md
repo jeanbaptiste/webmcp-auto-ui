@@ -25,21 +25,25 @@ The user wants a mini guide of an area, encyclopedia-style:
 
 1. **Search the theme**:
    ```js
-   const res = await call('search_wikipedia', { query: 'temple Kyoto', limit: 12 });
-   const hits = res.results.slice(0, 8);
+   const res = await call('search_wikipedia', { query: 'temple Kyoto', limit: 12 }).catch(() => null);
+   const hits = (res?.results ?? []).slice(0, 8);
+   if (hits.length === 0) return widget('text', { content: 'No matches found.' });
    ```
 
 2. **Fetch coordinates for each hit** in parallel (some have none):
    ```js
    const enriched = await Promise.all(hits.map(async h => {
+     if (!h?.title) return null;
      const [c, s] = await Promise.all([
        call('get_coordinates', { title: h.title }).catch(() => null),
        call('get_summary', { title: h.title }).catch(() => null)
      ]);
-     const p = c?.coordinates?.find(x => x.primary) || c?.coordinates?.[0];
-     return p ? { title: h.title, lat: p.latitude, lon: p.longitude, summary: s?.summary || '' } : null;
+     const coords = c?.coordinates ?? [];
+     const p = coords.find(x => x?.primary) || coords[0];
+     return (p && Number.isFinite(p?.latitude)) ? { title: h.title, lat: p.latitude, lon: p.longitude, summary: s?.summary ?? '' } : null;
    }));
    const places = enriched.filter(Boolean);
+   if (places.length === 0) return widget('text', { content: 'No geolocated places.' });
    ```
 
 3. **Compute map center** (mean of coords):
@@ -53,10 +57,10 @@ The user wants a mini guide of an area, encyclopedia-style:
    await widget('map', {
      center: [cLat, cLon],
      zoom: 12,
-     markers: places.map(p => ({ lat: p.lat, lon: p.lon, label: p.title, popup: p.summary.slice(0, 120) }))
+     markers: places.map(p => ({ lat: p.lat, lon: p.lon, label: p.title, popup: (p.summary || '').slice(0, 120) }))
    });
    await widget('cards', {
-     items: places.map(p => ({ title: p.title, body: p.summary.slice(0, 160) }))
+     items: places.map(p => ({ title: p.title, body: (p.summary || '').slice(0, 160) }))
    });
    await widget('table', {
      columns: ['Place', 'Lat', 'Lon'],
@@ -68,24 +72,28 @@ The user wants a mini guide of an area, encyclopedia-style:
 
 ### Temples of Kyoto
 ```js
-const res = await call('search_wikipedia', { query: 'temple Kyoto', limit: 10 });
-const places = (await Promise.all(res.results.slice(0, 6).map(async h => {
+const res = await call('search_wikipedia', { query: 'temple Kyoto', limit: 10 }).catch(() => null);
+const hits = (res?.results ?? []).slice(0, 6);
+const places = (await Promise.all(hits.map(async h => {
+  if (!h?.title) return null;
   const c = await call('get_coordinates', { title: h.title }).catch(() => null);
   const s = await call('get_summary', { title: h.title }).catch(() => null);
-  const p = c?.coordinates?.[0];
-  return p ? { title: h.title, lat: p.latitude, lon: p.longitude, summary: s?.summary || '' } : null;
+  const p = (c?.coordinates ?? [])[0];
+  return (p && Number.isFinite(p?.latitude)) ? { title: h.title, lat: p.latitude, lon: p.longitude, summary: s?.summary ?? '' } : null;
 }))).filter(Boolean);
+if (places.length === 0) return widget('text', { content: 'No geolocated temples.' });
 await widget('map', {
   center: [places[0].lat, places[0].lon], zoom: 12,
   markers: places.map(p => ({ lat: p.lat, lon: p.lon, label: p.title }))
 });
-await widget('cards', { items: places.map(p => ({ title: p.title, body: p.summary.slice(0, 160) })) });
+await widget('cards', { items: places.map(p => ({ title: p.title, body: (p.summary || '').slice(0, 160) })) });
 ```
 
 ### Châteaux de la Loire
 ```js
-const res = await call('search_wikipedia', { query: 'château Loire France', limit: 10 });
-await widget('cards', { items: res.results.map(h => ({ title: h.title, body: h.snippet.replace(/<[^>]+>/g, '') })) });
+const res = await call('search_wikipedia', { query: 'château Loire France', limit: 10 }).catch(() => null);
+const hits = (res?.results ?? []);
+await widget('cards', { items: hits.map(h => ({ title: h?.title ?? '—', body: (h?.snippet ?? '').replace(/<[^>]+>/g, '') })) });
 ```
 
 ## Common mistakes

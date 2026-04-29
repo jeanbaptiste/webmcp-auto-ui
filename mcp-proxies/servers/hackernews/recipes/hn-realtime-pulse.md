@@ -29,14 +29,15 @@ This complements `hn-front-page-overview` (editorial) with a strict reverse-chro
 1. **Fetch latest posts** (no tag filter — capture all activity):
    ```js
    const res = await call('get-latest-posts', { hitsPerPage: 50 });
-   const posts = res.hits;
+   const posts = (res?.hits ?? []).filter(p => p);
+   if (posts.length === 0) return widget('text', { content: 'No recent activity (API rate-limited?).' });
    ```
 
 2. **Breakdown by content type**:
    ```js
    const types = { story: 0, comment: 0, show_hn: 0, ask_hn: 0, poll: 0 };
    for (const p of posts) {
-     for (const t of (p._tags || [])) if (t in types) types[t]++;
+     for (const t of (p?._tags ?? [])) if (t in types) types[t]++;
    }
    ```
 
@@ -52,10 +53,10 @@ This complements `hn-front-page-overview` (editorial) with a strict reverse-chro
    ```js
    await widget('timeline', {
      events: posts.slice(0, 30).map(p => ({
-       date: p.created_at,
-       title: p.title || p.story_title || '(comment)',
-       description: `by ${p.author} · ${p.points || 0} pts`,
-       url: p.url || `https://news.ycombinator.com/item?id=${p.objectID}`
+       date: p?.created_at ?? new Date().toISOString(),
+       title: p?.title || p?.story_title || '(comment)',
+       description: `by ${p?.author ?? '—'} · ${p?.points ?? 0} pts`,
+       url: p?.url || `https://news.ycombinator.com/item?id=${p?.objectID ?? ''}`
      }))
    });
    ```
@@ -65,9 +66,13 @@ This complements `hn-front-page-overview` (editorial) with a strict reverse-chro
    await widget('table', {
      columns: ['Time', 'Type', 'Title', 'Author'],
      rows: posts.map(p => {
-       const tag = (p._tags || []).find(t => ['story', 'comment', 'show_hn', 'ask_hn', 'poll'].includes(t)) || '?';
-       const time = new Date(p.created_at).toISOString().slice(11, 16);
-       return [time, tag, p.title || p.story_title || '(comment)', p.author];
+       const tag = (p?._tags ?? []).find(t => ['story', 'comment', 'show_hn', 'ask_hn', 'poll'].includes(t)) || '?';
+       let time = '—';
+       try {
+         const d = new Date(p?.created_at);
+         if (Number.isFinite(d.getTime())) time = d.toISOString().slice(11, 16);
+       } catch {}
+       return [time, tag, p?.title || p?.story_title || '(comment)', p?.author ?? '—'];
      })
    });
    ```
@@ -76,39 +81,42 @@ This complements `hn-front-page-overview` (editorial) with a strict reverse-chro
 
 ### Live pulse — all types
 ```js
-const { hits } = await call('get-latest-posts', { hitsPerPage: 50 });
+const res = await call('get-latest-posts', { hitsPerPage: 50 });
+const hits = (res?.hits ?? []).filter(p => p);
 await widget('stat-card', { label: 'Last 50', value: hits.length, icon: 'activity' });
 await widget('timeline', {
   events: hits.slice(0, 20).map(p => ({
-    date: p.created_at,
-    title: p.title || p.story_title || '(comment)',
-    description: `by ${p.author}`
+    date: p?.created_at ?? new Date().toISOString(),
+    title: p?.title || p?.story_title || '(comment)',
+    description: `by ${p?.author ?? '—'}`
   }))
 });
 ```
 
 ### Latest stories only
 ```js
-const { hits } = await call('get-latest-posts', { tags: ['story'], hitsPerPage: 30 });
+const res = await call('get-latest-posts', { tags: ['story'], hitsPerPage: 30 });
+const hits = (res?.hits ?? []).filter(p => p);
 await widget('timeline', {
   events: hits.map(p => ({
-    date: p.created_at,
-    title: p.title,
-    description: `${p.points || 0} pts · ${p.num_comments || 0} comments`,
-    url: p.url
+    date: p?.created_at ?? new Date().toISOString(),
+    title: p?.title ?? '(untitled)',
+    description: `${p?.points ?? 0} pts · ${p?.num_comments ?? 0} comments`,
+    url: p?.url
   }))
 });
 await widget('table', {
   columns: ['Title', 'Author', 'Posted'],
-  rows: hits.map(p => [p.title, p.author, p.created_at.slice(0, 19).replace('T', ' ')])
+  rows: hits.map(p => [p?.title ?? '(untitled)', p?.author ?? '—', p?.created_at?.slice(0, 19).replace('T', ' ') ?? '—'])
 });
 ```
 
 ### Show HN feed
 ```js
-const { hits } = await call('get-latest-posts', { tags: ['show_hn'], hitsPerPage: 20 });
+const res = await call('get-latest-posts', { tags: ['show_hn'], hitsPerPage: 20 });
+const hits = (res?.hits ?? []).filter(p => p);
 await widget('timeline', {
-  events: hits.map(p => ({ date: p.created_at, title: p.title, description: p.author, url: p.url }))
+  events: hits.map(p => ({ date: p?.created_at ?? new Date().toISOString(), title: p?.title ?? '(untitled)', description: p?.author ?? '—', url: p?.url }))
 });
 ```
 

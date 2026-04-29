@@ -26,21 +26,24 @@ EPIC takes ~10-20 full-disc images per day; played as a carousel they reveal Ear
 
 ```js
 // 1. Fetch EPIC frames for a date (natural or enhanced collection)
-const frames = await call('nasa_epic', {
+const raw = await call('nasa_epic', {
   collection: 'natural',
   date: '2026-04-28'
-});
+}).catch(() => null);
+const frames = (Array.isArray(raw) ? raw : []).filter(f => f);
+if (frames.length === 0) return widget('text', { content: 'No EPIC frames for this date.' });
 
 // EPIC image URL pattern
-const dateParts = frames[0].date.slice(0, 10).split('-');
-const baseUrl = `https://epic.gsfc.nasa.gov/archive/natural/${dateParts[0]}/${dateParts[1]}/${dateParts[2]}/png`;
+const firstDate = frames[0]?.date ?? '';
+const dateParts = firstDate.slice(0, 10).split('-');
+const baseUrl = dateParts.length === 3 ? `https://epic.gsfc.nasa.gov/archive/natural/${dateParts[0]}/${dateParts[1]}/${dateParts[2]}/png` : '';
 
 // 2. Carousel of frames (chronological)
 await widget('carousel', {
-  items: frames.map(f => ({
+  items: frames.filter(f => f?.image && baseUrl).map(f => ({
     image: `${baseUrl}/${f.image}.png`,
-    title: f.caption || 'Earth — DSCOVR/EPIC',
-    subtitle: f.date
+    title: f?.caption || 'Earth — DSCOVR/EPIC',
+    subtitle: f?.date ?? '—'
   }))
 });
 
@@ -48,11 +51,11 @@ await widget('carousel', {
 await widget('map', {
   center: [0, 0],
   zoom: 1,
-  markers: frames.map(f => ({
+  markers: frames.filter(f => Number.isFinite(f?.centroid_coordinates?.lat)).map(f => ({
     lat: f.centroid_coordinates.lat,
     lon: f.centroid_coordinates.lon,
-    label: f.date.slice(11, 16),
-    popup: `Sub-solar point at ${f.date}`
+    label: (f?.date ?? '').slice(11, 16),
+    popup: `Sub-solar point at ${f?.date ?? '—'}`
   }))
 });
 
@@ -61,8 +64,8 @@ await widget('kv', {
   items: [
     { label: 'Frames', value: frames.length },
     { label: 'Collection', value: 'natural' },
-    { label: 'First image', value: frames[0].date },
-    { label: 'Last image', value: frames[frames.length - 1].date }
+    { label: 'First image', value: frames[0]?.date ?? '—' },
+    { label: 'Last image', value: frames[frames.length - 1]?.date ?? '—' }
   ]
 });
 ```
@@ -72,15 +75,17 @@ await widget('kv', {
 ### Today's natural collection
 ```js
 const today = new Date().toISOString().slice(0, 10);
-const frames = await call('nasa_epic', { collection: 'natural', date: today });
-await widget('carousel', { items: frames.map(f => ({ image: epicUrl(f), subtitle: f.date })) });
-await widget('map', { center: [0, 0], zoom: 1, markers: frames.map(f => ({ lat: f.centroid_coordinates.lat, lon: f.centroid_coordinates.lon })) });
+const raw = await call('nasa_epic', { collection: 'natural', date: today }).catch(() => null);
+const frames = (Array.isArray(raw) ? raw : []).filter(f => f);
+await widget('carousel', { items: frames.map(f => ({ image: epicUrl(f), subtitle: f?.date ?? '—' })) });
+await widget('map', { center: [0, 0], zoom: 1, markers: frames.filter(f => Number.isFinite(f?.centroid_coordinates?.lat)).map(f => ({ lat: f.centroid_coordinates.lat, lon: f.centroid_coordinates.lon })) });
 ```
 
 ### Enhanced collection on a specific date
 ```js
-const frames = await call('nasa_epic', { collection: 'enhanced', date: '2024-12-21' });
-await widget('carousel', { items: frames.map(f => ({ image: epicUrl(f, 'enhanced'), title: f.date })) });
+const raw = await call('nasa_epic', { collection: 'enhanced', date: '2024-12-21' }).catch(() => null);
+const frames = (Array.isArray(raw) ? raw : []).filter(f => f);
+await widget('carousel', { items: frames.map(f => ({ image: epicUrl(f, 'enhanced'), title: f?.date ?? '—' })) });
 await widget('kv', { items: [{ label: 'Solstice', value: '2024-12-21' }, { label: 'Frames', value: frames.length }] });
 ```
 

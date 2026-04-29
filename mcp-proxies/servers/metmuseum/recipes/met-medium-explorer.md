@@ -24,16 +24,18 @@ layout:
 
 1. **Resolve the department** via `list-departments`:
    ```js
-   const { departments } = await call('list-departments', {});
-   const dept = departments.find(d => d.displayName.includes('Greek'));
+   const resp = await call('list-departments', {}).catch(() => null);
+   const departments = resp?.departments ?? [];
+   const dept = departments.find(d => d?.displayName?.includes('Greek'));
+   if (!dept) return widget('text', { content: 'Department not found.' });
    ```
 
 2. **Run one search per medium** of interest:
    ```js
    const media = ['Terracotta', 'Marble', 'Bronze', 'Limestone'];
    const counts = await Promise.all(media.map(async m => {
-     const r = await call('search-museum-objects', { q: '*', departmentId: dept.departmentId, medium: m, pageSize: 1 });
-     return { medium: m, total: r.total, sampleId: r.objectIDs[0] };
+     const r = await call('search-museum-objects', { q: '*', departmentId: dept.departmentId, medium: m, pageSize: 1 }).catch(() => null);
+     return { medium: m, total: r?.total ?? 0, sampleId: (r?.objectIDs ?? [])[0] };
    }));
    ```
 
@@ -41,44 +43,46 @@ layout:
    ```js
    await widget('chart-rich', {
      type: 'bar',
-     data: counts.map(c => ({ label: c.medium, value: c.total, sampleId: c.sampleId }))
+     data: counts.map(c => ({ label: c?.medium ?? '—', value: c?.total ?? 0, sampleId: c?.sampleId }))
    });
    ```
 
 4. **Per-medium examples**:
    ```js
-   const examples = await Promise.all(counts.map(c => call('get-museum-object', { objectId: c.sampleId })));
-   const items = examples.map(e => e.object);
-   await widget('gallery', { images: items.map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: w.medium })) });
+   const examples = await Promise.all(counts.filter(c => c?.sampleId).map(c => call('get-museum-object', { objectId: c.sampleId }).catch(() => null)));
+   const items = examples.filter(e => e?.object).map(e => e.object);
+   await widget('gallery', { images: items.filter(w => w?.primaryImageSmall).map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.medium ?? '—' })) });
    ```
 
 5. **Detail cards** with dimensions:
    ```js
    await widget('cards', {
-     items: items.map(w => ({ title: w.title, subtitle: w.medium, image: w.primaryImageSmall, body: w.dimensions }))
+     items: items.map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.medium ?? '—', image: w?.primaryImageSmall, body: w?.dimensions ?? '—' }))
    });
    ```
 
 6. **KV taxonomy**:
    ```js
-   await widget('kv', { pairs: counts.map(c => [c.medium, `${c.total} objects`]) });
+   await widget('kv', { pairs: counts.map(c => [c?.medium ?? '—', `${c?.total ?? 0} objects`]) });
    ```
 
 ## Examples
 
 ### Greek/Roman department
 ```js
-const { departments } = await call('list-departments', {});
-const greek = departments.find(d => d.displayName.includes('Greek'));
+const resp = await call('list-departments', {}).catch(() => null);
+const departments = resp?.departments ?? [];
+const greek = departments.find(d => d?.displayName?.includes('Greek'));
+if (!greek) return widget('text', { content: 'Department not found.' });
 const media = ['Terracotta', 'Marble', 'Bronze'];
-const counts = await Promise.all(media.map(m => call('search-museum-objects', { q: 'sculpture', departmentId: greek.departmentId, medium: m, pageSize: 1 })));
-await widget('chart-rich', { type: 'bar', data: media.map((m, i) => ({ label: m, value: counts[i].total })) });
+const counts = await Promise.all(media.map(m => call('search-museum-objects', { q: 'sculpture', departmentId: greek.departmentId, medium: m, pageSize: 1 }).catch(() => null)));
+await widget('chart-rich', { type: 'bar', data: media.map((m, i) => ({ label: m, value: counts[i]?.total ?? 0 })) });
 ```
 
 ### Japanese prints
 ```js
-const r = await call('search-museum-objects', { q: 'print', departmentId: 6, medium: 'Woodblock print', pageSize: 1 });
-await widget('kv', { pairs: [['Woodblock print', `${r.total}`]] });
+const r = await call('search-museum-objects', { q: 'print', departmentId: 6, medium: 'Woodblock print', pageSize: 1 }).catch(() => null);
+await widget('kv', { pairs: [['Woodblock print', `${r?.total ?? 0}`]] });
 ```
 
 ## Common mistakes

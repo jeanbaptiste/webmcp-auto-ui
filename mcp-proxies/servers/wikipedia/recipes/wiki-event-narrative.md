@@ -24,22 +24,23 @@ The user wants a structured retelling, not a raw article:
 
 1. **Fetch the article + sections** to find narrative phases:
    ```js
-   const art = await call('get_article', { title: 'Fall of the Berlin Wall' });
-   const secs = await call('get_sections', { title: 'Fall of the Berlin Wall' });
+   const art = await call('get_article', { title: 'Fall of the Berlin Wall' }).catch(() => null);
+   if (!art || art?.exists === false) return widget('text', { content: 'Page not found.' });
+   const secs = await call('get_sections', { title: 'Fall of the Berlin Wall' }).catch(() => null);
    ```
 
 2. **Pick 2-3 narrative sections** (Causes / Course / Consequences when present):
    ```js
-   const phases = secs.sections.filter(s => /background|cause|history|aftermath|consequence|impact/i.test(s.title)).slice(0, 3);
+   const phases = (secs?.sections ?? []).filter(s => s?.title && /background|cause|history|aftermath|consequence|impact/i.test(s.title)).slice(0, 3);
    ```
 
 3. **Summarize each phase + extract a few facts**:
    ```js
-   const enriched = await Promise.all(phases.map(async p => ({
-     title: p.title,
-     summary: (await call('summarize_article_section', { title: art.title, section_title: p.title, max_length: 250 })).summary,
-     facts: (await call('extract_key_facts', { title: art.title, topic_within_article: p.title, count: 3 })).facts
-   })));
+   const enriched = await Promise.all(phases.map(async p => {
+     const summary = await call('summarize_article_section', { title: art?.title, section_title: p?.title, max_length: 250 }).catch(() => null);
+     const facts = await call('extract_key_facts', { title: art?.title, topic_within_article: p?.title, count: 3 }).catch(() => null);
+     return { title: p?.title ?? '—', summary: summary?.summary ?? '', facts: facts?.facts ?? [] };
+   }));
    ```
 
 4. **Render the timeline + summary + kv**:
@@ -47,9 +48,9 @@ The user wants a structured retelling, not a raw article:
    await widget('timeline', {
      events: enriched.flatMap(p => p.facts.map(f => ({ title: p.title, description: f })))
    });
-   await widget('text', { content: art.summary });
+   await widget('text', { content: art?.summary ?? '' });
    await widget('kv', {
-     items: enriched.map(p => ({ label: p.title, value: p.summary.slice(0, 200) + '…' }))
+     items: enriched.map(p => ({ label: p.title, value: (p.summary || '').slice(0, 200) + '…' }))
    });
    ```
 
@@ -57,26 +58,28 @@ The user wants a structured retelling, not a raw article:
 
 ### Fall of the Berlin Wall
 ```js
-const art = await call('get_article', { title: 'Fall of the Berlin Wall' });
-const secs = await call('get_sections', { title: 'Fall of the Berlin Wall' });
-const phases = secs.sections.filter(s => /background|history|aftermath/i.test(s.title)).slice(0, 3);
-const enriched = await Promise.all(phases.map(async p => ({
-  title: p.title,
-  facts: (await call('extract_key_facts', { title: art.title, topic_within_article: p.title, count: 3 })).facts
-})));
+const art = await call('get_article', { title: 'Fall of the Berlin Wall' }).catch(() => null);
+if (!art || art?.exists === false) return widget('text', { content: 'Page not found.' });
+const secs = await call('get_sections', { title: 'Fall of the Berlin Wall' }).catch(() => null);
+const phases = (secs?.sections ?? []).filter(s => s?.title && /background|history|aftermath/i.test(s.title)).slice(0, 3);
+const enriched = await Promise.all(phases.map(async p => {
+  const facts = await call('extract_key_facts', { title: art?.title, topic_within_article: p?.title, count: 3 }).catch(() => null);
+  return { title: p?.title ?? '—', facts: facts?.facts ?? [] };
+}));
 await widget('timeline', {
   events: enriched.flatMap(p => p.facts.map(f => ({ title: p.title, description: f })))
 });
-await widget('text', { content: art.summary });
+await widget('text', { content: art?.summary ?? '' });
 ```
 
 ### Industrial Revolution narrative
 ```js
-const art = await call('get_article', { title: 'Industrial Revolution' });
-const causes = await call('summarize_article_section', { title: 'Industrial Revolution', section_title: 'Causes', max_length: 250 });
-const facts = await call('extract_key_facts', { title: 'Industrial Revolution', count: 6 });
-await widget('timeline', { events: facts.facts.map(f => ({ title: 'Industrial Revolution', description: f })) });
-await widget('text', { content: causes.summary });
+const art = await call('get_article', { title: 'Industrial Revolution' }).catch(() => null);
+if (!art || art?.exists === false) return widget('text', { content: 'Page not found.' });
+const causes = await call('summarize_article_section', { title: 'Industrial Revolution', section_title: 'Causes', max_length: 250 }).catch(() => null);
+const facts = await call('extract_key_facts', { title: 'Industrial Revolution', count: 6 }).catch(() => null);
+await widget('timeline', { events: (facts?.facts ?? []).map(f => ({ title: 'Industrial Revolution', description: f })) });
+await widget('text', { content: causes?.summary ?? '' });
 ```
 
 ## Common mistakes

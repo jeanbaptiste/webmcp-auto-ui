@@ -31,24 +31,26 @@ const data = await call('jpl_nhats', {
   dv: 6,         // ≤ 6 km/s total
   dur: 360,      // ≤ 360 days
   launch: '2030-2035'
-});
-const targets = data.data || [];
+}).catch(() => null);
+const targets = (data?.data ?? []).filter(t => t);
+if (targets.length === 0) return widget('text', { content: 'No NHATS targets for this envelope.' });
 
 // 2. Rank
-targets.sort((a, b) => +a.min_dv?.dv - +b.min_dv?.dv);
+targets.sort((a, b) => +(a?.min_dv?.dv ?? Infinity) - +(b?.min_dv?.dv ?? Infinity));
 
 // 3. Enrich top-5 with SBDB
 const top5 = targets.slice(0, 5);
 const enriched = await Promise.all(
-  top5.map(t => call('jpl_sbdb', { sstr: t.des }).catch(() => null))
+  top5.map(t => t?.des ? call('jpl_sbdb', { sstr: t.des }).catch(() => null) : Promise.resolve(null))
 );
 
 // 4. KPIs
+const durs = targets.map(t => +(t?.min_dur?.dur ?? Infinity)).filter(Number.isFinite);
 await widget('kv', {
   items: [
     { label: 'Targets', value: targets.length },
-    { label: 'Min Δv (km/s)', value: targets[0]?.min_dv?.dv },
-    { label: 'Min duration (d)', value: Math.min(...targets.map(t => +t.min_dur?.dur || Infinity)) },
+    { label: 'Min Δv (km/s)', value: targets[0]?.min_dv?.dv ?? '—' },
+    { label: 'Min duration (d)', value: durs.length > 0 ? Math.min(...durs) : '—' },
     { label: 'Launch window', value: '2030-2035' }
   ]
 });
@@ -56,11 +58,11 @@ await widget('kv', {
 // 5. Scatter Δv vs duration
 await widget('chart', {
   type: 'scatter',
-  data: targets.map(t => ({
-    x: +t.min_dv?.dv,
-    y: +t.min_dur?.dur,
-    label: t.des,
-    color: +t.min_dv?.dv < 5 ? '#16a34a' : '#3b82f6'
+  data: targets.filter(t => Number.isFinite(+t?.min_dv?.dv) && Number.isFinite(+t?.min_dur?.dur)).map(t => ({
+    x: +t.min_dv.dv,
+    y: +t.min_dur.dur,
+    label: t?.des ?? '—',
+    color: +t.min_dv.dv < 5 ? '#16a34a' : '#3b82f6'
   })),
   xLabel: 'Min total Δv (km/s)',
   yLabel: 'Min mission duration (days)'
@@ -69,15 +71,15 @@ await widget('chart', {
 // 6. Sortable table
 await widget('table', {
   columns: ['Designation', 'Min Δv (km/s)', 'Min duration (d)', 'H', 'OCC'],
-  rows: targets.map(t => [t.des, t.min_dv?.dv, t.min_dur?.dur, t.h, t.occ])
+  rows: targets.map(t => [t?.des ?? '—', t?.min_dv?.dv ?? '—', t?.min_dur?.dur ?? '—', t?.h ?? '—', t?.occ ?? '—'])
 });
 
 // 7. Top-5 candidate cards
 await widget('cards', {
   items: top5.map((t, i) => ({
-    title: t.des,
-    subtitle: `Δv ${t.min_dv?.dv} km/s · ${t.min_dur?.dur} d`,
-    description: enriched[i]?.object?.orbit_class?.name || 'NEO'
+    title: t?.des ?? '—',
+    subtitle: `Δv ${t?.min_dv?.dv ?? '—'} km/s · ${t?.min_dur?.dur ?? '—'} d`,
+    description: enriched[i]?.object?.orbit_class?.name ?? 'NEO'
   }))
 });
 ```
@@ -86,15 +88,17 @@ await widget('cards', {
 
 ### Easiest reachable NEOs
 ```js
-const data = await call('jpl_nhats', { dv: 5, dur: 270, launch: '2025-2030' });
-await widget('kv', { items: [{ label: 'Easy targets', value: data.data.length }] });
-await widget('cards', { items: data.data.slice(0, 3).map(t => ({ title: t.des, subtitle: 'Δv ' + t.min_dv.dv })) });
+const data = await call('jpl_nhats', { dv: 5, dur: 270, launch: '2025-2030' }).catch(() => null);
+const targets = (data?.data ?? []).filter(t => t);
+await widget('kv', { items: [{ label: 'Easy targets', value: targets.length }] });
+await widget('cards', { items: targets.slice(0, 3).map(t => ({ title: t?.des ?? '—', subtitle: 'Δv ' + (t?.min_dv?.dv ?? '—') })) });
 ```
 
 ### Strict crewed budget
 ```js
-const data = await call('jpl_nhats', { dv: 4, dur: 180 });
-await widget('table', { columns: ['Des', 'Δv', 'Days'], rows: data.data.map(t => [t.des, t.min_dv.dv, t.min_dur.dur]) });
+const data = await call('jpl_nhats', { dv: 4, dur: 180 }).catch(() => null);
+const targets = (data?.data ?? []).filter(t => t);
+await widget('table', { columns: ['Des', 'Δv', 'Days'], rows: targets.map(t => [t?.des ?? '—', t?.min_dv?.dv ?? '—', t?.min_dur?.dur ?? '—']) });
 ```
 
 ## Common mistakes
