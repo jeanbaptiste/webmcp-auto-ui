@@ -12,7 +12,7 @@
 // showcase. Filter them so the widget falls back to its empty state.
 const PLACEHOLDER_URL_PATTERNS = [
   /https?:\/\/example\.com\b/i,
-  /https?:\/\/\.\.\.[\/]/,
+  /https?:\/\/\.{3}(?!\w)/,
   /https?:\/\/your-/i,
   /https?:\/\/<[^>]+>/,
 ];
