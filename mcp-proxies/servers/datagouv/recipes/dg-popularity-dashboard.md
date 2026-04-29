@@ -1,0 +1,106 @@
+---
+id: dg-popularity-dashboard
+name: Popularity dashboard for a dataset
+description: Visualize 12-24 months of visits and downloads as a stacked area chart, with stat-cards on totals, peaks and YoY growth, plus a per-file breakdown
+when: the user asks how popular a dataset is, how many people use it, or how its usage evolved
+servers: [datagouv]
+tools_used: [get_dataset_info, get_metrics, list_dataset_resources]
+data_type: monthly metrics 12-24 months
+components_used: [chart-rich, stat-card, table, kv]
+layout:
+  type: grid
+  columns: 2
+  arrangement: full-width chart-rich on top, stats + table + kv below
+---
+
+## When to use
+
+The user asks about popularity:
+- "Le dataset DVF est-il très consulté ?"
+- "Combien de téléchargements pour le RNA cette année ?"
+- "Évolution du nombre de visites de ce dataset"
+- "Quel fichier de ce dataset est le plus téléchargé ?"
+
+This recipe is great for public communication and inter-agency benchmarking.
+
+## How to use
+
+1. **Fetch info, metrics, resources**:
+   ```js
+   const [info, metrics, resList] = await Promise.all([
+     call('get_dataset_info', { dataset_id }),
+     call('get_metrics', { dataset_id, limit: 24 }),
+     call('list_dataset_resources', { dataset_id })
+   ]);
+   const series = (metrics.metrics ?? []).slice().reverse(); // chronological
+   ```
+
+2. **Compute aggregates**:
+   ```js
+   const total12 = series.slice(-12).reduce((s, m) => s + (m.monthly_download ?? 0), 0);
+   const total12prev = series.slice(-24, -12).reduce((s, m) => s + (m.monthly_download ?? 0), 0);
+   const yoy = total12prev ? ((total12 - total12prev) / total12prev * 100).toFixed(1) : 'n/a';
+   const peak = series.reduce((p, m) => (m.monthly_download ?? 0) > (p.monthly_download ?? 0) ? m : p, series[0] ?? {});
+   ```
+
+3. **Render**:
+   ```js
+   await widget('chart-rich', {
+     type: 'area-stacked',
+     labels: series.map(m => m.month),
+     series: [
+       { name: 'Visites', values: series.map(m => m.monthly_visit ?? 0) },
+       { name: 'Téléchargements', values: series.map(m => m.monthly_download ?? 0) }
+     ]
+   });
+
+   await widget('stat-card', { label: 'Téléchargements 12 mois', value: total12.toLocaleString('fr-FR'), icon: 'download' });
+   await widget('stat-card', { label: 'Pic mensuel', value: `${(peak.monthly_download ?? 0).toLocaleString('fr-FR')} (${peak.month})`, icon: 'trending-up' });
+   await widget('stat-card', { label: 'Évol. YoY', value: `${yoy} %`, icon: 'activity' });
+
+   await widget('table', {
+     columns: ['Fichier', 'Format', 'Taille'],
+     rows: resList.resources.slice(0, 10).map(r => [r.title, r.format, r.size_human])
+   });
+
+   await widget('kv', {
+     items: [
+       { key: 'Titre', value: info.title },
+       { key: 'Organisation', value: info.organization?.name },
+       { key: 'Licence', value: info.license },
+       { key: 'Fréquence', value: info.frequency }
+     ]
+   });
+   ```
+
+## Examples
+
+### DVF popularity
+```js
+const dataset_id = '5cc1b94a634f4165e96436c1';
+const metrics = await call('get_metrics', { dataset_id, limit: 24 });
+const series = metrics.metrics.slice().reverse();
+await widget('chart-rich', {
+  type: 'area-stacked',
+  labels: series.map(m => m.month),
+  series: [
+    { name: 'Visites', values: series.map(m => m.monthly_visit) },
+    { name: 'Téléchargements', values: series.map(m => m.monthly_download) }
+  ]
+});
+```
+
+### RNA downloads this year
+```js
+const metrics = await call('get_metrics', { dataset_id: '58e53811c751df03df38f42d', limit: 12 });
+const total = metrics.metrics.reduce((s, m) => s + (m.monthly_download ?? 0), 0);
+await widget('stat-card', { label: 'Téléchargements 12 mois', value: total.toLocaleString('fr-FR') });
+```
+
+## Common mistakes
+
+- **Plotting metrics chronologically when the API returns them reverse-chronologically** — the API lists most recent first; reverse the array before charting.
+- **Comparing 12-month windows that overlap** — YoY needs two disjoint 12-month windows (`-24..-12` vs `-12..0`); never reuse months.
+- **Missing months** — the API skips months with zero traffic for some datasets; pad the series with zeros to keep the x-axis even.
+- **Confusing `monthly_visit` and `monthly_download`** — visits include landing-page hits without files; downloads count actual file fetches.
+- **Calling `get_metrics` on the demo environment** — returns empty arrays; production-only.

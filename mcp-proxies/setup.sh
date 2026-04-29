@@ -63,9 +63,11 @@ green "[3/7] Copying bridge files to $BRIDGE_DIR..."
 mkdir -p "$BRIDGE_DIR"
 mkdir -p "$BRIDGE_DIR/recipes"
 
-cp "$SCRIPT_DIR/bridge/mcp-stdio-bridge.py" "$BRIDGE_DIR/mcp-stdio-bridge.py"
-cp "$SCRIPT_DIR/bridge/inaturalist-mcp.py"  "$BRIDGE_DIR/inaturalist-mcp.py"
+cp "$SCRIPT_DIR/bridge/mcp-stdio-bridge.py"     "$BRIDGE_DIR/mcp-stdio-bridge.py"
+cp "$SCRIPT_DIR/bridge/mcp-http-passthrough.py" "$BRIDGE_DIR/mcp-http-passthrough.py"
+cp "$SCRIPT_DIR/bridge/inaturalist-mcp.py"      "$BRIDGE_DIR/inaturalist-mcp.py"
 chmod +x "$BRIDGE_DIR/mcp-stdio-bridge.py"
+chmod +x "$BRIDGE_DIR/mcp-http-passthrough.py"
 chmod +x "$BRIDGE_DIR/inaturalist-mcp.py"
 
 # Copy recipes if they exist
@@ -152,12 +154,57 @@ EOF
     echo "  Generated $unit_file (port $port)"
 }
 
+generate_passthrough_unit() {
+    local name="$1"
+    local upstream="$2"
+    local port="$3"
+    local unit_file="/etc/systemd/system/mcp-${name}.service"
+
+    local recipes_flag=""
+    if [[ -d "$BRIDGE_DIR/recipes/${name}" ]]; then
+        recipes_flag="--recipes-dir $BRIDGE_DIR/recipes/${name}"
+    elif [[ -f "$BRIDGE_DIR/recipes/${name}.json" ]]; then
+        recipes_flag="--recipes $BRIDGE_DIR/recipes/${name}.json"
+    fi
+
+    cat > "$unit_file" <<EOF
+[Unit]
+Description=MCP HTTP passthrough: ${name}
+After=network.target
+
+[Service]
+Type=simple
+User=${BRIDGE_USER}
+Group=${BRIDGE_USER}
+EnvironmentFile=${BRIDGE_DIR}/.env
+ExecStart=/usr/bin/python3 ${BRIDGE_DIR}/mcp-http-passthrough.py --upstream "${upstream}" --port ${port} ${recipes_flag}
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mcp-${name}
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=${BRIDGE_DIR}
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    echo "  Generated $unit_file (passthrough → ${upstream}, port $port)"
+}
+
 generate_unit "hackernews"  "npx -y hn-mcp-server"                                9006
 generate_unit "metmuseum"   "npx -y metmuseum-mcp"                                9001
 generate_unit "openmeteo"   "npx -y open-meteo-mcp"                               9002
-generate_unit "wikipedia"   "npx -y wikipedia-mcp"                                9005
+generate_unit "wikipedia"   "wikipedia-mcp"                                       9005
 generate_unit "inaturalist" "python3 ${BRIDGE_DIR}/inaturalist-mcp.py"            9007
 generate_unit "nasa"        "npx -y @programcomputer/nasa-mcp-server@latest"      9008 "Environment=NASA_API_KEY=\${NASA_API_KEY}"
+generate_passthrough_unit "datagouv" "https://mcp.data.gouv.fr/mcp"               9009
 
 systemctl daemon-reload
 
@@ -181,7 +228,7 @@ fi
 
 green "[6/7] Starting/restarting services..."
 
-SERVICES=(mcp-hackernews mcp-metmuseum mcp-openmeteo mcp-wikipedia mcp-inaturalist mcp-nasa)
+SERVICES=(mcp-hackernews mcp-metmuseum mcp-openmeteo mcp-wikipedia mcp-inaturalist mcp-nasa mcp-datagouv)
 
 for svc in "${SERVICES[@]}"; do
     systemctl enable "$svc" --now 2>/dev/null
@@ -205,6 +252,7 @@ declare -A ENDPOINTS=(
     [wikipedia]=9005
     [inaturalist]=9007
     [nasa]=9008
+    [datagouv]=9009
 )
 
 PAYLOAD='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'

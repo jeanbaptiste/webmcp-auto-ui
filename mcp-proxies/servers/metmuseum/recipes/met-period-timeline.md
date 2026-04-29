@@ -1,0 +1,104 @@
+---
+id: met-period-timeline
+name: Build a chronological timeline of artworks for a given period
+description: Timeline + chart of objects by century + illustrated gallery for an art-historical period
+when: the user asks about an art-historical period (Egyptian New Kingdom, Italian Renaissance, Tang dynasty)
+servers: [metmuseum]
+tools_used: [search-museum-objects, get-museum-object]
+data_type: chronologique
+components_used: [timeline, gallery, chart, stat-card]
+layout:
+  type: grid
+  columns: 2
+  arrangement: timeline at top, chart + stats on a row, full-width gallery at the bottom
+---
+
+## When to use
+
+- "Egyptian art from the New Kingdom"
+- "Italian Renaissance at the Met"
+- "Tang dynasty objects"
+- "Art from 1500 to 1600 in Europe"
+- "Edo period prints"
+
+## How to use
+
+1. **Search with a date range** (`dateBegin`/`dateEnd` are required together) plus a department for relevance:
+   ```js
+   const search = await call('search-museum-objects', {
+     q: 'sculpture',
+     departmentId: 10,
+     dateBegin: -1550,
+     dateEnd: -1070,
+     hasImages: true,
+     pageSize: 40
+   });
+   ```
+
+2. **Fetch a representative sample** (8-12 detailed objects):
+   ```js
+   const sampled = search.objectIDs.slice(0, 12);
+   const details = await Promise.all(sampled.map(id => call('get-museum-object', { objectId: id })));
+   const works = details.map(d => d.object).filter(o => o.primaryImageSmall);
+   ```
+
+3. **Timeline** sorted by `objectBeginDate`:
+   ```js
+   await widget('timeline', {
+     items: works
+       .sort((a, b) => (a.objectBeginDate || 0) - (b.objectBeginDate || 0))
+       .map(w => ({ date: w.objectDate, title: w.title, description: w.medium, image: w.primaryImageSmall }))
+   });
+   ```
+
+4. **Distribution by century** in a chart:
+   ```js
+   const buckets = {};
+   for (const w of works) {
+     const c = Math.floor((w.objectBeginDate || 0) / 100) * 100;
+     buckets[c] = (buckets[c] || 0) + 1;
+   }
+   await widget('chart', {
+     type: 'bar',
+     data: Object.entries(buckets).map(([k, v]) => ({ label: `${k}`, value: v }))
+   });
+   ```
+
+5. **Stats** (span covered, cultures represented):
+   ```js
+   const cultures = [...new Set(works.map(w => w.culture).filter(Boolean))];
+   await widget('stat-card', { label: 'Objects sampled', value: works.length, icon: 'archive' });
+   await widget('stat-card', { label: 'Cultures', value: cultures.length, icon: 'globe' });
+   ```
+
+6. **Illustrated gallery**:
+   ```js
+   await widget('gallery', {
+     images: works.map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: w.objectDate }))
+   });
+   ```
+
+## Examples
+
+### Italian Renaissance (1400-1600)
+```js
+const r = await call('search-museum-objects', { q: 'Italy', departmentId: 11, dateBegin: 1400, dateEnd: 1600, hasImages: true, pageSize: 40 });
+const objs = await Promise.all(r.objectIDs.slice(0, 12).map(id => call('get-museum-object', { objectId: id })));
+const works = objs.map(o => o.object);
+await widget('timeline', { items: works.map(w => ({ date: w.objectDate, title: w.title, image: w.primaryImageSmall })) });
+```
+
+### Tang dynasty
+```js
+const r = await call('search-museum-objects', { q: 'Tang', departmentId: 6, dateBegin: 618, dateEnd: 907, hasImages: true });
+const objs = await Promise.all(r.objectIDs.slice(0, 10).map(id => call('get-museum-object', { objectId: id })));
+await widget('gallery', { images: objs.map(o => o.object).map(w => ({ src: w.primaryImageSmall, alt: w.title, caption: w.objectDate })) });
+```
+
+## Common mistakes
+
+- **`dateBegin` without `dateEnd`** (or vice-versa): the API silently ignores the filter — always pass both
+- **Negative dates for BCE**: BCE years are negative integers — `dateBegin: -1550` for 1550 BCE
+- **Skipping `departmentId`**: a date-only query mixes Greek pottery with European paintings — always pair the period with a department
+- **Sorting on `objectDate` (string)**: dates like "ca. 1550" don't sort numerically — always use `objectBeginDate`
+- **Tiny sample on a wide range**: 5 works over 500 years is meaningless — bump `pageSize` and detail at least 10-12

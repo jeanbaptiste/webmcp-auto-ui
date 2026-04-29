@@ -1,0 +1,95 @@
+---
+id: weekly-forecast-rich
+name: Previsions meteo enrichies sur 7 a 14 jours
+description: Chart Tmin/Tmax + precipitations daily, table jour par jour, stat-cards "jour le plus chaud" et "total pluie" pour une ville
+when: l'utilisateur demande les previsions de la semaine, "meteo des 7 prochains jours", planning hebdomadaire ou previsions long terme grand public
+servers: [openmeteo]
+tools_used: [geocoding, weather_forecast]
+data_type: timeseries
+components_used: [chart-rich, table, stat-card]
+layout:
+  type: grid
+  columns: 2
+  arrangement: chart pleine largeur, table + stat-cards dessous
+---
+
+## When to use
+
+- "Donne-moi la meteo pour Toulouse cette semaine"
+- "Previsions 7 jours a Strasbourg"
+- "Meteo de la semaine prochaine a Brest"
+- "A quoi va ressembler la semaine cote temperatures a Lyon ?"
+- "Planning meteo Bordeaux pour le week-end et la semaine"
+
+Aide a planifier sortie, jardinage, lessive, voyage court.
+
+## How to use
+
+1. `geocoding({ name, count: 1 })` -> `latitude, longitude, timezone`.
+2. `weather_forecast` avec `daily: [temperature_2m_max, temperature_2m_min, precipitation_sum, precipitation_probability_max, weather_code, wind_speed_10m_max]` et `forecast_days: 7` (ou 14, max 16).
+3. Calculer agregats : indice du jour le plus chaud (`Math.max(...tmax)`), somme des precipitations.
+4. Rendre chart-rich (lignes Tmax/Tmin + barres pluie), table jour par jour et 2 stat-cards.
+
+```js
+const geo = await call('geocoding', { name: 'Toulouse', count: 1 });
+const { latitude, longitude, timezone } = geo.results[0];
+
+const w = await call('weather_forecast', {
+  latitude, longitude, timezone,
+  daily: ['temperature_2m_max', 'temperature_2m_min', 'precipitation_sum',
+          'precipitation_probability_max', 'wind_speed_10m_max'],
+  forecast_days: 7
+});
+
+const d = w.daily;
+const hottestIdx = d.temperature_2m_max.indexOf(Math.max(...d.temperature_2m_max));
+const totalRain = d.precipitation_sum.reduce((a, b) => a + b, 0);
+
+await widget('chart-rich', {
+  title: 'Previsions 7 jours - Toulouse',
+  type: 'line',
+  xAxis: { label: 'Date', data: d.time },
+  series: [
+    { label: 'Tmax (C)', data: d.temperature_2m_max, color: '#e74c3c' },
+    { label: 'Tmin (C)', data: d.temperature_2m_min, color: '#3498db' },
+    { label: 'Pluie (mm)', data: d.precipitation_sum, type: 'bar', color: '#95a5a6' }
+  ]
+});
+
+await widget('table', {
+  title: 'Detail jour par jour',
+  columns: ['Jour', 'Tmax', 'Tmin', 'Pluie (mm)', 'Prob. pluie', 'Vent max'],
+  rows: d.time.map((t, i) => [
+    t,
+    `${d.temperature_2m_max[i]}C`,
+    `${d.temperature_2m_min[i]}C`,
+    d.precipitation_sum[i].toFixed(1),
+    `${d.precipitation_probability_max[i]}%`,
+    `${d.wind_speed_10m_max[i]} km/h`
+  ])
+});
+
+await widget('stat-card', {
+  items: [
+    { label: 'Jour le plus chaud', value: `${d.time[hottestIdx]} (${d.temperature_2m_max[hottestIdx]}C)`, icon: 'sun' },
+    { label: 'Total pluie 7j', value: `${totalRain.toFixed(1)} mm`, icon: 'cloud-rain' }
+  ]
+});
+```
+
+## Examples
+
+### Strasbourg sur 14 jours
+Meme pipeline avec `forecast_days: 14`. Au-dela de 7 jours, indiquer dans le titre que la fiabilite decroit ; preferer la recette `ensemble-uncertainty-band` au-dela de J+5.
+
+### Brest week-end + semaine
+Pipeline identique. Le table met en evidence visuellement les 2 jours du week-end via une colonne "type" (Sam/Dim).
+
+## Common mistakes
+
+- Ne pas depasser `forecast_days: 16` (limite API) ; au-dela utiliser `seasonal_forecast`
+- Toujours inclure `precipitation_probability_max` -- sans probabilite, "0 mm" est trompeur (pluie possible mais < 0.1mm)
+- Limiter le chart a 7-10 points pour la lisibilite ; pour 14j, alterner avec un table plus dense
+- Ne pas confondre `precipitation_sum` (mm cumules sur 24h) et `precipitation_probability_max` (%)
+- Toujours passer le `timezone` -- sinon `time` est en UTC et decale les jours
+- Ne pas oublier le `weather_code` daily si on veut afficher des icones meteo dans le table
