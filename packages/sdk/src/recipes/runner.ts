@@ -35,27 +35,77 @@ const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as
 interface RunnerCtx {
   log: (msg: string) => void;
   start: number;
+  widgets: Array<{ name: string; params: Record<string, unknown> }>;
 }
 
 function makeCtx(): RunnerCtx & { logs: RunLog[] } {
   const start = performance.now();
   const logs: RunLog[] = [];
+  const widgets: Array<{ name: string; params: Record<string, unknown> }> = [];
   return {
     start,
     logs,
+    widgets,
     log(msg: string) {
       logs.push({ t: Math.round(performance.now() - start), msg });
     },
   };
 }
 
-async function runJsLike(code: string, ctx: RunnerCtx): Promise<unknown> {
+/**
+ * Build the `call(toolName, args)` helper exposed to recipe JS sandboxes.
+ * Resolves a tool by name across all connected MCP servers, calls it, and
+ * returns the parsed text payload (JSON if possible) or the raw result.
+ */
+function makeCallHelper(multiClient: McpMultiClient | undefined, ctx: RunnerCtx) {
+  return async (toolName: string, args: Record<string, unknown> = {}) => {
+    const found = findToolOnAnyServer(multiClient, toolName);
+    if (!found || !multiClient) {
+      throw new Error(`No MCP server exposes tool "${toolName}"`);
+    }
+    ctx.log(`call(${toolName})`);
+    const res = await multiClient.callToolOn(found.url, toolName, args);
+    const textPart = res?.content?.find((c: { type: string }) => c.type === 'text') as
+      | { text?: string }
+      | undefined;
+    if (textPart?.text) {
+      try {
+        return JSON.parse(textPart.text);
+      } catch {
+        return textPart.text;
+      }
+    }
+    return res;
+  };
+}
+
+/**
+ * Build the `widget(name, params)` helper. Captures each call into the run
+ * context so the host can mount them stacked in the run panel.
+ */
+function makeWidgetHelper(ctx: RunnerCtx) {
+  return async (name: string, params: Record<string, unknown> = {}) => {
+    ctx.log(`widget(${name})`);
+    ctx.widgets.push({ name, params });
+    return { name, params };
+  };
+}
+
+async function runJsLike(
+  code: string,
+  ctx: RunnerCtx,
+  multiClient?: McpMultiClient,
+): Promise<unknown> {
   // Wrap user code as the body of an async function that executes itself.
   // Users can use `await`, define vars, and return a final value.
+  // We inject `call` and `widget` helpers as parameters so recipes can
+  // invoke MCP tools and emit widgets without preamble.
   const wrapped = `return (async () => {\n${code}\n})();`;
-  const fn = new AsyncFunction(wrapped);
+  const fn = new (AsyncFunction as unknown as new (
+    ...args: string[]
+  ) => (call: unknown, widget: unknown) => Promise<unknown>)('call', 'widget', wrapped);
   ctx.log('dispatched (inline async)');
-  const out = await fn();
+  const out = await fn(makeCallHelper(multiClient, ctx), makeWidgetHelper(ctx));
   ctx.log('resolved');
   return out;
 }
@@ -310,7 +360,7 @@ export async function runCode(
     }
     let output: unknown;
     if (JS_LANGS.has(normLang) || TS_LANGS.has(normLang) || normLang === '') {
-      output = await runJsLike(code, ctx);
+      output = await runJsLike(code, ctx, multiClient);
     } else {
       output = await runViaMcp(code, normLang, multiClient, ctx);
     }
@@ -323,6 +373,7 @@ export async function runCode(
       tokens,
       output,
       logs: ctx.logs,
+      ...(ctx.widgets.length > 0 ? { widgets: ctx.widgets } : {}),
     };
   } catch (err) {
     const durationMs = Math.round(performance.now() - ctx.start);

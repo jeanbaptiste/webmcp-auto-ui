@@ -130,9 +130,13 @@
         <div>
           <div class="flex items-center mb-1">
             <span class="text-[9px] font-mono text-text2 uppercase tracking-wider">
-              {active.result.status === 'error' ? 'Error' : active.result.widget ? 'Widget' : 'Output'}
+              {active.result.status === 'error'
+                ? 'Error'
+                : (active.result.widgets && active.result.widgets.length > 0) || active.result.widget
+                  ? `Widget${active.result.widgets && active.result.widgets.length > 1 ? `s (${active.result.widgets.length})` : ''}`
+                  : 'Output'}
             </span>
-            {#if !active.result.widget}
+            {#if !active.result.widget && !(active.result.widgets && active.result.widgets.length > 0)}
               <button
                 class="ml-auto font-mono text-[10px] px-2 py-0.5 rounded border transition-colors
                        {copyState === 'copied' ? 'border-teal/40 text-teal' : 'border-border2 text-text2 hover:text-text1'}"
@@ -142,7 +146,15 @@
               </button>
             {/if}
           </div>
-          {#if active.result.status === 'done' && active.result.widget}
+          {#if active.result.status === 'done' && active.result.widgets && active.result.widgets.length > 0}
+            <div class="widget-host flex flex-col gap-3">
+              {#key active.id}
+                {#each active.result.widgets as w, i (i)}
+                  <WidgetRenderer type={w.name} data={w.params} {servers} />
+                {/each}
+              {/key}
+            </div>
+          {:else if active.result.status === 'done' && active.result.widget}
             <div class="widget-host">
               {#key active.id}
                 <WidgetRenderer

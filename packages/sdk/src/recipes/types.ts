@@ -50,6 +50,12 @@ export interface RunResult {
    * exposes the parsed widget to the host so it can be mounted live.
    */
   widget?: { name: string; params: Record<string, unknown> };
+  /**
+   * Set when the executed JS snippet called `widget(name, params)` one or
+   * more times via the in-sandbox helper. Each call is captured in order
+   * so the host can mount them stacked in the same run panel.
+   */
+  widgets?: Array<{ name: string; params: Record<string, unknown> }>;
 }
 
 export interface RunTab {
