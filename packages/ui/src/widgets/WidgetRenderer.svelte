@@ -194,56 +194,6 @@
   // ── Vanilla renderer container + lifecycle ────────────
   let vanillaContainer: HTMLElement | undefined = $state(undefined);
 
-  // Lazy-mount: only mount vanilla renderers when the container is in (or near)
-  // the viewport. Chromium caps active WebGL contexts at ~16 per tab — without
-  // this, scrolling past many map widgets kills earlier contexts and leaves
-  // blank canvases. Cleanup on scroll-out releases the GL context.
-  let isVisible = $state(false);
-
-  // Visibility tracker: rect-based check on scroll/resize, throttled by rAF.
-  // We don't use IntersectionObserver because it computes against the unscaled
-  // viewport, which gives wrong results under CSS `zoom` on <html> (the UI
-  // scale toggle in this project). getBoundingClientRect + window.innerHeight
-  // are both in zoomed CSS pixels, so manual checks stay consistent.
-  $effect(() => {
-    if (!vanillaContainer) return;
-    const el = vanillaContainer;
-    const MARGIN = 100;
-    const UNMOUNT_DELAY = 400;
-    let unmountTimer: ReturnType<typeof setTimeout> | null = null;
-    let rafId = 0;
-
-    function check() {
-      rafId = 0;
-      const r = el.getBoundingClientRect();
-      const visible = r.bottom > -MARGIN && r.top < window.innerHeight + MARGIN;
-      if (visible) {
-        if (unmountTimer) { clearTimeout(unmountTimer); unmountTimer = null; }
-        if (!isVisible) isVisible = true;
-      } else if (isVisible && !unmountTimer) {
-        unmountTimer = setTimeout(() => { isVisible = false; unmountTimer = null; }, UNMOUNT_DELAY);
-      }
-    }
-    function schedule() { if (!rafId) rafId = requestAnimationFrame(check); }
-
-    // Initial check (post-layout) + a couple of follow-ups so widgets that
-    // mount inside containers whose size is set after first paint also catch.
-    schedule();
-    const t1 = setTimeout(schedule, 100);
-    const t2 = setTimeout(schedule, 400);
-    window.addEventListener('scroll', schedule, { passive: true, capture: true });
-    window.addEventListener('resize', schedule);
-    window.addEventListener('webmcp:ui-scale-change', schedule);
-    return () => {
-      if (unmountTimer) clearTimeout(unmountTimer);
-      if (rafId) cancelAnimationFrame(rafId);
-      clearTimeout(t1); clearTimeout(t2);
-      window.removeEventListener('scroll', schedule, { capture: true } as EventListenerOptions);
-      window.removeEventListener('resize', schedule);
-      window.removeEventListener('webmcp:ui-scale-change', schedule);
-    };
-  });
-
   // Cleanup handle shared between the mount effect and the data-update fallback
   // remount — so a fallback remount can tear down the previous render even
   // though it doesn't re-run the mount effect.
@@ -262,7 +212,7 @@
   $effect(() => {
     // Touch only the mount deps; `plainData` is intentionally read via untrack
     // so data updates don't retrigger this effect.
-    if (!useVanilla || !vanillaRenderer || !vanillaContainer || !isVisible) return;
+    if (!useVanilla || !vanillaRenderer || !vanillaContainer) return;
     const container = vanillaContainer;
     const renderer = vanillaRenderer;
     // If a previous render is still live (e.g. via data-update fallback),
@@ -304,9 +254,6 @@
       cancelled = true;
       container.removeEventListener('widget:interact', onInteract);
       runCurrentCleanup();
-      // Clear any DOM the renderer left behind (broken sprite imgs, dead
-      // canvases, …) so the lazy-unmount state is fully clean.
-      container.innerHTML = '';
     };
   });
 
@@ -319,10 +266,6 @@
   $effect(() => {
     const data = plainData;
     if (!vanillaContainer || !useVanilla) return;
-    // Read isVisible without tracking — when isVisible flips true after a
-    // lazy unmount, the mount effect already remounts; firing the fallback
-    // remount here too would render the renderer twice (e.g. doubled lines).
-    if (untrack(() => !isVisible)) return;
     if (firstDataCycle) { firstDataCycle = false; return; }
     const ev = new CustomEvent('widget:data-update', { detail: data, cancelable: true });
     const handled = !vanillaContainer.dispatchEvent(ev);
@@ -410,7 +353,7 @@
 {#if isNativeCustomElement}
   <div bind:this={ceContainer} class="ce-container w-full h-full overflow-auto p-2"></div>
 {:else if useVanilla}
-  <div bind:this={vanillaContainer} class="vanilla-container w-full h-full overflow-auto p-2" style="min-height: 420px"></div>
+  <div bind:this={vanillaContainer} class="vanilla-container w-full h-full overflow-auto p-2"></div>
 {:else if customRenderer}
   <svelte:component this={customRenderer as Component<any>} {data} {id} />
 {:else}
