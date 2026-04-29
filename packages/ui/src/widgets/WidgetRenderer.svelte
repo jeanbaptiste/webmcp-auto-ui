@@ -200,34 +200,47 @@
   // blank canvases. Cleanup on scroll-out releases the GL context.
   let isVisible = $state(false);
 
+  // Visibility tracker: rect-based check on scroll/resize, throttled by rAF.
+  // We don't use IntersectionObserver because it computes against the unscaled
+  // viewport, which gives wrong results under CSS `zoom` on <html> (the UI
+  // scale toggle in this project). getBoundingClientRect + window.innerHeight
+  // are both in zoomed CSS pixels, so manual checks stay consistent.
   $effect(() => {
     if (!vanillaContainer) return;
     const el = vanillaContainer;
-    // Debounce the unmount transition so quick scrolls don't flicker widgets
-    // on/off. Mounts are immediate; only the visible→hidden flip waits.
+    const MARGIN = 100;
+    const UNMOUNT_DELAY = 400;
     let unmountTimer: ReturnType<typeof setTimeout> | null = null;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.target !== el) continue;
-          if (entry.isIntersecting) {
-            if (unmountTimer) { clearTimeout(unmountTimer); unmountTimer = null; }
-            isVisible = true;
-          } else {
-            if (unmountTimer) clearTimeout(unmountTimer);
-            unmountTimer = setTimeout(() => { isVisible = false; unmountTimer = null; }, 400);
-          }
-        }
-      },
-      // 100px: mount slightly before the widget enters the viewport so users
-      // see ready content. Larger margins push simultaneous WebGL contexts
-      // above Chromium's ~16/tab cap when map sections sit adjacent.
-      { rootMargin: '100px', threshold: 0 },
-    );
-    observer.observe(el);
+    let rafId = 0;
+
+    function check() {
+      rafId = 0;
+      const r = el.getBoundingClientRect();
+      const visible = r.bottom > -MARGIN && r.top < window.innerHeight + MARGIN;
+      if (visible) {
+        if (unmountTimer) { clearTimeout(unmountTimer); unmountTimer = null; }
+        if (!isVisible) isVisible = true;
+      } else if (isVisible && !unmountTimer) {
+        unmountTimer = setTimeout(() => { isVisible = false; unmountTimer = null; }, UNMOUNT_DELAY);
+      }
+    }
+    function schedule() { if (!rafId) rafId = requestAnimationFrame(check); }
+
+    // Initial check (post-layout) + a couple of follow-ups so widgets that
+    // mount inside containers whose size is set after first paint also catch.
+    schedule();
+    const t1 = setTimeout(schedule, 100);
+    const t2 = setTimeout(schedule, 400);
+    window.addEventListener('scroll', schedule, { passive: true, capture: true });
+    window.addEventListener('resize', schedule);
+    window.addEventListener('webmcp:ui-scale-change', schedule);
     return () => {
       if (unmountTimer) clearTimeout(unmountTimer);
-      observer.disconnect();
+      if (rafId) cancelAnimationFrame(rafId);
+      clearTimeout(t1); clearTimeout(t2);
+      window.removeEventListener('scroll', schedule, { capture: true } as EventListenerOptions);
+      window.removeEventListener('resize', schedule);
+      window.removeEventListener('webmcp:ui-scale-change', schedule);
     };
   });
 
