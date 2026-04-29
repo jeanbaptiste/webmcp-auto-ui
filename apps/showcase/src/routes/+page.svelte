@@ -38,7 +38,7 @@
   const theme = getTheme();
 
   // ── Theme ────────────────────────────────────────────────────────────────
-  let activePreset = $state<ThemePreset>(PRESETS[0]);
+  let activePreset = $state<ThemePreset>(PRESETS.find(p => p.id === 'pastel') ?? PRESETS[0]);
 
   function selectPreset(preset: ThemePreset) {
     activePreset = preset;
@@ -316,7 +316,7 @@
                   <span class="text-[10px] font-mono text-text2 uppercase tracking-widest">{block.label}</span>
                   <code class="text-[10px] font-mono text-accent ml-2">type="{block.type}"</code>
                 </div>
-                <WidgetRenderer type={block.type} data={block.data} />
+                <WidgetRenderer type={block.type} data={block.data} servers={demoServersForRenderer} />
               </div>
             {/each}
           </div>
@@ -331,7 +331,7 @@
                   <code class="text-[10px] font-mono text-accent">type="{block.type}"</code>
                 </div>
                 <div class="p-4">
-                  <WidgetRenderer type={block.type} data={block.data} />
+                  <WidgetRenderer type={block.type} data={block.data} servers={demoServersForRenderer} />
                 </div>
               </div>
             {/each}
