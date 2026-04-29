@@ -44,7 +44,12 @@ export async function createMap(
   const OSM = (await import('ol/source/OSM')).default;
   const { fromLonLat } = await import('ol/proj');
 
-  container.style.height = container.style.height || '100%';
+  // Use an explicit pixel height (not 100%) so .ol-viewport's `height: 100%`
+  // resolves against a definite value. With `100%`, the cascade chains up to
+  // ancestors with no explicit height → ol-viewport collapses to 0 and the
+  // canvas (escaping via transform) gets clipped by overflow:hidden +
+  // contain:strict, leaving the card visually empty.
+  if (!container.style.height) container.style.height = '420px';
   container.style.minHeight = container.style.minHeight || '400px';
   container.style.width = container.style.width || '100%';
 
