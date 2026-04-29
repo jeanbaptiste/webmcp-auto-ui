@@ -203,19 +203,32 @@
   $effect(() => {
     if (!vanillaContainer) return;
     const el = vanillaContainer;
+    // Debounce the unmount transition so quick scrolls don't flicker widgets
+    // on/off. Mounts are immediate; only the visible→hidden flip waits.
+    let unmountTimer: ReturnType<typeof setTimeout> | null = null;
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.target === el) isVisible = entry.isIntersecting;
+          if (entry.target !== el) continue;
+          if (entry.isIntersecting) {
+            if (unmountTimer) { clearTimeout(unmountTimer); unmountTimer = null; }
+            isVisible = true;
+          } else {
+            if (unmountTimer) clearTimeout(unmountTimer);
+            unmountTimer = setTimeout(() => { isVisible = false; unmountTimer = null; }, 400);
+          }
         }
       },
-      // 0px: mount strictly when visible. Pre-mounting too aggressively pushes
-      // simultaneous WebGL contexts above Chromium's ~16/tab cap when map rows
-      // sit adjacent (e.g. maplibre → openlayers section).
-      { rootMargin: '0px', threshold: 0 },
+      // 100px: mount slightly before the widget enters the viewport so users
+      // see ready content. Larger margins push simultaneous WebGL contexts
+      // above Chromium's ~16/tab cap when map sections sit adjacent.
+      { rootMargin: '100px', threshold: 0 },
     );
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      if (unmountTimer) clearTimeout(unmountTimer);
+      observer.disconnect();
+    };
   });
 
   // Cleanup handle shared between the mount effect and the data-update fallback
@@ -278,6 +291,9 @@
       cancelled = true;
       container.removeEventListener('widget:interact', onInteract);
       runCurrentCleanup();
+      // Clear any DOM the renderer left behind (broken sprite imgs, dead
+      // canvases, …) so the lazy-unmount state is fully clean.
+      container.innerHTML = '';
     };
   });
 
@@ -289,7 +305,11 @@
   let firstDataCycle = true;
   $effect(() => {
     const data = plainData;
-    if (!vanillaContainer || !useVanilla || !isVisible) return;
+    if (!vanillaContainer || !useVanilla) return;
+    // Read isVisible without tracking — when isVisible flips true after a
+    // lazy unmount, the mount effect already remounts; firing the fallback
+    // remount here too would render the renderer twice (e.g. doubled lines).
+    if (untrack(() => !isVisible)) return;
     if (firstDataCycle) { firstDataCycle = false; return; }
     const ev = new CustomEvent('widget:data-update', { detail: data, cancelable: true });
     const handled = !vanillaContainer.dispatchEvent(ev);
