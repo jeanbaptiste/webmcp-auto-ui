@@ -209,7 +209,10 @@
           if (entry.target === el) isVisible = entry.isIntersecting;
         }
       },
-      { rootMargin: '200px', threshold: 0 },
+      // 0px: mount strictly when visible. Pre-mounting too aggressively pushes
+      // simultaneous WebGL contexts above Chromium's ~16/tab cap when map rows
+      // sit adjacent (e.g. maplibre → openlayers section).
+      { rootMargin: '0px', threshold: 0 },
     );
     observer.observe(el);
     return () => observer.disconnect();
