@@ -194,6 +194,27 @@
   // ── Vanilla renderer container + lifecycle ────────────
   let vanillaContainer: HTMLElement | undefined = $state(undefined);
 
+  // Lazy-mount: only mount vanilla renderers when the container is in (or near)
+  // the viewport. Chromium caps active WebGL contexts at ~16 per tab — without
+  // this, scrolling past many map widgets kills earlier contexts and leaves
+  // blank canvases. Cleanup on scroll-out releases the GL context.
+  let isVisible = $state(false);
+
+  $effect(() => {
+    if (!vanillaContainer) return;
+    const el = vanillaContainer;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.target === el) isVisible = entry.isIntersecting;
+        }
+      },
+      { rootMargin: '200px', threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
+
   // Cleanup handle shared between the mount effect and the data-update fallback
   // remount — so a fallback remount can tear down the previous render even
   // though it doesn't re-run the mount effect.
@@ -212,7 +233,7 @@
   $effect(() => {
     // Touch only the mount deps; `plainData` is intentionally read via untrack
     // so data updates don't retrigger this effect.
-    if (!useVanilla || !vanillaRenderer || !vanillaContainer) return;
+    if (!useVanilla || !vanillaRenderer || !vanillaContainer || !isVisible) return;
     const container = vanillaContainer;
     const renderer = vanillaRenderer;
     // If a previous render is still live (e.g. via data-update fallback),
@@ -265,7 +286,7 @@
   let firstDataCycle = true;
   $effect(() => {
     const data = plainData;
-    if (!vanillaContainer || !useVanilla) return;
+    if (!vanillaContainer || !useVanilla || !isVisible) return;
     if (firstDataCycle) { firstDataCycle = false; return; }
     const ev = new CustomEvent('widget:data-update', { detail: data, cancelable: true });
     const handled = !vanillaContainer.dispatchEvent(ev);
@@ -353,7 +374,7 @@
 {#if isNativeCustomElement}
   <div bind:this={ceContainer} class="ce-container w-full h-full overflow-auto p-2"></div>
 {:else if useVanilla}
-  <div bind:this={vanillaContainer} class="vanilla-container w-full h-full overflow-auto p-2"></div>
+  <div bind:this={vanillaContainer} class="vanilla-container w-full h-full overflow-auto p-2" style="min-height: 420px"></div>
 {:else if customRenderer}
   <svelte:component this={customRenderer as Component<any>} {data} {id} />
 {:else}
