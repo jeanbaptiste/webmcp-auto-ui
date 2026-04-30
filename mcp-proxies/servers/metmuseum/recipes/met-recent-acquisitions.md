@@ -34,62 +34,63 @@ layout:
    if (ids.length === 0) await widget('text', { content: 'No objects found.' });
    ```
 
-2. **Fetch and filter on `accessionYear`** (last 5 years):
+2. **Fetch and sort by most recent `accessionYear`** (small batch — the Met bridge throttles parallel requests; sort instead of cutoff-filter, then take the top N):
    ```js
-   const cutoff = new Date().getFullYear() - 5;
-   const objs = await Promise.all(ids.slice(0, 30).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-   const all = objs.filter(o => o?.object).map(o => o.object);
-   const recent = all.filter(w => Number(w?.accessionYear) >= cutoff && w?.primaryImageSmall);
+   const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+   const withYear = all.filter(w => Number(w?.accessionYear) > 0);
+   const recent = [...(withYear.length ? withYear : all)].sort((a, b) => Number(b?.accessionYear || 0) - Number(a?.accessionYear || 0)).slice(0, 12);
    ```
 
 3. **Stats**:
    ```js
-   await widget('stat-card', { label: 'New since ' + cutoff, value: recent.length, icon: 'plus' });
-   await widget('stat-card', { label: 'Sample size', value: all.length, icon: 'archive' });
+   const newest = recent[0]?.accessionYear;
+   await widget('stat-card', { label: 'Most recent acquisition', value: Number(newest) || recent.length || 1, icon: 'plus' });
+   await widget('stat-card', { label: 'Sample size', value: Math.max(all.length, 1), icon: 'archive' });
    ```
 
 4. **Acquisition timeline**:
    ```js
-   await widget('timeline', {
-     items: [...recent].sort((a, b) => Number(a?.accessionYear || 0) - Number(b?.accessionYear || 0)).map(w => ({
-       date: w?.accessionYear ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall, description: w?.creditLine ?? '—'
-     }))
-   });
+   const tlItems = [...recent].sort((a, b) => Number(a?.accessionYear || 0) - Number(b?.accessionYear || 0)).map(w => ({ date: w?.accessionYear ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall, description: w?.creditLine ?? '—' }));
+   await widget('timeline', { items: tlItems.length ? tlItems : [{ date: '—', title: 'No samples returned' }] });
    ```
 
 5. **Cards of new arrivals**:
    ```js
-   await widget('cards', {
-     items: recent.map(w => ({
-       title: w?.title ?? '(untitled)', subtitle: `Acquired ${w?.accessionYear ?? '—'}`,
-       image: w?.primaryImageSmall, body: w?.creditLine ?? '—'
-     }))
-   });
+   const cardItems = recent.map(w => ({ title: w?.title ?? '(untitled)', subtitle: `Acquired ${w?.accessionYear ?? '—'}`, image: w?.primaryImageSmall, body: w?.creditLine ?? '—' }));
+   await widget('cards', { items: cardItems.length ? cardItems : [{ title: 'No samples', subtitle: '—' }] });
    ```
 
 6. **Gallery**:
    ```js
-   await widget('gallery', { images: recent.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `Acquired ${w?.accessionYear ?? '—'}` })) });
+   const gImages = recent.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `Acquired ${w?.accessionYear ?? '—'}` }));
+   await widget('gallery', { images: gImages.length ? gImages : [{ src: '', alt: 'No samples', caption: '—' }] });
    ```
 
 ## Examples
 
-### American department, last 5 years
+### European Paintings — newest first
 ```js
-const r = await call('search-museum-objects', { q: '*', departmentId: 11, hasImages: true, pageSize: 40 }).catch(() => null);
+const r = await call('search-museum-objects', { q: '*', departmentId: 11, hasImages: true, pageSize: 20 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
-const objs = await Promise.all(ids.slice(0, 25).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const recent = objs.filter(o => o?.object).map(o => o.object).filter(w => Number(w?.accessionYear) >= 2020);
-await widget('cards', { items: recent.map(w => ({ title: w?.title ?? '(untitled)', subtitle: `Acquired ${w?.accessionYear ?? '—'}`, image: w?.primaryImageSmall })) });
+const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+const withYear = all.filter(w => Number(w?.accessionYear));
+const recent = [...(withYear.length ? withYear : all)].sort((a, b) => Number(b.accessionYear || 0) - Number(a.accessionYear || 0)).slice(0, 10);
+const items7 = recent.map(w => ({ title: w?.title ?? '(untitled)', subtitle: `Acquired ${w?.accessionYear ?? '—'}`, image: w?.primaryImageSmall }));
+await widget('cards', { items: items7.length ? items7 : [{ title: 'No samples', subtitle: '—' }] });
 ```
 
-### Brand-new highlights
+### Highlights — newest first
 ```js
-const r = await call('search-museum-objects', { q: '*', isHighlight: true, hasImages: true, pageSize: 40 }).catch(() => null);
+const r = await call('search-museum-objects', { q: '*', isHighlight: true, hasImages: true, pageSize: 20 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
-const objs = await Promise.all(ids.slice(0, 20).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const recent = objs.filter(o => o?.object).map(o => o.object).filter(w => Number(w?.accessionYear) >= 2022);
-await widget('timeline', { items: recent.map(w => ({ date: w?.accessionYear ?? '—', title: w?.title ?? '(untitled)' })) });
+const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+const withYear = all.filter(w => Number(w?.accessionYear));
+const recent = [...(withYear.length ? withYear : all)].sort((a, b) => Number(b.accessionYear || 0) - Number(a.accessionYear || 0)).slice(0, 8);
+const items = recent.map(w => ({ date: w?.accessionYear ?? '—', title: w?.title ?? '(untitled)' }));
+await widget('timeline', { items: items.length ? items : [{ date: '—', title: 'No samples' }] });
 ```
 
 ## Common mistakes

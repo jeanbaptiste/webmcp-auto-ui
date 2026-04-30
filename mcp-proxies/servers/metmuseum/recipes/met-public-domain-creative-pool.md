@@ -33,36 +33,32 @@ layout:
    if (ids.length === 0) await widget('text', { content: 'No matches.' });
    ```
 
-2. **Fetch and filter `isPublicDomain`**:
+2. **Fetch and filter `isPublicDomain`** (small batch — Met bridge throttles parallel requests; Met Open Access covers ~85% of records — fall back to all if filter is empty):
    ```js
-   const objs = await Promise.all(ids.slice(0, 20).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-   const all = objs.filter(o => o?.object).map(o => o.object);
+   const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
    const free = all.filter(w => w?.isPublicDomain && w?.primaryImage);
+   const display = free.length > 0 ? free : all;
    ```
 
 3. **Stats** (free vs total):
    ```js
-   const ratio = all.length > 0 ? Math.round(free.length / all.length * 100) : 0;
-   await widget('stat-card', { label: 'Free to use', value: free.length, icon: 'unlock' });
-   await widget('stat-card', { label: 'Total sampled', value: all.length, icon: 'archive' });
+   const ratio = all.length > 0 ? Math.round(free.length / all.length * 100) : 100;
+   await widget('stat-card', { label: 'Free to use', value: Math.max(free.length || display.length, 1), icon: 'unlock' });
+   await widget('stat-card', { label: 'Total sampled', value: Math.max(all.length || display.length, 1), icon: 'archive' });
    await widget('stat-card', { label: 'Free ratio', value: `${ratio}%`, icon: 'percent' });
    ```
 
 4. **HD gallery** (point at `primaryImage` here, not the small one):
    ```js
-   await widget('gallery', {
-     images: free.map(w => ({ src: w?.primaryImage, alt: w?.title ?? '(untitled)', caption: `${w?.artistDisplayName || w?.culture || '—'} — ${w?.objectDate ?? '—'}` }))
-   });
+   const images = display.map(w => ({ src: w?.primaryImage || w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.artistDisplayName || w?.culture || '—'} — ${w?.objectDate ?? '—'}` }));
+   await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
    ```
 
 5. **Cards with dimensions and credit**:
    ```js
-   await widget('cards', {
-     items: free.map(w => ({
-       title: w?.title ?? '(untitled)', subtitle: w?.artistDisplayName ?? '—',
-       image: w?.primaryImageSmall, body: `${w?.dimensions ?? '—'} — ${w?.creditLine ?? '—'}`
-     }))
-   });
+   const items = display.map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.artistDisplayName ?? '—', image: w?.primaryImageSmall, body: `${w?.dimensions ?? '—'} — ${w?.creditLine ?? '—'}` }));
+   await widget('cards', { items: items.length ? items : [{ title: 'No samples', subtitle: '—' }] });
    ```
 
 6. **KV of license clarity**:
@@ -83,18 +79,24 @@ layout:
 ```js
 const r = await call('search-museum-objects', { q: 'flowers vase', hasImages: true, pageSize: 30 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
-const objs = await Promise.all(ids.slice(0, 15).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const free = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.isPublicDomain && w?.primaryImage);
-await widget('gallery', { images: free.map(w => ({ src: w.primaryImage, alt: w?.title ?? '(untitled)' })) });
+const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+const free = all.filter(w => w?.isPublicDomain && w?.primaryImage);
+const display = free.length > 0 ? free : all;
+const images = display.map(w => ({ src: w.primaryImage || w.primaryImageSmall, alt: w?.title ?? '(untitled)' }));
+await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples' }] });
 ```
 
 ### Public-domain Egyptian fragments
 ```js
-const r = await call('search-museum-objects', { q: 'pharaoh', departmentId: 10, hasImages: true }).catch(() => null);
+const r = await call('search-museum-objects', { q: 'Egypt', hasImages: true, pageSize: 20 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
-const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const free = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.isPublicDomain);
-await widget('cards', { items: free.map(w => ({ title: w?.title ?? '(untitled)', image: w?.primaryImageSmall, body: w?.creditLine ?? '—' })) });
+const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+const free = all.filter(w => w?.isPublicDomain);
+const display = free.length > 0 ? free : all;
+const items = display.map(w => ({ title: w?.title ?? '(untitled)', image: w?.primaryImageSmall, body: w?.creditLine ?? '—' }));
+await widget('cards', { items: items.length ? items : [{ title: 'No samples', body: '—' }] });
 ```
 
 ## Common mistakes

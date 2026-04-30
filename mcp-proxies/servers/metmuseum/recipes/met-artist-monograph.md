@@ -92,7 +92,7 @@ layout:
 
 ### Vermeer at the Met
 ```js
-const r = await call('search-museum-objects', { q: 'Johannes Vermeer', artistOrCulture: true, hasImages: true }).catch(() => null);
+const r = await call('search-museum-objects', { q: 'Vermeer', hasImages: true, pageSize: 30 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
 if (ids.length === 0) await widget('text', { content: 'No results.' });
 const objs = await Promise.all(ids.slice(0, 6).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
@@ -103,7 +103,7 @@ await widget('gallery', { images: works.map(w => ({ src: w?.primaryImageSmall, a
 
 ### Hokusai prints
 ```js
-const r = await call('search-museum-objects', { q: 'Hokusai', artistOrCulture: true, hasImages: true, departmentId: 6 }).catch(() => null);
+const r = await call('search-museum-objects', { q: 'Hokusai', hasImages: true, departmentId: 6 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object);

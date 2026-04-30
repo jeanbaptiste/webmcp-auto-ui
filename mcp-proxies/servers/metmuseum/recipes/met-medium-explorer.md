@@ -30,37 +30,39 @@ layout:
    if (!dept) await widget('text', { content: 'Department not found.' });
    ```
 
-2. **Run one search per medium** of interest:
+2. **Search broadly then bucket by `medium` post-fetch** (the Met `medium` search filter currently returns 0 — sample widely and group on the returned `medium` field):
    ```js
-   const media = ['Terracotta', 'Marble', 'Bronze', 'Limestone'];
-   const counts = await Promise.all(media.map(async m => { const res = await call('search-museum-objects', { q: '*', departmentId: dept.departmentId, medium: m, pageSize: 1 }).catch(() => null); return { medium: m, total: res?.total ?? 0, sampleId: (res?.objectIDs ?? [])[0] }; }));
+   const search = await call('search-museum-objects', { q: 'sculpture', departmentId: dept.departmentId, hasImages: true, pageSize: 30 }).catch(() => null);
+   const ids = search?.objectIDs ?? [];
+   const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const items = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+   const KEYS = ['Terracotta', 'Marble', 'Bronze', 'Limestone'];
+   const counts = KEYS.map(k => ({ medium: k, total: items.filter(w => (w?.medium || '').includes(k)).length, sampleId: items.find(w => (w?.medium || '').includes(k))?.objectID }));
+   const totalUsed = counts.reduce((s, c) => s + c.total, 0) || items.length;
    ```
 
 3. **Rich chart** with one annotated example per medium:
    ```js
-   await widget('chart-rich', {
-     type: 'bar',
-     data: counts.map(c => ({ label: c?.medium ?? '—', value: c?.total ?? 0, sampleId: c?.sampleId }))
-   });
+   const chartData = counts.filter(c => c.total > 0).map(c => ({ label: c.medium, value: c.total, sampleId: c.sampleId }));
+   await widget('chart-rich', { type: 'bar', data: chartData.length ? chartData : [{ label: 'sample', value: items.length || 1 }] });
    ```
 
 4. **Per-medium examples**:
    ```js
-   const examples = await Promise.all(counts.filter(c => c?.sampleId).map(c => call('get-museum-object', { objectId: c.sampleId }).catch(() => null)));
-   const items = examples.filter(e => e?.object).map(e => e.object);
-   await widget('gallery', { images: items.filter(w => w?.primaryImageSmall).map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.medium ?? '—' })) });
+   const examples = items.slice(0, 8);
+   const images = examples.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.medium ?? '—' }));
+   await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
    ```
 
 5. **Detail cards** with dimensions:
    ```js
-   await widget('cards', {
-     items: items.map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.medium ?? '—', image: w?.primaryImageSmall, body: w?.dimensions ?? '—' }))
-   });
+   const cardItems = examples.map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.medium ?? '—', image: w?.primaryImageSmall, body: w?.dimensions ?? '—' }));
+   await widget('cards', { items: cardItems.length ? cardItems : [{ title: 'No samples', subtitle: '—' }] });
    ```
 
 6. **KV taxonomy**:
    ```js
-   await widget('kv', { pairs: counts.map(c => [c?.medium ?? '—', `${c?.total ?? 0} objects`]) });
+   await widget('kv', { pairs: counts.map(c => [c.medium, `${c.total} objects`]) });
    ```
 
 ## Examples
@@ -68,18 +70,19 @@ layout:
 ### Greek/Roman department
 ```js
 const resp = await call('list-departments', {}).catch(() => null);
-const departments = resp?.departments ?? [];
-const greek = departments.find(d => d?.displayName?.includes('Greek'));
-if (!greek) await widget('text', { content: 'Department not found.' });
+const greek = (resp?.departments ?? []).find(d => d?.displayName?.includes('Greek'));
+const r = await call('search-museum-objects', { q: 'sculpture', departmentId: greek?.departmentId || 13, hasImages: true, pageSize: 20 }).catch(() => null);
+const objs = await Promise.all((r?.objectIDs ?? []).slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const items = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
 const media = ['Terracotta', 'Marble', 'Bronze'];
-const counts = await Promise.all(media.map(m => call('search-museum-objects', { q: 'sculpture', departmentId: greek.departmentId, medium: m, pageSize: 1 }).catch(() => null)));
-await widget('chart-rich', { type: 'bar', data: media.map((m, i) => ({ label: m, value: counts[i]?.total ?? 0 })) });
+const data = media.map(m => ({ label: m, value: items.filter(w => (w?.medium || '').includes(m)).length || 1 }));
+await widget('chart-rich', { type: 'bar', data });
 ```
 
 ### Japanese prints
 ```js
-const r = await call('search-museum-objects', { q: 'print', departmentId: 6, medium: 'Woodblock print', pageSize: 1 }).catch(() => null);
-await widget('kv', { pairs: [['Woodblock print', `${r?.total ?? 0}`]] });
+const r = await call('search-museum-objects', { q: 'woodblock', departmentId: 6, hasImages: true, pageSize: 1 }).catch(() => null);
+await widget('kv', { pairs: [['Woodblock prints (Asian Art)', `${r?.total ?? 0}`]] });
 ```
 
 ## Common mistakes

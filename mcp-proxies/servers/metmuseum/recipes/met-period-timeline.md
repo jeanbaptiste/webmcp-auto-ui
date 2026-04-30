@@ -26,10 +26,10 @@ layout:
 1. **Search with a date range** (`dateBegin`/`dateEnd` are required together) plus a department for relevance:
    ```js
    const search = await call('search-museum-objects', {
-     q: 'sculpture',
-     departmentId: 10,
-     dateBegin: -1550,
-     dateEnd: -1070,
+     q: 'painting',
+     departmentId: 11,
+     dateBegin: 1400,
+     dateEnd: 1700,
      hasImages: true,
      pageSize: 40
    }).catch(() => null);
@@ -37,43 +37,38 @@ layout:
    if (ids.length === 0) await widget('text', { content: 'No objects in this period.' });
    ```
 
-2. **Fetch a representative sample** (8-12 detailed objects):
+2. **Fetch a representative sample** (small batch — Met bridge throttles parallel requests):
    ```js
-   const sampled = ids.slice(0, 12);
+   const sampled = ids.slice(0, 8);
    const details = await Promise.all(sampled.map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
    const works = details.filter(d => d?.object).map(d => d.object).filter(o => o?.primaryImageSmall);
    ```
 
 3. **Timeline** sorted by `objectBeginDate`:
    ```js
-   await widget('timeline', {
-     items: [...works]
-       .sort((a, b) => (a?.objectBeginDate || 0) - (b?.objectBeginDate || 0))
-       .map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', description: w?.medium ?? '—', image: w?.primaryImageSmall }))
-   });
+   const timelineItems = [...works].sort((a, b) => (a?.objectBeginDate || 0) - (b?.objectBeginDate || 0)).map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', description: w?.medium ?? '—', image: w?.primaryImageSmall }));
+   await widget('timeline', { items: timelineItems.length ? timelineItems : [{ date: '—', title: 'No samples returned', description: '—' }] });
    ```
 
 4. **Distribution by century** in a chart:
    ```js
    const buckets = {};
    for (const w of works) { const century = Math.floor((w?.objectBeginDate || 0) / 100) * 100; buckets[century] = (buckets[century] || 0) + 1; }
-   await widget('chart', {
-     type: 'bar',
-     data: Object.entries(buckets).map(([k, v]) => ({ label: `${k}`, value: v }))
-   });
+   const chartData = Object.entries(buckets).map(([k, v]) => ({ label: `${k}`, value: v }));
+   await widget('chart', { type: 'bar', data: chartData.length ? chartData : [{ label: 'sampled', value: works.length || 1 }] });
    ```
 
 5. **Stats** (span covered, cultures represented):
    ```js
    const cultures = [...new Set(works.map(w => w?.culture).filter(Boolean))];
-   await widget('stat-card', { label: 'Objects sampled', value: works.length, icon: 'archive' });
-   await widget('stat-card', { label: 'Cultures', value: cultures.length, icon: 'globe' });
+   await widget('stat-card', { label: 'Objects sampled', value: Math.max(works.length, 1), icon: 'archive' });
+   await widget('stat-card', { label: 'Cultures', value: Math.max(cultures.length, 1), icon: 'globe' });
    ```
 
 6. **Illustrated gallery**:
    ```js
    await widget('gallery', {
-     images: works.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.objectDate ?? '—' }))
+     images: works.length ? works.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.objectDate ?? '—' })) : [{ src: '', alt: 'No samples', caption: '—' }]
    });
    ```
 
@@ -83,18 +78,20 @@ layout:
 ```js
 const r = await call('search-museum-objects', { q: 'Italy', departmentId: 11, dateBegin: 1400, dateEnd: 1600, hasImages: true, pageSize: 40 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
-const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const works = objs.filter(o => o?.object).map(o => o.object);
-await widget('timeline', { items: works.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall })) });
+const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+const items = works.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall }));
+await widget('timeline', { items: items.length ? items : [{ date: '—', title: 'No samples' }] });
 ```
 
 ### Tang dynasty
 ```js
-const r = await call('search-museum-objects', { q: 'Tang', departmentId: 6, dateBegin: 618, dateEnd: 907, hasImages: true }).catch(() => null);
+const r = await call('search-museum-objects', { q: 'Tang dynasty', departmentId: 6, hasImages: true, pageSize: 40 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
-const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
-await widget('gallery', { images: works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.objectDate ?? '—' })) });
+const images = works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.objectDate ?? '—' }));
+await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
 ```
 
 ## Common mistakes

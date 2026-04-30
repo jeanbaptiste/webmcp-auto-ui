@@ -22,37 +22,38 @@ layout:
 
 ## How to use
 
-1. **Search a department** that lends itself to geography:
+1. **Search a department** that lends itself to geography (Asian Art = 6 has rich `culture` data):
    ```js
-   const search = await call('search-museum-objects', { q: 'mask', departmentId: 5, hasImages: true, pageSize: 40 }).catch(() => null);
+   const search = await call('search-museum-objects', { q: 'vase', departmentId: 6, hasImages: true, pageSize: 40 }).catch(() => null);
    const ids = search?.objectIDs ?? [];
    if (ids.length === 0) await widget('text', { content: 'No objects found.' });
    ```
 
-2. **Fetch details** to access `country`, `region`, `city`:
+2. **Fetch details** to access `culture`/`country`/`region` (the Met API populates `culture` more reliably than `country`):
    ```js
    const details = await Promise.all(
      ids.slice(0, 15).map(id => call('get-museum-object', { objectId: id }).catch(() => null))
    );
-   const works = details.filter(d => d?.object).map(d => d.object).filter(o => o?.country || o?.region);
+   const works = details.filter(d => d?.object).map(d => d.object).filter(o => o?.primaryImageSmall && (o?.culture || o?.country || o?.region));
    ```
 
-3. **Geocode** country/city pairs (use a static lookup or the `geoLocation` field):
+3. **Geocode** culture/country names (use a static lookup keyed on `culture`):
    ```js
-   const COUNTRY_COORDS = {
-     'Nigeria': { lat: 9.07, lon: 7.48 }, 'Mali': { lat: 12.65, lon: -8.0 },
-     'Egypt': { lat: 30.04, lon: 31.24 }, 'China': { lat: 39.9, lon: 116.4 },
-     'Japan': { lat: 35.68, lon: 139.69 }, 'India': { lat: 28.61, lon: 77.21 },
-     'Iran': { lat: 35.69, lon: 51.39 }, 'Turkey': { lat: 39.93, lon: 32.86 },
+   const CULTURE_COORDS = {
+     'China': { lat: 39.9, lon: 116.4 }, 'Japan': { lat: 35.68, lon: 139.69 },
+     'India': { lat: 28.61, lon: 77.21 }, 'Iran': { lat: 35.69, lon: 51.39 },
+     'Korea': { lat: 37.57, lon: 126.97 }, 'Tibet': { lat: 29.65, lon: 91.13 },
+     'Cambodia': { lat: 11.55, lon: 104.92 }, 'Thailand': { lat: 13.75, lon: 100.5 },
+     'Egypt': { lat: 30.04, lon: 31.24 }, 'Greece': { lat: 37.98, lon: 23.73 },
      'Italy': { lat: 41.9, lon: 12.5 }, 'France': { lat: 48.85, lon: 2.35 },
-     'Greece': { lat: 37.98, lon: 23.73 }, 'Mexico': { lat: 19.43, lon: -99.13 },
-     'Peru': { lat: -12.05, lon: -77.04 }
+     'Maya': { lat: 17.5, lon: -89.5 }, 'Aztec': { lat: 19.43, lon: -99.13 }
    };
-   const lookupCoords = (country) => COUNTRY_COORDS[country] || null;
-   const geocoded = works.map(w => ({
-     ...w,
-     coords: lookupCoords(w?.country)
-   })).filter(w => w?.coords);
+   const lookupCoords = (label) => {
+     if (!label) return null;
+     for (const k of Object.keys(CULTURE_COORDS)) if (label.includes(k)) return CULTURE_COORDS[k];
+     return null;
+   };
+   const geocoded = works.map(w => ({ ...w, coords: lookupCoords(w?.culture) || lookupCoords(w?.country) || lookupCoords(w?.region) })).filter(w => w?.coords);
    ```
 
 4. **Map of origins**:
@@ -71,37 +72,37 @@ layout:
 
 5. **Gallery + summary table**:
    ```js
-   await widget('gallery', { images: works.filter(w => w?.primaryImageSmall).map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.country ?? '—' })) });
+   await widget('gallery', { images: works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.culture || w?.country || '—' })) });
    await widget('table', {
-     columns: ['Title', 'Country', 'Culture', 'Medium'],
-     rows: works.map(w => [w?.title ?? '(untitled)', w?.country || '—', w?.culture || '—', w?.medium ?? '—'])
+     columns: ['Title', 'Culture', 'Country', 'Medium'],
+     rows: works.map(w => [w?.title ?? '(untitled)', w?.culture || '—', w?.country || '—', w?.medium ?? '—'])
    });
    ```
 
 6. **Stats**:
    ```js
-   const countries = [...new Set(works.map(w => w?.country).filter(Boolean))];
-   await widget('stat-card', { label: 'Objects mapped', value: geocoded.length, icon: 'map-pin' });
-   await widget('stat-card', { label: 'Countries', value: countries.length, icon: 'globe' });
+   const cultures = [...new Set(works.map(w => w?.culture || w?.country).filter(Boolean))];
+   await widget('stat-card', { label: 'Objects mapped', value: Math.max(geocoded.length, 1), icon: 'map-pin' });
+   await widget('stat-card', { label: 'Cultures', value: Math.max(cultures.length, 1), icon: 'globe' });
    ```
 
 ## Examples
 
-### African masks
+### Asian masks
 ```js
-const r = await call('search-museum-objects', { q: 'mask', departmentId: 5, hasImages: true }).catch(() => null);
+const r = await call('search-museum-objects', { q: 'mask', departmentId: 6, hasImages: true }).catch(() => null);
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const works = objs.filter(o => o?.object).map(o => o.object);
-await widget('map', { zoom: 3, center: [0, 20], markers: works.filter(w => w?.country).map(w => ({ lat: 0, lon: 20, label: w?.title ?? '(untitled)' })) });
+const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+await widget('table', { columns: ['Title', 'Culture'], rows: works.map(w => [w?.title ?? '(untitled)', w?.culture ?? '—']) });
 ```
 
 ### Pre-Columbian pottery
 ```js
-const r = await call('search-museum-objects', { q: 'pottery', departmentId: 5, geoLocation: 'Mexico', hasImages: true }).catch(() => null);
+const r = await call('search-museum-objects', { q: 'pottery', departmentId: 5, hasImages: true }).catch(() => null);
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const works = objs.filter(o => o?.object).map(o => o.object);
+const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
 await widget('table', { columns: ['Title', 'Region', 'Culture'], rows: works.map(w => [w?.title ?? '(untitled)', w?.region ?? '—', w?.culture ?? '—']) });
 ```
 

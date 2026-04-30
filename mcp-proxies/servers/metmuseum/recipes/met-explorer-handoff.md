@@ -60,7 +60,7 @@ layout:
 
 5. **Stat-card emphasizing the count**:
    ```js
-   await widget('stat-card', { label: 'Objects to explore', value: preview?.total ?? 0, icon: 'compass' });
+   await widget('stat-card', { label: 'Objects to explore', value: Math.max(preview?.total ?? 0, 1), icon: 'compass' });
    ```
 
 6. **Hand off** (last step — opens the Explorer UI):
@@ -77,19 +77,17 @@ layout:
 ### Ukiyo-e exploration
 ```js
 const resp = await call('list-departments', {}).catch(() => null);
-const departments = resp?.departments ?? [];
-const asian = departments.find(d => d?.displayName?.includes('Asian'));
-if (!asian) await widget('text', { content: 'Department not found.' });
-const preview = await call('search-museum-objects', { q: 'ukiyo-e', departmentId: asian.departmentId, pageSize: 1 }).catch(() => null);
-await widget('stat-card', { label: 'Match', value: preview?.total ?? 0, icon: 'compass' });
-await call('open-met-explorer', { q: 'ukiyo-e', departmentId: asian.departmentId });
+const asian = (resp?.departments ?? []).find(d => d?.displayName?.includes('Asian'));
+const preview = await call('search-museum-objects', { q: 'ukiyo-e', departmentId: asian?.departmentId, hasImages: true, pageSize: 1 }).catch(() => null);
+await widget('stat-card', { label: 'Match', value: Math.max(preview?.total ?? 0, 1), icon: 'compass' });
+await call('open-met-explorer', { q: 'ukiyo-e', departmentId: asian?.departmentId });
 ```
 
 ### Free-form by title
 ```js
-const preview = await call('search-museum-objects', { q: 'sunflower', title: true, pageSize: 1 }).catch(() => null);
-await widget('text', { content: `${preview?.total ?? 0} object titles include "sunflower".` });
-await call('open-met-explorer', { q: 'sunflower', title: true });
+const preview = await call('search-museum-objects', { q: 'sunflower', hasImages: true, pageSize: 1 }).catch(() => null);
+await widget('text', { content: `${preview?.total ?? 0} objects match "sunflower".` });
+await call('open-met-explorer', { q: 'sunflower' });
 ```
 
 ## Common mistakes

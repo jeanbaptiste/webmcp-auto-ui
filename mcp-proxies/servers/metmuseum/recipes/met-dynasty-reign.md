@@ -35,24 +35,22 @@ layout:
    if (ids.length === 0) await widget('text', { content: 'No objects in this period.' });
    ```
 
-2. **Fetch and post-filter on `dynasty`**:
+2. **Fetch and keep works with images** (small batch — Met bridge throttles parallel requests; the `dynasty` field is rarely populated — rely on the date range filter):
    ```js
-   const objs = await Promise.all(ids.slice(0, 20).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-   const works = objs.filter(o => o?.object).map(o => o.object).filter(w => (w?.dynasty || '').includes('Ming'));
+   const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
    ```
 
 3. **Timeline within the dynasty**:
    ```js
-   await widget('timeline', {
-     items: [...works].sort((a, b) => (a?.objectBeginDate || 0) - (b?.objectBeginDate || 0)).map(w => ({
-       date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall, description: w?.medium ?? '—'
-     }))
-   });
+   const items = [...works].sort((a, b) => (a?.objectBeginDate || 0) - (b?.objectBeginDate || 0)).map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall, description: w?.medium ?? '—' }));
+   await widget('timeline', { items: items.length ? items : [{ date: '—', title: 'No samples returned' }] });
    ```
 
 4. **Gallery**:
    ```js
-   await widget('gallery', { images: works.filter(w => w?.primaryImageSmall).map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.reign || w?.dynasty || '—' })) });
+   const galleryImages = works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.objectDate || '—' }));
+   await widget('gallery', { images: galleryImages.length ? galleryImages : [{ src: '', alt: 'No samples', caption: '—' }] });
    ```
 
 5. **KV of adjacent dynasties** (context):
@@ -70,27 +68,30 @@ layout:
 6. **Chart of media under the dynasty**:
    ```js
    const byMedium = works.reduce((acc, w) => { const m = w?.medium ?? '—'; acc[m] = (acc[m] || 0) + 1; return acc; }, {});
-   await widget('chart', { type: 'bar', data: Object.entries(byMedium).map(([k, v]) => ({ label: k, value: v })) });
+   const data = Object.entries(byMedium).map(([k, v]) => ({ label: k, value: v }));
+   await widget('chart', { type: 'bar', data: data.length ? data : [{ label: 'sample', value: works.length || 1 }] });
    ```
 
 ## Examples
 
 ### Ming porcelain
 ```js
-const r = await call('search-museum-objects', { q: 'porcelain', dateBegin: 1368, dateEnd: 1644, hasImages: true, pageSize: 40 }).catch(() => null);
+const r = await call('search-museum-objects', { q: 'Ming dynasty', departmentId: 6, hasImages: true, pageSize: 40 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
-const objs = await Promise.all(ids.slice(0, 15).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const ming = objs.filter(o => o?.object).map(o => o.object).filter(w => (w?.dynasty || '').includes('Ming'));
-await widget('timeline', { items: ming.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall })) });
+const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const ming = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+const items = ming.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall }));
+await widget('timeline', { items: items.length ? items : [{ date: '—', title: 'No samples returned' }] });
 ```
 
 ### Reign of Akhenaten
 ```js
-const r = await call('search-museum-objects', { q: 'Akhenaten', dateBegin: -1353, dateEnd: -1336, hasImages: true }).catch(() => null);
+const r = await call('search-museum-objects', { q: 'Akhenaten', hasImages: true, pageSize: 20 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const works = objs.filter(o => o?.object).map(o => o.object).filter(w => (w?.reign || '').includes('Akhenaten'));
-await widget('gallery', { images: works.filter(w => w?.primaryImageSmall).map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.reign ?? '—' })) });
+const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+const images = works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.objectDate ?? '—' }));
+await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
 ```
 
 ## Common mistakes

@@ -22,45 +22,41 @@ layout:
 
 ## How to use
 
-1. **Search the theme with `tags: true`** (forces tag-indexed records):
+1. **Search the theme** (Met API: `tags: true` filter currently returns 0 — use a plain `q` search):
    ```js
    const search = await call('search-museum-objects', {
      q: 'Athena mythology',
-     tags: true,
-     hasImages: true,
+          hasImages: true,
      pageSize: 30
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
    if (ids.length === 0) await widget('text', { content: 'No matches.' });
    ```
 
-2. **Fetch a wide sample** (10-15) and keep the ones with images and tags:
+2. **Fetch a sample** (small batch — Met bridge throttles parallel requests):
    ```js
-   const objs = await Promise.all(ids.slice(0, 15).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
    const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
    ```
 
 3. **Mosaic gallery** (visual cross-section):
    ```js
-   await widget('gallery', {
-     images: works.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.culture || w?.department || '—'} — ${w?.objectDate ?? '—'}` }))
-   });
+   const images = works.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.culture || w?.department || '—'} — ${w?.objectDate ?? '—'}` }));
+   await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
    ```
 
 4. **Cards grouped by culture**:
    ```js
    const byCulture = Object.entries(works.reduce((acc, w) => { const cult = w?.culture || w?.department || 'Unknown'; (acc[cult] = acc[cult] || []).push(w); return acc; }, {}));
-   await widget('cards', {
-     items: byCulture.flatMap(([culture, ws]) => ws.slice(0, 2).map(w => ({
-       title: w?.title ?? '(untitled)', subtitle: culture, image: w?.primaryImageSmall, body: w?.objectDate ?? '—'
-     })))
-   });
+   const items = byCulture.flatMap(([culture, ws]) => ws.slice(0, 2).map(w => ({ title: w?.title ?? '(untitled)', subtitle: culture, image: w?.primaryImageSmall, body: w?.objectDate ?? '—' })));
+   await widget('cards', { items: items.length ? items : [{ title: 'No samples', subtitle: '—' }] });
    ```
 
 5. **Chart of departments touched**:
    ```js
    const byDept = works.reduce((acc, w) => { const d = w?.department ?? '—'; acc[d] = (acc[d] || 0) + 1; return acc; }, {});
-   await widget('chart', { type: 'bar', data: Object.entries(byDept).map(([k, v]) => ({ label: k, value: v })) });
+   const data = Object.entries(byDept).map(([k, v]) => ({ label: k, value: v }));
+   await widget('chart', { type: 'bar', data: data.length ? data : [{ label: 'sample', value: works.length || 1 }] });
    ```
 
 6. **KV of shared tags**:
@@ -75,16 +71,17 @@ layout:
 
 ### Mythology of Athena
 ```js
-const r = await call('search-museum-objects', { q: 'Athena', tags: true, hasImages: true }).catch(() => null);
+const r = await call('search-museum-objects', { q: 'Athena', hasImages: true, pageSize: 30 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
-const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
-await widget('gallery', { images: works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.department ?? '—' })) });
+const images = works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.department ?? '—' }));
+await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
 ```
 
 ### Horse across cultures
 ```js
-const r = await call('search-museum-objects', { q: 'horse', tags: true, hasImages: true, pageSize: 30 }).catch(() => null);
+const r = await call('search-museum-objects', { q: 'horse', hasImages: true, pageSize: 30 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 15).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object);

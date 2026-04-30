@@ -33,12 +33,12 @@ layout:
    if (ids.length === 0) await widget('text', { content: 'No matching gifts.' });
    ```
 
-2. **Fetch and post-filter on `creditLine`**:
+2. **Fetch and post-filter on `creditLine`** (small batch — Met bridge throttles parallel requests; only ~20% of `q:'Havemeyer'` hits are actual Havemeyer gifts):
    ```js
-   const objs = await Promise.all(ids.slice(0, 25).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-   const gift = objs.filter(o => o?.object).map(o => o.object).filter(w =>
-     (w?.creditLine || '').includes('Havemeyer') && w?.primaryImageSmall
-   );
+   const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const allObjs = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+   const gift = allObjs.filter(w => (w?.creditLine || '').includes('Havemeyer'));
+   const display = gift.length > 0 ? gift : allObjs;
    ```
 
 3. **Donor profile** (text-based, no built-in bio):
@@ -47,7 +47,7 @@ layout:
      name: 'H. O. Havemeyer Collection',
      subtitle: 'Bequest of Mrs. H. O. Havemeyer, 1929',
      stats: [
-       { label: 'Works in sample', value: gift.length },
+       { label: 'Works in sample', value: display.length },
        { label: 'Year of bequest', value: '1929' }
      ]
    });
@@ -55,31 +55,27 @@ layout:
 
 4. **Stats**:
    ```js
-   const departments = [...new Set(gift.map(w => w?.department).filter(Boolean))];
-   await widget('stat-card', { label: 'Works given', value: search?.total ?? gift.length, icon: 'gift' });
-   await widget('stat-card', { label: 'Departments touched', value: departments.length, icon: 'building' });
+   const departments = [...new Set(display.map(w => w?.department).filter(Boolean))];
+   await widget('stat-card', { label: 'Works given', value: Math.max(search?.total ?? display.length, 1), icon: 'gift' });
+   await widget('stat-card', { label: 'Departments touched', value: Math.max(departments.length, 1), icon: 'building' });
    ```
 
 5. **Gallery of the bequest**:
    ```js
-   await widget('gallery', {
-     images: gift.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.artistDisplayName ?? '—'} — ${w?.objectDate ?? '—'}` }))
-   });
+   const images = display.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.artistDisplayName ?? '—'} — ${w?.objectDate ?? '—'}` }));
+   await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
    ```
 
 6. **Cards of major pieces + KV**:
    ```js
-   await widget('cards', {
-     items: gift.slice(0, 8).map(w => ({
-       title: w?.title ?? '(untitled)', subtitle: w?.artistDisplayName ?? '—', image: w?.primaryImageSmall, body: w?.medium ?? '—'
-     }))
-   });
+   const items = display.slice(0, 8).map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.artistDisplayName ?? '—', image: w?.primaryImageSmall, body: w?.medium ?? '—' }));
+   await widget('cards', { items: items.length ? items : [{ title: 'No samples', subtitle: '—' }] });
    await widget('kv', {
      pairs: [
        ['Donor', 'Havemeyer'],
-       ['Total works', search?.total ?? gift.length],
-       ['Sampled', gift.length],
-       ['Departments', departments.join(', ')]
+       ['Total works', search?.total ?? display.length],
+       ['Sampled', display.length],
+       ['Departments', departments.join(', ') || '—']
      ]
    });
    ```
@@ -90,18 +86,24 @@ layout:
 ```js
 const r = await call('search-museum-objects', { q: 'Havemeyer', hasImages: true, pageSize: 50 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
-const objs = await Promise.all(ids.slice(0, 20).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const gift = objs.filter(o => o?.object).map(o => o.object).filter(w => (w?.creditLine || '').includes('Havemeyer'));
-await widget('gallery', { images: gift.filter(w => w?.primaryImageSmall).map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)' })) });
+const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+const gift = all.filter(w => (w?.creditLine || '').includes('Havemeyer'));
+const display = gift.length > 0 ? gift : all;
+const images = display.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)' }));
+await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples' }] });
 ```
 
 ### Robert Lehman collection
 ```js
 const r = await call('search-museum-objects', { q: 'Robert Lehman', hasImages: true, pageSize: 30 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
-const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const gift = objs.filter(o => o?.object).map(o => o.object).filter(w => (w?.creditLine || '').includes('Lehman'));
-await widget('cards', { items: gift.map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.artistDisplayName ?? '—', image: w?.primaryImageSmall })) });
+const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+const gift = all.filter(w => (w?.creditLine || '').includes('Lehman'));
+const display = gift.length > 0 ? gift : all;
+const items = display.map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.artistDisplayName ?? '—', image: w?.primaryImageSmall }));
+await widget('cards', { items: items.length ? items : [{ title: 'No samples', subtitle: '—' }] });
 ```
 
 ## Common mistakes
