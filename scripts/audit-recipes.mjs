@@ -168,23 +168,19 @@ function parseBody(body) {
   return segments;
 }
 
-// ── Runner with per-block scope (harness-specific) ────────────────────────
+// ── Runner with per-recipe shared scope ───────────────────────────────────
 //
-// Design notes (2026-04-30, fix batch):
-// • The recipe blocks are usually ALTERNATIVES (✅ vs ❌, approach A vs B), not
-//   a sequential pipeline. A shared scope across blocks therefore generated
-//   cascading false positives ("already declared", "X is not defined" cascade).
-//   The harness now uses a FRESH scope per JS/TS block.
-// • Recipes targeting the Deno sandbox `run_script` (token: `agentTask(`,
-//   top-level `import ... from "https://..."` …) are tagged `tutorial` and
-//   their JS/TS blocks are skipped — they belong to a different runtime.
-// • TS-only constructs (`: Type` param/return annotations, `as`, `interface`,
-//   `type X = …`, generic `<T>` on call expressions, `import type …`) are
-//   stripped before exec. This is a sober regex pass — best-effort, not a
-//   transpiler. When the strip fails, the block is reported with `error` as
-//   before.
-// • SQL queries containing `$1`/`$2` placeholders without bindings are
-//   reported as `skip-sql-params` (not `empty` or `error`).
+// Design notes (2026-04-30):
+// • Scope is shared across blocks of the same recipe (pipeline support: bloc 2
+//   uses `ids` declared in bloc 1). When a bloc redeclares a name already in
+//   scope (alternative snippets ✅ vs ❌), the preamble simply omits that key —
+//   the bloc declares it afresh and writes back to scope. One filter, no fresh
+//   vs shared dichotomy.
+// • Recipes targeting the Deno sandbox `run_script` (`agentTask(`, top-level
+//   `import ... from "https://..."`) are tagged `tutorial` and skipped.
+// • TS-only constructs are stripped before exec (best-effort regex).
+// • SQL: `$N` placeholders without bindings → `skip-sql-params`. SQL bodies
+//   that contain only comments → `skip-sql-empty`.
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const JS_LANGS = new Set(['js', 'javascript', 'mjs', 'cjs', 'ts', 'typescript']);
@@ -313,20 +309,66 @@ async function runSqlBlock(code, mcp, sqlTool) {
   return { rowCount, raw: res };
 }
 
-async function runJsBlock(code, lang, mcp) {
-  // Fresh scope per block — recipes typically present alternative snippets,
-  // not a sequential pipeline. Sharing scope generated cascading false
-  // positives ("already declared", "X is not defined" cascade).
-  const source = TS_LANGS.has(lang) ? stripTypeScript(code) : code;
-  const wrapped = `return (async () => {\n${source}\n})();`;
-  const widgets = [];
-  const call = async (toolName, args = {}) => {
-    return await callTool(mcp.url, mcp.sid, toolName, args);
+// Extract top-level `const`/`let`/`var`/`function` names. Strips strings &
+// comments first, then walks the source counting `{}` depth so matches inside
+// callbacks / nested blocks are skipped. Identifiers + simple destructuring.
+function extractTopLevelDecls(code) {
+  const stripped = code
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '')
+    .replace(/'(?:\\.|[^'\\])*'/g, "''")
+    .replace(/"(?:\\.|[^"\\])*"/g, '""')
+    .replace(/`(?:\\.|[^`\\])*`/g, '``');
+  const names = new Set();
+  const reIdent = /\b(?:const|let|var|function)\s+([A-Za-z_$][\w$]*)/g;
+  const reDestruct = /\b(?:const|let|var)\s+([\[{])/g;
+  let m;
+  const depthAt = (idx) => {
+    let d = 0;
+    for (let i = 0; i < idx; i++) { if (stripped[i] === '{') d++; else if (stripped[i] === '}') d--; }
+    return d;
   };
+  while ((m = reIdent.exec(stripped)) !== null) {
+    if (depthAt(m.index) === 0) names.add(m[1]);
+  }
+  while ((m = reDestruct.exec(stripped)) !== null) {
+    if (depthAt(m.index) !== 0) continue;
+    const open = m[1];
+    const close = open === '[' ? ']' : '}';
+    let depth = 1, end = -1;
+    for (let i = m.index + m[0].length; i < stripped.length; i++) {
+      const c = stripped[i];
+      if (c === open) depth++;
+      else if (c === close) { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (end < 0) continue;
+    const inner = stripped.slice(m.index + m[0].length, end);
+    for (const n of inner.matchAll(/([A-Za-z_$][\w$]*)\s*(?:[:,=\]}]|$)/g)) names.add(n[1]);
+  }
+  return [...names];
+}
+
+async function runJsBlock(code, lang, mcp, scope) {
+  const source = TS_LANGS.has(lang) ? stripTypeScript(code) : code;
+  const decls = extractTopLevelDecls(source);
+  const declSet = new Set(decls);
+  const preambleKeys = Object.keys(scope).filter((k) => !declSet.has(k));
+  const preamble = preambleKeys.map((k) => `const ${k} = __scope__[${JSON.stringify(k)}];`).join('\n');
+  const writeback = decls.map((n) => `try { __scope__[${JSON.stringify(n)}] = ${n}; } catch {}`).join('\n');
+  const wrapped = `return (async () => {\n${preamble}\n${source}\n${writeback}\n})();`;
+  const widgets = [];
+  const call = async (toolName, args = {}) => callTool(mcp.url, mcp.sid, toolName, args);
   const widget = async (name, params = {}) => { widgets.push({ name, params }); return { name, params }; };
-  const fn = new AsyncFunction('call', 'widget', wrapped);
-  await fn(call, widget);
+  const fn = new AsyncFunction('call', 'widget', '__scope__', wrapped);
+  await fn(call, widget, scope);
   return { widgets };
+}
+
+// SQL bloc made of comments only → skip (no real query). Strip line/block
+// comments, return true if nothing's left.
+function isSqlCommentsOnly(code) {
+  const stripped = code.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  return stripped.trim().length === 0;
 }
 
 // ── Audit one server ───────────────────────────────────────────────────────
@@ -390,6 +432,7 @@ async function auditServer(server) {
 
     const sqlTool = tools.find((t) => t.name === 'query_sql');
     const tutorial = isTutorialRecipe(bodyText, codeBlocks);
+    const scope = {};
     for (let i = 0; i < codeBlocks.length; i++) {
       const blk = codeBlocks[i];
       const label = `${blk.lang}#${i + 1}`;
@@ -397,6 +440,10 @@ async function auditServer(server) {
         if (SQL_LANGS.has(blk.lang)) {
           if (!sqlTool) {
             rows.push({ server: server.id, recipe: name, block: label, status: 'skip-sql', reason: 'no query_sql tool on this server' });
+            continue;
+          }
+          if (isSqlCommentsOnly(blk.content)) {
+            rows.push({ server: server.id, recipe: name, block: label, status: 'skip-sql-empty', reason: 'block contains only comments' });
             continue;
           }
           if (hasSqlPositionalParams(blk.content)) {
@@ -414,7 +461,7 @@ async function auditServer(server) {
         }
         let widgets;
         try {
-          ({ widgets } = await runJsBlock(blk.content, blk.lang, mcp));
+          ({ widgets } = await runJsBlock(blk.content, blk.lang, mcp, scope));
         } catch (err) {
           // Classify TS doc-snippet errors as `skip-doc-snippet` rather than
           // `error`. These are pedagogical fragments (✅ vs ❌ side-by-side,
