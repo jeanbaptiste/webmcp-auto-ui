@@ -31,7 +31,7 @@ layout:
      pageSize: 40
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No objects.' });
+   if (ids.length === 0) await widget('text', { content: 'No objects.' });
    ```
 
 2. **Fetch and detect diaspora cases** (`artistNationality` ≠ `country`):
@@ -69,10 +69,7 @@ layout:
 
 5. **Chart of most frequent flows**:
    ```js
-   const flows = diaspora.reduce((acc, w) => {
-     const k = `${w?.artistNationality ?? '—'} → ${w?.country ?? '—'}`;
-     acc[k] = (acc[k] || 0) + 1; return acc;
-   }, {});
+   const flows = diaspora.reduce((acc, w) => { const flow = `${w?.artistNationality ?? '—'} → ${w?.country ?? '—'}`; acc[flow] = (acc[flow] || 0) + 1; return acc; }, {});
    await widget('chart', {
      type: 'bar',
      data: Object.entries(flows).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => ({ label: k, value: v }))

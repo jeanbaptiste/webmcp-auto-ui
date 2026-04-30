@@ -32,7 +32,7 @@ layout:
      pageSize: 40
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: `No objects in ${year}.` });
+   if (ids.length === 0) await widget('text', { content: `No objects in ${year}.` });
    ```
 
 2. **Fetch a sample**:

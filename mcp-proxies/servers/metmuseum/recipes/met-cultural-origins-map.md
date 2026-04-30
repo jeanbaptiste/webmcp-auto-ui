@@ -26,7 +26,7 @@ layout:
    ```js
    const search = await call('search-museum-objects', { q: 'mask', departmentId: 5, hasImages: true, pageSize: 40 }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No objects found.' });
+   if (ids.length === 0) await widget('text', { content: 'No objects found.' });
    ```
 
 2. **Fetch details** to access `country`, `region`, `city`:
@@ -39,9 +39,19 @@ layout:
 
 3. **Geocode** country/city pairs (use a static lookup or the `geoLocation` field):
    ```js
+   const COUNTRY_COORDS = {
+     'Nigeria': { lat: 9.07, lon: 7.48 }, 'Mali': { lat: 12.65, lon: -8.0 },
+     'Egypt': { lat: 30.04, lon: 31.24 }, 'China': { lat: 39.9, lon: 116.4 },
+     'Japan': { lat: 35.68, lon: 139.69 }, 'India': { lat: 28.61, lon: 77.21 },
+     'Iran': { lat: 35.69, lon: 51.39 }, 'Turkey': { lat: 39.93, lon: 32.86 },
+     'Italy': { lat: 41.9, lon: 12.5 }, 'France': { lat: 48.85, lon: 2.35 },
+     'Greece': { lat: 37.98, lon: 23.73 }, 'Mexico': { lat: 19.43, lon: -99.13 },
+     'Peru': { lat: -12.05, lon: -77.04 }
+   };
+   const lookupCoords = (country) => COUNTRY_COORDS[country] || null;
    const geocoded = works.map(w => ({
      ...w,
-     coords: lookupCoords(w?.country, w?.city) // e.g. { lat: 9.07, lon: 7.48 } for Nigeria
+     coords: lookupCoords(w?.country)
    })).filter(w => w?.coords);
    ```
 

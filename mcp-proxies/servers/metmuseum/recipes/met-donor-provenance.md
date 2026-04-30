@@ -30,7 +30,7 @@ layout:
      pageSize: 50
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No matching gifts.' });
+   if (ids.length === 0) await widget('text', { content: 'No matching gifts.' });
    ```
 
 2. **Fetch and post-filter on `creditLine`**:

@@ -34,7 +34,7 @@ layout:
      pageSize: 40
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No objects in this period.' });
+   if (ids.length === 0) await widget('text', { content: 'No objects in this period.' });
    ```
 
 2. **Fetch a representative sample** (8-12 detailed objects):
@@ -56,10 +56,7 @@ layout:
 4. **Distribution by century** in a chart:
    ```js
    const buckets = {};
-   for (const w of works) {
-     const c = Math.floor((w?.objectBeginDate || 0) / 100) * 100;
-     buckets[c] = (buckets[c] || 0) + 1;
-   }
+   for (const w of works) { const century = Math.floor((w?.objectBeginDate || 0) / 100) * 100; buckets[century] = (buckets[century] || 0) + 1; }
    await widget('chart', {
      type: 'bar',
      data: Object.entries(buckets).map(([k, v]) => ({ label: `${k}`, value: v }))

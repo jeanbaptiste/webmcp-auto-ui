@@ -32,14 +32,14 @@ layout:
      pageSize: 30
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No on-view objects.' });
+   if (ids.length === 0) await widget('text', { content: 'No on-view objects.' });
    ```
 
 2. **Fetch and keep entries with a `GalleryNumber`**:
    ```js
    const objs = await Promise.all(ids.slice(0, 15).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
    const stops = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.GalleryNumber).sort((a, b) => Number(a?.GalleryNumber || 0) - Number(b?.GalleryNumber || 0));
-   if (stops.length === 0) return widget('text', { content: 'No gallery numbers available.' });
+   if (stops.length === 0) await widget('text', { content: 'No gallery numbers available.' });
    ```
 
 3. **Stats**:

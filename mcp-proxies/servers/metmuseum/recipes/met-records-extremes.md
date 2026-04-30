@@ -31,24 +31,19 @@ layout:
      pageSize: 60
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No objects.' });
+   if (ids.length === 0) await widget('text', { content: 'No objects.' });
    ```
 
 2. **Fetch a wide sample** (you need numbers):
    ```js
    const objs = await Promise.all(ids.slice(0, 25).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
    const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.measurements && w?.primaryImageSmall);
-   if (works.length === 0) return widget('text', { content: 'No measurements available.' });
+   if (works.length === 0) await widget('text', { content: 'No measurements available.' });
    ```
 
 3. **Compute extremes** from `measurements[].elementMeasurements`:
    ```js
-   const sizeOf = w => {
-     const em = w?.measurements?.[0]?.elementMeasurements;
-     if (!em) return 0;
-     const vals = Object.values(em).filter(Number.isFinite);
-     return vals.length > 0 ? Math.max(...vals) : 0;
-   };
+   const sizeOf = w => { const elt = w?.measurements?.[0]?.elementMeasurements; if (!elt) return 0; const nums = Object.values(elt).filter(Number.isFinite); return nums.length > 0 ? Math.max(...nums) : 0; };
    const records = {
      largest: [...works].sort((a, b) => sizeOf(b) - sizeOf(a))[0],
      smallest: [...works].sort((a, b) => sizeOf(a) - sizeOf(b))[0],
@@ -95,7 +90,7 @@ const r = await call('search-museum-objects', { q: 'sculpture', departmentId: 13
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 20).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.measurements);
-if (works.length === 0) return widget('text', { content: 'No measurements available.' });
+if (works.length === 0) await widget('text', { content: 'No measurements available.' });
 const big = [...works].sort((a, b) => (b?.measurements?.[0]?.elementMeasurements?.Height || 0) - (a?.measurements?.[0]?.elementMeasurements?.Height || 0))[0];
 await widget('cards', { items: [{ title: 'TALLEST', subtitle: big?.title ?? '(untitled)', image: big?.primaryImageSmall, body: big?.dimensions ?? '—' }] });
 ```
@@ -106,7 +101,7 @@ const r = await call('search-museum-objects', { q: '*', departmentId: 10, hasIma
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 20).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object);
-if (works.length === 0) return widget('text', { content: 'No objects.' });
+if (works.length === 0) await widget('text', { content: 'No objects.' });
 const oldest = [...works].sort((a, b) => (a?.objectBeginDate || 0) - (b?.objectBeginDate || 0))[0];
 await widget('kv', { pairs: [['Oldest', `${oldest?.title ?? '—'} (${oldest?.objectDate ?? '—'})`]] });
 ```

@@ -30,7 +30,7 @@ layout:
      pageSize: 30
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No matches.' });
+   if (ids.length === 0) await widget('text', { content: 'No matches.' });
    ```
 
 2. **Fetch a wide sample**:
@@ -69,10 +69,7 @@ layout:
 6. **KV of recurring symbols** (from tags):
    ```js
    const tags = {};
-   for (const w of works) for (const t of (w?.tags ?? [])) {
-     const term = t?.term;
-     if (term) tags[term] = (tags[term] || 0) + 1;
-   }
+   for (const w of works) for (const t of (w?.tags ?? [])) { const tg = t?.term; if (tg) tags[tg] = (tags[tg] || 0) + 1; }
    const top = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 6);
    await widget('kv', { pairs: top.map(([t, n]) => [t, `${n} occurrences`]) });
    ```

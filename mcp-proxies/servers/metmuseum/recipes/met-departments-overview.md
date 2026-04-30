@@ -26,17 +26,12 @@ layout:
    ```js
    const resp = await call('list-departments', {}).catch(() => null);
    const departments = resp?.departments ?? [];
-   if (departments.length === 0) return widget('text', { content: 'No departments returned.' });
+   if (departments.length === 0) await widget('text', { content: 'No departments returned.' });
    ```
 
 2. **For each department, fetch a `total` and a signature-piece ID**:
    ```js
-   const stats = await Promise.all(departments.map(async d => {
-     const r = await call('search-museum-objects', {
-       q: '*', departmentId: d?.departmentId, isHighlight: true, hasImages: true, pageSize: 1
-     }).catch(() => null);
-     return { ...d, total: r?.total ?? 0, sampleId: (r?.objectIDs ?? [])[0] };
-   }));
+   const stats = await Promise.all(departments.map(async d => { const res = await call('search-museum-objects', { q: '*', departmentId: d?.departmentId, isHighlight: true, hasImages: true, pageSize: 1 }).catch(() => null); return { ...d, total: res?.total ?? 0, sampleId: (res?.objectIDs ?? [])[0] }; }));
    ```
 
 3. **Stats**:
@@ -79,10 +74,7 @@ layout:
 ```js
 const resp = await call('list-departments', {}).catch(() => null);
 const departments = resp?.departments ?? [];
-const stats = await Promise.all(departments.map(async d => {
-  const r = await call('search-museum-objects', { q: '*', departmentId: d?.departmentId, isHighlight: true, pageSize: 1 }).catch(() => null);
-  return { ...d, total: r?.total ?? 0 };
-}));
+const stats = await Promise.all(departments.map(async d => { const res = await call('search-museum-objects', { q: '*', departmentId: d?.departmentId, isHighlight: true, pageSize: 1 }).catch(() => null); return { ...d, total: res?.total ?? 0 }; }));
 await widget('chart', { type: 'bar', data: stats.map(d => ({ label: d?.displayName ?? '—', value: d?.total ?? 0 })) });
 await widget('kv', { pairs: stats.map(d => [d?.displayName ?? '—', `${d?.total ?? 0}`]) });
 ```

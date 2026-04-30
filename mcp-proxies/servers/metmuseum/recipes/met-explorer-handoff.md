@@ -79,7 +79,7 @@ layout:
 const resp = await call('list-departments', {}).catch(() => null);
 const departments = resp?.departments ?? [];
 const asian = departments.find(d => d?.displayName?.includes('Asian'));
-if (!asian) return widget('text', { content: 'Department not found.' });
+if (!asian) await widget('text', { content: 'Department not found.' });
 const preview = await call('search-museum-objects', { q: 'ukiyo-e', departmentId: asian.departmentId, pageSize: 1 }).catch(() => null);
 await widget('stat-card', { label: 'Match', value: preview?.total ?? 0, icon: 'compass' });
 await call('open-met-explorer', { q: 'ukiyo-e', departmentId: asian.departmentId });

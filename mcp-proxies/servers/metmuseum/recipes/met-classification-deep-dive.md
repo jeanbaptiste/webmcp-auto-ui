@@ -27,7 +27,7 @@ layout:
    const resp = await call('list-departments', {}).catch(() => null);
    const departments = resp?.departments ?? [];
    const dept = departments.find(d => d?.displayName?.includes('Drawings'));
-   if (!dept) return widget('text', { content: 'Department not found.' });
+   if (!dept) await widget('text', { content: 'Department not found.' });
    ```
 
 2. **Search broadly inside the department**:
@@ -39,18 +39,14 @@ layout:
      pageSize: 50
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No objects found.' });
+   if (ids.length === 0) await widget('text', { content: 'No objects found.' });
    ```
 
 3. **Fetch a sample and group by `classification`**:
    ```js
    const objs = await Promise.all(ids.slice(0, 30).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
    const works = objs.filter(o => o?.object).map(o => o.object);
-   const byClass = works.reduce((acc, w) => {
-     const k = w?.classification || 'Uncategorized';
-     (acc[k] = acc[k] || []).push(w);
-     return acc;
-   }, {});
+   const byClass = works.reduce((acc, w) => { const cls = w?.classification || 'Uncategorized'; (acc[cls] = acc[cls] || []).push(w); return acc; }, {});
    ```
 
 4. **Rich chart of classifications**:
@@ -85,15 +81,11 @@ layout:
 const dResp = await call('list-departments', {}).catch(() => null);
 const departments = dResp?.departments ?? [];
 const d = departments.find(x => x?.displayName?.includes('Drawings'));
-if (!d) return widget('text', { content: 'Department not found.' });
+if (!d) await widget('text', { content: 'Department not found.' });
 const r = await call('search-museum-objects', { q: '*', departmentId: d.departmentId, hasImages: true, pageSize: 50 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 25).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const grouped = objs.filter(o => o?.object).reduce((acc, o) => {
-  const k = o.object?.classification || 'Uncategorized';
-  (acc[k] = acc[k] || []).push(o.object);
-  return acc;
-}, {});
+const grouped = objs.filter(o => o?.object).reduce((acc, o) => { const cls = o.object?.classification || 'Uncategorized'; (acc[cls] = acc[cls] || []).push(o.object); return acc; }, {});
 await widget('chart-rich', { type: 'bar', data: Object.entries(grouped).map(([k, v]) => ({ label: k, value: v.length })) });
 ```
 

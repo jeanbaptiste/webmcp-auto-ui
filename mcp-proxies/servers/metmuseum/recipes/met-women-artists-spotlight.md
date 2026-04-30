@@ -31,14 +31,14 @@ layout:
      pageSize: 100
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No objects.' });
+   if (ids.length === 0) await widget('text', { content: 'No objects.' });
    ```
 
 2. **Fetch a wide sample** (the API only labels women artists with `artistGender`):
    ```js
    const objs = await Promise.all(ids.slice(0, 40).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
    const womenWorks = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.artistGender === 'Female' && w?.primaryImageSmall);
-   if (womenWorks.length === 0) return widget('text', { content: 'No women-attributed works in the sample.' });
+   if (womenWorks.length === 0) await widget('text', { content: 'No women-attributed works in the sample.' });
    ```
 
 3. **Profile the most-represented woman**:
@@ -69,10 +69,7 @@ layout:
 
 6. **Chart by decade**:
    ```js
-   const byDecade = womenWorks.reduce((acc, w) => {
-     const dec = Math.floor((w?.objectBeginDate || 0) / 10) * 10;
-     acc[dec] = (acc[dec] || 0) + 1; return acc;
-   }, {});
+   const byDecade = womenWorks.reduce((acc, w) => { const dec = Math.floor((w?.objectBeginDate || 0) / 10) * 10; acc[dec] = (acc[dec] || 0) + 1; return acc; }, {});
    await widget('chart', { type: 'bar', data: Object.entries(byDecade).map(([k, v]) => ({ label: `${k}s`, value: v })) });
    ```
 

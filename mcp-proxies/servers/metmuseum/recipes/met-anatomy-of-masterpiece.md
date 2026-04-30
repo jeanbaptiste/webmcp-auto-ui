@@ -30,7 +30,7 @@ layout:
      hasImages: true
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No matching objects found.' });
+   if (ids.length === 0) await widget('text', { content: 'No matching objects found.' });
    const top = ids[0];
    ```
 
@@ -38,7 +38,7 @@ layout:
    ```js
    const resp = await call('get-museum-object', { objectId: top, returnImage: true }).catch(() => null);
    const w = resp?.object;
-   if (!w || resp?.message) return widget('text', { content: 'Object not found.' });
+   if (!w || resp?.message) await widget('text', { content: 'Object not found.' });
    ```
 
 3. **Carousel of every view** (primary + additional):
@@ -88,17 +88,7 @@ layout:
 
 6. **Sister works** (same artist):
    ```js
-   if (w?.artistDisplayName) {
-     const sis = await call('search-museum-objects', { q: w.artistDisplayName, artistOrCulture: true, hasImages: true }).catch(() => null);
-     const sisIds = (sis?.objectIDs ?? []).slice(0, 4).filter(id => id !== top);
-     const sisObjs = await Promise.all(sisIds.map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-     const items = sisObjs.filter(o => o?.object && !o?.message).map(o => ({
-       title: o.object?.title ?? '(untitled)',
-       image: o.object?.primaryImageSmall,
-       body: o.object?.objectDate ?? '—'
-     }));
-     if (items.length > 0) await widget('cards', { items });
-   }
+   if (w?.artistDisplayName) { const sis = await call('search-museum-objects', { q: w.artistDisplayName, artistOrCulture: true, hasImages: true }).catch(() => null); const sisIds = (sis?.objectIDs ?? []).slice(0, 4).filter(id => id !== top); const sisObjs = await Promise.all(sisIds.map(id => call('get-museum-object', { objectId: id }).catch(() => null))); const items = sisObjs.filter(o => o?.object && !o?.message).map(o => ({ title: o.object?.title ?? '(untitled)', image: o.object?.primaryImageSmall, body: o.object?.objectDate ?? '—' })); if (items.length > 0) await widget('cards', { items }); }
    ```
 
 ## Examples
@@ -107,10 +97,10 @@ layout:
 ```js
 const s = await call('search-museum-objects', { q: 'Vermeer', artistOrCulture: true, hasImages: true }).catch(() => null);
 const ids = s?.objectIDs ?? [];
-if (ids.length === 0) return widget('text', { content: 'No results.' });
+if (ids.length === 0) await widget('text', { content: 'No results.' });
 const resp = await call('get-museum-object', { objectId: ids[0], returnImage: true }).catch(() => null);
 const w = resp?.object;
-if (!w) return widget('text', { content: 'Object not found.' });
+if (!w) await widget('text', { content: 'Object not found.' });
 const images = [w?.primaryImage, ...(w?.additionalImages ?? [])].filter(src => src && src.length > 0);
 if (images.length > 0) await widget('carousel', { items: images.map(src => ({ src })) });
 ```
@@ -119,10 +109,10 @@ if (images.length > 0) await widget('carousel', { items: images.map(src => ({ sr
 ```js
 const s = await call('search-museum-objects', { q: 'Akhenaten', isHighlight: true, hasImages: true }).catch(() => null);
 const ids = s?.objectIDs ?? [];
-if (ids.length === 0) return widget('text', { content: 'No results.' });
+if (ids.length === 0) await widget('text', { content: 'No results.' });
 const resp = await call('get-museum-object', { objectId: ids[0] }).catch(() => null);
 const w = resp?.object;
-if (!w) return widget('text', { content: 'Object not found.' });
+if (!w) await widget('text', { content: 'Object not found.' });
 await widget('text', { content: `Reign: ${w?.reign ?? '—'}. Period: ${w?.period ?? '—'}.` });
 const adds = (w?.additionalImages ?? []).filter(src => src && src.length > 0);
 if (adds.length > 0) await widget('carousel', { items: adds.map(src => ({ src })) });

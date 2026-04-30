@@ -31,7 +31,7 @@ layout:
      pageSize: 30
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No matches.' });
+   if (ids.length === 0) await widget('text', { content: 'No matches.' });
    ```
 
 2. **Fetch a wide sample** (10-15) and keep the ones with images and tags:
@@ -49,11 +49,7 @@ layout:
 
 4. **Cards grouped by culture**:
    ```js
-   const byCulture = Object.entries(works.reduce((acc, w) => {
-     const k = w?.culture || w?.department || 'Unknown';
-     (acc[k] = acc[k] || []).push(w);
-     return acc;
-   }, {}));
+   const byCulture = Object.entries(works.reduce((acc, w) => { const cult = w?.culture || w?.department || 'Unknown'; (acc[cult] = acc[cult] || []).push(w); return acc; }, {}));
    await widget('cards', {
      items: byCulture.flatMap(([culture, ws]) => ws.slice(0, 2).map(w => ({
        title: w?.title ?? '(untitled)', subtitle: culture, image: w?.primaryImageSmall, body: w?.objectDate ?? '—'
@@ -70,12 +66,9 @@ layout:
 6. **KV of shared tags**:
    ```js
    const tagCount = {};
-   for (const w of works) for (const t of (w?.tags ?? [])) {
-     const term = t?.term;
-     if (term) tagCount[term] = (tagCount[term] || 0) + 1;
-   }
-   const top = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 8);
-   await widget('kv', { pairs: top.map(([term, n]) => [term, `${n} objects`]) });
+   for (const w of works) for (const t of (w?.tags ?? [])) { const tg = t?.term; if (tg) tagCount[tg] = (tagCount[tg] || 0) + 1; }
+   const topTags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 8);
+   await widget('kv', { pairs: topTags.map(([tg, n]) => [tg, `${n} objects`]) });
    ```
 
 ## Examples

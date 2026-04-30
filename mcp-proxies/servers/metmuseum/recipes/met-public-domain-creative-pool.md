@@ -30,7 +30,7 @@ layout:
      pageSize: 30
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No matches.' });
+   if (ids.length === 0) await widget('text', { content: 'No matches.' });
    ```
 
 2. **Fetch and filter `isPublicDomain`**:

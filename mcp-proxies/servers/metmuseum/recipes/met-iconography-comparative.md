@@ -31,7 +31,7 @@ layout:
      pageSize: 30
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No matching motif.' });
+   if (ids.length === 0) await widget('text', { content: 'No matching motif.' });
    ```
 
 2. **Fetch a wide sample**:
@@ -49,11 +49,7 @@ layout:
 
 4. **Cards grouped by culture**:
    ```js
-   const byCulture = works.reduce((acc, w) => {
-     const k = w?.culture || w?.department || '—';
-     (acc[k] = acc[k] || []).push(w);
-     return acc;
-   }, {});
+   const byCulture = works.reduce((acc, w) => { const cult = w?.culture || w?.department || '—'; (acc[cult] = acc[cult] || []).push(w); return acc; }, {});
    await widget('cards', {
      items: Object.entries(byCulture).flatMap(([culture, ws]) => ws.slice(0, 2).map(w => ({
        title: w?.title ?? '(untitled)', subtitle: culture, image: w?.primaryImageSmall, body: w?.objectDate ?? '—'
@@ -63,20 +59,14 @@ layout:
 
 5. **Frequency chart by century**:
    ```js
-   const byCentury = works.reduce((acc, w) => {
-     const c = Math.floor((w?.objectBeginDate || 0) / 100) * 100;
-     acc[c] = (acc[c] || 0) + 1; return acc;
-   }, {});
+   const byCentury = works.reduce((acc, w) => { const century = Math.floor((w?.objectBeginDate || 0) / 100) * 100; acc[century] = (acc[century] || 0) + 1; return acc; }, {});
    await widget('chart', { type: 'bar', data: Object.entries(byCentury).map(([k, v]) => ({ label: `${k}`, value: v })) });
    ```
 
 6. **KV of related AAT/Wikidata terms**:
    ```js
    const tags = {};
-   for (const w of works) for (const t of (w?.tags ?? [])) {
-     const term = t?.term;
-     if (term) tags[term] = (tags[term] || 0) + 1;
-   }
+   for (const w of works) for (const t of (w?.tags ?? [])) { const tg = t?.term; if (tg) tags[tg] = (tags[tg] || 0) + 1; }
    const top = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 8);
    await widget('kv', { pairs: top.map(([t, n]) => [t, `${n} co-occurrences`]) });
    ```

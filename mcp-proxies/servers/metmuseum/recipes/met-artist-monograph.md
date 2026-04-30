@@ -32,7 +32,7 @@ layout:
      pageSize: 30
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No works found.' });
+   if (ids.length === 0) await widget('text', { content: 'No works found.' });
    ```
 
 2. **Fetch details** for the first 8-10 results:
@@ -41,7 +41,7 @@ layout:
      ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null))
    );
    const works = objects.filter(r => r?.object && !r?.message).map(r => r.object).filter(o => o?.primaryImageSmall);
-   if (works.length === 0) return widget('text', { content: 'No works with images found.' });
+   if (works.length === 0) await widget('text', { content: 'No works with images found.' });
    ```
 
 3. **Build the artist profile** from any work (bio is on every record):
@@ -94,7 +94,7 @@ layout:
 ```js
 const r = await call('search-museum-objects', { q: 'Johannes Vermeer', artistOrCulture: true, hasImages: true }).catch(() => null);
 const ids = r?.objectIDs ?? [];
-if (ids.length === 0) return widget('text', { content: 'No results.' });
+if (ids.length === 0) await widget('text', { content: 'No results.' });
 const objs = await Promise.all(ids.slice(0, 6).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
 await widget('profile', { name: 'Johannes Vermeer', subtitle: works[0]?.artistDisplayBio ?? '' });

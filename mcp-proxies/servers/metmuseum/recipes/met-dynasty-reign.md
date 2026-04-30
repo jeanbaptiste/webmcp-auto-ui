@@ -32,7 +32,7 @@ layout:
      pageSize: 40
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No objects in this period.' });
+   if (ids.length === 0) await widget('text', { content: 'No objects in this period.' });
    ```
 
 2. **Fetch and post-filter on `dynasty`**:

@@ -27,16 +27,13 @@ layout:
    const resp = await call('list-departments', {}).catch(() => null);
    const departments = resp?.departments ?? [];
    const dept = departments.find(d => d?.displayName?.includes('Greek'));
-   if (!dept) return widget('text', { content: 'Department not found.' });
+   if (!dept) await widget('text', { content: 'Department not found.' });
    ```
 
 2. **Run one search per medium** of interest:
    ```js
    const media = ['Terracotta', 'Marble', 'Bronze', 'Limestone'];
-   const counts = await Promise.all(media.map(async m => {
-     const r = await call('search-museum-objects', { q: '*', departmentId: dept.departmentId, medium: m, pageSize: 1 }).catch(() => null);
-     return { medium: m, total: r?.total ?? 0, sampleId: (r?.objectIDs ?? [])[0] };
-   }));
+   const counts = await Promise.all(media.map(async m => { const res = await call('search-museum-objects', { q: '*', departmentId: dept.departmentId, medium: m, pageSize: 1 }).catch(() => null); return { medium: m, total: res?.total ?? 0, sampleId: (res?.objectIDs ?? [])[0] }; }));
    ```
 
 3. **Rich chart** with one annotated example per medium:
@@ -73,7 +70,7 @@ layout:
 const resp = await call('list-departments', {}).catch(() => null);
 const departments = resp?.departments ?? [];
 const greek = departments.find(d => d?.displayName?.includes('Greek'));
-if (!greek) return widget('text', { content: 'Department not found.' });
+if (!greek) await widget('text', { content: 'Department not found.' });
 const media = ['Terracotta', 'Marble', 'Bronze'];
 const counts = await Promise.all(media.map(m => call('search-museum-objects', { q: 'sculpture', departmentId: greek.departmentId, medium: m, pageSize: 1 }).catch(() => null)));
 await widget('chart-rich', { type: 'bar', data: media.map((m, i) => ({ label: m, value: counts[i]?.total ?? 0 })) });

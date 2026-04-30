@@ -31,7 +31,7 @@ layout:
      pageSize: 50
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) return widget('text', { content: 'No objects found.' });
+   if (ids.length === 0) await widget('text', { content: 'No objects found.' });
    ```
 
 2. **Fetch and filter on `accessionYear`** (last 5 years):
