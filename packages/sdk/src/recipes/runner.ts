@@ -90,12 +90,26 @@ function makeWidgetHelper(ctx: RunnerCtx) {
   };
 }
 
-/** Match top-level `const|let|var name`, `function name`, `class name`. */
+/** Match top-level `const|let|var name`, `function name`, `class name`.
+ *  Skips matches that occur inside a `{}` block (e.g. callback bodies) by
+ *  counting unbalanced braces before the match position, on a sanitized copy
+ *  of the code where strings and comments are blanked out. */
 function extractTopLevelDecls(code: string): string[] {
+  const stripped = code
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '')
+    .replace(/'(?:\\.|[^'\\])*'/g, "''")
+    .replace(/"(?:\\.|[^"\\])*"/g, '""')
+    .replace(/`(?:\\.|[^`\\])*`/g, '``');
   const re = /^[\t ]*(?:const|let|var|function|class)\s+([a-zA-Z_$][\w$]*)/gm;
   const out = new Set<string>();
   let m: RegExpExecArray | null;
-  while ((m = re.exec(code)) !== null) out.add(m[1]);
+  while ((m = re.exec(stripped)) !== null) {
+    const before = stripped.slice(0, m.index);
+    const opens = (before.match(/\{/g) ?? []).length;
+    const closes = (before.match(/\}/g) ?? []).length;
+    if (opens === closes) out.add(m[1]);
+  }
   return Array.from(out);
 }
 

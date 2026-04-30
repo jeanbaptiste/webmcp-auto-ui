@@ -218,10 +218,23 @@ async function runSqlBlock(code, mcp, sqlTool) {
 }
 
 function extractTopLevelDecls(code) {
+  // Skip matches inside a {} block (callbacks etc.) by checking brace depth
+  // before the match position, on a sanitized copy with strings/comments out.
+  const stripped = code
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '')
+    .replace(/'(?:\\.|[^'\\])*'/g, "''")
+    .replace(/"(?:\\.|[^"\\])*"/g, '""')
+    .replace(/`(?:\\.|[^`\\])*`/g, '``');
   const re = /^[\t ]*(?:const|let|var|function|class)\s+([a-zA-Z_$][\w$]*)/gm;
   const out = new Set();
   let m;
-  while ((m = re.exec(code)) !== null) out.add(m[1]);
+  while ((m = re.exec(stripped)) !== null) {
+    const before = stripped.slice(0, m.index);
+    const opens = (before.match(/\{/g) ?? []).length;
+    const closes = (before.match(/\}/g) ?? []).length;
+    if (opens === closes) out.add(m[1]);
+  }
   return [...out];
 }
 
