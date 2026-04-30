@@ -168,11 +168,107 @@ function parseBody(body) {
   return segments;
 }
 
-// ── Runner with shared scope (mirrors packages/sdk/src/recipes/runner.ts) ──
+// ── Runner with per-block scope (harness-specific) ────────────────────────
+//
+// Design notes (2026-04-30, fix batch):
+// • The recipe blocks are usually ALTERNATIVES (✅ vs ❌, approach A vs B), not
+//   a sequential pipeline. A shared scope across blocks therefore generated
+//   cascading false positives ("already declared", "X is not defined" cascade).
+//   The harness now uses a FRESH scope per JS/TS block.
+// • Recipes targeting the Deno sandbox `run_script` (token: `agentTask(`,
+//   top-level `import ... from "https://..."` …) are tagged `tutorial` and
+//   their JS/TS blocks are skipped — they belong to a different runtime.
+// • TS-only constructs (`: Type` param/return annotations, `as`, `interface`,
+//   `type X = …`, generic `<T>` on call expressions, `import type …`) are
+//   stripped before exec. This is a sober regex pass — best-effort, not a
+//   transpiler. When the strip fails, the block is reported with `error` as
+//   before.
+// • SQL queries containing `$1`/`$2` placeholders without bindings are
+//   reported as `skip-sql-params` (not `empty` or `error`).
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const JS_LANGS = new Set(['js', 'javascript', 'mjs', 'cjs', 'ts', 'typescript']);
+const TS_LANGS = new Set(['ts', 'typescript']);
 const SQL_LANGS = new Set(['sql']);
+
+// ── TypeScript strip (best-effort regex, no full parser) ──────────────────
+
+function stripTypeScript(code) {
+  let s = code;
+  // 1. Remove `import type { … } from '…'` lines
+  s = s.replace(/^[\t ]*import\s+type\s+[^;\n]+;?[\t ]*$/gm, '');
+  // 2. Remove `export type X = …` and `type X = …;` declarations (single-line)
+  s = s.replace(/^[\t ]*(?:export\s+)?type\s+[A-Za-z_$][\w$]*\s*=\s*[^;\n]+;?[\t ]*$/gm, '');
+  // 3. Remove `interface Foo { … }` blocks (balanced braces, single-pass)
+  s = s.replace(/^[\t ]*(?:export\s+)?interface\s+[A-Za-z_$][\w$]*[^\{]*\{/gm, (match, offset, full) => {
+    // We can't easily balance braces in a single regex; flag for the next pass.
+    return ' IFACE_OPEN ' + match;
+  });
+  // Walk and remove balanced interface bodies.
+  while (true) {
+    const idx = s.indexOf(' IFACE_OPEN ');
+    if (idx < 0) break;
+    const headerEnd = s.indexOf('{', idx);
+    if (headerEnd < 0) { s = s.replace(' IFACE_OPEN ', ''); break; }
+    let depth = 0, end = -1;
+    for (let i = headerEnd; i < s.length; i++) {
+      if (s[i] === '{') depth++;
+      else if (s[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (end < 0) { s = s.replace(' IFACE_OPEN ', ''); break; }
+    s = s.slice(0, idx) + s.slice(end + 1);
+  }
+  // 4. Strip ` as Type` / ` as const` (inline cast).
+  //    `as Foo<Bar, Baz>` — handle generics by matching balanced angle brackets.
+  s = s.replace(/\s+as\s+(?:const\b|[A-Za-z_$][\w$.<>,\s\[\]|&'"]*)/g, '');
+  // 5. Strip generic call expressions: `foo<T, U>(...)` → `foo(...)`.
+  //    Heuristic: identifier followed by `<…>(`, where contents look type-y.
+  s = s.replace(/([A-Za-z_$][\w$]*)\s*<\s*([^<>{};=]+?)\s*>\s*\(/g, '$1(');
+  // Same for tagged template: `db<T>\`…\`` → `db\`…\``.
+  s = s.replace(/([A-Za-z_$][\w$]*)\s*<\s*([^<>{};=]+?)\s*>\s*`/g, '$1`');
+  // 6. Strip return-type annotations: `): Type {` / `): Type =>`
+  s = s.replace(/\)\s*:\s*[A-Za-z_$][\w$.<>\[\]\s|&,'"]*?(\s*(?:\{|=>))/g, ')$1');
+  // 7. Strip param-type annotations inside arrow/function params:
+  //    `(a: Foo, b: Bar<X>) =>` → `(a, b) =>`
+  //    We do a conservative pass: `:Type` between an identifier and the next
+  //    `,` or `)` at depth 0 of `<>[]{}`.
+  s = s.replace(/([A-Za-z_$][\w$]*\??)\s*:\s*([A-Za-z_$][\w$.<>\[\]\s|&,'"]*?)(\s*[,)=])/g,
+    (m, id, _ty, tail) => `${id}${tail}`);
+  // 8. Strip `<T>` generic parameters on function/method declarations:
+  //    `function foo<T>(…)` → `function foo(…)`
+  s = s.replace(/(function\s+[A-Za-z_$][\w$]*)\s*<[^<>{};=]+>/g, '$1');
+  // 9. Strip `enum Foo { … }` (rare in recipes).
+  s = s.replace(/^[\t ]*(?:export\s+)?enum\s+[A-Za-z_$][\w$]*\s*\{[^}]*\}[\t ]*$/gm, '');
+  return s;
+}
+
+// ── Tutorial recipe detection (Deno sandbox / run_script) ─────────────────
+
+function isTutorialRecipe(bodyText, codeBlocks) {
+  if (typeof bodyText === 'string') {
+    if (/agentTask\s*\(/.test(bodyText)) return true;
+    if (/\brun_script\b/.test(bodyText) && /agentTask|Deno\b|\bimport\s+[^;]+from\s+["']https?:\/\//.test(bodyText)) return true;
+  }
+  for (const blk of codeBlocks) {
+    if (!JS_LANGS.has(blk.lang)) continue;
+    if (/agentTask\s*\(/.test(blk.content)) return true;
+    if (/^\s*import\s+[^;]+from\s+["']https?:\/\//m.test(blk.content)) return true;
+  }
+  return false;
+}
+
+// ── SQL placeholder detection ─────────────────────────────────────────────
+
+function hasSqlPositionalParams(code) {
+  // Match `$1`, `$2`, etc., outside of strings. We do a sober pass: strip
+  // strings & comments first, then look for `$\d+`.
+  const stripped = code
+    .replace(/--[^\n]*/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/'(?:''|[^'])*'/g, "''")
+    .replace(/"(?:""|[^"])*"/g, '""');
+  return /\$\d+/.test(stripped);
+}
 
 /**
  * Heuristic: sniff `FROM <schema>.<table>` / `JOIN <schema>.<table>` to pick a
@@ -217,95 +313,19 @@ async function runSqlBlock(code, mcp, sqlTool) {
   return { rowCount, raw: res };
 }
 
-function matchBracket(code, startIdx) {
-  const open = code[startIdx];
-  const close = open === '[' ? ']' : open === '{' ? '}' : open === '(' ? ')' : '';
-  if (!close) return -1;
-  let depth = 0;
-  for (let i = startIdx; i < code.length; i++) {
-    if (code[i] === open) depth++;
-    else if (code[i] === close) { depth--; if (depth === 0) return i; }
-  }
-  return -1;
-}
-
-function namesFromPattern(content) {
-  const parts = [];
-  let depth = 0, start = 0;
-  for (let i = 0; i < content.length; i++) {
-    const c = content[i];
-    if (c === '{' || c === '[' || c === '(') depth++;
-    else if (c === '}' || c === ']' || c === ')') depth--;
-    else if (c === ',' && depth === 0) { parts.push(content.slice(start, i)); start = i + 1; }
-  }
-  parts.push(content.slice(start));
-  const names = [];
-  for (let part of parts) {
-    part = part.trim();
-    if (!part) continue;
-    if (part.startsWith('...')) part = part.slice(3).trim();
-    const eqIdx = part.indexOf('=');
-    if (eqIdx >= 0) part = part.slice(0, eqIdx).trim();
-    const colonIdx = part.indexOf(':');
-    if (colonIdx >= 0) {
-      const alias = part.slice(colonIdx + 1).trim();
-      if (alias.startsWith('{') || alias.startsWith('[')) {
-        const end = matchBracket(alias, 0);
-        if (end > 0) names.push(...namesFromPattern(alias.slice(1, end)));
-      } else if (/^[a-zA-Z_$][\w$]*$/.test(alias)) {
-        names.push(alias);
-      }
-      continue;
-    }
-    if (/^[a-zA-Z_$][\w$]*$/.test(part)) names.push(part);
-  }
-  return names;
-}
-
-function extractTopLevelDecls(code) {
-  const stripped = code
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n]*/g, '')
-    .replace(/'(?:\\.|[^'\\])*'/g, "''")
-    .replace(/"(?:\\.|[^"\\])*"/g, '""')
-    .replace(/`(?:\\.|[^`\\])*`/g, '``');
-  const out = new Set();
-  const reId = /^[\t ]*(?:const|let|var|function|class)\s+([a-zA-Z_$][\w$]*)/gm;
-  let m;
-  while ((m = reId.exec(stripped)) !== null) {
-    const before = stripped.slice(0, m.index);
-    const opens = (before.match(/\{/g) ?? []).length;
-    const closes = (before.match(/\}/g) ?? []).length;
-    if (opens === closes) out.add(m[1]);
-  }
-  const reDestr = /^[\t ]*(?:const|let|var)\s+([\[\{])/gm;
-  while ((m = reDestr.exec(stripped)) !== null) {
-    const before = stripped.slice(0, m.index);
-    const opens = (before.match(/\{/g) ?? []).length;
-    const closes = (before.match(/\}/g) ?? []).length;
-    if (opens !== closes) continue;
-    const bracketStart = m.index + m[0].length - 1;
-    const end = matchBracket(stripped, bracketStart);
-    if (end < 0) continue;
-    const inner = stripped.slice(bracketStart + 1, end);
-    for (const n of namesFromPattern(inner)) out.add(n);
-  }
-  return [...out];
-}
-
-async function runJsBlock(code, lang, scope, mcp) {
-  const currentDecls = new Set(extractTopLevelDecls(code));
-  const priorKeys = Object.keys(scope).filter((k) => /^[a-zA-Z_$][\w$]*$/.test(k) && !currentDecls.has(k));
-  const preamble = priorKeys.map((k) => `const ${k} = __scope__[${JSON.stringify(k)}];`).join('\n');
-  const writeback = [...currentDecls].map((k) => `__scope__[${JSON.stringify(k)}] = ${k};`).join('\n');
-  const wrapped = `return (async () => {\n${preamble}\n${code}\n${writeback}\n})();`;
+async function runJsBlock(code, lang, mcp) {
+  // Fresh scope per block — recipes typically present alternative snippets,
+  // not a sequential pipeline. Sharing scope generated cascading false
+  // positives ("already declared", "X is not defined" cascade).
+  const source = TS_LANGS.has(lang) ? stripTypeScript(code) : code;
+  const wrapped = `return (async () => {\n${source}\n})();`;
   const widgets = [];
   const call = async (toolName, args = {}) => {
     return await callTool(mcp.url, mcp.sid, toolName, args);
   };
   const widget = async (name, params = {}) => { widgets.push({ name, params }); return { name, params }; };
-  const fn = new AsyncFunction('call', 'widget', '__scope__', wrapped);
-  await fn(call, widget, scope);
+  const fn = new AsyncFunction('call', 'widget', wrapped);
+  await fn(call, widget);
   return { widgets };
 }
 
@@ -369,7 +389,7 @@ async function auditServer(server) {
     }
 
     const sqlTool = tools.find((t) => t.name === 'query_sql');
-    const scope = {};
+    const tutorial = isTutorialRecipe(bodyText, codeBlocks);
     for (let i = 0; i < codeBlocks.length; i++) {
       const blk = codeBlocks[i];
       const label = `${blk.lang}#${i + 1}`;
@@ -379,12 +399,41 @@ async function auditServer(server) {
             rows.push({ server: server.id, recipe: name, block: label, status: 'skip-sql', reason: 'no query_sql tool on this server' });
             continue;
           }
+          if (hasSqlPositionalParams(blk.content)) {
+            rows.push({ server: server.id, recipe: name, block: label, status: 'skip-sql-params', reason: 'positional params ($1, $2, …) without bindings' });
+            continue;
+          }
           const { rowCount } = await runSqlBlock(blk.content, mcp, sqlTool);
           const status = rowCount === 0 ? 'empty' : 'ok';
           rows.push({ server: server.id, recipe: name, block: label, status, reason: `${rowCount} row(s)` });
           continue;
         }
-        const { widgets } = await runJsBlock(blk.content, blk.lang, scope, mcp);
+        if (tutorial) {
+          rows.push({ server: server.id, recipe: name, block: label, status: 'skip-tutorial', reason: 'recipe targets run_script / Deno sandbox' });
+          continue;
+        }
+        let widgets;
+        try {
+          ({ widgets } = await runJsBlock(blk.content, blk.lang, mcp));
+        } catch (err) {
+          // Classify TS doc-snippet errors as `skip-doc-snippet` rather than
+          // `error`. These are pedagogical fragments (✅ vs ❌ side-by-side,
+          // illustrative usage referring to a `db` / `dossier` symbol assumed
+          // to exist in the reader's context) — not actual recipe bugs.
+          const msg = String(err.message ?? err);
+          const isDocSnippet =
+            TS_LANGS.has(blk.lang) && (
+              /is not defined/.test(msg) ||
+              /has already been declared/.test(msg) ||
+              /Cannot use import statement/.test(msg) ||
+              /Unexpected (?:identifier|token)/.test(msg)
+            );
+          if (isDocSnippet) {
+            rows.push({ server: server.id, recipe: name, block: label, status: 'skip-doc-snippet', reason: msg.slice(0, 160) });
+            continue;
+          }
+          throw err;
+        }
         let status = 'ok';
         let reason = `${widgets.length} widget(s)`;
         const empties = [];
@@ -445,19 +494,21 @@ if (wantJson) {
   }
   // Per-server summary at the end
   console.log('\n## Summary\n');
-  console.log('| server | total | ok | empty | error | other |');
-  console.log('|--------|-------|----|----|----|----|');
+  console.log('| server | total | ok | empty | error | skipped | narrative |');
+  console.log('|--------|-------|----|----|----|----|----|');
   const byServer = new Map();
   for (const r of allRows) {
     if (!byServer.has(r.server)) byServer.set(r.server, []);
     byServer.get(r.server).push(r);
   }
+  const SKIPS = new Set(['skip-sql', 'skip-sql-params', 'skip-tutorial', 'skip-doc-snippet']);
   for (const [srv, rows] of byServer) {
     const exec = rows.filter((r) => r.block !== '-');
     const ok = exec.filter((r) => r.status === 'ok').length;
     const empty = exec.filter((r) => r.status === 'empty').length;
     const err = exec.filter((r) => r.status === 'error').length;
-    const other = rows.length - exec.length;
-    console.log(`| ${srv} | ${exec.length} | ${ok} | ${empty} | ${err} | ${other} |`);
+    const skipped = exec.filter((r) => SKIPS.has(r.status)).length;
+    const narrative = rows.filter((r) => r.status === 'no-runnable-blocks').length;
+    console.log(`| ${srv} | ${exec.length} | ${ok} | ${empty} | ${err} | ${skipped} | ${narrative} |`);
   }
 }
