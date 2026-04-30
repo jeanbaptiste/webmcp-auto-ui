@@ -32,7 +32,7 @@ export { GemmaProvider } from './providers/gemma.js';
 export type { GemmaProviderOptions, GemmaStatus } from './providers/gemma.js';
 
 // Agent loop
-export { runAgentLoop, toProviderTools, fromMcpTools, trimConversationHistory } from './loop.js';
+export { runAgentLoop, toProviderTools, fromMcpTools, trimConversationHistory, pruneOrphanToolResults } from './loop.js';
 export { buildSystemPrompt, buildSystemPromptWithAliases } from './prompts/index.js';
 export type { SystemPromptResult } from './prompts/index.js';
 export type { AgentLoopOptions } from './loop.js';

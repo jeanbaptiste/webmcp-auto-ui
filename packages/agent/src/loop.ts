@@ -275,6 +275,10 @@ export async function runAgentLoop(
       }
     }
 
+    // Defensive: strip any orphan tool_result blocks before sending — strict
+    // providers (Anthropic) reject these with a 400.
+    pruneOrphanToolResults(messages);
+
     callbacks.onLLMRequest?.(messages, iterationTools);
     const t0 = performance.now();
     let streamingText = '';
@@ -539,6 +543,15 @@ export async function runAgentLoop(
                             const c = messages[i].content;
                             if (Array.isArray(c) && c.length === 0) messages.splice(i, 1);
                           }
+                          // Also drop pending tool_results in the current iteration whose
+                          // tool_use was just stripped from the assistant turn — otherwise
+                          // they become orphans when pushed at the end of the loop.
+                          for (let j = toolResults.length - 1; j >= 0; j--) {
+                            const b = toolResults[j];
+                            if (b.type === 'tool_result' && strippedIds.has((b as { tool_use_id: string }).tool_use_id)) {
+                              toolResults.splice(j, 1);
+                            }
+                          }
                         }
                         hasRendered = false;
                       }
@@ -663,30 +676,8 @@ export function trimConversationHistory(history: ChatMessage[], maxTokens: numbe
 
   // Remove orphaned tool_result blocks anywhere in history — strict providers
   // (Anthropic, etc.) reject tool_result blocks whose tool_use_id does not
-  // correspond to an earlier assistant tool_use. Head-only pruning misses
-  // internal orphans caused by mid-history trims.
-  const validToolUseIds = new Set<string>();
-  for (let i = 0; i < trimmed.length; i++) {
-    const msg = trimmed[i];
-    // Collect tool_use ids from assistant messages seen so far
-    if (msg.role === 'assistant' && Array.isArray(msg.content)) {
-      for (const b of msg.content as any[]) {
-        if (b?.type === 'tool_use' && typeof b.id === 'string') validToolUseIds.add(b.id);
-      }
-    }
-    // Filter out orphan tool_result blocks in user messages
-    if (msg.role === 'user' && Array.isArray(msg.content)) {
-      msg.content = (msg.content as any[]).filter(b => {
-        if (b?.type !== 'tool_result') return true;
-        return typeof b.tool_use_id === 'string' && validToolUseIds.has(b.tool_use_id);
-      }) as any;
-    }
-  }
-  // Drop user messages that became empty after orphan-pruning
-  for (let i = trimmed.length - 1; i >= 0; i--) {
-    const c = trimmed[i].content;
-    if (Array.isArray(c) && c.length === 0) trimmed.splice(i, 1);
-  }
+  // correspond to an earlier assistant tool_use.
+  pruneOrphanToolResults(trimmed);
 
   // Ensure the first non-system message is role=user (API requirement)
   while (trimmed.length > 0) {
@@ -699,4 +690,34 @@ export function trimConversationHistory(history: ChatMessage[], maxTokens: numbe
   }
 
   return trimmed;
+}
+
+/**
+ * Strip orphan tool_result blocks (whose tool_use_id has no matching tool_use
+ * in any preceding assistant message) and drop user messages that become
+ * empty as a result. Mutates `messages` in place.
+ *
+ * Strict providers (Anthropic API) reject orphans with a 400. This guard
+ * runs immediately before each provider call.
+ */
+export function pruneOrphanToolResults(messages: ChatMessage[]): void {
+  const validToolUseIds = new Set<string>();
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+      for (const b of msg.content as any[]) {
+        if (b?.type === 'tool_use' && typeof b.id === 'string') validToolUseIds.add(b.id);
+      }
+    }
+    if (msg.role === 'user' && Array.isArray(msg.content)) {
+      msg.content = (msg.content as any[]).filter(b => {
+        if (b?.type !== 'tool_result') return true;
+        return typeof b.tool_use_id === 'string' && validToolUseIds.has(b.tool_use_id);
+      }) as any;
+    }
+  }
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const c = messages[i].content;
+    if (Array.isArray(c) && c.length === 0) messages.splice(i, 1);
+  }
 }
