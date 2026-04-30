@@ -65,15 +65,14 @@ function makeCallHelper(multiClient: McpMultiClient | undefined, ctx: RunnerCtx)
     }
     ctx.log(`call(${toolName})`);
     const res = await multiClient.callToolOn(found.url, toolName, args);
+    // MCP-spec: prefer structuredContent (typed payload) over content[].text.
+    const sc = (res as { structuredContent?: unknown }).structuredContent;
+    if (sc != null && typeof sc === 'object') return sc;
     const textPart = res?.content?.find((c: { type: string }) => c.type === 'text') as
       | { text?: string }
       | undefined;
     if (textPart?.text) {
-      try {
-        return JSON.parse(textPart.text);
-      } catch {
-        return textPart.text;
-      }
+      try { return JSON.parse(textPart.text); } catch { return textPart.text; }
     }
     return res;
   };
