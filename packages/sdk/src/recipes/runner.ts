@@ -90,7 +90,60 @@ function makeWidgetHelper(ctx: RunnerCtx) {
   };
 }
 
-/** Match top-level `const|let|var name`, `function name`, `class name`.
+/** Find the index of the matching close bracket for `code[startIdx]`. */
+function matchBracket(code: string, startIdx: number): number {
+  const open = code[startIdx];
+  const close = open === '[' ? ']' : open === '{' ? '}' : open === '(' ? ')' : '';
+  if (!close) return -1;
+  let depth = 0;
+  for (let i = startIdx; i < code.length; i++) {
+    if (code[i] === open) depth++;
+    else if (code[i] === close) { depth--; if (depth === 0) return i; }
+  }
+  return -1;
+}
+
+/** Extract identifier names from a destructuring pattern body (without
+ *  the outer brackets). Handles `[a, b]`, `{a, b}`, `{a: alias}`,
+ *  `[a, ...rest]`, default values `a = 1`, top-level commas only. */
+function namesFromPattern(content: string): string[] {
+  const parts: string[] = [];
+  let depth = 0, start = 0;
+  for (let i = 0; i < content.length; i++) {
+    const c = content[i];
+    if (c === '{' || c === '[' || c === '(') depth++;
+    else if (c === '}' || c === ']' || c === ')') depth--;
+    else if (c === ',' && depth === 0) { parts.push(content.slice(start, i)); start = i + 1; }
+  }
+  parts.push(content.slice(start));
+  const names: string[] = [];
+  for (let part of parts) {
+    part = part.trim();
+    if (!part) continue;
+    if (part.startsWith('...')) part = part.slice(3).trim();
+    // Strip default value `name = expr`
+    const eqIdx = part.indexOf('=');
+    if (eqIdx >= 0) part = part.slice(0, eqIdx).trim();
+    // Object rename `key: alias` → take alias side
+    const colonIdx = part.indexOf(':');
+    if (colonIdx >= 0) {
+      const alias = part.slice(colonIdx + 1).trim();
+      // alias may itself be a nested pattern — recurse
+      if (alias.startsWith('{') || alias.startsWith('[')) {
+        const end = matchBracket(alias, 0);
+        if (end > 0) names.push(...namesFromPattern(alias.slice(1, end)));
+      } else if (/^[a-zA-Z_$][\w$]*$/.test(alias)) {
+        names.push(alias);
+      }
+      continue;
+    }
+    if (/^[a-zA-Z_$][\w$]*$/.test(part)) names.push(part);
+  }
+  return names;
+}
+
+/** Match top-level `const|let|var name`, `function name`, `class name`,
+ *  plus destructuring `const [a, b] = ...` and `const { a, b } = ...`.
  *  Skips matches that occur inside a `{}` block (e.g. callback bodies) by
  *  counting unbalanced braces before the match position, on a sanitized copy
  *  of the code where strings and comments are blanked out. */
@@ -101,14 +154,28 @@ function extractTopLevelDecls(code: string): string[] {
     .replace(/'(?:\\.|[^'\\])*'/g, "''")
     .replace(/"(?:\\.|[^"\\])*"/g, '""')
     .replace(/`(?:\\.|[^`\\])*`/g, '``');
-  const re = /^[\t ]*(?:const|let|var|function|class)\s+([a-zA-Z_$][\w$]*)/gm;
   const out = new Set<string>();
+  // Identifier-form decls (existing behavior)
+  const reId = /^[\t ]*(?:const|let|var|function|class)\s+([a-zA-Z_$][\w$]*)/gm;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(stripped)) !== null) {
+  while ((m = reId.exec(stripped)) !== null) {
     const before = stripped.slice(0, m.index);
     const opens = (before.match(/\{/g) ?? []).length;
     const closes = (before.match(/\}/g) ?? []).length;
     if (opens === closes) out.add(m[1]);
+  }
+  // Destructuring: const|let|var followed by `[` or `{`
+  const reDestr = /^[\t ]*(?:const|let|var)\s+([\[\{])/gm;
+  while ((m = reDestr.exec(stripped)) !== null) {
+    const before = stripped.slice(0, m.index);
+    const opens = (before.match(/\{/g) ?? []).length;
+    const closes = (before.match(/\}/g) ?? []).length;
+    if (opens !== closes) continue;
+    const bracketStart = m.index + m[0].length - 1;
+    const end = matchBracket(stripped, bracketStart);
+    if (end < 0) continue;
+    const inner = stripped.slice(bracketStart + 1, end);
+    for (const n of namesFromPattern(inner)) out.add(n);
   }
   return Array.from(out);
 }

@@ -217,23 +217,78 @@ async function runSqlBlock(code, mcp, sqlTool) {
   return { rowCount, raw: res };
 }
 
+function matchBracket(code, startIdx) {
+  const open = code[startIdx];
+  const close = open === '[' ? ']' : open === '{' ? '}' : open === '(' ? ')' : '';
+  if (!close) return -1;
+  let depth = 0;
+  for (let i = startIdx; i < code.length; i++) {
+    if (code[i] === open) depth++;
+    else if (code[i] === close) { depth--; if (depth === 0) return i; }
+  }
+  return -1;
+}
+
+function namesFromPattern(content) {
+  const parts = [];
+  let depth = 0, start = 0;
+  for (let i = 0; i < content.length; i++) {
+    const c = content[i];
+    if (c === '{' || c === '[' || c === '(') depth++;
+    else if (c === '}' || c === ']' || c === ')') depth--;
+    else if (c === ',' && depth === 0) { parts.push(content.slice(start, i)); start = i + 1; }
+  }
+  parts.push(content.slice(start));
+  const names = [];
+  for (let part of parts) {
+    part = part.trim();
+    if (!part) continue;
+    if (part.startsWith('...')) part = part.slice(3).trim();
+    const eqIdx = part.indexOf('=');
+    if (eqIdx >= 0) part = part.slice(0, eqIdx).trim();
+    const colonIdx = part.indexOf(':');
+    if (colonIdx >= 0) {
+      const alias = part.slice(colonIdx + 1).trim();
+      if (alias.startsWith('{') || alias.startsWith('[')) {
+        const end = matchBracket(alias, 0);
+        if (end > 0) names.push(...namesFromPattern(alias.slice(1, end)));
+      } else if (/^[a-zA-Z_$][\w$]*$/.test(alias)) {
+        names.push(alias);
+      }
+      continue;
+    }
+    if (/^[a-zA-Z_$][\w$]*$/.test(part)) names.push(part);
+  }
+  return names;
+}
+
 function extractTopLevelDecls(code) {
-  // Skip matches inside a {} block (callbacks etc.) by checking brace depth
-  // before the match position, on a sanitized copy with strings/comments out.
   const stripped = code
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/\/\/[^\n]*/g, '')
     .replace(/'(?:\\.|[^'\\])*'/g, "''")
     .replace(/"(?:\\.|[^"\\])*"/g, '""')
     .replace(/`(?:\\.|[^`\\])*`/g, '``');
-  const re = /^[\t ]*(?:const|let|var|function|class)\s+([a-zA-Z_$][\w$]*)/gm;
   const out = new Set();
+  const reId = /^[\t ]*(?:const|let|var|function|class)\s+([a-zA-Z_$][\w$]*)/gm;
   let m;
-  while ((m = re.exec(stripped)) !== null) {
+  while ((m = reId.exec(stripped)) !== null) {
     const before = stripped.slice(0, m.index);
     const opens = (before.match(/\{/g) ?? []).length;
     const closes = (before.match(/\}/g) ?? []).length;
     if (opens === closes) out.add(m[1]);
+  }
+  const reDestr = /^[\t ]*(?:const|let|var)\s+([\[\{])/gm;
+  while ((m = reDestr.exec(stripped)) !== null) {
+    const before = stripped.slice(0, m.index);
+    const opens = (before.match(/\{/g) ?? []).length;
+    const closes = (before.match(/\}/g) ?? []).length;
+    if (opens !== closes) continue;
+    const bracketStart = m.index + m[0].length - 1;
+    const end = matchBracket(stripped, bracketStart);
+    if (end < 0) continue;
+    const inner = stripped.slice(bracketStart + 1, end);
+    for (const n of namesFromPattern(inner)) out.add(n);
   }
   return [...out];
 }
