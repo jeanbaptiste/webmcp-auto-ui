@@ -107,26 +107,45 @@ async function mcpInit(url) {
   return sid;
 }
 
+// Retry transient failures (5xx, network errors, 429). Three attempts with
+// 1s/4s/9s backoff. 4xx (other than 429) and parse errors fail fast.
+async function withRetry(label, fn) {
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try { return await fn(); }
+    catch (err) {
+      lastErr = err;
+      const msg = String(err.message ?? err);
+      const transient = /HTTP (5\d\d|429)\b/.test(msg) || /fetch failed|ECONNRESET|ETIMEDOUT|socket hang up/i.test(msg);
+      if (!transient || attempt === 3) throw err;
+      await new Promise((r) => setTimeout(r, attempt * attempt * 1000));
+    }
+  }
+  throw lastErr;
+}
+
 let _rpcId = 100;
 async function mcpCall(url, sid, method, params) {
   const id = ++_rpcId;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json, text/event-stream',
-      'mcp-session-id': sid,
-      ...(authHeaderFor(url) ? { Authorization: authHeaderFor(url) } : {}),
-    },
-    body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+  return withRetry(method, async () => {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        'mcp-session-id': sid,
+        ...(authHeaderFor(url) ? { Authorization: authHeaderFor(url) } : {}),
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+    });
+    if (!res.ok) throw new Error(`${method} HTTP ${res.status}`);
+    const text = await res.text();
+    const msgs = parseSse(text);
+    const reply = msgs.find((m) => m.id === id);
+    if (!reply) throw new Error(`${method} no reply`);
+    if (reply.error) throw new Error(`${method} ${reply.error.message ?? JSON.stringify(reply.error)}`);
+    return reply.result;
   });
-  if (!res.ok) throw new Error(`${method} HTTP ${res.status}`);
-  const text = await res.text();
-  const msgs = parseSse(text);
-  const reply = msgs.find((m) => m.id === id);
-  if (!reply) throw new Error(`${method} no reply`);
-  if (reply.error) throw new Error(`${method} ${reply.error.message ?? JSON.stringify(reply.error)}`);
-  return reply.result;
 }
 
 async function listTools(url, sid) {
