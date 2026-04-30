@@ -20,6 +20,12 @@
      * Ignored when `actions` is provided.
      */
     onrun?: (payload: { code: string; lang: string; result: RunResult }) => void;
+    /**
+     * Optional shared scope object. When provided, top-level decls of prior
+     * blocks are visible in this block, and this block's top-level decls are
+     * written back so subsequent blocks can read them. Owner: the host modal.
+     */
+    scope?: Record<string, unknown>;
   }
 
   let {
@@ -27,6 +33,7 @@
     lang = 'text',
     actions = undefined,
     onrun,
+    scope,
   }: Props = $props();
 
   let editable = $state('');
@@ -86,7 +93,7 @@
     startTimer(t0);
 
     const multi = canvas.multiClient as McpMultiClient | undefined;
-    const result = await runCode(editable, lang, multi);
+    const result = await runCode(editable, lang, multi, scope);
 
     stopTimer();
     lastDuration = result.durationMs;

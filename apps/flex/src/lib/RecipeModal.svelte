@@ -72,6 +72,9 @@
   let runs = $state<RunTab[]>([]);
   let activeTabId = $state<string | null>(null);
   let runModalOpen = $state(false);
+  // Shared scope across this recipe's code blocks. Top-level decls written
+  // here by one block are visible in subsequent blocks (pipeline recipes).
+  let runScope = $state<Record<string, unknown>>({});
 
   // Reset runs when the recipe changes
   $effect(() => {
@@ -80,6 +83,7 @@
     runs = [];
     activeTabId = null;
     runModalOpen = false;
+    runScope = {};
   });
 
   function tabIdFor(index: number, lang: string): string {
@@ -117,7 +121,7 @@
     };
     runs = [...runs];
     const multi = canvas.multiClient as Parameters<typeof runCode>[2];
-    const result = await runCode(tab.code, tab.lang, multi);
+    const result = await runCode(tab.code, tab.lang, multi, runScope);
     runs[idx] = { ...tab, result };
     runs = [...runs];
   }
@@ -210,6 +214,7 @@
                     <RecipeCodeBlock
                       code={seg.content}
                       lang={seg.lang ?? 'text'}
+                      scope={runScope}
                       onrun={(payload) => handleBlockRun(i, payload)}
                     />
                   {/if}

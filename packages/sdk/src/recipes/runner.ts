@@ -91,21 +91,44 @@ function makeWidgetHelper(ctx: RunnerCtx) {
   };
 }
 
+/** Match top-level `const|let|var name`, `function name`, `class name`. */
+function extractTopLevelDecls(code: string): string[] {
+  const re = /^[\t ]*(?:const|let|var|function|class)\s+([a-zA-Z_$][\w$]*)/gm;
+  const out = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(code)) !== null) out.add(m[1]);
+  return Array.from(out);
+}
+
 async function runJsLike(
   code: string,
   ctx: RunnerCtx,
   multiClient?: McpMultiClient,
+  scope?: Record<string, unknown>,
 ): Promise<unknown> {
   // Wrap user code as the body of an async function that executes itself.
   // Users can use `await`, define vars, and return a final value.
   // We inject `call` and `widget` helpers as parameters so recipes can
   // invoke MCP tools and emit widgets without preamble.
-  const wrapped = `return (async () => {\n${code}\n})();`;
+  // When a `scope` object is provided, top-level decls of prior blocks are
+  // re-injected as local consts (preamble), and the current block's top-level
+  // decls are written back at the end so the next block can read them.
+  const currentDecls = new Set(extractTopLevelDecls(code));
+  const priorKeys = scope
+    ? Object.keys(scope).filter((k) => /^[a-zA-Z_$][\w$]*$/.test(k) && !currentDecls.has(k))
+    : [];
+  const preamble = priorKeys.map((k) => `const ${k} = __scope__[${JSON.stringify(k)}];`).join('\n');
+  const writeback = scope
+    ? Array.from(currentDecls).map((k) => `__scope__[${JSON.stringify(k)}] = ${k};`).join('\n')
+    : '';
+  const wrapped = `return (async () => {\n${preamble}\n${code}\n${writeback}\n})();`;
   const fn = new (AsyncFunction as unknown as new (
     ...args: string[]
-  ) => (call: unknown, widget: unknown) => Promise<unknown>)('call', 'widget', wrapped);
+  ) => (call: unknown, widget: unknown, __scope__: Record<string, unknown>) => Promise<unknown>)(
+    'call', 'widget', '__scope__', wrapped,
+  );
   ctx.log('dispatched (inline async)');
-  const out = await fn(makeCallHelper(multiClient, ctx), makeWidgetHelper(ctx));
+  const out = await fn(makeCallHelper(multiClient, ctx), makeWidgetHelper(ctx), scope ?? {});
   ctx.log('resolved');
   return out;
 }
@@ -334,7 +357,8 @@ export function parseWidgetDisplayCall(
 export async function runCode(
   code: string,
   lang: string,
-  multiClient?: McpMultiClient
+  multiClient?: McpMultiClient,
+  scope?: Record<string, unknown>,
 ): Promise<RunResult> {
   const ctx = makeCtx();
   const normLang = (lang || '').toLowerCase();
@@ -360,7 +384,7 @@ export async function runCode(
     }
     let output: unknown;
     if (JS_LANGS.has(normLang) || TS_LANGS.has(normLang) || normLang === '') {
-      output = await runJsLike(code, ctx, multiClient);
+      output = await runJsLike(code, ctx, multiClient, scope);
     } else {
       output = await runViaMcp(code, normLang, multiClient, ctx);
     }
