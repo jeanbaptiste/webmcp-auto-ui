@@ -77,15 +77,18 @@ await widget('kv', {
 const today = new Date().toISOString().slice(0, 10);
 const raw = await call('nasa_epic', { collection: 'natural', date: today }).catch(() => null);
 const frames = (Array.isArray(raw) ? raw : []).filter(f => f);
-await widget('carousel', { items: frames.map(f => ({ image: epicUrl(f), subtitle: f?.date ?? '—' })) });
-await widget('map', { center: [0, 0], zoom: 1, markers: frames.filter(f => Number.isFinite(f?.centroid_coordinates?.lat)).map(f => ({ lat: f.centroid_coordinates.lat, lon: f.centroid_coordinates.lon })) });
+const carItems = frames.map(f => ({ image: epicUrl(f), subtitle: f?.date ?? '—' }));
+const markers = frames.filter(f => Number.isFinite(f?.centroid_coordinates?.lat)).map(f => ({ lat: f.centroid_coordinates.lat, lon: f.centroid_coordinates.lon }));
+await widget('carousel', { items: carItems.length ? carItems : [{ title: 'EPIC natural (preview)', subtitle: today }] });
+await widget('map', { center: [0, 0], zoom: 1, markers: markers.length ? markers : [{ lat: 0, lon: 0, label: 'EPIC sub-solar (preview)' }] });
 ```
 
 ### Enhanced collection on a specific date
 ```js
 const raw = await call('nasa_epic', { collection: 'enhanced', date: '2024-12-21' }).catch(() => null);
 const frames = (Array.isArray(raw) ? raw : []).filter(f => f);
-await widget('carousel', { items: frames.map(f => ({ image: epicUrl(f, 'enhanced'), title: f?.date ?? '—' })) });
+const carItems = frames.map(f => ({ image: epicUrl(f, 'enhanced'), title: f?.date ?? '—' }));
+await widget('carousel', { items: carItems.length ? carItems : [{ title: 'EPIC enhanced 2024-12-21 (preview)', subtitle: 'Run live to see frames' }] });
 await widget('kv', { items: [{ label: 'Solstice', value: '2024-12-21' }, { label: 'Frames', value: frames.length }] });
 ```
 

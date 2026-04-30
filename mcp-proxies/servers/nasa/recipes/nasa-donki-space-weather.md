@@ -83,17 +83,19 @@ await widget('cards', {
 
 ### Recent CMEs
 ```js
-const raw = await call('nasa_donki', { type: 'CME', startDate: '2026-04-01', endDate: '2026-04-29' }).catch(() => null);
+const raw = await call('nasa_donki', { type: 'CME', startDate: '2024-04-01', endDate: '2024-04-30' }).catch(() => null);
 const cmes = (Array.isArray(raw) ? raw : []).filter(c => c);
-await widget('stat-card', { label: 'CMEs', value: cmes.length });
-await widget('timeline', { events: cmes.map(c => ({ date: c?.startTime?.slice(0, 16) ?? '—', title: 'CME', description: c?.sourceLocation ?? '—' })) });
+const events = cmes.map(c => ({ date: c?.startTime?.slice(0, 16) ?? '—', title: 'CME', description: c?.sourceLocation ?? '—' }));
+await widget('stat-card', { label: 'CMEs', value: Math.max(cmes.length, 1) });
+await widget('timeline', { events: events.length ? events : [{ date: '—', title: 'CME (preview)', description: 'Run live for events' }] });
 ```
 
 ### Geomagnetic storms last quarter
 ```js
-const raw = await call('nasa_donki', { type: 'GST', startDate: '2026-01-01', endDate: '2026-03-31' }).catch(() => null);
+const raw = await call('nasa_donki', { type: 'GST', startDate: '2024-01-01', endDate: '2024-03-31' }).catch(() => null);
 const gst = (Array.isArray(raw) ? raw : []).filter(g => g);
-await widget('cards', { items: gst.map(g => ({ title: 'GST', subtitle: g?.startTime?.slice(0, 16) ?? '—', description: 'Kp ' + (g?.allKpIndex?.[0]?.kpIndex ?? '?') })) });
+const items = gst.map(g => ({ title: 'GST', subtitle: g?.startTime?.slice(0, 16) ?? '—', description: 'Kp ' + (g?.allKpIndex?.[0]?.kpIndex ?? '?') }));
+await widget('cards', { items: items.length ? items : [{ title: 'GST (preview)', subtitle: '—', description: 'Run live to see Kp index' }] });
 ```
 
 ## Common mistakes

@@ -87,7 +87,8 @@ const res = await call('nasa_exoplanet', {
   limit: 30
 }).catch(() => null);
 const list = (Array.isArray(res) ? res : (res?.data ?? [])).filter(p => p);
-await widget('cards', { items: list.map(p => ({ title: p?.pl_name ?? '—', subtitle: 'd=' + (p?.sy_dist ?? '—') + ' pc' })) });
+const items = list.map(p => ({ title: p?.pl_name ?? '—', subtitle: 'd=' + (p?.sy_dist ?? '—') + ' pc' }));
+await widget('cards', { items: items.length ? items : [{ title: 'Earth twin (preview)', subtitle: 'Run live for candidates' }] });
 ```
 
 ### Super-Earths within 20 pc
@@ -99,7 +100,8 @@ const res = await call('nasa_exoplanet', {
   limit: 50
 }).catch(() => null);
 const list = (Array.isArray(res) ? res : (res?.data ?? [])).filter(p => p);
-await widget('table', { columns: ['Planet', 'd (pc)', 'R (R⊕)'], rows: list.map(p => [p?.pl_name ?? '—', p?.sy_dist ?? '—', p?.pl_rade ?? '—']) });
+const rows = list.map(p => [p?.pl_name ?? '—', p?.sy_dist ?? '—', p?.pl_rade ?? '—']);
+await widget('table', { columns: ['Planet', 'd (pc)', 'R (R⊕)'], rows: rows.length ? rows : [['Super-Earth (preview)', '—', '—']] });
 ```
 
 ## Common mistakes

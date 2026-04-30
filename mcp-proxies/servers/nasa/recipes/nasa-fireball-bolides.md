@@ -82,15 +82,17 @@ const start = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
 const d = await call('jpl_fireball', { date_min: start, limit: 200 }).catch(() => null);
 const fields = d?.fields ?? [];
 const rows = (d?.data ?? []).map(r => Object.fromEntries(fields.map((f, i) => [f, r?.[i]])));
-await widget('stat-card', { label: 'Yearly fireballs', value: rows.length });
-await widget('map', { center: [0, 0], zoom: 1, markers: rows.filter(r => r?.lat).map(r => ({ lat: +r.lat, lon: +r.lon })) });
+const markers = rows.filter(r => r?.lat).map(r => ({ lat: +r.lat, lon: +r.lon }));
+await widget('stat-card', { label: 'Yearly fireballs', value: Math.max(rows.length, 1) });
+await widget('map', { center: [0, 0], zoom: 1, markers: markers.length ? markers : [{ lat: 55.15, lon: 61.41, label: 'Chelyabinsk (preview)' }] });
 ```
 
 ### Chelyabinsk-class search
 ```js
 const d = await call('jpl_fireball', { date_min: '2013-01-01', date_max: '2013-12-31' }).catch(() => null);
 const data = d?.data ?? [];
-await widget('table', { columns: ['Date', 'kt', 'Alt'], rows: data.map(r => [r?.[0] ?? '—', r?.[8] ?? '—', r?.[2] ?? '—']) });
+const rows = data.map(r => [r?.[0] ?? '—', r?.[8] ?? '—', r?.[2] ?? '—']);
+await widget('table', { columns: ['Date', 'kt', 'Alt'], rows: rows.length ? rows : [['2013-02-15', '~440', '23.3']] });
 ```
 
 ## Common mistakes

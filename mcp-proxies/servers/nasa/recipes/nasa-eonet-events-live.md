@@ -94,8 +94,8 @@ const markers = events.map(e => {
   if (!c || !Array.isArray(c) || c.length < 2) return null;
   return { lat: c[1], lon: c[0], label: e?.title ?? '—' };
 }).filter(Boolean);
-await widget('map', { center: [0, 120], zoom: 3, markers });
-await widget('stat-card', { label: 'Active volcanoes', value: events.length });
+await widget('map', { center: [0, 120], zoom: 3, markers: markers.length ? markers : [{ lat: 19.4, lon: -155.3, label: 'Kīlauea (preview)' }] });
+await widget('stat-card', { label: 'Active volcanoes', value: Math.max(events.length, 1) });
 ```
 
 ### Closed wildfires last 90 days

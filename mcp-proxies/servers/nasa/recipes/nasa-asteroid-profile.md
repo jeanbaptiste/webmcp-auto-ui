@@ -87,7 +87,7 @@ const cadData = cad?.data ?? [];
 const rows = cadData.slice(0, 20).map(d => [d?.[3] ?? '—', d?.[4] ?? '—', d?.[7] ?? '—', d?.[10] ?? '—']);
 await widget('table', {
   columns: ['Body', 'Date (TDB)', 'Distance (au)', 'V-rel (km/s)'],
-  rows
+  rows: rows.length ? rows : [['Earth', '—', '—', '—']]
 });
 
 // 8. Sentry summary as prose

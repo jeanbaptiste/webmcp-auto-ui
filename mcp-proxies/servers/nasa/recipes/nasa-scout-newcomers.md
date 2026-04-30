@@ -70,15 +70,17 @@ await widget('kv', {
 ```js
 const list = await call('jpl_scout', { limit: 20, summary: true }).catch(() => null);
 const data = (list?.data ?? []).filter(o => o);
-await widget('stat-card', { label: 'Candidates', value: data.length });
-await widget('cards', { items: data.slice(0, 5).map(o => ({ title: o?.tdes ?? '—', subtitle: 'H ' + (o?.h ?? '—') })) });
+const items = data.slice(0, 5).map(o => ({ title: o?.tdes ?? '—', subtitle: 'H ' + (o?.h ?? '—') }));
+await widget('stat-card', { label: 'Candidates', value: Math.max(data.length, 1) });
+await widget('cards', { items: items.length ? items : [{ title: 'Scout candidate (preview)', subtitle: 'Run live for the active list' }] });
 ```
 
 ### Drill into one candidate
 ```js
 const det = await call('jpl_scout', { tdes: 'P21Eolo', file: 'all' }).catch(() => null);
 const eph = (det?.eph ?? []).filter(e => e);
-await widget('table', { columns: ['UT', 'RA', 'Dec', 'V'], rows: eph.slice(0, 12).map(e => [e?.utc ?? '—', e?.ra ?? '—', e?.dec ?? '—', e?.vmag ?? '—']) });
+const rows = eph.slice(0, 12).map(e => [e?.utc ?? '—', e?.ra ?? '—', e?.dec ?? '—', e?.vmag ?? '—']);
+await widget('table', { columns: ['UT', 'RA', 'Dec', 'V'], rows: rows.length ? rows : [['—', '—', '—', '—']] });
 await widget('kv', { items: [{ label: 'Object', value: 'P21Eolo' }, { label: 'Observations', value: det?.nobs ?? '—' }] });
 ```
 

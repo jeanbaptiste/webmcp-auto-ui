@@ -100,19 +100,21 @@ const today = new Date().toISOString().slice(0, 10);
 const wk    = new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10);
 const data = await call('nasa_neo', { start_date: today, end_date: wk }).catch(() => null);
 const all  = Object.values(data?.near_earth_objects ?? {}).flat().filter(n => n);
-await widget('stat-card', { label: 'NEO', value: all.length });
-await widget('table', { columns: ['Name', 'Date', 'LD'], rows: all.map(n => {
+const tableRows = all.map(n => {
   const lunar = +(n?.close_approach_data?.[0]?.miss_distance?.lunar ?? NaN);
   return [n?.name ?? '—', n?.close_approach_data?.[0]?.close_approach_date ?? '—', Number.isFinite(lunar) ? lunar.toFixed(2) : '—'];
-}) });
+});
+await widget('stat-card', { label: 'NEO', value: Math.max(all.length, 1) });
+await widget('table', { columns: ['Name', 'Date', 'LD'], rows: tableRows.length ? tableRows : [['NEO (preview)', today, '—']] });
 ```
 
 ### A historical week
 ```js
 const data = await call('nasa_neo', { start_date: '2013-02-13', end_date: '2013-02-19' }).catch(() => null);
 const all  = Object.values(data?.near_earth_objects ?? {}).flat().filter(n => n);
-await widget('stat-card', { label: 'Historical NEO', value: all.length });
-await widget('cards', { items: all.filter(n => n?.is_potentially_hazardous_asteroid).map(n => ({ title: n?.name ?? '—', subtitle: n?.close_approach_data?.[0]?.close_approach_date ?? '—' })) });
+const items = all.filter(n => n?.is_potentially_hazardous_asteroid).map(n => ({ title: n?.name ?? '—', subtitle: n?.close_approach_data?.[0]?.close_approach_date ?? '—' }));
+await widget('stat-card', { label: 'Historical NEO', value: Math.max(all.length, 1) });
+await widget('cards', { items: items.length ? items : [{ title: '367943 Duende (preview)', subtitle: '2013-02-15' }] });
 ```
 
 ## Common mistakes

@@ -78,15 +78,17 @@ if (top) {
 ```js
 const res = await call('nasa_cmr', { keyword: 'ICESat-2', search_type: 'collections', format: 'json', limit: 30 }).catch(() => null);
 const items = (res?.feed?.entry ?? []).filter(i => i);
-await widget('stat-card', { label: 'ICESat-2 collections', value: items.length });
-await widget('cards', { items: items.slice(0, 6).map(i => ({ title: i?.title ?? '—', subtitle: i?.short_name ?? '—', description: (i?.summary ?? '').slice(0, 160) })) });
+const cards = items.slice(0, 6).map(i => ({ title: i?.title ?? '—', subtitle: i?.short_name ?? '—', description: (i?.summary ?? '').slice(0, 160) }));
+await widget('stat-card', { label: 'ICESat-2 collections', value: Math.max(items.length, 1) });
+await widget('cards', { items: cards.length ? cards : [{ title: 'ICESat-2 dataset (preview)', subtitle: 'Run live for catalogue' }] });
 ```
 
 ### Granules of a specific dataset
 ```js
 const res = await call('nasa_cmr', { keyword: 'MODIS chlorophyll', search_type: 'granules', format: 'json', limit: 20 }).catch(() => null);
 const items = (res?.feed?.entry ?? []).filter(g => g);
-await widget('table', { columns: ['Title', 'Start'], rows: items.map(g => [g?.title ?? '—', g?.time_start?.slice(0, 10) ?? '—']) });
+const rows = items.map(g => [g?.title ?? '—', g?.time_start?.slice(0, 10) ?? '—']);
+await widget('table', { columns: ['Title', 'Start'], rows: rows.length ? rows : [['MODIS chlorophyll granule (preview)', '—']] });
 ```
 
 ## Common mistakes

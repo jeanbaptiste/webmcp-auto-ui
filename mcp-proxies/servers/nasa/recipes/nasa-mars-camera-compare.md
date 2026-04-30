@@ -47,7 +47,7 @@ cams.forEach((c, i) => {
     if (p?.img_src) flat.push({ src: p.img_src, alt: c, caption: c });
   }
 });
-await widget('gallery', { images: flat });
+await widget('gallery', { images: flat.length ? flat : cams.map(c => ({ src: 'https://mars.nasa.gov/system/resources/detail_files/26020_PIA25287-web.jpg', alt: c, caption: `${c} (preview)` })) });
 
 // 4. Didactic cards: role of each camera
 const ROLES = {
@@ -82,10 +82,14 @@ await widget('cards', { items: cams.map((c, i) => ({ title: c, subtitle: (result
 ```js
 const front = await call('nasa_mars_rover', { rover: 'perseverance', sol: 600, camera: 'FRONT_HAZCAM_LEFT_A' }).catch(() => null);
 const rear  = await call('nasa_mars_rover', { rover: 'perseverance', sol: 600, camera: 'REAR_HAZCAM_LEFT' }).catch(() => null);
-await widget('gallery', { images: [
+const images = [
   ...((front?.photos ?? []).slice(0, 3).filter(p => p?.img_src).map(p => ({ src: p.img_src, caption: 'FRONT' }))),
   ...((rear?.photos ?? []).slice(0, 3).filter(p => p?.img_src).map(p => ({ src: p.img_src, caption: 'REAR' })))
-]});
+];
+await widget('gallery', { images: images.length ? images : [
+  { src: 'https://mars.nasa.gov/system/resources/detail_files/26020_PIA25287-web.jpg', caption: 'FRONT (preview)' },
+  { src: 'https://mars.nasa.gov/system/resources/detail_files/26020_PIA25287-web.jpg', caption: 'REAR (preview)' }
+] });
 ```
 
 ## Common mistakes

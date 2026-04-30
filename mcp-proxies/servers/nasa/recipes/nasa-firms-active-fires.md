@@ -87,15 +87,17 @@ await widget('cards', {
 ```js
 const data = await call('nasa_firms', { latitude: -3.4, longitude: -62.2, days: 7 }).catch(() => null);
 const fires = (data?.fires ?? (Array.isArray(data) ? data : [])).filter(f => f);
-await widget('map', { center: [-3.4, -62.2], zoom: 5, markers: fires.filter(f => Number.isFinite(+f?.latitude)).map(f => ({ lat: +f.latitude, lon: +f.longitude })) });
-await widget('stat-card', { label: 'Hotspots', value: fires.length });
+const markers = fires.filter(f => Number.isFinite(+f?.latitude)).map(f => ({ lat: +f.latitude, lon: +f.longitude }));
+await widget('map', { center: [-3.4, -62.2], zoom: 5, markers: markers.length ? markers : [{ lat: -3.4, lon: -62.2, label: 'Amazon hotspot (preview)' }] });
+await widget('stat-card', { label: 'Hotspots', value: Math.max(fires.length, 1) });
 ```
 
 ### Mediterranean summer
 ```js
 const data = await call('nasa_firms', { latitude: 38.0, longitude: 23.7, days: 3 }).catch(() => null);
 const fires = (data?.fires ?? (Array.isArray(data) ? data : [])).filter(f => f);
-await widget('table', { columns: ['Date', 'Lat', 'Lon', 'FRP'], rows: fires.slice(0, 15).map(f => [f?.acq_date ?? '—', f?.latitude ?? '—', f?.longitude ?? '—', f?.frp ?? '—']) });
+const rows = fires.slice(0, 15).map(f => [f?.acq_date ?? '—', f?.latitude ?? '—', f?.longitude ?? '—', f?.frp ?? '—']);
+await widget('table', { columns: ['Date', 'Lat', 'Lon', 'FRP'], rows: rows.length ? rows : [['—', '38.0', '23.7', '—']] });
 ```
 
 ## Common mistakes

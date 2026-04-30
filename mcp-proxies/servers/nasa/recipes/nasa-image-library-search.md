@@ -69,16 +69,19 @@ await widget('cards', {
 ```js
 const res = await call('nasa_images', { q: 'Apollo 11', media_type: 'image', year_start: '1969', year_end: '1969' }).catch(() => null);
 const items = (res?.collection?.items ?? []).filter(it => it);
-await widget('stat-card', { label: 'Apollo 11 photos', value: res?.collection?.metadata?.total_hits ?? items.length });
-await widget('gallery', { images: items.slice(0, 30).filter(it => it?.links?.[0]?.href).map(it => ({ src: it.links[0].href, alt: it?.data?.[0]?.title ?? '—' })) });
+const total = res?.collection?.metadata?.total_hits ?? items.length;
+const images = items.slice(0, 30).filter(it => it?.links?.[0]?.href).map(it => ({ src: it.links[0].href, alt: it?.data?.[0]?.title ?? '—' }));
+await widget('stat-card', { label: 'Apollo 11 photos', value: Math.max(total, 1) });
+await widget('gallery', { images: images.length ? images : [{ src: 'https://images-assets.nasa.gov/image/as11-40-5874/as11-40-5874~thumb.jpg', alt: 'Apollo 11 (preview)' }] });
 ```
 
 ### JWST videos this year
 ```js
 const res = await call('nasa_images', { q: 'James Webb', media_type: 'video', year_start: '2024', year_end: '2026' }).catch(() => null);
 const items = (res?.collection?.items ?? []).filter(it => it);
-await widget('stat-card', { label: 'JWST videos', value: items.length });
-await widget('cards', { items: items.map(it => ({ title: it?.data?.[0]?.title ?? '—', subtitle: (it?.data?.[0]?.date_created ?? '').slice(0, 4), description: (it?.data?.[0]?.description ?? '').slice(0, 160) })) });
+const cards = items.map(it => ({ title: it?.data?.[0]?.title ?? '—', subtitle: (it?.data?.[0]?.date_created ?? '').slice(0, 4), description: (it?.data?.[0]?.description ?? '').slice(0, 160) }));
+await widget('stat-card', { label: 'JWST videos', value: Math.max(items.length, 1) });
+await widget('cards', { items: cards.length ? cards : [{ title: 'JWST video (preview)', subtitle: '2024', description: 'Run live for media.nasa.gov results' }] });
 ```
 
 ## Common mistakes

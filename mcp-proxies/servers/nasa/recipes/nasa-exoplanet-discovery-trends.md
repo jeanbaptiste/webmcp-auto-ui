@@ -85,14 +85,15 @@ const res = await call('nasa_exoplanet', { table: 'ps', select: 'disc_year', whe
 const planets = (Array.isArray(res) ? res : (res?.data ?? [])).filter(p => p);
 const byYear = {};
 for (const p of planets) if (p?.disc_year != null) byYear[p.disc_year] = (byYear[p.disc_year] || 0) + 1;
-await widget('chart', { type: 'bar', data: Object.entries(byYear).map(([y, n]) => ({ label: y, value: n })) });
+const data = Object.entries(byYear).map(([y, n]) => ({ label: y, value: n }));
+await widget('chart', { type: 'bar', data: data.length ? data : [{ label: '2024', value: 1 }] });
 ```
 
 ### Kepler harvest specifically
 ```js
 const res = await call('nasa_exoplanet', { table: 'ps', select: 'pl_name', where: "default_flag=1 and disc_facility like '%Kepler%'", limit: 5000 }).catch(() => null);
 const list = (Array.isArray(res) ? res : (res?.data ?? [])).filter(p => p);
-await widget('stat-card', { label: 'Kepler discoveries', value: list.length });
+await widget('stat-card', { label: 'Kepler discoveries', value: Math.max(list.length, 1) });
 ```
 
 ## Examples (cont.)

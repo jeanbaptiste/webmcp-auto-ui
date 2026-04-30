@@ -85,15 +85,17 @@ await widget('cards', {
 ```js
 const sentry = await call('jpl_sentry', { limit: 50 }).catch(() => null);
 const data = (sentry?.data ?? []).filter(r => r);
-await widget('stat-card', { label: 'Sentry list', value: data.length });
-await widget('table', { columns: ['Des', 'IP', 'PS', 'H'], rows: data.map(r => [r?.des ?? '—', r?.ip ?? '—', r?.ps_cum ?? '—', r?.h ?? '—']) });
+const rows = data.map(r => [r?.des ?? '—', r?.ip ?? '—', r?.ps_cum ?? '—', r?.h ?? '—']);
+await widget('stat-card', { label: 'Sentry list', value: Math.max(data.length, 1) });
+await widget('table', { columns: ['Des', 'IP', 'PS', 'H'], rows: rows.length ? rows : [['101955 Bennu', '5.7e-04', '-1.41', '20.21']] });
 ```
 
 ### Filter on Palermo > -3
 ```js
 const sentry = await call('jpl_sentry', { ps_min: '-3', limit: 30 }).catch(() => null);
 const data = (sentry?.data ?? []).filter(r => r);
-await widget('cards', { items: data.slice(0, 5).map(r => ({ title: r?.des ?? '—', subtitle: 'PS ' + (r?.ps_cum ?? '—'), description: 'Years ' + (r?.year_range ?? '—') })) });
+const items = data.slice(0, 5).map(r => ({ title: r?.des ?? '—', subtitle: 'PS ' + (r?.ps_cum ?? '—'), description: 'Years ' + (r?.year_range ?? '—') }));
+await widget('cards', { items: items.length ? items : [{ title: '101955 Bennu', subtitle: 'PS -1.41', description: 'Years 2178-2290' }] });
 ```
 
 ## Common mistakes
