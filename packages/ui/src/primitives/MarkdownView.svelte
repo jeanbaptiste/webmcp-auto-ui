@@ -5,13 +5,23 @@
   interface Props {
     source: string;
     class?: string;
+    onLinkClick?: (href: string, ev: MouseEvent) => void;
   }
 
-  let { source, class: className = '' }: Props = $props();
+  let { source, class: className = '', onLinkClick }: Props = $props();
   const html = $derived(renderMarkdown(source ?? ''));
+
+  function handleClick(ev: MouseEvent) {
+    if (!onLinkClick) return;
+    const a = (ev.target as HTMLElement | null)?.closest?.('a');
+    if (!a) return;
+    const href = a.getAttribute('href');
+    if (!href) return;
+    onLinkClick(href, ev);
+  }
 </script>
 
-<div class="markdown-body {className}">
+<div class="markdown-body {className}" onclick={handleClick} role="presentation">
   {@html html}
 </div>
 

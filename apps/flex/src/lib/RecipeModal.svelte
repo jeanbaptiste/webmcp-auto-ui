@@ -15,9 +15,10 @@
     anchorText?: string;
     /** Connected WebMCP servers — forwarded to the run panel for live widget rendering. */
     servers?: WebMcpServer[];
+    onNavigate?: (slug: string, anchor?: string) => void;
   }
 
-  let { open = $bindable(false), recipe, onclose, anchorText = undefined, servers = [] }: Props = $props();
+  let { open = $bindable(false), recipe, onclose, anchorText = undefined, servers = [], onNavigate }: Props = $props();
 
   /** True when the recipe is an MCP recipe (no body/when/layout — only name+description) */
   const isMcpRecipe = $derived(
@@ -209,7 +210,19 @@
               {#each segments as seg, i (i)}
                 <div data-segment-idx={i} class="transition-shadow">
                   {#if seg.type === 'markdown'}
-                    <MarkdownView source={seg.content} />
+                    <MarkdownView
+                      source={seg.content}
+                      onLinkClick={(href, ev) => {
+                        if (href.startsWith('recipe:')) {
+                          ev.preventDefault();
+                          const rest = href.slice('recipe:'.length);
+                          const hashIdx = rest.indexOf('#');
+                          const slug = hashIdx >= 0 ? rest.slice(0, hashIdx) : rest;
+                          const anchor = hashIdx >= 0 ? decodeURIComponent(rest.slice(hashIdx + 1)) : undefined;
+                          onNavigate?.(slug, anchor);
+                        }
+                      }}
+                    />
                   {:else}
                     <RecipeCodeBlock
                       code={seg.content}

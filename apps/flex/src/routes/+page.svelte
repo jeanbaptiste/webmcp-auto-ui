@@ -1438,6 +1438,22 @@
   anchorText={detailAnchor}
   servers={activeServers}
   onclose={() => { detailOpen = false; detailAnchor = undefined; }}
+  onNavigate={(slug, anchor) => {
+    // 3 sources to resolve a recipe slug: discovery cache, local webmcp, traceObserver
+    const fromMcp = mcpRecipes.find(r => r.name === slug || (r as any).originalName === slug || (r as any).id === slug);
+    const fromWebmcp = !fromMcp ? webmcpRecipes.find(r => r.name === slug || (r as any).id === slug) : null;
+    let resolved: any = fromMcp ?? fromWebmcp ?? null;
+    if (!resolved) {
+      const body = traceObserver.getLoadedRecipes().get(slug);
+      if (body) resolved = { name: slug, description: '', body };
+    }
+    if (!resolved) {
+      console.warn('[RecipeModal] recipe not found:', slug);
+      return;
+    }
+    detailRecipe = resolved as RecipeData;
+    detailAnchor = anchor;
+  }}
 />
 
 <ToolBrowser bind:open={toolBrowserOpen} tools={browsableTools} initialFilter={toolBrowserFilter} />
