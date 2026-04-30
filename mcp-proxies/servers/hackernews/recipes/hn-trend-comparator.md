@@ -26,6 +26,8 @@ The agent loops over each term, fetches its results, and composes a comparative 
 
 ## How to use
 
+> Each numbered block below is **self-contained** — it re-fetches the per-term buckets so it can run standalone in a recipe runner.
+
 1. **Define the terms to compare** and fetch each in turn:
    ```js
    const terms = ['AI', 'crypto', 'web3'];
@@ -43,58 +45,99 @@ The agent loops over each term, fetches its results, and composes a comparative 
 
 2. **Compute per-term KPIs**:
    ```js
+   const terms = ['AI', 'crypto', 'web3'];
+   const buckets = {};
+   for (const term of terms) {
+     const res = await call('search-posts', { query: term, tags: ['story'], numericFilters: ['points>=100'], hitsPerPage: 100 });
+     buckets[term] = (res?.hits ?? []).filter(p => p);
+   }
    const summary = terms.map(t => {
      const posts = buckets[t] ?? [];
      const avgPoints = Math.round(posts.reduce((s, x) => s + (x?.points || 0), 0) / Math.max(posts.length, 1));
      const avgComments = Math.round(posts.reduce((s, x) => s + (x?.num_comments || 0), 0) / Math.max(posts.length, 1));
      return { term: t, count: posts.length, avgPoints, avgComments };
    });
+   await widget('text', { content: `Terms: ${summary.map(s => `${s.term}=${s.count}`).join(', ')}.` });
    ```
 
 3. **Stat-cards — one per term, headline metric**:
    ```js
-   for (const s of summary) {
-     await widget('stat-card', { label: s.term, value: `${s.count} posts`, icon: 'search' });
+   const terms = ['AI', 'crypto', 'web3'];
+   const buckets = {};
+   for (const term of terms) {
+     const res = await call('search-posts', { query: term, tags: ['story'], numericFilters: ['points>=100'], hitsPerPage: 100 });
+     buckets[term] = (res?.hits ?? []).filter(p => p);
+   }
+   for (const t of terms) {
+     const posts = buckets[t] ?? [];
+     await widget('stat-card', { label: t, value: `${Math.max(posts.length, 1)} posts`, icon: 'search' });
    }
    ```
 
 4. **Volume comparison chart**:
    ```js
+   const terms = ['AI', 'crypto', 'web3'];
+   const data = [];
+   for (const term of terms) {
+     const res = await call('search-posts', { query: term, tags: ['story'], numericFilters: ['points>=100'], hitsPerPage: 100 });
+     const posts = (res?.hits ?? []).filter(p => p);
+     data.push({ label: term, value: posts.length });
+   }
    await widget('chart-rich', {
      type: 'bar',
      title: 'Posts per term',
-     data: summary.map(s => ({ label: s.term, value: s.count }))
+     data: data.length ? data : [{ label: 'AI', value: 1 }]
    });
    ```
 
 5. **Average score comparison**:
    ```js
+   const terms = ['AI', 'crypto', 'web3'];
+   const data = [];
+   for (const term of terms) {
+     const res = await call('search-posts', { query: term, tags: ['story'], numericFilters: ['points>=100'], hitsPerPage: 100 });
+     const posts = (res?.hits ?? []).filter(p => p);
+     const avg = Math.round(posts.reduce((s, x) => s + (x?.points || 0), 0) / Math.max(posts.length, 1));
+     data.push({ label: term, value: avg });
+   }
    await widget('chart-rich', {
      type: 'bar',
      title: 'Average score per term',
-     data: summary.map(s => ({ label: s.term, value: s.avgPoints }))
+     data: data.length ? data : [{ label: 'AI', value: 1 }]
    });
    ```
 
 6. **Ranked summary table**:
    ```js
+   const terms = ['AI', 'crypto', 'web3'];
+   const summary = [];
+   for (const term of terms) {
+     const res = await call('search-posts', { query: term, tags: ['story'], numericFilters: ['points>=100'], hitsPerPage: 100 });
+     const posts = (res?.hits ?? []).filter(p => p);
+     const avgPoints = Math.round(posts.reduce((s, x) => s + (x?.points || 0), 0) / Math.max(posts.length, 1));
+     const avgComments = Math.round(posts.reduce((s, x) => s + (x?.num_comments || 0), 0) / Math.max(posts.length, 1));
+     summary.push({ term, count: posts.length, avgPoints, avgComments });
+   }
+   const rows = summary.sort((a, b) => b.count - a.count).map(s => [s.term, s.count, s.avgPoints, s.avgComments]);
    await widget('table', {
      columns: ['Term', 'Posts', 'Avg points', 'Avg comments'],
-     rows: summary
-       .sort((a, b) => b.count - a.count)
-       .map(s => [s.term, s.count, s.avgPoints, s.avgComments])
+     rows: rows.length ? rows : [['—', 0, 0, 0]]
    });
    ```
 
 7. **Top post per term** (optional — quick qualitative anchor):
    ```js
+   const terms = ['AI', 'crypto', 'web3'];
+   const rows = [];
+   for (const term of terms) {
+     const res = await call('search-posts', { query: term, tags: ['story'], numericFilters: ['points>=100'], hitsPerPage: 50 });
+     const posts = (res?.hits ?? []).filter(p => p);
+     const top = posts.length > 0 ? [...posts].sort((a, b) => (b?.points ?? 0) - (a?.points ?? 0))[0] : null;
+     rows.push([term, top?.title ?? '—', top?.points ?? 0]);
+   }
    await widget('table', {
      columns: ['Term', 'Top post', 'Points'],
-     rows: terms.map(t => {
-       const arr = buckets[t] ?? [];
-       const top = arr.length > 0 ? [...arr].sort((a, b) => (b?.points ?? 0) - (a?.points ?? 0))[0] : null;
-       return [t, top?.title ?? '—', top?.points ?? 0];
-     })
+     rows: rows.length ? rows : [['—', '—', 0]]
    });
    ```
 
@@ -108,10 +151,11 @@ for (const t of terms) {
   const res = await call('search-posts', { query: t, tags: ['story'], numericFilters: ['points>=100'], hitsPerPage: 100 }).catch(() => null);
   buckets[t] = (res?.hits ?? []).filter(p => p);
 }
+const data = terms.map(t => ({ label: t, value: (buckets[t] ?? []).length }));
 await widget('chart-rich', {
   type: 'bar',
   title: 'High-score posts (100+)',
-  data: terms.map(t => ({ label: t, value: (buckets[t] ?? []).length }))
+  data: data.length ? data : [{ label: 'AI', value: 1 }]
 });
 ```
 
@@ -124,9 +168,10 @@ for (const t of terms) {
   const hits = (res?.hits ?? []).filter(p => p);
   summary.push({ term: t, count: hits.length, avg: Math.round(hits.reduce((s, x) => s + (x?.points || 0), 0) / Math.max(hits.length, 1)) });
 }
+const rows = summary.map(s => [s.term, s.count, s.avg]);
 await widget('table', {
   columns: ['Language', 'Posts', 'Avg score'],
-  rows: summary.map(s => [s.term, s.count, s.avg])
+  rows: rows.length ? rows : [['—', 0, 0]]
 });
 ```
 

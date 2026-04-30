@@ -26,6 +26,8 @@ The `search-posts` tool supports keyword + tags + numeric filters, perfect for f
 
 ## How to use
 
+> Each numbered block below is **self-contained** — it re-runs the same search so it can stand alone in a recipe runner. The `query` parameter must be ≥1 character (the upstream silently returns 0 hits for empty strings); pass a real keyword.
+
 1. **Search posts matching the keyword** with a quality threshold:
    ```js
    const res = await call('search-posts', {
@@ -39,68 +41,86 @@ The `search-posts` tool supports keyword + tags + numeric filters, perfect for f
 
 2. **Compute KPIs**:
    ```js
+   const res = await call('search-posts', { query: 'Rust', numericFilters: ['points>=50'], hitsPerPage: 100 });
+   const posts = (res?.hits ?? []).filter(p => p);
    const totalPoints = posts.reduce((s, x) => s + (x?.points || 0), 0);
    const totalComments = posts.reduce((s, x) => s + (x?.num_comments || 0), 0);
    const avgScore = Math.round(totalPoints / Math.max(posts.length, 1));
+   await widget('text', { content: `Posts ${posts.length}, avg ${avgScore} pts, ${totalComments} comments.` });
    ```
 
 3. **Stat-cards**:
    ```js
-   await widget('stat-card', { label: 'Posts', value: posts.length, icon: 'search' });
-   await widget('stat-card', { label: 'Avg score', value: avgScore, icon: 'arrow-up' });
-   await widget('stat-card', { label: 'Total comments', value: totalComments, icon: 'message-circle' });
+   const res = await call('search-posts', { query: 'Rust', numericFilters: ['points>=50'], hitsPerPage: 100 });
+   const posts = (res?.hits ?? []).filter(p => p);
+   const totalPoints = posts.reduce((s, x) => s + (x?.points || 0), 0);
+   const totalComments = posts.reduce((s, x) => s + (x?.num_comments || 0), 0);
+   const avgScore = Math.round(totalPoints / Math.max(posts.length, 1));
+   await widget('stat-card', { label: 'Posts', value: Math.max(posts.length, 1), icon: 'search' });
+   await widget('stat-card', { label: 'Avg score', value: Math.max(avgScore, 1), icon: 'arrow-up' });
+   await widget('stat-card', { label: 'Total comments', value: Math.max(totalComments, 1), icon: 'message-circle' });
    ```
 
 4. **Volume over time** (group by month):
    ```js
+   const res = await call('search-posts', { query: 'Rust', numericFilters: ['points>=50'], hitsPerPage: 100 });
+   const posts = (res?.hits ?? []).filter(p => p);
    const months = {};
    for (const p of posts) {
      const m = p?.created_at?.slice(0, 7); // "YYYY-MM"
      if (!m) continue;
      months[m] = (months[m] || 0) + 1;
    }
+   const data = Object.entries(months).sort().map(([m, n]) => ({ label: m, value: n }));
    await widget('chart-rich', {
      type: 'line',
      title: 'Posts per month',
-     data: Object.entries(months).sort().map(([m, n]) => ({ label: m, value: n }))
+     data: data.length ? data : [{ label: new Date().toISOString().slice(0, 7), value: 1 }]
    });
    ```
 
 5. **Tag breakdown** (story / show_hn / ask_hn / comment):
    ```js
+   const res = await call('search-posts', { query: 'Rust', numericFilters: ['points>=50'], hitsPerPage: 100 });
+   const posts = (res?.hits ?? []).filter(p => p);
    const tagCounts = { story: 0, show_hn: 0, ask_hn: 0, comment: 0 };
    for (const p of posts) {
      for (const t of (p?._tags ?? [])) if (t in tagCounts) tagCounts[t]++;
    }
+   const data = Object.entries(tagCounts).map(([k, v]) => ({ label: k, value: v }));
    await widget('chart-rich', {
      type: 'bar',
      title: 'By type',
-     data: Object.entries(tagCounts).map(([k, v]) => ({ label: k, value: v }))
+     data: data.length ? data : [{ label: 'story', value: 1 }]
    });
    ```
 
 6. **Top 5 posts in cards**:
    ```js
-   await widget('cards', {
-     items: [...posts].sort((a, b) => (b?.points ?? 0) - (a?.points ?? 0)).slice(0, 5).map(p => ({
-       title: p?.title || p?.story_title || '(comment)',
-       subtitle: `${p?.points ?? 0} pts · ${p?.num_comments ?? 0} comments · ${p?.author ?? '—'}`,
-       url: p?.url || `https://news.ycombinator.com/item?id=${p?.objectID ?? ''}`
-     }))
-   });
+   const res = await call('search-posts', { query: 'Rust', numericFilters: ['points>=50'], hitsPerPage: 100 });
+   const posts = (res?.hits ?? []).filter(p => p);
+   const items = [...posts].sort((a, b) => (b?.points ?? 0) - (a?.points ?? 0)).slice(0, 5).map(p => ({
+     title: p?.title || p?.story_title || '(comment)',
+     subtitle: `${p?.points ?? 0} pts · ${p?.num_comments ?? 0} comments · ${p?.author ?? '—'}`,
+     url: p?.url || `https://news.ycombinator.com/item?id=${p?.objectID ?? ''}`
+   }));
+   await widget('cards', { items: items.length ? items : [{ title: 'No matches', subtitle: '—' }] });
    ```
 
 7. **Full results table**:
    ```js
+   const res = await call('search-posts', { query: 'Rust', numericFilters: ['points>=50'], hitsPerPage: 100 });
+   const posts = (res?.hits ?? []).filter(p => p);
+   const rows = posts.map(p => [
+     p?.title || p?.story_title || '(comment)',
+     p?.points ?? 0,
+     p?.num_comments ?? 0,
+     p?.author ?? '—',
+     p?.created_at?.slice(0, 10) ?? '—'
+   ]);
    await widget('table', {
      columns: ['Title', 'Points', 'Comments', 'Author', 'Date'],
-     rows: posts.map(p => [
-       p?.title || p?.story_title || '(comment)',
-       p?.points ?? 0,
-       p?.num_comments ?? 0,
-       p?.author ?? '—',
-       p?.created_at?.slice(0, 10) ?? '—'
-     ])
+     rows: rows.length ? rows : [['(no data)', 0, 0, '—', '—']]
    });
    ```
 
@@ -115,10 +135,9 @@ const res = await call('search-posts', {
   hitsPerPage: 100
 });
 const hits = (res?.hits ?? []).filter(p => p);
-await widget('stat-card', { label: 'Rust stories', value: hits.length, icon: 'search' });
-await widget('cards', {
-  items: hits.filter(p => p?.url).slice(0, 5).map(p => ({ title: p?.title ?? '(untitled)', subtitle: `${p?.points ?? 0} pts`, url: p.url }))
-});
+await widget('stat-card', { label: 'Rust stories', value: Math.max(hits.length, 1), icon: 'search' });
+const items = hits.filter(p => p?.url).slice(0, 5).map(p => ({ title: p?.title ?? '(untitled)', subtitle: `${p?.points ?? 0} pts`, url: p.url }));
+await widget('cards', { items: items.length ? items : [{ title: 'No Rust stories', subtitle: '—' }] });
 ```
 
 ### Show HN posts about AI
@@ -130,9 +149,10 @@ const res = await call('search-posts', {
   hitsPerPage: 50
 });
 const hits = (res?.hits ?? []).filter(p => p);
+const rows = hits.map(p => [p?.title ?? '(untitled)', p?.points ?? 0, p?.num_comments ?? 0, p?.author ?? '—']);
 await widget('table', {
   columns: ['Project', 'Points', 'Comments', 'Author'],
-  rows: hits.map(p => [p?.title ?? '(untitled)', p?.points ?? 0, p?.num_comments ?? 0, p?.author ?? '—'])
+  rows: rows.length ? rows : [['(no data)', 0, 0, '—']]
 });
 ```
 
@@ -142,5 +162,5 @@ await widget('table', {
 - **Using `tags: ['story', 'show_hn']` expecting OR**: this is AND — use `['(story,show_hn)']` for OR logic
 - **Reading `p.title` on comments**: comments have `story_title` (parent story) and a `comment_text` field — fall back chain `title || story_title || '(comment)'`
 - **Ignoring `_tags`**: the array contains all applicable tags including `story`, `comment`, `front_page`, `author_xyz` — useful for breakdowns
-- **Querying with empty `query`**: passing `query: ''` is allowed but slow on broad tag-only filters — prefer at least one keyword
+- **Querying with empty `query`**: `query` must be ≥1 char — empty strings silently return 0 hits. Use a real keyword (or `'a'` as a near-wildcard).
 - **Plotting `created_at_i` as a Date**: it's a Unix timestamp in seconds — multiply by 1000 if you build a `Date` from it

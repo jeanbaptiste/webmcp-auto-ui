@@ -26,67 +26,96 @@ This recipe combines `get-user` (static profile) with `search-posts` (their cont
 
 ## How to use
 
+> Each numbered block below is **self-contained** — it re-fetches the user + posts so it can run standalone in a recipe runner.
+>
+> **Important** — `search-posts` requires a `query` ≥1 character; passing `query: ''` silently returns 0 hits. Use `query: 'a'` as a near-wildcard to filter by `author_USERNAME` tag without scoping the keyword.
+
 1. **Fetch the user profile**:
    ```js
    const user = await call('get-user', { username: 'pg' }).catch(() => null);
    if (!user || !user.username) return widget('text', { content: 'User not found.' });
    ```
 
-2. **Fetch their recent stories** via the `author_USERNAME` tag:
+2. **Fetch their recent stories** via the `author_USERNAME` tag (note `query: 'a'`):
    ```js
+   const user = await call('get-user', { username: 'pg' }).catch(() => null);
    const res = await call('search-posts', {
-     query: '',
-     tags: [`author_${user.username}`, 'story'],
-     numericFilters: ['points>=20'],
+     query: 'a',
+     tags: [`author_${user?.username ?? 'pg'}`, 'story'],
      hitsPerPage: 50
    }).catch(() => null);
    const posts = (res?.hits ?? []).filter(p => p);
+   await widget('text', { content: `Loaded ${posts.length} stories for ${user?.username ?? 'pg'}.` });
    ```
 
 3. **Profile card** (bio, karma, since):
    ```js
+   const user = await call('get-user', { username: 'pg' }).catch(() => null);
    const createdMs = (user?.created_at_i ?? 0) * 1000;
    const since = createdMs > 0 ? new Date(createdMs).getFullYear() : '—';
    await widget('profile', {
-     name: user?.username ?? '—',
+     name: user?.username ?? 'pg',
      subtitle: `${user?.karma ?? 0} karma · since ${since}`,
      body: (user?.about ?? '(no bio)').replace(/<[^>]+>/g, ''),
-     url: `https://news.ycombinator.com/user?id=${user?.username ?? ''}`
+     url: `https://news.ycombinator.com/user?id=${user?.username ?? 'pg'}`
    });
    ```
 
 4. **KPI stat-cards**:
    ```js
+   const user = await call('get-user', { username: 'pg' }).catch(() => null);
+   const res = await call('search-posts', {
+     query: 'a',
+     tags: [`author_${user?.username ?? 'pg'}`, 'story'],
+     hitsPerPage: 50
+   }).catch(() => null);
+   const posts = (res?.hits ?? []).filter(p => p);
    const createdMs = (user?.created_at_i ?? 0) * 1000;
    const ageYears = createdMs > 0 ? new Date().getFullYear() - new Date(createdMs).getFullYear() : 0;
    const scores = posts.map(p => p?.points || 0).filter(Number.isFinite);
-   await widget('stat-card', { label: 'Karma', value: user?.karma ?? 0, icon: 'star' });
-   await widget('stat-card', { label: 'Account age (yrs)', value: ageYears, icon: 'calendar' });
-   await widget('stat-card', { label: 'Recent stories', value: posts.length, icon: 'file-text' });
-   await widget('stat-card', { label: 'Top score', value: scores.length > 0 ? Math.max(...scores) : 0, icon: 'flame' });
+   await widget('stat-card', { label: 'Karma', value: Math.max(user?.karma ?? 0, 1), icon: 'star' });
+   await widget('stat-card', { label: 'Account age (yrs)', value: Math.max(ageYears, 1), icon: 'calendar' });
+   await widget('stat-card', { label: 'Recent stories', value: Math.max(posts.length, 1), icon: 'file-text' });
+   await widget('stat-card', { label: 'Top score', value: Math.max(scores.length > 0 ? Math.max(...scores) : 0, 1), icon: 'flame' });
    ```
 
 5. **Recent posts table**:
    ```js
+   const user = await call('get-user', { username: 'pg' }).catch(() => null);
+   const res = await call('search-posts', {
+     query: 'a',
+     tags: [`author_${user?.username ?? 'pg'}`, 'story'],
+     hitsPerPage: 50
+   }).catch(() => null);
+   const posts = (res?.hits ?? []).filter(p => p);
+   const rows = posts.map(p => [
+     p?.title ?? '(untitled)',
+     p?.points ?? 0,
+     p?.num_comments ?? 0,
+     p?.created_at?.slice(0, 10) ?? '—'
+   ]);
    await widget('table', {
      columns: ['Title', 'Points', 'Comments', 'Date'],
-     rows: posts.map(p => [
-       p?.title ?? '(untitled)',
-       p?.points ?? 0,
-       p?.num_comments ?? 0,
-       p?.created_at?.slice(0, 10) ?? '—'
-     ])
+     rows: rows.length ? rows : [['(no stories)', 0, 0, '—']]
    });
    ```
 
 6. **Score timeline** (post score over time):
    ```js
+   const user = await call('get-user', { username: 'pg' }).catch(() => null);
+   const res = await call('search-posts', {
+     query: 'a',
+     tags: [`author_${user?.username ?? 'pg'}`, 'story'],
+     hitsPerPage: 50
+   }).catch(() => null);
+   const posts = (res?.hits ?? []).filter(p => p);
+   const data = [...posts]
+     .sort((a, b) => (a?.created_at_i ?? 0) - (b?.created_at_i ?? 0))
+     .map(p => ({ label: p?.created_at?.slice(0, 7) ?? '—', value: p?.points ?? 0 }));
    await widget('chart-rich', {
      type: 'line',
-     title: `Score timeline — ${user?.username ?? '—'}`,
-     data: [...posts]
-       .sort((a, b) => (a?.created_at_i ?? 0) - (b?.created_at_i ?? 0))
-       .map(p => ({ label: p?.created_at?.slice(0, 7) ?? '—', value: p?.points ?? 0 }))
+     title: `Score timeline — ${user?.username ?? 'pg'}`,
+     data: data.length ? data : [{ label: '—', value: 1 }]
    });
    ```
 
@@ -97,9 +126,8 @@ This recipe combines `get-user` (static profile) with `search-posts` (their cont
 const user = await call('get-user', { username: 'pg' }).catch(() => null);
 if (!user) return widget('text', { content: 'User not found.' });
 const res = await call('search-posts', {
-  query: '',
+  query: 'a',
   tags: ['author_pg', 'story'],
-  numericFilters: ['points>=50'],
   hitsPerPage: 50
 }).catch(() => null);
 const hits = (res?.hits ?? []).filter(p => p);
@@ -108,10 +136,11 @@ await widget('profile', {
   subtitle: `${user?.karma ?? 0} karma`,
   body: (user?.about ?? '').replace(/<[^>]+>/g, '')
 });
-await widget('stat-card', { label: 'Karma', value: user?.karma ?? 0, icon: 'star' });
+await widget('stat-card', { label: 'Karma', value: Math.max(user?.karma ?? 0, 1), icon: 'star' });
+const rows = hits.slice(0, 20).map(p => [p?.title ?? '(untitled)', p?.points ?? 0, p?.created_at?.slice(0, 10) ?? '—']);
 await widget('table', {
   columns: ['Title', 'Points', 'Date'],
-  rows: hits.slice(0, 20).map(p => [p?.title ?? '(untitled)', p?.points ?? 0, p?.created_at?.slice(0, 10) ?? '—'])
+  rows: rows.length ? rows : [['(no stories)', 0, '—']]
 });
 ```
 
@@ -125,14 +154,15 @@ await widget('profile', {
   body: (user?.about ?? '(no bio)').replace(/<[^>]+>/g, '')
 });
 const res = await call('search-posts', {
-  query: '',
+  query: 'a',
   tags: ['author_dang', 'comment'],
   hitsPerPage: 20
 }).catch(() => null);
 const hits = (res?.hits ?? []).filter(p => p);
+const rows = hits.map(c => [c?.story_title ?? '?', c?.points ?? 0, c?.created_at?.slice(0, 10) ?? '—']);
 await widget('table', {
   columns: ['Comment on', 'Points', 'Date'],
-  rows: hits.map(c => [c?.story_title ?? '?', c?.points ?? 0, c?.created_at?.slice(0, 10) ?? '—'])
+  rows: rows.length ? rows : [['(no comments)', 0, '—']]
 });
 ```
 
@@ -142,5 +172,5 @@ await widget('table', {
 - **`about` field is HTML**: strip tags with `.replace(/<[^>]+>/g, '')` for plain rendering, or pass `html: true` to a widget that supports it
 - **`created_at_i` is in seconds, not ms**: multiply by 1000 before `new Date(...)`
 - **`author_USERNAME` tag is case-sensitive too**: use the exact username from the profile, not a normalized version
-- **Empty `query: ''` with author tag**: this works on HN Algolia, but pair it with `tags: ['story']` (or `comment`) to avoid mixing types
-- **Skipping the `numericFilters`**: an active user with thousands of low-score comments will saturate the response — filter `points>=20` for stories or use pagination
+- **Empty `query: ''` with author tag**: the upstream `search-posts` requires `query` length ≥1 and silently returns 0 hits otherwise — pass `query: 'a'` (or any single character) as a no-op token
+- **Skipping the `numericFilters`**: an active user with thousands of low-score comments will saturate the response — apply `points>=20` for stories or use pagination. Note: with `numericFilters: ['points>=20']`, some users (e.g. `pg`) end up with 0 hits — relax the filter when listing recent posts.
