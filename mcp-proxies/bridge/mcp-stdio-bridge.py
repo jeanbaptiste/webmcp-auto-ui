@@ -156,8 +156,26 @@ def handle_recipe_call(name, arguments):
 
 # ── Process management ────────────────────────────────────────────────────────
 
+def _drain_stderr(p):
+    """Continuously read upstream stderr and forward to our own stderr.
+
+    Without this, a chatty upstream fills the OS pipe buffer (~64 KB) and
+    deadlocks: upstream blocks on its next stderr write, never produces stdout,
+    and the bridge sits forever in `readline()`. Observed in production with
+    wikipedia-mcp (2026-04-30).
+    """
+    try:
+        for line in iter(p.stderr.readline, ""):
+            if not line:
+                break
+            sys.stderr.write("[upstream] " + line)
+            sys.stderr.flush()
+    except Exception:
+        pass
+
+
 def start_process(cmd):
-    return subprocess.Popen(
+    p = subprocess.Popen(
         cmd,
         shell=True,
         stdin=subprocess.PIPE,
@@ -166,6 +184,9 @@ def start_process(cmd):
         text=True,
         bufsize=1,
     )
+    t = threading.Thread(target=_drain_stderr, args=(p,), daemon=True)
+    t.start()
+    return p
 
 
 def ensure_process(cmd):

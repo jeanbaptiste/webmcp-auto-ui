@@ -1,19 +1,31 @@
 #!/usr/bin/env python3
 """
 iNaturalist MCP server — 16 tools, stdlib only
-API: https://api.inaturalist.org/v2
+
+Returns upstream iNat API responses with shape preserved (passthrough).
+Recipes rely on the canonical iNat shape: `results[].taxon.id`,
+`results[].taxon.preferred_common_name`, `results[].geojson.coordinates`,
+`results[].photos[].url`, `total_results`, etc.
+
+Uses API v1 because v2 requires sparse `fields=` selectors that strip the
+nested structures recipes expect. Earlier versions of this bridge flattened
+the response to a custom simplified shape — that broke 39/67 recipes
+(`taxon: "string"`, `photo: "string"`, no `photos[]`, no `geojson`).
+Bridge fix 2026-04-30: stop flattening, return upstream JSON unchanged.
+
+API: https://api.inaturalist.org/v1
 """
 import json
 import sys
 import urllib.request
 import urllib.parse
 
-BASE = "https://api.inaturalist.org/v2"
-HEADERS = {"Accept": "application/json", "User-Agent": "inaturalist-mcp/1.0"}
+BASE = "https://api.inaturalist.org/v1"
+HEADERS = {"Accept": "application/json", "User-Agent": "inaturalist-mcp/1.1"}
 
 
 def api_get(path, params):
-    clean = {k: v for k, v in params.items() if v is not None}
+    clean = {k: v for k, v in (params or {}).items() if v is not None}
     url = BASE + path + ("?" + urllib.parse.urlencode(clean) if clean else "")
     req = urllib.request.Request(url, headers=HEADERS)
     with urllib.request.urlopen(req, timeout=15) as r:
@@ -38,17 +50,17 @@ TOOLS = [
     # ── Observations ────────────────────────────────────────────────────────
     {
         "name": "search_observations",
-        "description": "Search wildlife observations. Filter by taxon, place, date range, quality grade, or geographic coordinates.",
+        "description": "Search wildlife observations. Filter by taxon, place, date range, quality grade, or geographic coordinates. Returns canonical iNaturalist shape: `results[].taxon`, `results[].geojson.coordinates`, `results[].photos[].url`, `results[].user`, `results[].species_guess`, `total_results`.",
         "inputSchema": {"type": "object", "properties": OBS_PROPS},
     },
     {
         "name": "species_counts",
-        "description": "Get top species observed in an area/taxon, ranked by observation count. Great for biodiversity summaries.",
+        "description": "Top species observed in an area/taxon ranked by observation count. Returns `results[].count` and `results[].taxon` (full taxon object with `id`, `name`, `preferred_common_name`, `rank`, `iconic_taxon_name`, `default_photo`).",
         "inputSchema": {"type": "object", "properties": {**OBS_PROPS, "include_ancestors": {"type": "boolean"}}},
     },
     {
         "name": "observations_histogram",
-        "description": "Time-series histogram of observation counts. Useful for phenology and seasonal patterns.",
+        "description": "Time-series histogram of observation counts. Returns `results.<interval>` map of `YYYY-MM-DD: count`. Useful for phenology and seasonal patterns.",
         "inputSchema": {"type": "object", "properties": {**OBS_PROPS,
             "date_field": {"type": "string", "enum": ["observed_on", "created_at"], "default": "observed_on"},
             "interval":   {"type": "string", "enum": ["year", "month", "week", "day", "hour"], "default": "month"},
@@ -56,7 +68,7 @@ TOOLS = [
     },
     {
         "name": "observers_leaderboard",
-        "description": "Top observers ranked by observation count for a taxon/place.",
+        "description": "Top observers ranked by observation/species count. Returns `results[].user` (with `login`, `name`, `icon`), `results[].observation_count`, `results[].species_count`.",
         "inputSchema": {"type": "object", "properties": {**OBS_PROPS,
             "order_by": {"type": "string", "enum": ["observation_count", "species_count"], "default": "observation_count"},
         }},
@@ -64,7 +76,7 @@ TOOLS = [
     # ── Taxa ────────────────────────────────────────────────────────────────
     {
         "name": "search_taxa",
-        "description": "Search species and taxa by name. Returns scientific name, common name, rank, observation count, conservation status.",
+        "description": "Search species and taxa by name. Returns `results[]` with the full taxon object: `id`, `name`, `preferred_common_name`, `rank`, `observations_count`, `iconic_taxon_name`, `default_photo`, `conservation_status`.",
         "inputSchema": {"type": "object", "required": ["q"], "properties": {
             "q":        {"type": "string",  "description": "Search query (scientific or common name)"},
             "rank":     {"type": "string",  "description": "Taxonomic rank",
@@ -75,7 +87,7 @@ TOOLS = [
     },
     {
         "name": "get_taxon",
-        "description": "Get detailed info about a taxon by its iNaturalist ID: name, common name, rank, conservation status, ancestry, Wikipedia summary.",
+        "description": "Get detailed info about a taxon by its iNaturalist ID. Returns the full taxon record: `id`, `name`, `preferred_common_name`, `rank`, `observations_count`, `iconic_taxon_name`, `conservation_status`, `ancestry`, `ancestors`, `wikipedia_summary`, `default_photo` (with `medium_url`, `square_url`).",
         "inputSchema": {"type": "object", "required": ["id"], "properties": {
             "id":     {"type": "integer", "description": "iNaturalist taxon ID"},
             "locale": {"type": "string",  "description": "Language for common names"},
@@ -83,7 +95,7 @@ TOOLS = [
     },
     {
         "name": "similar_species",
-        "description": "Species frequently confused with a given taxon — same identifications. Useful for distinguishing look-alikes.",
+        "description": "Species frequently confused with a given taxon. Returns `results[].count` and `results[].taxon` (full taxon object). Useful for distinguishing look-alikes.",
         "inputSchema": {"type": "object", "required": ["taxon_id"], "properties": {
             "taxon_id":      {"type": "integer"},
             "quality_grade": {"type": "string", "enum": ["research", "needs_id", "casual"]},
@@ -93,7 +105,7 @@ TOOLS = [
     },
     {
         "name": "taxon_suggestions",
-        "description": "AI-assisted taxon ID suggestions for a location/date — powers the iNaturalist identification feature.",
+        "description": "AI-assisted taxon ID suggestions for a location/date. Returns `results[].score` and `results[].taxon` (full taxon object).",
         "inputSchema": {"type": "object", "properties": {
             "lat":         {"type": "number"},
             "lng":         {"type": "number"},
@@ -108,7 +120,7 @@ TOOLS = [
     # ── Places ──────────────────────────────────────────────────────────────
     {
         "name": "search_places",
-        "description": "Search iNaturalist places by name (countries, regions, parks, etc.).",
+        "description": "Search iNaturalist places by name (countries, regions, parks, etc.). Returns `results[]` with `id`, `display_name`, `name`, `place_type`, `bbox_area`, `geometry_geojson`.",
         "inputSchema": {"type": "object", "required": ["q"], "properties": {
             "q":        {"type": "string"},
             "per_page": {"type": "integer", "default": 10},
@@ -116,7 +128,7 @@ TOOLS = [
     },
     {
         "name": "nearby_places",
-        "description": "Find iNaturalist places overlapping or near a bounding box.",
+        "description": "Find iNaturalist places overlapping or near a bounding box. Returns `results.standard[]` and `results.community[]`.",
         "inputSchema": {"type": "object", "required": ["nelat", "nelng", "swlat", "swlng"], "properties": {
             "nelat":    {"type": "number", "description": "NE latitude"},
             "nelng":    {"type": "number", "description": "NE longitude"},
@@ -128,7 +140,7 @@ TOOLS = [
     # ── Identifications & Projects ───────────────────────────────────────────
     {
         "name": "top_identifiers",
-        "description": "Top identifier leaderboard for a taxon — who identifies this species most.",
+        "description": "Top identifier leaderboard for a taxon. Returns `results[].user` and `results[].count`.",
         "inputSchema": {"type": "object", "required": ["taxon_id"], "properties": {
             "taxon_id":      {"type": "integer"},
             "quality_grade": {"type": "string", "enum": ["research", "needs_id", "casual"]},
@@ -137,7 +149,7 @@ TOOLS = [
     },
     {
         "name": "recent_taxa",
-        "description": "Recently identified taxa — a live feed of what naturalists are currently identifying.",
+        "description": "Recently identified taxa — a live feed of what naturalists are currently identifying. Returns `results[].taxon` (full taxon with `default_photo`) and `results[].observation` (the underlying observation).",
         "inputSchema": {"type": "object", "properties": {
             "taxon_id":      {"type": "integer"},
             "quality_grade": {"type": "string", "enum": ["research", "needs_id", "casual"]},
@@ -147,7 +159,7 @@ TOOLS = [
     },
     {
         "name": "search_projects",
-        "description": "Search iNaturalist projects (bioblitzes, citizen science campaigns, etc.).",
+        "description": "Search iNaturalist projects (bioblitzes, citizen science campaigns). Returns `results[]` with `id`, `title`, `description`, `place_id`, `project_type`, `observations_count`, `species_count`.",
         "inputSchema": {"type": "object", "properties": {
             "q":        {"type": "string"},
             "place_id": {"type": "integer"},
@@ -158,7 +170,7 @@ TOOLS = [
     # ── Cross-entity search ──────────────────────────────────────────────────
     {
         "name": "search",
-        "description": "Cross-entity search across taxa, places, projects, and users simultaneously.",
+        "description": "Cross-entity search across taxa, places, projects, and users simultaneously. Returns `results[]` with `type`, `score`, `record` (the entity object).",
         "inputSchema": {"type": "object", "required": ["q"], "properties": {
             "q":        {"type": "string"},
             "sources":  {"type": "string",
@@ -171,7 +183,7 @@ TOOLS = [
     # ── Bonus ────────────────────────────────────────────────────────────────
     {
         "name": "iconic_taxa_counts",
-        "description": "Species counts broken down by iconic taxon group (Animalia, Plantae, Fungi, Aves, Reptilia, etc.). Great for biodiversity pie charts.",
+        "description": "Species counts broken down by iconic taxon group (Animalia, Plantae, Fungi, Aves, Reptilia, etc.). Returns `results[].taxon`, `results[].count`, `results[].taxon_id`. Great for biodiversity pie charts.",
         "inputSchema": {"type": "object", "properties": {
             "place_id":      {"type": "integer"},
             "taxon_id":      {"type": "integer"},
@@ -182,7 +194,7 @@ TOOLS = [
     },
     {
         "name": "unobserved_taxa",
-        "description": "Species within a clade that are on the checklist for a place but NOT yet observed there. Reveals biodiversity gaps.",
+        "description": "Species within a clade that are on the checklist for a place but NOT yet observed there. Returns `results[]` (full taxon objects with `default_photo`). Reveals biodiversity gaps.",
         "inputSchema": {"type": "object", "required": ["taxon_id", "place_id"], "properties": {
             "taxon_id": {"type": "integer", "description": "Root clade (e.g. 3=birds, 47126=plants, 1=all)"},
             "place_id": {"type": "integer"},
@@ -193,6 +205,11 @@ TOOLS = [
 
 
 # ── Tool handlers ──────────────────────────────────────────────────────────────
+#
+# All handlers return the upstream iNat v1 JSON response unchanged
+# (passthrough). Recipes consume the canonical shape; flattening it broke
+# 39/67 recipes in the audit (2026-04-30).
+
 
 def _obs_params(a, extra=None):
     p = {k: a.get(k) for k in OBS_PROPS}
@@ -201,236 +218,116 @@ def _obs_params(a, extra=None):
     return p
 
 
+def _cap_per_page(p, default=10, max_=200):
+    if p.get("per_page") is None:
+        p["per_page"] = default
+    else:
+        try:
+            p["per_page"] = min(int(p["per_page"]), max_)
+        except (TypeError, ValueError):
+            p["per_page"] = default
+    return p
+
+
 def handle(name, a):
+    a = a or {}
+
     if name == "search_observations":
-        p = {**_obs_params(a),
-             "fields": "taxon.name,taxon.preferred_common_name,taxon.rank,observed_on,place_guess,quality_grade,uri,photos.url"}
-        d = api_get("/observations", p)
-        return {"total": d.get("total_results"), "results": [
-            {"id": o.get("uuid"),
-             "taxon": (o.get("taxon") or {}).get("name"),
-             "common": (o.get("taxon") or {}).get("preferred_common_name"),
-             "rank": (o.get("taxon") or {}).get("rank"),
-             "observed_on": o.get("observed_on"),
-             "place": o.get("place_guess"),
-             "quality_grade": o.get("quality_grade"),
-             "url": o.get("uri"),
-             "photo": ((o.get("photos") or [{}])[0]).get("url")}
-            for o in d.get("results", [])
-        ]}
+        return api_get("/observations", _cap_per_page(_obs_params(a)))
 
     if name == "species_counts":
-        p = {**_obs_params(a, ["include_ancestors"]),
-             "fields": "taxon.name,taxon.preferred_common_name,taxon.rank,taxon.iconic_taxon_name"}
-        d = api_get("/observations/species_counts", p)
-        return {"total": d.get("total_results"), "results": [
-            {"count": r.get("count"),
-             "taxon_id": (r.get("taxon") or {}).get("id"),
-             "name": (r.get("taxon") or {}).get("name"),
-             "common": (r.get("taxon") or {}).get("preferred_common_name"),
-             "rank": (r.get("taxon") or {}).get("rank"),
-             "iconic": (r.get("taxon") or {}).get("iconic_taxon_name")}
-            for r in d.get("results", [])
-        ]}
+        return api_get("/observations/species_counts",
+                       _cap_per_page(_obs_params(a, ["include_ancestors"])))
 
     if name == "observations_histogram":
-        p = _obs_params(a, ["date_field", "interval"])
-        d = api_get("/observations/histogram", p)
-        return d.get("results", {})
+        return api_get("/observations/histogram",
+                       _obs_params(a, ["date_field", "interval"]))
 
     if name == "observers_leaderboard":
-        p = {**_obs_params(a, ["order_by"]),
-             "fields": "user.login,user.name,user.observations_count"}
-        d = api_get("/observations/observers", p)
-        return {"total": d.get("total_results"), "results": [
-            {"rank": i + 1,
-             "login": (r.get("user") or {}).get("login"),
-             "name": (r.get("user") or {}).get("name"),
-             "observation_count": r.get("observation_count"),
-             "species_count": r.get("species_count")}
-            for i, r in enumerate(d.get("results", []))
-        ]}
+        return api_get("/observations/observers",
+                       _cap_per_page(_obs_params(a, ["order_by"])))
 
     if name == "search_taxa":
-        p = {"q": a.get("q"), "rank": a.get("rank"),
-             "per_page": min(a.get("per_page", 10), 200),
-             "locale": a.get("locale"),
-             "fields": "name,preferred_common_name,rank,observations_count,iconic_taxon_name,conservation_status"}
-        d = api_get("/taxa", p)
-        return {"total": d.get("total_results"), "results": [
-            {"id": t.get("id"),
-             "name": t.get("name"),
-             "common": t.get("preferred_common_name"),
-             "rank": t.get("rank"),
-             "observations_count": t.get("observations_count"),
-             "iconic": t.get("iconic_taxon_name"),
-             "conservation": (t.get("conservation_status") or {}).get("status")}
-            for t in d.get("results", [])
-        ]}
+        p = {"q": a.get("q"), "rank": a.get("rank"), "locale": a.get("locale"),
+             "per_page": a.get("per_page", 10)}
+        return api_get("/taxa", _cap_per_page(p))
 
     if name == "get_taxon":
-        d = api_get(f"/taxa/{a['id']}", {
-            "locale": a.get("locale"),
-            "fields": "name,preferred_common_name,rank,observations_count,iconic_taxon_name,"
-                      "conservation_status,ancestry,wikipedia_summary,default_photo",
-        })
-        results = d.get("results", [])
+        # /taxa/{id} returns {results: [taxon]}; surface the taxon directly
+        # so recipes can do `detail.preferred_common_name` without unwrap.
+        # (Recipes consistently treat this tool as returning the taxon
+        # itself — see inat-species-profile.md, inat-similar-species.md.)
+        d = api_get(f"/taxa/{a['id']}", {"locale": a.get("locale")})
+        results = d.get("results", []) if isinstance(d, dict) else []
         if not results:
             return {"error": "taxon not found"}
-        t = results[0]
-        return {
-            "id": t.get("id"),
-            "name": t.get("name"),
-            "common": t.get("preferred_common_name"),
-            "rank": t.get("rank"),
-            "observations_count": t.get("observations_count"),
-            "iconic": t.get("iconic_taxon_name"),
-            "conservation": (t.get("conservation_status") or {}).get("status"),
-            "ancestry": t.get("ancestry"),
-            "wikipedia_summary": t.get("wikipedia_summary"),
-            "photo": (t.get("default_photo") or {}).get("medium_url"),
-        }
+        return results[0]
 
     if name == "similar_species":
-        p = {"taxon_id": a["taxon_id"],
+        p = {"taxon_id": a.get("taxon_id"),
              "quality_grade": a.get("quality_grade"),
              "place_id": a.get("place_id"),
-             "per_page": min(a.get("per_page", 10), 200),
-             "fields": "taxon.name,taxon.preferred_common_name,taxon.rank"}
-        d = api_get("/identifications/similar_species", p)
-        return {"total": d.get("total_results"), "results": [
-            {"count": r.get("count"),
-             "taxon_id": (r.get("taxon") or {}).get("id"),
-             "name": (r.get("taxon") or {}).get("name"),
-             "common": (r.get("taxon") or {}).get("preferred_common_name"),
-             "rank": (r.get("taxon") or {}).get("rank")}
-            for r in d.get("results", [])
-        ]}
+             "per_page": a.get("per_page", 10)}
+        return api_get("/identifications/similar_species", _cap_per_page(p))
 
     if name == "taxon_suggestions":
-        p = {k: a.get(k) for k in ["lat", "lng", "observed_on", "taxon_id", "place_id", "source", "limit"]}
-        p["fields"] = "taxon.name,taxon.preferred_common_name,taxon.rank,taxon.iconic_taxon_name"
-        d = api_get("/taxa/suggest", p)
-        return {"results": [
-            {"score": r.get("score"),
-             "taxon_id": (r.get("taxon") or {}).get("id"),
-             "name": (r.get("taxon") or {}).get("name"),
-             "common": (r.get("taxon") or {}).get("preferred_common_name"),
-             "rank": (r.get("taxon") or {}).get("rank")}
-            for r in d.get("results", [])
-        ]}
+        p = {k: a.get(k) for k in
+             ["lat", "lng", "observed_on", "taxon_id", "place_id", "source", "limit"]}
+        return api_get("/taxa/suggest", p)
 
     if name == "search_places":
-        p = {"q": a["q"],
-             "per_page": min(a.get("per_page", 10), 200),
-             "fields": "name,display_name,place_type,bbox_area"}
-        d = api_get("/places", p)
-        return {"total": d.get("total_results"), "results": [
-            {"id": pl.get("id"),
-             "name": pl.get("display_name") or pl.get("name"),
-             "place_type": pl.get("place_type"),
-             "bbox_area": pl.get("bbox_area")}
-            for pl in d.get("results", [])
-        ]}
+        # /v1/places does not exist; use /places/autocomplete which returns
+        # the same canonical place shape (id, display_name, place_type, …).
+        p = {"q": a.get("q"), "per_page": a.get("per_page", 10)}
+        return api_get("/places/autocomplete", _cap_per_page(p))
 
     if name == "nearby_places":
-        p = {k: a[k] for k in ["nelat", "nelng", "swlat", "swlng"]}
-        p["per_page"] = min(a.get("per_page", 5), 200)
-        p["fields"] = "name,display_name,place_type"
-        d = api_get("/places/nearby", p)
-        results = d.get("results", {})
-        items = (results.get("standard", []) if isinstance(results, dict) else results) + \
-                (results.get("community", []) if isinstance(results, dict) else [])
-        return {"results": [
-            {"id": pl.get("id"),
-             "name": pl.get("display_name") or pl.get("name"),
-             "place_type": pl.get("place_type")}
-            for pl in items
-        ]}
+        p = {k: a.get(k) for k in ["nelat", "nelng", "swlat", "swlng"]}
+        p["per_page"] = a.get("per_page", 5)
+        d = api_get("/places/nearby", _cap_per_page(p, default=5))
+        # Upstream returns `results: {standard: [...], community: [...]}`.
+        # Flatten to `results: [...]` so recipes can `.map()` directly.
+        # Each place keeps its full upstream shape (id, display_name,
+        # place_type, geometry_geojson, …). Recipes do not branch on
+        # standard/community.
+        results = d.get("results", []) if isinstance(d, dict) else []
+        if isinstance(results, dict):
+            flat = list(results.get("standard") or []) + list(results.get("community") or [])
+            d = dict(d)
+            d["results"] = flat
+        return d
 
     if name == "top_identifiers":
-        p = {"taxon_id": a["taxon_id"],
+        p = {"taxon_id": a.get("taxon_id"),
              "quality_grade": a.get("quality_grade"),
-             "per_page": min(a.get("per_page", 10), 200),
-             "fields": "user.login,user.name"}
-        d = api_get("/identifications/identifiers", p)
-        return {"total": d.get("total_results"), "results": [
-            {"rank": i + 1,
-             "login": (r.get("user") or {}).get("login"),
-             "name": (r.get("user") or {}).get("name"),
-             "count": r.get("count")}
-            for i, r in enumerate(d.get("results", []))
-        ]}
+             "per_page": a.get("per_page", 10)}
+        return api_get("/identifications/identifiers", _cap_per_page(p))
 
     if name == "recent_taxa":
         p = {k: a.get(k) for k in ["taxon_id", "quality_grade", "rank"]}
-        p["per_page"] = min(a.get("per_page", 10), 200)
-        p["fields"] = "taxon.name,taxon.preferred_common_name,taxon.rank,obs_count"
-        d = api_get("/identifications/recent_taxa", p)
-        return {"results": [
-            {"taxon_id": (r.get("taxon") or {}).get("id"),
-             "name": (r.get("taxon") or {}).get("name"),
-             "common": (r.get("taxon") or {}).get("preferred_common_name"),
-             "rank": (r.get("taxon") or {}).get("rank"),
-             "recent_obs_count": r.get("obs_count")}
-            for r in d.get("results", [])
-        ]}
+        p["per_page"] = a.get("per_page", 10)
+        return api_get("/identifications/recent_taxa", _cap_per_page(p))
 
     if name == "search_projects":
         p = {k: a.get(k) for k in ["q", "place_id", "type"]}
-        p["per_page"] = min(a.get("per_page", 10), 200)
-        p["fields"] = "title,description,place_id,project_type,observations_count,species_count"
-        d = api_get("/projects", p)
-        return {"total": d.get("total_results"), "results": [
-            {"id": r.get("id"),
-             "title": r.get("title"),
-             "description": (r.get("description") or "")[:200],
-             "type": r.get("project_type"),
-             "observations_count": r.get("observations_count"),
-             "species_count": r.get("species_count")}
-            for r in d.get("results", [])
-        ]}
+        p["per_page"] = a.get("per_page", 10)
+        return api_get("/projects", _cap_per_page(p))
 
     if name == "search":
-        p = {"q": a["q"],
+        p = {"q": a.get("q"),
              "sources": a.get("sources", "taxa,places,projects"),
              "place_id": a.get("place_id"),
-             "per_page": min(a.get("per_page", 10), 200),
-             "fields": "record.name,record.title,record.preferred_common_name,record.rank"}
-        d = api_get("/search", p)
-        return {"total": d.get("total_results"), "results": [
-            {"type": r.get("type"),
-             "id": (r.get("record") or {}).get("id"),
-             "name": (r.get("record") or {}).get("name") or (r.get("record") or {}).get("title"),
-             "common": (r.get("record") or {}).get("preferred_common_name"),
-             "rank": (r.get("record") or {}).get("rank")}
-            for r in d.get("results", [])
-        ]}
+             "per_page": a.get("per_page", 10)}
+        return api_get("/search", _cap_per_page(p))
 
     if name == "iconic_taxa_counts":
         p = {k: a.get(k) for k in ["place_id", "taxon_id", "quality_grade", "d1", "d2"]}
-        p["fields"] = "taxon.name,taxon.preferred_common_name"
-        d = api_get("/observations/iconic_taxa_species_counts", p)
-        return {"results": [
-            {"iconic_taxon": (r.get("taxon") or {}).get("name"),
-             "common": (r.get("taxon") or {}).get("preferred_common_name"),
-             "count": r.get("count")}
-            for r in d.get("results", [])
-        ]}
+        return api_get("/observations/iconic_taxa_species_counts", p)
 
     if name == "unobserved_taxa":
-        p = {"place_id": a["place_id"],
-             "per_page": min(a.get("per_page", 10), 200),
-             "fields": "name,preferred_common_name,rank,observations_count"}
-        d = api_get(f"/taxa/{a['taxon_id']}/wanted", p)
-        return {"total": d.get("total_results"), "results": [
-            {"id": t.get("id"),
-             "name": t.get("name"),
-             "common": t.get("preferred_common_name"),
-             "rank": t.get("rank"),
-             "global_obs_count": t.get("observations_count")}
-            for t in d.get("results", [])
-        ]}
+        p = {"place_id": a.get("place_id"),
+             "per_page": a.get("per_page", 10)}
+        return api_get(f"/taxa/{a['taxon_id']}/wanted", _cap_per_page(p))
 
     return {"error": f"Unknown tool: {name}"}
 
@@ -459,7 +356,7 @@ def main():
             respond({"jsonrpc": "2.0", "id": rid, "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "inaturalist-mcp", "version": "1.0.0"},
+                "serverInfo": {"name": "inaturalist-mcp", "version": "1.1.0"},
             }})
         elif method == "notifications/initialized":
             pass
