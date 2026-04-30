@@ -41,21 +41,21 @@ The user wants to explore the French open data catalog by theme:
      items: datasets.map(d => ({
        title: d.title ?? '—',
        subtitle: d.organization?.name ?? 'Producteur inconnu',
-       description: (d.description ?? '').slice(0, 180) + '…',
-       href: d.page,
-       badge: d.frequency
+       description: (d.tags ?? []).slice(0, 6).join(', '),
+       href: d.url
      }))
    });
 
    await widget('table', {
-     columns: ['Titre', 'Organisation', 'Format', 'Taille', 'MAJ'],
-     rows: datasets.map(d => [d.title ?? '—', d.organization?.name ?? '—', d.main_format ?? '—', d.size_human ?? '—', d.last_modified ?? '—'])
+     columns: ['Titre', 'Organisation', 'Tags', 'Fichiers'],
+     rows: datasets.map(d => [d.title ?? '—', d.organization?.name ?? '—', (d.tags ?? []).slice(0, 3).join(', ') || '—', d.resources ?? 0])
    });
 
-   const orgs = new Set(datasets.map(d => d.organization?.id).filter(Boolean));
+   const orgs = new Set(datasets.map(d => d.organization?.name).filter(Boolean));
+   const totalResources = datasets.reduce((s, d) => s + (d.resources ?? 0), 0);
    await widget('stat-card', { label: 'Résultats', value: res?.total ?? datasets.length, icon: 'database' });
    await widget('stat-card', { label: 'Organisations', value: orgs.size, icon: 'building' });
-   await widget('stat-card', { label: 'Dernière MAJ', value: datasets[0]?.last_modified ?? '—', icon: 'clock' });
+   await widget('stat-card', { label: 'Fichiers cumulés', value: totalResources, icon: 'file' });
    ```
 
 3. **Optional drill-down** — if the user picks one card, follow up with `get_dataset_info` and the *Dataset profile* recipe (`dg-dataset-profile`).

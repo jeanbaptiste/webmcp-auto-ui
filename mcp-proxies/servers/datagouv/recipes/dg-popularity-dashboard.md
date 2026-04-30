@@ -27,14 +27,17 @@ This recipe is great for public communication and inter-agency benchmarking.
 
 1. **Fetch info, metrics, resources**:
    ```js
-   const [info, metrics, resList] = await Promise.all([
+   const dataset_id = '5cc1b94a634f4165e96436c1'; // DVF (fallback example)
+   const _all = await Promise.all([
      call('get_dataset_info', { dataset_id }).catch(() => null),
      call('get_metrics', { dataset_id, limit: 24 }).catch(() => ({ metrics: [] })),
      call('list_dataset_resources', { dataset_id }).catch(() => ({ resources: [] }))
    ]);
+   const info = _all[0];
+   const metrics = _all[1];
+   const resList = _all[2];
    if (!info) {
      await widget('text', { content: 'Dataset introuvable.' });
-     return;
    }
    const series = (metrics?.metrics ?? []).slice().reverse(); // chronological
    ```
@@ -49,30 +52,32 @@ This recipe is great for public communication and inter-agency benchmarking.
 
 3. **Render**:
    ```js
+   const I = info ?? {};
    await widget('chart-rich', {
      type: 'area-stacked',
-     labels: series.map(m => m.month),
+     labels: series.map(x => x.month),
      series: [
-       { name: 'Visites', values: series.map(m => m.monthly_visit ?? 0) },
-       { name: 'Téléchargements', values: series.map(m => m.monthly_download ?? 0) }
+       { name: 'Visites', values: series.map(x => x.monthly_visit ?? 0) },
+       { name: 'Téléchargements', values: series.map(x => x.monthly_download ?? 0) }
      ]
    });
 
    await widget('stat-card', { label: 'Téléchargements 12 mois', value: total12.toLocaleString('fr-FR'), icon: 'download' });
-   await widget('stat-card', { label: 'Pic mensuel', value: `${(peak.monthly_download ?? 0).toLocaleString('fr-FR')} (${peak.month})`, icon: 'trending-up' });
+   await widget('stat-card', { label: 'Pic mensuel', value: `${(peak.monthly_download ?? 0).toLocaleString('fr-FR')} (${peak.month ?? '—'})`, icon: 'trending-up' });
    await widget('stat-card', { label: 'Évol. YoY', value: `${yoy} %`, icon: 'activity' });
 
+   const fRows = (resList?.resources ?? []).slice(0, 10).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—']);
    await widget('table', {
      columns: ['Fichier', 'Format', 'Taille'],
-     rows: (resList?.resources ?? []).slice(0, 10).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—'])
+     rows: fRows.length ? fRows : [['—', '—', '—']]
    });
 
    await widget('kv', {
      items: [
-       { key: 'Titre', value: info.title ?? '—' },
-       { key: 'Organisation', value: info.organization?.name ?? '—' },
-       { key: 'Licence', value: info.license ?? '—' },
-       { key: 'Fréquence', value: info.frequency ?? '—' }
+       { key: 'Titre', value: I.title ?? '—' },
+       { key: 'Organisation', value: I.organization?.name ?? '—' },
+       { key: 'Licence', value: I.license ?? '—' },
+       { key: 'Fréquence', value: I.frequency ?? '—' }
      ]
    });
    ```

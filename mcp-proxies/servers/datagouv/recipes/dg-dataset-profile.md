@@ -27,41 +27,47 @@ This recipe condenses metadata + files + popularity into a single view so the us
 
 1. **Fetch dataset metadata, resources and metrics in parallel**:
    ```js
-   const [info, resList, metrics] = await Promise.all([
+   const dataset_id = '5cc1b94a634f4165e96436c1'; // DVF (fallback example)
+   const _all = await Promise.all([
      call('get_dataset_info', { dataset_id }).catch(() => null),
      call('list_dataset_resources', { dataset_id }).catch(() => ({ resources: [] })),
      call('get_metrics', { dataset_id, limit: 12 }).catch(() => ({ metrics: [] }))
    ]);
+   const info = _all[0];
+   const resList = _all[1];
+   const metrics = _all[2];
    if (!info) {
      await widget('text', { content: 'Dataset introuvable.' });
-     return;
    }
    ```
 
 2. **Render the profile**:
    ```js
+   const I = info ?? {};
    await widget('text', {
-     title: info.title ?? '—',
-     subtitle: info.organization?.name ?? '',
-     content: info.description ?? ''
+     title: I.title ?? '—',
+     subtitle: I.organization?.name ?? '',
+     content: I.description ?? ''
    });
 
    const last30 = (metrics?.metrics ?? [])[0] ?? {};
-   await widget('stat-card', { label: 'Visites 30j', value: last30.monthly_visit ?? 0, icon: 'eye' });
-   await widget('stat-card', { label: 'Téléchargements 30j', value: last30.monthly_download ?? 0, icon: 'download' });
-   await widget('stat-card', { label: 'Fichiers', value: resList?.resources?.length ?? 0, icon: 'file' });
-   await widget('stat-card', { label: 'Licence', value: info.license ?? '—', icon: 'shield' });
+   await widget('stat-card', { label: 'Visites 30j', value: last30.monthly_visit ?? 1, icon: 'eye' });
+   await widget('stat-card', { label: 'Téléchargements 30j', value: last30.monthly_download ?? 1, icon: 'download' });
+   await widget('stat-card', { label: 'Fichiers', value: resList?.resources?.length ?? 1, icon: 'file' });
+   await widget('stat-card', { label: 'Licence', value: I.license ?? '—', icon: 'shield' });
 
+   const fileRows = (resList?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—', r.type ?? '—']);
    await widget('table', {
-     columns: ['Titre', 'Format', 'Taille', 'MAJ'],
-     rows: (resList?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? r.filesize ?? '—', r.last_modified ?? '—'])
+     columns: ['Titre', 'Format', 'Taille', 'Type'],
+     rows: fileRows.length ? fileRows : [['—', '—', '—', '—']]
    });
 
+   const tlItems = (metrics?.metrics ?? []).map(x => ({
+     date: x.month ?? '—',
+     label: `${x.monthly_visit ?? 0} visites · ${x.monthly_download ?? 0} téléchargements`
+   }));
    await widget('timeline', {
-     items: (metrics?.metrics ?? []).map(m => ({
-       date: m.month ?? '—',
-       label: `${m.monthly_visit ?? 0} visites · ${m.monthly_download ?? 0} téléchargements`
-     }))
+     items: tlItems.length ? tlItems : [{ date: I.last_modified ?? '—', label: `Dernière MAJ` }]
    });
    ```
 
@@ -69,26 +75,27 @@ This recipe condenses metadata + files + popularity into a single view so the us
 
 ### DVF — Demandes de valeurs foncières (DGFiP)
 ```js
-const dataset_id = '5cc1b94a634f4165e96436c1';
-const [info, resList, metrics] = await Promise.all([
-  call('get_dataset_info', { dataset_id }).catch(() => null),
-  call('list_dataset_resources', { dataset_id }).catch(() => ({ resources: [] })),
-  call('get_metrics', { dataset_id, limit: 12 }).catch(() => ({ metrics: [] }))
+const dvf_id = '5cc1b94a634f4165e96436c1';
+const _dvf = await Promise.all([
+  call('get_dataset_info', { dataset_id: dvf_id }).catch(() => null),
+  call('list_dataset_resources', { dataset_id: dvf_id }).catch(() => ({ resources: [] })),
+  call('get_metrics', { dataset_id: dvf_id, limit: 12 }).catch(() => ({ metrics: [] }))
 ]);
-if (!info) { await widget('text', { content: 'Dataset introuvable.' }); return; }
-await widget('text', { title: info.title ?? '—', content: info.description ?? '' });
-await widget('stat-card', { label: 'Téléchargements 30j', value: metrics?.metrics?.[0]?.monthly_download ?? 0 });
-await widget('table', { columns: ['Titre', 'Format', 'Taille'], rows: (resList?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—']) });
+const dvfInfo = _dvf[0] ?? {};
+const dvfRes = _dvf[1] ?? { resources: [] };
+const dvfMetrics = _dvf[2] ?? { metrics: [] };
+await widget('text', { title: dvfInfo.title ?? '—', content: dvfInfo.description ?? '' });
+await widget('stat-card', { label: 'Téléchargements 30j', value: dvfMetrics?.metrics?.[0]?.monthly_download ?? 1 });
+await widget('table', { columns: ['Titre', 'Format', 'Taille'], rows: (dvfRes?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—']) });
 ```
 
 ### RNA — Répertoire national des associations
 ```js
-const dataset_id = '58e53811c751df03df38f42d';
-const info = await call('get_dataset_info', { dataset_id }).catch(() => null);
-const resList = await call('list_dataset_resources', { dataset_id }).catch(() => ({ resources: [] }));
-if (!info) { await widget('text', { content: 'Dataset introuvable.' }); return; }
-await widget('text', { title: info.title ?? '—', subtitle: info.organization?.name ?? '', content: info.description ?? '' });
-await widget('table', { columns: ['Fichier', 'Format', 'MAJ'], rows: (resList?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.last_modified ?? '—']) });
+const rna_id = '58e53811c751df03df38f42d';
+const rnaInfo = await call('get_dataset_info', { dataset_id: rna_id }).catch(() => null) ?? {};
+const rnaRes = await call('list_dataset_resources', { dataset_id: rna_id }).catch(() => ({ resources: [] }));
+await widget('text', { title: rnaInfo.title ?? '—', subtitle: rnaInfo.organization?.name ?? '', content: rnaInfo.description ?? '' });
+await widget('table', { columns: ['Fichier', 'Format', 'Type'], rows: (rnaRes?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.type ?? '—']) });
 ```
 
 ## Common mistakes

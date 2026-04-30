@@ -27,35 +27,38 @@ This recipe is the "dev landing page" for a public API.
 
 1. **Fetch info + OpenAPI spec**:
    ```js
-   const [info, spec] = await Promise.all([
+   const dataservice_id = '6661e60fda535e9773c510ca'; // API Sirene
+   const _all = await Promise.all([
      call('get_dataservice_info', { dataservice_id }).catch(() => null),
      call('get_dataservice_openapi_spec', { dataservice_id }).catch(() => null)
    ]);
+   const info = _all[0];
+   const spec = _all[1];
    if (!info) {
      await widget('text', { content: 'Dataservice introuvable.' });
-     return;
    }
    ```
 
 2. **Render**:
    ```js
+   const I = info ?? {};
    await widget('text', {
-     title: info.title ?? '—',
-     subtitle: info.organization?.name ?? '',
-     content: info.description ?? ''
+     title: I.title ?? '—',
+     subtitle: I.organization?.name ?? '',
+     content: I.description ?? ''
    });
 
    const endpoints = spec?.endpoints ?? [];
    await widget('table', {
-     columns: ['Méthode', 'Path', 'Description', 'Auth'],
-     rows: endpoints.map(e => [e.method ?? '—', e.path ?? '—', e.summary ?? '—', e.security ? '🔒' : '—'])
+     columns: ['Méthode', 'Path', 'Description', 'Params'],
+     rows: endpoints.map(e => [e.method ?? '—', e.path ?? '—', e.summary ?? '—', (e.parameters ?? []).length])
    });
 
    const sample = endpoints[0];
-   if (sample) {
-     const curl = `curl -X ${sample.method ?? 'GET'} '${info.base_api_url ?? ''}${sample.path ?? ''}' \\\n  -H 'Accept: application/json'`;
-     await widget('code', { language: 'bash', code: curl });
-   }
+   const curlCmd = sample
+     ? `curl -X ${sample.method ?? 'GET'} '${I.base_api_url ?? ''}${sample.path ?? ''}' \\\n  -H 'Accept: application/json'`
+     : `curl '${I.base_api_url ?? ''}'`;
+   await widget('code', { language: 'bash', code: curlCmd });
 
    await widget('cards', {
      items: (spec?.common_errors ?? [
@@ -70,25 +73,29 @@ This recipe is the "dev landing page" for a public API.
 
 ### SIRENE API by INSEE
 ```js
-const [info, spec] = await Promise.all([
-  call('get_dataservice_info', { dataservice_id: '<sirene-dataservice-id>' }).catch(() => null),
-  call('get_dataservice_openapi_spec', { dataservice_id: '<sirene-dataservice-id>' }).catch(() => null)
+const _ex = await Promise.all([
+  call('get_dataservice_info', { dataservice_id: '6661e60fda535e9773c510ca' }).catch(() => null),
+  call('get_dataservice_openapi_spec', { dataservice_id: '6661e60fda535e9773c510ca' }).catch(() => null)
 ]);
-if (!info) { await widget('text', { content: 'Dataservice introuvable.' }); return; }
-await widget('text', { title: info.title ?? '—', content: info.description ?? '' });
-await widget('table', { columns: ['Méthode', 'Path', 'Description'], rows: (spec?.endpoints ?? []).map(e => [e.method ?? '—', e.path ?? '—', e.summary ?? '—']) });
-await widget('code', { language: 'bash', code: `curl '${info.base_api_url ?? ''}/siret/12345678900012' -H 'Authorization: Bearer YOUR_TOKEN'` });
+const sirInfo = _ex[0] ?? {};
+const sirSpec = _ex[1] ?? {};
+await widget('text', { title: sirInfo.title ?? '—', content: sirInfo.description ?? '' });
+await widget('table', { columns: ['Méthode', 'Path', 'Description'], rows: (sirSpec?.endpoints ?? []).map(e => [e.method ?? '—', e.path ?? '—', e.summary ?? '—']) });
+await widget('code', { language: 'bash', code: `curl '${sirInfo.base_api_url ?? ''}/siret/12345678900012' -H 'Authorization: Bearer YOUR_TOKEN'` });
 ```
 
-### adresse.data.gouv.fr API
+### Discover an adresse-related API
 ```js
-const [info, spec] = await Promise.all([
-  call('get_dataservice_info', { dataservice_id: '<adresse-dataservice-id>' }).catch(() => null),
-  call('get_dataservice_openapi_spec', { dataservice_id: '<adresse-dataservice-id>' }).catch(() => null)
-]);
-if (!info) { await widget('text', { content: 'Dataservice introuvable.' }); return; }
-await widget('table', { columns: ['Méthode', 'Path'], rows: (spec?.endpoints ?? []).map(e => [e.method ?? '—', e.path ?? '—']) });
-await widget('code', { language: 'bash', code: `curl '${info.base_api_url ?? ''}/search/?q=8+rue+de+la+paix+Paris'` });
+const adrSearch = await call('search_dataservices', { query: 'adresse', page_size: 1 }).catch(() => ({ dataservices: [] }));
+const adr_id = adrSearch?.dataservices?.[0]?.id;
+const _adr = adr_id ? await Promise.all([
+  call('get_dataservice_info', { dataservice_id: adr_id }).catch(() => null),
+  call('get_dataservice_openapi_spec', { dataservice_id: adr_id }).catch(() => null)
+]) : [null, null];
+const adrInfo = _adr[0] ?? {};
+const adrSpec = _adr[1] ?? {};
+await widget('table', { columns: ['Méthode', 'Path'], rows: (adrSpec?.endpoints ?? []).map(e => [e.method ?? '—', e.path ?? '—']) });
+await widget('code', { language: 'bash', code: `curl '${adrInfo.base_api_url ?? ''}/search/?q=8+rue+de+la+paix+Paris'` });
 ```
 
 ## Common mistakes

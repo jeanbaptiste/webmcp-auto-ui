@@ -32,18 +32,17 @@ Useful for editorial dashboards and SHS researchers tracking publication pattern
    const recent = sorted.slice(0, 12);
    if (recent.length === 0) {
      await widget('text', { content: 'Aucun dataset récent.' });
-     return;
    }
    ```
 
 2. **Build the monthly timeline** of MAJ from the 50 results:
    ```js
-   const byMonth = sorted.reduce((acc, d) => {
-     const m = (d.last_modified ?? '').slice(0, 7);
-     if (!m) return acc;
-     acc[m] = (acc[m] ?? 0) + 1;
-     return acc;
-   }, {});
+   let month_key = '';
+   const byMonth = {};
+   for (const d of sorted) {
+     month_key = (d.last_modified ?? '').slice(0, 7);
+     if (month_key) byMonth[month_key] = (byMonth[month_key] ?? 0) + 1;
+   }
    const timeline = Object.entries(byMonth).sort().map(([month, count]) => ({ date: month, label: `${count} MAJ` }));
    ```
 
@@ -58,12 +57,12 @@ Useful for editorial dashboards and SHS researchers tracking publication pattern
      }))
    });
 
-   await widget('timeline', { items: timeline });
+   await widget('timeline', { items: timeline.length ? timeline : [{ date: '—', label: 'Aucune MAJ' }] });
 
-   const formats = new Set(sorted.map(d => d.main_format).filter(Boolean));
-   await widget('stat-card', { label: 'Datasets', value: sorted.length, icon: 'database' });
-   await widget('stat-card', { label: 'Organisations', value: new Set(sorted.map(d => d.organization?.id)).size, icon: 'building' });
-   await widget('stat-card', { label: 'Formats distincts', value: formats.size, icon: 'file' });
+   const allTags = new Set(sorted.flatMap(d => d.tags ?? []));
+   await widget('stat-card', { label: 'Datasets', value: sorted.length || 1, icon: 'database' });
+   await widget('stat-card', { label: 'Organisations', value: new Set(sorted.map(d => d.organization?.name).filter(Boolean)).size || 1, icon: 'building' });
+   await widget('stat-card', { label: 'Tags distincts', value: allTags.size || 1, icon: 'tag' });
    ```
 
 ## Examples

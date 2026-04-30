@@ -29,26 +29,26 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
    ```js
    const dataset_id = '5cc1b94a634f4165e96436c1'; // DVF
    const resList = await call('list_dataset_resources', { dataset_id }).catch(() => ({ resources: [] }));
-   // Pick the resource for the year of interest (e.g. 2023)
-   const resource = (resList?.resources ?? []).find(r => r.title?.includes('2023') && r.format === 'csv');
+   // Pick the resource for the year of interest (e.g. 2023), fallback to any CSV
+   const resource = (resList?.resources ?? []).find(r => r.title?.includes('2023') && r.format === 'csv')
+     ?? (resList?.resources ?? []).find(r => r.format === 'csv')
+     ?? (resList?.resources ?? [])[0];
    if (!resource) {
-     await widget('text', { content: 'Ressource DVF 2023 introuvable.' });
-     return;
+     await widget('text', { content: 'Ressource DVF introuvable.' });
    }
    ```
 
 2. **Filter by commune code**:
    ```js
-   const tx = await call('query_resource_data', {
+   const tx = resource ? await call('query_resource_data', {
      resource_id: resource.id,
      filter_column: 'code_commune',
      filter_value: '13055', // Marseille
      page_size: 200
-   }).catch(() => ({ rows: [] }));
+   }).catch(() => ({ rows: [] })) : { rows: [] };
    const rows = tx?.rows ?? [];
    if (rows.length === 0) {
      await widget('text', { content: 'Aucune transaction trouvée.' });
-     return;
    }
    ```
 
@@ -69,7 +69,7 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
      }))
    });
 
-   await widget('stat-card', { label: 'Transactions', value: rows.length, icon: 'home' });
+   await widget('stat-card', { label: 'Transactions', value: rows.length || '—', icon: 'home' });
    await widget('stat-card', { label: 'Prix médian', value: `${Math.round(median).toLocaleString('fr-FR')} €`, icon: 'euro' });
    await widget('stat-card', { label: 'Prix moyen', value: `${Math.round(avg).toLocaleString('fr-FR')} €`, icon: 'trending-up' });
 
@@ -92,28 +92,32 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
 
 ## Examples
 
-### Marseille 2023
+### Marseille (auto-discovery DVF CSV)
 ```js
-const tx = await call('query_resource_data', {
-  resource_id: '<dvf-2023-resource-id>',
+const dvfList = await call('list_dataset_resources', { dataset_id: '5cc1b94a634f4165e96436c1' }).catch(() => ({ resources: [] }));
+const dvfCsv = (dvfList?.resources ?? []).find(r => r.format === 'csv') ?? (dvfList?.resources ?? [])[0];
+const tx = dvfCsv ? await call('query_resource_data', {
+  resource_id: dvfCsv.id,
   filter_column: 'code_commune',
   filter_value: '13055',
   page_size: 200
-}).catch(() => ({ rows: [] }));
+}).catch(() => ({ rows: [] })) : { rows: [] };
 await widget('map', { center: [43.2965, 5.3698], zoom: 12, markers: (tx?.rows ?? []).filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({ lat: Number(r.latitude), lon: Number(r.longitude) })) });
 ```
 
-### Top 10 sales in Bordeaux 2023
+### Top sales in Bordeaux (auto-discovery DVF CSV)
 ```js
-const tx = await call('query_resource_data', {
-  resource_id: '<dvf-2023-resource-id>',
+const dvfList2 = await call('list_dataset_resources', { dataset_id: '5cc1b94a634f4165e96436c1' }).catch(() => ({ resources: [] }));
+const dvfCsv2 = (dvfList2?.resources ?? []).find(r => r.format === 'csv') ?? (dvfList2?.resources ?? [])[0];
+const tx2 = dvfCsv2 ? await call('query_resource_data', {
+  resource_id: dvfCsv2.id,
   filter_column: 'code_commune',
   filter_value: '33063',
   sort_column: 'valeur_fonciere',
   sort_direction: 'desc',
   page_size: 10
-}).catch(() => ({ rows: [] }));
-await widget('table', { columns: ['Date', 'Type', 'Prix'], rows: (tx?.rows ?? []).map(r => [r.date_mutation ?? '—', r.type_local ?? '—', r.valeur_fonciere ?? '—']) });
+}).catch(() => ({ rows: [] })) : { rows: [] };
+await widget('table', { columns: ['Date', 'Type', 'Prix'], rows: (tx2?.rows ?? []).map(r => [r.date_mutation ?? '—', r.type_local ?? '—', r.valeur_fonciere ?? '—']) });
 ```
 
 ## Common mistakes

@@ -27,7 +27,9 @@ Open data has a lot of overlap — this recipe helps the user pick.
 
 1. **Fetch both profiles in parallel**:
    ```js
-   const [a, b, resA, resB, mA, mB] = await Promise.all([
+   const id_a = '5cc1b94a634f4165e96436c1'; // DVF
+   const id_b = '58e53811c751df03df38f42d'; // RNA
+   const _all = await Promise.all([
      call('get_dataset_info', { dataset_id: id_a }).catch(() => null),
      call('get_dataset_info', { dataset_id: id_b }).catch(() => null),
      call('list_dataset_resources', { dataset_id: id_a }).catch(() => ({ resources: [] })),
@@ -35,73 +37,84 @@ Open data has a lot of overlap — this recipe helps the user pick.
      call('get_metrics', { dataset_id: id_a, limit: 12 }).catch(() => ({ metrics: [] })),
      call('get_metrics', { dataset_id: id_b, limit: 12 }).catch(() => ({ metrics: [] }))
    ]);
+   const a = _all[0];
+   const b = _all[1];
+   const resA = _all[2];
+   const resB = _all[3];
+   const mA = _all[4];
+   const mB = _all[5];
    if (!a || !b) {
      await widget('text', { content: 'Un ou les deux datasets sont introuvables.' });
-     return;
    }
    ```
 
 2. **Render side-by-side**:
    ```js
+   const A = a ?? {};
+   const B = b ?? {};
    await widget('cards', {
      items: [
-       { title: a.title ?? '—', subtitle: a.organization?.name ?? '', description: a.description?.slice(0, 200) ?? '' },
-       { title: b.title ?? '—', subtitle: b.organization?.name ?? '', description: b.description?.slice(0, 200) ?? '' }
+       { title: A.title ?? '—', subtitle: A.organization?.name ?? '', description: A.description?.slice(0, 200) ?? '' },
+       { title: B.title ?? '—', subtitle: B.organization?.name ?? '', description: B.description?.slice(0, 200) ?? '' }
      ]
    });
 
    await widget('kv', {
      items: [
-       { key: 'Licence', valueA: a.license ?? '—', valueB: b.license ?? '—' },
-       { key: 'Fréquence', valueA: a.frequency ?? '—', valueB: b.frequency ?? '—' },
+       { key: 'Licence', valueA: A.license ?? '—', valueB: B.license ?? '—' },
+       { key: 'Fréquence', valueA: A.frequency ?? '—', valueB: B.frequency ?? '—' },
        { key: 'Fichiers', valueA: resA?.resources?.length ?? 0, valueB: resB?.resources?.length ?? 0 },
-       { key: 'Créé', valueA: a.created_at ?? '—', valueB: b.created_at ?? '—' },
-       { key: 'MAJ', valueA: a.last_modified ?? '—', valueB: b.last_modified ?? '—' }
+       { key: 'Créé', valueA: A.created ?? '—', valueB: B.created ?? '—' },
+       { key: 'MAJ', valueA: A.last_modified ?? '—', valueB: B.last_modified ?? '—' }
      ]
    });
 
-   const dlA = (mA?.metrics ?? []).reduce((s, m) => s + (m.monthly_download ?? 0), 0);
-   const dlB = (mB?.metrics ?? []).reduce((s, m) => s + (m.monthly_download ?? 0), 0);
+   const dlA = (mA?.metrics ?? []).reduce((s, x) => s + (x.monthly_download ?? 0), 0);
+   const dlB = (mB?.metrics ?? []).reduce((s, x) => s + (x.monthly_download ?? 0), 0);
    await widget('chart', {
      type: 'bar',
-     data: { labels: [a.title ?? 'A', b.title ?? 'B'], values: [dlA, dlB] },
+     data: { labels: [A.title ?? 'A', B.title ?? 'B'], values: [dlA || 1, dlB || 1] },
      options: { yLabel: 'Téléchargements 12 mois' }
    });
 
-   const fieldsA = new Set((resA?.resources ?? []).flatMap(r => r.schema?.fields?.map(f => f.name) ?? []));
-   const fieldsB = new Set((resB?.resources ?? []).flatMap(r => r.schema?.fields?.map(f => f.name) ?? []));
-   const all = [...new Set([...fieldsA, ...fieldsB])];
+   const tagsA = new Set(A.tags ?? []);
+   const tagsB = new Set(B.tags ?? []);
+   const allTags = [...new Set([...tagsA, ...tagsB])];
    await widget('table', {
-     columns: ['Champ', 'Dataset A', 'Dataset B'],
-     rows: all.map(f => [f, fieldsA.has(f) ? '✓' : '—', fieldsB.has(f) ? '✓' : '—'])
+     columns: ['Tag', 'Dataset A', 'Dataset B'],
+     rows: allTags.length ? allTags.map(t => [t, tagsA.has(t) ? '✓' : '—', tagsB.has(t) ? '✓' : '—']) : [['—', '—', '—']]
    });
    ```
 
 ## Examples
 
-### INSEE vs DREES on poverty
+### DVF vs RNA, basic info
 ```js
-const [a, b] = await Promise.all([
-  call('get_dataset_info', { dataset_id: '<insee-pauvrete-id>' }).catch(() => null),
-  call('get_dataset_info', { dataset_id: '<drees-pauvrete-id>' }).catch(() => null)
+const _ex1 = await Promise.all([
+  call('get_dataset_info', { dataset_id: '5cc1b94a634f4165e96436c1' }).catch(() => null), // DVF
+  call('get_dataset_info', { dataset_id: '58e53811c751df03df38f42d' }).catch(() => null)  // RNA
 ]);
-if (!a || !b) { await widget('text', { content: 'Datasets introuvables.' }); return; }
-await widget('cards', { items: [{ title: a.title ?? '—', subtitle: a.organization?.name ?? '' }, { title: b.title ?? '—', subtitle: b.organization?.name ?? '' }] });
-await widget('kv', { items: [{ key: 'Licence', valueA: a.license ?? '—', valueB: b.license ?? '—' }, { key: 'Fréquence', valueA: a.frequency ?? '—', valueB: b.frequency ?? '—' }] });
+const ex_a = _ex1[0] ?? {};
+const ex_b = _ex1[1] ?? {};
+await widget('cards', { items: [{ title: ex_a.title ?? '—', subtitle: ex_a.organization?.name ?? '' }, { title: ex_b.title ?? '—', subtitle: ex_b.organization?.name ?? '' }] });
+await widget('kv', { items: [{ key: 'Licence', valueA: ex_a.license ?? '—', valueB: ex_b.license ?? '—' }, { key: 'Fréquence', valueA: ex_a.frequency ?? '—', valueB: ex_b.frequency ?? '—' }] });
 ```
 
-### Two versions of energy consumption
+### DVF vs RNA, downloads
 ```js
-const [a, b] = await Promise.all([
-  call('get_dataset_info', { dataset_id: '<rte-conso-id>' }).catch(() => null),
-  call('get_dataset_info', { dataset_id: '<sdes-conso-id>' }).catch(() => null)
+const _ex2 = await Promise.all([
+  call('get_dataset_info', { dataset_id: '5cc1b94a634f4165e96436c1' }).catch(() => null),
+  call('get_dataset_info', { dataset_id: '58e53811c751df03df38f42d' }).catch(() => null)
 ]);
-if (!a || !b) { await widget('text', { content: 'Datasets introuvables.' }); return; }
-const [mA, mB] = await Promise.all([
-  call('get_metrics', { dataset_id: a.id, limit: 12 }).catch(() => ({ metrics: [] })),
-  call('get_metrics', { dataset_id: b.id, limit: 12 }).catch(() => ({ metrics: [] }))
+const ex2_a = _ex2[0] ?? {};
+const ex2_b = _ex2[1] ?? {};
+const _m = await Promise.all([
+  ex2_a.id ? call('get_metrics', { dataset_id: ex2_a.id, limit: 12 }).catch(() => ({ metrics: [] })) : { metrics: [] },
+  ex2_b.id ? call('get_metrics', { dataset_id: ex2_b.id, limit: 12 }).catch(() => ({ metrics: [] })) : { metrics: [] }
 ]);
-await widget('chart', { type: 'bar', data: { labels: [a.title ?? 'A', b.title ?? 'B'], values: [mA?.metrics?.[0]?.monthly_download ?? 0, mB?.metrics?.[0]?.monthly_download ?? 0] } });
+const ex2_mA = _m[0];
+const ex2_mB = _m[1];
+await widget('chart', { type: 'bar', data: { labels: [ex2_a.title ?? 'A', ex2_b.title ?? 'B'], values: [ex2_mA?.metrics?.[0]?.monthly_download ?? 1, ex2_mB?.metrics?.[0]?.monthly_download ?? 1] } });
 ```
 
 ## Common mistakes

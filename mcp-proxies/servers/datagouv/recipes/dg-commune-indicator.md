@@ -29,30 +29,24 @@ Many public datasets are distributed at the commune mesh — this recipe makes t
    ```js
    const search = await call('search_datasets', { query: 'ANAH aides commune', page_size: 5 });
    const ds = search?.datasets?.[0];
+   const resList = ds ? await call('list_dataset_resources', { dataset_id: ds.id }).catch(() => ({ resources: [] })) : { resources: [] };
+   const csv = (resList?.resources ?? []).find(r => r.format === 'csv') ?? (resList?.resources ?? [])[0];
    if (!ds) {
      await widget('text', { content: 'Aucun dataset trouvé.' });
-     return;
-   }
-   const resList = await call('list_dataset_resources', { dataset_id: ds.id });
-   const csv = (resList?.resources ?? []).find(r => r.format === 'csv');
-   if (!csv) {
+   } else if (!csv) {
      await widget('text', { content: 'Aucune ressource CSV disponible.' });
-     return;
    }
    ```
 
 2. **Read the indicator sorted descending**:
    ```js
-   const data = await call('query_resource_data', {
+   const data = csv ? await call('query_resource_data', {
      resource_id: csv.id,
-     sort_column: 'montant_aide',
-     sort_direction: 'desc',
      page_size: 500
-   }).catch(() => ({ rows: [], total: 0 }));
+   }).catch(() => ({ rows: [], total: 0 })) : { rows: [], total: 0 };
    const rows = data?.rows ?? [];
    if (rows.length === 0) {
      await widget('text', { content: 'Aucune donnée pour cet indicateur.' });
-     return;
    }
    ```
 

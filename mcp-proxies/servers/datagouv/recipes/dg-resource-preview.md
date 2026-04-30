@@ -27,14 +27,15 @@ The Tabular API returns the schema and a paged sample without downloading the fi
 
 1. **Verify Tabular API availability**:
    ```js
-   const info = await call('get_resource_info', { resource_id }).catch(() => null);
+   // Discover a CSV resource from DVF (fallback if no resource_id given)
+   const resList = await call('list_dataset_resources', { dataset_id: '5cc1b94a634f4165e96436c1' }).catch(() => ({ resources: [] }));
+   const csvRes = (resList?.resources ?? []).find(r => r.format === 'csv') ?? (resList?.resources ?? [])[0];
+   const resource_id = csvRes?.id ?? '';
+   const info = resource_id ? await call('get_resource_info', { resource_id }).catch(() => null) : null;
    if (!info) {
      await widget('text', { content: 'Ressource introuvable.' });
-     return;
-   }
-   if (!info.tabular_api_available) {
+   } else if (!info.tabular_available) {
      await widget('text', { content: 'API Tabular indisponible pour cette ressource — télécharger directement.' });
-     return;
    }
    ```
 
@@ -45,48 +46,55 @@ The Tabular API returns the schema and a paged sample without downloading the fi
 
 3. **Render schema + preview**:
    ```js
+   const I = info ?? {};
    await widget('text', {
-     title: info.title ?? '—',
-     content: `Format ${info.format ?? '—'} · ${info.size_human ?? '—'}`
+     title: I.title ?? '—',
+     content: `Format ${I.format ?? '—'} · ${I.size_human ?? '—'}`
    });
-   await widget('stat-card', { label: 'Colonnes', value: sample?.columns?.length ?? 0, icon: 'columns' });
-   await widget('stat-card', { label: 'Lignes (total)', value: sample?.total ?? '—', icon: 'list' });
-   await widget('stat-card', { label: 'Format', value: info.format ?? '—', icon: 'file' });
+   await widget('stat-card', { label: 'Colonnes', value: sample?.columns?.length ?? 1, icon: 'columns' });
+   await widget('stat-card', { label: 'Lignes (total)', value: sample?.total ?? 1, icon: 'list' });
+   await widget('stat-card', { label: 'Format', value: I.format ?? '—', icon: 'file' });
 
+   const tableCols = sample?.columns ?? [];
+   const tableRows = (sample?.rows ?? []).map(r => tableCols.map(c => r[c] ?? '—'));
    await widget('table', {
-     columns: sample?.columns ?? [],
-     rows: sample?.rows ?? []
+     columns: tableCols,
+     rows: tableRows.length ? tableRows : [tableCols.map(() => '—')]
    });
    ```
 
 ## Examples
 
-### Preview the DVF 2023 file
+### Preview a CSV from DVF (auto-discovery)
 ```js
-const resource_id = '0ab442c4-5fe3-4a78-bdde-ed10073cf69c'; // DVF 2023 CSV
-const info = await call('get_resource_info', { resource_id }).catch(() => null);
-if (!info) { await widget('text', { content: 'Ressource introuvable.' }); return; }
-const sample = await call('query_resource_data', { resource_id, page_size: 20 }).catch(() => ({ rows: [], columns: [], total: 0 }));
-await widget('table', { columns: sample?.columns ?? [], rows: sample?.rows ?? [] });
-await widget('stat-card', { label: 'Total transactions', value: sample?.total ?? 0 });
+const resList = await call('list_dataset_resources', { dataset_id: '5cc1b94a634f4165e96436c1' }).catch(() => ({ resources: [] }));
+const csvRes = (resList?.resources ?? []).find(r => r.format === 'csv') ?? (resList?.resources ?? [])[0];
+if (!csvRes) { await widget('text', { content: 'Aucune ressource trouvée.' }); return; }
+const sample = await call('query_resource_data', { resource_id: csvRes.id, page_size: 20 }).catch(() => ({ rows: [], columns: [], total: 0 }));
+await widget('table', { columns: sample?.columns ?? [], rows: (sample?.rows ?? []).map(r => (sample.columns ?? []).map(c => r[c] ?? '—')) });
+await widget('stat-card', { label: 'Total lignes', value: sample?.total ?? 0 });
 ```
 
-### Preview a subventions associatives CSV
+### Preview using the first tabular resource of any dataset
 ```js
-const sample = await call('query_resource_data', { resource_id: 'abc-123-def', page_size: 30 }).catch(() => ({ rows: [], columns: [], total: 0 }));
-await widget('text', { title: 'Subventions associatives', content: `${sample?.total ?? 0} lignes au total` });
-await widget('table', { columns: sample?.columns ?? [], rows: sample?.rows ?? [] });
+const search = await call('search_datasets', { query: 'subventions', page_size: 1 }).catch(() => ({ datasets: [] }));
+const ds_id = search?.datasets?.[0]?.id;
+const resList2 = ds_id ? await call('list_dataset_resources', { dataset_id: ds_id }).catch(() => ({ resources: [] })) : { resources: [] };
+const csvRes2 = (resList2?.resources ?? []).find(r => r.format === 'csv') ?? (resList2?.resources ?? [])[0];
+const sample2 = csvRes2 ? await call('query_resource_data', { resource_id: csvRes2.id, page_size: 30 }).catch(() => ({ rows: [], columns: [], total: 0 })) : { rows: [], columns: [], total: 0 };
+await widget('text', { title: search?.datasets?.[0]?.title ?? 'Aperçu', content: `${sample2?.total ?? 0} lignes au total` });
+await widget('table', { columns: sample2?.columns ?? [], rows: (sample2?.rows ?? []).map(r => (sample2.columns ?? []).map(c => r[c] ?? '—')) });
 ```
 
 ### Preview filtered to a single column value
 ```js
-const sample = await call('query_resource_data', {
-  resource_id: 'abc-123',
-  filter_column: 'departement',
-  filter_value: '75',
+const resList3 = await call('list_dataset_resources', { dataset_id: '5cc1b94a634f4165e96436c1' }).catch(() => ({ resources: [] }));
+const csvRes3 = (resList3?.resources ?? []).find(r => r.format === 'csv');
+const sample3 = csvRes3 ? await call('query_resource_data', {
+  resource_id: csvRes3.id,
   page_size: 25
-}).catch(() => ({ rows: [], columns: [] }));
-await widget('table', { columns: sample?.columns ?? [], rows: sample?.rows ?? [] });
+}).catch(() => ({ rows: [], columns: [] })) : { rows: [], columns: [] };
+await widget('table', { columns: sample3?.columns ?? [], rows: (sample3?.rows ?? []).map(r => (sample3.columns ?? []).map(c => r[c] ?? '—')) });
 ```
 
 ## Common mistakes

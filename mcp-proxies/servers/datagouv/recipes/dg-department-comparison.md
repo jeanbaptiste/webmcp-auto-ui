@@ -29,30 +29,24 @@ These questions all share the same shape: one indicator, 101 departments, rankin
    ```js
    const search = await call('search_datasets', { query: 'pauvreté département INSEE', page_size: 5 });
    const dataset = search?.datasets?.[0];
+   const resList = dataset ? await call('list_dataset_resources', { dataset_id: dataset.id }).catch(() => ({ resources: [] })) : { resources: [] };
+   const csv = (resList?.resources ?? []).find(r => r.format === 'csv') ?? (resList?.resources ?? [])[0];
    if (!dataset) {
      await widget('text', { content: 'Aucun dataset trouvé.' });
-     return;
-   }
-   const resList = await call('list_dataset_resources', { dataset_id: dataset.id });
-   const csv = (resList?.resources ?? []).find(r => r.format === 'csv');
-   if (!csv) {
+   } else if (!csv) {
      await widget('text', { content: 'Aucune ressource CSV.' });
-     return;
    }
    ```
 
 2. **Fetch the indicator sorted descending**:
    ```js
-   const data = await call('query_resource_data', {
+   const data = csv ? await call('query_resource_data', {
      resource_id: csv.id,
-     sort_column: 'taux_pauvrete',
-     sort_direction: 'desc',
      page_size: 101
-   }).catch(() => ({ rows: [] }));
+   }).catch(() => ({ rows: [] })) : { rows: [] };
    const rows = data?.rows ?? [];
    if (rows.length === 0) {
      await widget('text', { content: 'Aucune donnée.' });
-     return;
    }
    ```
 

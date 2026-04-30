@@ -29,40 +29,34 @@ INSEE and SDES publish many long series on data.gouv.fr — this recipe wraps th
    ```js
    const search = await call('search_datasets', { query: 'salaire moyen INSEE série', page_size: 5 });
    const ds = search?.datasets?.[0];
+   const resList = ds ? await call('list_dataset_resources', { dataset_id: ds.id }).catch(() => ({ resources: [] })) : { resources: [] };
+   const csv = (resList?.resources ?? []).find(r => r.format === 'csv') ?? (resList?.resources ?? [])[0];
    if (!ds) {
      await widget('text', { content: 'Aucun dataset trouvé.' });
-     return;
-   }
-   const resList = await call('list_dataset_resources', { dataset_id: ds.id });
-   const csv = (resList?.resources ?? []).find(r => r.format === 'csv');
-   if (!csv) {
+   } else if (!csv) {
      await widget('text', { content: 'Aucune ressource CSV.' });
-     return;
    }
    ```
 
 2. **Read the series sorted by year**:
    ```js
-   const data = await call('query_resource_data', {
+   const data = csv ? await call('query_resource_data', {
      resource_id: csv.id,
-     sort_column: 'annee',
-     sort_direction: 'asc',
      page_size: 100
-   }).catch(() => ({ rows: [] }));
+   }).catch(() => ({ rows: [] })) : { rows: [] };
    const rows = (data?.rows ?? []).filter(r => Number.isFinite(Number(r.valeur)));
    if (rows.length === 0) {
      await widget('text', { content: 'Aucune donnée temporelle.' });
-     return;
    }
    ```
 
 3. **Render line chart + KPIs + recent-years table**:
    ```js
-   const first = rows[0];
-   const last = rows[rows.length - 1];
+   const first = rows[0] ?? {};
+   const last = rows[rows.length - 1] ?? {};
    const firstVal = Number(first.valeur);
    const lastVal = Number(last.valeur);
-   const change = firstVal !== 0 ? ((lastVal - firstVal) / firstVal * 100).toFixed(1) : 'n/a';
+   const change = (Number.isFinite(firstVal) && firstVal !== 0) ? ((lastVal - firstVal) / firstVal * 100).toFixed(1) : 'n/a';
 
    await widget('chart', {
      type: 'line',
