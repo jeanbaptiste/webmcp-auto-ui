@@ -328,9 +328,9 @@ async function runSqlBlock(code, mcp, sqlTool) {
   return { rowCount, raw: res };
 }
 
-// Extract top-level `const`/`let`/`var`/`function` names. Strips strings &
-// comments first, then walks the source counting `{}` depth so matches inside
-// callbacks / nested blocks are skipped. Identifiers + simple destructuring.
+// Extract top-level `const`/`let`/`var`/`function` decl names. Strips strings &
+// comments, walks at brace-depth 0. Handles multi-decl `const a = 1, b = 2`,
+// destructure `const {x, y: z} = …` and `const [a, b] = …`.
 function extractTopLevelDecls(code) {
   const stripped = code
     .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -339,30 +339,77 @@ function extractTopLevelDecls(code) {
     .replace(/"(?:\\.|[^"\\])*"/g, '""')
     .replace(/`(?:\\.|[^`\\])*`/g, '``');
   const names = new Set();
-  const reIdent = /\b(?:const|let|var|function)\s+([A-Za-z_$][\w$]*)/g;
-  const reDestruct = /\b(?:const|let|var)\s+([\[{])/g;
-  let m;
   const depthAt = (idx) => {
     let d = 0;
     for (let i = 0; i < idx; i++) { if (stripped[i] === '{') d++; else if (stripped[i] === '}') d--; }
     return d;
   };
-  while ((m = reIdent.exec(stripped)) !== null) {
-    if (depthAt(m.index) === 0) names.add(m[1]);
-  }
-  while ((m = reDestruct.exec(stripped)) !== null) {
+  const reKw = /\b(const|let|var|function)\s+/g;
+  let m;
+  while ((m = reKw.exec(stripped)) !== null) {
     if (depthAt(m.index) !== 0) continue;
-    const open = m[1];
-    const close = open === '[' ? ']' : '}';
-    let depth = 1, end = -1;
-    for (let i = m.index + m[0].length; i < stripped.length; i++) {
-      const c = stripped[i];
-      if (c === open) depth++;
-      else if (c === close) { depth--; if (depth === 0) { end = i; break; } }
+    let i = m.index + m[0].length;
+    if (m[1] === 'function') {
+      const id = stripped.slice(i).match(/^([A-Za-z_$][\w$]*)/);
+      if (id) names.add(id[1]);
+      continue;
     }
-    if (end < 0) continue;
-    const inner = stripped.slice(m.index + m[0].length, end);
-    for (const n of inner.matchAll(/([A-Za-z_$][\w$]*)\s*(?:[:,=\]}]|$)/g)) names.add(n[1]);
+    // Loop over comma-separated declarators in the same `const`/`let`/`var`.
+    while (i < stripped.length) {
+      while (i < stripped.length && /\s/.test(stripped[i])) i++;
+      const c = stripped[i];
+      if (c === '[' || c === '{') {
+        // Destructure: walk balanced, capture leading binding idents.
+        const open = c, close = open === '[' ? ']' : '}';
+        let d = 1, j = i + 1, expectBind = true;
+        while (j < stripped.length && d > 0) {
+          const k = stripped[j];
+          if (k === open) d++;
+          else if (k === close) { d--; if (d === 0) { j++; break; } }
+          if (d > 0) {
+            if (k === ',') expectBind = true;
+            else if (k === ':') expectBind = true;
+            else if (k === '=') {
+              j++;
+              while (j < stripped.length) {
+                const kk = stripped[j];
+                if (kk === '(' || kk === '[' || kk === '{') d++;
+                else if (kk === ')' || kk === ']' || kk === '}') { d--; if (d === 0) break; }
+                else if (d === 1 && kk === ',') break;
+                j++;
+              }
+              expectBind = false;
+              continue;
+            } else if (expectBind && /[A-Za-z_$]/.test(k)) {
+              const id = stripped.slice(j).match(/^[A-Za-z_$][\w$]*/);
+              if (id) { names.add(id[0]); j += id[0].length; expectBind = false; continue; }
+            }
+          }
+          j++;
+        }
+        i = j;
+      } else if (/[A-Za-z_$]/.test(c)) {
+        const id = stripped.slice(i).match(/^[A-Za-z_$][\w$]*/);
+        names.add(id[0]);
+        i += id[0].length;
+      } else break;
+      // Optional initializer `= …` — skip until top-level `,` or `;`.
+      while (i < stripped.length && /\s/.test(stripped[i])) i++;
+      if (stripped[i] === '=') {
+        i++;
+        let d = 0;
+        while (i < stripped.length) {
+          const k = stripped[i];
+          if (k === '(' || k === '[' || k === '{') d++;
+          else if (k === ')' || k === ']' || k === '}') d--;
+          else if (d === 0 && (k === ',' || k === ';')) break;
+          i++;
+        }
+      }
+      while (i < stripped.length && /\s/.test(stripped[i])) i++;
+      if (stripped[i] !== ',') break;
+      i++;
+    }
   }
   return [...names];
 }
