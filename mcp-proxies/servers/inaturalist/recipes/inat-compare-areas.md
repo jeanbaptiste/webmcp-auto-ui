@@ -32,10 +32,10 @@ if (!a || !b) {
   return;
 }
 
-// 2. Top species per area for the same clade
+// 2. Top species per area
 const [topA, topB] = await Promise.all([
-  call('species_counts', { place_id: a.id, taxon_name: 'Aves', per_page: 50 }).catch(() => ({ results: [], total_results: 0 })),
-  call('species_counts', { place_id: b.id, taxon_name: 'Aves', per_page: 50 }).catch(() => ({ results: [], total_results: 0 })),
+  call('species_counts', { place_id: a.id, per_page: 50 }).catch(() => ({ results: [], total_results: 0 })),
+  call('species_counts', { place_id: b.id, per_page: 50 }).catch(() => ({ results: [], total_results: 0 })),
 ]);
 const namesA = new Set((topA?.results ?? []).map(r => r.taxon?.name).filter(Boolean));
 const namesB = new Set((topB?.results ?? []).map(r => r.taxon?.name).filter(Boolean));
@@ -45,8 +45,8 @@ const onlyB = [...namesB].filter(n => !namesA.has(n));
 
 // 3. Observations sample for each map
 const [obsA, obsB] = await Promise.all([
-  call('search_observations', { place_id: a.id, taxon_name: 'Aves', per_page: 80, quality_grade: 'research' }).catch(() => ({ results: [] })),
-  call('search_observations', { place_id: b.id, taxon_name: 'Aves', per_page: 80, quality_grade: 'research' }).catch(() => ({ results: [] })),
+  call('search_observations', { place_id: a.id, per_page: 80, quality_grade: 'research' }).catch(() => ({ results: [] })),
+  call('search_observations', { place_id: b.id, per_page: 80, quality_grade: 'research' }).catch(() => ({ results: [] })),
 ]);
 
 // 4. Render comparison chart
@@ -54,7 +54,7 @@ await widget('chart', {
   type: 'bar',
   labels: [a.display_name ?? 'Area A', b.display_name ?? 'Area B'],
   data: [topA?.total_results ?? 0, topB?.total_results ?? 0],
-  title: 'Species count (Aves)',
+  title: 'Species count',
 });
 
 // 5. Maps side-by-side

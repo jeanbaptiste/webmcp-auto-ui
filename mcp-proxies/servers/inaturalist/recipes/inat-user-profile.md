@@ -32,14 +32,13 @@ if (!user) {
   return;
 }
 
-// 2. Their observations (the inaturalist MCP doesn't expose user_id directly,
-//    but a place_id-less search by per_page returns nothing — fall back to
-//    searching their observations via the public profile slug if needed.)
+// 2. Their observations
 const obs = await call('search_observations', {
+  user_id: user.id,
   per_page: 100,
   quality_grade: 'research',
 }).catch(() => ({ results: [] }));
-const myObs = (obs?.results ?? []).filter(o => o.user?.id === user.id).slice(0, 50);
+const myObs = (obs?.results ?? []).slice(0, 50);
 
 // 3. Profile
 await widget('profile', {
@@ -106,8 +105,8 @@ await widget('profile', { title: u.name ?? u.login ?? 'User', subtitle: '@' + (u
 const res = await call('search', { q: 'naturalist42', sources: 'users', per_page: 1 }).catch(() => ({ results: [] }));
 const u = res?.results?.[0]?.record;
 if (!u) { await widget('text', { content: 'User not found.' }); return; }
-const all = await call('search_observations', { per_page: 200, quality_grade: 'research' }).catch(() => ({ results: [] }));
-const mine = (all?.results ?? []).filter(o => o.user?.id === u.id && o.geojson?.coordinates);
+const all = await call('search_observations', { user_id: u.id, per_page: 200, quality_grade: 'research' }).catch(() => ({ results: [] }));
+const mine = (all?.results ?? []).filter(o => o.geojson?.coordinates);
 await widget('map', { zoom: 5, cluster: true, markers: mine.map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })) });
 ```
 

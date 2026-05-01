@@ -107,8 +107,10 @@ await widget('gallery', {
 ```js
 const region = (await call('search_places', { q: 'Massif Central', per_page: 1 }))?.results?.[0];
 if (!region) { await widget('text', { content: 'Region not found.' }); return; }
-const board = await call('observers_leaderboard', { place_id: region.id, taxon_name: 'Accipitriformes', per_page: 10 }).catch(() => ({ results: [] }));
-await widget('table', { columns: ['User', 'Species'], rows: (board?.results ?? []).map(r => [r.user?.login ?? '—', r.species_count ?? 0]) });
+const candidates = await call('nearby_places', { nelat: region.bounding_box_geojson?.coordinates?.[0]?.[2]?.[1], nelng: region.bounding_box_geojson?.coordinates?.[0]?.[2]?.[0], swlat: region.bounding_box_geojson?.coordinates?.[0]?.[0]?.[1], swlng: region.bounding_box_geojson?.coordinates?.[0]?.[0]?.[0], per_page: 10 }).catch(() => ({ results: [] }));
+const ranked = await Promise.all((candidates?.results ?? []).map(async p => { const counts = await call('species_counts', { place_id: p.id, taxon_name: 'Accipitriformes', per_page: 1 }).catch(() => ({ total_results: 0 })); return { place: p, richness: counts?.total_results ?? 0 }; }));
+ranked.sort((a, b) => b.richness - a.richness);
+await widget('table', { columns: ['Place', 'Species'], rows: ranked.slice(0, 8).map((r, i) => [r.place?.display_name ?? '—', r.richness ?? 0]) });
 ```
 
 ### Orchid spots in Provence

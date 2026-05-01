@@ -40,7 +40,7 @@ if (feedResults.length === 0) {
 // 2. Sample observations for each taxon to populate the gallery
 const samples = await Promise.all(
   feedResults.slice(0, 12).map(t =>
-    call('search_observations', { taxon_id: t.id, per_page: 1, quality_grade: 'research' }).catch(() => ({ results: [] })),
+    call('search_observations', { taxon_id: t.id, per_page: 1, quality_grade: 'research', photos: true }).catch(() => ({ results: [] })),
   ),
 );
 

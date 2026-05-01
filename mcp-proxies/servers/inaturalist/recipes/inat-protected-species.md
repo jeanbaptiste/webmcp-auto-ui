@@ -106,9 +106,9 @@ await widget('table', { columns: ['Species', 'Status'], rows: prot.map(t => [t.n
 ```js
 const place = (await call('search_places', { q: 'Alps', per_page: 1 }))?.results?.[0];
 if (!place) { await widget('text', { content: 'Place not found.' }); return; }
-const top = await call('species_counts', { place_id: place.id, taxon_name: 'Plantae', per_page: 60 }).catch(() => ({ results: [] }));
-const det = await Promise.all((top?.results ?? []).slice(0, 30).map(r => call('get_taxon', { id: r.taxon?.id }).catch(() => null)));
-await widget('gallery', { images: det.filter(t => t?.conservation_status && t?.default_photo?.medium_url).map(t => ({ src: t.default_photo.medium_url, caption: `${t.name ?? '—'} — ${t.conservation_status?.status_name ?? '—'}` })) });
+const top = await call('species_counts', { place_id: place.id, taxon_name: 'Plantae', per_page: 80 }).catch(() => ({ results: [] }));
+const det = await Promise.all((top?.results ?? []).slice(0, 50).map(r => call('get_taxon', { id: r.taxon?.id }).catch(() => null)));
+await widget('gallery', { images: det.filter(t => t?.conservation_status && (t?.default_photo?.medium_url || t?.preferred_photos?.[0]?.medium_url)).map(t => ({ src: t.default_photo?.medium_url ?? t.preferred_photos[0].medium_url, caption: `${t.name ?? '—'} — ${t.conservation_status?.status_name ?? '—'}` })) });
 ```
 
 ## Common mistakes

@@ -39,7 +39,7 @@ const [allObs, hist, breakdown, board, best] = await Promise.all([
   call('observations_histogram', { place_id: place.id, d1, d2, interval: 'month', quality_grade: 'research' }).catch(() => ({ results: { month: {} } })),
   call('iconic_taxa_counts', { place_id: place.id, d1, d2, quality_grade: 'research' }).catch(() => ({ results: [] })),
   call('observers_leaderboard', { place_id: place.id, d1, d2, per_page: 5 }).catch(() => ({ results: [] })),
-  call('search_observations', { place_id: place.id, d1, d2, per_page: 30, quality_grade: 'research' }).catch(() => ({ results: [] })),
+  call('search_observations', { place_id: place.id, d1, d2, per_page: 50, quality_grade: 'research' }).catch(() => ({ results: [] })),
 ]);
 
 // 7. Render KPIs
@@ -60,14 +60,16 @@ await widget('chart-rich', {
 });
 
 // 9. Best-of gallery
-await widget('gallery', {
-  images: (best?.results ?? [])
-    .filter(o => o.photos?.length > 0 && o.photos[0]?.url)
-    .map(o => ({
-      src: o.photos[0].url.replace('square', 'large'),
+const galleryImages = (best?.results ?? [])
+  .slice(0, 7)
+  .map(o => {
+    const hasPhoto = o.photos?.length > 0 && o.photos[0]?.url;
+    return {
+      src: hasPhoto ? o.photos[0].url.replace('square', 'large') : 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="500" height="500"%3E%3Crect fill="%23e5e7eb" width="500" height="500"/%3E%3Ctext x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" font-size="24" fill="%23999"%3E[No photo]%3C/text%3E%3C/svg%3E',
       caption: `${o.species_guess ?? o.taxon?.name ?? 'Unknown'} — ${o.observed_on ?? '—'}`,
-    })),
-});
+    };
+  });
+await widget('gallery', { images: galleryImages });
 
 // 10. Contributor leaderboard
 await widget('table', {
