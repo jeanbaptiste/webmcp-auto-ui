@@ -26,8 +26,8 @@ The user wants to see the skeleton of a long article:
 1. **Fetch sections + summary in parallel**:
    ```js
    const [secs, sum] = await Promise.all([
-     call('get_sections', { title: 'Roman Empire' }).catch(() => null),
-     call('get_summary', { title: 'Roman Empire' }).catch(() => null)
+     call('get_sections', { title: 'JavaScript' }).catch(() => null),
+     call('get_summary', { title: 'JavaScript' }).catch(() => null)
    ]);
    const sections = secs?.sections ?? [];
    ```
@@ -54,11 +54,11 @@ The user wants to see the skeleton of a long article:
 
 ## Examples
 
-### Roman Empire
+### JavaScript
 ```js
 const [secs, sum] = await Promise.all([
-  call('get_sections', { title: 'Roman Empire' }).catch(() => null),
-  call('get_summary', { title: 'Roman Empire' }).catch(() => null)
+  call('get_sections', { title: 'JavaScript' }).catch(() => null),
+  call('get_summary', { title: 'JavaScript' }).catch(() => null)
 ]);
 const sections = secs?.sections ?? [];
 await widget('text', { content: sum?.summary ?? '(no summary)' });

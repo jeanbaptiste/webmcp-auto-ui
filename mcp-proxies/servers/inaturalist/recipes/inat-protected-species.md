@@ -31,9 +31,9 @@ if (!place) {
   return;
 }
 
-// 2. Top species observed there
+// 2. Top threatened species observed there (server-side filter — includes default_photo)
 const top = await call('species_counts', {
-  place_id: place.id, per_page: 100, quality_grade: 'research',
+  place_id: place.id, per_page: 100, quality_grade: 'research', threatened: true,
 }).catch(() => ({ results: [] }));
 
 // 3. Hydrate species and keep only the protected ones
@@ -81,9 +81,9 @@ await widget('map', {
     })),
 });
 await widget('gallery', {
-  images: protectedTaxa
-    .filter(t => t?.default_photo?.medium_url)
-    .map(t => ({ src: t.default_photo.medium_url, caption: t.preferred_common_name ?? t.name ?? '' })),
+  images: (top?.results ?? [])
+    .filter(r => r?.taxon?.default_photo?.medium_url)
+    .map(r => ({ src: r.taxon.default_photo.medium_url, caption: r.taxon.preferred_common_name ?? r.taxon.name ?? '' })),
 });
 await widget('stat-card', { label: 'Protected species found', value: protectedTaxa.length, icon: 'shield' });
 await widget('stat-card', { label: 'Observations mapped', value: obs?.total_results ?? 0, icon: 'eye' });

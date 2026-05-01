@@ -31,7 +31,8 @@ const feed = await call('recent_taxa', {
   per_page: 30,
 }).catch(() => ({ results: [] }));
 
-const feedResults = feed?.results ?? [];
+// recent_taxa returns { taxon_id, identification_id, identification, taxon } — dereference taxon
+const feedResults = (feed?.results ?? []).map(r => r.taxon ?? r).filter(t => t?.id);
 if (feedResults.length === 0) {
   await widget('text', { content: 'No recent activity.' });
   return;
@@ -55,7 +56,7 @@ await widget('timeline', {
   })),
 });
 
-// 4. Photo strip
+// 4. Photo strip — taxon.default_photo has square_url/medium_url directly
 const images = samples
   .map((s, i) => {
     const o = s?.results?.[0];

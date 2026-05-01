@@ -81,14 +81,14 @@ await widget('table', {
 
 ## Examples
 
-### Sologne vs Dombes
+### Bretagne vs Midi-Pyrénées
 ```js
-const a = (await call('search_places', { q: 'Sologne', per_page: 1 }))?.results?.[0];
-const b = (await call('search_places', { q: 'Dombes', per_page: 1 }))?.results?.[0];
+const a = (await call('search_places', { q: 'Bretagne', per_page: 1 }))?.results?.[0];
+const b = (await call('search_places', { q: 'Midi-Pyrénées', per_page: 1 }))?.results?.[0];
 if (!a || !b) { await widget('text', { content: 'Place not found.' }); return; }
 const [ca, cb] = await Promise.all([
-  call('species_counts', { place_id: a.id, taxon_name: 'Aves', per_page: 1 }).catch(() => ({ total_results: 0 })),
-  call('species_counts', { place_id: b.id, taxon_name: 'Aves', per_page: 1 }).catch(() => ({ total_results: 0 })),
+  call('species_counts', { place_id: a.id, taxon_name: 'Aves', per_page: 50 }).catch(() => ({ total_results: 0 })),
+  call('species_counts', { place_id: b.id, taxon_name: 'Aves', per_page: 50 }).catch(() => ({ total_results: 0 })),
 ]);
 await widget('chart', { type: 'bar', labels: [a.display_name ?? 'A', b.display_name ?? 'B'], data: [ca?.total_results ?? 0, cb?.total_results ?? 0] });
 ```
