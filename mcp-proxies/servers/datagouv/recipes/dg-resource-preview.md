@@ -88,12 +88,11 @@ await widget('table', { columns: sample2?.columns ?? [], rows: (sample2?.rows ??
 
 ### Preview filtered to a single column value
 ```js
-const resList3 = await call('list_dataset_resources', { dataset_id: '5cc1b94a634f4165e96436c1' }).catch(() => ({ resources: [] }));
-const csvRes3 = (resList3?.resources ?? []).find(r => r.format === 'csv');
-const sample3 = csvRes3 ? await call('query_resource_data', {
-  resource_id: csvRes3.id,
+// Subventions régionales aux associations (dataset 66dbcfce36f23a6cf922771c, ~23k lignes)
+const sample3 = await call('query_resource_data', {
+  resource_id: '58075a79-8b16-4004-9640-6413c1dc2d60',
   page_size: 25
-}).catch(() => ({ rows: [], columns: [] })) : { rows: [], columns: [] };
+}).catch(() => ({ rows: [], columns: [] }));
 await widget('table', { columns: sample3?.columns ?? [], rows: (sample3?.rows ?? []).map(r => (sample3.columns ?? []).map(c => r[c] ?? '—')) });
 ```
 

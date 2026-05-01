@@ -81,13 +81,20 @@ These questions all share the same shape: one indicator, 101 departments, rankin
 
 ### Top 10 departments for poverty rate
 ```js
+// dataset: "Logements et logements sociaux dans les départements" (Caisse des Dépôts)
+// dataset_id: 6170ae0fa87ac5bb394b49b3 — resource_id: bf82e99f-cb74-48e6-b49f-9a0da726d5dc
+// 116 rows/year, column "Taux de pauvreté* (en %)" — filter on année_publication to avoid duplicates
 const data = await call('query_resource_data', {
-  resource_id: '<insee-pauvrete-resource-id>',
-  sort_column: 'taux_pauvrete',
-  sort_direction: 'desc',
-  page_size: 10
+  resource_id: 'bf82e99f-cb74-48e6-b49f-9a0da726d5dc',
+  filters: { année_publication: '2023' },
+  page_size: 120
 }).catch(() => ({ rows: [] }));
-await widget('table', { columns: ['Département', 'Taux %'], rows: (data?.rows ?? []).map(r => [r.nom_departement ?? '—', r.taux_pauvrete ?? '—']) });
+const col = 'Taux de pauvreté* (en %)';
+const rows = (data?.rows ?? [])
+  .filter(r => r[col] != null && r[col] !== '')
+  .sort((a, b) => Number(b[col]) - Number(a[col]))
+  .slice(0, 10);
+await widget('table', { columns: ['Département', 'Code', 'Taux %'], rows: rows.map(r => [r.nom_departement ?? '—', r.code_departement ?? '—', r[col] ?? '—']) });
 ```
 
 ### Top 10 departments for renewable energy share

@@ -38,13 +38,34 @@ INSEE and SDES publish many long series on data.gouv.fr — this recipe wraps th
    }
    ```
 
-2. **Read the series sorted by year**:
+2. **Read the series — auto-detect year and value columns**:
    ```js
    const data = csv ? await call('query_resource_data', {
      resource_id: csv.id,
-     page_size: 100
+     page_size: 200
    }).catch(() => ({ rows: [] })) : { rows: [] };
-   const rows = (data?.rows ?? []).filter(r => Number.isFinite(Number(r.valeur)));
+   const allRows = data?.rows ?? [];
+
+   // Auto-detect year column: first column whose values look like 4-digit years
+   const sampleRow = allRows[0] ?? {};
+   const yearCol = Object.keys(sampleRow).find(k =>
+     k !== '__id' && /ann[eé]e|year|an$/i.test(k) && String(sampleRow[k]).match(/^\d{4}$/)
+   ) ?? Object.keys(sampleRow).find(k =>
+     k !== '__id' && String(sampleRow[k]).match(/^(19|20)\d{2}$/)
+   );
+   // Auto-detect value column: first numeric column that is not a year or id
+   const valueCol = Object.keys(sampleRow).find(k =>
+     k !== '__id' && k !== yearCol && Number.isFinite(Number(sampleRow[k])) && !String(sampleRow[k]).match(/^\d{4}$/)
+   );
+
+   if (!yearCol || !valueCol) {
+     await widget('text', { content: 'Impossible de détecter les colonnes année/valeur.' });
+   }
+
+   const rows = allRows
+     .filter(r => yearCol && valueCol && Number.isFinite(Number(r[valueCol])) && String(r[yearCol]).match(/^\d{4}$/))
+     .sort((a, b) => Number(a[yearCol]) - Number(b[yearCol]));
+
    if (rows.length === 0) {
      await widget('text', { content: 'Aucune donnée temporelle.' });
    }
@@ -54,53 +75,50 @@ INSEE and SDES publish many long series on data.gouv.fr — this recipe wraps th
    ```js
    const first = rows[0] ?? {};
    const last = rows[rows.length - 1] ?? {};
-   const firstVal = Number(first.valeur);
-   const lastVal = Number(last.valeur);
+   const firstVal = Number(first[valueCol]);
+   const lastVal = Number(last[valueCol]);
    const change = (Number.isFinite(firstVal) && firstVal !== 0) ? ((lastVal - firstVal) / firstVal * 100).toFixed(1) : 'n/a';
 
    await widget('chart', {
      type: 'line',
-     data: { labels: rows.map(r => r.annee ?? '—'), values: rows.map(r => Number(r.valeur)) },
-     options: { xLabel: 'Année', yLabel: 'Valeur' }
+     data: { labels: rows.map(r => r[yearCol] ?? '—'), values: rows.map(r => Number(r[valueCol])) },
+     options: { xLabel: 'Année', yLabel: valueCol }
    });
 
-   await widget('stat-card', { label: `Valeur ${first.annee ?? '—'}`, value: first.valeur ?? '—', icon: 'flag' });
-   await widget('stat-card', { label: `Valeur ${last.annee ?? '—'}`, value: last.valeur ?? '—', icon: 'flag-checkered' });
+   await widget('stat-card', { label: `Valeur ${first[yearCol] ?? '—'}`, value: first[valueCol] ?? '—', icon: 'flag' });
+   await widget('stat-card', { label: `Valeur ${last[yearCol] ?? '—'}`, value: last[valueCol] ?? '—', icon: 'flag-checkered' });
    await widget('stat-card', { label: 'Variation', value: change === 'n/a' ? '—' : `${change} %`, icon: 'trending-up' });
 
-   const tableRows = rows.length > 0 ? rows.slice(-10).reverse().map(r => [r.annee ?? '—', r.valeur ?? '—']) : [];
+   const tableRows = rows.length > 0 ? rows.slice(-10).reverse().map(r => [r[yearCol] ?? '—', r[valueCol] ?? '—']) : [];
    await widget('table', {
-     columns: ['Année', 'Valeur'],
+     columns: ['Année', valueCol],
      rows: tableRows
    });
    ```
 
 ## Examples
 
-### Average salary since 2010
+### Infirmiers du secteur public hospitalier (2003–2023)
+<!-- dataset: 622633125eafccb7033e0c52 — resource: 5a7c057e-2a73-4c60-b4d7-b9b9462189ab
+     Colonnes: Année (year), Effectifs (float), Secteur, Professions
+     Filter: Professions="4 - Infirmiers" côté API, Secteur="Public" côté client
+     21 points annuels → tabular API confirmed -->
 ```js
 const data = await call('query_resource_data', {
-  resource_id: '<insee-salaire-moyen-resource-id>',
-  sort_column: 'annee',
-  page_size: 30
-}).catch(() => ({ rows: [] }));
-const rows = data?.rows ?? [];
-await widget('chart', { type: 'line', data: { labels: rows.map(r => r.annee ?? '—'), values: rows.map(r => Number(r.salaire_moyen)).filter(Number.isFinite) } });
-```
-
-### Vacant housing in France
-```js
-const data = await call('query_resource_data', {
-  resource_id: '<sdes-logements-vacants-resource-id>',
-  sort_column: 'annee',
+  resource_id: '5a7c057e-2a73-4c60-b4d7-b9b9462189ab',
+  filter_column: 'Professions',
+  filter_value: '4 - Infirmiers',
   page_size: 50
 }).catch(() => ({ rows: [] }));
-const rows = data?.rows ?? [];
-await widget('chart', { type: 'line', data: { labels: rows.map(r => r.annee ?? '—'), values: rows.map(r => Number(r.logements_vacants)).filter(Number.isFinite) } });
-const a = Number(rows.at(-1)?.logements_vacants);
-const b = Number(rows.at(-10)?.logements_vacants);
-const pct = (Number.isFinite(a) && Number.isFinite(b) && b !== 0) ? (((a - b) / b) * 100).toFixed(1) : null;
-await widget('stat-card', { label: 'Variation 10 ans', value: pct != null ? `${pct} %` : '—' });
+const rows = (data?.rows ?? [])
+  .filter(r => r['Secteur'] === 'Public' && Number.isFinite(Number(r['Effectifs'])))
+  .sort((a, b) => Number(a['Année']) - Number(b['Année']));
+await widget('chart', { type: 'line', data: { labels: rows.map(r => r['Année'] ?? '—'), values: rows.map(r => Number(r['Effectifs'])) }, options: { xLabel: 'Année', yLabel: 'Effectifs' } });
+const last = rows.at(-1);
+const first = rows.at(0);
+const pct = (first && last && Number(first['Effectifs']) !== 0) ? (((Number(last['Effectifs']) - Number(first['Effectifs'])) / Number(first['Effectifs'])) * 100).toFixed(1) : null;
+await widget('stat-card', { label: `${first?.['Année'] ?? '—'} → ${last?.['Année'] ?? '—'}`, value: pct != null ? `${pct} %` : '—', icon: 'trending-up' });
+await widget('table', { columns: ['Année', 'Effectifs'], rows: rows.slice(-10).reverse().map(r => [r['Année'] ?? '—', r['Effectifs'] ?? '—']) });
 ```
 
 ## Common mistakes

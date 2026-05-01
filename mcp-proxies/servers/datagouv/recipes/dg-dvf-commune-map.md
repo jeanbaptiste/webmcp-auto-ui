@@ -29,9 +29,10 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
    ```js
    const dataset_id = '5cc1b94a634f4165e96436c1'; // DVF
    const resList = await call('list_dataset_resources', { dataset_id }).catch(() => ({ resources: [] }));
-   // Pick the resource for the year of interest (e.g. 2023), fallback to any CSV
-   const resource = (resList?.resources ?? []).find(r => r.title?.includes('2023') && r.format === 'csv')
-     ?? (resList?.resources ?? []).find(r => r.format === 'csv')
+   // Pick the main tabular resource (csv.gz or csv), fallback to first resource
+   // Note: as of 2025, the geo-DVF dataset has a single csv.gz spanning 2021-2025
+   const resource = (resList?.resources ?? []).find(r => r.format === 'csv.gz' || r.format === 'csv')
+     ?? (resList?.resources ?? []).find(r => r.type === 'main')
      ?? (resList?.resources ?? [])[0];
    if (!resource) {
      await widget('text', { content: 'Ressource DVF introuvable.' });
@@ -40,10 +41,15 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
 
 2. **Filter by commune code**:
    ```js
+   // ⚠️ Paris/Lyon/Marseille: use arrondissement codes, not the city code.
+   // Paris 75056 → no rows; use e.g. 75116 (16e, 38k tx) or 75109 (9e, 15k tx)
+   // Marseille 13055 → no rows; use e.g. 13205 (5e, 13k tx)
+   // Lyon 69123 → no rows; use e.g. 69383 (3e, 23k tx)
+   // Bordeaux 33063 → works directly (69k tx, no arrondissements)
    const tx = resource ? await call('query_resource_data', {
      resource_id: resource.id,
      filter_column: 'code_commune',
-     filter_value: '13055', // Marseille
+     filter_value: '13205', // Marseille 5e Arrondissement
      page_size: 200
    }).catch(() => ({ rows: [] })) : { rows: [] };
    const rows = tx?.rows ?? [];
@@ -62,8 +68,8 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
      const avg = prices.length > 0 ? prices.reduce((s, x) => s + x, 0) / prices.length : 0;
 
      await widget('map', {
-       center: [43.2965, 5.3698],
-       zoom: 12,
+       center: [43.2930, 5.3949], // Marseille 5e Arrondissement
+       zoom: 13,
        markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({
          lat: Number(r.latitude),
          lon: Number(r.longitude),
@@ -96,28 +102,27 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
 
 ## Examples
 
-### Marseille (auto-discovery DVF CSV)
+### Marseille 5e Arrondissement (auto-discovery DVF CSV)
 ```js
+// 13205 = Marseille 5e Arrondissement (13k transactions géolocalisées)
+// 13055 = code commune de la ville entière → aucun résultat dans DVF géolocalisé
 const dvfList = await call('list_dataset_resources', { dataset_id: '5cc1b94a634f4165e96436c1' }).catch(() => ({ resources: [] }));
-const dvfCsv = (dvfList?.resources ?? []).find(r => r.format === 'csv') ?? (dvfList?.resources ?? [])[0];
+const dvfCsv = (dvfList?.resources ?? []).find(r => r.format === 'csv.gz' || r.format === 'csv') ?? (dvfList?.resources ?? [])[0];
 const tx = dvfCsv ? await call('query_resource_data', {
   resource_id: dvfCsv.id,
   filter_column: 'code_commune',
-  filter_value: '13055',
+  filter_value: '13205',
   page_size: 200
 }).catch(() => ({ rows: [] })) : { rows: [] };
 const rows = tx?.rows ?? [];
-if (rows.length === 0) {
-  await widget('text', { content: 'Aucune transaction DVF trouvée pour Marseille.' });
-} else {
-  await widget('map', { center: [43.2965, 5.3698], zoom: 12, markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({ lat: Number(r.latitude), lon: Number(r.longitude), label: Number.isFinite(Number(r.valeur_fonciere)) ? `${Math.round(Number(r.valeur_fonciere)).toLocaleString('fr-FR')} €` : '—' })) });
-}
+await widget('map', { center: [43.2930, 5.3949], zoom: 13, markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({ lat: Number(r.latitude), lon: Number(r.longitude), label: Number.isFinite(Number(r.valeur_fonciere)) ? `${Math.round(Number(r.valeur_fonciere)).toLocaleString('fr-FR')} €` : '—' })) });
 ```
 
 ### Top sales in Bordeaux (auto-discovery DVF CSV)
 ```js
+// 33063 = Bordeaux (code commune direct, 69k transactions — pas d'arrondissements)
 const dvfList2 = await call('list_dataset_resources', { dataset_id: '5cc1b94a634f4165e96436c1' }).catch(() => ({ resources: [] }));
-const dvfCsv2 = (dvfList2?.resources ?? []).find(r => r.format === 'csv') ?? (dvfList2?.resources ?? [])[0];
+const dvfCsv2 = (dvfList2?.resources ?? []).find(r => r.format === 'csv.gz' || r.format === 'csv') ?? (dvfList2?.resources ?? [])[0];
 const tx2 = dvfCsv2 ? await call('query_resource_data', {
   resource_id: dvfCsv2.id,
   filter_column: 'code_commune',
@@ -127,17 +132,13 @@ const tx2 = dvfCsv2 ? await call('query_resource_data', {
   page_size: 10
 }).catch(() => ({ rows: [] })) : { rows: [] };
 const rows2 = tx2?.rows ?? [];
-if (rows2.length === 0) {
-  await widget('text', { content: 'Aucune transaction DVF trouvée pour Bordeaux.' });
-} else {
-  await widget('table', { columns: ['Date', 'Type', 'Prix'], rows: rows2.map(r => [r.date_mutation ?? '—', r.type_local ?? '—', r.valeur_fonciere ?? '—']) });
-}
+await widget('table', { columns: ['Date', 'Type', 'Prix'], rows: rows2.map(r => [r.date_mutation ?? '—', r.type_local ?? '—', r.valeur_fonciere ?? '—']) });
 ```
 
 ## Common mistakes
 
 - **Filtering on `nom_commune`** — names are not unique (Saint-Denis, La Roche…). Always filter on `code_commune` (INSEE 5-digit code).
-- **Forgetting Paris / Lyon / Marseille arrondissements** — Marseille is `13055` but its 16 arrondissements have their own codes (`13201`-`13216`); decide which level the user wants.
+- **Using city-level codes for Paris / Lyon / Marseille** — `75056` (Paris), `13055` (Marseille), `69123` (Lyon) return **0 rows** in the geo-DVF. These cities are split into arrondissements, each with its own code. Use arrondissement codes: Paris 16e → `75116` (38k tx), Paris 9e → `75109` (15k tx); Marseille 5e → `13205` (13k tx), Marseille 1er → `13201` (9k tx); Lyon 3e → `69383` (23k tx), Lyon 6e → `69386` (11k tx). Bordeaux `33063` works directly (no arrondissements, 69k tx).
 - **Treating raw `valeur_fonciere` as €/m²** — it is the *total* transaction price; divide by `surface_reelle_bati` for €/m² and filter out land-only mutations (`type_local` = "Terrain").
 - **Not paginating** — a Paris-wide query returns ~50k rows per year; cap at 200 for previews and request the full file URL via `get_resource_info` for full analysis.
 - **Plotting transactions without dropping outliers** — DVF includes commercial blocs > 50 M€; trim the top 1 % before drawing distributions.
