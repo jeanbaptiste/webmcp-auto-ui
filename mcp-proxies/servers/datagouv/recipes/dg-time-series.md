@@ -68,9 +68,10 @@ INSEE and SDES publish many long series on data.gouv.fr — this recipe wraps th
    await widget('stat-card', { label: `Valeur ${last.annee ?? '—'}`, value: last.valeur ?? '—', icon: 'flag-checkered' });
    await widget('stat-card', { label: 'Variation', value: change === 'n/a' ? '—' : `${change} %`, icon: 'trending-up' });
 
+   const tableRows = rows.length > 0 ? rows.slice(-10).reverse().map(r => [r.annee ?? '—', r.valeur ?? '—']) : [];
    await widget('table', {
      columns: ['Année', 'Valeur'],
-     rows: rows.slice(-10).reverse().map(r => [r.annee ?? '—', r.valeur ?? '—'])
+     rows: tableRows
    });
    ```
 

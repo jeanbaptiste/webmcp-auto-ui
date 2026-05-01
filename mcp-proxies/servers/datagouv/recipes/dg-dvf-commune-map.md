@@ -54,40 +54,44 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
 
 3. **Compute aggregates and render**:
    ```js
-   const prices = rows.map(r => Number(r.valeur_fonciere)).filter(Number.isFinite).sort((a, b) => a - b);
-   const median = prices.length > 0 ? prices[Math.floor(prices.length / 2)] : 0;
-   const avg = prices.length > 0 ? prices.reduce((s, x) => s + x, 0) / prices.length : 0;
+   if (rows.length === 0) {
+     await widget('text', { content: `Aucune transaction DVF trouvée pour ce code commune.` });
+   } else {
+     const prices = rows.map(r => Number(r.valeur_fonciere)).filter(Number.isFinite).sort((a, b) => a - b);
+     const median = prices.length > 0 ? prices[Math.floor(prices.length / 2)] : 0;
+     const avg = prices.length > 0 ? prices.reduce((s, x) => s + x, 0) / prices.length : 0;
 
-   await widget('map', {
-     center: [43.2965, 5.3698],
-     zoom: 12,
-     markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({
-       lat: Number(r.latitude),
-       lon: Number(r.longitude),
-       label: Number.isFinite(Number(r.valeur_fonciere)) ? `${Math.round(Number(r.valeur_fonciere)).toLocaleString('fr-FR')} €` : '—',
-       popup: `${r.type_local ?? '—'} · ${r.surface_reelle_bati ?? '—'} m² · ${r.date_mutation ?? '—'}`
-     }))
-   });
+     await widget('map', {
+       center: [43.2965, 5.3698],
+       zoom: 12,
+       markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({
+         lat: Number(r.latitude),
+         lon: Number(r.longitude),
+         label: Number.isFinite(Number(r.valeur_fonciere)) ? `${Math.round(Number(r.valeur_fonciere)).toLocaleString('fr-FR')} €` : '—',
+         popup: `${r.type_local ?? '—'} · ${r.surface_reelle_bati ?? '—'} m² · ${r.date_mutation ?? '—'}`
+       }))
+     });
 
-   await widget('stat-card', { label: 'Transactions', value: rows.length || '—', icon: 'home' });
-   await widget('stat-card', { label: 'Prix médian', value: `${Math.round(median).toLocaleString('fr-FR')} €`, icon: 'euro' });
-   await widget('stat-card', { label: 'Prix moyen', value: `${Math.round(avg).toLocaleString('fr-FR')} €`, icon: 'trending-up' });
+     await widget('stat-card', { label: 'Transactions', value: rows.length || '—', icon: 'home' });
+     await widget('stat-card', { label: 'Prix médian', value: `${Math.round(median).toLocaleString('fr-FR')} €`, icon: 'euro' });
+     await widget('stat-card', { label: 'Prix moyen', value: `${Math.round(avg).toLocaleString('fr-FR')} €`, icon: 'trending-up' });
 
-   await widget('table', {
-     columns: ['Date', 'Type', 'Surface', 'Prix', 'Adresse'],
-     rows: [...rows]
-       .sort((a, b) => (Number(b.valeur_fonciere) || 0) - (Number(a.valeur_fonciere) || 0))
-       .slice(0, 10)
-       .map(r => [r.date_mutation ?? '—', r.type_local ?? '—', `${r.surface_reelle_bati ?? '—'} m²`, Number.isFinite(Number(r.valeur_fonciere)) ? `${Number(r.valeur_fonciere).toLocaleString('fr-FR')} €` : '—', `${r.adresse_numero ?? ''} ${r.adresse_nom_voie ?? ''}`.trim() || '—'])
-   });
+     await widget('table', {
+       columns: ['Date', 'Type', 'Surface', 'Prix', 'Adresse'],
+       rows: [...rows]
+         .sort((a, b) => (Number(b.valeur_fonciere) || 0) - (Number(a.valeur_fonciere) || 0))
+         .slice(0, 10)
+         .map(r => [r.date_mutation ?? '—', r.type_local ?? '—', `${r.surface_reelle_bati ?? '—'} m²`, Number.isFinite(Number(r.valeur_fonciere)) ? `${Number(r.valeur_fonciere).toLocaleString('fr-FR')} €` : '—', `${r.adresse_numero ?? ''} ${r.adresse_nom_voie ?? ''}`.trim() || '—'])
+     });
 
-   // Price distribution histogram
-   const buckets = [0, 100_000, 250_000, 500_000, 1_000_000, Infinity];
-   const counts = buckets.slice(0, -1).map((lo, i) => prices.filter(p => p >= lo && p < buckets[i + 1]).length);
-   await widget('chart', {
-     type: 'bar',
-     data: { labels: ['<100k', '100-250k', '250-500k', '500k-1M', '>1M'], values: counts }
-   });
+     // Price distribution histogram
+     const buckets = [0, 100_000, 250_000, 500_000, 1_000_000, Infinity];
+     const counts = buckets.slice(0, -1).map((lo, i) => prices.filter(p => p >= lo && p < buckets[i + 1]).length);
+     await widget('chart', {
+       type: 'bar',
+       data: { labels: ['<100k', '100-250k', '250-500k', '500k-1M', '>1M'], values: counts }
+     });
+   }
    ```
 
 ## Examples
@@ -102,7 +106,12 @@ const tx = dvfCsv ? await call('query_resource_data', {
   filter_value: '13055',
   page_size: 200
 }).catch(() => ({ rows: [] })) : { rows: [] };
-await widget('map', { center: [43.2965, 5.3698], zoom: 12, markers: (tx?.rows ?? []).filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({ lat: Number(r.latitude), lon: Number(r.longitude) })) });
+const rows = tx?.rows ?? [];
+if (rows.length === 0) {
+  await widget('text', { content: 'Aucune transaction DVF trouvée pour Marseille.' });
+} else {
+  await widget('map', { center: [43.2965, 5.3698], zoom: 12, markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({ lat: Number(r.latitude), lon: Number(r.longitude), label: Number.isFinite(Number(r.valeur_fonciere)) ? `${Math.round(Number(r.valeur_fonciere)).toLocaleString('fr-FR')} €` : '—' })) });
+}
 ```
 
 ### Top sales in Bordeaux (auto-discovery DVF CSV)
@@ -117,7 +126,12 @@ const tx2 = dvfCsv2 ? await call('query_resource_data', {
   sort_direction: 'desc',
   page_size: 10
 }).catch(() => ({ rows: [] })) : { rows: [] };
-await widget('table', { columns: ['Date', 'Type', 'Prix'], rows: (tx2?.rows ?? []).map(r => [r.date_mutation ?? '—', r.type_local ?? '—', r.valeur_fonciere ?? '—']) });
+const rows2 = tx2?.rows ?? [];
+if (rows2.length === 0) {
+  await widget('text', { content: 'Aucune transaction DVF trouvée pour Bordeaux.' });
+} else {
+  await widget('table', { columns: ['Date', 'Type', 'Prix'], rows: rows2.map(r => [r.date_mutation ?? '—', r.type_local ?? '—', r.valeur_fonciere ?? '—']) });
+}
 ```
 
 ## Common mistakes

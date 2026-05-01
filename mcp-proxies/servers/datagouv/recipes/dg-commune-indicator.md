@@ -52,23 +52,27 @@ Many public datasets are distributed at the commune mesh — this recipe makes t
 
 3. **Render national map (points colored by value), ranking, distribution, median**:
    ```js
+   const markersData = rows
+     .filter(r => (Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))) || r.code_commune)
+     .map(r => ({
+       lat: Number(r.latitude) || 46.6,
+       lon: Number(r.longitude) || 2.5,
+       value: Number(r.montant_aide) || 0,
+       label: r.nom_commune ?? r.code_commune ?? '',
+       popup: `${r.nom_commune ?? r.code_commune ?? '—'} · ${Number.isFinite(Number(r.montant_aide)) ? Number(r.montant_aide).toLocaleString('fr-FR') : '—'} €`
+     }));
    await widget('map', {
      center: [46.6, 2.5],
      zoom: 6,
-     markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({
-       lat: Number(r.latitude),
-       lon: Number(r.longitude),
-       value: Number(r.montant_aide),
-       label: r.nom_commune ?? '',
-       popup: `${r.nom_commune ?? '—'} · ${Number.isFinite(Number(r.montant_aide)) ? Number(r.montant_aide).toLocaleString('fr-FR') : '—'} €`
-     })),
+     markers: markersData.length > 0 ? markersData : [],
      color_field: 'value',
      color_scale: 'viridis'
    });
 
+   const topRows = rows.length > 0 ? rows.slice(0, 10) : [];
    await widget('table', {
      columns: ['Rang', 'Commune', 'INSEE', 'Valeur'],
-     rows: rows.slice(0, 10).map((r, i) => [i + 1, r.nom_commune ?? '—', r.code_commune ?? '—', Number.isFinite(Number(r.montant_aide)) ? Number(r.montant_aide).toLocaleString('fr-FR') : '—'])
+     rows: topRows.map((r, i) => [i + 1, r.nom_commune ?? r.code_commune ?? '—', r.code_commune ?? '—', Number.isFinite(Number(r.montant_aide)) ? Number(r.montant_aide).toLocaleString('fr-FR') : '—'])
    });
 
    const values = rows.map(r => Number(r.montant_aide)).filter(Number.isFinite).sort((a, b) => a - b);
@@ -79,10 +83,12 @@ Many public datasets are distributed at the commune mesh — this recipe makes t
 
    const buckets = [0, 1000, 5000, 20_000, 100_000, Infinity];
    const counts = buckets.slice(0, -1).map((lo, i) => values.filter(v => v >= lo && v < buckets[i + 1]).length);
-   await widget('chart', {
-     type: 'bar',
-     data: { labels: ['<1k', '1-5k', '5-20k', '20-100k', '>100k'], values: counts }
-   });
+   if (values.length > 0) {
+     await widget('chart', {
+       type: 'bar',
+       data: { labels: ['<1k', '1-5k', '5-20k', '20-100k', '>100k'], values: counts }
+     });
+   }
    ```
 
 ## Examples

@@ -59,7 +59,7 @@ The Tabular API returns the schema and a paged sample without downloading the fi
    const tableRows = (sample?.rows ?? []).map(r => tableCols.map(c => r[c] ?? '—'));
    await widget('table', {
      columns: tableCols,
-     rows: tableRows.length ? tableRows : [tableCols.map(() => '—')]
+     rows: tableRows
    });
    ```
 

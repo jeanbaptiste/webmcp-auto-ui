@@ -42,6 +42,8 @@ These questions all share the same shape: one indicator, 101 departments, rankin
    ```js
    const data = csv ? await call('query_resource_data', {
      resource_id: csv.id,
+     sort_column: csv.csv_columns?.[0] ?? undefined,
+     sort_direction: 'desc',
      page_size: 101
    }).catch(() => ({ rows: [] })) : { rows: [] };
    const rows = data?.rows ?? [];
