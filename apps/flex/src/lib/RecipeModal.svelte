@@ -1,11 +1,10 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, MarkdownView, RecipeCodeBlock } from '@webmcp-auto-ui/ui';
+  import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, MarkdownView, RecipeCodeBlock, RecipeRunModal } from '@webmcp-auto-ui/ui';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { parseBody, runCode } from '@webmcp-auto-ui/sdk';
   import type { RecipeData, RunResult, RunTab } from '@webmcp-auto-ui/sdk';
   import type { WebMcpServer } from '@webmcp-auto-ui/core';
-  import RecipeRunModal from './RecipeRunModal.svelte';
 
   interface Props {
     open: boolean;

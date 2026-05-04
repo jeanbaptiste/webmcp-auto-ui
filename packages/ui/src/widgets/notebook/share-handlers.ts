@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import { encode, buildShortUrl } from '@webmcp-auto-ui/sdk';
+import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
 import type { NotebookState, NotebookCell } from './shared.js';
 
 // ---------------------------------------------------------------------------
@@ -27,8 +28,23 @@ export async function shareAsMarkdown(state: NotebookState): Promise<void> {
   triggerDownload(blob, sanitizeFilename(state.title || 'notebook') + '.md');
 }
 
-function serializeToMarkdown(state: NotebookState): string {
+/**
+ * Serialize a notebook state as a HyperSkill standalone markdown:
+ *   ---
+ *   title: "..."
+ *   description: "..."
+ *   servers:
+ *     - name: foo
+ *       url: https://...
+ *   ---
+ *   <body with ```sql / ```js fenced cells>
+ *
+ * Re-parsable via @webmcp-auto-ui/core::parseFrontmatter + @webmcp-auto-ui/sdk::parseBody.
+ */
+export function serializeToMarkdown(state: NotebookState): string {
+  const fm = buildFrontmatter(state);
   const parts: string[] = [];
+  if (fm) parts.push(fm);
   if (state.title) parts.push(`# ${state.title}`, '');
   for (const cell of state.cells) {
     if (cell.type === 'md') {
@@ -44,6 +60,60 @@ function serializeToMarkdown(state: NotebookState): string {
     }
   }
   return parts.join('\n').trim() + '\n';
+}
+
+/**
+ * Emit YAML frontmatter for HyperSkill format. Reads connected MCP servers from
+ * the canvas store. Returns '' when nothing useful to declare (no title, no
+ * description, no servers) — caller can skip prepending.
+ */
+function buildFrontmatter(state: NotebookState): string {
+  const title = (state.title || '').trim();
+  const description = extractDescription(state);
+  const servers = collectEnabledServers();
+  if (!title && !description && servers.length === 0) return '';
+
+  const lines: string[] = ['---'];
+  if (title) lines.push(`title: ${yamlQuote(title)}`);
+  if (description) lines.push(`description: ${yamlQuote(description)}`);
+  if (servers.length > 0) {
+    lines.push('servers:');
+    for (const s of servers) {
+      lines.push(`  - name: ${yamlQuote(s.name)}`);
+      lines.push(`    url: ${yamlQuote(s.url)}`);
+    }
+  }
+  lines.push('---', '');
+  return lines.join('\n');
+}
+
+function extractDescription(state: NotebookState): string {
+  for (const cell of state.cells) {
+    if (cell.type !== 'md') continue;
+    const text = stripHtml(cell.content).trim();
+    if (!text) continue;
+    // First non-heading line of the first md cell.
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+    const prose = lines.find((l) => !/^#{1,6}\s/.test(l) && !/^[-*]\s/.test(l));
+    if (prose) return prose.slice(0, 200);
+  }
+  return '';
+}
+
+function collectEnabledServers(): { name: string; url: string }[] {
+  try {
+    const servers = canvasVanilla.dataServers ?? [];
+    return servers
+      .filter((s: any) => s?.enabled && s?.url && s?.name && s.name !== 'autoui' && s.kind !== 'ui' && s.kind !== 'webmcp')
+      .map((s: any) => ({ name: String(s.name), url: String(s.url) }));
+  } catch {
+    return [];
+  }
+}
+
+/** Quote a YAML scalar safely. Conservative: always double-quote. */
+function yamlQuote(s: string): string {
+  return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n') + '"';
 }
 
 function stripHtml(s: string): string {

@@ -18,7 +18,7 @@
   // ---------------------------------------------------------------------------
 
   import { filterRecipes, sortRecipes, WEBMCP_RECIPES } from '@webmcp-auto-ui/agent';
-  import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
+  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { parseBody } from '@webmcp-auto-ui/sdk';
   import MarkdownView from '../../primitives/MarkdownView.svelte';
   import RecipeCodeBlock from '../../recipe/RecipeCodeBlock.svelte';
@@ -157,7 +157,7 @@
     if (d.mcpServers?.length) {
       const fetches = d.mcpServers.map(async (srv) => {
         try {
-          const res: any = await callToolViaPostMessage(`${srv.name}_list_recipes`, {});
+          const res: any = await canvas.callTool(srv.name, 'list_recipes', {});
           const items = extractRecipeItems(res, srv);
           if (items.length) recipes = [...recipes, ...items];
         } catch { /* ignore */ }
@@ -239,8 +239,9 @@
     // Fetch body on demand if missing
     if (!r.body && r.serverName && r.serverName !== 'webmcp') {
       try {
-        const res: any = await callToolViaPostMessage(
-          `${r.serverName}_get_recipe`,
+        const res: any = await canvas.callTool(
+          r.serverName,
+          'get_recipe',
           { name: r.originalName ?? r.name, id: r.id ?? r.name },
         );
         r = { ...r, body: extractRecipeBody(res) ?? '' };

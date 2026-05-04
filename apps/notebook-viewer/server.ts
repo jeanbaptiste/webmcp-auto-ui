@@ -184,9 +184,9 @@ async function handlePublish(req: http.IncomingMessage, res: http.ServerResponse
   } catch {
     return jsonResponse(res, 400, { error: 'invalid json' });
   }
-  const state = parsed?.state;
-  if (!state || typeof state !== 'object') {
-    return jsonResponse(res, 400, { error: 'missing state' });
+  const markdown = parsed?.markdown;
+  if (typeof markdown !== 'string' || !markdown.trim()) {
+    return jsonResponse(res, 400, { error: 'missing markdown' });
   }
 
   const reqSlug: string | undefined = typeof parsed?.slug === 'string' ? parsed.slug : undefined;
@@ -213,7 +213,7 @@ async function handlePublish(req: http.IncomingMessage, res: http.ServerResponse
     const updatedAt = Date.now();
     await fsp.writeFile(
       file,
-      JSON.stringify({ state, token: existingToken, publishedAt, updatedAt }),
+      JSON.stringify({ markdown, token: existingToken, publishedAt, updatedAt }),
       'utf8',
     );
     return jsonResponse(res, 200, {
@@ -224,12 +224,9 @@ async function handlePublish(req: http.IncomingMessage, res: http.ServerResponse
     });
   }
 
-  // CAS B — first publish
-  const titleSource: string =
-    (typeof state.title === 'string' && state.title) ||
-    (typeof state.kicker === 'string' && state.kicker) ||
-    '';
-  const base = deriveSlug(titleSource);
+  // CAS B — first publish. Slug derived from frontmatter `title` or first H1.
+  const meta = extractIndexMeta(markdown);
+  const base = deriveSlug(meta.title);
   // Ensure uniqueness — very unlikely to collide, but retry a few times just in case.
   let slug = `${base}-${randomSuffix(6)}`;
   for (let i = 0; i < 5; i++) {
@@ -245,7 +242,7 @@ async function handlePublish(req: http.IncomingMessage, res: http.ServerResponse
   const publishedAt = Date.now();
   await fsp.writeFile(
     publishedFileFor(slug),
-    JSON.stringify({ state, token, publishedAt }),
+    JSON.stringify({ markdown, token, publishedAt }),
     'utf8',
   );
   return jsonResponse(res, 200, {
@@ -325,25 +322,58 @@ function stripMarkdownInline(text: string): string {
     .trim();
 }
 
-function extractIndexMeta(state: any): { title: string; description: string } {
-  let title = (typeof state?.title === 'string' && state.title.trim()) ? state.title.trim() : '';
+/**
+ * Split a HyperSkill markdown into (frontmatter block string | null, body).
+ * Returns null when no leading `---\n...\n---` is detected.
+ */
+function splitFrontmatter(markdown: string): { frontmatter: string | null; body: string } {
+  const trimmed = markdown.replace(/^﻿/, '');
+  if (!trimmed.startsWith('---\n') && !trimmed.startsWith('---\r\n')) {
+    return { frontmatter: null, body: trimmed };
+  }
+  const endRe = /\n---(\r?\n|$)/;
+  const m = endRe.exec(trimmed);
+  if (!m) return { frontmatter: null, body: trimmed };
+  const fmBlock = trimmed.slice(4, m.index);
+  const after = trimmed.slice(m.index + 4 + m[1].length);
+  return { frontmatter: fmBlock, body: after };
+}
+
+/**
+ * Pluck a top-level scalar `key: value` from a YAML frontmatter block.
+ * Conservative: handles double-quoted, single-quoted, or unquoted scalars on
+ * a single line. Skips nested structures.
+ */
+function pluckScalar(fm: string, key: string): string {
+  const re = new RegExp(`^${key}\\s*:\\s*(.+?)\\s*$`, 'mi');
+  const m = re.exec(fm);
+  if (!m) return '';
+  let v = m[1].trim();
+  // Strip surrounding quotes
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    v = v.slice(1, -1).replace(/\\"/g, '"').replace(/\\'/g, "'").replace(/\\n/g, '\n');
+  }
+  return v;
+}
+
+function extractIndexMeta(markdown: string): { title: string; description: string } {
+  const { frontmatter, body } = splitFrontmatter(markdown || '');
+  let title = '';
   let description = '';
-  const cells = Array.isArray(state?.cells) ? state.cells : [];
-  for (const c of cells) {
-    if (!c || typeof c !== 'object') continue;
-    const type = (c as any).type;
-    const content = (c as any).content;
-    if (type !== 'md' || typeof content !== 'string') continue;
-    const lines = content.split('\n').map((l: string) => l.trim()).filter(Boolean);
+  if (frontmatter) {
+    title = pluckScalar(frontmatter, 'title');
+    description = pluckScalar(frontmatter, 'description');
+  }
+  if (!title || !description) {
+    const lines = body.split('\n').map((l) => l.trim()).filter(Boolean);
     if (!title) {
-      const h1 = lines.find((l: string) => /^#\s+/.test(l));
+      const h1 = lines.find((l) => /^#\s+/.test(l));
       if (h1) title = stripMarkdownInline(h1);
     }
     if (!description) {
-      const prose = lines.find((l: string) => !/^#{1,6}\s/.test(l) && !/^[-*]\s/.test(l));
+      const prose = lines.find((l) => !/^#{1,6}\s/.test(l) && !/^[-*]\s/.test(l) && !/^```/.test(l));
       if (prose) description = stripMarkdownInline(prose).slice(0, 200);
     }
-    if (title && description) break;
   }
   return {
     title: title || 'Untitled notebook',
@@ -374,8 +404,9 @@ async function handleListIndex(res: http.ServerResponse) {
     try {
       const raw = await fsp.readFile(file, 'utf8');
       const parsed = JSON.parse(raw);
-      const state = parsed?.state;
-      const meta = extractIndexMeta(state);
+      const markdown: string = typeof parsed?.markdown === 'string' ? parsed.markdown : '';
+      if (!markdown) continue;
+      const meta = extractIndexMeta(markdown);
       const publishedAt = Number(parsed?.publishedAt) || 0;
       const updatedAt = parsed?.updatedAt != null ? Number(parsed.updatedAt) : undefined;
       items.push({

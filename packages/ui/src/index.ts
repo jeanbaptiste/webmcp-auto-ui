@@ -21,6 +21,7 @@ export { renderMarkdown, highlightCode, createMarkdownRenderer } from './primiti
 
 // Recipe building blocks (used by RecipeModal and notebook recipe-viewer)
 export { default as RecipeCodeBlock } from './recipe/RecipeCodeBlock.svelte';
+export { default as RecipeRunModal } from './recipe/RecipeRunModal.svelte';
 export type { RecipeBlockAction } from './recipe/types.js';
 
 // Widgets are shipped as Svelte 5 custom elements — import the widget file

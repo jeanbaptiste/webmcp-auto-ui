@@ -6,7 +6,7 @@
 // Collapsed by default.
 // ---------------------------------------------------------------------------
 
-import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
+import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 import { openRecipeViewerModal, openToolViewerModal, type ImportedRecipe } from './import-modal-api.js';
 import type { NotebookCell, NotebookState, DataServerDescriptor } from './shared.js';
 
@@ -134,7 +134,7 @@ export function mountLeftPane(
     }
     if (!imported.body) {
       try {
-        const res: any = await callToolViaPostMessage(`${srv.name}_get_recipe`, { name: r.name, id: r.name });
+        const res: any = await canvas.callTool(srv.name, 'get_recipe', { name: r.name, id: r.name });
         const text = res?.content?.find?.((c: any) => c.type === 'text')?.text;
         if (text) {
           let body = text;

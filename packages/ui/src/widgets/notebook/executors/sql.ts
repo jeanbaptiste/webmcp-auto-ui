@@ -1,14 +1,16 @@
-import { callToolViaPostMessage } from '@webmcp-auto-ui/core';
+import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 import { findCodeParamName, buildToolArgs } from '@webmcp-auto-ui/sdk';
 import type { CellExecutor, CellExecContext, CellResult, DataServerDescriptor, DataServerTool } from '../shared.js';
 
 const PATTERN_PRIMARY = /^.*query_sql$/i;
 const PATTERN_FALLBACK = /^(query|run|execute)(_sql)?$/i;
 
-function findSqlTool(servers: DataServerDescriptor[]): DataServerTool | null {
+interface SqlHit { srv: DataServerDescriptor; tool: DataServerTool; }
+
+function findSqlTool(servers: DataServerDescriptor[]): SqlHit | null {
   for (const p of [PATTERN_PRIMARY, PATTERN_FALLBACK]) {
     for (const srv of servers) {
-      for (const t of srv.tools ?? []) if (p.test(t.name)) return t;
+      for (const t of srv.tools ?? []) if (p.test(t.name)) return { srv, tool: t };
     }
   }
   return null;
@@ -17,10 +19,11 @@ function findSqlTool(servers: DataServerDescriptor[]): DataServerTool | null {
 export function createSqlExecutor(getServers: () => DataServerDescriptor[]): CellExecutor {
   return async (ctx: CellExecContext): Promise<CellResult> => {
     const startedAt = Date.now();
-    const tool = findSqlTool(getServers());
-    if (!tool) {
+    const hit = findSqlTool(getServers());
+    if (!hit) {
       return { ok: false, error: 'No SQL tool available on connected servers.', errorKind: 'schema', durationMs: Date.now() - startedAt };
     }
+    const { srv, tool } = hit;
     const sql = (ctx.cell.content ?? '').trim();
     if (!sql) return { ok: true, kind: 'empty', durationMs: Date.now() - startedAt };
 
@@ -36,7 +39,7 @@ export function createSqlExecutor(getServers: () => DataServerDescriptor[]): Cel
 
     let raw: unknown;
     try {
-      raw = await callToolViaPostMessage(tool.name, args);
+      raw = await canvas.callTool(srv.name, tool.name, args);
     } catch (err) {
       return { ok: false, error: String((err as { message?: unknown })?.message ?? err), errorKind: 'runtime', durationMs: Date.now() - startedAt };
     }

@@ -1,23 +1,8 @@
 <script lang="ts">
   // nb.hyperskills.net — entry point.
-  //
-  // Three behaviours:
-  //   - ?hs=... or ?n=...          → decode + mount the notebook widget (legacy)
-  //   - no param                   → fetch /api/p and show the index of published notebooks
-  //
+  // Lists published notebooks from /api/p. Individual notebooks are served at
+  // /p/:slug.
   import { onMount } from 'svelte';
-  import { browser } from '$app/environment';
-  import { mountWidget } from '@webmcp-auto-ui/core';
-  import { autoui } from '@webmcp-auto-ui/agent';
-  import {
-    detectIntent,
-    loadFromHsParam,
-    loadFromShortToken,
-    extractMeta,
-    NotebookLoadError,
-    type NotebookPayload,
-    type NotebookMeta,
-  } from '$lib/notebook-loader';
 
   interface IndexItem {
     slug: string;
@@ -30,35 +15,9 @@
   type View =
     | { status: 'index-loading' }
     | { status: 'index'; items: IndexItem[] }
-    | { status: 'index-error'; message: string }
-    | { status: 'loading' }
-    | { status: 'ready'; payload: NotebookPayload; meta: NotebookMeta }
-    | { status: 'error'; message: string };
+    | { status: 'index-error'; message: string };
 
   let view = $state<View>({ status: 'index-loading' });
-  let host = $state<HTMLDivElement | null>(null);
-  let cleanup: (() => void) | null = null;
-
-  async function boot() {
-    const intent = detectIntent(window.location.href);
-    if (intent.kind === 'none') {
-      await loadIndex();
-      return;
-    }
-    view = { status: 'loading' };
-    try {
-      const payload = intent.kind === 'hs'
-        ? await loadFromHsParam(window.location.href)
-        : await loadFromShortToken(intent.value);
-      const meta = extractMeta(payload);
-      view = { status: 'ready', payload, meta };
-    } catch (err) {
-      const message = err instanceof NotebookLoadError
-        ? messageFor(err)
-        : 'Something went wrong while loading this notebook.';
-      view = { status: 'error', message };
-    }
-  }
 
   async function loadIndex() {
     view = { status: 'index-loading' };
@@ -67,50 +26,14 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const items = (await res.json()) as IndexItem[];
       view = { status: 'index', items: Array.isArray(items) ? items : [] };
-    } catch (err) {
+    } catch {
       view = { status: 'index-error', message: 'Could not load the notebook index.' };
     }
   }
 
-  function messageFor(err: NotebookLoadError): string {
-    switch (err.code) {
-      case 'unsupported': return 'Only notebook widgets are supported here.';
-      case 'not_found':   return 'This notebook link could not be found.';
-      case 'network':     return 'Network error — please try again.';
-      case 'invalid':
-      default:            return 'This notebook link is invalid or expired.';
-    }
-  }
-
-  // Mount the widget whenever the view becomes `ready` and the host is bound.
-  $effect(() => {
-    if (!browser) return;
-    if (view.status !== 'ready' || !host) return;
-    if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
-    host.innerHTML = '';
-    const data = { ...view.payload.data, autoRun: true };
-    const result = mountWidget(host, view.payload.kind, data, [autoui]);
-    if (typeof result === 'function') cleanup = result;
-    return () => {
-      if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
-    };
-  });
-
   onMount(() => {
-    boot();
-    return () => {
-      if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
-    };
+    loadIndex();
   });
-
-  const ogTitle = $derived(
-    view.status === 'ready' ? `${view.meta.title} — nb.hyperskills.net` : 'nb.hyperskills.net',
-  );
-  const ogDesc = $derived(
-    view.status === 'ready'
-      ? view.meta.description
-      : 'Public notebooks shared via WebMCP.',
-  );
 
   // Relative date formatting: "il y a 3 jours" / "2 heures".
   function formatRelative(ts: number): string {
@@ -130,14 +53,11 @@
 </script>
 
 <svelte:head>
-  <title>{ogTitle}</title>
-  <meta name="description" content={ogDesc} />
-  <meta property="og:title" content={ogTitle} />
-  <meta property="og:description" content={ogDesc} />
+  <title>nb.hyperskills.net</title>
+  <meta name="description" content="Public notebooks shared via WebMCP." />
+  <meta property="og:title" content="nb.hyperskills.net" />
+  <meta property="og:description" content="Public notebooks shared via WebMCP." />
   <meta property="og:type" content="article" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content={ogTitle} />
-  <meta name="twitter:description" content={ogDesc} />
 </svelte:head>
 
 {#if view.status === 'index-loading'}
@@ -156,7 +76,7 @@
       <p class="nb-hero-desc">{view.message}</p>
     </section>
   </main>
-{:else if view.status === 'index'}
+{:else}
   <main class="nb-page">
     <section class="nb-hero">
       <div class="nb-eyebrow">nb.hyperskills.net</div>
@@ -188,16 +108,4 @@
       </section>
     {/if}
   </main>
-{:else if view.status === 'loading'}
-  <main class="nb-page nb-loading">
-    <p>Loading notebook…</p>
-  </main>
-{:else if view.status === 'error'}
-  <main class="nb-page nb-error">
-    <h1>Unable to display notebook</h1>
-    <p>{view.message}</p>
-    <p><a href="/">← Back to index</a></p>
-  </main>
-{:else}
-  <div class="nb-viewer-host" bind:this={host}></div>
 {/if}

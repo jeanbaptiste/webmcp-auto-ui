@@ -1,125 +1,71 @@
 // ---------------------------------------------------------------------------
-// Notebook loader — decode / fetch / normalize notebook state for the viewer.
+// Notebook loader — fetch + parse a HyperSkill standalone markdown.
 // ---------------------------------------------------------------------------
 //
-// Supports three ingestion paths:
-//   1. ?hs=<payload>   — full HyperSkill URL, client-side decode via SDK
-//   2. ?n=<token>      — short token, fetched from /api/resolve?n=...
-//   3. /:slug          — permanent published notebook, fetched from /api/p/:slug
+// All published notebooks are now standalone markdown HyperSkill files :
+//   ---
+//   title: "..."
+//   description: "..."
+//   servers:
+//     - name: foo
+//       url: https://...
+//   ---
+//   <body with ```sql / ```js / ```ts fenced cells>
 //
-// In every case we normalize to `{ kind, data }` where:
-//   - `kind`  is the widget name (always `'notebook'`). Legacy payloads with
-//              `notebook-compact | -workspace | -document | -editorial` are
-//              transparently mapped to `notebook`.
-//   - `data`  is the notebook state object (id, title, mode, cells, ...) with
-//              `mode` forced to `'view'`.
+// The viewer fetches `/api/p/:slug` → `{ markdown, publishedAt, updatedAt? }`,
+// then parses it client-side via `@webmcp-auto-ui/core::parseFrontmatter` and
+// `@webmcp-auto-ui/sdk::parseBody`.
 // ---------------------------------------------------------------------------
 
-import { decode, getHsParam, getShortToken } from '@webmcp-auto-ui/sdk';
+import { parseFrontmatter } from '@webmcp-auto-ui/core';
+import { parseBody, type ParsedSegment } from '@webmcp-auto-ui/sdk';
 
-export type NotebookKind = 'notebook';
-
-export interface NotebookPayload {
-  kind: NotebookKind;
-  data: Record<string, unknown>;
+export interface NotebookFrontmatter {
+  title?: string;
+  description?: string;
+  servers?: Array<{ name: string; url: string }>;
+  [key: string]: unknown;
 }
 
-const LEGACY_KINDS = new Set([
-  'notebook',
-  'notebook-compact',
-  'notebook-workspace',
-  'notebook-document',
-  'notebook-editorial',
-]);
+export interface NotebookPayload {
+  markdown: string;
+  frontmatter: NotebookFrontmatter;
+  body: string;
+  segments: ParsedSegment[];
+  publishedAt?: number;
+  updatedAt?: number;
+}
 
 export class NotebookLoadError extends Error {
-  constructor(public code: 'invalid' | 'unsupported' | 'not_found' | 'network', message: string) {
+  constructor(public code: 'invalid' | 'not_found' | 'network', message: string) {
     super(message);
     this.name = 'NotebookLoadError';
   }
 }
 
-// ---------------------------------------------------------------------------
-// Normalization — the share handler encodes the raw state directly (no wrapper).
-// We accept both shapes: `{kind, data}` or a plain state object.
-// ---------------------------------------------------------------------------
-
-function coerceKind(_raw: unknown): NotebookKind {
-  // Only one notebook widget remains. Legacy kinds are silently mapped.
-  return 'notebook';
+function normalizeFrontmatterServers(
+  raw: unknown,
+): Array<{ name: string; url: string }> {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object')
+    .map((s) => ({
+      name: typeof s.name === 'string' ? s.name : '',
+      url: typeof s.url === 'string' ? s.url : '',
+    }))
+    .filter((s) => s.name && s.url);
 }
 
-export function normalizePayload(parsed: unknown): NotebookPayload {
-  if (!parsed || typeof parsed !== 'object') {
-    throw new NotebookLoadError('invalid', 'Notebook payload is not an object');
-  }
-  const obj = parsed as Record<string, unknown>;
-
-  // Wrapped form: { kind, data }
-  if (typeof obj.kind === 'string' && obj.data && typeof obj.data === 'object') {
-    const kindStr = String(obj.kind);
-    if (!LEGACY_KINDS.has(kindStr)) {
-      throw new NotebookLoadError('unsupported', `Unsupported widget kind: ${kindStr}`);
-    }
-    const data = { ...(obj.data as Record<string, unknown>), mode: 'view' };
-    return { kind: 'notebook', data };
-  }
-
-  // Plain state form: { id, title, cells, ... }
-  if (Array.isArray(obj.cells)) {
-    const kind = coerceKind((obj as { widget?: unknown }).widget);
-    const data = { ...obj, mode: 'view' };
-    return { kind, data };
-  }
-
-  // Published envelope: { state: {...}, publishedAt, updatedAt? }
-  if (obj.state && typeof obj.state === 'object' && Array.isArray((obj.state as Record<string, unknown>).cells)) {
-    const inner = obj.state as Record<string, unknown>;
-    const kind = coerceKind((inner as { widget?: unknown }).widget);
-    const data = { ...inner, mode: 'view' };
-    return { kind, data };
-  }
-
-  throw new NotebookLoadError('invalid', 'Notebook payload has no recognizable shape');
-}
-
-// ---------------------------------------------------------------------------
-// Loaders
-// ---------------------------------------------------------------------------
-
-export async function loadFromHsParam(fullUrl: string): Promise<NotebookPayload> {
-  try {
-    const { content } = await decode(fullUrl);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      throw new NotebookLoadError('invalid', 'Decoded content is not JSON');
-    }
-    return normalizePayload(parsed);
-  } catch (err) {
-    if (err instanceof NotebookLoadError) throw err;
-    throw new NotebookLoadError('invalid', 'Failed to decode HyperSkill link');
-  }
-}
-
-export async function loadFromShortToken(token: string): Promise<NotebookPayload> {
-  let res: Response;
-  try {
-    res = await fetch(`/api/resolve?n=${encodeURIComponent(token)}`, {
-      headers: { accept: 'application/json' },
-    });
-  } catch {
-    throw new NotebookLoadError('network', 'Could not reach the resolver service');
-  }
-  if (res.status === 404) {
-    throw new NotebookLoadError('not_found', 'Short link not found');
-  }
-  if (!res.ok) {
-    throw new NotebookLoadError('network', `Resolver returned ${res.status}`);
-  }
-  const parsed = await res.json().catch(() => null);
-  return normalizePayload(parsed);
+export function parseNotebookMarkdown(markdown: string): {
+  frontmatter: NotebookFrontmatter;
+  body: string;
+  segments: ParsedSegment[];
+} {
+  const { frontmatter, body } = parseFrontmatter(markdown);
+  const fm: NotebookFrontmatter = { ...(frontmatter as NotebookFrontmatter) };
+  fm.servers = normalizeFrontmatterServers((frontmatter as { servers?: unknown }).servers);
+  const segments = parseBody(body);
+  return { frontmatter: fm, body, segments };
 }
 
 export async function loadFromSlug(slug: string): Promise<NotebookPayload> {
@@ -138,29 +84,24 @@ export async function loadFromSlug(slug: string): Promise<NotebookPayload> {
     throw new NotebookLoadError('network', `Server returned ${res.status}`);
   }
   const parsed = await res.json().catch(() => null);
-  return normalizePayload(parsed);
+  const markdown = parsed?.markdown;
+  if (typeof markdown !== 'string' || !markdown.trim()) {
+    throw new NotebookLoadError('invalid', 'Notebook payload has no markdown');
+  }
+  const { frontmatter, body, segments } = parseNotebookMarkdown(markdown);
+  return {
+    markdown,
+    frontmatter,
+    body,
+    segments,
+    publishedAt: typeof parsed?.publishedAt === 'number' ? parsed.publishedAt : undefined,
+    updatedAt: typeof parsed?.updatedAt === 'number' ? parsed.updatedAt : undefined,
+  };
 }
 
 // ---------------------------------------------------------------------------
-// URL param discovery — resolves which loader to use given current location.
-// ---------------------------------------------------------------------------
-
-export type UrlIntent =
-  | { kind: 'hs'; value: string }
-  | { kind: 'short'; value: string }
-  | { kind: 'none' };
-
-export function detectIntent(href: string): UrlIntent {
-  const hs = getHsParam(href);
-  if (hs) return { kind: 'hs', value: hs };
-  const n = getShortToken(href);
-  if (n) return { kind: 'short', value: n };
-  return { kind: 'none' };
-}
-
-// ---------------------------------------------------------------------------
-// OG meta extraction — title from H1 in first markdown cell, description
-// from first prose line stripped of markdown/HTML.
+// OG meta extraction — title from frontmatter or first H1, description from
+// frontmatter or first prose line.
 // ---------------------------------------------------------------------------
 
 export interface NotebookMeta {
@@ -170,39 +111,33 @@ export interface NotebookMeta {
 
 function stripMarkdown(text: string): string {
   return text
-    .replace(/<[^>]+>/g, ' ')       // html tags
-    .replace(/```[\s\S]*?```/g, ' ') // fenced code
-    .replace(/`[^`]*`/g, ' ')        // inline code
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ') // images
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1') // links -> text
-    .replace(/^#{1,6}\s+/gm, '')     // headings
-    .replace(/[*_~>]/g, '')          // emphasis / blockquote
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/[*_~>]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
 export function extractMeta(payload: NotebookPayload): NotebookMeta {
-  const data = payload.data as { title?: unknown; cells?: unknown };
-  let title = typeof data.title === 'string' && data.title.trim()
-    ? data.title.trim()
-    : '';
-  let description = '';
+  const fmTitle = typeof payload.frontmatter.title === 'string' ? payload.frontmatter.title.trim() : '';
+  const fmDesc = typeof payload.frontmatter.description === 'string' ? payload.frontmatter.description.trim() : '';
+  let title = fmTitle;
+  let description = fmDesc;
 
-  const cells = Array.isArray(data.cells) ? data.cells : [];
-  for (const c of cells) {
-    if (!c || typeof c !== 'object') continue;
-    const cell = c as { type?: unknown; content?: unknown };
-    if (cell.type !== 'md' || typeof cell.content !== 'string') continue;
-    const lines = cell.content.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (!title || !description) {
+    const lines = payload.body.split('\n').map((l) => l.trim()).filter(Boolean);
     if (!title) {
       const h1 = lines.find((l) => /^#\s+/.test(l));
       if (h1) title = stripMarkdown(h1);
     }
     if (!description) {
-      const prose = lines.find((l) => !/^#{1,6}\s/.test(l) && !/^[-*]\s/.test(l));
+      const prose = lines.find((l) => !/^#{1,6}\s/.test(l) && !/^[-*]\s/.test(l) && !/^```/.test(l));
       if (prose) description = stripMarkdown(prose).slice(0, 200);
     }
-    if (title && description) break;
   }
 
   return {

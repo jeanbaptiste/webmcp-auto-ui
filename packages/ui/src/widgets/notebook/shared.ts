@@ -4,6 +4,7 @@
 // Used by the four notebook layout renderers (compact/workspace/document/editorial)
 // ---------------------------------------------------------------------------
 
+import { serializeToMarkdown } from './share-handlers.js';
 
 export const NB_PUBLISH_HOST: string = (() => {
   try {
@@ -847,19 +848,14 @@ export function createPublishControls(state: NotebookState, opts: PublishControl
     btn.disabled = true;
     btn.textContent = state.publishedSlug ? '… updating' : '… publishing';
     try {
-      const minimal = opts.serializeState
-        ? opts.serializeState(state)
-        : {
-            id: state.id,
-            title: state.title,
-            mode: state.mode,
-            cells: state.cells,
-          };
+      // HyperSkill standalone markdown — frontmatter (title/description/servers)
+      // + body with fenced cells. Re-parsable via parseFrontmatter + parseBody.
+      const markdown = serializeToMarkdown(state);
       const res = await fetch(`${NB_PUBLISH_HOST}/api/publish`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          state: minimal,
+          markdown,
           slug: state.publishedSlug,
           token: state.publishedToken,
         }),
