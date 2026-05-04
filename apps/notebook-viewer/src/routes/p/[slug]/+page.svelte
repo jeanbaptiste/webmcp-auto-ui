@@ -10,9 +10,11 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { browser } from '$app/environment';
-  import { mountWidget } from '@webmcp-auto-ui/core';
+  import { mountWidget, jsonResult } from '@webmcp-auto-ui/core';
   import { autoui } from '@webmcp-auto-ui/agent';
   import { extractCellsFromRecipe } from '@webmcp-auto-ui/ui';
+  import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+  import { runCode } from '@webmcp-auto-ui/sdk';
   import {
     loadFromSlug,
     extractMeta,
@@ -83,10 +85,142 @@
     const data = buildWidgetData(view.payload, view.meta);
     const result = mountWidget(host, 'notebook', data, [autoui]);
     if (typeof result === 'function') cleanup = result;
+    // Expose the loaded notebook elements as WebMCP tools so a connecting
+    // agent (extension, IDE) can introspect/execute them — same pattern as
+    // todo app: each domain primitive becomes a registerTool call.
+    const unregister = registerNotebookTools(view.payload, view.meta, data.cells);
     return () => {
+      try { unregister(); } catch {}
       if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
     };
   });
+
+  // ─── WebMCP tools registration ────────────────────────────────────────────
+  // The page exposes the notebook content (meta, cells, recipes from
+  // connected MCP servers) as tools. Pattern mirrored from apps/todo.
+  function registerNotebookTools(
+    payload: NotebookPayload,
+    meta: NotebookMeta,
+    cells: Array<{ id: string; type: string; content: string }>,
+  ): () => void {
+    const mc = (navigator as unknown as Record<string, unknown>).modelContext as {
+      registerTool: (t: unknown) => void;
+      unregisterTool: (n: string) => void;
+    } | undefined;
+    if (!mc) return () => {};
+
+    const names: string[] = [];
+    const reg = (tool: any) => { mc.registerTool(tool); names.push(tool.name); };
+
+    reg({
+      name: 'get_notebook_meta',
+      description: 'Get the loaded notebook metadata: title, description, declared MCP servers.',
+      inputSchema: { type: 'object', properties: {} },
+      execute: () => jsonResult({
+        title: meta.title,
+        description: meta.description,
+        servers: payload.frontmatter.servers ?? [],
+      }),
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'list_cells',
+      description: 'List the cells of the loaded notebook (id, type, short content preview).',
+      inputSchema: { type: 'object', properties: {} },
+      execute: () => jsonResult(cells.map((c) => ({
+        id: c.id,
+        type: c.type,
+        preview: (c.content || '').slice(0, 120),
+      }))),
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'get_cell',
+      description: 'Get the full content of a notebook cell by id.',
+      inputSchema: {
+        type: 'object',
+        properties: { id: { type: 'string', description: 'Cell id from list_cells.' } },
+        required: ['id'],
+      },
+      execute: (a: Record<string, unknown>) => {
+        const cell = cells.find((c) => c.id === a.id);
+        if (!cell) return jsonResult({ error: `cell "${String(a.id)}" not found` });
+        return jsonResult(cell);
+      },
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'run_cell',
+      description: 'Execute a code cell (sql/js) of the loaded notebook by id. Markdown cells return an error.',
+      inputSchema: {
+        type: 'object',
+        properties: { id: { type: 'string', description: 'Cell id from list_cells.' } },
+        required: ['id'],
+      },
+      execute: async (a: Record<string, unknown>) => {
+        const cell = cells.find((c) => c.id === a.id);
+        if (!cell) return jsonResult({ error: `cell "${String(a.id)}" not found` });
+        if (cell.type === 'md') return jsonResult({ error: 'cannot run a markdown cell' });
+        const lang = cell.type === 'sql' ? 'sql' : 'js';
+        const multi = canvas.multiClient as Parameters<typeof runCode>[2];
+        const result = await runCode(cell.content, lang, multi, {});
+        return jsonResult(result);
+      },
+    });
+
+    reg({
+      name: 'list_connected_recipes',
+      description: 'List recipes exposed by the MCP servers currently connected by this notebook.',
+      inputSchema: { type: 'object', properties: {} },
+      execute: () => {
+        const out: Array<{ server: string; name: string; description?: string }> = [];
+        for (const s of canvas.dataServers ?? []) {
+          if (!s.connected) continue;
+          for (const r of (s.recipes ?? [])) {
+            out.push({ server: s.name, name: r.name, description: r.description });
+          }
+        }
+        return jsonResult(out);
+      },
+      annotations: { readOnlyHint: true },
+    });
+
+    reg({
+      name: 'get_connected_recipe',
+      description: 'Get a recipe body from a connected MCP server.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          server: { type: 'string', description: 'Server name (from list_connected_recipes).' },
+          name:   { type: 'string', description: 'Recipe name (from list_connected_recipes).' },
+        },
+        required: ['server', 'name'],
+      },
+      execute: async (a: Record<string, unknown>) => {
+        const s = (canvas.dataServers ?? []).find((d) => d.name === a.server);
+        if (!s) return jsonResult({ error: `server "${String(a.server)}" not connected` });
+        const cached = (s.recipes ?? []).find((r) => r.name === a.name);
+        if (cached?.body) return jsonResult({ server: s.name, name: cached.name, body: cached.body });
+        try {
+          const res: any = await canvas.callTool(s.name, 'get_recipe', { name: a.name, id: a.name });
+          const text = res?.content?.find?.((c: any) => c.type === 'text')?.text ?? '';
+          return jsonResult({ server: s.name, name: a.name, body: text });
+        } catch (err: any) {
+          return jsonResult({ error: String(err?.message ?? err) });
+        }
+      },
+      annotations: { readOnlyHint: true },
+    });
+
+    return () => {
+      for (const n of names) {
+        try { mc.unregisterTool(n); } catch {}
+      }
+    };
+  }
 
   onMount(() => {
     const slug = $page.params.slug;
