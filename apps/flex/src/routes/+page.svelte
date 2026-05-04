@@ -665,6 +665,7 @@
         result.push({
           protocol: 'mcp',
           serverName: cacheKey,
+          serverUrl: server.url,
           tools: fromMcpTools((server.tools ?? []) as Parameters<typeof fromMcpTools>[0]),
           recipes: serverRecipes.length > 0 ? serverRecipes : undefined,
         } as McpLayer);
