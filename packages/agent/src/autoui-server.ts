@@ -54,6 +54,40 @@ When the user wants to browse, search, or pick a recipe — for example "show me
 Call widget_display({name: "recipe-browser", params: {recipes: [...], layout: "list"}}). The widget emits a bubbling 'widget:interact' CustomEvent with detail={action:"pick", payload: recipe} when the user clicks Pick.
 `;
 
+// Inline recipe for tool-browser (real vanilla widget)
+const toolBrowserRecipe = `---
+widget: tool-browser
+description: Interactive tool browser with search/filters/preview. Use when the user wants to browse, search, or pick a tool from connected servers.
+group: rich
+schema:
+  type: object
+  required:
+    - tools
+  properties:
+    tools:
+      type: array
+      description: List of BrowsableTool objects (name, description, server, inputSchema, ...).
+      items:
+        type: object
+    filters:
+      type: object
+      description: Initial filters
+      properties:
+        q:
+          type: string
+    layout:
+      type: string
+      enum: [list, grid]
+      description: Default layout (default list)
+---
+
+## When to use
+When the user wants to browse, search, or pick a tool — for example "show me the available tools".
+
+## How to use
+Call widget_display({name: "tool-browser", params: {tools: [...]}}). The widget emits a bubbling 'widget:interact' CustomEvent on user actions.
+`;
+
 // ---------------------------------------------------------------------------
 // Inline recipes (frontmatter + body)
 // ---------------------------------------------------------------------------
@@ -930,6 +964,7 @@ Call widget_display({name: "chat-input", params: {placeholder: "Your reply..."}}
 const _NOTEBOOK_RECIPE_SOURCES: string[] = [
   notebookRecipe as string,
   recipeBrowserRecipe,
+  toolBrowserRecipe,
 ];
 export const NATIVE_WIDGET_NAMES = [...RECIPES, ..._NOTEBOOK_RECIPE_SOURCES].map(r => {
   const match = r.match(/widget:\s*(\S+)/);
@@ -954,6 +989,9 @@ autoui.registerWidget(notebookRecipe as string, renderNotebook as any);
 
 // Recipe browser — resolved by WidgetRenderer as <auto-recipe-browser> custom element
 autoui.registerWidget(recipeBrowserRecipe, undefined);
+
+// Tool browser — resolved by WidgetRenderer as <auto-tool-browser> custom element
+autoui.registerWidget(toolBrowserRecipe, undefined);
 
 // Register flow recipes (multi-step procedures) from the global recipe registry
 // that declare this server (autoui) in their frontmatter.

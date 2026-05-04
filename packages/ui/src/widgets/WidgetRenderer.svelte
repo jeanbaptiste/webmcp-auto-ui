@@ -72,6 +72,7 @@
   import './notebook/notebook.svelte';
   // Agent browsers (registered as widgets for widget_display)
   import '../agent/RecipeBrowser.svelte';
+  import '../agent/ToolBrowser.svelte';
 
   /** Native widget types served as custom elements (`<auto-${type}>`). */
   const NATIVE_CUSTOM_ELEMENTS = new Set<string>([
@@ -85,6 +86,7 @@
     'notebook',
     // Agent browsers
     'recipe-browser',
+    'tool-browser',
   ]);
 
   /** A vanilla renderer: returns cleanup or Promise thereof. Still used for
