@@ -88,7 +88,7 @@
     if (view.status !== 'ready' || !host) return;
     if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
     host.innerHTML = '';
-    const data = { ...view.payload.data, liveData: true, hideLiveToggle: true };
+    const data = { ...view.payload.data, autoRun: true };
     const result = mountWidget(host, view.payload.kind, data, [autoui]);
     if (typeof result === 'function') cleanup = result;
     return () => {

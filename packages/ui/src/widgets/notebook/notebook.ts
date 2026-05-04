@@ -54,7 +54,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       <div class="nbe-leftpane-slot"></div>
       <div class="nbe-shell">
         <div class="nbe-kicker">
-          <span class="nbe-live-toggle-slot"></span>
           <div class="nb-mode-switch" style="margin-left:auto;">
             <button class="nb-mode-edit nb-on">edit</button>
             <button class="nb-mode-view">view</button>
@@ -102,24 +101,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       node.addEventListener('focusin', () => { lastActiveIdx = idx; });
       cellsEl.appendChild(node);
     });
-  }
-
-  const hideLiveToggle = (data as any).hideLiveToggle === true;
-
-  function renderLiveToggle() {
-    const slot = shell.querySelector('.nbe-live-toggle-slot') as HTMLElement;
-    if (hideLiveToggle) { slot.innerHTML = ''; return; }
-    if (state.mode === 'edit') {
-      const checked = state.autoRun === true ? 'checked' : '';
-      slot.innerHTML = `<label class="nbe-live-toggle" title="Re-execute SQL cells against connected servers when this notebook is opened in view mode."><input type="checkbox" ${checked} />Live data</label>`;
-      const cb = slot.querySelector('input[type=checkbox]') as HTMLInputElement;
-      cb.addEventListener('change', () => {
-        state.autoRun = cb.checked;
-        rerender();
-      });
-    } else {
-      slot.innerHTML = '';
-    }
   }
 
   function renderLiveBadge() {
@@ -194,7 +175,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   function rerender() {
     const restore = preserveScrollAround(cellsEl);
     mountHistoryPanel(historyPanel, state, (snap) => { restoreCellFromSnapshot(state, snap); rerender(); });
-    renderLiveToggle();
     renderLiveBadge();
     renderEmptyState();
     renderCells();
@@ -799,18 +779,6 @@ function injectLayoutStyles(): void {
 }
 .nbe-toast.nbe-toast-in { opacity: 1; transform: translateX(-50%) translateY(0); }
 .nbe-toast.nbe-toast-error { color: var(--color-accent2); border-color: var(--color-accent2); }
-
-/* Live mode — discreet toggle in header (edit mode only) */
-.nbe-live-toggle {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
-  font-size: 10.5px; color: var(--color-text2);
-  letter-spacing: 0.06em; text-transform: uppercase;
-  cursor: pointer; user-select: none;
-  padding: 2px 7px; border: 1px solid var(--color-border); border-radius: 4px;
-}
-.nbe-live-toggle:hover { color: var(--color-text1); border-color: var(--color-border2); }
-.nbe-live-toggle input { margin: 0; cursor: pointer; }
 
 /* Title row + Live badge (view mode + autoRun) */
 .nbe-title-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }

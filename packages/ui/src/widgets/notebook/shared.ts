@@ -259,9 +259,9 @@ export function cellRuntimeStatus(cell: NotebookCell, overlay: RuntimeOverlay | 
   return 'idle';
 }
 
-/** Live-mode whitelist. Only SQL cells are re-executable publicly. */
+/** Live-mode whitelist. SQL and JS cells are re-executable; markdown stays frozen. */
 export function isReRunnable(cell: NotebookCell): boolean {
-  return cell.type === 'sql';
+  return cell.type === 'sql' || cell.type === 'js';
 }
 
 /**
@@ -471,10 +471,22 @@ export function bootstrapLiveRefresh(opts: BootstrapLiveRefreshOptions): () => v
       }
       await waitForEnabledServers(canvas, timeoutMs ?? 5000);
 
-      const runner = createBridgeSqlRunner(
+      const sqlRunner = createBridgeSqlRunner(
         canvas.callTool.bind(canvas),
         () => collectDataServers(data).filter((s) => canvas.dataServers.find((d) => d.name === s.name)?.connected),
       );
+
+      const runner: CellRunner = async (cell, signal) => {
+        if (cell.type === 'sql') return sqlRunner(cell, signal);
+        if (cell.type === 'js') {
+          const exec = state.executors?.js;
+          if (!exec) {
+            return { ok: false, error: 'No JS executor registered', errorKind: 'runtime', durationMs: 0 };
+          }
+          return exec({ cell, state, scope: state.scope, signal });
+        }
+        return { ok: false, error: `Cell type '${cell.type}' is not re-runnable`, errorKind: 'runtime', durationMs: 0 };
+      };
 
       await runAutoRefresh({ state, overlay, runner, onCellChange, onTick, signal: ac.signal });
     } catch (err) {

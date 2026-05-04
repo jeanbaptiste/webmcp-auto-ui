@@ -23,7 +23,6 @@
     title?: string;
     mode?: 'edit' | 'view';
     autoRun?: boolean;
-    hideLiveToggle?: boolean;
     cells?: NotebookCell[];
     /** MCP servers for SQL execution (array of {name, url}) */
     servers?: Array<{ name: string; url?: string }>;

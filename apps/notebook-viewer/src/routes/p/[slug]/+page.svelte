@@ -46,8 +46,8 @@
     if (view.status !== 'ready' || !host) return;
     if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
     host.innerHTML = '';
-    // nb.hyperskills.net is always live data — hide the toggle, force live on.
-    const data = { ...view.payload.data, liveData: true, hideLiveToggle: true };
+    // nb.hyperskills.net is always live: SQL and JS cells re-execute at mount.
+    const data = { ...view.payload.data, autoRun: true };
     const result = mountWidget(host, view.payload.kind, data, [autoui]);
     if (typeof result === 'function') cleanup = result;
     return () => {
