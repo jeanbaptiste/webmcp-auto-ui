@@ -41,7 +41,7 @@ export type { AgentLoopOptions } from './loop.js';
 export { autoui, NATIVE_WIDGET_NAMES } from './autoui-server.js';
 
 // Tool layers
-export { buildToolsFromLayers, buildDiscoveryTools, buildDiscoveryToolsWithAliases, activateServerTools, resolveCanonicalTools, toolAliasMap, flattenPathMaps, buildDiscoveryCache } from './tool-layers.js';
+export { buildToolsFromLayers, buildDiscoveryTools, buildDiscoveryToolsWithAliases, activateServerTools, resolveCanonicalTools, toolAliasMap, flattenPathMaps, buildDiscoveryCache, sanitizeServerName } from './tool-layers.js';
 export type { ToolLayer, McpLayer, WebMcpLayer, DiscoveryToolsResult, SchemaTransformOptions, BuildToolsResult, ProviderKind } from './tool-layers.js';
 
 // Discovery cache

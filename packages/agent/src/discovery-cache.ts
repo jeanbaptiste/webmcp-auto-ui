@@ -6,6 +6,7 @@
 
 import type { ProviderTool } from './types.js';
 import type { PipelineTrace } from './pipeline-trace.js';
+import { sanitizeServerName } from './tool-layers.js';
 
 /** Tool names that are resolved locally from cache — hidden from user-facing browsers. */
 export const DISCOVERY_TOOL_NAMES = new Set(['list_recipes', 'search_recipes', 'get_recipe', 'list_tools', 'search_tools']);
@@ -30,14 +31,21 @@ export interface ServerCache {
 export class DiscoveryCache {
   private servers = new Map<string, ServerCache>();
 
+  /** Normalize a server prefix so register/lookup share the same key shape
+   *  regardless of casing, spaces, or other artifacts. Mirrors the
+   *  sanitization applied to tool name prefixes by tool-layers. */
+  private norm(serverPrefix: string): string {
+    return sanitizeServerName(serverPrefix);
+  }
+
   /** Register a server's recipes and tools */
   register(serverPrefix: string, data: ServerCache): void {
-    this.servers.set(serverPrefix, data);
+    this.servers.set(this.norm(serverPrefix), data);
   }
 
   /** Check if we have cached data for a server prefix */
   has(serverPrefix: string): boolean {
-    return this.servers.has(serverPrefix);
+    return this.servers.has(this.norm(serverPrefix));
   }
 
   /** Clear all cached data */
@@ -45,7 +53,7 @@ export class DiscoveryCache {
     this.servers.clear();
   }
 
-  /** All registered server prefixes */
+  /** All registered server prefixes (normalized) */
   serverPrefixes(): string[] {
     return [...this.servers.keys()];
   }
@@ -70,22 +78,22 @@ export class DiscoveryCache {
 
   /** Recipe count for a specific server */
   recipeCount(serverPrefix: string): number {
-    return this.servers.get(serverPrefix)?.recipes.length ?? 0;
+    return this.servers.get(this.norm(serverPrefix))?.recipes.length ?? 0;
   }
 
   /** Get the cached recipes for a specific server prefix. */
   recipesFor(serverPrefix: string): CachedRecipe[] {
-    return this.servers.get(serverPrefix)?.recipes ?? [];
+    return this.servers.get(this.norm(serverPrefix))?.recipes ?? [];
   }
 
   /** Tool count for a specific server */
   toolCount(serverPrefix: string): number {
-    return this.servers.get(serverPrefix)?.tools.length ?? 0;
+    return this.servers.get(this.norm(serverPrefix))?.tools.length ?? 0;
   }
 
   /** Tool count excluding discovery tools (hidden from user-facing browsers) */
   browsableToolCount(serverPrefix: string): number {
-    const tools = this.servers.get(serverPrefix)?.tools ?? [];
+    const tools = this.servers.get(this.norm(serverPrefix))?.tools ?? [];
     return tools.filter(t => !DISCOVERY_TOOL_NAMES.has(t.name)).length;
   }
 
@@ -103,7 +111,7 @@ export class DiscoveryCache {
     params: Record<string, unknown>,
     trace?: PipelineTrace,
   ): string | null {
-    const cache = this.servers.get(serverPrefix);
+    const cache = this.servers.get(this.norm(serverPrefix));
     if (!cache) return null;
 
     switch (realToolName) {

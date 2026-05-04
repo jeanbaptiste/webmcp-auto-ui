@@ -9,7 +9,7 @@
   import {
     TransformersProvider, runAgentLoop, buildSystemPrompt,
     fromMcpTools, trimConversationHistory, summarizeChat,
-    buildToolsFromLayers, runDiagnostics, DiscoveryCache, DISCOVERY_TOOL_NAMES, ContextRAG,
+    buildToolsFromLayers, runDiagnostics, DiscoveryCache, DISCOVERY_TOOL_NAMES, ContextRAG, sanitizeServerName,
     buildGemmaPrompt,
     createTraceObserver,
     TRANSFORMERS_MODELS,
@@ -482,9 +482,9 @@
   const mcpRecipes = $derived.by(() => {
     cacheVersion; // reactivity trigger
     const connected = canvas.dataServers.filter(s => s.connected);
-    const mcpServerNames = new Set(connected.map(s => s.serverName ?? s.name));
+    const mcpServerNames = new Set(connected.map(s => sanitizeServerName(s.serverName ?? s.name)));
     const all = discoveryCache.allRecipes().filter(r => r.server && mcpServerNames.has(r.server));
-    const nameToUrl = new Map(connected.map(s => [s.serverName ?? s.name, s.url]));
+    const nameToUrl = new Map(connected.map(s => [sanitizeServerName(s.serverName ?? s.name), s.url]));
     const nameCounts = new Map<string, number>();
     for (const r of all) nameCounts.set(r.name, (nameCounts.get(r.name) ?? 0) + 1);
     return all.map(r => {
