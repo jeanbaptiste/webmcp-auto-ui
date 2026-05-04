@@ -59,14 +59,39 @@
    *  - `mode: 'view'`, `liveData: true`, `hideLiveToggle: true` mirror the
    *    previous nb.hyperskills.net behaviour.
    */
-  function buildWidgetData(payload: NotebookPayload, meta: NotebookMeta) {
+  /**
+   * Pull the publish token from `?t=<token>` URL param if present (and persist
+   * it in localStorage), or from a previously persisted entry. Returns '' when
+   * no token is known — in that case the save button will exist but the server
+   * rejects with 403, signalling read-only state.
+   *
+   * Storing in localStorage scopes the token to the visitor's browser on the
+   * nb.hyperskills.net origin only. The URL is cleaned via history.replaceState
+   * to avoid leaks (sharing, browser history, referer).
+   */
+  function hydrateToken(slug: string): string {
+    if (typeof window === 'undefined') return '';
+    const url = new URL(window.location.href);
+    const fromUrl = url.searchParams.get('t');
+    const key = `nb-token-${slug}`;
+    if (fromUrl) {
+      try { window.localStorage.setItem(key, fromUrl); } catch {}
+      url.searchParams.delete('t');
+      try { window.history.replaceState({}, '', url.toString()); } catch {}
+      return fromUrl;
+    }
+    try { return window.localStorage.getItem(key) ?? ''; } catch { return ''; }
+  }
+
+  function buildWidgetData(payload: NotebookPayload, meta: NotebookMeta, slug: string) {
     const cells = extractCellsFromRecipe(payload.body);
     const servers = (payload.frontmatter.servers ?? []).map((s) => ({
       name: s.name,
       url: s.url,
     }));
+    const publishedToken = hydrateToken(slug);
     return {
-      id: 'nb-' + Math.random().toString(36).slice(2, 10),
+      id: 'nb-' + slug,
       title: meta.title,
       mode: 'view',
       autoRun: false,
@@ -74,6 +99,10 @@
       hideLiveToggle: true,
       servers,
       cells,
+      // Hydrate publish state so the button reads "save" (and updates the
+      // existing slug) instead of "publish" (which would create a duplicate).
+      publishedSlug: slug,
+      publishedToken,
     };
   }
 
@@ -82,7 +111,8 @@
     if (view.status !== 'ready' || !host) return;
     if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
     host.innerHTML = '';
-    const data = buildWidgetData(view.payload, view.meta);
+    const slug = $page.params.slug ?? '';
+    const data = buildWidgetData(view.payload, view.meta, slug);
     const result = mountWidget(host, 'notebook', data, [autoui]);
     if (typeof result === 'function') cleanup = result;
     // Expose the loaded notebook elements as WebMCP tools so a connecting

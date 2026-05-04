@@ -764,7 +764,7 @@ function publishUrlFor(slug: string): string {
 }
 
 function publishBtnLabel(state: NotebookState): string {
-  return state.publishedSlug ? '🔄 update' : '📤 publish';
+  return state.publishedSlug ? '💾 save' : '📤 publish';
 }
 
 function refreshPublishControls(state: NotebookState, controls: PublishControlsHandles): void {
@@ -772,7 +772,7 @@ function refreshPublishControls(state: NotebookState, controls: PublishControlsH
   btn.textContent = publishBtnLabel(state);
   btn.dataset.state = state.publishedSlug ? 'published' : 'draft';
   if (state.publishedSlug) {
-    btn.title = `Update ${publishUrlFor(state.publishedSlug)}`;
+    btn.title = `Save changes to ${publishUrlFor(state.publishedSlug)}`;
   } else {
     btn.title = 'Publish this notebook';
   }
@@ -846,7 +846,7 @@ export function createPublishControls(state: NotebookState, opts: PublishControl
   const onClick = async () => {
     const prevLabel = btn.textContent ?? '';
     btn.disabled = true;
-    btn.textContent = state.publishedSlug ? '… updating' : '… publishing';
+    btn.textContent = state.publishedSlug ? '… saving' : '… publishing';
     try {
       // HyperSkill standalone markdown — frontmatter (title/description/servers)
       // + body with fenced cells. Re-parsable via parseFrontmatter + parseBody.
@@ -865,15 +865,19 @@ export function createPublishControls(state: NotebookState, opts: PublishControl
       state.publishedSlug = reply.slug;
       state.publishedToken = reply.token;
       state.lastEditAt = Date.now();
-      const url: string = reply.url ?? publishUrlFor(String(reply.slug));
-      try { await navigator.clipboard?.writeText?.(url); } catch { /* ignore */ }
+      const baseUrl: string = reply.url ?? publishUrlFor(String(reply.slug));
+      // Author URL embeds the token via `?t=` so the viewer can hydrate it
+      // (one-shot — the viewer extracts it into localStorage and cleans the
+      // URL). Public visitors share the bare URL without ?t.
+      const authorUrl = `${baseUrl}?t=${encodeURIComponent(String(reply.token))}`;
+      try { await navigator.clipboard?.writeText?.(authorUrl); } catch { /* ignore */ }
       const updated = Boolean(reply.updated);
       toast(
         updated
-          ? `updated · ${url.replace(/^https?:\/\//, '')} (copied)`
-          : `published · ${url.replace(/^https?:\/\//, '')} (copied)`
+          ? `saved · ${baseUrl.replace(/^https?:\/\//, '')} (author link copied)`
+          : `published · ${baseUrl.replace(/^https?:\/\//, '')} (author link copied)`
       );
-      opts.onPublished?.({ slug: String(reply.slug), url, updated });
+      opts.onPublished?.({ slug: String(reply.slug), url: baseUrl, updated });
     } catch (err: any) {
       toast(`publish failed · ${String(err?.message ?? err)}`, true);
       btn.textContent = prevLabel;
