@@ -9,26 +9,55 @@
     open: boolean;
     tools: BrowsableTool[];
     initialFilter?: string;
+    /** Layout toggle: list (default) or grid — reserved for future grid view */
+    layout?: 'list' | 'grid';
+    /** Agent widget_display payload — when present, takes priority over named props. */
+    data?: {
+      tools?: BrowsableTool[];
+      layout?: 'list' | 'grid';
+      filters?: { q?: string };
+    } | null;
   }
 
-  let { open = $bindable(false), tools = [], initialFilter = '' }: Props = $props();
+  let {
+    open = $bindable(false),
+    tools = [],
+    initialFilter = '',
+    layout: _initialLayout = 'list',
+    data = null,
+  }: Props = $props();
+
+  let agentClosed = $state(false);
+  const effectiveTools = $derived<BrowsableTool[]>(data?.tools ?? tools);
+  const effectiveOpen = $derived(data ? !agentClosed : open);
 
   let query = $state('');
   let selected = $state<BrowsableTool | null>(null);
 
+  // Settings mode: sync initialFilter when modal opens
   $effect(() => {
-    if (open) {
+    if (open && !data) {
       query = initialFilter || '';
       selected = null;
     }
   });
 
-  const filtered = $derived(sortRecipes(filterRecipes(tools, query)));
+  // Agent mode: sync payload when `data` arrives
+  $effect(() => {
+    if (data) {
+      query = data.filters?.q ?? '';
+      selected = null;
+      agentClosed = false;
+    }
+  });
+
+  const filtered = $derived(sortRecipes(filterRecipes(effectiveTools, query)));
   const grouped = $derived(groupToolsByServer(filtered));
 
   function close() {
     open = false;
     selected = null;
+    if (data) agentClosed = true;
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -39,9 +68,9 @@
   }
 </script>
 
-<svelte:window onkeydown={open ? handleKeydown : undefined} />
+<svelte:window onkeydown={effectiveOpen ? handleKeydown : undefined} />
 
-{#if open}
+{#if effectiveOpen}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
        onclick={close}>
