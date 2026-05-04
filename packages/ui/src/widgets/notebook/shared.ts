@@ -187,6 +187,8 @@ export function createState(initial?: Partial<NotebookState>): NotebookState {
     executors: initial?.executors ?? {},
     lastEditAt: initial?.lastEditAt ?? Date.now(),
     autoRun: initial?.autoRun ?? false,
+    publishedSlug: initial?.publishedSlug,
+    publishedToken: initial?.publishedToken,
   };
 }
 

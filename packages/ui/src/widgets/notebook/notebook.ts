@@ -36,6 +36,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     mode: (data.mode as any) ?? 'edit',
     cells: data.cells as any,
     autoRun: (data as any).autoRun === true,
+    publishedSlug: (data as any).publishedSlug,
+    publishedToken: (data as any).publishedToken,
   });
 
   // Live mode runtime overlay (created lazily). Never mutates state.
