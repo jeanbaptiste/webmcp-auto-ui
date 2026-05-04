@@ -54,6 +54,17 @@ export class McpMultiClient {
     const initResult = await client.connect();
     const tools = await client.listTools();
 
+    // -----------------------------------------------------------------------
+    // Cosmetic rebrand map: some MCP servers expose a `serverInfo.name` that
+    // doesn't match the public-facing brand we want to display in the UI. The
+    // Tricoteuses MCP server, for instance, declares itself as "moulineuse"
+    // (internal codename) but ships under the "Tricoteuses" brand. Rather
+    // than patch the upstream server, we rebadge the name on the client.
+    //
+    // TODO(2026-05-03): migrate this to an external config (e.g. a per-app
+    // `serverAliases` option passed to McpMultiClient) so that the core
+    // package has zero brand-specific knowledge baked in.
+    // -----------------------------------------------------------------------
     const SERVER_NAME_MAP: Record<string, string> = { 'moulineuse': 'Tricoteuses' };
     const name = SERVER_NAME_MAP[initResult.serverInfo.name] ?? initResult.serverInfo.name;
     this.servers.set(url, { client, name, tools });
