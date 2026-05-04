@@ -920,6 +920,21 @@
       return;
     }
 
+    // Intercept "list recipes" / "list tools" — open the Settings browsers locally.
+    const lower = msg.trim().toLowerCase();
+    if (lower === 'list recipes' || lower === 'recipes') {
+      recipeBrowserOpen = true;
+      recipeBrowserFilter = '';
+      input = '';
+      return;
+    }
+    if (lower === 'list tools' || lower === 'tools') {
+      toolBrowserOpen = true;
+      toolBrowserFilter = '';
+      input = '';
+      return;
+    }
+
     // Intercept "test" command — chain both canary and hummingbird test flows.
     if (msg.trim().toLowerCase() === 'test') {
       input = '';
