@@ -34,6 +34,14 @@
     onOpenInNotebook?: (type: string, data: Record<string, unknown>) => void;
     /** Called when user clicks a recipe to view its detail. Host shows the recipe modal. */
     onOpenRecipe?: (recipe: RecipeItem) => void;
+    /** Agent widget_display payload — when present, takes priority over named props. */
+    data?: {
+      recipes?: RecipeItem[];
+      mcpRecipes?: RecipeItem[];
+      webmcpRecipes?: RecipeItem[];
+      layout?: 'list' | 'grid';
+      filters?: { q?: string; kind?: 'all' | 'mcp' | 'webmcp' };
+    } | null;
   }
 
   let {
@@ -44,7 +52,14 @@
     layout: initialLayout = 'list',
     onOpenInNotebook,
     onOpenRecipe,
+    data = null,
   }: Props = $props();
+
+  // Agent mode: when `data` is present, use it as source of truth and force open.
+  let agentClosed = $state(false);
+  const effectiveMcp = $derived<RecipeItem[]>(data?.recipes ?? data?.mcpRecipes ?? mcpRecipes);
+  const effectiveWebmcp = $derived<RecipeItem[]>(data?.webmcpRecipes ?? webmcpRecipes);
+  const effectiveOpen = $derived(data ? !agentClosed : open);
 
   /** Look up the canvas server name (= registry id) matching the given URL. */
   function findServerNameByUrl(url: string | undefined): string | undefined {
@@ -63,11 +78,21 @@
   let copyState = $state<'idle' | 'copied'>('idle');
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
 
-  // Sync initialFilter into search when modal opens
+  // Sync initialFilter into search when modal opens (Settings mode)
   $effect(() => {
-    if (open) {
+    if (open && !data) {
       query = initialFilter ?? '';
       kind = 'all';
+      selected = null;
+    }
+  });
+
+  // Sync agent payload into local state when `data` arrives
+  $effect(() => {
+    if (data) {
+      query = data.filters?.q ?? '';
+      kind = data.filters?.kind ?? 'all';
+      layout = data.layout ?? initialLayout;
       selected = null;
     }
   });
@@ -76,19 +101,27 @@
     if (filterKind === 'all') return recipes;
     return recipes.filter((_r) => {
       // webmcpRecipes are already separated — use the array membership to determine kind
-      return filterKind === 'webmcp' ? webmcpRecipes.includes(_r) : mcpRecipes.includes(_r);
+      return filterKind === 'webmcp' ? effectiveWebmcp.includes(_r) : effectiveMcp.includes(_r);
     });
   }
 
   const filteredMcp = $derived(
-    kind === 'webmcp' ? [] : sortRecipes(filterRecipes(mcpRecipes, query))
+    kind === 'webmcp' ? [] : sortRecipes(filterRecipes(effectiveMcp, query))
   );
   const filteredWebmcp = $derived(
-    kind === 'mcp' ? [] : sortRecipes(filterRecipes(webmcpRecipes, query))
+    kind === 'mcp' ? [] : sortRecipes(filterRecipes(effectiveWebmcp, query))
   );
   const totalResults = $derived(filteredMcp.length + filteredWebmcp.length);
 
-  function close() { open = false; selected = null; }
+  // Reset agent-close override when a fresh payload arrives
+  $effect(() => {
+    if (data) agentClosed = false;
+  });
+  function close() {
+    open = false;
+    selected = null;
+    if (data) agentClosed = true;
+  }
 
   function onKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') close();
@@ -184,7 +217,7 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-{#if open}
+{#if effectiveOpen}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6"
@@ -251,7 +284,7 @@
           {#if layout === 'grid'}
             <div class="grid grid-cols-2 gap-2 mt-2">
               {#each [...filteredMcp, ...filteredWebmcp] as recipe, i (`grid:${recipe.name}:${i}`)}
-                {@const isWebmcp = webmcpRecipes.includes(recipe)}
+                {@const isWebmcp = effectiveWebmcp.includes(recipe)}
                 <div class="group flex flex-col gap-1 p-3 bg-surface2/50 rounded-lg hover:bg-surface2 transition-colors cursor-pointer border border-border2/50"
                      onclick={() => openRecipe(recipe)}>
                   <div class="font-mono text-[11px] text-text1 font-medium truncate">{recipe.name}</div>
