@@ -21,8 +21,6 @@ export interface ConnectedServer {
   tools: McpTool[];
 }
 
-export type AggregatedTool = McpTool & { serverUrl: string; serverName: string };
-
 // ---------------------------------------------------------------------------
 // McpMultiClient
 // ---------------------------------------------------------------------------
@@ -80,43 +78,6 @@ export class McpMultiClient {
     const result: ConnectedServer[] = [];
     for (const [url, entry] of this.servers) {
       result.push({ url, name: entry.name, tools: entry.tools });
-    }
-    return result;
-  }
-
-  /**
-   * List ALL tools from ALL connected servers.
-   * Each tool is augmented with its origin server URL and name.
-   * Duplicate tool names across servers are prefixed with the server name
-   * (e.g. "wikipedia__search") to satisfy the Claude API uniqueness constraint.
-   */
-  listAllTools(): AggregatedTool[] {
-    // First pass: count occurrences of each tool name across all servers
-    const nameCounts = new Map<string, number>();
-    for (const [, entry] of this.servers) {
-      for (const tool of entry.tools) {
-        nameCounts.set(tool.name, (nameCounts.get(tool.name) ?? 0) + 1);
-      }
-    }
-
-    // Second pass: build result, prefixing duplicates with serverName
-    const result: AggregatedTool[] = [];
-    for (const [url, entry] of this.servers) {
-      for (const tool of entry.tools) {
-        const isDuplicate = (nameCounts.get(tool.name) ?? 0) > 1;
-        if (isDuplicate) {
-          const prefix = this.normalizeServerName(entry.name);
-          result.push({
-            ...tool,
-            name: `${prefix}__${tool.name}`,
-            description: `[${entry.name}] ${tool.description ?? ''}`,
-            serverUrl: url,
-            serverName: entry.name,
-          });
-        } else {
-          result.push({ ...tool, serverUrl: url, serverName: entry.name });
-        }
-      }
     }
     return result;
   }
