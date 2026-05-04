@@ -83,38 +83,6 @@ export class McpMultiClient {
   }
 
   /**
-   * Call a tool by name. Automatically routes to the correct server.
-   * Supports both plain names ("search") and prefixed names ("wikipedia__search")
-   * for disambiguated duplicates.
-   */
-  async callTool(name: string, args?: Record<string, unknown>): Promise<McpToolResult> {
-    // 1. Exact match on original tool name (unprefixed)
-    for (const [, entry] of this.servers) {
-      const match = entry.tools.find((t) => t.name === name);
-      if (match) {
-        return entry.client.callTool(name, args);
-      }
-    }
-
-    // 2. Prefixed name: "serverprefix__realToolName"
-    const separatorIdx = name.indexOf('__');
-    if (separatorIdx !== -1) {
-      const prefix = name.slice(0, separatorIdx);
-      const realName = name.slice(separatorIdx + 2);
-      for (const [, entry] of this.servers) {
-        if (this.normalizeServerName(entry.name) === prefix) {
-          const match = entry.tools.find((t) => t.name === realName);
-          if (match) {
-            return entry.client.callTool(realName, args);
-          }
-        }
-      }
-    }
-
-    throw new Error(`McpMultiClient: no server exposes tool "${name}"`);
-  }
-
-  /**
    * Call a tool on a SPECIFIC server (identified by URL).
    * Use this instead of callTool() when the same tool name may exist on multiple
    * servers and you need to target one specifically (e.g. discovery `list_recipes`).
@@ -135,15 +103,6 @@ export class McpMultiClient {
     }
     await Promise.all(promises);
     this.servers.clear();
-  }
-
-  // -------------------------------------------------------------------------
-  // Private helpers
-  // -------------------------------------------------------------------------
-
-  /** Convert a server name to a snake_case prefix for tool name disambiguation. */
-  private normalizeServerName(name: string): string {
-    return name.toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '');
   }
 
   // -------------------------------------------------------------------------

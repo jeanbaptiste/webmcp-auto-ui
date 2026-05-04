@@ -460,10 +460,18 @@ export async function runAgentLoop(
             if (!client) {
               result = `Error: no MCP client available for tool ${name}`;
             } else {
-              const mcpResult = await client.callTool(realToolName, toolInput);
-              const textContent = mcpResult.content?.find((c: { type: string }) => c.type === 'text') as { text?: string } | undefined;
-              const rawResult = textContent?.text ?? JSON.stringify(mcpResult);
-              result = truncateResults ? truncateResult(rawResult, maxResultLength) : rawResult;
+              const mcpLayer = (options.layers ?? []).find(
+                l => sanitizeServerName(l.serverName) === serverName && l.protocol === 'mcp'
+              ) as { serverUrl?: string } | undefined;
+              const serverUrl = mcpLayer?.serverUrl;
+              if (!serverUrl) {
+                result = `Error: no serverUrl resolved for tool "${name}" (server "${serverName}"). Pass serverUrl on the matching ToolLayer.`;
+              } else {
+                const mcpResult = await (client as unknown as { callToolOn: (u: string, n: string, a: unknown) => Promise<{ content?: { type: string; text?: string }[] }> }).callToolOn(serverUrl, realToolName, toolInput);
+                const textContent = mcpResult.content?.find((c: { type: string }) => c.type === 'text') as { text?: string } | undefined;
+                const rawResult = textContent?.text ?? JSON.stringify(mcpResult);
+                result = truncateResults ? truncateResult(rawResult, maxResultLength) : rawResult;
+              }
             }
           } else if (protocol === 'webmcp') {
             // Intercept recall BEFORE hitting executeTool — use the local resultBuffer directly
