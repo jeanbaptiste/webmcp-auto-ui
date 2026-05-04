@@ -1,8 +1,17 @@
 <script lang="ts">
   import '../app.css';
+  import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { HeaderControls } from '@webmcp-auto-ui/ui';
+  import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
   let { children } = $props();
+
+  // The notebook widget reads globalThis.__canvasVanilla for auto-connect of
+  // frontmatter-declared MCP servers. Exposing it here is the canonical
+  // pattern (same as flex/recipes/template).
+  onMount(() => {
+    (globalThis as any).__canvasVanilla = canvasVanilla;
+  });
 
   // Only show the "back to index" chip on notebook pages (i.e. /:slug, not /).
   const isNotebookPage = $derived($page.url?.pathname && $page.url.pathname !== '/');
