@@ -644,7 +644,7 @@ async function runAgentForCell(
       maxIterations: 6,
       signal: aborter.signal,
       callbacks: {
-        onToolCall: (name: string) => { status.textContent = `· ${name}…`; },
+        onToolCall: (call: { name?: string }) => { status.textContent = `· ${call?.name ?? '?'}…`; },
       },
     });
     status.textContent = '✓ done';
