@@ -80,6 +80,11 @@ export interface NotebookState {
    *  Defaults to '/api/chat' when absent — flex sets '/flex/api/chat' to
    *  match its base path; notebook-viewer keeps the default. */
   chatApiBase?: string;
+  /** Just-in-time getter for the host's currently enabled WebMCP server ids.
+   *  Read at publish time by share-handlers.buildFrontmatter to write the
+   *  `webmcp_servers:` frontmatter line without going through canvas (avoids
+   *  notify cascades on the host's left pane). */
+  enabledServerIds?: () => string[];
 }
 
 export interface HistoryEntry {
@@ -200,6 +205,7 @@ export function createState(initial?: Partial<NotebookState>): NotebookState {
     publishedToken: initial?.publishedToken,
     webmcpServers: initial?.webmcpServers,
     chatApiBase: initial?.chatApiBase,
+    enabledServerIds: initial?.enabledServerIds,
   };
 }
 
