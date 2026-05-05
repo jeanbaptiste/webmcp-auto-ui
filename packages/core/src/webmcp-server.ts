@@ -333,6 +333,9 @@ export function mountWidget(
     const tag = `auto-${type}`;
     if (customElements.get(tag)) {
       const plainData = JSON.parse(JSON.stringify(data));
+      // Re-attach server instances post-clone — JSON.stringify strips methods,
+      // and widgets like notebook need live `.layer()` / `.getWidget()` access.
+      if (servers && servers.length > 0) plainData.webmcpServers = servers;
       const el = document.createElement(tag) as HTMLElement;
       (el as unknown as { data: unknown }).data = plainData;
       container.innerHTML = '';
@@ -350,6 +353,8 @@ export function mountWidget(
       // Deep-clone to strip Svelte 5 $state proxies — third-party libs (Chart.js,
       // Cytoscape, Plotly, etc.) use Object.defineProperty which conflicts with proxies.
       const plainData = JSON.parse(JSON.stringify(data));
+      // Re-attach server instances post-clone (see custom-element branch above).
+      if (servers && servers.length > 0) plainData.webmcpServers = servers;
       let cleanup: (() => void) | void;
       let cancelled = false;
       try {

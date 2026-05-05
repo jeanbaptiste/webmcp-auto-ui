@@ -134,7 +134,11 @@
     host.innerHTML = '';
     const slug = $page.params.slug ?? '';
     const data = buildWidgetData(view.payload, view.meta, slug);
-    const result = mountWidget(host, 'notebook', data, [autoui]);
+    // Merge frontmatter-activated servers with the always-on `autoui`. mountWidget
+    // re-injects this list as data.webmcpServers post-clone so methods survive.
+    const activated = (data.webmcpServers ?? []) as WebMcpServer[];
+    const allServers = activated.some((s) => s.name === 'autoui') ? activated : [autoui, ...activated];
+    const result = mountWidget(host, 'notebook', data, allServers);
     if (typeof result === 'function') cleanup = result;
     // Expose the loaded notebook elements as WebMCP tools so a connecting
     // agent (extension, IDE) can introspect/execute them — same pattern as
