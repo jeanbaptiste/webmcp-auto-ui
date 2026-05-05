@@ -70,3 +70,7 @@ pnpm-lock.yaml
 
 # Sub-agent refactor reports (artefacts internes, hors scope du repo)
 .refactor-reports/
+
+# Python bytecode (mcp-proxies)
+__pycache__/
+*.pyc
