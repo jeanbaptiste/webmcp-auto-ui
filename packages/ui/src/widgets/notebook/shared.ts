@@ -25,6 +25,7 @@ export type CellResult =
   | { ok: true; kind: 'table'; rows: Record<string, unknown>[]; columns: string[]; rowCount: number; truncated?: boolean; durationMs: number; logs?: string[] }
   | { ok: true; kind: 'value'; value: unknown; durationMs: number; logs?: string[] }
   | { ok: true; kind: 'chart'; spec: unknown; durationMs: number; logs?: string[] }
+  | { ok: true; kind: 'widget'; widgets: Array<{ name: string; params: Record<string, unknown> }>; durationMs: number; logs?: string[] }
   | { ok: true; kind: 'empty'; durationMs: number; logs?: string[] }
   | { ok: false; error: string; errorKind?: 'syntax' | 'runtime' | 'timeout' | 'schema'; durationMs: number; logs?: string[] };
 
@@ -1162,7 +1163,22 @@ const NOTEBOOK_STYLES = `
 .nb-root.nb-view-mode .nb-icon-btn.nb-danger,
 .nb-root.nb-view-mode .nb-toggle-src,
 .nb-root.nb-view-mode .nb-toggle-res,
-.nb-root.nb-view-mode .nb-add-cell { display: none !important; }
+.nb-root.nb-view-mode .nb-add-cell,
+.nb-root.nb-view-mode .nbe-cell-actionbar { display: none !important; }
+
+/* Per-cell action bar — slim row of insert/agent shortcuts shown under each cell in edit mode. */
+.nbe-cell-actionbar {
+  display: flex; gap: 4px; align-items: center;
+  margin: 4px 0 14px 0; padding-left: 28px;
+  opacity: 0.55; transition: opacity 120ms ease;
+}
+.nbe-cell-actionbar:hover { opacity: 1; }
+.nb-cellbar-btn {
+  font-size: 11px; padding: 2px 8px; line-height: 1.4;
+  background: transparent; border: 1px dashed var(--color-border, #c8c2b4);
+  color: var(--color-text2, #645d4f); border-radius: 6px; cursor: pointer;
+}
+.nb-cellbar-btn:hover { background: var(--color-bg2, #f4efdf); color: var(--color-text1, #1c1a16); border-style: solid; }
 /* Run controls (.nb-ctl-pill) remain active in view mode — users can execute cells
  * even when the notebook is read-only; only editing the source is locked. */
 .nb-root.nb-view-mode textarea,

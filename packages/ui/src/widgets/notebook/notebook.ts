@@ -10,7 +10,7 @@ import {
   setupDnD, deleteCellWithConfirm, restoreCellFromSnapshot, addCell,
   addImportedCells, registerExecutor, collectDataServers,
   autosize, openShareModal, registerHistoryObserver,
-  renderCellLogs,
+  renderCellLogs, uid, defaultCellContent,
   createPublishControls, autoConnectFrontmatterServers,
   createRuntimeOverlay, effectiveResult, cellRuntimeStatus,
   lastRefreshedAt, bootstrapLiveRefresh, fmtRelTime, preserveScrollAround,
@@ -25,6 +25,9 @@ import { extractCellsFromRecipe, extractCellFromMarkdown } from './resource-extr
 import { mountLeftPane } from './left-pane.js';
 import { highlightCode } from '../../primitives/markdown-renderer.js';
 import { createSqlExecutor } from './executors/sql.js';
+import { runCode } from '@webmcp-auto-ui/sdk';
+import { canvas } from '@webmcp-auto-ui/sdk/canvas';
+import { mountWidget } from '@webmcp-auto-ui/core';
 
 export async function render(container: HTMLElement, data: Record<string, unknown>): Promise<() => void> {
   injectStyles();
@@ -71,11 +74,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
         <div class="nb-history-panel nbe-history-panel"></div>
         <div class="nbe-cells"></div>
         <div class="nbe-footer">
-          <button class="nb-btn nb-add-cell" data-add="md">+ prose</button>
-          <button class="nb-btn nb-add-cell" data-add="sql">+ sql</button>
-          <button class="nb-btn nb-add-cell" data-add="js">+ chart</button>
-          <button class="nb-btn nb-add-cell" data-add-modal="md">+ md</button>
-          <button class="nb-btn nb-add-cell" data-add-modal="recipe">+ recipe</button>
           <span class="nbe-share-btn" title="Share">share</span>
           <span class="nbe-publish-slot"></span>
         </div>
@@ -307,35 +305,35 @@ export async function render(container: HTMLElement, data: Record<string, unknow
 async function jsExecutor(ctx: CellExecContext): Promise<CellResult> {
   const start = Date.now();
   const { cell, scope } = ctx;
-  try {
-    const keys = Object.keys(scope);
-    const values = keys.map((k) => scope[k]);
-    const src = cell.content.trim();
-    const body = /^\s*(return|var|let|const|function|class|if|for|while|\/\/|\/\*)/.test(src)
-      ? src
-      : `return (async () => { return (${src}); })();`;
-    // eslint-disable-next-line no-new-func
-    const fn = new Function(...keys, body);
-    let result = fn(...values);
-    if (result && typeof result.then === 'function') result = await result;
-    const durationMs = Date.now() - start;
-
-    if (result === undefined || result === null) return { ok: true, kind: 'empty', durationMs };
-    if (Array.isArray(result)) {
-      const rows = result.filter((r) => r && typeof r === 'object') as Record<string, unknown>[];
-      const columns = rows.length ? Array.from(new Set(rows.flatMap((r) => Object.keys(r)))) : [];
-      return { ok: true, kind: 'table', rows, columns, rowCount: rows.length, durationMs };
-    }
-    if (result && typeof result === 'object') {
-      const r: any = result;
-      if (r.data || r.marks || r.mark || r.$schema) {
-        return { ok: true, kind: 'chart', spec: result, durationMs };
-      }
-    }
-    return { ok: true, kind: 'value', value: result, durationMs };
-  } catch (err: any) {
-    return { ok: false, error: String(err?.message ?? err), errorKind: 'runtime', durationMs: Date.now() - start };
+  // Accept both `call(...)` (SDK) and `callTool(...)` (legacy / AI-generated)
+  // as aliases. runCode injects `call` and `widget` helpers around an
+  // AsyncFunction body, so top-level `await` and MCP calls work uniformly.
+  const code = cell.content.replace(/\bcallTool\s*\(/g, 'call(');
+  const res = await runCode(code, 'js', canvas.multiClient, scope);
+  const durationMs = Date.now() - start;
+  if (res.status === 'error') {
+    return { ok: false, error: res.error ?? 'error', errorKind: 'runtime', durationMs, logs: res.logs };
   }
+  // Widgets emitted via `widget(name, params)` or via `*_widget_display(...)`
+  // calls — surface them as a dedicated kind so the host can mount them.
+  const widgets = res.widgets ?? (res.widget ? [res.widget] : []);
+  if (widgets.length > 0) {
+    return { ok: true, kind: 'widget', widgets, durationMs, logs: res.logs };
+  }
+  const result = res.output;
+  if (result === undefined || result === null) return { ok: true, kind: 'empty', durationMs, logs: res.logs };
+  if (Array.isArray(result)) {
+    const rows = result.filter((r) => r && typeof r === 'object') as Record<string, unknown>[];
+    const columns = rows.length ? Array.from(new Set(rows.flatMap((r) => Object.keys(r)))) : [];
+    return { ok: true, kind: 'table', rows, columns, rowCount: rows.length, durationMs, logs: res.logs };
+  }
+  if (result && typeof result === 'object') {
+    const r: any = result;
+    if (r.data || r.marks || r.mark || r.$schema) {
+      return { ok: true, kind: 'chart', spec: result, durationMs, logs: res.logs };
+    }
+  }
+  return { ok: true, kind: 'value', value: result, durationMs, logs: res.logs };
 }
 
 // ---------------------------------------------------------------------------
@@ -443,7 +441,56 @@ function renderCell(cell: NotebookCell, state: NotebookState, overlay: RuntimeOv
   (head.querySelector('.nb-toggle-src') as HTMLElement).addEventListener('click', () => { cell.hideSource = !cell.hideSource; rerender(); });
   (head.querySelector('.nb-toggle-res') as HTMLElement).addEventListener('click', () => { cell.hideResult = !cell.hideResult; rerender(); });
 
+  if (state.mode !== 'view') wrap.appendChild(renderCellActionBar(state, cell, rerender));
+
   return wrap;
+}
+
+/**
+ * Per-cell action bar: [+ text] [+ sql] [+ JS] [+ widget] [+ agent]
+ * Inserts a new cell directly after this one, or opens a picker / agent input.
+ * `widget` and `agent` are wired in dedicated handlers below.
+ */
+function renderCellActionBar(state: NotebookState, cell: NotebookCell, rerender: () => void): HTMLElement {
+  const bar = document.createElement('div');
+  bar.className = 'nbe-cell-actionbar';
+  const idx = state.cells.findIndex((c) => c.id === cell.id);
+  const insertAfter = (type: 'md' | 'sql' | 'js', content?: string) => {
+    const newCell: NotebookCell = {
+      id: uid(),
+      type,
+      content: content ?? defaultCellContent(type),
+      hideSource: false, hideResult: false, status: 'stale',
+    };
+    addImportedCells(state, [newCell], idx);
+    rerender();
+  };
+  bar.innerHTML = `
+    <button class="nb-btn nb-cellbar-btn" data-add="md">+ text</button>
+    <button class="nb-btn nb-cellbar-btn" data-add="sql">+ sql</button>
+    <button class="nb-btn nb-cellbar-btn" data-add="js">+ JS</button>
+    <button class="nb-btn nb-cellbar-btn" data-cellbar="widget">+ widget</button>
+    <button class="nb-btn nb-cellbar-btn" data-cellbar="agent">+ agent</button>`;
+  bar.querySelectorAll<HTMLElement>('[data-add]').forEach((btn) => {
+    btn.addEventListener('click', () => insertAfter(btn.dataset.add as 'md' | 'sql' | 'js'));
+  });
+  bar.querySelector<HTMLElement>('[data-cellbar="widget"]')?.addEventListener('click', () => {
+    openWidgetPicker(state, cell, rerender);
+  });
+  bar.querySelector<HTMLElement>('[data-cellbar="agent"]')?.addEventListener('click', () => {
+    toggleAgentBar(bar, state, cell, rerender);
+  });
+  return bar;
+}
+
+// Stubs filled in by tasks 13 (+widget) and 14 (+agent).
+function openWidgetPicker(_state: NotebookState, _cell: NotebookCell, _rerender: () => void): void {
+  // TODO task 13
+  console.warn('[notebook] widget picker not yet wired');
+}
+function toggleAgentBar(_host: HTMLElement, _state: NotebookState, _cell: NotebookCell, _rerender: () => void): void {
+  // TODO task 14
+  console.warn('[notebook] agent bar not yet wired');
 }
 
 // ---------------------------------------------------------------------------
@@ -507,6 +554,21 @@ function renderResultInto(el: HTMLElement, cell: NotebookCell, overlay: RuntimeO
     chart.className = 'nb-chart';
     el.appendChild(chart);
     renderChart(chart, r.spec).catch(() => { /* fallback handled internally */ });
+    return;
+  }
+  if (r.kind === 'widget') {
+    for (const w of r.widgets) {
+      const host = document.createElement('div');
+      host.className = 'nb-widget-host';
+      el.appendChild(host);
+      try { mountWidget(host, w.name, w.params); }
+      catch (err) {
+        const pre = document.createElement('pre');
+        pre.className = 'nbe-result-error';
+        pre.textContent = `widget "${w.name}" failed: ${String((err as { message?: unknown })?.message ?? err)}`;
+        host.appendChild(pre);
+      }
+    }
     return;
   }
   // table — editorial style: serif header row, mono cells, minimal chrome.
