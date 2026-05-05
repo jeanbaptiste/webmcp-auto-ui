@@ -169,7 +169,7 @@
     const tag = `auto-${type}`;
     // Instantiate on first mount. `data` setter is reactive via Svelte 5 custom-element.
     const el = document.createElement(tag) as HTMLElement;
-    (el as unknown as { data: unknown }).data = plainData;
+    (el as unknown as { data: unknown }).data = servers ? { ...plainData, webmcpServers: servers } : plainData;
     const onInteract = (ev: Event) => {
       const ce = ev as CustomEvent<{ action?: string; payload?: unknown }>;
       const action = ce.detail?.action ?? 'interact';
@@ -190,7 +190,7 @@
   $effect(() => {
     const next = plainData;
     if (!isNativeCustomElement || !ceElement) return;
-    (ceElement as unknown as { data: unknown }).data = next;
+    (ceElement as unknown as { data: unknown }).data = servers ? { ...next, webmcpServers: servers } : next;
   });
 
   // ── Vanilla renderer container + lifecycle ────────────
