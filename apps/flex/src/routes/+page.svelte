@@ -1364,9 +1364,9 @@
   {webmcpRecipes}
   onbrowserecipes={() => { settingsOpen = false; recipeBrowserOpen = true; recipeBrowserFilter = ''; }}
   {recipeCountByServer}
-  onrecipeclick={(id) => { settingsOpen = false; recipeBrowserOpen = true; const srv = canvas.dataServers.find(s => s.name === id); recipeBrowserFilter = srv?.serverName ?? srv?.name ?? id; }}
+  onrecipeclick={(id) => { settingsOpen = false; recipeBrowserOpen = true; const srv = canvas.dataServers.find(s => s.name === id); recipeBrowserFilter = sanitizeServerName(srv?.serverName ?? srv?.name ?? id); }}
   {toolCountByServer}
-  ontoolclick={(id) => { settingsOpen = false; toolBrowserOpen = true; const srv = canvas.dataServers.find(s => s.name === id); toolBrowserFilter = srv?.serverName ?? srv?.name ?? id; }}
+  ontoolclick={(id) => { settingsOpen = false; toolBrowserOpen = true; const srv = canvas.dataServers.find(s => s.name === id); toolBrowserFilter = sanitizeServerName(srv?.serverName ?? srv?.name ?? id); }}
   {webmcpRecipeCountByServer}
   {webmcpToolCountByServer}
   onwebmcprecipeclick={(id) => {
