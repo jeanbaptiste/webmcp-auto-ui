@@ -258,13 +258,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     rerender();
   });
 
-  // Visitors (no publish token) can't save edits — hide the mode toggle so
-  // they don't accidentally enter edit mode and discover their changes
-  // can't be persisted. Authors keep the toggle.
-  if (state.mode === 'view' && !state.publishedToken) {
-    const toggle = shell.querySelector('.nb-mode-switch') as HTMLElement | null;
-    if (toggle) toggle.style.display = 'none';
-  }
 
   // Left pane (collapsed by default)
   const pane = mountLeftPane(leftPaneHost, state, collectDataServers(data), {

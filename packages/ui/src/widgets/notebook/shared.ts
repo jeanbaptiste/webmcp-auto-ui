@@ -771,16 +771,25 @@ function publishUrlFor(slug: string): string {
   return `${NB_PUBLISH_HOST}/p/${slug}`;
 }
 
+function publishMode(state: NotebookState): 'publish' | 'save' | 'fork' {
+  if (!state.publishedSlug) return 'publish';
+  return state.publishedToken ? 'save' : 'fork';
+}
+
 function publishBtnLabel(state: NotebookState): string {
-  return state.publishedSlug ? '💾 save' : '📤 publish';
+  const m = publishMode(state);
+  return m === 'save' ? '💾 save' : m === 'fork' ? '🍴 fork' : '📤 publish';
 }
 
 function refreshPublishControls(state: NotebookState, controls: PublishControlsHandles): void {
   const { btn, badge, footer } = controls;
   btn.textContent = publishBtnLabel(state);
-  btn.dataset.state = state.publishedSlug ? 'published' : 'draft';
-  if (state.publishedSlug) {
-    btn.title = `Save changes to ${publishUrlFor(state.publishedSlug)}`;
+  const mode = publishMode(state);
+  btn.dataset.state = mode === 'publish' ? 'draft' : mode === 'fork' ? 'fork' : 'published';
+  if (mode === 'save') {
+    btn.title = `Save changes to ${publishUrlFor(state.publishedSlug!)}`;
+  } else if (mode === 'fork') {
+    btn.title = 'Fork this notebook — publish a copy you own';
   } else {
     btn.title = 'Publish this notebook';
   }
@@ -796,8 +805,18 @@ function refreshPublishControls(state: NotebookState, controls: PublishControlsH
   }
   if (footer) {
     if (state.publishedSlug) {
-      const url = publishUrlFor(state.publishedSlug);
-      footer.innerHTML = `Published at <a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>`;
+      const publicUrl = publishUrlFor(state.publishedSlug);
+      if (state.publishedToken) {
+        // Author view — show the author URL (with ?t=) so the author keeps their
+        // edit access even after the clipboard is overwritten. The public URL is
+        // exposed via a copy button next to it for sharing.
+        const authorUrl = `${publicUrl}?t=${encodeURIComponent(state.publishedToken)}`;
+        footer.innerHTML =
+          `Published at <a href="${escapeHtml(authorUrl)}" target="_blank" rel="noopener">${escapeHtml(publicUrl)}</a>` +
+          ` <button type="button" class="nb-copy-public-link" title="Copy public link (no edit token)" data-public-url="${escapeHtml(publicUrl)}">copy public link</button>`;
+      } else {
+        footer.innerHTML = `Published at <a href="${escapeHtml(publicUrl)}" target="_blank" rel="noopener">${escapeHtml(publicUrl)}</a>`;
+      }
       footer.style.display = '';
     } else {
       footer.innerHTML = '';
@@ -853,20 +872,24 @@ export function createPublishControls(state: NotebookState, opts: PublishControl
 
   const onClick = async () => {
     const prevLabel = btn.textContent ?? '';
+    const mode = publishMode(state);
     btn.disabled = true;
-    btn.textContent = state.publishedSlug ? '… saving' : '… publishing';
+    btn.textContent = mode === 'save' ? '… saving' : mode === 'fork' ? '… forking' : '… publishing';
     try {
       // HyperSkill standalone markdown — frontmatter (title/description/servers)
       // + body with fenced cells. Re-parsable via parseFrontmatter + parseBody.
       const markdown = serializeToMarkdown(state);
+      // Fork = publish a fresh copy (no slug/token) — the server allocates a new
+      // slug and token, and the visitor becomes the author of the copy.
+      const payload: Record<string, unknown> = { markdown };
+      if (mode === 'save') {
+        payload.slug = state.publishedSlug;
+        payload.token = state.publishedToken;
+      }
       const res = await fetch(`${NB_PUBLISH_HOST}/api/publish`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          markdown,
-          slug: state.publishedSlug,
-          token: state.publishedToken,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const reply: any = await res.json();
@@ -879,15 +902,20 @@ export function createPublishControls(state: NotebookState, opts: PublishControl
       // URL). Public visitors share the bare URL without ?t.
       const authorUrl = `${baseUrl}?t=${encodeURIComponent(String(reply.token))}`;
       try { await navigator.clipboard?.writeText?.(authorUrl); } catch { /* ignore */ }
+      // On fork, also rewrite the browser URL so the visitor sees the new slug
+      // and so a refresh keeps them as author (token persisted in localStorage).
+      if (mode === 'fork' && typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem(`nb-token-${reply.slug}`, String(reply.token));
+        } catch {}
+        try { window.history.replaceState({}, '', baseUrl); } catch {}
+      }
       const updated = Boolean(reply.updated);
-      toast(
-        updated
-          ? `saved · ${baseUrl.replace(/^https?:\/\//, '')} (author link copied)`
-          : `published · ${baseUrl.replace(/^https?:\/\//, '')} (author link copied)`
-      );
+      const action = mode === 'fork' ? 'forked' : updated ? 'saved' : 'published';
+      toast(`${action} · ${baseUrl.replace(/^https?:\/\//, '')} (author link copied)`);
       opts.onPublished?.({ slug: String(reply.slug), url: baseUrl, updated });
     } catch (err: any) {
-      toast(`publish failed · ${String(err?.message ?? err)}`, true);
+      toast(`${mode} failed · ${String(err?.message ?? err)}`, true);
       btn.textContent = prevLabel;
     } finally {
       btn.disabled = false;
@@ -897,8 +925,26 @@ export function createPublishControls(state: NotebookState, opts: PublishControl
 
   btn.addEventListener('click', onClick);
 
+  // Delegated handler for the "copy public link" button rendered in the footer
+  // when the author has a token. We can't bind directly because the footer
+  // innerHTML is rebuilt by refreshPublishControls.
+  const onFooterClick = (e: Event) => {
+    const target = e.target as HTMLElement | null;
+    const copyBtn = target?.closest('.nb-copy-public-link') as HTMLElement | null;
+    if (!copyBtn) return;
+    e.preventDefault();
+    const url = copyBtn.dataset.publicUrl ?? '';
+    if (!url) return;
+    void (async () => {
+      try { await navigator.clipboard?.writeText?.(url); toast(`public link copied · ${url.replace(/^https?:\/\//, '')}`); }
+      catch { toast('copy failed', true); }
+    })();
+  };
+  if (footer) footer.addEventListener('click', onFooterClick);
+
   return () => {
     btn.removeEventListener('click', onClick);
+    if (footer) footer.removeEventListener('click', onFooterClick);
     btn.parentNode?.removeChild(btn);
     badge?.parentNode?.removeChild(badge);
     footer?.parentNode?.removeChild(footer);
