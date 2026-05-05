@@ -232,7 +232,7 @@
     let cancelled = false;
 
     try {
-      const result = renderer(container, untrack(() => plainData));
+      const result = renderer(container, untrack(() => servers ? { ...plainData, webmcpServers: servers } : plainData));
       if (result && typeof (result as Promise<unknown>).then === 'function') {
         (result as Promise<void | (() => void)>).then(
           (c) => {
@@ -279,7 +279,7 @@
     runCurrentCleanup();
     container.innerHTML = '';
     try {
-      const result = vanillaRenderer(container, data);
+      const result = vanillaRenderer(container, servers ? { ...data, webmcpServers: servers } : data);
       if (result && typeof (result as Promise<unknown>).then === 'function') {
         (result as Promise<void | (() => void)>).then(
           (c) => { currentCleanup = c ?? undefined; },
