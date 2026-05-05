@@ -137,6 +137,12 @@
   let activeServers = $derived<WebMcpServer[]>(
     SERVER_REGISTRY.filter(s => enabledServers.has(s.id)).map(s => s.server)
   );
+  // Mirror the local Set into canvas.enabledServerIds so consumers reading the
+  // shared store (notebook publish via buildFrontmatter, HS export, …) see the
+  // current selection without needing a manual sync at each call site.
+  $effect(() => {
+    canvas.setEnabledServers([...enabledServers]);
+  });
 
   // ── Nano-RAG (experimental, off by default) ──────────────────────
   let contextRAGEnabled = $state(false);
