@@ -757,7 +757,10 @@ export function collectWebmcpServers(
       label: s.name,
       kind: 'webmcp' as const,
       recipes: (layer.recipes ?? []).map((r: any) => ({ name: r.name, description: r.description, body: r.body })),
-      tools: (layer.tools ?? []).map((t: any) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })),
+      // Tools of bundled WebMCP servers (search_recipes, widget_display, canvas, …)
+      // are agent-facing primitives, not callable from a JS cell via callTool().
+      // Hide them from the Resources pane to avoid generating broken cells.
+      tools: [],
     };
   });
 }

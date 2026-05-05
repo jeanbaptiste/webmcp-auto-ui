@@ -4,7 +4,7 @@
 // Consumed by import-modals.ts and left-pane.ts.
 // ---------------------------------------------------------------------------
 
-import { parseBody } from '@webmcp-auto-ui/sdk';
+import { parseBody, parseWidgetDisplayCall } from '@webmcp-auto-ui/sdk';
 import { uid, defaultCellContent } from './shared.js';
 import type { NotebookCell, CellType } from './shared.js';
 
@@ -78,6 +78,21 @@ export function extractCellFromFence(lang: string, content: string): NotebookCel
       const sql = extractSqlFromLooseObject(argsRaw);
       if (sql != null) {
         return { id: uid(), type: 'sql', content: sql.trim(), hideSource: false, hideResult: false };
+      }
+    }
+    // widget_display is a local WebMCP tool (autoui), not a remote MCP tool —
+    // route it to the JS sandbox `widget()` helper which captures and renders
+    // inline. callTool() would fail with "No MCP server exposes tool".
+    if (/^(?:[A-Za-z_]\w*_)?widget_display$/.test(name)) {
+      const parsed = parseWidgetDisplayCall(trimmed);
+      if (parsed) {
+        const paramsLiteral = JSON.stringify(parsed.params, null, 2);
+        return {
+          id: uid(),
+          type: 'js',
+          content: `return widget('${parsed.name}', ${paramsLiteral})`,
+          hideSource: false, hideResult: false,
+        };
       }
     }
     return {
