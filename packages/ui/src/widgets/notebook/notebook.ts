@@ -8,7 +8,7 @@
 import {
   createState, injectStyles, mountRunControls, mountHistoryPanel,
   setupDnD, deleteCellWithConfirm, restoreCellFromSnapshot, addCell,
-  addImportedCells, registerExecutor, collectDataServers,
+  addImportedCells, registerExecutor, collectDataServers, collectWebmcpServers,
   autosize, openShareModal, registerHistoryObserver,
   renderCellLogs, uid, defaultCellContent,
   createPublishControls, autoConnectFrontmatterServers,
@@ -259,8 +259,13 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   });
 
 
-  // Left pane (collapsed by default)
-  const pane = mountLeftPane(leftPaneHost, state, collectDataServers(data), {
+  // Left pane (collapsed by default). Lists remote data servers AND bundled
+  // WebMCP servers (autoui, d3, …) in two distinct groups.
+  const collectAll = () => [
+    ...collectDataServers(data),
+    ...collectWebmcpServers(state.webmcpServers),
+  ];
+  const pane = mountLeftPane(leftPaneHost, state, collectAll(), {
     onInjectCells: (cells) => {
       addImportedCells(state, cells, activeCellIdx());
       rerender();
@@ -269,14 +274,14 @@ export async function render(container: HTMLElement, data: Record<string, unknow
 
   // Auto-connect data servers declared in the recipe frontmatter (data.servers).
   // The notebook reads MCP state passively from canvas.dataServers.
-  autoConnectFrontmatterServers(data, () => pane.setServers(collectDataServers(data)));
+  autoConnectFrontmatterServers(data, () => pane.setServers(collectAll()));
 
   // Keep pane servers in sync with canvas changes
   let canvasUnsub: (() => void) | null = null;
   try {
     const canvasAny: any = (globalThis as any).__canvasVanilla || (globalThis as any).canvasVanilla;
     if (canvasAny?.subscribe) {
-      canvasUnsub = canvasAny.subscribe(() => pane.setServers(collectDataServers(data)));
+      canvasUnsub = canvasAny.subscribe(() => pane.setServers(collectAll()));
     }
   } catch { /* ignore */ }
 

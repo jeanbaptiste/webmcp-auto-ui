@@ -67,7 +67,16 @@ export function mountLeftPane(
       serversEl.innerHTML = '<div class="nb-lp-empty">No servers connected.</div>';
       return;
     }
+    let lastGroup: 'data' | 'webmcp' | null = null;
     for (const srv of servers) {
+      const group: 'data' | 'webmcp' = srv.kind === 'webmcp' ? 'webmcp' : 'data';
+      if (group !== lastGroup) {
+        const header = document.createElement('div');
+        header.className = 'nb-lp-group-header';
+        header.textContent = group === 'webmcp' ? 'Widgets' : 'Data';
+        serversEl.appendChild(header);
+        lastGroup = group;
+      }
       const section = document.createElement('section');
       section.className = 'nb-lp-srv';
       section.innerHTML = `
@@ -131,6 +140,10 @@ export function mountLeftPane(
     const key = srv.name + ':' + r.name;
     if (!imported.body && recipeBodyCache.has(key)) {
       imported.body = recipeBodyCache.get(key);
+    }
+    // Bundled WebMCP servers expose recipe bodies inline — no MCP roundtrip.
+    if (!imported.body && srv.kind === 'webmcp') {
+      imported.body = `> ⚠ Recipe \`${r.name}\` (server \`${srv.name}\`) has no inline body.`;
     }
     if (!imported.body) {
       try {
@@ -245,6 +258,13 @@ function injectLeftPaneStyles() {
     .nb-lp-title { flex: 1; font-weight: 600; font-size: 12px; }
     .nb-lp-close { background: none; border: none; cursor: pointer; font-size: 16px; color: var(--color-text2, #666); }
     .nb-lp-servers { overflow-y: auto; padding: 8px 10px 12px; flex: 1; }
+    .nb-lp-group-header {
+      font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--color-text2, #888); padding: 6px 2px 4px;
+      border-bottom: 1px dashed var(--color-border, #e4e4e7);
+      margin-bottom: 6px;
+    }
+    .nb-lp-group-header:not(:first-child) { margin-top: 14px; }
     .nb-lp-srv { margin-bottom: 10px; }
     .nb-lp-srv-head {
       display: flex; align-items: center; gap: 6px;

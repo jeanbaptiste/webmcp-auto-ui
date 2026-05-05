@@ -689,7 +689,8 @@ export interface DataServerDescriptor {
   /** Real server name from MCP handshake (initResult.serverInfo.name, aliased). */
   serverName?: string;
   url?: string;
-  kind?: string;
+  /** 'data' = remote MCP via canvas.dataServers, 'webmcp' = bundled JS server. */
+  kind?: 'data' | 'webmcp' | string;
   tools?: DataServerTool[];
   recipes?: DataServerRecipe[];
 }
@@ -738,6 +739,27 @@ export function collectDataServers(data: Record<string, unknown>): DataServerDes
       recipes: Array.isArray(s.recipes) ? s.recipes : [],
       tools: Array.isArray(s.tools) ? s.tools : [],
     }));
+}
+
+/**
+ * Project bundled WebMCP server instances into the same descriptor shape used
+ * by the left pane, so they render alongside remote data servers in a separate
+ * "Widgets" group. Recipe bodies are inlined (no get_recipe roundtrip needed).
+ */
+export function collectWebmcpServers(
+  servers: import('@webmcp-auto-ui/core').WebMcpServer[] | undefined,
+): DataServerDescriptor[] {
+  if (!servers?.length) return [];
+  return servers.map((s) => {
+    const layer = (() => { try { return s.layer(); } catch { return { recipes: [], tools: [] }; } })();
+    return {
+      name: s.name,
+      label: s.name,
+      kind: 'webmcp' as const,
+      recipes: (layer.recipes ?? []).map((r: any) => ({ name: r.name, description: r.description, body: r.body })),
+      tools: (layer.tools ?? []).map((t: any) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })),
+    };
+  });
 }
 
 
