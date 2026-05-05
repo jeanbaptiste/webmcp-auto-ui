@@ -254,7 +254,13 @@
     component?: string,
   ): { id: string } | undefined {
     ensureServerEnabled(server);
-    return flexGrid?.addBlock(type, data, server, component);
+    // Notebook widgets need to know the host's base path so their internal
+    // +agent button POSTs to /flex/api/chat instead of /api/chat (which would
+    // hit notebook-viewer's nginx route on this domain — 405).
+    const enrichedData = type === 'notebook' && !data.chatApiBase
+      ? { ...data, chatApiBase: `${base}/api/chat` }
+      : data;
+    return flexGrid?.addBlock(type, enrichedData, server, component);
   }
 
   $effect(() => {

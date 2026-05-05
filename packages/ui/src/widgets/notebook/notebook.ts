@@ -42,7 +42,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     publishedSlug: (data as any).publishedSlug,
     publishedToken: (data as any).publishedToken,
     webmcpServers: (data as any).webmcpServers,
-  });
+    chatApiBase: (data as any).chatApiBase,
+  } as any);
 
   // Live mode runtime overlay (created lazily). Never mutates state.
   let overlay: RuntimeOverlay | null = null;
@@ -630,7 +631,10 @@ async function runAgentForCell(
   try {
     // Lazy import to keep notebook bundle slim when agent is unused.
     const { RemoteLLMProvider, runAgentLoop } = await import('@webmcp-auto-ui/agent');
-    const provider = new RemoteLLMProvider({ proxyUrl: '/api/chat', model: 'haiku' });
+    // Host injects chatApiBase via data (flex serves under /flex, notebook-viewer
+    // at root). Default '/api/chat' kept for hosts mounting at the root.
+    const proxyUrl = (state as { chatApiBase?: string }).chatApiBase ?? '/api/chat';
+    const provider = new RemoteLLMProvider({ proxyUrl, model: 'haiku' });
     const layer = buildAgentLayerForCell(state, cell, rerender);
     const systemPrompt = buildAgentSystemPromptForCell(state, cell);
     await runAgentLoop(prompt, {

@@ -76,6 +76,10 @@ export interface NotebookState {
    *  `data.webmcpServers` at mount; used by the widget picker (+widget) and as
    *  fallback for `mountWidget` when a custom-element tag isn't defined. */
   webmcpServers?: import('@webmcp-auto-ui/core').WebMcpServer[];
+  /** Host-supplied LLM proxy endpoint. The notebook agent posts to this URL.
+   *  Defaults to '/api/chat' when absent — flex sets '/flex/api/chat' to
+   *  match its base path; notebook-viewer keeps the default. */
+  chatApiBase?: string;
 }
 
 export interface HistoryEntry {
@@ -195,6 +199,7 @@ export function createState(initial?: Partial<NotebookState>): NotebookState {
     publishedSlug: initial?.publishedSlug,
     publishedToken: initial?.publishedToken,
     webmcpServers: initial?.webmcpServers,
+    chatApiBase: initial?.chatApiBase,
   };
 }
 
