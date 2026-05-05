@@ -71,7 +71,7 @@ function buildFrontmatter(state: NotebookState): string {
   const title = (state.title || '').trim();
   const description = extractDescription(state);
   const servers = collectEnabledServers();
-  const webmcpServers = collectEnabledWebmcpServers(state);
+  const webmcpServers = collectEnabledWebmcpServers();
   if (!title && !description && servers.length === 0 && webmcpServers.length === 0) return '';
 
   const lines: string[] = ['---'];
@@ -93,15 +93,13 @@ function buildFrontmatter(state: NotebookState): string {
 }
 
 /**
- * Registry ids (e.g. 'autoui', 'd3', 'observable-plot') of bundled WebMCP
- * servers active in this notebook. Read just-in-time from a host-supplied
- * getter on `state` — bypasses canvas to avoid notify cascades on the host's
- * left pane. The viewer re-instantiates servers from @webmcp-auto-ui/servers
- * on load.
+ * Read canvas.enabledServerIds — the registry ids (e.g. 'autoui', 'd3',
+ * 'observable-plot') of bundled WebMCP servers active in this notebook.
+ * The viewer re-instantiates them from @webmcp-auto-ui/servers on load.
  */
-function collectEnabledWebmcpServers(state: NotebookState): string[] {
+function collectEnabledWebmcpServers(): string[] {
   try {
-    const ids = state.enabledServerIds?.() ?? [];
+    const ids = (canvasVanilla as { enabledServerIds?: string[] }).enabledServerIds ?? [];
     return ids.filter((id): id is string => typeof id === 'string' && id.length > 0);
   } catch {
     return [];

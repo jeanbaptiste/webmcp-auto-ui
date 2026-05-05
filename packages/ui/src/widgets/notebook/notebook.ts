@@ -43,7 +43,6 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     publishedToken: (data as any).publishedToken,
     webmcpServers: (data as any).webmcpServers,
     chatApiBase: (data as any).chatApiBase,
-    enabledServerIds: (data as any).enabledServerIds,
   } as any);
 
   // Live mode runtime overlay (created lazily). Never mutates state.

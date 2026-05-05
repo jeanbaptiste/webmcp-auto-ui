@@ -137,6 +137,12 @@
   let activeServers = $derived<WebMcpServer[]>(
     SERVER_REGISTRY.filter(s => enabledServers.has(s.id)).map(s => s.server)
   );
+  // Mirror the local Set into canvas.enabledServerIds so consumers reading the
+  // shared store (notebook publish via buildFrontmatter, HS export, …) see the
+  // current selection without needing a manual sync at each call site.
+  $effect(() => {
+    canvas.setEnabledServers([...enabledServers]);
+  });
 
   // ── Nano-RAG (experimental, off by default) ──────────────────────
   let contextRAGEnabled = $state(false);
@@ -251,12 +257,8 @@
     // Notebook widgets need to know the host's base path so their internal
     // +agent button POSTs to /flex/api/chat instead of /api/chat (which would
     // hit notebook-viewer's nginx route on this domain — 405).
-    const enrichedData = type === 'notebook'
-      ? {
-          ...data,
-          chatApiBase: data.chatApiBase ?? `${base}/api/chat`,
-          enabledServerIds: () => [...enabledServers],
-        }
+    const enrichedData = type === 'notebook' && !data.chatApiBase
+      ? { ...data, chatApiBase: `${base}/api/chat` }
       : data;
     return flexGrid?.addBlock(type, enrichedData, server, component);
   }
