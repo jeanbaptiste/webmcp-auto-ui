@@ -602,8 +602,12 @@ function toggleAgentBar(host: HTMLElement, state: NotebookState, cell: NotebookC
   input.addEventListener('widget:interact', (e: Event) => {
     const detail = (e as CustomEvent).detail ?? {};
     const action = (detail as { action?: string }).action;
-    if (action === 'stop') { aborter?.abort(); return; }
+    // Prevent the event bubbling to the host (flex/etc.) — otherwise their
+    // own widget-interaction handler would launch a SECOND, unconstrained
+    // agent loop that renders widgets outside the notebook (canvas blocks).
+    if (action === 'stop') { e.stopPropagation(); aborter?.abort(); return; }
     if (action !== 'submit') return;
+    e.stopPropagation();
     const text = ((detail as { payload?: { text?: string } }).payload?.text ?? '').trim();
     if (!text) return;
     void runAgentForCell(text, state, cell, rerender, status, input, () => aborter ??= new AbortController());
