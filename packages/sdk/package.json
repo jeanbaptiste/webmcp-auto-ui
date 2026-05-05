@@ -8,14 +8,17 @@
   "main": "./src/index.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "svelte": "./src/index.ts",
       "import": "./src/index.ts"
     },
     "./canvas": {
+      "types": "./dist/canvas.d.ts",
       "svelte": "./src/canvas.ts",
       "import": "./src/canvas.ts"
     },
     "./canvas-vanilla": {
+      "types": "./dist/canvas-vanilla.d.ts",
       "import": "./src/canvas-vanilla.ts"
     }
   },
