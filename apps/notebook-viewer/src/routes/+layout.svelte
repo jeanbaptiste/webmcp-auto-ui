@@ -3,6 +3,9 @@
   import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
   import { HeaderControls } from '@webmcp-auto-ui/ui';
+  // Side-effect import: register <auto-chat-input> so the per-cell agent bar
+  // (built via innerHTML in the notebook widget) finds the custom element.
+  import '@webmcp-auto-ui/ui/widgets/rich/chat-input.svelte';
   import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
   import {
     initializeWebMCPPolyfill,

@@ -24,6 +24,8 @@ export interface NotebookFrontmatter {
   title?: string;
   description?: string;
   servers?: Array<{ name: string; url: string }>;
+  /** Bundled WebMCP server ids (registry ids: 'autoui', 'd3', 'observable-plot', etc.). */
+  webmcp_servers?: string[];
   [key: string]: unknown;
 }
 
@@ -56,6 +58,11 @@ function normalizeFrontmatterServers(
     .filter((s) => s.name && s.url);
 }
 
+function normalizeWebmcpServers(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((s): s is string => typeof s === 'string' && s.length > 0);
+}
+
 export function parseNotebookMarkdown(markdown: string): {
   frontmatter: NotebookFrontmatter;
   body: string;
@@ -64,6 +71,7 @@ export function parseNotebookMarkdown(markdown: string): {
   const { frontmatter, body } = parseFrontmatter(markdown);
   const fm: NotebookFrontmatter = { ...(frontmatter as NotebookFrontmatter) };
   fm.servers = normalizeFrontmatterServers((frontmatter as { servers?: unknown }).servers);
+  fm.webmcp_servers = normalizeWebmcpServers((frontmatter as { webmcp_servers?: unknown }).webmcp_servers);
   const segments = parseBody(body);
   return { frontmatter: fm, body, segments };
 }

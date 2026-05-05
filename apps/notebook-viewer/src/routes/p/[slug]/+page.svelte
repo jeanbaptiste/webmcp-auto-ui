@@ -15,6 +15,8 @@
   import { extractCellsFromRecipe } from '@webmcp-auto-ui/ui';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
   import { runCode } from '@webmcp-auto-ui/sdk';
+  import { WEBMCP_SERVER_REGISTRY } from '@webmcp-auto-ui/servers';
+  import type { WebMcpServer } from '@webmcp-auto-ui/core';
   import {
     loadFromSlug,
     extractMeta,
@@ -83,14 +85,33 @@
     try { return window.localStorage.getItem(key) ?? ''; } catch { return ''; }
   }
 
+  /**
+   * Re-instantiate the bundled WebMCP servers listed in frontmatter so the
+   * widget picker / agent / cell executors can resolve their recipes. Bundled
+   * servers are JS modules — no network. They expose `widget_display` + a
+   * recipes catalogue. Mirrors flex's SERVER_REGISTRY filter.
+   */
+  function activateWebmcpServers(ids: readonly string[]): WebMcpServer[] {
+    if (!ids?.length) return [];
+    const enabled = new Set(ids);
+    const active: WebMcpServer[] = [];
+    for (const entry of WEBMCP_SERVER_REGISTRY) {
+      if (enabled.has(entry.id)) active.push(entry.server);
+    }
+    canvas.setEnabledServers(ids.slice());
+    return active;
+  }
+
   function buildWidgetData(payload: NotebookPayload, meta: NotebookMeta, slug: string) {
     const cells = extractCellsFromRecipe(payload.body);
     const servers = (payload.frontmatter.servers ?? []).map((s) => ({
       name: s.name,
       url: s.url,
     }));
+    const webmcpServers = activateWebmcpServers(payload.frontmatter.webmcp_servers ?? []);
     const publishedToken = hydrateToken(slug);
     return {
+      webmcpServers,
       id: 'nb-' + slug,
       title: meta.title,
       mode: 'view',

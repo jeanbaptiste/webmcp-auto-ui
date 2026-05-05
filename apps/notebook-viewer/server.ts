@@ -176,6 +176,43 @@ function publishedFileFor(slug: string): string {
   return path.join(PUBLISHED_DIR, `${slug}.json`);
 }
 
+/**
+ * Proxy POST /api/chat → Anthropic Messages API. Mirrors the shape used by
+ * apps/flex (same body, same X-Model header, same __apiKey escape hatch).
+ * The actual key lives in env LLM_API_KEY — never in the browser.
+ */
+async function handleChat(req: http.IncomingMessage, res: http.ServerResponse) {
+  const buf = await readBody(req);
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(buf.toString('utf8'));
+  } catch {
+    return jsonResponse(res, 400, { error: 'invalid json' });
+  }
+  const apiKey = (body.__apiKey as string | undefined) || process.env.LLM_API_KEY || '';
+  delete body.__apiKey;
+  if (!apiKey) return jsonResponse(res, 500, { error: 'LLM_API_KEY not configured' });
+  const model = (req.headers['x-model'] as string | undefined) ?? 'claude-haiku-4-5-20251001';
+  let upstream: Response;
+  try {
+    upstream = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-2024-07-31',
+      },
+      body: JSON.stringify({ ...body, model }),
+    });
+  } catch (err) {
+    return jsonResponse(res, 502, { error: String((err as { message?: unknown })?.message ?? err) });
+  }
+  const text = await upstream.text();
+  res.writeHead(upstream.status, { 'Content-Type': 'application/json', ...corsHeaders() });
+  res.end(text);
+}
+
 async function handlePublish(req: http.IncomingMessage, res: http.ServerResponse) {
   const body = await readBody(req);
   let parsed: any;
@@ -514,6 +551,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    if (urlPath === '/api/chat' && method === 'POST') {
+      await handleChat(req, res);
+      log(method, urlPath, res.statusCode, Date.now() - started);
+      return;
+    }
+
     if (urlPath === '/api/health' && method === 'GET') {
       jsonResponse(res, 200, { ok: true, uptime: Math.floor((Date.now() - START) / 1000) });
       log(method, urlPath, 200, Date.now() - started);

@@ -41,6 +41,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     autoRun: (data as any).autoRun === true,
     publishedSlug: (data as any).publishedSlug,
     publishedToken: (data as any).publishedToken,
+    webmcpServers: (data as any).webmcpServers,
   });
 
   // Live mode runtime overlay (created lazily). Never mutates state.
@@ -60,8 +61,8 @@ export async function render(container: HTMLElement, data: Record<string, unknow
       <div class="nbe-shell">
         <div class="nbe-kicker">
           <div class="nb-mode-switch" style="margin-left:auto;">
-            <button class="nb-mode-edit nb-on">edit</button>
-            <button class="nb-mode-view">view</button>
+            <button class="nb-mode-edit ${state.mode === 'edit' ? 'nb-on' : ''}">edit</button>
+            <button class="nb-mode-view ${state.mode === 'view' ? 'nb-on' : ''}">view</button>
           </div>
           <button class="nb-btn nbe-history-btn">⟲ history</button>
           <span class="nbe-publish-badge-slot"></span>
@@ -257,6 +258,14 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     rerender();
   });
 
+  // Visitors (no publish token) can't save edits — hide the mode toggle so
+  // they don't accidentally enter edit mode and discover their changes
+  // can't be persisted. Authors keep the toggle.
+  if (state.mode === 'view' && !state.publishedToken) {
+    const toggle = shell.querySelector('.nb-mode-switch') as HTMLElement | null;
+    if (toggle) toggle.style.display = 'none';
+  }
+
   // Left pane (collapsed by default)
   const pane = mountLeftPane(leftPaneHost, state, collectDataServers(data), {
     onInjectCells: (cells) => {
@@ -432,7 +441,7 @@ function renderCell(cell: NotebookCell, state: NotebookState, overlay: RuntimeOv
   if (!cell.hideResult) {
     const res = document.createElement('div');
     res.className = 'nbe-result';
-    renderResultInto(res, cell, overlay);
+    renderResultInto(res, cell, overlay, state);
     codeCell.appendChild(res);
   }
 
@@ -483,14 +492,273 @@ function renderCellActionBar(state: NotebookState, cell: NotebookCell, rerender:
   return bar;
 }
 
-// Stubs filled in by tasks 13 (+widget) and 14 (+agent).
-function openWidgetPicker(_state: NotebookState, _cell: NotebookCell, _rerender: () => void): void {
-  // TODO task 13
-  console.warn('[notebook] widget picker not yet wired');
+/**
+ * +widget picker — lists the recipes exposed by every active WebMCP server
+ * (state.webmcpServers, populated from frontmatter.webmcp_servers). On pick,
+ * inserts a JS cell after the current one with a template that reads the
+ * upstream cell's varname (default 'rows') and renders the widget.
+ */
+function openWidgetPicker(state: NotebookState, cell: NotebookCell, rerender: () => void): void {
+  const servers = state.webmcpServers ?? [];
+  type Item = { server: string; name: string; description?: string };
+  const items: Item[] = [];
+  for (const s of servers) {
+    const recipes = s.layer().recipes ?? [];
+    for (const r of recipes) items.push({ server: s.name, name: r.name, description: r.description });
+  }
+  if (items.length === 0) {
+    toastNoServers();
+    return;
+  }
+  const upstreamVar = findUpstreamVarname(state, cell);
+  const overlay = document.createElement('div');
+  overlay.className = 'nbe-picker-overlay';
+  overlay.innerHTML = `
+    <div class="nbe-picker">
+      <header>
+        <input class="nbe-picker-q" placeholder="filter widgets…" autofocus />
+        <button class="nbe-picker-close" type="button">✕</button>
+      </header>
+      <ul class="nbe-picker-list"></ul>
+    </div>`;
+  document.body.appendChild(overlay);
+  const close = () => { try { overlay.remove(); } catch { /* ignore */ } };
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  (overlay.querySelector('.nbe-picker-close') as HTMLElement).addEventListener('click', close);
+  const list = overlay.querySelector('.nbe-picker-list') as HTMLElement;
+  const q = overlay.querySelector('.nbe-picker-q') as HTMLInputElement;
+  const render = (filter = '') => {
+    const f = filter.toLowerCase().trim();
+    list.innerHTML = items
+      .filter((i) => !f || i.name.toLowerCase().includes(f) || (i.description ?? '').toLowerCase().includes(f) || i.server.toLowerCase().includes(f))
+      .map((i) => `<li data-name="${escapeAttr(i.name)}" data-server="${escapeAttr(i.server)}">
+        <span class="nbe-picker-name">${escapeHtml(i.name)}</span>
+        <span class="nbe-picker-server">${escapeHtml(i.server)}</span>
+        <span class="nbe-picker-desc">${escapeHtml(i.description ?? '')}</span>
+      </li>`).join('');
+  };
+  render();
+  q.addEventListener('input', () => render(q.value));
+  list.addEventListener('click', (e) => {
+    const li = (e.target as HTMLElement).closest('li[data-name]') as HTMLElement | null;
+    if (!li) return;
+    const name = li.dataset.name as string;
+    const idx = state.cells.findIndex((c) => c.id === cell.id);
+    const template = upstreamVar
+      ? `return widget('${name}', { rows: ${upstreamVar} })`
+      : `return widget('${name}', {})`;
+    const newCell: NotebookCell = {
+      id: uid(), type: 'js',
+      content: template,
+      hideSource: false, hideResult: false, status: 'stale',
+    };
+    addImportedCells(state, [newCell], idx);
+    close();
+    rerender();
+  });
+  function toastNoServers() {
+    const t = document.createElement('div');
+    t.className = 'nbe-toast nbe-toast-error nbe-toast-in';
+    t.textContent = 'No WebMCP server is enabled — add some in flex first (autoui, d3, observable-plot…)';
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
+  }
 }
-function toggleAgentBar(_host: HTMLElement, _state: NotebookState, _cell: NotebookCell, _rerender: () => void): void {
-  // TODO task 14
-  console.warn('[notebook] agent bar not yet wired');
+
+/**
+ * Walk back from `cell` to find the nearest cell with a varname (typically a
+ * SQL cell). The widget template will bind to that variable so the chosen
+ * widget visualises the upstream cell's output. Returns null if none.
+ */
+function findUpstreamVarname(state: NotebookState, cell: NotebookCell): string | null {
+  const idx = state.cells.findIndex((c) => c.id === cell.id);
+  for (let i = idx; i >= 0; i--) {
+    const c = state.cells[i];
+    if (c?.varname) return c.varname;
+  }
+  return null;
+}
+
+/**
+ * +agent bar — toggled inline below the cell action bar. The user types a
+ * prompt in <auto-chat-input>, runAgentLoop is invoked with a focused tool
+ * layer that lets the LLM:
+ *   - read the current cell + scope
+ *   - rewrite the current cell content
+ *   - insert a new cell after it (text / sql / js / widget)
+ * Every mutation logs into state.history so the user can ⟲ revert.
+ * Provider: RemoteLLMProvider via /api/chat (proxy reads env LLM_API_KEY).
+ */
+function toggleAgentBar(host: HTMLElement, state: NotebookState, cell: NotebookCell, rerender: () => void): void {
+  const existing = host.parentElement?.querySelector(':scope > .nbe-agent-bar');
+  if (existing) { existing.remove(); return; }
+  const bar = document.createElement('div');
+  bar.className = 'nbe-agent-bar';
+  bar.innerHTML = `
+    <auto-chat-input placeholder="ask agent — e.g. 'filter rows where votes > 50' / 'add a sankey of this'"></auto-chat-input>
+    <div class="nbe-agent-status" hidden></div>`;
+  host.insertAdjacentElement('afterend', bar);
+  const input = bar.querySelector('auto-chat-input') as HTMLElement & { disabled?: boolean };
+  const status = bar.querySelector('.nbe-agent-status') as HTMLElement;
+  let aborter: AbortController | null = null;
+  input.addEventListener('widget:interact', (e: Event) => {
+    const detail = (e as CustomEvent).detail ?? {};
+    const action = (detail as { action?: string }).action;
+    if (action === 'stop') { aborter?.abort(); return; }
+    if (action !== 'submit') return;
+    const text = ((detail as { payload?: { text?: string } }).payload?.text ?? '').trim();
+    if (!text) return;
+    void runAgentForCell(text, state, cell, rerender, status, input, () => aborter ??= new AbortController());
+  });
+}
+
+async function runAgentForCell(
+  prompt: string,
+  state: NotebookState,
+  cell: NotebookCell,
+  rerender: () => void,
+  status: HTMLElement,
+  input: HTMLElement & { disabled?: boolean },
+  getAborter: () => AbortController,
+): Promise<void> {
+  status.hidden = false;
+  status.textContent = '…';
+  input.disabled = true;
+  const aborter = getAborter();
+  try {
+    // Lazy import to keep notebook bundle slim when agent is unused.
+    const { RemoteLLMProvider, runAgentLoop } = await import('@webmcp-auto-ui/agent');
+    const provider = new RemoteLLMProvider({ proxyUrl: '/api/chat', model: 'haiku' });
+    const layer = buildAgentLayerForCell(state, cell, rerender);
+    const systemPrompt = buildAgentSystemPromptForCell(state, cell);
+    await runAgentLoop(prompt, {
+      provider,
+      layers: [layer],
+      systemPrompt,
+      maxIterations: 6,
+      signal: aborter.signal,
+      callbacks: {
+        onToolCall: (name: string) => { status.textContent = `· ${name}…`; },
+      },
+    });
+    status.textContent = '✓ done';
+  } catch (err) {
+    status.textContent = 'error: ' + String((err as { message?: unknown })?.message ?? err);
+  } finally {
+    input.disabled = false;
+  }
+}
+
+/**
+ * Build the WebMCP tool layer the agent sees. Tools mutate state via the
+ * shared helpers (addImportedCells, logHistory) so revert via ⟲ history works
+ * exactly like a manual edit.
+ */
+function buildAgentLayerForCell(state: NotebookState, cell: NotebookCell, rerender: () => void) {
+  const idx = () => state.cells.findIndex((c) => c.id === cell.id);
+  const tools = [
+    {
+      name: 'get_current_cell',
+      description: 'Read the cell the user invoked the agent on (id, type, content, varname).',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({
+        id: cell.id, type: cell.type,
+        content: cell.content,
+        varname: (cell as { varname?: string }).varname,
+      }),
+    },
+    {
+      name: 'list_cells',
+      description: 'List all cells in the notebook (id, type, short content preview).',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => state.cells.map((c) => ({
+        id: c.id, type: c.type,
+        preview: (c.content ?? '').slice(0, 120),
+        varname: (c as { varname?: string }).varname,
+      })),
+    },
+    {
+      name: 'update_cell',
+      description: 'Replace the current cell content with new code/markdown. The cell type is preserved.',
+      inputSchema: {
+        type: 'object',
+        properties: { content: { type: 'string', description: 'New full content for the cell.' } },
+        required: ['content'],
+      },
+      execute: async (args: Record<string, unknown>) => {
+        const next = String(args.content ?? '');
+        const before = cell.content;
+        if (before === next) return { ok: true, unchanged: true };
+        // Snapshot prior content so logHistory can support revert.
+        cell.content = next;
+        cell.status = 'stale';
+        state.lastEditAt = Date.now();
+        // Manual history entry — reuse `edit` kind, summary mentions agent.
+        try {
+          (state.history ?? []).push({
+            ts: Date.now(), kind: 'edit',
+            summary: `agent edited ${cell.type} cell`,
+            snapshot: { cellId: cell.id, before, after: next },
+          } as never);
+        } catch { /* ignore — best-effort */ }
+        rerender();
+        return { ok: true };
+      },
+    },
+    {
+      name: 'insert_cell_after',
+      description: 'Insert a new cell directly after the current one. Use type=text for prose, sql for queries, js for scripts/widgets.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          type:    { type: 'string', enum: ['text', 'sql', 'js'], description: '"text" for markdown prose, "sql" for a query, "js" for a script (use widget(name, params) to render a widget).' },
+          content: { type: 'string', description: 'Cell content.' },
+          varname: { type: 'string', description: 'Optional varname for sql/js cells — exposes the result as a variable to subsequent cells.' },
+        },
+        required: ['type', 'content'],
+      },
+      execute: async (args: Record<string, unknown>) => {
+        const t = String(args.type ?? '');
+        const type: NotebookCell['type'] = t === 'text' ? 'md' : t === 'sql' ? 'sql' : 'js';
+        const newCell: NotebookCell = {
+          id: uid(), type,
+          content: String(args.content ?? ''),
+          hideSource: false, hideResult: false, status: 'stale',
+          ...(args.varname ? { varname: String(args.varname) } : {}),
+        };
+        addImportedCells(state, [newCell], idx());
+        rerender();
+        return { ok: true, id: newCell.id };
+      },
+    },
+    {
+      name: 'list_widgets',
+      description: 'List widgets exposed by the connected WebMCP servers — pickable in JS cells via widget(name, params).',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => {
+        const out: Array<{ server: string; name: string; description?: string }> = [];
+        for (const s of state.webmcpServers ?? []) {
+          for (const r of s.layer().recipes ?? []) out.push({ server: s.name, name: r.name, description: r.description });
+        }
+        return out;
+      },
+    },
+  ];
+  return { protocol: 'webmcp' as const, serverName: 'notebook-editor', tools, recipes: [] };
+}
+
+function buildAgentSystemPromptForCell(_state: NotebookState, cell: NotebookCell): string {
+  return [
+    'You are an in-notebook editing assistant. The user invoked you on a specific cell.',
+    'Your job: rewrite that cell, OR insert a follow-up cell after it, based on the user\'s prompt.',
+    `The current cell is of type "${cell.type}".`,
+    'Workflow:',
+    '  1. Call get_current_cell to read the cell content + varname.',
+    '  2. If the user wants to TRANSFORM the existing cell (filter, refactor, fix), call update_cell.',
+    '  3. If the user wants a FOLLOW-UP step (chart, summary, follow-up query), call insert_cell_after.',
+    '  4. For widgets: call list_widgets first to discover available names, then write a JS cell with `return widget("<name>", { rows, ...params })`.',
+    'Be terse. One or two tool calls is usually enough. Do not explain at length.',
+  ].join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -518,7 +786,7 @@ function formatMs(ms: number): string {
   return (ms / 1000).toFixed(2) + 's';
 }
 
-function renderResultInto(el: HTMLElement, cell: NotebookCell, overlay: RuntimeOverlay | null): void {
+function renderResultInto(el: HTMLElement, cell: NotebookCell, overlay: RuntimeOverlay | null, stateRef?: NotebookState): void {
   const r = effectiveResult(cell, overlay) ?? cell.lastResult;
   el.innerHTML = '';
   if (!r) {
@@ -557,11 +825,12 @@ function renderResultInto(el: HTMLElement, cell: NotebookCell, overlay: RuntimeO
     return;
   }
   if (r.kind === 'widget') {
+    const fallbackServers = stateRef?.webmcpServers ?? [];
     for (const w of r.widgets) {
       const host = document.createElement('div');
       host.className = 'nb-widget-host';
       el.appendChild(host);
-      try { mountWidget(host, w.name, w.params); }
+      try { mountWidget(host, w.name, w.params, fallbackServers); }
       catch (err) {
         const pre = document.createElement('pre');
         pre.className = 'nbe-result-error';

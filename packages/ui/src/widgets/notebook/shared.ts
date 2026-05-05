@@ -72,6 +72,10 @@ export interface NotebookState {
    * a RuntimeOverlay consumed at render. Default false (frozen snapshots).
    */
   autoRun?: boolean;
+  /** Bundled WebMCP server instances active in this notebook. Populated from
+   *  `data.webmcpServers` at mount; used by the widget picker (+widget) and as
+   *  fallback for `mountWidget` when a custom-element tag isn't defined. */
+  webmcpServers?: import('@webmcp-auto-ui/core').WebMcpServer[];
 }
 
 export interface HistoryEntry {
@@ -190,6 +194,7 @@ export function createState(initial?: Partial<NotebookState>): NotebookState {
     autoRun: initial?.autoRun ?? false,
     publishedSlug: initial?.publishedSlug,
     publishedToken: initial?.publishedToken,
+    webmcpServers: initial?.webmcpServers,
   };
 }
 
@@ -1179,6 +1184,63 @@ const NOTEBOOK_STYLES = `
   color: var(--color-text2, #645d4f); border-radius: 6px; cursor: pointer;
 }
 .nb-cellbar-btn:hover { background: var(--color-bg2, #f4efdf); color: var(--color-text1, #1c1a16); border-style: solid; }
+
+/* Widget picker overlay (+widget action) */
+.nbe-picker-overlay {
+  position: fixed; inset: 0; background: rgba(20, 18, 14, 0.55);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 80px; z-index: 9999;
+  font-family: var(--font-sans, system-ui);
+}
+.nbe-picker {
+  background: var(--color-bg1, #faf6e6); color: var(--color-text1, #1c1a16);
+  border-radius: 12px; box-shadow: 0 24px 64px rgba(0,0,0,0.18);
+  width: min(620px, calc(100vw - 32px)); max-height: 70vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.nbe-picker > header {
+  display: flex; gap: 8px; align-items: center;
+  padding: 10px 12px; border-bottom: 1px solid var(--color-border, #c8c2b4);
+}
+.nbe-picker-q {
+  flex: 1; font-family: inherit; font-size: 14px;
+  padding: 6px 10px; border: 1px solid var(--color-border, #c8c2b4);
+  background: var(--color-bg0, #ffffff); border-radius: 6px;
+}
+.nbe-picker-close {
+  background: transparent; border: none; cursor: pointer;
+  font-size: 16px; color: var(--color-text2, #645d4f); padding: 4px 8px;
+}
+.nbe-picker-list {
+  list-style: none; margin: 0; padding: 4px 0;
+  overflow-y: auto; flex: 1;
+}
+.nbe-picker-list li {
+  display: grid; grid-template-columns: minmax(120px, auto) auto 1fr;
+  gap: 12px; align-items: baseline;
+  padding: 8px 14px; cursor: pointer;
+  border-bottom: 1px solid var(--color-bg2, #f0eada);
+}
+.nbe-picker-list li:hover { background: var(--color-bg2, #f4efdf); }
+.nbe-picker-name { font-family: var(--font-mono, monospace); font-size: 13px; color: var(--color-text1, #1c1a16); }
+.nbe-picker-server { font-size: 11px; color: var(--color-accent, #1d6f5f); text-transform: lowercase; }
+.nbe-picker-desc { font-size: 12px; color: var(--color-text2, #645d4f); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Agent bar (+agent) */
+.nbe-agent-bar {
+  margin: 0 0 16px 28px;
+  padding: 8px 10px;
+  background: var(--color-bg2, #f4efdf);
+  border-radius: 8px;
+  border: 1px solid var(--color-border, #c8c2b4);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.nbe-agent-bar auto-chat-input { display: block; }
+.nbe-agent-status {
+  font-family: var(--font-mono, monospace); font-size: 11px;
+  color: var(--color-text2, #645d4f);
+  padding: 0 4px;
+}
 /* Run controls (.nb-ctl-pill) remain active in view mode — users can execute cells
  * even when the notebook is read-only; only editing the source is locked. */
 .nb-root.nb-view-mode textarea,

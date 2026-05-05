@@ -71,7 +71,8 @@ function buildFrontmatter(state: NotebookState): string {
   const title = (state.title || '').trim();
   const description = extractDescription(state);
   const servers = collectEnabledServers();
-  if (!title && !description && servers.length === 0) return '';
+  const webmcpServers = collectEnabledWebmcpServers();
+  if (!title && !description && servers.length === 0 && webmcpServers.length === 0) return '';
 
   const lines: string[] = ['---'];
   if (title) lines.push(`title: ${yamlQuote(title)}`);
@@ -83,8 +84,26 @@ function buildFrontmatter(state: NotebookState): string {
       lines.push(`    url: ${yamlQuote(s.url)}`);
     }
   }
+  if (webmcpServers.length > 0) {
+    // YAML flow-style for compactness (registry ids, no spaces).
+    lines.push(`webmcp_servers: [${webmcpServers.map(yamlQuote).join(', ')}]`);
+  }
   lines.push('---', '');
   return lines.join('\n');
+}
+
+/**
+ * Read canvas.enabledServerIds — the registry ids (e.g. 'autoui', 'd3',
+ * 'observable-plot') of bundled WebMCP servers active in this notebook.
+ * The viewer re-instantiates them from @webmcp-auto-ui/servers on load.
+ */
+function collectEnabledWebmcpServers(): string[] {
+  try {
+    const ids = (canvasVanilla as { enabledServerIds?: string[] }).enabledServerIds ?? [];
+    return ids.filter((id): id is string => typeof id === 'string' && id.length > 0);
+  } catch {
+    return [];
+  }
 }
 
 function extractDescription(state: NotebookState): string {
