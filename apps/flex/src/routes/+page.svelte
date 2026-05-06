@@ -2,7 +2,7 @@
   import { onMount, onDestroy, untrack } from 'svelte';
   import { base } from '$app/paths';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-  import { listSkills, encodeHyperSkill } from '@webmcp-auto-ui/sdk';
+  import { listSkills, encodeHyperSkill, canvasToNotebookMarkdown } from '@webmcp-auto-ui/sdk';
   import type { Skill, HyperSkill, RecipeData } from '@webmcp-auto-ui/sdk';
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
@@ -28,7 +28,7 @@
     threejsServer, tremorServer, turfServer, vegaServer, vegaLiteServer,
   } from '@webmcp-auto-ui/servers';
   import { McpStatus, ModelLoader, AgentProgress, EphemeralBubble, TokenBubble, bus, layoutAdapter, HeaderControls, DiagnosticModal, DiagnosticIcon } from '@webmcp-auto-ui/ui';
-  import { Menu, Terminal, LayoutGrid, Paperclip, X as XIcon } from 'lucide-svelte';
+  import { Menu, Terminal, LayoutGrid, BookOpen, Paperclip, X as XIcon } from 'lucide-svelte';
   import FlexGrid from '$lib/FlexGrid.svelte';
   import HistoryModal from '$lib/HistoryModal.svelte';
   import SettingsDrawer from '$lib/SettingsDrawer.svelte';
@@ -160,7 +160,7 @@
   });
 
   // FlexGrid ref
-  let flexGrid: { addBlock: (type: string, data: Record<string, unknown>, server?: string, component?: string) => { id: string }; clearBlocks: () => void; syncFromCanvas: () => void } | undefined;
+  let flexGrid: { addBlock: (type: string, data: Record<string, unknown>, server?: string, component?: string, traceNodeId?: string) => { id: string }; clearBlocks: () => void; syncFromCanvas: () => void } | undefined;
 
   // ── Widget interaction → LLM pipeline ─────────────────────────────
   const INTERACTIVE_ACTIONS = new Set(['click', 'select', 'submit', 'itemclick', 'rowclick', 'cardclick', 'eventclick', 'personclick', 'groupclick', 'cellclick', 'imageclick', 'slidechange']);
@@ -252,6 +252,7 @@
     data: Record<string, unknown>,
     server?: string,
     component?: string,
+    traceNodeId?: string,
   ): { id: string } | undefined {
     ensureServerEnabled(server);
     // Notebook widgets need to know the host's base path so their internal
@@ -260,7 +261,7 @@
     const enrichedData = type === 'notebook' && !data.chatApiBase
       ? { ...data, chatApiBase: `${base}/api/chat` }
       : data;
-    return flexGrid?.addBlock(type, enrichedData, server, component);
+    return flexGrid?.addBlock(type, enrichedData, server, component, traceNodeId);
   }
 
   $effect(() => {
@@ -946,6 +947,11 @@
       input = '';
       return;
     }
+    if (lower === 'notebook' || lower === 'save as notebook') {
+      await saveCanvasAsNotebook();
+      input = '';
+      return;
+    }
 
     // Intercept "test" command — chain both canary and hummingbird test flows.
     if (msg.trim().toLowerCase() === 'test') {
@@ -1141,6 +1147,45 @@
     }
   }
 
+  // Snapshot current canvas as a published notebook on nb.hyperskills.net.
+  async function saveCanvasAsNotebook(): Promise<void> {
+    const toast = (msg: string, isError = false) => {
+      console[isError ? 'error' : 'log']('[notebook]', msg);
+      ephemeral = [...ephemeral, { id: 'nb-' + Date.now(), role: 'assistant', html: msg }];
+      setTimeout(() => { ephemeral = ephemeral.filter(e => !e.id.startsWith('nb-')); }, 6000);
+    };
+    if (!canvas.blocks.length) {
+      toast('Canvas vide — rien à sauvegarder', true);
+      return;
+    }
+    const blocks = canvas.blocks.map(b => ({ id: b.id, type: b.type, data: b.data ?? {} }));
+    const getLineage = (id: string) => traceObserver.getWidgetLineage(id);
+    const servers = canvas.dataServers
+      .filter(s => s.connected)
+      .map(s => ({ name: s.serverName ?? s.name, url: s.url }));
+    const webmcpServers = canvas.enabledServerIds.slice();
+    const markdown = canvasToNotebookMarkdown(blocks, getLineage, {
+      title: 'Canvas snapshot',
+      servers,
+      webmcpServers,
+    });
+    try {
+      const res = await fetch('https://nb.hyperskills.net/api/publish', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ markdown }),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const reply = await res.json();
+      const url = reply.url ?? `https://nb.hyperskills.net/p/${reply.slug}`;
+      const authorUrl = reply.token ? `${url}?t=${encodeURIComponent(reply.token)}` : url;
+      try { await navigator.clipboard?.writeText?.(authorUrl); } catch { /* ignore */ }
+      toast(`Notebook publié · ${url.replace(/^https?:\/\//, '')} (lien auteur copié)`);
+    } catch (err) {
+      toast('Publish failed · ' + String((err as Error)?.message ?? err), true);
+    }
+  }
+
   function clearAll() {
     flexGrid?.clearBlocks();
     conversationHistory = [];
@@ -1238,6 +1283,12 @@
     <div class="flex-1"></div>
 
     {#if composerMode}
+      <button class="flex items-center h-7 px-1.5 rounded border border-border2 text-text2 hover:text-text1 transition-all flex-shrink-0"
+              onclick={saveCanvasAsNotebook}
+              aria-label="Save canvas as notebook"
+              title="Save canvas as notebook">
+        <BookOpen size={14} />
+      </button>
       <button class="flex items-center h-7 px-1.5 rounded border transition-all flex-shrink-0
                      {layoutMode === 'grid' ? 'border-accent bg-accent/10 text-accent' : 'border-border2 text-text2 hover:text-text1'}"
               onclick={() => layoutMode = layoutMode === 'float' ? 'grid' : 'float'}
