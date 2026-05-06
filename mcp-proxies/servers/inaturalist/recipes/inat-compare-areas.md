@@ -6,7 +6,7 @@ when: the user asks to compare two locations, "which has more X", area-vs-area b
 servers: [inaturalist]
 tools_used: [search_places, species_counts, search_observations]
 data_type: cross-area species comparison
-components_used: [chart, table, map, stat-card]
+components_used: [chart-rich, data-table, map, stat-card]
 layout:
   type: grid
   columns: 2
@@ -45,10 +45,10 @@ const onlyA = [...namesA].filter(n => !namesB.has(n));
 const onlyB = [...namesB].filter(n => !namesA.has(n));
 
 // 3. Render comparison chart early (before slower obs fetch)
-await widget('chart', {
+await widget('chart-rich', {
   type: 'bar',
   labels: [a.display_name ?? 'Area A', b.display_name ?? 'Area B'],
-  data: [topA?.total_results ?? 0, topB?.total_results ?? 0],
+  data: [{ label: 'Species', values: [topA?.total_results ?? 0, topB?.total_results ?? 0] }],
   title: 'Species count',
 });
 
@@ -91,7 +91,7 @@ const [ca, cb] = await Promise.all([
   call('species_counts', { place_id: a.id, taxon_name: 'Aves', per_page: 50 }).catch(() => ({ total_results: 0 })),
   call('species_counts', { place_id: b.id, taxon_name: 'Aves', per_page: 50 }).catch(() => ({ total_results: 0 })),
 ]);
-await widget('chart', { type: 'bar', labels: [a.display_name ?? 'A', b.display_name ?? 'B'], data: [ca?.total_results ?? 0, cb?.total_results ?? 0] });
+await widget('chart-rich', { type: 'bar', labels: [a.display_name ?? 'A', b.display_name ?? 'B'], data: [{ label: 'Aves', values: [ca?.total_results ?? 0, cb?.total_results ?? 0] }] });
 ```
 
 ### Pyrenees vs Alps orchids
