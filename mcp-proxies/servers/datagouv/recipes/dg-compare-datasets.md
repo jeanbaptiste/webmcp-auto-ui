@@ -71,11 +71,15 @@ Open data has a lot of overlap — this recipe helps the user pick.
 
    const dlA = (mA?.metrics ?? []).reduce((s, x) => s + (x.monthly_download ?? 0), 0);
    const dlB = (mB?.metrics ?? []).reduce((s, x) => s + (x.monthly_download ?? 0), 0);
-   await widget('chart', {
-     type: 'bar',
-     data: { labels: [A.title ?? 'A', B.title ?? 'B'], values: [dlA || 1, dlB || 1] },
-     options: { yLabel: 'Téléchargements 12 mois' }
-   });
+   if (dlA || dlB) {
+     await widget('chart', {
+       type: 'bar',
+       data: { labels: [A.title ?? 'A', B.title ?? 'B'], values: [dlA, dlB] },
+       options: { yLabel: 'Téléchargements 12 mois' }
+     });
+   } else {
+     await widget('text', { content: 'Données de téléchargement indisponibles.' });
+   }
 
    const tagsA = new Set(A.tags ?? []);
    const tagsB = new Set(B.tags ?? []);
@@ -114,7 +118,13 @@ const _m = await Promise.all([
 ]);
 const ex2_mA = _m[0];
 const ex2_mB = _m[1];
-await widget('chart', { type: 'bar', data: { labels: [ex2_a.title ?? 'A', ex2_b.title ?? 'B'], values: [ex2_mA?.metrics?.[0]?.monthly_download ?? 1, ex2_mB?.metrics?.[0]?.monthly_download ?? 1] } });
+const ex2_dlA = (ex2_mA?.metrics ?? []).reduce((s, x) => s + (x.monthly_download ?? 0), 0);
+const ex2_dlB = (ex2_mB?.metrics ?? []).reduce((s, x) => s + (x.monthly_download ?? 0), 0);
+if (ex2_dlA || ex2_dlB) {
+  await widget('chart', { type: 'bar', data: { labels: [ex2_a.title ?? 'A', ex2_b.title ?? 'B'], values: [ex2_dlA, ex2_dlB] } });
+} else {
+  await widget('text', { content: 'Données de téléchargement indisponibles.' });
+}
 ```
 
 ## Common mistakes

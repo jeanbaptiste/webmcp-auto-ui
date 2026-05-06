@@ -54,27 +54,42 @@ These questions all share the same shape: one indicator, 101 departments, rankin
 
 3. **Render map + ranking**:
    ```js
-   await widget('map', {
-     mode: 'choropleth',
-     geo_level: 'department',
-     code_field: 'code_departement',
-     value_field: 'taux_pauvrete',
-     features: rows
-   });
+   // Dynamically resolve column names — actual CSV columns vary across datasets
+   const keys = rows.length > 0 ? Object.keys(rows[0]) : [];
+   const codeCol = keys.find(k => /code.dep/i.test(k)) ?? keys.find(k => /^code/i.test(k)) ?? keys[0];
+   const nameCol = keys.find(k => /nom.dep/i.test(k)) ?? keys.find(k => /^nom/i.test(k)) ?? keys[1] ?? codeCol;
+   const valueCol = keys.find(k => keys.indexOf(k) > 0 && rows.slice(0, 5).every(r => r[k] !== '' && !isNaN(Number(r[k])))) ?? keys[keys.length - 1];
 
-   await widget('data-table', {
-     columns: ['Rang', 'Département', 'Code', 'Valeur'],
-     rows: rows.slice(0, 10).map((r, i) => [i + 1, r.nom_departement ?? '—', r.code_departement ?? '—', r.taux_pauvrete ?? '—'])
-   });
+   if (rows.length === 0) {
+     await widget('text', { content: 'Aucune donnée à afficher.' });
+   } else {
+     await widget('map', {
+       mode: 'choropleth',
+       geo_level: 'department',
+       code_field: codeCol,
+       value_field: valueCol,
+       features: rows
+     });
 
-   await widget('chart', {
-     type: 'bar',
-     data: {
-       labels: rows.slice(0, 15).map(r => r.nom_departement ?? '—'),
-       values: rows.slice(0, 15).map(r => Number(r.taux_pauvrete)).filter(Number.isFinite)
-     },
-     options: { xLabel: 'Département', yLabel: 'Taux %' }
-   });
+     await widget('data-table', {
+       columns: ['Rang', 'Département', 'Code', 'Valeur'],
+       rows: rows.slice(0, 10).map((r, i) => [i + 1, r[nameCol] ?? '—', r[codeCol] ?? '—', r[valueCol] ?? '—'])
+     });
+
+     const chartValues = rows.slice(0, 15).map(r => Number(r[valueCol])).filter(Number.isFinite);
+     if (chartValues.length > 0) {
+       await widget('chart', {
+         type: 'bar',
+         data: {
+           labels: rows.slice(0, 15).map(r => r[nameCol] ?? '—'),
+           values: chartValues
+         },
+         options: { xLabel: 'Département', yLabel: 'Valeur' }
+       });
+     } else {
+       await widget('text', { content: `Impossible de tracer le graphique : la colonne "${valueCol}" ne contient pas de valeurs numériques. Colonnes disponibles : ${keys.join(', ')}` });
+     }
+   }
    ```
 
 ## Examples
@@ -99,15 +114,32 @@ await widget('data-table', { columns: ['Département', 'Code', 'Taux %'], rows: 
 
 ### Top 10 departments for renewable energy share
 ```js
+// ILLUSTRATIVE EXAMPLE — '<sdes-enr-resource-id>' is a placeholder.
+// Before running, discover the real resource_id via search_datasets + list_dataset_resources
+// (e.g. search_datasets({ query: 'part énergies renouvelables département SDES' }))
+// then replace the placeholder with the actual resource id.
 const data = await call('query_resource_data', {
-  resource_id: '<sdes-enr-resource-id>',
+  resource_id: '<sdes-enr-resource-id>', // ← replace with real id before use
   sort_column: 'part_enr',
   sort_direction: 'desc',
   page_size: 101
 }).catch(() => ({ rows: [] }));
 const rows = data?.rows ?? [];
-await widget('map', { mode: 'choropleth', geo_level: 'department', code_field: 'code_dep', value_field: 'part_enr', features: rows });
-await widget('chart', { type: 'bar', data: { labels: rows.slice(0, 10).map(r => r.nom_dep ?? '—'), values: rows.slice(0, 10).map(r => Number(r.part_enr)).filter(Number.isFinite) } });
+if (rows.length === 0) {
+  await widget('text', { content: 'Aucune donnée — vérifiez que le resource_id est correct.' });
+} else {
+  const keys = Object.keys(rows[0]);
+  const codeCol = keys.find(k => /code.dep/i.test(k)) ?? 'code_dep';
+  const nameCol = keys.find(k => /nom.dep/i.test(k)) ?? 'nom_dep';
+  const valueCol = keys.find(k => /part_enr/i.test(k)) ?? keys[keys.length - 1];
+  await widget('map', { mode: 'choropleth', geo_level: 'department', code_field: codeCol, value_field: valueCol, features: rows });
+  const chartValues = rows.slice(0, 10).map(r => Number(r[valueCol])).filter(Number.isFinite);
+  if (chartValues.length > 0) {
+    await widget('chart', { type: 'bar', data: { labels: rows.slice(0, 10).map(r => r[nameCol] ?? '—'), values: chartValues } });
+  } else {
+    await widget('text', { content: `Colonne valeur "${valueCol}" non numérique. Colonnes : ${keys.join(', ')}` });
+  }
+}
 ```
 
 ## Common mistakes

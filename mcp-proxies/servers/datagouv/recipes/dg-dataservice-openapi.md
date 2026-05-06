@@ -48,16 +48,29 @@ This recipe is the "dev landing page" for a public API.
      content: I.description ?? ''
    });
 
-   const endpoints = spec?.endpoints ?? [];
-   await widget('data-table', {
-     columns: ['Méthode', 'Path', 'Description', 'Params'],
-     rows: endpoints.map(e => [e.method ?? '—', e.path ?? '—', e.summary ?? '—', (e.parameters ?? []).length])
-   });
+   const endpoints = spec?.endpoints ?? (spec?.paths
+     ? Object.entries(spec.paths).flatMap(([path, methods]) =>
+         Object.entries(methods).map(([method, op]) => ({
+           method: method.toUpperCase(), path,
+           summary: op.summary ?? '—',
+           parameters: op.parameters ?? []
+         })))
+     : []);
+   if (endpoints.length === 0) {
+     await widget('text', { content: spec ? 'Aucun endpoint trouvé dans la spec OpenAPI.' : 'Spec OpenAPI non disponible pour ce dataservice.' });
+   } else {
+     await widget('data-table', {
+       columns: ['Méthode', 'Path', 'Description', 'Params'],
+       rows: endpoints.map(e => [e.method ?? '—', e.path ?? '—', e.summary ?? '—', String((e.parameters ?? []).length)])
+     });
+   }
 
    const sample = endpoints[0];
-   const curlCmd = sample
-     ? `curl -X ${sample.method ?? 'GET'} '${I.base_api_url ?? ''}${sample.path ?? ''}' \\\n  -H 'Accept: application/json'`
-     : `curl '${I.base_api_url ?? ''}'`;
+   const curlCmd = (I.base_api_url && sample)
+     ? `curl -X ${sample.method ?? 'GET'} '${I.base_api_url}${sample.path ?? ''}' \\\n  -H 'Accept: application/json'`
+     : I.base_api_url
+       ? `curl '${I.base_api_url}'`
+       : '# base_api_url non disponible — vérifier la fiche dataservice';
    await widget('code', { language: 'bash', code: curlCmd });
 
    await widget('cards', {

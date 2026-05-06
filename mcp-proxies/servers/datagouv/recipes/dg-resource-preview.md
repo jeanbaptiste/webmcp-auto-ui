@@ -51,8 +51,14 @@ The Tabular API returns the schema and a paged sample without downloading the fi
      title: I.title ?? '—',
      content: `Format ${I.format ?? '—'} · ${I.size_human ?? '—'}`
    });
-   await widget('stat-card', { label: 'Colonnes', value: sample?.columns?.length ?? 1, icon: 'columns' });
-   await widget('stat-card', { label: 'Lignes (total)', value: sample?.total ?? 1, icon: 'list' });
+
+   if (!sample?.columns?.length && sample?.total === 0) {
+     await widget('text', { content: 'Échec de la récupération des données (API Tabular indisponible ou ressource introuvable).' });
+     return;
+   }
+
+   await widget('stat-card', { label: 'Colonnes', value: sample?.columns?.length ?? 0, icon: 'columns' });
+   await widget('stat-card', { label: 'Lignes (total)', value: sample?.total ?? 0, icon: 'list' });
    await widget('stat-card', { label: 'Format', value: I.format ?? '—', icon: 'file' });
 
    const tableCols = sample?.columns ?? [];

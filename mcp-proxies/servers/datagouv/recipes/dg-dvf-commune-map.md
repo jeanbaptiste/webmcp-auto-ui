@@ -31,7 +31,7 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
    const resList = await call('list_dataset_resources', { dataset_id }).catch(() => ({ resources: [] }));
    // Pick the main tabular resource (csv.gz or csv), fallback to first resource
    // Note: as of 2025, the geo-DVF dataset has a single csv.gz spanning 2021-2025
-   const resource = (resList?.resources ?? []).find(r => r.format === 'csv.gz' || r.format === 'csv')
+   const resource = (resList?.resources ?? []).find(r => r.format === 'csv.gz' || r.format === 'csv' || r.format === 'parquet')
      ?? (resList?.resources ?? []).find(r => r.type === 'main')
      ?? (resList?.resources ?? [])[0];
    if (!resource) {
@@ -52,7 +52,8 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
      filter_value: '13205', // Marseille 5e Arrondissement
      page_size: 200
    }).catch(() => ({ rows: [] })) : { rows: [] };
-   const rows = tx?.rows ?? [];
+   const _unwrap = r => Array.isArray(r) ? r : (r?.data ?? r?.results ?? r?.rows ?? r?.entries ?? r?.items ?? []);
+   const rows = _unwrap(tx);
    if (rows.length === 0) {
      await widget('text', { content: 'Aucune transaction trouvée.' });
    }
@@ -91,12 +92,14 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
      });
 
      // Price distribution histogram
-     const buckets = [0, 100_000, 250_000, 500_000, 1_000_000, Infinity];
-     const counts = buckets.slice(0, -1).map((lo, i) => prices.filter(p => p >= lo && p < buckets[i + 1]).length);
-     await widget('chart', {
-       type: 'bar',
-       data: { labels: ['<100k', '100-250k', '250-500k', '500k-1M', '>1M'], values: counts }
-     });
+     if (prices.length > 0) {
+       const buckets = [0, 100_000, 250_000, 500_000, 1_000_000, Infinity];
+       const counts = buckets.slice(0, -1).map((lo, i) => prices.filter(p => p >= lo && p < buckets[i + 1]).length);
+       await widget('chart', {
+         type: 'bar',
+         data: { labels: ['<100k', '100-250k', '250-500k', '500k-1M', '>1M'], values: counts }
+       });
+     }
    }
    ```
 
@@ -107,14 +110,15 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
 // 13205 = Marseille 5e Arrondissement (13k transactions géolocalisées)
 // 13055 = code commune de la ville entière → aucun résultat dans DVF géolocalisé
 const dvfList = await call('list_dataset_resources', { dataset_id: '5cc1b94a634f4165e96436c1' }).catch(() => ({ resources: [] }));
-const dvfCsv = (dvfList?.resources ?? []).find(r => r.format === 'csv.gz' || r.format === 'csv') ?? (dvfList?.resources ?? [])[0];
+const dvfCsv = (dvfList?.resources ?? []).find(r => r.format === 'csv.gz' || r.format === 'csv' || r.format === 'parquet') ?? (dvfList?.resources ?? [])[0];
 const tx = dvfCsv ? await call('query_resource_data', {
   resource_id: dvfCsv.id,
   filter_column: 'code_commune',
   filter_value: '13205',
   page_size: 200
 }).catch(() => ({ rows: [] })) : { rows: [] };
-const rows = tx?.rows ?? [];
+const _unwrap = r => Array.isArray(r) ? r : (r?.data ?? r?.results ?? r?.rows ?? r?.entries ?? r?.items ?? []);
+const rows = _unwrap(tx);
 await widget('map', { center: [5.3949, 43.2930], zoom: 13, markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({ lat: Number(r.latitude), lon: Number(r.longitude), label: Number.isFinite(Number(r.valeur_fonciere)) ? `${Math.round(Number(r.valeur_fonciere)).toLocaleString('fr-FR')} €` : '—' })) });
 ```
 
@@ -122,7 +126,7 @@ await widget('map', { center: [5.3949, 43.2930], zoom: 13, markers: rows.filter(
 ```js
 // 33063 = Bordeaux (code commune direct, 69k transactions — pas d'arrondissements)
 const dvfList2 = await call('list_dataset_resources', { dataset_id: '5cc1b94a634f4165e96436c1' }).catch(() => ({ resources: [] }));
-const dvfCsv2 = (dvfList2?.resources ?? []).find(r => r.format === 'csv.gz' || r.format === 'csv') ?? (dvfList2?.resources ?? [])[0];
+const dvfCsv2 = (dvfList2?.resources ?? []).find(r => r.format === 'csv.gz' || r.format === 'csv' || r.format === 'parquet') ?? (dvfList2?.resources ?? [])[0];
 const tx2 = dvfCsv2 ? await call('query_resource_data', {
   resource_id: dvfCsv2.id,
   filter_column: 'code_commune',
@@ -131,7 +135,8 @@ const tx2 = dvfCsv2 ? await call('query_resource_data', {
   sort_direction: 'desc',
   page_size: 10
 }).catch(() => ({ rows: [] })) : { rows: [] };
-const rows2 = tx2?.rows ?? [];
+const _unwrap2 = r => Array.isArray(r) ? r : (r?.data ?? r?.results ?? r?.rows ?? r?.entries ?? r?.items ?? []);
+const rows2 = _unwrap2(tx2);
 await widget('data-table', { columns: ['Date', 'Type', 'Prix'], rows: rows2.map(r => [r.date_mutation ?? '—', r.type_local ?? '—', r.valeur_fonciere ?? '—']) });
 ```
 

@@ -27,14 +27,16 @@ Many public datasets are distributed at the commune mesh — this recipe makes t
 
 1. **Find the right resource**:
    ```js
-   const search = await call('search_datasets', { query: 'ANAH aides commune', page_size: 5 });
+   const search = await call('search_datasets', { query: 'ANAH aides commune', page_size: 5 }).catch(() => ({ datasets: [] }));
    const ds = search?.datasets?.[0];
    const resList = ds ? await call('list_dataset_resources', { dataset_id: ds.id }).catch(() => ({ resources: [] })) : { resources: [] };
    const csv = (resList?.resources ?? []).find(r => r.format === 'csv') ?? (resList?.resources ?? [])[0];
    if (!ds) {
      await widget('text', { content: 'Aucun dataset trouvé.' });
+     return;
    } else if (!csv) {
      await widget('text', { content: 'Aucune ressource CSV disponible.' });
+     return;
    }
    ```
 
@@ -47,6 +49,7 @@ Many public datasets are distributed at the commune mesh — this recipe makes t
    const rows = data?.rows ?? [];
    if (rows.length === 0) {
      await widget('text', { content: 'Aucune donnée pour cet indicateur.' });
+     return;
    }
    ```
 
@@ -63,13 +66,15 @@ Many public datasets are distributed at the commune mesh — this recipe makes t
        label: r.nom_standard ?? r.code_insee ?? '',
        popup: `${r.nom_standard ?? r.code_insee ?? '—'} · ${Number.isFinite(Number(r.population)) ? Number(r.population).toLocaleString('fr-FR') : '—'} hab.`
      }));
-   await widget('map', {
-     center: [46.6, 2.5],
-     zoom: 6,
-     markers: markersData.length > 0 ? markersData : [],
-     color_field: 'value',
-     color_scale: 'viridis'
-   });
+   if (markersData.length > 0) {
+     await widget('map', {
+       center: [46.6, 2.5],
+       zoom: 6,
+       markers: markersData,
+       color_field: 'value',
+       color_scale: 'viridis'
+     });
+   }
 
    const topRows = rows.length > 0 ? rows.slice(0, 10) : [];
    await widget('data-table', {

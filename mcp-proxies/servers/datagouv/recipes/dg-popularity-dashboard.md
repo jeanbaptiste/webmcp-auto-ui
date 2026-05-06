@@ -37,7 +37,8 @@ This recipe is great for public communication and inter-agency benchmarking.
    const metrics = _all[1];
    const resList = _all[2];
    if (!info) {
-     await widget('text', { content: 'Dataset introuvable.' });
+     await widget('text', { content: 'Dataset introuvable ou API indisponible.' });
+     return;
    }
    const series = (metrics?.metrics ?? []).slice().reverse(); // chronological
    ```
@@ -52,25 +53,33 @@ This recipe is great for public communication and inter-agency benchmarking.
 
 3. **Render**:
    ```js
-   const I = info ?? {};
-   await widget('chart-rich', {
-     type: 'area-stacked',
-     labels: series.map(x => x.month),
-     series: [
-       { name: 'Visites', values: series.map(x => x.monthly_visit ?? 0) },
-       { name: 'Téléchargements', values: series.map(x => x.monthly_download ?? 0) }
-     ]
-   });
+   const I = info;
+   if (!series.length) {
+     await widget('text', { content: 'Métriques indisponibles pour ce dataset.' });
+   } else {
+     await widget('chart-rich', {
+       type: 'area-stacked',
+       labels: series.map(x => x.month),
+       series: [
+         { name: 'Visites', values: series.map(x => x.monthly_visit ?? 0) },
+         { name: 'Téléchargements', values: series.map(x => x.monthly_download ?? 0) }
+       ]
+     });
 
-   await widget('stat-card', { label: 'Téléchargements 12 mois', value: total12.toLocaleString('fr-FR'), icon: 'download' });
-   await widget('stat-card', { label: 'Pic mensuel', value: `${(peak.monthly_download ?? 0).toLocaleString('fr-FR')} (${peak.month ?? '—'})`, icon: 'trending-up' });
-   await widget('stat-card', { label: 'Évol. YoY', value: `${yoy} %`, icon: 'activity' });
+     await widget('stat-card', { label: 'Téléchargements 12 mois', value: total12.toLocaleString('fr-FR'), icon: 'download' });
+     await widget('stat-card', { label: 'Pic mensuel', value: `${(peak.monthly_download ?? 0).toLocaleString('fr-FR')} (${peak.month ?? '—'})`, icon: 'trending-up' });
+     await widget('stat-card', { label: 'Évol. YoY', value: `${yoy} %`, icon: 'activity' });
+   }
 
    const fRows = (resList?.resources ?? []).slice(0, 10).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—']);
-   await widget('data-table', {
-     columns: ['Fichier', 'Format', 'Taille'],
-     rows: fRows.length ? fRows : [['—', '—', '—']]
-   });
+   if (!fRows.length) {
+     await widget('text', { content: 'Liste des ressources indisponible.' });
+   } else {
+     await widget('data-table', {
+       columns: ['Fichier', 'Format', 'Taille'],
+       rows: fRows
+     });
+   }
 
    await widget('kv', {
      items: [
@@ -89,21 +98,30 @@ This recipe is great for public communication and inter-agency benchmarking.
 const dataset_id = '5cc1b94a634f4165e96436c1';
 const metrics = await call('get_metrics', { dataset_id, limit: 24 }).catch(() => ({ metrics: [] }));
 const series = (metrics?.metrics ?? []).slice().reverse();
-await widget('chart-rich', {
-  type: 'area-stacked',
-  labels: series.map(m => m.month ?? '—'),
-  series: [
-    { name: 'Visites', values: series.map(m => m.monthly_visit ?? 0) },
-    { name: 'Téléchargements', values: series.map(m => m.monthly_download ?? 0) }
-  ]
-});
+if (!series.length) {
+  await widget('text', { content: 'Métriques indisponibles pour ce dataset.' });
+} else {
+  await widget('chart-rich', {
+    type: 'area-stacked',
+    labels: series.map(m => m.month ?? '—'),
+    series: [
+      { name: 'Visites', values: series.map(m => m.monthly_visit ?? 0) },
+      { name: 'Téléchargements', values: series.map(m => m.monthly_download ?? 0) }
+    ]
+  });
+}
 ```
 
 ### RNA downloads this year
 ```js
 const metrics = await call('get_metrics', { dataset_id: '58e53811c751df03df38f42d', limit: 12 }).catch(() => ({ metrics: [] }));
-const total = (metrics?.metrics ?? []).reduce((s, m) => s + (m.monthly_download ?? 0), 0);
-await widget('stat-card', { label: 'Téléchargements 12 mois', value: total.toLocaleString('fr-FR') });
+const series12 = metrics?.metrics ?? [];
+if (!series12.length) {
+  await widget('text', { content: 'Métriques indisponibles pour ce dataset.' });
+} else {
+  const total = series12.reduce((s, m) => s + (m.monthly_download ?? 0), 0);
+  await widget('stat-card', { label: 'Téléchargements 12 mois', value: total.toLocaleString('fr-FR') });
+}
 ```
 
 ## Common mistakes

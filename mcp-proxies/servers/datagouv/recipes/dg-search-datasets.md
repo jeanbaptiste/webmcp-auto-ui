@@ -52,7 +52,7 @@ The user wants to explore the French open data catalog by theme:
    });
 
    const orgs = new Set(datasets.map(d => d.organization?.name).filter(Boolean));
-   const totalResources = datasets.reduce((s, d) => s + (d.resources ?? 0), 0);
+   const totalResources = datasets.reduce((s, d) => s + (Array.isArray(d.resources) ? d.resources.length : (d.nb_resources ?? 0)), 0);
    await widget('stat-card', { label: 'Résultats', value: res?.total ?? datasets.length, icon: 'database' });
    await widget('stat-card', { label: 'Organisations', value: orgs.size, icon: 'building' });
    await widget('stat-card', { label: 'Fichiers cumulés', value: totalResources, icon: 'file' });
@@ -73,8 +73,8 @@ await widget('stat-card', { label: 'Datasets', value: res?.total ?? 0 });
 ```js
 const res = await call('search_datasets', { query: 'pauvreté INSEE', page_size: 20 }).catch(() => ({ datasets: [] }));
 const datasets = res?.datasets ?? [];
-await widget('cards', { items: datasets.slice(0, 8).map(d => ({ title: d.title ?? '—', subtitle: d.organization?.name ?? '', description: d.description ?? '' })) });
-await widget('data-table', { columns: ['Titre', 'Format', 'MAJ'], rows: datasets.map(d => [d.title ?? '—', d.main_format ?? '—', d.last_modified ?? '—']) });
+await widget('cards', { items: datasets.slice(0, 8).map(d => ({ title: d.title ?? '—', subtitle: d.organization?.name ?? '', description: d.description?.slice(0, 200) ?? '' })) });
+await widget('data-table', { columns: ['Titre', 'Fichiers', 'MAJ'], rows: datasets.map(d => [d.title ?? '—', d.resources?.length ?? 0, d.last_modified ?? '—']) });
 ```
 
 ### Renewable energy datasets, sorted by recency

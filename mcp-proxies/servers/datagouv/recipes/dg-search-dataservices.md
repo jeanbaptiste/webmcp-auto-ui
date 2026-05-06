@@ -58,12 +58,16 @@ The user is looking for a programmatic data source:
    await widget('stat-card', { label: 'Organisations', value: new Set(services.map(s => s.organization?.id)).size, icon: 'building' });
    ```
 
+   > **MCP connectivity note** — if `search_dataservices` fails, the `.catch` returns an empty array and the guard above fires immediately, emitting `'Aucune API trouvée.'`. The stat-cards are intentionally skipped because all values would be 0; the text widget makes the connectivity issue explicit.
+
 ## Examples
 
 ### Find SIRENE APIs
 ```js
 const res = await call('search_dataservices', { query: 'sirene', page_size: 10 }).catch(() => ({ dataservices: [] }));
-await widget('cards', { items: (res?.dataservices ?? []).map(s => ({ title: s.title ?? '—', subtitle: s.organization?.name ?? '', href: s.base_api_url })) });
+const items = (res?.dataservices ?? []).map(s => ({ title: s.title ?? '—', subtitle: s.organization?.name ?? '', href: s.base_api_url }));
+if (!items.length) { await widget('text', { content: 'Aucune API SIRENE trouvée.' }); return; }
+await widget('cards', { items });
 ```
 
 ### Find an address API

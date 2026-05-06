@@ -76,14 +76,23 @@ Useful for editorial dashboards and SHS researchers tracking publication pattern
 ```js
 const res = await call('search_datasets', { query: 'éducation', page_size: 50 }).catch(() => ({ datasets: [] }));
 const recent = [...(res?.datasets ?? [])].sort((a, b) => (b.last_modified ?? '').localeCompare(a.last_modified ?? '')).slice(0, 12);
-await widget('cards', { items: recent.map(d => ({ title: d.title ?? '—', subtitle: d.organization?.name ?? '', badge: d.last_modified ?? '' })) });
+if (recent.length === 0) {
+  await widget('text', { content: 'Aucun dataset récent trouvé (service indisponible ou aucun résultat).' });
+} else {
+  await widget('cards', { items: recent.map(d => ({ title: d.title ?? '—', subtitle: d.organization?.name ?? '', badge: d.last_modified ?? '' })) });
+}
 ```
 
 ### Transport open data this month
 ```js
 const res = await call('search_datasets', { query: 'transport', page_size: 50 }).catch(() => ({ datasets: [] }));
-const thisMonth = (res?.datasets ?? []).filter(d => (d.last_modified ?? '').startsWith('2026-04'));
-await widget('cards', { items: thisMonth.map(d => ({ title: d.title ?? '—', subtitle: d.organization?.name ?? '' })) });
+const currentMonth = new Date().toISOString().slice(0, 7);
+const thisMonth = (res?.datasets ?? []).filter(d => (d.last_modified ?? '').startsWith(currentMonth));
+if (thisMonth.length === 0) {
+  await widget('text', { content: 'Aucun dataset transport publié ce mois.' });
+} else {
+  await widget('cards', { items: thisMonth.map(d => ({ title: d.title ?? '—', subtitle: d.organization?.name ?? '' })) });
+}
 await widget('stat-card', { label: 'Publiés ce mois', value: thisMonth.length });
 ```
 

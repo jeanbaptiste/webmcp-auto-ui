@@ -38,6 +38,7 @@ This recipe condenses metadata + files + popularity into a single view so the us
    const metrics = _all[2];
    if (!info) {
      await widget('text', { content: 'Dataset introuvable.' });
+     return;
    }
    ```
 
@@ -50,25 +51,33 @@ This recipe condenses metadata + files + popularity into a single view so the us
      content: I.description ?? ''
    });
 
+   // get_metrics is production-only — fallback to '—' when unavailable
    const last30 = (metrics?.metrics ?? [])[0] ?? {};
-   await widget('stat-card', { label: 'Visites 30j', value: last30.monthly_visit ?? 1, icon: 'eye' });
-   await widget('stat-card', { label: 'Téléchargements 30j', value: last30.monthly_download ?? 1, icon: 'download' });
-   await widget('stat-card', { label: 'Fichiers', value: resList?.resources?.length ?? 1, icon: 'file' });
+   await widget('stat-card', { label: 'Visites 30j', value: last30.monthly_visit ?? '—', icon: 'eye' });
+   await widget('stat-card', { label: 'Téléchargements 30j', value: last30.monthly_download ?? '—', icon: 'download' });
+   await widget('stat-card', { label: 'Fichiers', value: resList?.resources?.length ?? '—', icon: 'file' });
    await widget('stat-card', { label: 'Licence', value: I.license ?? '—', icon: 'shield' });
 
    const fileRows = (resList?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—', r.type ?? '—']);
-   await widget('data-table', {
-     columns: ['Titre', 'Format', 'Taille', 'Type'],
-     rows: fileRows.length ? fileRows : [['—', '—', '—', '—']]
-   });
+   if (fileRows.length) {
+     await widget('data-table', {
+       columns: ['Titre', 'Format', 'Taille', 'Type'],
+       rows: fileRows
+     });
+   } else {
+     await widget('text', { content: 'Aucun fichier disponible.' });
+   }
 
    const tlItems = (metrics?.metrics ?? []).map(x => ({
      date: x.month ?? '—',
      label: `${x.monthly_visit ?? 0} visites · ${x.monthly_download ?? 0} téléchargements`
    }));
-   await widget('timeline', {
-     items: tlItems.length ? tlItems : [{ date: I.last_modified ?? '—', label: `Dernière MAJ` }]
-   });
+   if (tlItems.length) {
+     await widget('timeline', { items: tlItems });
+   } else if (I.last_modified) {
+     await widget('timeline', { items: [{ date: I.last_modified, label: 'Dernière MAJ' }] });
+   }
+   // else: skip timeline entirely when no metrics and no last_modified
    ```
 
 ## Examples
@@ -85,8 +94,13 @@ const dvfInfo = _dvf[0] ?? {};
 const dvfRes = _dvf[1] ?? { resources: [] };
 const dvfMetrics = _dvf[2] ?? { metrics: [] };
 await widget('text', { title: dvfInfo.title ?? '—', content: dvfInfo.description ?? '' });
-await widget('stat-card', { label: 'Téléchargements 30j', value: dvfMetrics?.metrics?.[0]?.monthly_download ?? 1 });
-await widget('data-table', { columns: ['Titre', 'Format', 'Taille'], rows: (dvfRes?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—']) });
+await widget('stat-card', { label: 'Téléchargements 30j', value: dvfMetrics?.metrics?.[0]?.monthly_download ?? '—' });
+const dvfRows = (dvfRes?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—']);
+if (dvfRows.length) {
+  await widget('data-table', { columns: ['Titre', 'Format', 'Taille'], rows: dvfRows });
+} else {
+  await widget('text', { content: 'Aucun fichier disponible.' });
+}
 ```
 
 ### RNA — Répertoire national des associations
@@ -95,7 +109,12 @@ const rna_id = '58e53811c751df03df38f42d';
 const rnaInfo = await call('get_dataset_info', { dataset_id: rna_id }).catch(() => null) ?? {};
 const rnaRes = await call('list_dataset_resources', { dataset_id: rna_id }).catch(() => ({ resources: [] }));
 await widget('text', { title: rnaInfo.title ?? '—', subtitle: rnaInfo.organization?.name ?? '', content: rnaInfo.description ?? '' });
-await widget('data-table', { columns: ['Fichier', 'Format', 'Type'], rows: (rnaRes?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.type ?? '—']) });
+const rnaRows = (rnaRes?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.type ?? '—']);
+if (rnaRows.length) {
+  await widget('data-table', { columns: ['Fichier', 'Format', 'Type'], rows: rnaRows });
+} else {
+  await widget('text', { content: 'Aucun fichier disponible.' });
+}
 ```
 
 ## Common mistakes

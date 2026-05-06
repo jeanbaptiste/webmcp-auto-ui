@@ -27,7 +27,7 @@ INSEE and SDES publish many long series on data.gouv.fr — this recipe wraps th
 
 1. **Find a series resource**:
    ```js
-   const search = await call('search_datasets', { query: 'salaire moyen INSEE série', page_size: 5 });
+   const search = await call('search_datasets', { query: 'salaire moyen INSEE série', page_size: 5 }).catch(() => ({ datasets: [] }));
    const ds = search?.datasets?.[0];
    const resList = ds ? await call('list_dataset_resources', { dataset_id: ds.id }).catch(() => ({ resources: [] })) : { resources: [] };
    const csv = (resList?.resources ?? []).find(r => r.format === 'csv') ?? (resList?.resources ?? [])[0];
@@ -60,6 +60,7 @@ INSEE and SDES publish many long series on data.gouv.fr — this recipe wraps th
 
    if (!yearCol || !valueCol) {
      await widget('text', { content: 'Impossible de détecter les colonnes année/valeur.' });
+     return;
    }
 
    const rows = allRows
@@ -68,6 +69,7 @@ INSEE and SDES publish many long series on data.gouv.fr — this recipe wraps th
 
    if (rows.length === 0) {
      await widget('text', { content: 'Aucune donnée temporelle.' });
+     return;
    }
    ```
 
@@ -113,6 +115,10 @@ const data = await call('query_resource_data', {
 const rows = (data?.rows ?? [])
   .filter(r => r['Secteur'] === 'Public' && Number.isFinite(Number(r['Effectifs'])))
   .sort((a, b) => Number(a['Année']) - Number(b['Année']));
+if (rows.length === 0) {
+  await widget('text', { content: 'Données indisponibles (MCP fail ou resource non tabulaire).' });
+  return;
+}
 await widget('chart', { type: 'line', data: { labels: rows.map(r => r['Année'] ?? '—'), values: rows.map(r => Number(r['Effectifs'])) }, options: { xLabel: 'Année', yLabel: 'Effectifs' } });
 const last = rows.at(-1);
 const first = rows.at(0);

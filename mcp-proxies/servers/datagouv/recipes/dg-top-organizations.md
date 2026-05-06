@@ -85,15 +85,28 @@ for (const d of (res?.datasets ?? [])) {
   }
 }
 const ranking2 = Object.values(acc2).sort((x, y) => y.count - x.count);
-await widget('data-table', { columns: ['Organisation', 'Datasets'], rows: ranking2.length ? ranking2.slice(0, 10).map(o => [o.name ?? '—', o.count ?? 0]) : [['—', 0]] });
+if (ranking2.length === 0) {
+  await widget('text', { content: 'Aucune organisation trouvée pour ce thème.' });
+} else {
+  await widget('data-table', { columns: ['Organisation', 'Datasets'], rows: ranking2.slice(0, 10).map(o => [o.name ?? '—', o.count ?? 0]) });
+}
 ```
 
 ### Profile INSEE
 ```js
 const res = await call('search_datasets', { query: 'INSEE', page_size: 50 }).catch(() => ({ datasets: [] }));
 const insee = (res?.datasets ?? []).filter(d => (d.organization?.name ?? '').toLowerCase().includes('insee'));
-await widget('profile', { name: 'INSEE', description: `${insee.length} datasets visibles dans cette recherche` });
-await widget('cards', { items: (insee.length ? insee : (res?.datasets ?? [])).slice(0, 5).map(d => ({ title: d.title ?? '—', subtitle: d.organization?.name ?? '' })) });
+try {
+  await widget('profile', { name: 'INSEE', description: `${insee.length} datasets visibles dans cette recherche` });
+  const cardItems = (insee.length ? insee : (res?.datasets ?? [])).slice(0, 5).map(d => ({ title: d.title ?? '—', subtitle: d.organization?.name ?? '' }));
+  if (cardItems.length === 0) {
+    await widget('text', { content: 'Aucun dataset trouvé.' });
+  } else {
+    await widget('cards', { items: cardItems });
+  }
+} catch (e) {
+  await widget('text', { content: 'Impossible de charger le profil INSEE.' });
+}
 ```
 
 ## Common mistakes
