@@ -858,7 +858,15 @@ function renderResultInto(el: HTMLElement, cell: NotebookCell, overlay: RuntimeO
   const r = effectiveResult(cell, overlay) ?? cell.lastResult;
   el.innerHTML = '';
   if (!r) {
-    el.innerHTML = `<div class="nbe-result-empty">press ▶ to run</div>`;
+    const rtStatus = cellRuntimeStatus(cell, overlay);
+    const isView = stateRef?.mode === 'view';
+    if (rtStatus === 'running') {
+      el.innerHTML = `<div class="nbe-result-running"><span class="nbe-spinner"></span> running</div>`;
+    } else if (isView) {
+      el.innerHTML = `<div class="nbe-result-empty">—</div>`;
+    } else {
+      el.innerHTML = `<div class="nbe-result-empty">press ▶ to run</div>`;
+    }
     return;
   }
   // Logs panel (shared across all widgets), prepended above the main result
@@ -1126,6 +1134,10 @@ function injectLayoutStyles(): void {
 }
 .nbe-result-empty {
   color: var(--color-text2); font-style: italic; font-size: 11.5px;
+}
+.nbe-result-running {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: #2ea043; font-size: 11.5px;
 }
 .nbe-result-error {
   color: var(--color-accent2); white-space: pre-wrap; font-size: 12px;
