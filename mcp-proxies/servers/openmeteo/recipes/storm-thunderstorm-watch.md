@@ -76,13 +76,21 @@ stormHours.forEach((s, i) => {
 });
 
 await widget('chart-rich', {
-  title: `Probabilite orages 48h - ${name ?? ''}`,
+  title: `Probabilite orages 48h - ${name ?? ''} — probabilite`,
   type: 'line',
   xAxis: { label: 'Heure', data: h.time ?? [] },
   series: [
-    { label: 'Prob. precip (%)', data: h.precipitation_probability ?? [], color: '#3498db' },
-    { label: 'CAPE (J/kg)', data: h.cape ?? [], color: '#e74c3c' },
-    { label: 'Precip (mm)', data: h.precipitation ?? [], type: 'bar', color: '#7f8c8d' }
+    { label: 'Prob. precip (%)', data: h.precipitation_probability ?? [], color: '#3498db' }
+  ]
+});
+
+await widget('chart-rich', {
+  title: `Probabilite orages 48h - ${name ?? ''} — CAPE / precip`,
+  type: 'line',
+  xAxis: { label: 'Heure', data: h.time ?? [] },
+  series: [
+    { label: 'CAPE norm (0-100)', data: (h.cape ?? []).map(v => Number.isFinite(v) ? Math.min(100, v / 50) : 0), color: '#e74c3c' },
+    { label: 'Precip (mm)', data: h.precipitation ?? [], color: '#7f8c8d' }
   ]
 });
 
@@ -100,7 +108,7 @@ await widget('stat-card', {
   items: [
     { label: 'Fenetre sans pluie max', value: `${bestLen}h`, icon: 'sun' },
     { label: 'Demarre le', value: bestLen > 0 ? (h.time[bestStart] ?? '—') : '-', icon: 'clock' },
-    { label: 'Episodes orageux 48h', value: String(stormEpisodes.length), icon: 'cloud-lightning' }
+    { label: 'Episodes orageux 48h', value: String(stormEpisodes.length), icon: 'zap' }
   ]
 });
 

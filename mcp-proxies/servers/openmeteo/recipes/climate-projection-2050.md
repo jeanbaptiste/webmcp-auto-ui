@@ -65,11 +65,31 @@ function annualize(times, values) {
   return Object.entries(byYear).map(([y, arr]) => ({ year: +y, mean: arr.reduce((a,b)=>a+b,0)/arr.length }));
 }
 
-const annual = annualize(c.daily.time, c.daily.temperature_2m_mean ?? []);
-if (annual.length === 0) {
+const MODELS = [
+  { key: 'EC_Earth3P_HR',  label: 'EC-Earth3P-HR (SSP)',  color: '#e74c3c' },
+  { key: 'MRI_AGCM3_2_S', label: 'MRI-AGCM3-2-S (SSP)',  color: '#2980b9' },
+  { key: 'CMCC_CM2_VHR4', label: 'CMCC-CM2-VHR4 (SSP)',  color: '#27ae60' },
+];
+
+const series = [];
+let firstAnnual = null;
+
+for (const model of MODELS) {
+  const fieldKey = `temperature_2m_mean_${model.key}`;
+  const rawValues = c.daily[fieldKey];
+  if (!Array.isArray(rawValues)) continue; // modele absent de la reponse
+  const annual = annualize(c.daily.time, rawValues);
+  if (annual.length === 0) continue;
+  if (!firstAnnual) firstAnnual = annual;
+  series.push({ label: model.label, data: annual.map(a => a.mean), color: model.color });
+}
+
+if (series.length === 0) {
   await widget('text', { content: 'Aucune donnee annuelle exploitable.' });
   return;
 }
+
+const annual = firstAnnual; // reference pour les abscisses et la table
 const baselineSlice = annual.slice(0, 10);
 const baseline = baselineSlice.reduce((a, b) => a + b.mean, 0) / baselineSlice.length;
 
@@ -84,7 +104,7 @@ await widget('chart-rich', {
   title: 'Temperature moyenne annuelle - Marseille (2025-2100)',
   type: 'line',
   xAxis: { label: 'Annee', data: annual.map(a => a.year) },
-  series: [{ label: 'Tmoy annuelle (C)', data: annual.map(a => a.mean), color: '#e74c3c' }]
+  series,
 });
 
 await widget('data-table', {

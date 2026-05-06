@@ -23,14 +23,13 @@ Operations / debug scenario:
 
 ## How to use
 
-1. **Run the diagnostic** (no parameters):
+1. **Run the diagnostic and render results** (no parameters):
    ```js
-   const c = await call('test_wikipedia_connectivity', {}).catch(() => null);
-   if (!c) return widget('text', { content: 'Connectivity check failed.' });
-   ```
-
-2. **Render headline status + detail**:
-   ```js
+   const c = await Promise.race([
+     call('test_wikipedia_connectivity', {}),
+     new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 8000))
+   ]).catch(e => ({ _error: e.message }));
+   if (c?._error) return widget('text', { content: `Connectivity check failed: ${c._error}` });
    const latencyMs = Number.isFinite(c?.response_time_ms) ? c.response_time_ms : 0;
    await widget('stat-card', {
      label: 'Status',

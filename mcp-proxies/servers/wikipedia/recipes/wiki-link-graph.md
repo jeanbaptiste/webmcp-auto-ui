@@ -26,7 +26,7 @@ The user wants the network of references from one article:
 1. **Fetch the links list**:
    ```js
    const res = await call('get_links', { title: 'Quantum mechanics' }).catch(() => null);
-   const links = (res?.links ?? []).filter(l => typeof l === 'string' && l.length > 0);
+   const links = (res?.links ?? []).map(l => (typeof l === 'string' ? l : l?.title ?? '')).filter(Boolean);
    if (links.length === 0) return widget('text', { content: 'No outgoing links available.' });
    ```
 
@@ -50,7 +50,7 @@ The user wants the network of references from one article:
    await widget('cards', {
      items: summaries.filter(s => s).map(s => ({
        title: s?.title ?? '—',
-       body: (s?.summary ?? '').slice(0, 140),
+       body: (s?.extract ?? s?.description ?? s?.summary ?? '').slice(0, 140),
        url: `https://en.wikipedia.org/wiki/${encodeURIComponent((s?.title ?? '').replace(/ /g, '_'))}`
      }))
    });
@@ -65,12 +65,12 @@ The user wants the network of references from one article:
 ### Mécanique quantique
 ```js
 const res = await call('get_links', { title: 'Quantum mechanics' }).catch(() => null);
-const links = (res?.links ?? []).filter(l => l);
+const links = (res?.links ?? []).map(l => (typeof l === 'string' ? l : l?.title ?? '')).filter(Boolean);
 const top = links.slice(0, 6);
 const sums = await Promise.all(top.map(l => call('get_summary', { title: l }).catch(() => null)));
 await widget('stat-card', { label: 'Links', value: links.length, icon: 'link' });
 await widget('cards', {
-  items: sums.filter(Boolean).map(s => ({ title: s?.title ?? '—', body: (s?.summary ?? '').slice(0, 120) }))
+  items: sums.filter(Boolean).map(s => ({ title: s?.title ?? '—', body: (s?.extract ?? s?.description ?? s?.summary ?? '').slice(0, 120) }))
 });
 await widget('data-table', { columns: ['#', 'Article'], rows: links.map((l, i) => [i + 1, l]) });
 ```
@@ -78,7 +78,7 @@ await widget('data-table', { columns: ['#', 'Article'], rows: links.map((l, i) =
 ### Internet outgoing links
 ```js
 const res = await call('get_links', { title: 'Internet' }).catch(() => null);
-const links = (res?.links ?? []).filter(l => l);
+const links = (res?.links ?? []).map(l => (typeof l === 'string' ? l : l?.title ?? '')).filter(Boolean);
 await widget('stat-card', { label: 'Outgoing', value: links.length, icon: 'link' });
 await widget('data-table', { columns: ['#', 'Linked article'], rows: links.slice(0, 100).map((l, i) => [i + 1, l]) });
 ```
@@ -87,7 +87,7 @@ await widget('data-table', { columns: ['#', 'Linked article'], rows: links.slice
 
 - **Rendering 1000+ rows in the table**: large articles have huge link lists — cap at 100-200 rows
 - **Calling `get_summary` for every link**: 200 sequential calls is slow ; sample 6-10 for cards only
-- **Treating `links` as objects**: it's an array of strings (titles)
+- **Treating `links` as plain strings**: `get_links` returns objects `{ ns, title }` — always extract `.title` with `.map(l => (typeof l === 'string' ? l : l?.title ?? '')).filter(Boolean)`
 - **Not catching errors on `get_summary`**: a stale or redirect link may 404 — wrap with `.catch`
 - **Forgetting the count stat-card**: the total is the headline metric — show it before the table
 - **Using `Promise.all` on 50 summaries** without `catch`: one failure kills the whole batch

@@ -79,7 +79,7 @@ const snowArr = (hourly.snowfall ?? []).filter(v => Number.isFinite(v));
 
 await widget('stat-card', {
   title: `Conditions ${name ?? ''}${altitude != null ? ` (${altitude}m)` : ''}`,
-  items: [
+  stats: [
     { label: 'T sommet', value: Number.isFinite(tNow) ? `${tNow.toFixed(1)}C` : '—', icon: 'thermometer' },
     { label: 'Ressenti', value: Number.isFinite(apparentNow) ? `${apparentNow.toFixed(1)}C` : '—', icon: 'wind' },
     { label: 'Vent (120m)', value: Number.isFinite(windNow) ? `${windNow.toFixed(0)} km/h` : '—', icon: 'wind' },
@@ -90,21 +90,21 @@ await widget('stat-card', {
 await widget('chart-rich', {
   title: 'Vent et T (tranches 6h, 3 jours)',
   type: 'line',
-  xAxis: { label: 'Heure', data: tDS.times },
-  series: [
-    { label: 'T (C)', data: tDS.values, color: '#3498db' },
-    { label: 'Vent 120m (km/h)', data: windDS.values, color: '#e67e22' }
+  labels: tDS.times,
+  datasets: [
+    { label: 'T (C)', data: tDS.values, borderColor: '#3498db' },
+    { label: 'Vent 120m (km/h)', data: windDS.values, borderColor: '#e67e22' }
   ]
 });
 
 await widget('kv', {
   title: 'Donnees complementaires',
   pairs: [
-    ['Altitude', altitude != null ? `${altitude} m` : '—'],
-    ['Visibilite actuelle', Number.isFinite(visM) ? `${(visM / 1000).toFixed(1)} km` : '—'],
-    ['Iso 0C actuelle', Number.isFinite(isoZero) ? `${isoZero.toFixed(0)} m` : '—'],
-    ['Rafale max prevue 3j', gustArr.length > 0 ? `${Math.max(...gustArr).toFixed(0)} km/h` : '—'],
-    ['Neige prevue 3j', `${snowArr.reduce((s,v)=>s+v,0).toFixed(1)} cm`]
+    { key: 'Altitude', value: altitude != null ? `${altitude} m` : '—' },
+    { key: 'Visibilite actuelle', value: Number.isFinite(visM) ? `${(visM / 1000).toFixed(1)} km` : '—' },
+    { key: 'Iso 0C actuelle', value: Number.isFinite(isoZero) ? `${isoZero.toFixed(0)} m` : '—' },
+    { key: 'Rafale max prevue 3j', value: gustArr.length > 0 ? `${Math.max(...gustArr).toFixed(0)} km/h` : '—' },
+    { key: 'Neige prevue 3j', value: `${snowArr.reduce((s,v)=>s+v,0).toFixed(1)} cm` }
   ]
 });
 ```

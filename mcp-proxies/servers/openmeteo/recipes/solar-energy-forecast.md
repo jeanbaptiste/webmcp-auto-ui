@@ -54,7 +54,7 @@ if (!w?.daily?.time?.length) {
 
 const radSums = (w.daily.shortwave_radiation_sum ?? []).filter(v => Number.isFinite(v));
 const sunDur = (w.daily.sunshine_duration ?? []).filter(v => Number.isFinite(v));
-const dailyKWh = radSums.map(v => v / 1000); // MJ/m2 -> kWh/m2 (selon convention)
+const dailyKWh = radSums.map(v => v / 3.6); // MJ/m2 -> kWh/m2 (1 MJ = 1/3.6 kWh)
 const totalKWh = dailyKWh.reduce((s, v) => s + v, 0);
 const totalSunHours = sunDur.reduce((s, v) => s + v, 0) / 3600;
 const optimalTilt = Math.round(latitude); // regle de pouce
@@ -62,26 +62,14 @@ const optimalAzimuth = latitude > 0 ? 'Sud (180°)' : 'Nord (0°)';
 const bestIdx = dailyKWh.length > 0 ? dailyKWh.indexOf(Math.max(...dailyKWh)) : -1;
 const days = dailyKWh.length || 1;
 
-await widget('chart-rich', {
-  title: 'Radiation solaire 5 jours - Montpellier',
-  type: 'line',
-  xAxis: { label: 'Heure', data: w.hourly?.time ?? [] },
-  series: [
-    { label: 'Globale (W/m2)', data: w.hourly?.shortwave_radiation ?? [], color: '#f39c12' },
-    { label: 'Directe', data: w.hourly?.direct_radiation ?? [], color: '#e67e22' },
-    { label: 'Diffuse', data: w.hourly?.diffuse_radiation ?? [], color: '#3498db' }
-  ]
-});
+// Filtrer les heures de nuit (shortwave_radiation = 0) pour le chart
+const hourlyRad = w.hourly?.shortwave_radiation ?? [];
+const dayIdx = hourlyRad.map((v, i) => v > 0 ? i : -1).filter(i => i >= 0);
+const hourlyTime = w.hourly?.time ?? [];
+const hourlyDirect = w.hourly?.direct_radiation ?? [];
+const hourlyDiffuse = w.hourly?.diffuse_radiation ?? [];
 
-await widget('stat-card', {
-  items: [
-    { label: 'Energie 5j', value: `${totalKWh.toFixed(1)} kWh/m2`, icon: 'sun' },
-    { label: 'Soleil cumule', value: `${totalSunHours.toFixed(1)} h`, icon: 'clock' },
-    { label: 'Meilleure journee', value: bestIdx >= 0 ? (w.daily.time?.[bestIdx] ?? '—') : '—', icon: 'star' },
-    { label: 'kWh/m2/jour moyen', value: `${(totalKWh / days).toFixed(2)}`, icon: 'trending-up' }
-  ]
-});
-
+// Configuration statique independante des donnees meteo — affichee en premier
 await widget('kv', {
   title: 'Configuration optimale (regle de pouce annuelle)',
   pairs: [
@@ -91,6 +79,28 @@ await widget('kv', {
     ['Note', 'Inclinaison plus faible (latitude - 15°) optimise l\'ete ; plus forte (latitude + 15°) optimise l\'hiver']
   ]
 });
+
+await widget('chart-rich', {
+  title: 'Radiation solaire 5 jours - Montpellier',
+  type: 'line',
+  xAxis: { label: 'Heure', data: dayIdx.map(i => hourlyTime[i]) },
+  series: [
+    { label: 'Globale (W/m2)', data: dayIdx.map(i => hourlyRad[i]), color: '#f39c12' },
+    { label: 'Directe', data: dayIdx.map(i => hourlyDirect[i] ?? 0), color: '#e67e22' },
+    { label: 'Diffuse', data: dayIdx.map(i => hourlyDiffuse[i] ?? 0), color: '#3498db' }
+  ]
+});
+
+if (radSums.length > 0) {
+  await widget('stat-card', {
+    items: [
+      { label: 'Energie 5j', value: Number.isFinite(totalKWh) ? `${totalKWh.toFixed(1)} kWh/m2` : '—', icon: 'sun' },
+      { label: 'Soleil cumule', value: `${totalSunHours.toFixed(1)} h`, icon: 'clock' },
+      { label: 'Meilleure journee', value: bestIdx >= 0 ? (w.daily.time?.[bestIdx] ?? '—') : '—', icon: 'star' },
+      { label: 'kWh/m2/jour moyen', value: Number.isFinite(totalKWh) ? `${(totalKWh / days).toFixed(2)}` : '—', icon: 'trending-up' }
+    ]
+  });
+}
 ```
 
 ## Examples

@@ -60,29 +60,29 @@ const hourly48 = (hourly.time ?? []).slice(0, 48);
 await widget('stat-card', {
   title: 'Meteo actuelle - Lille',
   items: [
-    { label: 'Temperature', value: cur.temperature != null ? `${cur.temperature}C` : '—', icon: 'thermometer' },
-    { label: 'Vent', value: cur.windspeed != null ? `${cur.windspeed} km/h` : '—', icon: 'wind' },
-    { label: 'Humidite', value: hourly.relative_humidity_2m?.[0] != null ? `${hourly.relative_humidity_2m[0]}%` : '—', icon: 'droplets' },
-    { label: 'Pluie 24h', value: daily.precipitation_sum?.[0] != null ? `${daily.precipitation_sum[0]} mm` : '—', icon: 'cloud-rain' }
+    { label: 'Temperature', value: cur.temperature != null ? `${cur.temperature}C` : '—' },
+    { label: 'Vent', value: cur.windspeed != null ? `${cur.windspeed} km/h` : '—' },
+    { label: 'Humidite', value: hourly.relative_humidity_2m?.[0] != null ? `${hourly.relative_humidity_2m[0]}%` : '—' },
+    { label: 'Pluie 24h', value: daily.precipitation_sum?.[0] != null ? `${daily.precipitation_sum[0]} mm` : '—' }
   ]
 });
 
 await widget('chart-rich', {
   title: 'Prochaines 48h',
   type: 'line',
-  xAxis: { label: 'Heure', data: hourly48 },
-  series: [
+  labels: hourly48,
+  datasets: [
     { label: 'Temperature (C)', data: (hourly.temperature_2m ?? []).slice(0, 48), color: '#e74c3c' },
-    { label: 'Precipitation (mm)', data: (hourly.precipitation ?? []).slice(0, 48), type: 'bar', color: '#3498db' }
+    { label: 'Precipitation (mm)', data: (hourly.precipitation ?? []).slice(0, 48), color: '#3498db' }
   ]
 });
 
 await widget('kv', {
   title: 'Infos pratiques',
   pairs: [
-    ['Lever du soleil', daily.sunrise?.[0]?.slice(11, 16) ?? '—'],
-    ['Coucher du soleil', daily.sunset?.[0]?.slice(11, 16) ?? '—'],
-    ['UV max aujourd\'hui', daily.uv_index_max?.[0] != null ? String(daily.uv_index_max[0]) : '—']
+    { key: 'Lever du soleil', value: daily.sunrise?.[0]?.slice(11, 16) ?? '—' },
+    { key: 'Coucher du soleil', value: daily.sunset?.[0]?.slice(11, 16) ?? '—' },
+    { key: 'UV max aujourd\'hui', value: daily.uv_index_max?.[0] != null ? String(daily.uv_index_max[0]) : '—' }
   ]
 });
 ```

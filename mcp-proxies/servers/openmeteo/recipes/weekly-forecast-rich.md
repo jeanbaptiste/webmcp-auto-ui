@@ -59,27 +59,35 @@ const hottestIdx = hottestVal != null ? tmaxArr.indexOf(hottestVal) : -1;
 const totalRain = (d.precipitation_sum ?? []).filter(v => Number.isFinite(v)).reduce((a, b) => a + b, 0);
 
 await widget('chart-rich', {
-  title: 'Previsions 7 jours - Toulouse',
+  title: 'Temperatures 7 jours - Toulouse',
   type: 'line',
   xAxis: { label: 'Date', data: d.time ?? [] },
   series: [
     { label: 'Tmax (C)', data: d.temperature_2m_max ?? [], color: '#e74c3c' },
-    { label: 'Tmin (C)', data: d.temperature_2m_min ?? [], color: '#3498db' },
-    { label: 'Pluie (mm)', data: d.precipitation_sum ?? [], type: 'bar', color: '#95a5a6' }
+    { label: 'Tmin (C)', data: d.temperature_2m_min ?? [], color: '#3498db' }
+  ]
+});
+
+await widget('chart-rich', {
+  title: 'Precipitations 7 jours - Toulouse',
+  type: 'bar',
+  xAxis: { label: 'Date', data: d.time ?? [] },
+  series: [
+    { label: 'Pluie (mm)', data: d.precipitation_sum ?? [], color: '#95a5a6' }
   ]
 });
 
 await widget('data-table', {
   title: 'Detail jour par jour',
   columns: ['Jour', 'Tmax', 'Tmin', 'Pluie (mm)', 'Prob. pluie', 'Vent max'],
-  rows: (d.time ?? []).map((t, i) => [
-    t,
-    d.temperature_2m_max?.[i] != null ? `${d.temperature_2m_max[i]}C` : '—',
-    d.temperature_2m_min?.[i] != null ? `${d.temperature_2m_min[i]}C` : '—',
-    Number.isFinite(d.precipitation_sum?.[i]) ? d.precipitation_sum[i].toFixed(1) : '—',
-    d.precipitation_probability_max?.[i] != null ? `${d.precipitation_probability_max[i]}%` : '—',
-    d.wind_speed_10m_max?.[i] != null ? `${d.wind_speed_10m_max[i]} km/h` : '—'
-  ])
+  rows: (d.time ?? []).map((t, i) => ({
+    'Jour': t,
+    'Tmax': d.temperature_2m_max?.[i] != null ? `${d.temperature_2m_max[i]}C` : '—',
+    'Tmin': d.temperature_2m_min?.[i] != null ? `${d.temperature_2m_min[i]}C` : '—',
+    'Pluie (mm)': Number.isFinite(d.precipitation_sum?.[i]) ? d.precipitation_sum[i].toFixed(1) : '—',
+    'Prob. pluie': d.precipitation_probability_max?.[i] != null ? `${d.precipitation_probability_max[i]}%` : '—',
+    'Vent max': d.wind_speed_10m_max?.[i] != null ? `${d.wind_speed_10m_max[i]} km/h` : '—'
+  }))
 });
 
 await widget('stat-card', {

@@ -25,13 +25,15 @@ Outil rare en grand public ; alerte preventive utile en zone inondable.
 
 ## How to use
 
-1. `geocoding({ name: "Tours", count: 1 })` -- la coordonnee doit etre proche d'un fleuve majeur (GloFAS = grands cours d'eau).
+1. `geocoding({ name: "Paris", count: 1 })` -- la coordonnee doit etre proche d'un fleuve majeur (GloFAS = grands cours d'eau). Points de test GloFAS garantis : Paris sur la Seine (lat=48.85, lon=2.35), Rhine a Cologne (50.93, 6.95), Danube a Vienne (48.21, 16.37).
 2. `flood_forecast` avec `daily: [river_discharge, river_discharge_mean, river_discharge_max, river_discharge_min, river_discharge_p50]` sur 30 jours.
 3. Comparer la prevision a la moyenne climatologique (`river_discharge_mean`).
 4. Rendre chart, stat-cards (max attendu, ecart vs normale, jour critique), carte du point.
 
 ```js
-const geo = await call('geocoding', { name: 'Tours', count: 1 });
+// Point de test GloFAS garanti : Paris (Seine) lat=48.85, lon=2.35
+// Autres points surs : Rhine a Cologne (50.93, 6.95), Danube a Vienne (48.21, 16.37)
+const geo = await call('geocoding', { name: 'Paris', count: 1 });
 const place = geo?.results?.[0];
 if (!place) {
   await widget('text', { content: 'Ville introuvable.' });
@@ -48,7 +50,12 @@ const f = await call('flood_forecast', {
 const discharge = (f?.daily?.river_discharge ?? []).filter(v => Number.isFinite(v));
 const climato = (f?.daily?.river_discharge_mean ?? []).filter(v => Number.isFinite(v));
 if (discharge.length === 0) {
-  await widget('text', { content: `Aucune donnee hydrologique pour ${name} (le point n'est probablement pas sur un grand cours d'eau GloFAS).` });
+  await widget('map', {
+    title: `Point hydro - ${name ?? ''} (hors couverture GloFAS)`,
+    center: { lat: latitude, lng: longitude }, zoom: 11,
+    markers: [{ lat: latitude, lng: longitude, label: name ?? '', popup: 'Aucune donnee GloFAS — le point n\'est probablement pas sur un grand cours d\'eau (bassin versant insuffisant).' }]
+  });
+  await widget('text', { content: `Aucune donnee hydrologique pour ${name}. GloFAS ne couvre que les grands cours d'eau (largeur de bassin suffisante). Essayer un point sur la Seine, la Loire, le Rhone ou le Rhin.` });
   return;
 }
 const peak = Math.max(...discharge);
@@ -93,7 +100,7 @@ Meme pipeline ; les marees Atlantique modulent le debit aval -- mentionner la li
 
 ## Common mistakes
 
-- GloFAS couvre les GRANDS cours d'eau (largeur > ~1 km de bassin versant) -- un ru local renverra null
+- GloFAS couvre les GRANDS cours d'eau (largeur > ~1 km de bassin versant) -- un ru local renverra null. Points de test garantis pour audit : Paris/Seine (48.85, 2.35), Rhine/Cologne (50.93, 6.95), Danube/Vienne (48.21, 16.37). Tours sur la Loire peut retourner vide si le point geocode tombe hors cellule GloFAS.
 - Ne pas comparer le debit a un seuil absolu sans contexte -- toujours rapporter au climatologique (`river_discharge_mean`)
 - L'horizon utile est ~30 jours ; au-dela, l'incertitude domine
 - `flood_forecast` ne fournit PAS de hauteur d'eau locale (la conversion debit -> hauteur depend de la station)

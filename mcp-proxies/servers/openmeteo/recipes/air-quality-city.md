@@ -55,7 +55,7 @@ const aqi = a.current?.european_aqi ?? null;
 const aqiLabel = aqi == null ? '—' : aqi < 20 ? 'Bon' : aqi < 40 ? 'Correct' : aqi < 60 ? 'Moyen' : aqi < 80 ? 'Mauvais' : 'Tres mauvais';
 
 await widget('stat-card', {
-  title: 'Qualite de l\'air - Lyon',
+  title: `Qualite de l'air - ${place.name}`,
   items: [
     { label: 'AQI europeen', value: aqi == null ? '—' : `${aqi} (${aqiLabel})`, icon: 'wind' },
     { label: 'PM2.5', value: Number.isFinite(a.current?.pm2_5) ? `${a.current.pm2_5.toFixed(1)} ug/m3` : '—', icon: 'circle' },
@@ -66,20 +66,32 @@ await widget('stat-card', {
 
 const hourly = a.hourly ?? {};
 const times = hourly.time ?? [];
+const timesEvery6h = times.filter((_, i) => i % 6 === 0);
+const sliceEvery6h = (arr) => (arr ?? []).filter((_, i) => i % 6 === 0);
 await widget('chart-rich', {
   title: 'Pollens sur 5 jours (grains/m3)',
   type: 'line',
-  xAxis: { label: 'Heure', data: times },
+  xAxis: { label: 'Heure', data: timesEvery6h.map(t => t.slice(5, 16).replace('T', ' ')) },
   series: [
-    { label: 'Graminees', data: hourly.grass_pollen ?? [], color: '#27ae60' },
-    { label: 'Bouleau', data: hourly.birch_pollen ?? [], color: '#8e44ad' },
-    { label: 'Olivier', data: hourly.olive_pollen ?? [], color: '#f39c12' },
-    { label: 'Ambroisie', data: hourly.ragweed_pollen ?? [], color: '#c0392b' }
+    { label: 'Graminees', data: sliceEvery6h(hourly.grass_pollen), color: '#27ae60' },
+    { label: 'Bouleau', data: sliceEvery6h(hourly.birch_pollen), color: '#8e44ad' },
+    { label: 'Olivier', data: sliceEvery6h(hourly.olive_pollen), color: '#f39c12' },
+    { label: 'Ambroisie', data: sliceEvery6h(hourly.ragweed_pollen), color: '#c0392b' }
   ]
 });
 
 const uvSeries = hourly.uv_index ?? [];
-const noonIdx = times.map((t, i) => t.endsWith('T12:00') ? i : -1).filter(i => i >= 0).slice(0, 5);
+let noonIdx = times.map((t, i) => t.endsWith('T12:00') ? i : -1).filter(i => i >= 0).slice(0, 5);
+if (noonIdx.length === 0) {
+  // Fallback : une valeur UV max par jour calendaire
+  const byDay = {};
+  times.forEach((t, i) => {
+    const day = t.slice(0, 10);
+    const v = uvSeries[i];
+    if (Number.isFinite(v) && (byDay[day] == null || v > uvSeries[byDay[day]])) byDay[day] = i;
+  });
+  noonIdx = Object.values(byDay).slice(0, 5);
+}
 await widget('kv', {
   title: 'UV index midi (5j)',
   pairs: noonIdx.map(i => {

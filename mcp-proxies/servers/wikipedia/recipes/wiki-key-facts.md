@@ -78,3 +78,4 @@ await widget('cards', { items: facts.map((fact, i) => ({ title: `Fact ${i + 1}`,
 - **Using `extract_key_facts` for narrative flow**: facts are atomic statements, not a story — use `summarize_article_section` for narrative
 - **Not handling `facts: []`**: if the article is too short, the array may be empty — render a stat-card "No facts extracted"
 - **Hardcoding `count: 5`**: respect the user's number ("Donne-moi 10 faits" → `count: 10`)
+- **Debugging widget render issues** (e.g. `[object Object]` in output): if `stat-card` or `cards` widgets don't render visually, fall back to `widget('text', ...)` to confirm the data pipeline works — `widget('text', { content: facts.map((f,i) => \`${i+1}. ${f}\`).join('\\n') })` keeps the output readable while the renderer is diagnosed

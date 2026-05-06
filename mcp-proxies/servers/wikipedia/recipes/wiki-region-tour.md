@@ -30,7 +30,7 @@ The user wants a mini guide of an area, encyclopedia-style:
    if (hits.length === 0) return widget('text', { content: 'No matches found.' });
    ```
 
-2. **Fetch coordinates for each hit** in parallel (some have none):
+2. **Fetch coordinates, compute center, render map + cards** (all in one cell to share scope):
    ```js
    const enriched = await Promise.all(hits.map(async h => {
      if (!h?.title) return null;
@@ -44,16 +44,10 @@ The user wants a mini guide of an area, encyclopedia-style:
    }));
    const places = enriched.filter(Boolean);
    if (places.length === 0) return widget('text', { content: 'No geolocated places.' });
-   ```
 
-3. **Compute map center** (mean of coords):
-   ```js
    const cLat = places.reduce((s, p) => s + p.lat, 0) / places.length;
    const cLon = places.reduce((s, p) => s + p.lon, 0) / places.length;
-   ```
 
-4. **Render map + cards + table**:
-   ```js
    await widget('map', {
      center: [cLon, cLat],
      zoom: 12,
@@ -62,9 +56,8 @@ The user wants a mini guide of an area, encyclopedia-style:
    await widget('cards', {
      items: places.map(p => ({ title: p.title, body: (p.summary || '').slice(0, 160) }))
    });
-   await widget('data-table', {
-     columns: ['Place', 'Lat', 'Lon'],
-     rows: places.map(p => [p.title, p.lat.toFixed(3), p.lon.toFixed(3)])
+   await widget('cards', {
+     items: places.map(p => ({ title: `${p.title} — coords`, body: `${p.lat.toFixed(3)}, ${p.lon.toFixed(3)}` }))
    });
    ```
 

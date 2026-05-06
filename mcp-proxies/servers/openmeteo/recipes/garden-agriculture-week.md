@@ -52,16 +52,17 @@ if (!w?.daily?.time?.length) {
 }
 
 const d = w.daily;
-const tmin = (d.temperature_2m_min ?? []).filter(v => Number.isFinite(v));
-const rain = (d.precipitation_sum ?? []).filter(v => Number.isFinite(v));
-const etpArr = (d.et0_fao_evapotranspiration ?? []).filter(v => Number.isFinite(v));
-const uvArr = (d.uv_index_max ?? []).filter(v => Number.isFinite(v));
-const wndArr = (d.wind_speed_10m_max ?? []).filter(v => Number.isFinite(v));
+const tmin = (d.temperature_2m_min ?? []).map(v => Number.isFinite(v) ? v : 0);
+const rain = (d.precipitation_sum ?? []).map(v => Number.isFinite(v) ? v : 0);
+const etpArr = (d.et0_fao_evapotranspiration ?? []).map(v => Number.isFinite(v) ? v : 0);
+const uvArr = (d.uv_index_max ?? []).map(v => Number.isFinite(v) ? v : 0);
+const wndArr = (d.wind_speed_10m_max ?? []).map(v => Number.isFinite(v) ? v : 0);
 
 const frostNights = tmin.filter(t => t < 0).length;
 const totalRain = rain.reduce((s, v) => s + v, 0);
 const totalETP = etpArr.reduce((s, v) => s + v, 0);
-const deficit = totalETP - totalRain;
+let deficit = totalETP - totalRain;
+if (Number.isNaN(deficit)) deficit = 0;
 let dryRun = 0, maxDryRun = 0;
 rain.forEach(p => { if (p < 0.5) { dryRun++; maxDryRun = Math.max(maxDryRun, dryRun); } else dryRun = 0; });
 
@@ -83,14 +84,15 @@ await widget('stat-card', {
   ]
 });
 
+const chartDates = (d.time ?? []).filter(v => v != null);
 await widget('chart-rich', {
   title: 'Tmin nocturne et precipitations',
   type: 'line',
-  xAxis: { label: 'Date', data: d.time ?? [] },
+  xAxis: { label: 'Date', data: chartDates },
   series: [
-    { label: 'Tmin (C)', data: d.temperature_2m_min ?? [], color: '#3498db' },
-    { label: 'Pluie (mm)', data: d.precipitation_sum ?? [], type: 'bar', color: '#27ae60' },
-    { label: 'Seuil gel', data: (d.time ?? []).map(() => 0), color: '#e74c3c', dashed: true }
+    { label: 'Tmin (C)', data: tmin, color: '#3498db' },
+    { label: 'Pluie (mm)', data: rain, type: 'bar', color: '#27ae60' },
+    { label: 'Seuil gel', data: chartDates.map(() => 0), color: '#e74c3c', style: 'dashed' }
   ]
 });
 

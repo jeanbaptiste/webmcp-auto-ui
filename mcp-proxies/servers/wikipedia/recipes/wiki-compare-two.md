@@ -37,9 +37,9 @@ The user wants a side-by-side comparison:
 
 2. **Render header stats**:
    ```js
-   await widget('stat-card', { label: 'A', value: sumA?.title ?? '—', icon: 'user' });
-   await widget('stat-card', { label: 'B', value: sumB?.title ?? '—', icon: 'user' });
-   await widget('stat-card', { label: 'Facts compared', value: Math.min(fA.length, fB.length), icon: 'columns' });
+   await widget('stat-card', { label: sumA?.title ?? 'A', value: fA.length, unit: 'facts', icon: 'user' });
+   await widget('stat-card', { label: sumB?.title ?? 'B', value: fB.length, unit: 'facts', icon: 'user' });
+   await widget('stat-card', { label: 'Facts compared', value: Math.min(fA.length, fB.length), icon: 'list' });
    ```
 
 3. **Render two summary blocks**:

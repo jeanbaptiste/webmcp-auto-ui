@@ -32,6 +32,15 @@ layout:
 ```js
 const cities = ['Paris', 'Bordeaux', 'Strasbourg', 'Marseille'];
 
+// Helper : temperature -> couleur (bleu #3b82f6 a froid, rouge #ef4444 a chaud, intervalle [0, 35])
+function tempToColor(t) {
+  const ratio = Math.min(1, Math.max(0, t / 35));
+  const r = Math.round(0x3b + ratio * (0xef - 0x3b));
+  const g = Math.round(0x82 + ratio * (0x44 - 0x82));
+  const b = Math.round(0xf6 + ratio * (0x44 - 0xf6));
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
+
 const geos = await Promise.all(cities.map(c => call('geocoding', { name: c, count: 1 }).catch(() => null)));
 const points = geos.map(g => g?.results?.[0]).filter(Boolean);
 
@@ -69,11 +78,18 @@ const center = {
   lng: data.reduce((s, d) => s + d.lng, 0) / data.length
 };
 
+// Zoom dynamique selon la dispersion lat/lng des villes
+const latSpan = Math.max(...data.map(d => d.lat)) - Math.min(...data.map(d => d.lat));
+const lngSpan = Math.max(...data.map(d => d.lng)) - Math.min(...data.map(d => d.lng));
+const span = Math.max(latSpan, lngSpan);
+const zoom = span < 3 ? 8 : span < 8 ? 6 : span < 20 ? 5 : 4;
+
 await widget('map', {
   title: 'Meteo actuelle - comparaison villes',
-  center, zoom: 6,
+  center, zoom,
   markers: data.map(d => ({
     lat: d.lat, lng: d.lng, label: d.name,
+    color: tempToColor(d.temp),
     popup: `${d.name} : ${d.temp}C, vent ${d.wind ?? '—'} km/h, pluie 24h ${d.rain ?? '—'} mm`
   }))
 });
@@ -83,16 +99,12 @@ const coldest = data.reduce((a, b) => a.temp < b.temp ? a : b);
 const withRain = data.filter(d => Number.isFinite(d.rain));
 const wettest = withRain.length > 0 ? withRain.reduce((a, b) => a.rain > b.rain ? a : b) : null;
 
-await widget('stat-card', {
-  items: [
-    { label: 'Plus chaude', value: `${hottest.name} (${hottest.temp}C)`, icon: 'sun' },
-    { label: 'Plus froide', value: `${coldest.name} (${coldest.temp}C)`, icon: 'snowflake' },
-    { label: 'Plus pluvieuse', value: wettest ? `${wettest.name} (${wettest.rain}mm)` : '—', icon: 'cloud-rain' }
-  ]
-});
+await widget('stat-card', { label: 'Plus chaude', value: `${hottest.name} (${hottest.temp}C)`, icon: 'sun' });
+await widget('stat-card', { label: 'Plus froide', value: `${coldest.name} (${coldest.temp}C)`, icon: 'snowflake' });
+await widget('stat-card', { label: 'Plus pluvieuse', value: wettest ? `${wettest.name} (${wettest.rain}mm)` : '—', icon: 'cloud-rain' });
 
 await widget('data-table', {
-  columns: ['Ville', 'T (C)', 'Vent (km/h)', 'Pluie 24h (mm)'],
+  headers: ['Ville', 'T (C)', 'Vent (km/h)', 'Pluie 24h (mm)'],
   rows: data.map(d => [d.name, d.temp, d.wind ?? '—', Number.isFinite(d.rain) ? d.rain.toFixed(1) : '—'])
 });
 ```

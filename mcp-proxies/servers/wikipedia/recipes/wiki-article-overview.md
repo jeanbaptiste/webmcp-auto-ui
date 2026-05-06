@@ -7,10 +7,6 @@ servers: [wikipedia]
 tools_used: [get_summary, get_article, get_sections]
 data_type: article
 components_used: [profile, text, kv, table]
-layout:
-  type: grid
-  columns: 2
-  arrangement: profile + summary text on the left, kv metadata + sections table on the right
 ---
 
 ## When to use

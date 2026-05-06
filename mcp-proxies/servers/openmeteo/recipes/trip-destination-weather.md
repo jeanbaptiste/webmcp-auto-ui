@@ -88,7 +88,7 @@ await widget('chart-rich', {
 });
 
 await widget('stat-card', {
-  items: [
+  stats: [
     { label: 'T moyenne', value: tMean != null ? `${tMean.toFixed(1)}C` : '—', icon: 'thermometer' },
     { label: 'Jours pluvieux', value: `${rainyDays}/${totalDays}`, icon: 'cloud-rain' },
     { label: 'UV max', value: peakUV != null ? `${peakUV.toFixed(0)}` : '—', icon: 'sun' },
