@@ -41,19 +41,53 @@
     return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
   }
 
+  /**
+   * Normalize a single series item:
+   * - `values: number[]`  → kept as-is
+   * - `value: number`     → wrapped as `[value]`   (tolerance #1)
+   */
+  function normalizeItem(o: Record<string, unknown>): ChartDataset | null {
+    // Prefer explicit `values` array; fall back to scalar `value`
+    let values: number[];
+    if (Array.isArray(o.values)) {
+      values = coerceValues(o.values);
+    } else if (typeof o.value === 'number' && Number.isFinite(o.value)) {
+      values = [o.value];
+    } else if (typeof o.value === 'string') {
+      const n = Number(o.value);
+      values = Number.isFinite(n) ? [n] : [];
+    } else {
+      values = [];
+    }
+    if (!values.length) return null;
+    return {
+      label: isPrimitiveLabel(o.label) ? String(o.label) : undefined,
+      values,
+      color: typeof o.color === 'string' ? o.color : undefined,
+    };
+  }
+
   function normalizeDatasets(raw: unknown): ChartDataset[] {
     if (!Array.isArray(raw)) return [];
     return raw.flatMap(item => {
       if (!item || typeof item !== 'object') return [];
-      const o = item as Record<string, unknown>;
-      // Validate values field
-      const values = coerceValues(o.values);
-      if (!values.length) return [];
-      return [{ label: isPrimitiveLabel(o.label) ? String(o.label) : undefined, values, color: typeof o.color === 'string' ? o.color : undefined }];
+      const result = normalizeItem(item as Record<string, unknown>);
+      return result ? [result] : [];
     });
   }
 
-  const datasets = $derived<ChartDataset[]>(normalizeDatasets(data?.datasets));
+  /**
+   * Resolve datasets from `data` prop, tolerating two shapes:
+   * - `{ datasets: [...] }` — canonical
+   * - `{ data: [...] }`     — agent shorthand (schema uses `data` key)
+   */
+  const datasets = $derived<ChartDataset[]>(
+    normalizeDatasets(
+      Array.isArray((data as Record<string, unknown> | undefined)?.['datasets'])
+        ? (data as Record<string, unknown>)['datasets']
+        : (data as Record<string, unknown> | undefined)?.['data'],
+    ),
+  );
   const labels = $derived<string[]>(Array.isArray(data?.labels) ? (data!.labels! as unknown[]).filter(isPrimitiveLabel).map(String) : []);
   const type = $derived(data?.type ?? 'bar');
   const isPie = $derived(type === 'pie' || type === 'donut');

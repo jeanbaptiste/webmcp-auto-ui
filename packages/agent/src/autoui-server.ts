@@ -340,24 +340,37 @@ schema:
     title:
       type: string
     columns:
+      description: Column definitions. Also accepts plain strings ["A","B"]. Alias "headers" is also accepted.
       type: array
       items:
-        type: object
-        required:
-          - key
-          - label
-        properties:
-          key:
-            type: string
-          label:
-            type: string
-          align:
-            type: string
-            enum: [left, center, right]
+        oneOf:
+          - type: string
+          - type: object
+            required:
+              - key
+              - label
+            properties:
+              key:
+                type: string
+              label:
+                type: string
+              align:
+                type: string
+                enum: [left, center, right]
+    headers:
+      description: Alias for columns. Accepts plain strings ["A","B"] or full column objects.
+      type: array
+      items:
+        oneOf:
+          - type: string
+          - type: object
     rows:
+      description: Array of row objects OR array of arrays (positionally mapped to columns/headers keys).
       type: array
       items:
-        type: object
+        oneOf:
+          - type: object
+          - type: array
 ---
 
 ## When to use
@@ -365,6 +378,7 @@ Display structured data in a table with column sorting.
 
 ## How to use
 Call widget_display({name: "data-table", params: {columns: [{key:"name",label:"Nom"}], rows: [{name:"Alice"}]}}).
+Rows can also be arrays: {headers:["name","age"], rows:[["Alice",30],["Bob",25]]}.
 `,
 
   // ── timeline ─────────────────────────────────────────────────────────────
@@ -579,8 +593,6 @@ schema:
       type: array
       items:
         type: object
-        required:
-          - values
         properties:
           label:
             type: string
@@ -588,6 +600,9 @@ schema:
             type: array
             items:
               type: number
+          value:
+            type: number
+            description: Scalar shorthand — treated as values:[value]. Use for single-point series.
           color:
             type: string
 ---
@@ -597,6 +612,7 @@ Pour des graphiques multi-series (barres, lignes, aires, camembert, donut).
 
 ## How to use
 Call widget_display({name: "chart-rich", params: {type: "bar", labels: ["Q1","Q2"], data: [{label:"Ventes", values:[10,20]}]}}).
+Single-point shorthand: data: [{label:"A", value:5}, {label:"B", value:8}].
 `,
 
   // ── cards ────────────────────────────────────────────────────────────────
