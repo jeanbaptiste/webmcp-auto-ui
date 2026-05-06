@@ -1094,7 +1094,7 @@ function injectLayoutStyles(): void {
 .nbe-hidden { display: none !important; }
 
 /* View-mode Option B: chrome hidden by default, revealed on hover in top-right corner. */
-.nb-root.nb-view-mode .nbe-code-cell { position: relative; }
+.nb-root.nb-view-mode .nbe-code-cell { position: relative; min-height: 28px; }
 .nb-root.nb-view-mode .nbe-cell-head {
   position: absolute; top: 0; right: 0; z-index: 2;
   padding: 4px 8px; gap: 6px;
