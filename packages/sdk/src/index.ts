@@ -102,3 +102,12 @@ export { extractSampleData } from './widget-sample-data.js';
 
 // MCP response normalizer — flattens common envelope shapes to array
 export { unwrap } from './unwrap.js';
+
+// Canvas → HyperSkill notebook serializer
+export { lineageToCells, canvasToNotebookMarkdown } from './canvas-to-notebook.js';
+export type {
+  WidgetLineage,
+  CanvasToNotebookOptions,
+  NotebookCell,
+  CanvasBlock,
+} from './canvas-to-notebook.js';
