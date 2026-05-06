@@ -77,3 +77,6 @@ __pycache__/
 
 # Race-check / debug artifacts (Playwright sampling outputs)
 .notes/race-check*
+
+# Recipe audit (Playwright harness outputs, screenshots, judgments)
+.notes/recipe-audit/

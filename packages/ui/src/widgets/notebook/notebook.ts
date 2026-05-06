@@ -29,6 +29,39 @@ import { runCode } from '@webmcp-auto-ui/sdk';
 import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 import { mountWidget } from '@webmcp-auto-ui/core';
 
+// Side-effect imports — register native widget custom elements so that
+// `mountWidget(host, name, params, servers)` can resolve `<auto-${name}>`
+// even when WidgetRenderer.svelte is not mounted on the page (e.g. notebook-
+// viewer, which mounts the notebook widget via vanilla renderNotebook but
+// never imports WidgetRenderer).  Without these imports `customElements.get`
+// returns undefined and every `await widget(...)` result falls through to the
+// silent `container.textContent = '[${type}]'` branch.
+import '../simple/stat.svelte';
+import '../simple/kv.svelte';
+import '../simple/list.svelte';
+import '../simple/chart.svelte';
+import '../simple/alert.svelte';
+import '../simple/code.svelte';
+import '../simple/text.svelte';
+import '../simple/actions.svelte';
+import '../simple/tags.svelte';
+import '../rich/stat-card.svelte';
+import '../rich/profile.svelte';
+import '../rich/json-viewer.svelte';
+import '../rich/chart-rich.svelte';
+import '../rich/sankey.svelte';
+import '../rich/hemicycle.svelte';
+import '../rich/data-table.svelte';
+import '../rich/timeline.svelte';
+import '../rich/trombinoscope.svelte';
+import '../rich/cards.svelte';
+import '../rich/grid-data.svelte';
+import '../rich/js-sandbox.svelte';
+import '../rich/log.svelte';
+import '../rich/gallery.svelte';
+import '../rich/carousel.svelte';
+import '../rich/map.svelte';
+
 export async function render(container: HTMLElement, data: Record<string, unknown>): Promise<() => void> {
   injectStyles();
   injectLayoutStyles();
@@ -316,6 +349,17 @@ export async function render(container: HTMLElement, data: Record<string, unknow
 // Executors (same pattern as compact/workspace/document agents)
 // ---------------------------------------------------------------------------
 
+/**
+ * Convert RunLog[] (objects with {t, msg}) returned by runCode into the
+ * string[] format expected by CellResult.logs. Each entry becomes a
+ * human-readable "<offset>ms  <message>" line.  Without this conversion every
+ * log entry would coerce to "[object Object]" in renderCellLogs.
+ */
+function logsToStrings(logs: Array<{ t: number; msg: string }> | undefined): string[] {
+  if (!logs || logs.length === 0) return [];
+  return logs.map((l) => `${l.t}ms  ${l.msg}`);
+}
+
 async function jsExecutor(ctx: CellExecContext): Promise<CellResult> {
   const start = Date.now();
   const { cell, scope } = ctx;
@@ -325,29 +369,30 @@ async function jsExecutor(ctx: CellExecContext): Promise<CellResult> {
   const code = cell.content.replace(/\bcallTool\s*\(/g, 'call(');
   const res = await runCode(code, 'js', canvas.multiClient, scope);
   const durationMs = Date.now() - start;
+  const logs = logsToStrings(res.logs as any);
   if (res.status === 'error') {
-    return { ok: false, error: res.error ?? 'error', errorKind: 'runtime', durationMs, logs: res.logs };
+    return { ok: false, error: res.error ?? 'error', errorKind: 'runtime', durationMs, logs };
   }
   // Widgets emitted via `widget(name, params)` or via `*_widget_display(...)`
   // calls — surface them as a dedicated kind so the host can mount them.
   const widgets = res.widgets ?? (res.widget ? [res.widget] : []);
   if (widgets.length > 0) {
-    return { ok: true, kind: 'widget', widgets, durationMs, logs: res.logs };
+    return { ok: true, kind: 'widget', widgets, durationMs, logs };
   }
   const result = res.output;
-  if (result === undefined || result === null) return { ok: true, kind: 'empty', durationMs, logs: res.logs };
+  if (result === undefined || result === null) return { ok: true, kind: 'empty', durationMs, logs };
   if (Array.isArray(result)) {
     const rows = result.filter((r) => r && typeof r === 'object') as Record<string, unknown>[];
     const columns = rows.length ? Array.from(new Set(rows.flatMap((r) => Object.keys(r)))) : [];
-    return { ok: true, kind: 'table', rows, columns, rowCount: rows.length, durationMs, logs: res.logs };
+    return { ok: true, kind: 'table', rows, columns, rowCount: rows.length, durationMs, logs };
   }
   if (result && typeof result === 'object') {
     const r: any = result;
     if (r.data || r.marks || r.mark || r.$schema) {
-      return { ok: true, kind: 'chart', spec: result, durationMs, logs: res.logs };
+      return { ok: true, kind: 'chart', spec: result, durationMs, logs };
     }
   }
-  return { ok: true, kind: 'value', value: result, durationMs, logs: res.logs };
+  return { ok: true, kind: 'value', value: result, durationMs, logs };
 }
 
 // ---------------------------------------------------------------------------
