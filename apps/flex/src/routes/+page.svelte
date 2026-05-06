@@ -2,7 +2,7 @@
   import { onMount, onDestroy, untrack } from 'svelte';
   import { base } from '$app/paths';
   import { canvas } from '@webmcp-auto-ui/sdk/canvas';
-  import { listSkills, encodeHyperSkill, canvasToNotebookMarkdown } from '@webmcp-auto-ui/sdk';
+  import { listSkills, encodeHyperSkill, canvasToNotebookCells } from '@webmcp-auto-ui/sdk';
   import type { Skill, HyperSkill, RecipeData } from '@webmcp-auto-ui/sdk';
   import type { McpMultiClient } from '@webmcp-auto-ui/core';
   import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
@@ -948,7 +948,7 @@
       return;
     }
     if (lower === 'notebook' || lower === 'save as notebook') {
-      await saveCanvasAsNotebook();
+      saveCanvasAsNotebook();
       input = '';
       return;
     }
@@ -1147,43 +1147,45 @@
     }
   }
 
-  // Snapshot current canvas as a published notebook on nb.hyperskills.net.
-  async function saveCanvasAsNotebook(): Promise<void> {
-    const toast = (msg: string, isError = false) => {
-      console[isError ? 'error' : 'log']('[notebook]', msg);
-      ephemeral = [...ephemeral, { id: 'nb-' + Date.now(), role: 'assistant', html: msg }];
-      setTimeout(() => { ephemeral = ephemeral.filter(e => !e.id.startsWith('nb-')); }, 6000);
-    };
+  // Build a notebook widget from the current canvas (each block becomes one or
+  // more cells with the tool calls / SQL that produced it) and mount it as a
+  // new block on the canvas. Publishing is left to the user via the notebook
+  // widget's own toolbar.
+  function saveCanvasAsNotebook(): void {
     if (!canvas.blocks.length) {
-      toast('Canvas vide — rien à sauvegarder', true);
+      ephemeral = [...ephemeral, { id: 'nb-' + Date.now(), role: 'assistant', html: 'Canvas vide — rien à sauvegarder' }];
+      setTimeout(() => { ephemeral = ephemeral.filter(e => !e.id.startsWith('nb-')); }, 6000);
       return;
     }
-    const blocks = canvas.blocks.map(b => ({ id: b.id, type: b.type, data: b.data ?? {} }));
+    const sourceBlocks = canvas.blocks.map(b => ({
+      id: b.id,
+      type: b.type,
+      data: (b.data ?? {}) as Record<string, unknown>,
+    }));
     const getLineage = (id: string) => traceObserver.getWidgetLineage(id);
     const servers = canvas.dataServers
       .filter(s => s.connected)
       .map(s => ({ name: s.serverName ?? s.name, url: s.url }));
     const webmcpServers = canvas.enabledServerIds.slice();
-    const markdown = canvasToNotebookMarkdown(blocks, getLineage, {
+    const data = canvasToNotebookCells(sourceBlocks, getLineage, {
       title: 'Canvas snapshot',
       servers,
       webmcpServers,
     });
-    try {
-      const res = await fetch('https://nb.hyperskills.net/api/publish', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ markdown }),
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const reply = await res.json();
-      const url = reply.url ?? `https://nb.hyperskills.net/p/${reply.slug}`;
-      const authorUrl = reply.token ? `${url}?t=${encodeURIComponent(reply.token)}` : url;
-      try { await navigator.clipboard?.writeText?.(authorUrl); } catch { /* ignore */ }
-      toast(`Notebook publié · ${url.replace(/^https?:\/\//, '')} (lien auteur copié)`);
-    } catch (err) {
-      toast('Publish failed · ' + String((err as Error)?.message ?? err), true);
+    if (data.cells.length === 0) {
+      ephemeral = [...ephemeral, { id: 'nb-' + Date.now(), role: 'assistant', html: 'Aucune cellule générée — vérifier la lineage des widgets' }];
+      setTimeout(() => { ephemeral = ephemeral.filter(e => !e.id.startsWith('nb-')); }, 6000);
+      return;
     }
+    addBlock('notebook', {
+      title: data.title ?? 'Canvas snapshot',
+      cells: data.cells,
+      mode: 'edit',
+      servers: data.servers ?? [],
+      webmcpServers: data.webmcpServers ?? [],
+    });
+    ephemeral = [...ephemeral, { id: 'nb-' + Date.now(), role: 'assistant', html: 'Notebook ajouté au canvas — édite-le, puis publie depuis sa toolbar' }];
+    setTimeout(() => { ephemeral = ephemeral.filter(e => !e.id.startsWith('nb-')); }, 6000);
   }
 
   function clearAll() {

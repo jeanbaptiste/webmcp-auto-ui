@@ -138,6 +138,54 @@ export function canvasToNotebookMarkdown(
   return fm.join('\n') + '\n' + body.join('\n').replace(/\n+$/, '') + '\n';
 }
 
+export interface CanvasToNotebookData {
+  title?: string;
+  description?: string;
+  /** Active MCP servers (name, url) — to seed the notebook widget's data. */
+  servers?: Array<{ name: string; url: string }>;
+  /** Active bundled WebMCP server ids. */
+  webmcpServers?: string[];
+  /** Cells ready to feed into a NotebookState. */
+  cells: Array<{
+    id: string;
+    type: 'md' | 'sql' | 'js';
+    content: string;
+    varname?: string;
+    status?: 'idle';
+  }>;
+}
+
+/** Same logic as canvasToNotebookMarkdown but returns structured cells for direct widget mounting. */
+export function canvasToNotebookCells(
+  blocks: CanvasBlock[],
+  getLineage: (blockId: string) => WidgetLineage | null,
+  opts: CanvasToNotebookOptions = {},
+): CanvasToNotebookData {
+  let counter = 0;
+  const cells: CanvasToNotebookData['cells'] = [];
+
+  for (const block of blocks) {
+    const raw = lineageToCells(block, getLineage(block.id));
+    for (const cell of raw) {
+      const entry: CanvasToNotebookData['cells'][number] = {
+        id: `c${counter++}`,
+        type: cell.kind,
+        content: cell.content,
+        status: 'idle',
+      };
+      if (cell.varname !== undefined) entry.varname = cell.varname;
+      cells.push(entry);
+    }
+  }
+
+  const out: CanvasToNotebookData = { cells };
+  if (opts.title) out.title = opts.title;
+  if (opts.description) out.description = opts.description;
+  if (opts.servers && opts.servers.length > 0) out.servers = opts.servers;
+  if (opts.webmcpServers && opts.webmcpServers.length > 0) out.webmcpServers = opts.webmcpServers;
+  return out;
+}
+
 function renderCell(cell: NotebookCell): string {
   if (cell.kind === 'md') return cell.content;
   if (cell.kind === 'sql') {

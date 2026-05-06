@@ -104,10 +104,11 @@ export { extractSampleData } from './widget-sample-data.js';
 export { unwrap } from './unwrap.js';
 
 // Canvas → HyperSkill notebook serializer
-export { lineageToCells, canvasToNotebookMarkdown } from './canvas-to-notebook.js';
+export { lineageToCells, canvasToNotebookMarkdown, canvasToNotebookCells } from './canvas-to-notebook.js';
 export type {
   WidgetLineage,
   CanvasToNotebookOptions,
+  CanvasToNotebookData,
   NotebookCell,
   CanvasBlock,
 } from './canvas-to-notebook.js';
