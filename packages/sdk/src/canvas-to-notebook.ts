@@ -4,6 +4,8 @@
  * present, snapshot fallback otherwise.
  */
 
+import { pickFence } from './recipes/fence.js';
+
 export interface WidgetLineage {
   widgetType: string;
   widgetParams: Record<string, unknown>;
@@ -190,9 +192,12 @@ function renderCell(cell: NotebookCell): string {
   if (cell.kind === 'md') return cell.content;
   if (cell.kind === 'sql') {
     const meta = cell.varname ? `-- @meta {"varname": "${cell.varname}"}\n` : '';
-    return '```sql\n' + meta + cell.content + '\n```';
+    const body = meta + cell.content;
+    const fence = pickFence(body);
+    return fence + 'sql\n' + body + '\n' + fence;
   }
-  return '```js\n' + cell.content + '\n```';
+  const fence = pickFence(cell.content);
+  return fence + 'js\n' + cell.content + '\n' + fence;
 }
 
 function pickArrayParamKey(params: Record<string, unknown>): string | null {

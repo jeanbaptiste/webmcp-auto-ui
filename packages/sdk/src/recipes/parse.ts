@@ -16,14 +16,17 @@ export function parseBody(body: string): ParsedSegment[] {
 
   const segments: ParsedSegment[] = [];
   // Match fenced code blocks with optional language tag.
-  // Non-greedy body; allow any chars between the fences.
-  const re = /```([a-zA-Z0-9_+-]*)\r?\n([\s\S]*?)```/g;
+  // Variable-length fence (≥3 backticks, CommonMark §4.5): the closing fence
+  // must use the same number of backticks as the opening — captured via \1.
+  // This allows cells whose content embeds ``` (e.g. widget('text', { content: "...```js..." }))
+  // to be encoded with a longer fence (4+ backticks) without premature closure.
+  const re = /(`{3,})([a-zA-Z0-9_+-]*)\r?\n([\s\S]*?)\r?\n\1[ \t]*(?=\r?\n|$)/g;
 
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
   while ((match = re.exec(body)) !== null) {
-    const [full, langRaw, codeRaw] = match;
+    const [full, , langRaw, codeRaw] = match;
     const start = match.index;
 
     if (start > lastIndex) {

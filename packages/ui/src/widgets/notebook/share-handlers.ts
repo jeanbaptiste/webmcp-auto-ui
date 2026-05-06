@@ -4,7 +4,7 @@
 // 4 formats: JSON, Markdown, Hyperskill link (+ short), PNG snapshot.
 // ---------------------------------------------------------------------------
 
-import { encode, buildShortUrl } from '@webmcp-auto-ui/sdk';
+import { encode, buildShortUrl, pickFence } from '@webmcp-auto-ui/sdk';
 import { canvasVanilla } from '@webmcp-auto-ui/sdk/canvas-vanilla';
 import type { NotebookState, NotebookCell } from './shared.js';
 
@@ -56,7 +56,9 @@ export function serializeToMarkdown(state: NotebookState): string {
       const metaLine = cell.args && Object.keys(cell.args).length > 0
         ? `${commentPrefix} @meta ${JSON.stringify(cell.args)}\n`
         : '';
-      parts.push('```' + lang + varname, metaLine + cell.content.trim(), '```', '');
+      const body = metaLine + cell.content.trim();
+      const fence = pickFence(body);
+      parts.push(fence + lang + varname, body, fence, '');
     }
   }
   return parts.join('\n').trim() + '\n';
