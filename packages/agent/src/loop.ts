@@ -12,6 +12,7 @@ import type { ToolLayer, SchemaTransformOptions } from './tool-layers.js';
 import { buildToolsFromLayers, buildDiscoveryToolsWithAliases, activateServerTools, toProviderTools, sanitizeServerName } from './tool-layers.js';
 import { buildSystemPromptWithAliases } from './prompts/index.js';
 import type { DiscoveryCache } from './discovery-cache.js';
+import { DISCOVERY_TOOL_NAMES } from './discovery-cache.js';
 import { unflattenParams, validateJsonSchema } from '@webmcp-auto-ui/core';
 import type { JsonSchema } from '@webmcp-auto-ui/core';
 import { autoRepairParams } from './auto-repair.js';
@@ -21,12 +22,6 @@ import { PipelineTrace } from './pipeline-trace.js';
 export { buildSystemPrompt } from './prompts/index.js';
 
 const MAX_RESULT_LEN = 10_000;
-
-/** Tool names (after prefix strip) that indicate discovery/exploration */
-const DISCOVERY_TOOL_NAMES = new Set([
-  'search_recipes', 'get_recipe', 'list_recipes', 'list_tables', 'describe_table',
-  'get_json_schemas', 'get_typescript_types', 'recall',
-]);
 
 function isDiscoveryTool(prefixedName: string): boolean {
   const match = prefixedName.match(/^.+?_(data|ui)_(.+)$/);
@@ -364,14 +359,28 @@ export async function runAgentLoop(
         }
 
         // ── Intercept list_tools / search_tools (local pseudo-tools) ──
-        // These are read-only discovery operations — do NOT activate the server.
+        // The agent inspecting a server's tools is a strong signal of intent to use them.
+        // Activate the server now so the next iteration can invoke its data tools directly,
+        // matching the system-prompt promise that "list_tools → use it directly in STEP 3".
         if (toolMatch && (toolMatch[3] === 'list_tools' || toolMatch[3] === 'search_tools')) {
           const [, serverName, token, pseudoTool] = toolMatch;
           const protocol = tokenToProtocol(token);
           const layer = (options.layers ?? []).find(l => sanitizeServerName(l.serverName) === serverName && l.protocol === protocol);
           if (!layer) {
             result = 'Error: server not found';
-          } else if (pseudoTool === 'list_tools') {
+          } else {
+            const serverKey = `${serverName}_${token}`;
+            if (!activatedServers.has(serverKey)) {
+              try {
+                const act = activateServerTools(activeTools, layer, schemaOptions, trace);
+                activeTools = act.tools;
+                for (const [k, v] of act.pathMaps) localPathMaps.set(k, v);
+                activatedServers.add(serverKey);
+              } catch (e) {
+                trace.push('activate', name, `activation failed for ${serverKey}: ${e instanceof Error ? e.message : String(e)}`, 'error');
+              }
+            }
+          if (pseudoTool === 'list_tools') {
             const tools = layer.tools.map(t => ({ name: t.name, description: t.description, inputSchema: (t as any).inputSchema }));
             result = JSON.stringify(tools, null, 2);
           } else {
@@ -387,6 +396,7 @@ export async function runAgentLoop(
               const tools = matches.map(t => ({ name: t.name, description: t.description, inputSchema: (t as any).inputSchema }));
               result = JSON.stringify(tools, null, 2);
             }
+          }
           }
         } else {
         // ── Normal tool dispatch — activate server on first contact ──
