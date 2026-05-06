@@ -67,12 +67,41 @@
     };
   }
 
+  /** Detect categorical shorthand: [{label?, value}, ...] — one point per item, single series. */
+  function isCategoricalArray(raw: unknown): boolean {
+    if (!Array.isArray(raw) || raw.length === 0) return false;
+    return raw.every(item =>
+      item && typeof item === 'object'
+      && !Array.isArray((item as Record<string, unknown>).values)
+      && (item as Record<string, unknown>).value !== undefined
+    );
+  }
+
   function normalizeDatasets(raw: unknown): ChartDataset[] {
     if (!Array.isArray(raw)) return [];
+    // Categorical shorthand: collapse N items into ONE series of N points.
+    // Without this, recipes that send `data: [{label, value}, ...]` produce N
+    // datasets of 1 point each, all rendering at x=0 (all dots stack vertically).
+    if (isCategoricalArray(raw)) {
+      const values = raw.map(item => {
+        const v = (item as Record<string, unknown>).value;
+        const n = typeof v === 'number' ? v : Number(v as string);
+        return Number.isFinite(n) ? n : 0;
+      });
+      return [{ values }];
+    }
     return raw.flatMap(item => {
       if (!item || typeof item !== 'object') return [];
       const result = normalizeItem(item as Record<string, unknown>);
       return result ? [result] : [];
+    });
+  }
+
+  function extractCategoricalLabels(raw: unknown): string[] {
+    if (!isCategoricalArray(raw)) return [];
+    return (raw as unknown[]).map(item => {
+      const l = (item as Record<string, unknown>).label;
+      return typeof l === 'string' || typeof l === 'number' ? String(l) : '';
     });
   }
 
@@ -81,14 +110,17 @@
    * - `{ datasets: [...] }` — canonical
    * - `{ data: [...] }`     — agent shorthand (schema uses `data` key)
    */
-  const datasets = $derived<ChartDataset[]>(
-    normalizeDatasets(
-      Array.isArray((data as Record<string, unknown> | undefined)?.['datasets'])
-        ? (data as Record<string, unknown>)['datasets']
-        : (data as Record<string, unknown> | undefined)?.['data'],
-    ),
+  const rawArray = $derived(
+    Array.isArray((data as Record<string, unknown> | undefined)?.['datasets'])
+      ? (data as Record<string, unknown>)['datasets']
+      : (data as Record<string, unknown> | undefined)?.['data'],
   );
-  const labels = $derived<string[]>(Array.isArray(data?.labels) ? (data!.labels! as unknown[]).filter(isPrimitiveLabel).map(String) : []);
+  const datasets = $derived<ChartDataset[]>(normalizeDatasets(rawArray));
+  const labels = $derived<string[]>(
+    Array.isArray(data?.labels)
+      ? (data!.labels! as unknown[]).filter(isPrimitiveLabel).map(String)
+      : extractCategoricalLabels(rawArray),
+  );
   const type = $derived(data?.type ?? 'bar');
   const isPie = $derived(type === 'pie' || type === 'donut');
   const allVals = $derived(datasets.flatMap(d => d.values));
