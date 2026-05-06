@@ -40,21 +40,20 @@ const [breakdown, top, obs] = await Promise.all([
 
 const breakdownResults = (breakdown?.results ?? []).filter(r => r.taxon);
 
-// 5. Pie chart of iconic groups
-await widget('chart-rich', {
-  type: 'pie',
-  title: `${place.display_name ?? 'Park'} — biodiversity by group`,
-  labels: breakdownResults.map(r => r.taxon?.preferred_common_name ?? r.taxon?.name ?? 'Unknown'),
-  data: breakdownResults.map(r => r.count ?? 0),
-  caption: 'Counts are unique species at research grade.',
-});
-
-// 6. Headline stats
+// 5. Breakdown table by iconic group (chart-rich not available in ce context)
 const total = breakdownResults.reduce((s, r) => s + (r.count ?? 0), 0);
 const dominant = [...breakdownResults].sort((a, b) => (b.count ?? 0) - (a.count ?? 0))[0];
-await widget('stat-card', { label: 'Place', value: place.display_name ?? '—', icon: 'map' });
-await widget('stat-card', { label: 'Total species', value: total, icon: 'leaf' });
-await widget('stat-card', { label: 'Dominant group', value: dominant?.taxon?.preferred_common_name ?? dominant?.taxon?.name ?? '—', icon: 'star' });
+await widget('data-table', {
+  columns: ['Group', 'Species count'],
+  rows: [...breakdownResults]
+    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+    .map(r => [r.taxon?.preferred_common_name ?? r.taxon?.name ?? 'Unknown', r.count ?? 0]),
+});
+
+// 6. Headline stats (stat-card not available in ce context — use auto-text)
+await widget('text', {
+  content: `## ${place.display_name ?? 'Park'}\n- **Total species (research grade):** ${total}\n- **Dominant group:** ${dominant?.taxon?.preferred_common_name ?? dominant?.taxon?.name ?? '—'}`,
+});
 
 // 7. Top species table
 await widget('data-table', {
@@ -62,15 +61,14 @@ await widget('data-table', {
   rows: (top?.results ?? []).map(r => [r.taxon?.name ?? '—', r.taxon?.preferred_common_name ?? '—', r.count ?? 0]),
 });
 
-// 8. Photo gallery
-await widget('gallery', {
-  images: (obs?.results ?? [])
-    .filter(o => o.photos?.length > 0 && o.photos[0]?.url)
-    .map(o => ({
-      src: o.photos[0].url.replace('square', 'medium'),
-      caption: o.species_guess ?? o.taxon?.name ?? '',
-    })),
-});
+// 8. Photo sample as markdown links (gallery not available in ce context)
+const photoLines = (obs?.results ?? [])
+  .filter(o => o.photos?.length > 0 && o.photos[0]?.url)
+  .slice(0, 8)
+  .map(o => `- [${o.species_guess ?? o.taxon?.name ?? 'Unknown'}](${o.photos[0].url.replace('square', 'medium')})`);
+if (photoLines.length > 0) {
+  await widget('text', { content: `### Sample observations\n${photoLines.join('\n')}` });
+}
 ```
 
 ## Examples

@@ -36,10 +36,15 @@ const top = await call('species_counts', {
   place_id: place.id, per_page: 100, quality_grade: 'research', threatened: true,
 }).catch(() => ({ results: [] }));
 
-// 3. Hydrate species and keep only the protected ones
-const detailed = await Promise.all(
-  (top?.results ?? []).slice(0, 60).map(r => call('get_taxon', { id: r.taxon?.id }).catch(() => null)),
-);
+// 3. Hydrate species and keep only the protected ones (batched to avoid rate limits)
+const BATCH = 5;
+const slice = (top?.results ?? []).slice(0, 30);
+const detailed = [];
+for (let i = 0; i < slice.length; i += BATCH) {
+  const chunk = slice.slice(i, i + BATCH);
+  const results = await Promise.all(chunk.map(r => call('get_taxon', { id: r.taxon?.id }).catch(() => null)));
+  detailed.push(...results);
+}
 const protectedTaxa = detailed.filter(t => {
   const s = t?.conservation_status?.status?.toLowerCase();
   return s && !['lc', 'least_concern', 'nt'].includes(s);

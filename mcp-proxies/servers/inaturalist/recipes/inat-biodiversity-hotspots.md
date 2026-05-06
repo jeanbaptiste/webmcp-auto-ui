@@ -33,25 +33,35 @@ if (!region || !region.bounding_box_geojson?.coordinates?.[0]) {
 const bbox = region.bounding_box_geojson.coordinates[0];
 
 // 2. Find candidate sub-places inside the region
+// Derive bbox via min/max to avoid relying on GeoJSON vertex order
+const lngs = bbox.map(c => c[0]);
+const lats = bbox.map(c => c[1]);
 const candidates = await call('nearby_places', {
-  nelat: bbox[2]?.[1],
-  nelng: bbox[2]?.[0],
-  swlat: bbox[0]?.[1],
-  swlng: bbox[0]?.[0],
-  per_page: 12,
+  nelat: Math.max(...lats),
+  nelng: Math.max(...lngs),
+  swlat: Math.min(...lats),
+  swlng: Math.min(...lngs),
+  per_page: 8,
 }).catch(() => ({ results: [] }));
 
-// 3. Score each candidate by species richness for the target clade
-const ranked = await Promise.all(
-  (candidates?.results ?? []).map(async p => {
-    const counts = await call('species_counts', {
-      place_id: p.id,
-      taxon_name: 'Amphibia',
-      per_page: 1,
-    }).catch(() => ({ total_results: 0 }));
-    return { place: p, richness: counts?.total_results ?? 0 };
-  }),
-);
+// 3. Score each candidate by species richness — serialized in batches of 3 to respect rate limit
+const places = candidates?.results ?? [];
+const ranked = [];
+for (let i = 0; i < places.length; i += 3) {
+  if (i > 0) await new Promise(r => setTimeout(r, 400));
+  const batch = places.slice(i, i + 3);
+  const results = await Promise.all(
+    batch.map(async p => {
+      const counts = await call('species_counts', {
+        place_id: p.id,
+        taxon_name: 'Amphibia',
+        per_page: 1,
+      }).catch(() => ({ total_results: 0 }));
+      return { place: p, richness: counts?.total_results ?? 0 };
+    }),
+  );
+  ranked.push(...results);
+}
 ranked.sort((a, b) => b.richness - a.richness);
 const top5 = ranked.slice(0, 5);
 
@@ -75,14 +85,16 @@ await widget('map', {
   markers: top5
     .filter(r => r.place?.location)
     .map(r => {
-      const [lat, lon] = r.place.location.split(',');
+      const [lat, lon] = r.place.location.split(',').map(Number);
+      if (!isFinite(lat) || !isFinite(lon)) return null;
       return {
         lat,
         lon,
         label: r.place.display_name ?? '',
         popup: `${r.richness} species`,
       };
-    }),
+    })
+    .filter(Boolean),
 });
 await widget('data-table', {
   columns: ['Rank', 'Place', 'Species'],

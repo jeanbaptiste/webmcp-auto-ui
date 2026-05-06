@@ -23,7 +23,7 @@ layout:
 
 ## How to use
 
-```js
+```js // @noexec
 // 1. Find the project
 const projects = await call('search_projects', { q: 'Bioblitz Camargue', per_page: 5 });
 const project = projects?.results?.[0];
@@ -79,10 +79,14 @@ await widget('gallery', {
 });
 
 // 7. Contributor leaderboard
-await widget('data-table', {
-  columns: ['Rank', 'User', 'Species', 'Observations'],
-  rows: (board?.results ?? []).map((r, i) => [i + 1, r.user?.login ?? '—', r.species_count ?? 0, r.observation_count ?? 0]),
-});
+if (!board?.results?.length) {
+  await widget('text', { content: 'No contributor data available for this project.' });
+} else {
+  await widget('data-table', {
+    columns: ['Rank', 'User', 'Species', 'Observations'],
+    rows: board.results.map((r, i) => [i + 1, r.user?.login ?? '—', r.species_count ?? 0, r.observation_count ?? 0]),
+  });
+}
 ```
 
 ## Examples
@@ -93,13 +97,21 @@ const p = (await call('search_projects', { q: 'City Nature Challenge Paris', per
 if (!p) { await widget('text', { content: 'No project found.' }); return; }
 await widget('stat-card', { label: p.title ?? 'Project', value: p.observations_count ?? '—', icon: 'flag' });
 const board = await call('observers_leaderboard', { place_id: p.place_id, per_page: 10 }).catch(() => ({ results: [] }));
-await widget('data-table', { columns: ['Rank', 'User', 'Species'], rows: (board?.results ?? []).map((r, i) => [i + 1, r.user?.login ?? '—', r.species_count ?? 0]) });
+if (!board?.results?.length) {
+  await widget('text', { content: 'No contributor data available for this project.' });
+} else {
+  await widget('data-table', { columns: ['Rank', 'User', 'Species'], rows: board.results.map((r, i) => [i + 1, r.user?.login ?? '—', r.species_count ?? 0]) });
+}
 ```
 
 ### Pollinator campaigns
 ```js
 const list = await call('search_projects', { q: 'pollinator', type: 'collection', per_page: 8 });
-await widget('cards', { items: (list?.results ?? []).map(p => ({ title: p.title ?? '—', subtitle: p.slug ?? '', image: p.icon, description: p.description?.slice(0, 200) ?? '' })) });
+if (!list?.results?.length) {
+  await widget('text', { content: 'No pollinator projects found.' });
+} else {
+  await widget('cards', { items: list.results.map(p => ({ title: p.title ?? '—', subtitle: p.slug ?? '', image: p.icon_url ?? p.icon ?? null, description: p.description?.slice(0, 200) ?? '' })) });
+}
 ```
 
 ## Common mistakes

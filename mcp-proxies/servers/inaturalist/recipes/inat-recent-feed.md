@@ -25,11 +25,10 @@ layout:
 
 ```js
 // 1. Pull the live identification feed (research grade keeps the signal clean)
-const feed = await call('recent_taxa', {
-  rank: 'species',
-  quality_grade: 'research',
-  per_page: 30,
-}).catch(() => ({ results: [] }));
+const feed = await Promise.race([
+  call('recent_taxa', { rank: 'species', quality_grade: 'research', per_page: 30 }),
+  new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
+]).catch(() => ({ results: [] }));
 
 // recent_taxa returns { taxon_id, identification_id, identification, taxon } — dereference taxon
 const feedResults = (feed?.results ?? []).map(r => r.taxon ?? r).filter(t => t?.id);
@@ -41,7 +40,10 @@ if (feedResults.length === 0) {
 // 2. Sample observations for each taxon to populate the gallery
 const samples = await Promise.all(
   feedResults.slice(0, 12).map(t =>
-    call('search_observations', { taxon_id: t.id, per_page: 1, quality_grade: 'research', photos: true }).catch(() => ({ results: [] })),
+    Promise.race([
+      call('search_observations', { taxon_id: t.id, per_page: 1, quality_grade: 'research', photos: true }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000)),
+    ]).catch(() => ({ results: [] })),
   ),
 );
 
@@ -80,14 +82,22 @@ await widget('stat-card', { label: 'Snapshot taken', value: new Date().toISOStri
 
 ### Latest fungi this week
 ```js
-const feed = await call('recent_taxa', { taxon_id: 47170, per_page: 20, rank: 'species' }).catch(() => ({ results: [] })); // 47170 = Fungi
-await widget('timeline', { events: (feed?.results ?? []).map(t => ({ title: t.preferred_common_name ?? t.name ?? 'Unknown', subtitle: t.name ?? '', image: t.default_photo?.square_url })) });
+const feed = await Promise.race([
+  call('recent_taxa', { taxon_id: 47170, per_page: 20, rank: 'species', quality_grade: 'research' }),
+  new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
+]).catch(() => ({ results: [] })); // 47170 = Fungi
+const taxa = (feed?.results ?? []).map(r => r.taxon ?? r).filter(t => t?.id);
+await widget('timeline', { events: taxa.map(t => ({ title: t.preferred_common_name ?? t.name ?? 'Unknown', subtitle: t.name ?? '', image: t.default_photo?.square_url })) });
 ```
 
 ### Live bird IDs
 ```js
-const feed = await call('recent_taxa', { taxon_id: 3, per_page: 15, quality_grade: 'research' }).catch(() => ({ results: [] }));
-await widget('gallery', { images: (feed?.results ?? []).filter(t => t.default_photo?.medium_url).map(t => ({ src: t.default_photo.medium_url, caption: t.preferred_common_name ?? t.name ?? '' })) });
+const feed = await Promise.race([
+  call('recent_taxa', { taxon_id: 3, per_page: 15, quality_grade: 'research' }),
+  new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
+]).catch(() => ({ results: [] }));
+const taxa = (feed?.results ?? []).map(r => r.taxon ?? r).filter(t => t?.default_photo?.medium_url);
+await widget('gallery', { images: taxa.map(t => ({ src: t.default_photo.medium_url, caption: t.preferred_common_name ?? t.name ?? '' })) });
 ```
 
 ## Common mistakes

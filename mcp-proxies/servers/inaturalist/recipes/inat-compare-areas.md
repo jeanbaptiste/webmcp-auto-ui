@@ -31,6 +31,7 @@ if (!a || !b) {
   await widget('text', { content: 'One or both places not found.' });
   return;
 }
+await widget('text', { content: '⏳ Loading species data…' });
 
 // 2. Top species per area
 const [topA, topB] = await Promise.all([
@@ -43,19 +44,19 @@ const shared = [...namesA].filter(n => namesB.has(n));
 const onlyA = [...namesA].filter(n => !namesB.has(n));
 const onlyB = [...namesB].filter(n => !namesA.has(n));
 
-// 3. Observations sample for each map
-const [obsA, obsB] = await Promise.all([
-  call('search_observations', { place_id: a.id, per_page: 80, quality_grade: 'research' }).catch(() => ({ results: [] })),
-  call('search_observations', { place_id: b.id, per_page: 80, quality_grade: 'research' }).catch(() => ({ results: [] })),
-]);
-
-// 4. Render comparison chart
+// 3. Render comparison chart early (before slower obs fetch)
 await widget('chart', {
   type: 'bar',
   labels: [a.display_name ?? 'Area A', b.display_name ?? 'Area B'],
   data: [topA?.total_results ?? 0, topB?.total_results ?? 0],
   title: 'Species count',
 });
+
+// 4. Observations sample for each map (reduced per_page for lower latency)
+const [obsA, obsB] = await Promise.all([
+  call('search_observations', { place_id: a.id, per_page: 30, quality_grade: 'research' }).catch(() => ({ results: [] })),
+  call('search_observations', { place_id: b.id, per_page: 30, quality_grade: 'research' }).catch(() => ({ results: [] })),
+]);
 
 // 5. Maps side-by-side
 const locA = a.location?.split(',').map(Number) ?? [];

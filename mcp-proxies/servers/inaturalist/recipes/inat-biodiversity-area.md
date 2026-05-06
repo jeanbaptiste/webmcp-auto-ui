@@ -46,14 +46,23 @@ const markers = results
     label: o.species_guess ?? o.taxon?.preferred_common_name ?? o.taxon?.name ?? '',
     popup: `${o.species_guess ?? o.taxon?.name ?? 'Unknown'} — ${o.observed_on ?? '—'}`,
   }));
-await widget('map', { center: [48.8566, 2.3522], zoom: 12, markers, cluster: true });
+if (markers.length === 0) {
+  await widget('text', { content: 'Aucune observation géoréférencée trouvée.' });
+} else {
+  await widget('map', { center: [48.8566, 2.3522], zoom: 12, markers, cluster: true });
+}
 
 // 3. Stat cards
 const species = new Set(results.map(o => o.taxon?.id).filter(Boolean));
 const observers = new Set(results.map(o => o.user?.id).filter(Boolean));
-await widget('stat-card', { label: 'Observations', value: obs?.total_results ?? 0, icon: 'eye' });
-await widget('stat-card', { label: 'Unique species', value: species.size, icon: 'leaf' });
-await widget('stat-card', { label: 'Observers', value: observers.size, icon: 'users' });
+await widget('data-table', {
+  columns: ['Metric', 'Value'],
+  rows: [
+    ['Observations', obs?.total_results ?? 0],
+    ['Unique species', species.size],
+    ['Observers', observers.size],
+  ],
+});
 
 // 4. Photo gallery (medium-sized thumbnails)
 const images = results

@@ -48,7 +48,7 @@ const recent = await call('search_observations', {
 }).catch(() => ({ results: [], total_results: 0 }));
 
 // 4. Detect migration peaks (top 3 weeks)
-const weekObj = hist?.results?.week ?? {};
+const weekObj = hist?.results?.week ?? hist?.results ?? {};
 const weeks = Object.entries(weekObj)
   .map(([k, v]) => ({ week: k, count: v }))
   .sort((a, b) => b.count - a.count);
@@ -92,7 +92,7 @@ const t = (await call('search_taxa', { q: 'Ciconia ciconia', per_page: 1 }))?.re
 const place = (await call('search_places', { q: 'France', per_page: 1 }))?.results?.[0];
 if (!t || !place) { await widget('text', { content: 'Species or place not found.' }); return; }
 const hist = await call('observations_histogram', { taxon_id: t.id, place_id: place.id, interval: 'week' }).catch(() => ({ results: { week: {} } }));
-const week = hist?.results?.week ?? {};
+const week = hist?.results?.week ?? hist?.results ?? {};
 await widget('chart', { type: 'line', labels: Object.keys(week), data: Object.values(week) });
 ```
 

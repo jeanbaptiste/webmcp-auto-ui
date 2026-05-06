@@ -25,8 +25,8 @@ layout:
 
 ```js
 // 1. Inputs
-const lat = 47.21;
-const lng = -1.55;
+const lat = 48.85;
+const lng = 2.35;
 const radius = 5; // km
 
 // 2. Nearby iNaturalist places (rough bounding box from radius)
@@ -55,21 +55,18 @@ await widget('map', {
   markers: [
     { lat, lon: lng, label: 'You are here', popup: today },
     ...(places?.results ?? [])
-      .filter(p => p.location)
-      .map(p => {
-        const [pLat, pLng] = p.location.split(',').map(Number);
-        return { lat: pLat, lon: pLng, label: p.display_name ?? '' };
-      }),
+      .filter(p => p.latitude != null && p.longitude != null)
+      .map(p => ({ lat: p.latitude, lon: p.longitude, label: p.name ?? '' })),
   ],
 });
 
 // 6. Recent observations gallery
 await widget('gallery', {
   images: (obs?.results ?? [])
-    .filter(o => o.photos?.length > 0 && o.photos[0]?.url)
+    .filter(o => o.photos?.[0]?.photo?.url ?? o.taxon?.default_photo?.medium_url)
     .slice(0, 12)
     .map(o => ({
-      src: o.photos[0].url.replace('square', 'medium'),
+      src: (o.photos?.[0]?.photo?.url ?? o.taxon?.default_photo?.medium_url ?? '').replace('square', 'medium'),
       caption: `${o.species_guess ?? o.taxon?.name ?? 'Unknown'} — ${o.observed_on ?? '—'}`,
     })),
 });
@@ -86,7 +83,7 @@ await widget('cards', {
 
 // 8. Stats
 await widget('stat-card', { label: 'Places nearby', value: places?.results?.length ?? 0, icon: 'map' });
-await widget('stat-card', { label: 'Recent obs', value: obs?.total_results ?? 0, icon: 'eye' });
+await widget('stat-card', { label: 'Recent obs', value: obs?.results?.length ?? obs?.total_results ?? 0, icon: 'eye' });
 await widget('stat-card', { label: 'AI suggestions', value: sugg?.results?.length ?? 0, icon: 'sparkles' });
 ```
 

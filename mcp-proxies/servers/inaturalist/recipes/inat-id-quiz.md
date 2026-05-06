@@ -52,7 +52,7 @@ await widget('map', {
   center: [lng, lat],
   zoom: 10,
   markers: [{ lat, lon: lng, label: 'Your location', popup: observed_on }],
-});
+}).catch(() => null);
 
 // 5. Context kv
 await widget('kv', {
@@ -63,7 +63,7 @@ await widget('kv', {
     'Suggestion source': sugg?.source ?? '—',
     'Candidates returned': suggResults.length,
   },
-});
+}).catch(() => null);
 
 // 6. Suggestion cards (with iNat probability/frequency)
 await widget('cards', {

@@ -4,7 +4,7 @@ name: Themed gallery of a family or clade
 description: Curate a research-grade photo gallery for a family / clade with descriptive cards and a clade summary — magazine-style iconography.
 when: the user asks for a photo gallery of a family, "beautiful pictures of X", iconographic survey of a clade, or a magazine-style species spread
 servers: [inaturalist]
-tools_used: [search_taxa, search_observations, get_taxon]
+tools_used: [search_taxa, search_observations, get_taxon, search_places]
 data_type: research-grade photos of a clade
 components_used: [gallery, cards, kv]
 layout:
@@ -101,7 +101,9 @@ await widget('gallery', { images: (obs?.results ?? []).filter(o => o.photos?.len
 const t = (await call('search_taxa', { q: 'Nudibranchia', rank: 'order', per_page: 1 }))?.results?.[0];
 if (!t) { await widget('text', { content: 'Clade not found.' }); return; }
 const obs = await call('search_observations', { taxon_id: t.id, per_page: 60, quality_grade: 'research' }).catch(() => ({ results: [] }));
-await widget('gallery', { images: (obs?.results ?? []).filter(o => o.photos?.length > 0 && o.photos[0]?.url).map(o => ({ src: o.photos[0].url.replace('square', 'large'), caption: o.species_guess ?? o.taxon?.name ?? '' })) });
+const bySpecies = new Map();
+for (const o of (obs?.results ?? [])) { if (o.photos?.length && o.photos[0]?.url && o.taxon?.id && !bySpecies.has(o.taxon.id)) bySpecies.set(o.taxon.id, o); }
+await widget('gallery', { images: [...bySpecies.values()].map(o => ({ src: o.photos[0].url.replace('square', 'large'), caption: o.species_guess ?? o.taxon?.name ?? '' })) });
 ```
 
 ## Common mistakes
