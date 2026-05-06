@@ -33,7 +33,12 @@ const res = await call('nasa_images', {
   year_start: '1969',
   year_end: '1969'
 }).catch(() => null);
-const items = (res?.collection?.items ?? []).filter(it => it);
+// Debug: inspect actual response shape if items are missing
+const _items_raw = res?.collection?.items;
+if (!_items_raw || _items_raw.length === 0) {
+  console.log('[nasa_images] response shape:', JSON.stringify(res, null, 2).slice(0, 400));
+}
+const items = (_items_raw ?? []).filter(it => it).slice(0, 10);
 if (items.length === 0) return widget('text', { content: 'No media found.' });
 
 // 2. Headline stats

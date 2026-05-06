@@ -62,13 +62,17 @@ layout:
 
 5. **Gallery of the bequest**:
    ```js
-   const images = display.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.artistDisplayName ?? '—'} — ${w?.objectDate ?? '—'}` }));
-   await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
+   const images = display.filter(w => w?.primaryImageSmall).map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.artistDisplayName ?? '—'} — ${w?.objectDate ?? '—'}` }));
+   if (images.length === 0) {
+     await widget('text', { content: 'No images available for this bequest.' });
+   } else {
+     await widget('gallery', { images });
+   }
    ```
 
 6. **Cards of major pieces + KV**:
    ```js
-   const items = display.slice(0, 8).map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.artistDisplayName ?? '—', image: w?.primaryImageSmall, body: w?.medium ?? '—' }));
+   const items = display.slice(0, 8).map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.artistDisplayName ?? '—', image: w?.primaryImageSmall || undefined, body: w?.medium ?? '—' }));
    await widget('cards', { items: items.length ? items : [{ title: 'No samples', subtitle: '—' }] });
    await widget('kv', {
      pairs: [

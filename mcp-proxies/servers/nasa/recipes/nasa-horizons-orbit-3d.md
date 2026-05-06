@@ -49,9 +49,11 @@ for (let i = 0; i < lines.length; i += 4) {
     points.push({ x: +xyz[0], y: +xyz[1], z: +xyz[2] });
   }
 }
+console.log('points:', points.length);
 if (points.length === 0) return widget('text', { content: 'No vector data parsed.' });
 
 // 3. Parameter kv
+console.log('--- kv ---');
 await widget('kv', {
   items: [
     { label: 'Target', value: '1 Ceres' },
@@ -63,6 +65,7 @@ await widget('kv', {
 });
 
 // 4. Orbit projection chart (X vs Y, ecliptic)
+console.log('--- chart-rich ---');
 await widget('chart-rich', {
   type: 'line',
   series: [
@@ -74,6 +77,7 @@ await widget('chart-rich', {
 });
 
 // 5. Distance vs time
+console.log('--- chart ---');
 await widget('chart', {
   type: 'line',
   data: points.map((p, i) => ({
@@ -84,6 +88,7 @@ await widget('chart', {
 });
 
 // 6. Didactic text
+console.log('--- text ---');
 await widget('text', {
   title: 'Reading the plot',
   body: 'The X-Y projection shows the orbit on the ecliptic plane. Distance from the Sun oscillates between perihelion and aphelion every ~4.6 years for Ceres. Tilt of the inclination is hidden in the Z component (not plotted here).'

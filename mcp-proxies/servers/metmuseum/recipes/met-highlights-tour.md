@@ -31,7 +31,7 @@ layout:
      pageSize: 20
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) await widget('text', { content: 'No highlights on view.' });
+   if (ids.length === 0) { await widget('text', { content: 'No highlights on view.' }); return; }
    ```
 
 2. **Fetch detailed objects** (6-10):
@@ -55,7 +55,8 @@ layout:
 5. **HD gallery + KV directory**:
    ```js
    const images = works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `Gallery ${w?.GalleryNumber ?? '?'}` }));
-   await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
+   if (!images.length) { await widget('text', { content: 'No gallery images available.' }); return; }
+   await widget('gallery', { images });
    await widget('kv', { pairs: works.length ? works.map(w => [w?.title ?? '(untitled)', `Gallery ${w?.GalleryNumber || '?'}`]) : [['(no samples)', '—']] });
    ```
 
@@ -79,12 +80,13 @@ await call('open-met-explorer', { q: 'impressionism' });
 
 ### Egyptian highlights
 ```js
-const r = await call('search-museum-objects', { q: 'Egypt', isHighlight: true, hasImages: true, pageSize: 15 }).catch(() => null);
+const r = await call('search-museum-objects', { q: 'Egypt', isHighlight: true, isOnView: true, hasImages: true, pageSize: 15 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 6).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
 const images = works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)' }));
-await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples' }] });
+if (!images.length) { await widget('text', { content: 'No gallery images available.' }); return; }
+await widget('gallery', { images });
 ```
 
 ## Examples — common mistakes

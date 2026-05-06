@@ -32,8 +32,9 @@ const fam = await call('jpl_periodic_orbits', {
   libr: 2,
   branch: 'N'
 }).catch(() => null);
+console.log(fam);
 const orbits = (fam?.data ?? []).filter(o => o);
-if (orbits.length === 0) return widget('text', { content: 'No orbits returned.' });
+if (!Array.isArray(fam?.data) || fam.data.length === 0) return widget('text', { content: 'No orbits returned.' });
 
 // 2. Optional: convert reference Julian Day to a calendar date
 const epoch = fam?.epoch_jd;
@@ -66,10 +67,16 @@ await widget('chart-rich', {
 });
 
 // 5. Sortable table
-await widget('data-table', {
-  columns: ['#', 'Period', 'Jacobi C', 'Stability', 'Amplitude'],
-  rows: orbits.slice(0, 30).map((o, i) => [i + 1, o?.period ?? '—', o?.jacobi ?? '—', o?.stability ?? '—', o?.amplitude ?? '—'])
-});
+const tableRows = orbits.slice(0, 30).map((o, i) => [i + 1, o?.period ?? '—', o?.jacobi ?? '—', o?.stability ?? '—', o?.amplitude ?? '—']);
+const allDash = tableRows.every(r => r.slice(1).every(v => v === '—'));
+if (allDash) {
+  await widget('text', { content: 'The API returned orbit records but no numeric fields (period/jacobi/stability/amplitude). Check that the correct field names are used for this family.' });
+} else {
+  await widget('data-table', {
+    columns: ['#', 'Period', 'Jacobi C', 'Stability', 'Amplitude'],
+    rows: tableRows
+  });
+}
 
 // 6. kv with epoch helpers
 await widget('kv', {
@@ -89,14 +96,24 @@ await widget('kv', {
 ```js
 const fam = await call('jpl_periodic_orbits', { sys: 'sun-earth', family: 'lyapunov', libr: 1 }).catch(() => null);
 await widget('text', { title: 'Sun-Earth L1 Lyapunov', body: 'Planar periodic orbits used for solar observatories like SOHO and DSCOVR.' });
-await widget('data-table', { columns: ['Period', 'Jacobi'], rows: (fam?.data ?? []).slice(0, 20).map(o => [o?.period ?? '—', o?.jacobi ?? '—']) });
+const lyapunovRows = (fam?.data ?? []).slice(0, 20).map(o => [o?.period ?? '—', o?.jacobi ?? '—']);
+if (!Array.isArray(fam?.data) || fam.data.length === 0) {
+  await widget('text', { content: 'No Lyapunov orbit data returned for Sun-Earth L1. The API may require different field names for this family.' });
+} else {
+  await widget('data-table', { columns: ['Period', 'Jacobi'], rows: lyapunovRows });
+}
 ```
 
 ### Distant Retrograde Orbits (Artemis)
 ```js
 const fam = await call('jpl_periodic_orbits', { sys: 'earth-moon', family: 'dro' }).catch(() => null);
 const cal = await call('jpl_jd_cal', { jd: String(fam?.epoch_jd ?? 2460676.5) }).catch(() => null);
-await widget('kv', { items: [{ label: 'Family', value: 'Earth-Moon DRO' }, { label: 'Epoch', value: cal?.cd ?? '—' }] });
+const kvItems = [{ label: 'Family', value: 'Earth-Moon DRO' }, { label: 'Epoch', value: cal?.cd ?? '—' }].filter(item => item.value !== undefined && item.value !== null);
+if (kvItems.length > 0) {
+  await widget('kv', { items: kvItems });
+} else {
+  await widget('text', { content: 'DRO family loaded but no displayable metadata.' });
+}
 ```
 
 ## Common mistakes

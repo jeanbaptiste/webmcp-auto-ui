@@ -40,15 +40,26 @@ const responses = await Promise.all(
 );
 
 // 2. Multi-layer map (toggleable layers)
-await widget('map', {
-  center: [20, 0],
-  zoom: 2,
-  tileLayers: responses.map((r, i) => ({
-    name: layers[i]?.label ?? '—',
-    url: r?.tileUrl || r?.url,
-    opacity: i === 0 ? 1 : 0.6
-  })).filter(t => t.url)
-});
+// Debug: inspect response shape to confirm the tile URL key
+if (responses[0]) console.log('nasa_gibs response keys:', JSON.stringify(responses[0]));
+const tileLayers = responses.map((r, i) => ({
+  name: layers[i]?.label ?? '—',
+  url: r?.tile_url || r?.tileUrl || r?.wmsUrl || r?.url,
+  opacity: i === 0 ? 1 : 0.6
+})).filter(t => t.url);
+
+if (tileLayers.length === 0) {
+  // Fallback: show raw response so the correct key is visible
+  await widget('kv', {
+    items: [{ label: 'Debug — raw response[0]', value: JSON.stringify(responses[0]) }]
+  });
+} else {
+  await widget('map', {
+    center: [20, 0],
+    zoom: 2,
+    tileLayers
+  });
+}
 
 // 3. Cards describing each layer
 await widget('cards', {
@@ -75,20 +86,33 @@ await widget('kv', {
 ### Daily true colour
 ```js
 const r = await call('nasa_gibs', { layer: 'MODIS_Terra_CorrectedReflectance_TrueColor', date: '2026-04-28' }).catch(() => null);
-const url = r?.tileUrl || r?.url;
-if (url) await widget('map', { center: [0, 0], zoom: 2, tileLayers: [{ name: 'True colour', url }] });
+// Always show metadata first — independent of tile URL availability
 await widget('kv', { items: [{ label: 'Layer', value: 'MODIS Terra TrueColor' }, { label: 'Date', value: '2026-04-28' }] });
+const url = r?.tile_url || r?.tileUrl || r?.wmsUrl || r?.url;
+if (url) {
+  await widget('map', { center: [0, 0], zoom: 2, tileLayers: [{ name: 'True colour', url }] });
+} else {
+  await widget('kv', { items: [{ label: 'Debug — raw response', value: JSON.stringify(r) }] });
+}
 ```
 
 ### Fires + aerosols overlay
 ```js
 const fires = await call('nasa_gibs', { layer: 'VIIRS_SNPP_Thermal_Anomalies_375m_Day', date: '2026-04-28' }).catch(() => null);
 const aero  = await call('nasa_gibs', { layer: 'MODIS_Aqua_Aerosol',                    date: '2026-04-28' }).catch(() => null);
+const getUrl = r => r?.tile_url || r?.tileUrl || r?.wmsUrl || r?.url;
 const tileLayers = [
-  aero?.tileUrl ? { name: 'Aerosol', url: aero.tileUrl, opacity: 0.5 } : null,
-  fires?.tileUrl ? { name: 'Fires', url: fires.tileUrl, opacity: 1.0 } : null
+  getUrl(aero)  ? { name: 'Aerosol', url: getUrl(aero),  opacity: 0.5 } : null,
+  getUrl(fires) ? { name: 'Fires',   url: getUrl(fires), opacity: 1.0 } : null
 ].filter(Boolean);
-await widget('map', { center: [-5, 25], zoom: 4, tileLayers });
+if (tileLayers.length === 0) {
+  await widget('kv', { items: [
+    { label: 'Debug — fires response',  value: JSON.stringify(fires) },
+    { label: 'Debug — aerosol response', value: JSON.stringify(aero) }
+  ]});
+} else {
+  await widget('map', { center: [-5, 25], zoom: 4, tileLayers });
+}
 ```
 
 ## Common mistakes

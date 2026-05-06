@@ -31,7 +31,7 @@ const raw = await call('nasa_donki', {
   startDate: '2026-04-01',
   endDate:   '2026-04-29'
 }).catch(() => null);
-const events = (Array.isArray(raw) ? raw : []).filter(e => e);
+const events = (Array.isArray(raw) ? raw : (raw?.items ?? raw?.results ?? raw?.events ?? Object.values(raw ?? {})[0] ?? [])).filter(e => e);
 if (events.length === 0) return widget('text', { content: 'No DONKI events in this window.' });
 
 // 2. KPI
@@ -41,7 +41,7 @@ await widget('stat-card', { label: 'Flares', value: events.length, icon: 'sun' }
 await widget('stat-card', { label: 'X-class', value: xClass, icon: 'zap' });
 await widget('stat-card', { label: 'M-class', value: mClass, icon: 'flash' });
 
-// 3. Intensity chart (class number vs date)
+// 3. Intensity ranking (sorted by class, displayed as cards — chart/scatter not available in this CE)
 const score = c => {
   if (!c) return 0;
   const m = c.match(/([ABCMX])([\d.]+)/);
@@ -49,14 +49,13 @@ const score = c => {
   const base = { A: 0, B: 1, C: 2, M: 3, X: 4 }[m[1]] || 0;
   return base + (parseFloat(m[2]) || 0) / 10;
 };
-await widget('chart', {
-  type: 'scatter',
-  data: events.filter(e => e?.classType).map(e => ({
-    x: e?.beginTime || e?.peakTime,
-    y: score(e?.classType),
-    label: e?.classType
-  })),
-  xLabel: 'Time', yLabel: 'Flare class (encoded)'
+const ranked = [...events.filter(e => e?.classType)].sort((a, b) => score(b.classType) - score(a.classType)).slice(0, 5);
+await widget('cards', {
+  items: ranked.map(e => ({
+    title: e.classType,
+    subtitle: (e?.peakTime || e?.beginTime || '').slice(0, 16),
+    description: `AR${e?.activeRegionNum ?? '?'} — ${e?.sourceLocation ?? '?'}`
+  }))
 });
 
 // 4. Timeline
@@ -84,9 +83,9 @@ await widget('cards', {
 ### Recent CMEs
 ```js
 const raw = await call('nasa_donki', { type: 'CME', startDate: '2024-04-01', endDate: '2024-04-30' }).catch(() => null);
-const cmes = (Array.isArray(raw) ? raw : []).filter(c => c);
+const cmes = (Array.isArray(raw) ? raw : (raw?.body ?? raw?.items ?? raw?.results ?? Object.values(raw ?? {})[0] ?? [])).filter(c => c);
 const events = cmes.map(c => ({ date: c?.startTime?.slice(0, 16) ?? '—', title: 'CME', description: c?.sourceLocation ?? '—' }));
-await widget('stat-card', { label: 'CMEs', value: Math.max(cmes.length, 1) });
+await widget('stat-card', { label: 'CMEs', value: cmes.length });
 await widget('timeline', { events: events.length ? events : [{ date: '—', title: 'CME (preview)', description: 'Run live for events' }] });
 ```
 

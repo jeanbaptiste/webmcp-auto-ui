@@ -48,8 +48,8 @@ const results = await Promise.all(sites.map(s =>
 // 2. Aggregate annual sums + averages
 const summary = sites.map((s, i) => {
   const p = results[i]?.properties?.parameter ?? {};
-  const irr = Object.values(p?.ALLSKY_SFC_SW_DWN ?? {}).filter(Number.isFinite);
-  const wind = Object.values(p?.WS10M ?? {}).filter(Number.isFinite);
+  const irr = Object.values(p?.ALLSKY_SFC_SW_DWN ?? {}).filter(v => Number.isFinite(v) && v > -990);
+  const wind = Object.values(p?.WS10M ?? {}).filter(v => Number.isFinite(v) && v > -990);
   return {
     ...s,
     annualIrr: irr.reduce((a, b) => a + b, 0),
@@ -58,7 +58,7 @@ const summary = sites.map((s, i) => {
   };
 });
 summary.sort((a, b) => b.annualIrr - a.annualIrr);
-if (summary.length === 0 || summary[0].annualIrr === 0) return widget('text', { content: 'No POWER data for these sites.' });
+if (summary.length === 0 || summary[0].annualIrr <= 0) return widget('text', { content: 'No POWER data for these sites.' });
 
 // 3. Map of sites
 await widget('map', {
@@ -79,7 +79,7 @@ await widget('chart', {
   type: 'line',
   series: summary.map(s => ({
     name: s.name,
-    data: Object.entries(s.irrSeries).map(([d, v]) => ({ x: d, y: v }))
+    data: Object.entries(s.irrSeries).map(([d, v]) => ({ x: d, y: v })).filter(p => p.y > -990)
   })),
   xLabel: 'Day', yLabel: 'kWh/m²/day'
 });
@@ -96,18 +96,20 @@ await widget('data-table', {
 ### Three French cities
 ```js
 const sites = [{name:'Brest',lat:48.4,lon:-4.5},{name:'Marseille',lat:43.3,lon:5.4},{name:'Lyon',lat:45.75,lon:4.85}];
-const res = await Promise.all(sites.map(s => call('nasa_power', { parameters: 'ALLSKY_SFC_SW_DWN', community: 'RE', latitude: s.lat, longitude: s.lon, start: '20240101', end: '20241231' }).catch(() => null)));
-const sums = sites.map((s, i) => ({ ...s, total: Object.values(res[i]?.properties?.parameter?.ALLSKY_SFC_SW_DWN ?? {}).filter(Number.isFinite).reduce((a, b) => a + b, 0) }));
+const res = await Promise.all(sites.map(s => call('nasa_power', { parameters: 'ALLSKY_SFC_SW_DWN', community: 'RE', latitude: s.lat, longitude: s.lon, start: '20240101', end: '20241231', format: 'json' }).catch(() => null)));
+const sums = sites.map((s, i) => ({ ...s, total: Object.values(res[i]?.properties?.parameter?.ALLSKY_SFC_SW_DWN ?? {}).filter(v => Number.isFinite(v) && v > -990).reduce((a, b) => a + b, 0) }));
 await widget('data-table', { columns: ['City', 'kWh/m²/yr'], rows: sums.map(s => [s.name, s.total.toFixed(0)]) });
 ```
 
 ### Wind sites Atlantic vs Mediterranean
 ```js
-const a = await call('nasa_power', { parameters: 'WS50M', community: 'RE', latitude: 47.5, longitude: -4.0, start: '20240101', end: '20241231' }).catch(() => null);
-const m = await call('nasa_power', { parameters: 'WS50M', community: 'RE', latitude: 43.0, longitude: 4.5,  start: '20240101', end: '20241231' }).catch(() => null);
+const [a, m] = await Promise.all([
+  call('nasa_power', { parameters: 'WS50M', community: 'RE', latitude: 47.5, longitude: -4.0, start: '20240101', end: '20241231', format: 'json' }).catch(() => null),
+  call('nasa_power', { parameters: 'WS50M', community: 'RE', latitude: 43.0, longitude: 4.5,  start: '20240101', end: '20241231', format: 'json' }).catch(() => null)
+]);
 await widget('chart', { type: 'line', series: [
-  { name: 'Atlantic', data: Object.entries(a?.properties?.parameter?.WS50M ?? {}).map(([d, v]) => ({ x: d, y: v })) },
-  { name: 'Med.',     data: Object.entries(m?.properties?.parameter?.WS50M ?? {}).map(([d, v]) => ({ x: d, y: v })) }
+  { name: 'Atlantic', data: Object.entries(a?.properties?.parameter?.WS50M ?? {}).map(([d, v]) => ({ x: d, y: v })).filter(p => p.y > -990) },
+  { name: 'Med.',     data: Object.entries(m?.properties?.parameter?.WS50M ?? {}).map(([d, v]) => ({ x: d, y: v })).filter(p => p.y > -990) }
 ]});
 ```
 

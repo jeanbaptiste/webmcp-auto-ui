@@ -7,6 +7,7 @@ servers: [metmuseum]
 tools_used: [list-departments, search-museum-objects, get-museum-object]
 data_type: sous-classification
 components_used: [chart-rich, gallery, cards, kv]
+ce: [auto-notebook, auto-text, auto-chart, auto-gallery, auto-cards, auto-kv]
 layout:
   type: grid
   columns: 2

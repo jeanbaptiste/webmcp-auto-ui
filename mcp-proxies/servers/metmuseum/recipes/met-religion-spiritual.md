@@ -35,19 +35,21 @@ layout:
 
 2. **Fetch a wide sample**:
    ```js
-   const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-   const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+   const objs = await Promise.all(ids.slice(0, 16).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const works_all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.title);
+   const works_with_image = works_all.filter(w => w?.primaryImageSmall);
    ```
 
 3. **Iconic gallery** (visual catechism):
    ```js
-   const images = works.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.culture || w?.country || '—'} — ${w?.objectDate ?? '—'}` }));
+   const gallery_works = works_with_image.length ? works_with_image : works_all;
+   const images = gallery_works.map(w => ({ src: w?.primaryImageSmall ?? '', alt: w?.title ?? '(untitled)', caption: `${w?.culture || w?.country || '—'} — ${w?.objectDate ?? '—'}` }));
    await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
    ```
 
 4. **Cards per school/tradition** (grouped by culture):
    ```js
-   const bySchool = works.reduce((acc, w) => { const k = w?.culture || w?.department || '—'; (acc[k] = acc[k] || []).push(w); return acc; }, {});
+   const bySchool = works_all.reduce((acc, w) => { const k = w?.culture || w?.department || '—'; (acc[k] = acc[k] || []).push(w); return acc; }, {});
    const items = Object.entries(bySchool).flatMap(([school, ws]) => ws.slice(0, 2).map(w => ({ title: w?.title ?? '(untitled)', subtitle: school, image: w?.primaryImageSmall, body: w?.medium ?? '—' })));
    await widget('cards', { items: items.length ? items : [{ title: 'No samples', subtitle: '—' }] });
    ```
@@ -66,9 +68,11 @@ layout:
 6. **KV of recurring symbols** (from tags):
    ```js
    const tags = {};
-   for (const w of works) for (const t of (w?.tags ?? [])) { const tg = t?.term; if (tg) tags[tg] = (tags[tg] || 0) + 1; }
-   const top = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 6);
-   await widget('kv', { pairs: top.map(([t, n]) => [t, `${n} occurrences`]) });
+   for (const w of works_all) for (const t of (w?.tags ?? [])) { const tg = t?.term; if (tg) tags[tg] = (tags[tg] || 0) + 1; }
+   const top = Object.entries(tags).length
+     ? Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 6)
+     : Object.entries(bySchool).slice(0, 6).map(([k, ws]) => [k, `${ws.length} works`]);
+   await widget('kv', { pairs: top.map(([t, n]) => [t, `${n}`]) });
    ```
 
 ## Examples

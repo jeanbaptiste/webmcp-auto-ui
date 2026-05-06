@@ -33,7 +33,7 @@ const res = await call('nasa_exoplanet', {
   order:  'sy_dist asc',
   limit:  60
 }).catch(() => null);
-const planets = (Array.isArray(res) ? res : (res?.data ?? [])).filter(p => p);
+const planets = [res].flat().flatMap(r => Array.isArray(r) ? r : (r?.data ?? r?.results ?? r?.planets ?? [])).filter(Boolean);
 if (planets.length === 0) return widget('text', { content: 'No habitable candidates returned.' });
 
 // 2. KPI stat-cards
@@ -86,8 +86,8 @@ const res = await call('nasa_exoplanet', {
   where: 'default_flag=1 and pl_rade between 0.8 and 1.2 and pl_eqt between 250 and 310',
   limit: 30
 }).catch(() => null);
-const list = (Array.isArray(res) ? res : (res?.data ?? [])).filter(p => p);
-const items = list.map(p => ({ title: p?.pl_name ?? '—', subtitle: 'd=' + (p?.sy_dist ?? '—') + ' pc' }));
+const list = [res].flat().flatMap(r => Array.isArray(r) ? r : (r?.data ?? r?.results ?? r?.planets ?? [])).filter(Boolean);
+const items = list.map(p => ({ title: p?.pl_name ?? '—', subtitle: 'd=' + (p?.sy_dist ?? '—') + ' pc' })).filter(i => i.title !== '—');
 await widget('cards', { items: items.length ? items : [{ title: 'Earth twin (preview)', subtitle: 'Run live for candidates' }] });
 ```
 
@@ -99,8 +99,8 @@ const res = await call('nasa_exoplanet', {
   where: 'default_flag=1 and sy_dist < 20 and pl_rade between 1.2 and 2.0',
   limit: 50
 }).catch(() => null);
-const list = (Array.isArray(res) ? res : (res?.data ?? [])).filter(p => p);
-const rows = list.map(p => [p?.pl_name ?? '—', p?.sy_dist ?? '—', p?.pl_rade ?? '—']);
+const list = [res].flat().flatMap(r => Array.isArray(r) ? r : (r?.data ?? r?.results ?? r?.planets ?? [])).filter(Boolean);
+const rows = list.map(p => [p?.pl_name ?? '—', p?.sy_dist ?? '—', p?.pl_rade ?? '—']).filter(r => r.some(v => v !== '—'));
 await widget('data-table', { columns: ['Planet', 'd (pc)', 'R (R⊕)'], rows: rows.length ? rows : [['Super-Earth (preview)', '—', '—']] });
 ```
 

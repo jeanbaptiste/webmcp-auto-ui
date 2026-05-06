@@ -31,7 +31,7 @@ layout:
      pageSize: 60
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) await widget('text', { content: 'No objects.' });
+   if (ids.length === 0) { await widget('text', { content: 'No objects.' }); return; }
    ```
 
 2. **Fetch a sample** (small batch — the Met bridge throttles parallel requests):
@@ -55,8 +55,8 @@ layout:
 
 4. **Top-5 cards**:
    ```js
-   const cardItems = Object.entries(records).filter(([_, w]) => w).map(([label, w]) => ({ title: label.toUpperCase(), subtitle: w?.title ?? '(untitled)', image: w?.primaryImageSmall, body: w?.dimensions ?? '—' }));
-   await widget('cards', { items: cardItems.length ? cardItems : [{ title: 'No samples', subtitle: '—' }] });
+   const cardItems = Object.entries(records).filter(([_, w]) => w?.primaryImageSmall).map(([label, w]) => ({ title: label.toUpperCase(), subtitle: w?.title ?? '(untitled)', image: w?.primaryImageSmall, body: w?.dimensions ?? '—' }));
+   if (cardItems.length === 0) { await widget('text', { content: 'Not enough objects with images to show record cards.' }); } else { await widget('cards', { items: cardItems }); }
    ```
 
 5. **KV of precise figures**:
@@ -73,8 +73,8 @@ layout:
 
 6. **Distribution chart** (size in cm):
    ```js
-   const chartItems = display.slice(0, 10).map(w => ({ label: (w?.title || 'work').slice(0, 20), value: sizeOf(w) || (w?.objectBeginDate ? Math.abs(w.objectBeginDate) % 1000 : 1) }));
-   await widget('chart', { type: 'bar', data: chartItems.length ? chartItems : [{ label: 'sample', value: 1 }] });
+   const chartItems = display.slice(0, 10).map(w => ({ label: (w?.title || 'work').slice(0, 20), value: sizeOf(w) })).filter(item => item.value > 0);
+   if (chartItems.length >= 2) { await widget('chart', { type: 'bar', data: chartItems }); } else { await widget('text', { content: 'Size data unavailable for charting — measurements missing from sampled objects.' }); }
    await widget('stat-card', { label: 'Sample size', value: Math.max(display.length, 1), icon: 'archive' });
    ```
 
@@ -86,7 +86,7 @@ const r = await call('search-museum-objects', { q: 'sculpture', departmentId: 13
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 20).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.measurements);
-if (works.length === 0) await widget('text', { content: 'No measurements available.' });
+if (works.length === 0) { await widget('text', { content: 'No measurements available.' }); return; }
 const big = [...works].sort((a, b) => (b?.measurements?.[0]?.elementMeasurements?.Height || 0) - (a?.measurements?.[0]?.elementMeasurements?.Height || 0))[0];
 await widget('cards', { items: [{ title: 'TALLEST', subtitle: big?.title ?? '(untitled)', image: big?.primaryImageSmall, body: big?.dimensions ?? '—' }] });
 ```
@@ -97,7 +97,7 @@ const r = await call('search-museum-objects', { q: '*', departmentId: 10, hasIma
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 20).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object);
-if (works.length === 0) await widget('text', { content: 'No objects.' });
+if (works.length === 0) { await widget('text', { content: 'No objects.' }); return; }
 const oldest = [...works].sort((a, b) => (a?.objectBeginDate || 0) - (b?.objectBeginDate || 0))[0];
 await widget('kv', { pairs: [['Oldest', `${oldest?.title ?? '—'} (${oldest?.objectDate ?? '—'})`]] });
 ```

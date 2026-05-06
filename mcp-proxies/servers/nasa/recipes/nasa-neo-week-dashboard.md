@@ -48,17 +48,14 @@ await widget('stat-card', { label: 'Potentially hazardous', value: hazardous.len
 await widget('stat-card', { label: 'Largest (m)', value: biggest ? Math.round(dia(biggest)) : '—', icon: 'maximize' });
 await widget('stat-card', { label: 'Closest (LD)', value: closest && Number.isFinite(ld(closest)) ? ld(closest).toFixed(2) : '—', icon: 'target' });
 
-// 4. Scatter chart: distance vs size
+// 4. Bar chart: top 10 NEOs by diameter (scatter not supported — chart widget uses bars:[name,value] only)
+const top10 = [...all]
+  .filter(n => dia(n) > 0)
+  .sort((a, b) => dia(b) - dia(a))
+  .slice(0, 10);
 await widget('chart', {
-  type: 'scatter',
-  data: all.filter(n => Number.isFinite(ld(n)) && dia(n) > 0).map(n => ({
-    x: ld(n),
-    y: dia(n),
-    label: n?.name ?? '—',
-    color: n?.is_potentially_hazardous_asteroid ? '#dc2626' : '#3b82f6'
-  })),
-  xLabel: 'Miss distance (lunar dist.)',
-  yLabel: 'Diameter max (m)'
+  title: 'Top 10 NEOs by diameter (m)',
+  bars: top10.map(n => [n?.name?.replace(/[()]/g, '').trim().slice(0, 20) ?? '—', Math.round(dia(n))])
 });
 
 // 5. Sortable table

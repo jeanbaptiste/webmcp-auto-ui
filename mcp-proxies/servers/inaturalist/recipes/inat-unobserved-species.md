@@ -39,14 +39,15 @@ const cladeId = 40151; // mammals
 const gap = await call('unobserved_taxa', {
   taxon_id: cladeId,
   place_id: place.id,
-  per_page: 12,
+  per_page: 8,
 }).catch(() => ({ results: [] }));
 
 const gapResults = gap?.results ?? [];
 
 // 4. Hydrate each missing species with photos
+await widget('text', { content: 'Hydrating species data…' });
 const detailed = (await Promise.all(
-  gapResults.map(t => call('get_taxon', { id: t.id }).catch(() => null)),
+  gapResults.slice(0, 8).map(t => call('get_taxon', { id: t.id }).catch(() => null)),
 )).filter(Boolean);
 
 // 5. Render

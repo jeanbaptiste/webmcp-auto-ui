@@ -46,7 +46,7 @@ await widget('data-table', {
   columns: ['Rank', 'Observer', 'Species', 'Observations'],
   rows: boardResults.map((row, i) => [
     i + 1,
-    row.user?.login ?? '—',
+    row.user?.login ?? row.observer?.login ?? row.login ?? '—',
     row.species_count ?? 0,
     row.observation_count ?? 0,
   ]),
@@ -54,11 +54,11 @@ await widget('data-table', {
 
 // 5. Stat cards
 await widget('stat-card', { label: 'Total observations', value: obs?.total_results ?? 0, icon: 'eye' });
-await widget('stat-card', { label: 'Top observer', value: boardResults[0].user?.login ?? '—', icon: 'star' });
+await widget('stat-card', { label: 'Top observer', value: boardResults[0].user?.login ?? boardResults[0].observer?.login ?? boardResults[0].login ?? '—', icon: 'star' });
 await widget('stat-card', { label: '#1 species count', value: boardResults[0].species_count ?? 0, icon: 'leaf' });
 
 // 6. Profile of the #1 contributor
-const champ = boardResults[0].user;
+const champ = boardResults[0].user ?? boardResults[0].observer ?? (boardResults[0].login ? boardResults[0] : null);
 if (champ) {
   await widget('profile', {
     title: champ.name ?? champ.login ?? 'Observer',
@@ -80,13 +80,13 @@ if (champ) {
 const place = (await call('search_places', { q: 'Switzerland', per_page: 1 }))?.results?.[0];
 if (!place) { await widget('text', { content: 'Place not found.' }); return; }
 const board = await call('observers_leaderboard', { place_id: place.id, taxon_name: 'Mammalia', per_page: 10 }).catch(() => ({ results: [] }));
-await widget('data-table', { columns: ['Rank', 'User', 'Species', 'Obs.'], rows: (board?.results ?? []).map((r, i) => [i + 1, r.user?.login ?? '—', r.species_count ?? 0, r.observation_count ?? 0]) });
+await widget('data-table', { columns: ['Rank', 'User', 'Species', 'Obs.'], rows: (board?.results ?? []).map((r, i) => [i + 1, r.user?.login ?? r.observer?.login ?? r.login ?? '—', r.species_count ?? 0, r.observation_count ?? 0]) });
 ```
 
 ### World leaderboard for sharks
 ```js
 const board = await call('observers_leaderboard', { taxon_name: 'Selachimorpha', order_by: 'observation_count', per_page: 20 }).catch(() => ({ results: [] }));
-await widget('data-table', { columns: ['Rank', 'User', 'Obs.'], rows: (board?.results ?? []).map((r, i) => [i + 1, r.user?.login ?? '—', r.observation_count ?? 0]) });
+await widget('data-table', { columns: ['Rank', 'User', 'Obs.'], rows: (board?.results ?? []).map((r, i) => [i + 1, r.user?.login ?? r.observer?.login ?? r.login ?? '—', r.observation_count ?? 0]) });
 ```
 
 ## Common mistakes

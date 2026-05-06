@@ -36,13 +36,16 @@ layout:
 2. **Fetch a sample** (small batch — Met bridge throttles parallel requests):
    ```js
    const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-   const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+   const works = objs.filter(o => o?.object).map(o => o.object); // no image filter — downstream widgets need all works
    ```
 
 3. **Mosaic gallery** (visual cross-section):
    ```js
-   const images = works.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.culture || w?.department || '—'} — ${w?.objectDate ?? '—'}` }));
-   await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
+   const worksWithImg = works.filter(w => w?.primaryImageSmall);
+   const images = worksWithImg.length
+     ? worksWithImg.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.culture || w?.department || '—'} — ${w?.objectDate ?? '—'}` }))
+     : [{ src: '', alt: 'No image available', caption: '—' }];
+   await widget('gallery', { images });
    ```
 
 4. **Cards grouped by culture**:
@@ -74,9 +77,12 @@ layout:
 const r = await call('search-museum-objects', { q: 'Athena', hasImages: true, pageSize: 30 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
-const images = works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.department ?? '—' }));
-await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
+const works = objs.filter(o => o?.object).map(o => o.object);
+const worksWithImg = works.filter(w => w?.primaryImageSmall);
+const images = worksWithImg.length
+  ? worksWithImg.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.department ?? '—' }))
+  : [{ src: '', alt: 'No image available', caption: '—' }];
+await widget('gallery', { images });
 ```
 
 ### Horse across cultures

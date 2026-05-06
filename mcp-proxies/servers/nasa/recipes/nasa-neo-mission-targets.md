@@ -27,13 +27,9 @@ NHATS keeps a catalogue of NEOs reachable with reasonable propellant + duration 
 
 ```js
 // 1. Filter to a realistic crewed envelope
-const data = await call('jpl_nhats', {
-  dv: 6,         // ≤ 6 km/s total
-  dur: 360,      // ≤ 360 days
-  launch: '2030-2035'
-}).catch(() => null);
+let data = await call('jpl_nhats', { dv: 7, dur: 450 }).catch(() => null);
 const targets = (data?.data ?? []).filter(t => t);
-if (targets.length === 0) return widget('text', { content: 'No NHATS targets for this envelope.' });
+if (targets.length === 0) return widget('text', { content: 'No NHATS targets found.' });
 
 // 2. Rank
 targets.sort((a, b) => +(a?.min_dv?.dv ?? Infinity) - +(b?.min_dv?.dv ?? Infinity));
@@ -88,7 +84,7 @@ await widget('cards', {
 
 ### Easiest reachable NEOs
 ```js
-const data = await call('jpl_nhats', { dv: 5, dur: 270, launch: '2025-2030' }).catch(() => null);
+const data = await call('jpl_nhats', { dv: 5, dur: 270 }).catch(() => null);
 const targets = (data?.data ?? []).filter(t => t);
 await widget('kv', { items: [{ label: 'Easy targets', value: targets.length }] });
 await widget('cards', { items: targets.slice(0, 3).map(t => ({ title: t?.des ?? '—', subtitle: 'Δv ' + (t?.min_dv?.dv ?? '—') })) });
@@ -96,7 +92,7 @@ await widget('cards', { items: targets.slice(0, 3).map(t => ({ title: t?.des ?? 
 
 ### Strict crewed budget
 ```js
-const data = await call('jpl_nhats', { dv: 4, dur: 180 }).catch(() => null);
+const data = await call('jpl_nhats', { dv: 4.5, dur: 180 }).catch(() => null);
 const targets = (data?.data ?? []).filter(t => t);
 await widget('data-table', { columns: ['Des', 'Δv', 'Days'], rows: targets.map(t => [t?.des ?? '—', t?.min_dv?.dv ?? '—', t?.min_dur?.dur ?? '—']) });
 ```

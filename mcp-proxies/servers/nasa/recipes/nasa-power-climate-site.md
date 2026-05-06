@@ -38,7 +38,7 @@ const data = await call('nasa_power', {
 }).catch(() => null);
 if (!data) return widget('text', { content: 'POWER request failed.' });
 
-const series = data?.properties?.parameter ?? {};
+const series = data?.properties?.parameter ?? data?.parameter ?? {};
 const dates = Object.keys(series?.T2M ?? {});
 if (dates.length === 0) return widget('text', { content: 'No POWER data returned.' });
 
@@ -88,14 +88,14 @@ await widget('kv', {
 ### Marrakech 2024
 ```js
 const d = await call('nasa_power', { parameters: 'ALLSKY_SFC_SW_DWN', community: 'RE', latitude: 31.6, longitude: -8.0, start: '20240101', end: '20241231' }).catch(() => null);
-const s = d?.properties?.parameter?.ALLSKY_SFC_SW_DWN ?? {};
+const s = d?.properties?.parameter?.ALLSKY_SFC_SW_DWN ?? d?.parameter?.ALLSKY_SFC_SW_DWN ?? {};
 await widget('chart-rich', { type: 'area', series: [{ name: 'Solar', data: Object.entries(s).map(([dd, v]) => ({ x: dd, y: v })) }] });
 ```
 
 ### Berlin temperature record
 ```js
 const d = await call('nasa_power', { parameters: 'T2M_MAX', community: 'AG', latitude: 52.5, longitude: 13.4, start: '20200101', end: '20241231' }).catch(() => null);
-const s = d?.properties?.parameter?.T2M_MAX ?? {};
+const s = d?.properties?.parameter?.T2M_MAX ?? d?.parameter?.T2M_MAX ?? {};
 const vals = Object.values(s).filter(Number.isFinite);
 await widget('stat-card', { label: 'Hottest day (°C)', value: vals.length > 0 ? Math.max(...vals).toFixed(1) : '—' });
 ```

@@ -37,7 +37,7 @@ layout:
 2. **Fetch and sort by most recent `accessionYear`** (small batch — the Met bridge throttles parallel requests; sort instead of cutoff-filter, then take the top N):
    ```js
    const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-   const all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+   const all = objs.filter(o => o?.object).map(o => o.object);
    const withYear = all.filter(w => Number(w?.accessionYear) > 0);
    const recent = [...(withYear.length ? withYear : all)].sort((a, b) => Number(b?.accessionYear || 0) - Number(a?.accessionYear || 0)).slice(0, 12);
    ```
@@ -63,8 +63,12 @@ layout:
 
 6. **Gallery**:
    ```js
-   const gImages = recent.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `Acquired ${w?.accessionYear ?? '—'}` }));
-   await widget('gallery', { images: gImages.length ? gImages : [{ src: '', alt: 'No samples', caption: '—' }] });
+   const gImages = recent.filter(w => w?.primaryImageSmall).map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `Acquired ${w?.accessionYear ?? '—'}` }));
+   if (gImages.length === 0) {
+     await widget('text', { content: 'No images available for this selection.' });
+   } else {
+     await widget('gallery', { images: gImages });
+   }
    ```
 
 ## Examples
@@ -74,7 +78,7 @@ layout:
 const r = await call('search-museum-objects', { q: '*', departmentId: 11, hasImages: true, pageSize: 20 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+const all = objs.filter(o => o?.object).map(o => o.object);
 const withYear = all.filter(w => Number(w?.accessionYear));
 const recent = [...(withYear.length ? withYear : all)].sort((a, b) => Number(b.accessionYear || 0) - Number(a.accessionYear || 0)).slice(0, 10);
 const items7 = recent.map(w => ({ title: w?.title ?? '(untitled)', subtitle: `Acquired ${w?.accessionYear ?? '—'}`, image: w?.primaryImageSmall }));
@@ -86,7 +90,7 @@ await widget('cards', { items: items7.length ? items7 : [{ title: 'No samples', 
 const r = await call('search-museum-objects', { q: '*', isHighlight: true, hasImages: true, pageSize: 20 }).catch(() => null);
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+const all = objs.filter(o => o?.object).map(o => o.object);
 const withYear = all.filter(w => Number(w?.accessionYear));
 const recent = [...(withYear.length ? withYear : all)].sort((a, b) => Number(b.accessionYear || 0) - Number(a.accessionYear || 0)).slice(0, 8);
 const items = recent.map(w => ({ date: w?.accessionYear ?? '—', title: w?.title ?? '(untitled)' }));

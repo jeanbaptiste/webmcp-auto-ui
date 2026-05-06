@@ -26,7 +26,7 @@ layout:
 ```js
 // 1. Resolve the user via cross-entity search
 const res = await call('search', { q: 'tela-botanica', sources: 'users', per_page: 1 }).catch(() => ({ results: [] }));
-const user = res?.results?.[0]?.record;
+const user = res?.results?.[0];
 if (!user) {
   await widget('text', { content: 'User not found.' });
   return;
@@ -95,7 +95,7 @@ await widget('data-table', {
 ### Resolve a specific user
 ```js
 const res = await call('search', { q: 'jb-photo', sources: 'users', per_page: 1 }).catch(() => ({ results: [] }));
-const u = res?.results?.[0]?.record;
+const u = res?.results?.[0];
 if (!u) { await widget('text', { content: 'User not found.' }); return; }
 await widget('profile', { title: u.name ?? u.login ?? 'User', subtitle: '@' + (u.login ?? '—'), image: u.icon_url, fields: { Joined: u.created_at?.slice(0, 10) ?? '—', 'Total obs': u.observations_count ?? 0 } });
 ```
@@ -103,7 +103,7 @@ await widget('profile', { title: u.name ?? u.login ?? 'User', subtitle: '@' + (u
 ### Map a user's hotspots
 ```js
 const res = await call('search', { q: 'naturalist42', sources: 'users', per_page: 1 }).catch(() => ({ results: [] }));
-const u = res?.results?.[0]?.record;
+const u = res?.results?.[0];
 if (!u) { await widget('text', { content: 'User not found.' }); return; }
 const all = await call('search_observations', { user_id: u.id, per_page: 200, quality_grade: 'research' }).catch(() => ({ results: [] }));
 const mine = (all?.results ?? []).filter(o => o.geojson?.coordinates);

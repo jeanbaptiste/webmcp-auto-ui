@@ -4,7 +4,7 @@ name: Seasonal phenology of a species
 description: Show when a species is most active during the year via a monthly histogram, key stats, illustrative photos and a condensed taxon card.
 when: the user asks when a species can be observed, its seasonal peak, its phenology, or the best month to spot it
 servers: [inaturalist]
-tools_used: [observations_histogram, search_observations, get_taxon, search_taxa]
+tools_used: [observations_histogram, search_observations, get_taxon, search_taxa, search_places]
 data_type: monthly time series + photos + taxon info
 components_used: [chart, stat-card, gallery, kv]
 layout:
@@ -39,20 +39,20 @@ const [hist, detail, obs] = await Promise.all([
   call('search_observations', { taxon_id: taxon.id, quality_grade: 'research', per_page: 24 }).catch(() => ({ results: [] })),
 ]);
 
-// 5. Identify peak
+// 3. Identify peak
 const months = Object.entries(hist?.results?.month ?? {});
 const sortedMonths = [...months].sort((a, b) => b[1] - a[1]);
 const peak = sortedMonths[0];
 const total = months.reduce((s, [, n]) => s + (n ?? 0), 0);
 
-// 6. Render
+// 4. Render
 await widget('chart', {
   type: 'bar',
   labels: months.map(([m]) => ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(m) - 1] ?? m),
   data: months.map(([, n]) => n),
   title: `Monthly observations of ${taxon.preferred_common_name ?? taxon.name ?? 'species'}`,
 });
-await widget('stat-card', { label: 'Peak month', value: peak?.[0] ?? '—', icon: 'calendar' });
+await widget('stat-card', { label: 'Peak month', value: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(peak?.[0]) - 1] ?? peak?.[0] ?? '—', icon: 'calendar' });
 await widget('stat-card', { label: 'Total observations', value: total, icon: 'eye' });
 await widget('kv', {
   title: taxon.preferred_common_name ?? taxon.name ?? 'Species',

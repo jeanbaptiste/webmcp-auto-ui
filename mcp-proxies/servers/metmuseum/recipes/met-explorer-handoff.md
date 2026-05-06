@@ -53,14 +53,14 @@ layout:
        ['Query', 'ukiyo-e'],
        ['Department', dept?.displayName || 'All'],
        ['With images', 'Yes'],
-       ['Expected matches', preview?.total ?? 0]
+       ['Expected matches', String(preview?.total ?? 0)]
      ]
    });
    ```
 
 5. **Stat-card emphasizing the count**:
    ```js
-   await widget('stat-card', { label: 'Objects to explore', value: Math.max(preview?.total ?? 0, 1), icon: 'compass' });
+   await widget('stat-card', { label: 'Objects to explore', value: Math.max(preview?.total ?? 0, 1), icon: 'search' });
    ```
 
 6. **Hand off** (last step — opens the Explorer UI):
@@ -79,14 +79,15 @@ layout:
 const resp = await call('list-departments', {}).catch(() => null);
 const asian = (resp?.departments ?? []).find(d => d?.displayName?.includes('Asian'));
 const preview = await call('search-museum-objects', { q: 'ukiyo-e', departmentId: asian?.departmentId, hasImages: true, pageSize: 1 }).catch(() => null);
-await widget('stat-card', { label: 'Match', value: Math.max(preview?.total ?? 0, 1), icon: 'compass' });
-await call('open-met-explorer', { q: 'ukiyo-e', departmentId: asian?.departmentId });
+await widget('stat-card', { label: 'Match', value: Math.max(preview?.total ?? 0, 1), icon: 'search' });
+await call('open-met-explorer', { q: 'ukiyo-e', departmentId: asian?.departmentId, hasImages: true });
 ```
 
 ### Free-form by title
 ```js
 const preview = await call('search-museum-objects', { q: 'sunflower', hasImages: true, pageSize: 1 }).catch(() => null);
 await widget('text', { content: `${preview?.total ?? 0} objects match "sunflower".` });
+await widget('stat-card', { label: 'Objects to explore', value: Math.max(preview?.total ?? 0, 1), icon: 'search' });
 await call('open-met-explorer', { q: 'sunflower' });
 ```
 

@@ -87,7 +87,8 @@ const data = await call('nasa_mars_rover', { rover: 'curiosity', sol: 1000 }).ca
 const photos = (data?.photos ?? []).filter(p => p);
 const images = photos.slice(0, 40).filter(p => p?.img_src).map(p => ({ src: p.img_src, caption: p?.camera?.name ?? '—' }));
 await widget('stat-card', { label: 'Photos', value: Math.max(photos.length, 1) });
-await widget('gallery', { images: images.length ? images : [{ src: 'https://mars.nasa.gov/msl-raw-images/proj/msl/redops/ods/surface/sol/01000/opgs/edr/fcam/FLB_510212164EDR_F0481570FHAZ00302M_.JPG', caption: 'Curiosity sol 1000 (preview)' }] });
+if (images.length === 0) return widget('text', { content: 'No photos for this sol.' });
+await widget('gallery', { images });
 ```
 
 ### Perseverance by earth date
@@ -95,7 +96,8 @@ await widget('gallery', { images: images.length ? images : [{ src: 'https://mars
 const data = await call('nasa_mars_rover', { rover: 'perseverance', earth_date: '2026-04-15' }).catch(() => null);
 const photos = (data?.photos ?? []).filter(p => p);
 const images = photos.slice(0, 60).filter(p => p?.img_src).map(p => ({ src: p.img_src, alt: p?.camera?.full_name ?? '—' }));
-await widget('gallery', { images: images.length ? images : [{ src: 'https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/01100/ids/edr/browse/zcam/ZL0_1100_0762997589_000FDR_N0500000ZCAM00000_0260LMJ01.png', alt: 'Perseverance (preview)' }] });
+if (images.length === 0) return widget('text', { content: 'No photos for this date.' });
+await widget('gallery', { images });
 await widget('kv', { items: [{ label: 'Rover', value: 'Perseverance' }, { label: 'Sol', value: photos[0]?.sol ?? '—' }] });
 ```
 

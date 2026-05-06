@@ -28,7 +28,8 @@ Sentry maintains a list of objects with non-zero cumulative impact probability o
 ```js
 // 1. Top of the Sentry list
 const sentry = await call('jpl_sentry', { limit: 50 }).catch(() => null);
-const rows   = (sentry?.data ?? []).filter(r => r);
+const raw    = sentry?.data ?? sentry?.results ?? (Array.isArray(sentry) ? sentry : []);
+const rows   = raw.filter(r => r);
 if (rows.length === 0) return widget('text', { content: 'Sentry list is empty or unavailable.' });
 
 // 2. Enrich top-5 with SBDB (diameter, fullname)
@@ -84,16 +85,18 @@ await widget('cards', {
 ### Default top 50
 ```js
 const sentry = await call('jpl_sentry', { limit: 50 }).catch(() => null);
-const data = (sentry?.data ?? []).filter(r => r);
+const raw  = sentry?.data ?? sentry?.results ?? (Array.isArray(sentry) ? sentry : []);
+const data = raw.filter(r => r);
 const rows = data.map(r => [r?.des ?? '—', r?.ip ?? '—', r?.ps_cum ?? '—', r?.h ?? '—']);
-await widget('stat-card', { label: 'Sentry list', value: Math.max(data.length, 1) });
+await widget('stat-card', { label: 'Sentry list', value: data.length });
 await widget('data-table', { columns: ['Des', 'IP', 'PS', 'H'], rows: rows.length ? rows : [['101955 Bennu', '5.7e-04', '-1.41', '20.21']] });
 ```
 
 ### Filter on Palermo > -3
 ```js
 const sentry = await call('jpl_sentry', { ps_min: '-3', limit: 30 }).catch(() => null);
-const data = (sentry?.data ?? []).filter(r => r);
+const raw  = sentry?.data ?? sentry?.results ?? (Array.isArray(sentry) ? sentry : []);
+const data = raw.filter(r => r);
 const items = data.slice(0, 5).map(r => ({ title: r?.des ?? '—', subtitle: 'PS ' + (r?.ps_cum ?? '—'), description: 'Years ' + (r?.year_range ?? '—') }));
 await widget('cards', { items: items.length ? items : [{ title: '101955 Bennu', subtitle: 'PS -1.41', description: 'Years 2178-2290' }] });
 ```

@@ -35,10 +35,13 @@ const results = await Promise.all(
 );
 
 // 2. Productivity chart (count per camera)
-await widget('chart', {
-  type: 'bar',
-  data: cams.map((c, i) => ({ label: c, value: (results[i]?.photos ?? []).length }))
-});
+const chartData = cams.map((c, i) => ({ label: c, value: (results[i]?.photos ?? []).length }));
+const hasData = chartData.some(d => d.value > 0);
+if (hasData) {
+  await widget('chart', { type: 'bar', data: chartData });
+} else {
+  await widget('cards', { items: [{ title: 'No photos found', description: 'Try a different sol number.' }] });
+}
 
 // 3. Side-by-side gallery (one row per camera)
 const flat = [];
@@ -47,7 +50,8 @@ cams.forEach((c, i) => {
     if (p?.img_src) flat.push({ src: p.img_src, alt: c, caption: c });
   }
 });
-await widget('gallery', { images: flat.length ? flat : cams.map(c => ({ src: 'https://mars.nasa.gov/system/resources/detail_files/26020_PIA25287-web.jpg', alt: c, caption: `${c} (preview)` })) });
+const FALLBACK = 'https://placehold.co/400x300/222/eee?text=No+Image';
+await widget('gallery', { images: flat.length ? flat : cams.map(c => ({ src: FALLBACK, alt: c, caption: `${c} (no image)` })) });
 
 // 4. Didactic cards: role of each camera
 const ROLES = {
@@ -86,9 +90,10 @@ const images = [
   ...((front?.photos ?? []).slice(0, 3).filter(p => p?.img_src).map(p => ({ src: p.img_src, caption: 'FRONT' }))),
   ...((rear?.photos ?? []).slice(0, 3).filter(p => p?.img_src).map(p => ({ src: p.img_src, caption: 'REAR' })))
 ];
+const FALLBACK = 'https://placehold.co/400x300/222/eee?text=No+Image';
 await widget('gallery', { images: images.length ? images : [
-  { src: 'https://mars.nasa.gov/system/resources/detail_files/26020_PIA25287-web.jpg', caption: 'FRONT (preview)' },
-  { src: 'https://mars.nasa.gov/system/resources/detail_files/26020_PIA25287-web.jpg', caption: 'REAR (preview)' }
+  { src: FALLBACK, caption: 'FRONT (no image)' },
+  { src: FALLBACK, caption: 'REAR (no image)' }
 ] });
 ```
 

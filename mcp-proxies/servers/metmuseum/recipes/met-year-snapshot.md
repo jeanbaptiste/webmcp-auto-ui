@@ -63,16 +63,16 @@ layout:
 5. **Cross-cultural gallery**:
    ```js
    const images = works.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.artistNationality || w?.culture || '—'} — ${w?.medium ?? '—'}` }));
-   await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
+   if (images.length) { await widget('gallery', { images }); } else { await widget('text', { content: 'No images available for this year.' }); }
    ```
 
 6. **Timeline + cards by nationality**:
    ```js
    const tlItems = works.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall }));
-   await widget('timeline', { items: tlItems.length ? tlItems : [{ date: '—', title: 'No samples returned' }] });
+   if (tlItems.length) { await widget('timeline', { items: tlItems }); } else { await widget('text', { content: 'No timeline items available for this year.' }); }
    const byNat = works.reduce((acc, w) => { const k = w?.artistNationality || w?.culture || 'Unknown'; (acc[k] = acc[k] || []).push(w); return acc; }, {});
    const cardsItems = Object.entries(byNat).flatMap(([c, ws]) => ws.slice(0, 1).map(w => ({ title: c, subtitle: w?.title ?? '(untitled)', image: w?.primaryImageSmall, body: w?.artistDisplayName || w?.culture || '—' })));
-   await widget('cards', { items: cardsItems.length ? cardsItems : [{ title: 'No samples', subtitle: '—' }] });
+   if (cardsItems.length) { await widget('cards', { items: cardsItems }); } else { await widget('text', { content: 'No cards to display for this year.' }); }
    ```
 
 ## Examples
@@ -84,7 +84,7 @@ const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
 const images = works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.artistNationality ?? '—' }));
-await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
+if (images.length) { await widget('gallery', { images }); } else { await widget('text', { content: 'No images available for this year.' }); }
 ```
 
 ### 1869 across cultures
@@ -94,7 +94,7 @@ const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
 const items = works.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)' }));
-await widget('timeline', { items: items.length ? items : [{ date: '—', title: 'No samples returned' }] });
+if (items.length) { await widget('timeline', { items }); } else { await widget('text', { content: 'No timeline items available for this year.' }); }
 ```
 
 ## Common mistakes

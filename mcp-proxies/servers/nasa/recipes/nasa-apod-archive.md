@@ -26,9 +26,11 @@ The recipe organises the response so the user can flip through (carousel), scan 
 
 ```js
 // 1. Fetch an explicit range OR a random count
+const end = new Date();
+const start = new Date(Date.now() - 7 * 24 * 3600 * 1000);
 const raw = await call('nasa_apod', {
-  start_date: '2026-04-22',
-  end_date:   '2026-04-29'
+  start_date: start.toISOString().slice(0, 10),
+  end_date:   end.toISOString().slice(0, 10)
 }).catch(() => null);
 const apods = (Array.isArray(raw) ? raw : []).filter(a => a);
 if (apods.length === 0) return widget('text', { content: 'No APOD entries (range too long, future date, or rate-limit).' });
@@ -80,7 +82,7 @@ const apods = (Array.isArray(raw) ? raw : []).filter(a => a);
 const carItems = apods.filter(a => a?.media_type === 'image' && a?.hdurl).map(a => ({ image: a.hdurl, title: a?.title ?? '(untitled)', subtitle: a?.date ?? '—' }));
 const cardItems = apods.map(a => ({ title: a?.title ?? '(untitled)', image: a?.url, subtitle: a?.date ?? '—' }));
 await widget('carousel', { items: carItems.length ? carItems : [{ title: 'APOD week (preview)', subtitle: 'Run live to see images' }] });
-await widget('cards', { items: cardItems.length ? cardItems : [{ title: 'APOD week (preview)', subtitle: 'Run live to see images' }] });
+await widget('cards', { items: cardItems.length ? cardItems : [{ title: 'Chargement échoué', subtitle: 'Relance en live pour voir les images' }] });
 ```
 
 ### 15 random pictures

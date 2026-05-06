@@ -32,26 +32,36 @@ layout:
 
 2. **Search broadly then bucket by `medium` post-fetch** (the Met `medium` search filter currently returns 0 — sample widely and group on the returned `medium` field):
    ```js
-   const search = await call('search-museum-objects', { q: 'sculpture', departmentId: dept.departmentId, hasImages: true, pageSize: 30 }).catch(() => null);
+   const search = await call('search-museum-objects', { q: '*', departmentId: dept.departmentId, hasImages: true, pageSize: 30 }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-   const items = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
-   const KEYS = ['Terracotta', 'Marble', 'Bronze', 'Limestone'];
-   const counts = KEYS.map(k => ({ medium: k, total: items.filter(w => (w?.medium || '').includes(k)).length, sampleId: items.find(w => (w?.medium || '').includes(k))?.objectID }));
-   const totalUsed = counts.reduce((s, c) => s + c.total, 0) || items.length;
+   const objs = await Promise.all(ids.slice(0, 20).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+   const allObjs = objs.filter(o => o?.object).map(o => o.object);
+   const items = allObjs.filter(w => w?.primaryImageSmall);
+   const mediumMap = {};
+   allObjs.forEach(w => { const m = (w?.medium || 'Unknown').split(';')[0].trim(); mediumMap[m] = (mediumMap[m] || 0) + 1; });
+   const counts = Object.entries(mediumMap).map(([medium, total]) => ({ medium, total, sampleId: allObjs.find(w => (w?.medium || '').startsWith(medium))?.objectID }));
+   const totalUsed = counts.reduce((s, c) => s + c.total, 0) || allObjs.length;
    ```
 
 3. **Rich chart** with one annotated example per medium:
    ```js
    const chartData = counts.filter(c => c.total > 0).map(c => ({ label: c.medium, value: c.total, sampleId: c.sampleId }));
-   await widget('chart-rich', { type: 'bar', data: chartData.length ? chartData : [{ label: 'sample', value: items.length || 1 }] });
+   if (chartData.length >= 2) {
+     await widget('chart-rich', { type: 'bar', data: chartData });
+   } else {
+     await widget('text', { content: 'Pas assez de médiums distincts pour un graphique — élargir la recherche.' });
+   }
    ```
 
 4. **Per-medium examples**:
    ```js
    const examples = items.slice(0, 8);
    const images = examples.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.medium ?? '—' }));
-   await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
+   if (!images.length) {
+     await widget('text', { content: 'Aucun objet avec image trouvé pour ce département.' });
+   } else {
+     await widget('gallery', { images });
+   }
    ```
 
 5. **Detail cards** with dimensions:

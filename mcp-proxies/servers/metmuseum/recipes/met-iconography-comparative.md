@@ -37,26 +37,27 @@ layout:
    ```js
    const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
    const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+   if (works.length === 0) { await widget('text', { content: 'No image-bearing records found for this motif. Try a broader search term.' }); return; }
    ```
 
 3. **Comparison gallery**:
    ```js
    const images = works.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.culture || w?.department || '—'} — ${w?.objectDate ?? '—'}` }));
-   await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
+   await widget('gallery', { images });
    ```
 
 4. **Cards grouped by culture**:
    ```js
    const byCulture = works.reduce((acc, w) => { const cult = w?.culture || w?.department || '—'; (acc[cult] = acc[cult] || []).push(w); return acc; }, {});
    const cardItems = Object.entries(byCulture).flatMap(([culture, ws]) => ws.slice(0, 2).map(w => ({ title: w?.title ?? '(untitled)', subtitle: culture, image: w?.primaryImageSmall, body: w?.objectDate ?? '—' })));
-   await widget('cards', { items: cardItems.length ? cardItems : [{ title: 'No samples returned', subtitle: '—' }] });
+   await widget('cards', { items: cardItems });
    ```
 
 5. **Frequency chart by century**:
    ```js
    const byCentury = works.reduce((acc, w) => { const century = Math.floor((w?.objectBeginDate || 0) / 100) * 100; acc[century] = (acc[century] || 0) + 1; return acc; }, {});
-   const data = Object.entries(byCentury).map(([k, v]) => ({ label: `${k}`, value: v }));
-   await widget('chart', { type: 'bar', data: data.length ? data : [{ label: 'sample', value: works.length || 1 }] });
+   const data = Object.entries(byCentury).map(([k, v]) => ({ label: `${Number(k) + 100}s`, value: v }));
+   if (data.length > 0) await widget('chart', { type: 'bar', data });
    ```
 
 6. **KV of related AAT/Wikidata terms**:
@@ -64,7 +65,7 @@ layout:
    const tags = {};
    for (const w of works) for (const t of (w?.tags ?? [])) { const tg = t?.term; if (tg) tags[tg] = (tags[tg] || 0) + 1; }
    const top = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 8);
-   await widget('kv', { pairs: top.map(([t, n]) => [t, `${n} co-occurrences`]) });
+   if (top.length > 0) await widget('kv', { pairs: top.map(([t, n]) => [t, `${n} co-occurrences`]) });
    ```
 
 ## Examples
@@ -75,8 +76,9 @@ const r = await call('search-museum-objects', { q: 'dragon', hasImages: true, pa
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+if (works.length === 0) { await widget('text', { content: 'No image-bearing records found for this motif. Try a broader search term.' }); return; }
 const images = works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.culture ?? '—' }));
-await widget('gallery', { images: images.length ? images : [{ src: '', alt: 'No samples', caption: '—' }] });
+await widget('gallery', { images });
 ```
 
 ### Lotus across Asia
@@ -85,8 +87,9 @@ const r = await call('search-museum-objects', { q: 'lotus', departmentId: 6, has
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+if (works.length === 0) { await widget('text', { content: 'No image-bearing records found for this motif. Try a broader search term.' }); return; }
 const items = works.map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.culture ?? '—', image: w?.primaryImageSmall }));
-await widget('cards', { items: items.length ? items : [{ title: 'No samples', subtitle: '—' }] });
+await widget('cards', { items });
 ```
 
 ## Common mistakes

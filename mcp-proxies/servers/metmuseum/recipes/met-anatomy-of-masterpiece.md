@@ -30,7 +30,7 @@ layout:
      hasImages: true
    }).catch(() => null);
    const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) await widget('text', { content: 'No matching objects found.' });
+   if (ids.length === 0) { await widget('text', { content: 'No matching objects found.' }); return; }
    const top = ids[0];
    ```
 
@@ -38,7 +38,7 @@ layout:
    ```js
    const resp = await call('get-museum-object', { objectId: top, returnImage: true }).catch(() => null);
    const w = resp?.object;
-   if (!w || resp?.message) await widget('text', { content: 'Object not found.' });
+   if (!w || resp?.message) { await widget('text', { content: 'Object not found.' }); return; }
    ```
 
 3. **Carousel of every view** (primary + additional):
@@ -97,10 +97,10 @@ layout:
 ```js
 const s = await call('search-museum-objects', { q: 'Vermeer', artistOrCulture: true, hasImages: true }).catch(() => null);
 const ids = s?.objectIDs ?? [];
-if (ids.length === 0) await widget('text', { content: 'No results.' });
+if (ids.length === 0) { await widget('text', { content: 'No results.' }); return; }
 const resp = await call('get-museum-object', { objectId: ids[0], returnImage: true }).catch(() => null);
 const w = resp?.object;
-if (!w) await widget('text', { content: 'Object not found.' });
+if (!w) { await widget('text', { content: 'Object not found.' }); return; }
 const images = [w?.primaryImage, ...(w?.additionalImages ?? [])].filter(src => src && src.length > 0);
 if (images.length > 0) await widget('carousel', { items: images.map(src => ({ src })) });
 ```
@@ -109,10 +109,10 @@ if (images.length > 0) await widget('carousel', { items: images.map(src => ({ sr
 ```js
 const s = await call('search-museum-objects', { q: 'Akhenaten', isHighlight: true, hasImages: true }).catch(() => null);
 const ids = s?.objectIDs ?? [];
-if (ids.length === 0) await widget('text', { content: 'No results.' });
+if (ids.length === 0) { await widget('text', { content: 'No results.' }); return; }
 const resp = await call('get-museum-object', { objectId: ids[0] }).catch(() => null);
 const w = resp?.object;
-if (!w) await widget('text', { content: 'Object not found.' });
+if (!w) { await widget('text', { content: 'Object not found.' }); return; }
 await widget('text', { content: `Reign: ${w?.reign ?? '—'}. Period: ${w?.period ?? '—'}.` });
 const adds = (w?.additionalImages ?? []).filter(src => src && src.length > 0);
 if (adds.length > 0) await widget('carousel', { items: adds.map(src => ({ src })) });

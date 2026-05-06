@@ -33,8 +33,7 @@ const r = await call('jpl_horizons', {
   START_TIME: '2026-04-29',
   STOP_TIME:  '2026-05-06',
   STEP_SIZE: '1d',
-  QUANTITIES: '1,9,20,23',  // RA/Dec, V mag, dist, alt/az
-  format: 'json'
+  QUANTITIES: '1,9,20,23'   // RA/Dec, V mag, dist, alt/az
 }).catch(() => null);
 if (!r) return widget('text', { content: 'Horizons request failed.' });
 
@@ -66,7 +65,7 @@ await widget('chart', {
 });
 
 // 5. Daily table
-await widget('data-table', {
+await widget('table', {
   columns: ['Date', 'RA', 'Dec', 'V mag', 'Distance (au)'],
   rows: rows.slice(0, 14).map(c => [c?.[0] ?? '—', (c?.[2] ?? '—') + ' ' + (c?.[3] ?? ''), c?.[4] ?? '—', c?.[5] ?? '—', c?.[6] ?? '—'])
 });
@@ -74,7 +73,7 @@ await widget('data-table', {
 // 6. Observation tips
 await widget('text', {
   title: 'Observation tips',
-  body: 'Mars rises east-southeast around local midnight. With V mag ~0.5 it is visible to the naked eye. A small telescope reveals the polar ice cap at high magnification. Best viewed when more than 30° above the horizon to minimise atmospheric extinction.'
+  content: 'Mars rises east-southeast around local midnight. With V mag ~0.5 it is visible to the naked eye. A small telescope reveals the polar ice cap at high magnification. Best viewed when more than 30° above the horizon to minimise atmospheric extinction.'
 });
 ```
 
@@ -86,8 +85,7 @@ const r = await call('jpl_horizons', {
   COMMAND: 'C/2020 F3',
   EPHEM_TYPE: 'OBSERVER',
   CENTER: '500@399',
-  START_TIME: '2020-07-10', STOP_TIME: '2020-07-25', STEP_SIZE: '1d',
-  format: 'json'
+  START_TIME: '2020-07-10', STOP_TIME: '2020-07-25', STEP_SIZE: '1d'
 }).catch(() => null);
 await widget('kv', { items: [{ label: 'Target', value: 'C/2020 F3 (NEOWISE)' }] });
 ```
@@ -100,7 +98,7 @@ const r = await call('jpl_horizons', {
   CENTER: 'coord@399',
   START_TIME: '2026-05-01', STOP_TIME: '2026-05-08', STEP_SIZE: '12h'
 }).catch(() => null);
-await widget('text', { title: 'Jupiter visibility', body: 'Rises after midnight, magnitude -2, easy naked-eye target.' });
+await widget('text', { title: 'Jupiter visibility', content: 'Rises after midnight, magnitude -2, easy naked-eye target.' });
 ```
 
 ## Common mistakes

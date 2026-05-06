@@ -33,28 +33,31 @@ const res = await call('nasa_cmr', {
   limit: 50
 }).catch(() => null);
 const items = (res?.feed?.entry ?? []).filter(i => i);
-if (items.length === 0) return widget('text', { content: 'No collections matched.' });
 
-// 2. KPI
+// 2. KPI (always render — value=0 when empty)
 const missions = new Set(items.flatMap(i => i?.platforms ?? []).filter(Boolean));
 const earliest = items.map(i => i?.time_start).filter(Boolean).sort()[0]?.slice(0, 4) ?? 'n/a';
 await widget('stat-card', { label: 'Collections', value: items.length, icon: 'database' });
 await widget('stat-card', { label: 'Distinct missions', value: missions.size, icon: 'satellite' });
 await widget('stat-card', { label: 'Earliest', value: earliest, icon: 'clock' });
 
-// 3. Cards per dataset
+// 3. Cards per dataset (empty-state inline)
 await widget('cards', {
-  items: items.slice(0, 12).map(i => ({
-    title: i?.title ?? '(untitled)',
-    subtitle: (i?.platforms ?? []).join(', '),
-    description: (i?.summary ?? '').slice(0, 200)
-  }))
+  items: items.length
+    ? items.slice(0, 12).map(i => ({
+        title: i?.title ?? '(untitled)',
+        subtitle: (i?.platforms ?? []).join(', '),
+        description: (i?.summary ?? '').slice(0, 200)
+      }))
+    : [{ title: 'No results', subtitle: '', description: 'No collections matched this keyword.' }]
 });
 
-// 4. Sortable table
+// 4. Sortable table (empty-state inline)
 await widget('data-table', {
   columns: ['Short name', 'Version', 'Start', 'End', 'Platforms'],
-  rows: items.map(i => [i?.short_name ?? '—', i?.version_id ?? '—', i?.time_start?.slice(0, 10) ?? '—', i?.time_end?.slice(0, 10) || 'ongoing', (i?.platforms ?? []).join(',')])
+  rows: items.length
+    ? items.map(i => [i?.short_name ?? '—', i?.version_id ?? '—', i?.time_start?.slice(0, 10) ?? '—', i?.time_end?.slice(0, 10) || 'ongoing', (i?.platforms ?? []).join(',')])
+    : [['—', '—', '—', '—', 'No collections matched.']]
 });
 
 // 5. Detail kv on the first match
@@ -80,7 +83,11 @@ const res = await call('nasa_cmr', { keyword: 'ICESat-2', search_type: 'collecti
 const items = (res?.feed?.entry ?? []).filter(i => i);
 const cards = items.slice(0, 6).map(i => ({ title: i?.title ?? '—', subtitle: i?.short_name ?? '—', description: (i?.summary ?? '').slice(0, 160) }));
 await widget('stat-card', { label: 'ICESat-2 collections', value: Math.max(items.length, 1) });
-await widget('cards', { items: cards.length ? cards : [{ title: 'ICESat-2 dataset (preview)', subtitle: 'Run live for catalogue' }] });
+if (!cards.length) {
+  await widget('text', { content: 'No ICESat-2 collections found.' });
+} else {
+  await widget('cards', { items: cards });
+}
 ```
 
 ### Granules of a specific dataset

@@ -74,6 +74,10 @@ await widget('kv', {
 
 ### Today's natural collection
 ```js
+const epicUrl = (f, col = 'natural') => {
+  const d = (f?.date ?? '').slice(0, 10).split('-');
+  return d.length === 3 ? `https://epic.gsfc.nasa.gov/archive/${col}/${d[0]}/${d[1]}/${d[2]}/png/${f.image}.png` : '';
+};
 const today = new Date().toISOString().slice(0, 10);
 const raw = await call('nasa_epic', { collection: 'natural', date: today }).catch(() => null);
 const frames = (Array.isArray(raw) ? raw : []).filter(f => f);
@@ -85,6 +89,10 @@ await widget('map', { center: [0, 0], zoom: 1, markers: markers.length ? markers
 
 ### Enhanced collection on a specific date
 ```js
+const epicUrl = (f, col = 'natural') => {
+  const d = (f?.date ?? '').slice(0, 10).split('-');
+  return d.length === 3 ? `https://epic.gsfc.nasa.gov/archive/${col}/${d[0]}/${d[1]}/${d[2]}/png/${f.image}.png` : '';
+};
 const raw = await call('nasa_epic', { collection: 'enhanced', date: '2024-12-21' }).catch(() => null);
 const frames = (Array.isArray(raw) ? raw : []).filter(f => f);
 const carItems = frames.map(f => ({ image: epicUrl(f, 'enhanced'), title: f?.date ?? '—' }));

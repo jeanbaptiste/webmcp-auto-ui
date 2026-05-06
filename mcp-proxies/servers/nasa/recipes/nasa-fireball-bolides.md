@@ -6,7 +6,7 @@ when: the user asks for recent fireballs, bolides, meteor explosions or DoD fire
 servers: [nasa]
 tools_used: [jpl_fireball]
 data_type: atmospheric impact events
-components_used: [stat-card, map, timeline, table]
+components_used: [stat-card, map, data-table]
 layout:
   type: stack
   arrangement: KPI row, world map, timeline, table
@@ -57,14 +57,16 @@ await widget('map', {
     }))
 });
 
-// 4. Timeline (largest first)
+// 4. Top events table (largest first)
 const top = [...rows].sort((a, b) => +(b?.['impact-e'] || 0) - +(a?.['impact-e'] || 0)).slice(0, 15);
-await widget('timeline', {
-  events: top.map(r => ({
-    date: r?.date?.slice(0, 10) ?? '—',
-    title: `${r?.['impact-e'] ?? '—'} kt`,
-    description: `${r?.alt ?? '—'} km altitude · ${r?.vel ?? '—'} km/s`
-  }))
+await widget('data-table', {
+  columns: ['Date', 'Energy (kt)', 'Altitude (km)', 'Velocity (km/s)'],
+  rows: top.map(r => [
+    r?.date?.slice(0, 10) ?? '—',
+    r?.['impact-e'] ?? '—',
+    r?.alt ?? '—',
+    r?.vel ?? '—'
+  ])
 });
 
 // 5. Table
@@ -72,6 +74,7 @@ await widget('data-table', {
   columns: ['Date', 'Energy (kt)', 'Altitude (km)', 'Velocity (km/s)', 'Lat', 'Lon'],
   rows: rows.slice(0, 25).map(r => [r?.date ?? '—', r?.['impact-e'] ?? '—', r?.alt ?? '—', r?.vel ?? '—', `${r?.lat ?? '—'}${r?.['lat-dir'] ?? ''}`, `${r?.lon ?? '—'}${r?.['lon-dir'] ?? ''}`])
 });
+void 0;
 ```
 
 ## Examples

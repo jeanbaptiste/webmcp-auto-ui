@@ -26,9 +26,10 @@ OSDR is NASA's repository for life sciences (rodents, plants, microbes flown to 
 
 ```js
 // 1. List files for a study
-const acc = '87';
+const acc = 87; // integer — API is strict about type
 const res = await call('nasa_osdr_files', { accession_number: acc }).catch(() => null);
-if (!res) return widget('text', { content: 'Study not found.' });
+console.log('OSDR top-level keys:', JSON.stringify(Object.keys(res ?? {})));
+if (!res || res.error) return widget('text', { content: 'Study not found.' });
 
 // OSDR shape varies; common: studies object with file metadata
 const studyContainer = res?.studies ?? res?.study ?? {};
@@ -76,17 +77,19 @@ await widget('data-table', {
 
 ### OSD-87
 ```js
-const r = await call('nasa_osdr_files', { accession_number: '87' }).catch(() => null);
-const files = ((Object.values(r?.studies ?? {})[0])?.study_files ?? r?.files ?? []).filter(f => f);
+const r = await call('nasa_osdr_files', { accession_number: 87 }).catch(() => null);
+const extractFiles = r => r?.study_files ?? r?.files ?? (Array.isArray(r) ? r : null) ?? Object.values(r?.studies ?? r?.study ?? {})[0]?.study_files ?? [];
+const files = extractFiles(r).filter(Boolean);
 await widget('stat-card', { label: 'OSD-87 files', value: files.length });
 await widget('data-table', { columns: ['Name', 'Size'], rows: files.slice(0, 30).map(f => [f?.file_name ?? '—', f?.file_size ?? '—']) });
 ```
 
 ### Cross-study summary
 ```js
-const ids = ['87', '102', '120'];
+const extractFiles = r => r?.study_files ?? r?.files ?? (Array.isArray(r) ? r : null) ?? Object.values(r?.studies ?? r?.study ?? {})[0]?.study_files ?? [];
+const ids = [87, 102, 120];
 const all = await Promise.all(ids.map(i => call('nasa_osdr_files', { accession_number: i }).catch(() => null)));
-const counts = ids.map((id, i) => ({ id, n: ((Object.values(all[i]?.studies ?? {})[0])?.study_files ?? all[i]?.files ?? []).length }));
+const counts = ids.map((id, i) => ({ id, n: extractFiles(all[i]).length }));
 await widget('data-table', { columns: ['Study', 'Files'], rows: counts.map(c => [`OSD-${c.id}`, c.n]) });
 ```
 
