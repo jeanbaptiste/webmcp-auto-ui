@@ -1152,12 +1152,13 @@
   // new block on the canvas. Publishing is left to the user via the notebook
   // widget's own toolbar.
   function saveCanvasAsNotebook(): void {
-    if (!canvas.blocks.length) {
-      ephemeral = [...ephemeral, { id: 'nb-' + Date.now(), role: 'assistant', html: 'Canvas vide — rien à sauvegarder' }];
+    const archivable = canvas.blocks.filter(b => b.type !== 'notebook');
+    if (!archivable.length) {
+      ephemeral = [...ephemeral, { id: 'nb-' + Date.now(), role: 'assistant', html: 'Aucun widget à archiver (notebooks exclus)' }];
       setTimeout(() => { ephemeral = ephemeral.filter(e => !e.id.startsWith('nb-')); }, 6000);
       return;
     }
-    const sourceBlocks = canvas.blocks.map(b => ({
+    const sourceBlocks = archivable.map(b => ({
       id: b.id,
       type: b.type,
       data: (b.data ?? {}) as Record<string, unknown>,
