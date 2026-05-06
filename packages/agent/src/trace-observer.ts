@@ -42,6 +42,19 @@ export interface RoundTripDetail {
   originRecipe?: string;
 }
 
+/** Lineage of a widget mount: tool_calls in the same iteration that produced it. */
+export interface WidgetLineage {
+  widgetType: string;
+  widgetParams: Record<string, unknown>;
+  toolCalls: Array<{
+    serverName: string;
+    toolName: string;
+    args: Record<string, unknown>;
+    resultPreview?: string;
+  }>;
+  originRecipe?: string;
+}
+
 export interface TraceObserver {
   /** Partial AgentCallbacks to merge into runAgentLoop callbacks. */
   callbacks: Partial<AgentCallbacks>;
@@ -57,6 +70,8 @@ export interface TraceObserver {
   getLoadedRecipes: () => Map<string, string>;
   /** Current recipe context: name of the most recently loaded recipe via get_recipe, or undefined. */
   getCurrentRecipeContext: () => string | undefined;
+  /** Resolve the chain of tool_calls in the same iteration that produced a widget. */
+  getWidgetLineage: (blockIdOrTraceNodeId: string) => WidgetLineage | null;
 }
 
 type NodeKind =
@@ -552,11 +567,12 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
       scheduleFlush();
     },
 
-    onWidget: (type: string, _data: Record<string, unknown>, serverName?: string): void => {
+    onWidget: (type: string, data: Record<string, unknown>, serverName?: string): void => {
       const node = addNode('widget', `${serverName ?? '?'}/${type}`, {
         iterationId: currentIterationId,
         type,
         serverName,
+        data,
       });
       const parent = lastToolCallId ?? currentLlmRespId;
       if (parent) {
@@ -653,6 +669,67 @@ export function createTraceObserver(ctx: TraceObserverContext): TraceObserver {
     },
     getCurrentRecipeContext(): string | undefined {
       return currentRecipeContext;
+    },
+    getWidgetLineage(blockIdOrTraceNodeId: string): WidgetLineage | null {
+      let widgetNode = nodes.find(
+        (n) => n.kind === 'widget' && n.id === blockIdOrTraceNodeId,
+      );
+      if (!widgetNode) {
+        widgetNode = nodes.find((n) => {
+          if (n.kind !== 'widget') return false;
+          for (const v of Object.values(n.meta)) {
+            if (v === blockIdOrTraceNodeId) return true;
+            if (v && typeof v === 'object') {
+              for (const vv of Object.values(v as Record<string, unknown>)) {
+                if (vv === blockIdOrTraceNodeId) return true;
+              }
+            }
+          }
+          return false;
+        });
+      }
+      if (!widgetNode) return null;
+      const iter = iterationAncestor(widgetNode);
+      if (!iter) {
+        return {
+          widgetType: (widgetNode.meta.type as string) ?? '',
+          widgetParams: ((widgetNode.meta.data as Record<string, unknown>) ?? {}) as Record<string, unknown>,
+          toolCalls: [],
+        };
+      }
+      const callNodes = nodes
+        .filter(
+          (n) =>
+            n.kind === 'tool_call' &&
+            n.meta.iterationId === iter.id &&
+            n.startMs <= widgetNode!.startMs,
+        )
+        .sort((a, b) => a.startMs - b.startMs);
+      const toolCalls: WidgetLineage['toolCalls'] = [];
+      let originRecipe: string | undefined;
+      for (const c of callNodes) {
+        const detail = nodeDetails.get(c.id);
+        const toolName = detail?.toolName ?? '';
+        const serverName = (c.meta.serverName as string | undefined)
+          ?? (toolName.includes('_') ? toolName.split('_')[0]! : '');
+        const args = ((c.meta.args as Record<string, unknown>) ?? {}) as Record<string, unknown>;
+        let resultPreview: string | undefined;
+        if (detail?.toolResult !== undefined) {
+          resultPreview = detail.toolResult.slice(0, 4096);
+        }
+        toolCalls.push({ serverName, toolName, args, resultPreview });
+        if (toolName === 'get_recipe' || toolName.endsWith('_get_recipe')) {
+          const r = (args.recipe_name ?? args.name ?? args.id) as unknown;
+          if (typeof r === 'string') originRecipe = r;
+        }
+      }
+      const lineage: WidgetLineage = {
+        widgetType: (widgetNode.meta.type as string) ?? '',
+        widgetParams: ((widgetNode.meta.data as Record<string, unknown>) ?? {}) as Record<string, unknown>,
+        toolCalls,
+      };
+      if (originRecipe) lineage.originRecipe = originRecipe;
+      return lineage;
     },
   };
 }

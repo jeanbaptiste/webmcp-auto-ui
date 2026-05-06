@@ -25,8 +25,8 @@
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let fl = $state<any>(null);
 
-  // Track provenance per block: blockId -> { server, component }
-  let provenance = $state<Record<string, { server?: string; component?: string }>>({});
+  // Track provenance per block: blockId -> { server, component, traceNodeId }
+  let provenance = $state<Record<string, { server?: string; component?: string; traceNodeId?: string }>>({});
 
   // Export modal state
   let exportTarget = $state<{ type: string; data: Record<string, unknown>; containerEl?: HTMLElement } | null>(null);
@@ -45,10 +45,10 @@
 
   onDestroy(() => layoutAdapter.unregister());
 
-  export function addBlock(type: string, data: Record<string, unknown>, server?: string, component?: string) {
+  export function addBlock(type: string, data: Record<string, unknown>, server?: string, component?: string, traceNodeId?: string) {
     const block = canvas.addWidget(type as Parameters<typeof canvas.addBlock>[0], data);
-    if (server || component) {
-      provenance = { ...provenance, [block.id]: { server, component } };
+    if (server || component || traceNodeId) {
+      provenance = { ...provenance, [block.id]: { server, component, traceNodeId } };
     }
     windows = [...windows, {
       id: block.id,

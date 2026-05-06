@@ -88,7 +88,7 @@ export {
 } from './ort-version.js';
 
 // Trace observer — live visual trace for runAgentLoop
-export { createTraceObserver, type TraceObserver, type TraceObserverContext, type RoundTripDetail } from './trace-observer.js';
+export { createTraceObserver, type TraceObserver, type TraceObserverContext, type RoundTripDetail, type WidgetLineage } from './trace-observer.js';
 
 // Nano-RAG — context compaction
 export { ContextRAG, type ContextRAGOptions } from './nano-rag/mod.js';
