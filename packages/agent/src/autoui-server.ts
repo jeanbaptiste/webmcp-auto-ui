@@ -840,12 +840,11 @@ Call widget_display({name: "carousel", params: {slides: [{src: "https://...", ti
   // ── stat-card ────────────────────────────────────────────────────────────
   `---
 widget: stat-card
-description: Enriched KPI with unit, delta, and colored variant (success/warning/error/info).
+description: >
+  Enriched KPI card with unit, delta, icon, and colored variant.
+  Supports single card OR a grid of N cards via the "items" array.
 schema:
   type: object
-  required:
-    - label
-    - value
   properties:
     label:
       type: string
@@ -854,6 +853,11 @@ schema:
     unit:
       type: string
       description: Unite affichee apres la valeur (ex "%", "km")
+    icon:
+      type: string
+      description: >
+        Emoji, unicode symbol, or keyword (e.g. "fire", "trending-up", "star").
+        Unknown keywords fall back silently to ℹ.
     delta:
       type: string
       description: Variation affichee (ex "+12%")
@@ -865,13 +869,47 @@ schema:
     variant:
       type: string
       enum: [default, success, warning, error, info]
+    items:
+      type: array
+      description: >
+        Grid mode: pass an array of stat items to render N cards side by side.
+        When present, top-level label/value/icon are ignored.
+      items:
+        type: object
+        required:
+          - label
+          - value
+        properties:
+          label:
+            type: string
+          value:
+            type: string
+          unit:
+            type: string
+          icon:
+            type: string
+          delta:
+            type: string
+          trend:
+            type: string
+            enum: [up, down, flat]
+          previousValue:
+            type: string
+          variant:
+            type: string
+            enum: [default, success, warning, error, info]
 ---
 
 ## When to use
-Pour un KPI enrichi avec delta, unite et variante de couleur.
+Pour un KPI enrichi avec delta, unite, icone et variante de couleur.
+Pour plusieurs KPIs cote a cote, utiliser le champ "items".
 
 ## How to use
-Call widget_display({name: "stat-card", params: {label: "Uptime", value: "99.9", unit: "%", trend: "up", variant: "success"}}).
+Single card:
+Call widget_display({name: "stat-card", params: {label: "Uptime", value: "99.9", unit: "%", trend: "up", variant: "success", icon: "🟢"}}).
+
+Grid of cards:
+Call widget_display({name: "stat-card", params: {items: [{label: "CPU", value: "42", unit: "%", icon: "💻", variant: "info"}, {label: "RAM", value: "8", unit: "GB", icon: "🗄", variant: "warning"}]}}).
 `,
 
   // ── grid-data ────────────────────────────────────────────────────────────

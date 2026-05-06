@@ -23,15 +23,36 @@
   let sortCol = $state<string|null>(null);
   let sortAsc = $state(true);
 
-  const rows = $derived<Record<string,unknown>[]>(
-    Array.isArray(data?.rows) && (data!.rows as unknown[]).length
-      ? data!.rows as Record<string,unknown>[]
-      : []
-  );
+  // ── Tolerance 1: alias `headers` → `columns` ─────────────────────────────
+  // Some callers pass `headers` (array of strings or column objects) instead of
+  // `columns`. Normalise so downstream logic only sees `columns`.
+  const resolvedColumnDefs = $derived.by<DataTableColumn[] | null>(() => {
+    const src = (data as DataTableData & { headers?: unknown }).headers ?? data?.columns;
+    if (!Array.isArray(src) || !src.length) return null;
+    // headers can be plain strings ["A","B"] or full column objects [{key,label}]
+    return (src as unknown[]).map((h) =>
+      typeof h === 'string' ? { key: h, label: h } : h as DataTableColumn
+    );
+  });
+
+  // ── Tolerance 2: rows as array-of-arrays ─────────────────────────────────
+  // If the first row is an array, map each row to an object using `resolvedColumnDefs`
+  // (falling back to positional keys "0","1",… when no column defs are available).
+  const rows = $derived.by<Record<string,unknown>[]>(() => {
+    if (!Array.isArray(data?.rows) || !(data!.rows as unknown[]).length) return [];
+    const raw = data!.rows as unknown[];
+    if (!Array.isArray(raw[0])) return raw as Record<string,unknown>[];
+    // array-of-arrays: convert to array-of-objects
+    const keys = resolvedColumnDefs?.map(c => c.key)
+      ?? (raw[0] as unknown[]).map((_, i) => String(i));
+    return (raw as unknown[][]).map(arr =>
+      Object.fromEntries(keys.map((k, i) => [k, arr[i]]))
+    );
+  });
 
   const columns = $derived<DataTableColumn[]>(
-    Array.isArray(data?.columns) && (data!.columns as unknown[]).length
-      ? data!.columns as DataTableColumn[]
+    resolvedColumnDefs && resolvedColumnDefs.length
+      ? resolvedColumnDefs
       : rows.length > 0
         ? Object.keys(rows[0] as object).map(k => ({ key: k, label: k }))
         : []
