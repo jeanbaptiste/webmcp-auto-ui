@@ -58,35 +58,43 @@ await widget('chart', {
   bars: top10.map(n => [n?.name?.replace(/[()]/g, '').trim().slice(0, 20) ?? '—', Math.round(dia(n))])
 });
 
-// 5. Sortable table
+// 5. Sortable table — rows must be Record<string,unknown>[], not array-of-arrays
 await widget('data-table', {
-  columns: ['Name', 'Approach', 'Distance (LD)', 'Velocity (km/s)', 'Diameter max (m)', 'Hazardous'],
+  columns: [
+    { key: 'Name',           label: 'Name' },
+    { key: 'Approach',       label: 'Approach' },
+    { key: 'Distance (LD)',  label: 'Distance (LD)' },
+    { key: 'Velocity (km/s)',label: 'Velocity (km/s)' },
+    { key: 'Diameter max (m)',label: 'Diameter max (m)' },
+    { key: 'Hazardous',      label: 'Hazardous' }
+  ],
   rows: all.map(n => {
     const ca = n?.close_approach_data?.[0];
     const lunar = +(ca?.miss_distance?.lunar ?? NaN);
     const vel = +(ca?.relative_velocity?.kilometers_per_second ?? NaN);
-    return [
-      n?.name ?? '—',
-      ca?.close_approach_date ?? '—',
-      Number.isFinite(lunar) ? lunar.toFixed(2) : '—',
-      Number.isFinite(vel) ? vel.toFixed(1) : '—',
-      Math.round(dia(n)),
-      n?.is_potentially_hazardous_asteroid ? 'YES' : 'no'
-    ];
+    return {
+      'Name':            n?.name ?? '—',
+      'Approach':        ca?.close_approach_date ?? '—',
+      'Distance (LD)':   Number.isFinite(lunar) ? lunar.toFixed(2) : '—',
+      'Velocity (km/s)': Number.isFinite(vel) ? vel.toFixed(1) : '—',
+      'Diameter max (m)':Math.round(dia(n)),
+      'Hazardous':       n?.is_potentially_hazardous_asteroid ? 'YES' : 'no'
+    };
   })
 });
 
 // 6. Hazardous asteroid cards
-await widget('cards', {
-  items: hazardous.slice(0, 6).map(n => {
-    const lunar = ld(n);
-    return {
-      title: n?.name ?? '—',
-      subtitle: n?.close_approach_data?.[0]?.close_approach_date ?? '—',
-      description: `${Math.round(dia(n))} m, ${Number.isFinite(lunar) ? lunar.toFixed(2) : '—'} LD`
-    };
-  })
+// Note: is_potentially_hazardous_asteroid can be false for all NEOs in quiet weeks — use all NEOs as fallback
+const cardItems = (hazardous.length > 0 ? hazardous : all).slice(0, 6).map(n => {
+  const lunar = ld(n);
+  return {
+    title: n?.name ?? '—',
+    subtitle: n?.close_approach_data?.[0]?.close_approach_date ?? '—',
+    description: `${Math.round(dia(n))} m, ${Number.isFinite(lunar) ? lunar.toFixed(2) : '—'} LD`
+  };
 });
+console.log('hazardous:', hazardous.length, '→ cardItems:', cardItems.length);
+await widget('cards', { items: cardItems });
 ```
 
 ## Examples
@@ -99,17 +107,25 @@ const data = await call('nasa_neo', { start_date: today, end_date: wk }).catch((
 const all  = Object.values(data?.near_earth_objects ?? {}).flat().filter(n => n);
 const tableRows = all.map(n => {
   const lunar = +(n?.close_approach_data?.[0]?.miss_distance?.lunar ?? NaN);
-  return [n?.name ?? '—', n?.close_approach_data?.[0]?.close_approach_date ?? '—', Number.isFinite(lunar) ? lunar.toFixed(2) : '—'];
+  return {
+    Name: n?.name ?? '—',
+    Date: n?.close_approach_data?.[0]?.close_approach_date ?? '—',
+    LD:   Number.isFinite(lunar) ? lunar.toFixed(2) : '—'
+  };
 });
 await widget('stat-card', { label: 'NEO', value: Math.max(all.length, 1) });
-await widget('data-table', { columns: ['Name', 'Date', 'LD'], rows: tableRows.length ? tableRows : [['NEO (preview)', today, '—']] });
+await widget('data-table', {
+  columns: [{ key: 'Name', label: 'Name' }, { key: 'Date', label: 'Date' }, { key: 'LD', label: 'LD' }],
+  rows: tableRows.length ? tableRows : [{ Name: 'NEO (preview)', Date: today, LD: '—' }]
+});
 ```
 
 ### A historical week
 ```js
 const data = await call('nasa_neo', { start_date: '2013-02-13', end_date: '2013-02-19' }).catch(() => null);
 const all  = Object.values(data?.near_earth_objects ?? {}).flat().filter(n => n);
-const items = all.filter(n => n?.is_potentially_hazardous_asteroid).map(n => ({ title: n?.name ?? '—', subtitle: n?.close_approach_data?.[0]?.close_approach_date ?? '—' }));
+const hazardousItems = all.filter(n => n?.is_potentially_hazardous_asteroid);
+const items = (hazardousItems.length > 0 ? hazardousItems : all).map(n => ({ title: n?.name ?? '—', subtitle: n?.close_approach_data?.[0]?.close_approach_date ?? '—' }));
 await widget('stat-card', { label: 'Historical NEO', value: Math.max(all.length, 1) });
 await widget('cards', { items: items.length ? items : [{ title: '367943 Duende (preview)', subtitle: '2013-02-15' }] });
 ```
@@ -119,5 +135,5 @@ await widget('cards', { items: items.length ? items : [{ title: '367943 Duende (
 - Asking ranges longer than 7 days — the API rejects it, paginate week by week
 - Using miss distance in km — lunar distances (LD) are far more readable for the public
 - Showing all NEOs as hazardous — typically <5% are flagged, highlight the flag explicitly
-- Forgetting the scatter colour — without colour the chart hides the dangerous outliers
+- Using `type:'scatter'` in the chart widget — only `bars:[name,value][]` is supported; use a bar chart sorted by diameter or miss distance instead
 - Using `name_limited` instead of `name` — `name` is the canonical designation
