@@ -54,13 +54,38 @@ export async function createMap(
   container.style.width = container.style.width || '100%';
 
   const {
-    center = DEFAULT_CENTER,
+    center: centerRaw = DEFAULT_CENTER,
     zoom = DEFAULT_ZOOM,
     projection = 'EPSG:3857',
     layers,
     rotation = 0,
     ...rest
   } = options ?? {};
+
+  // Normalize center: accept [lon, lat] array or {lat, lon}/{lat, lng}/{latitude, longitude} object.
+  let center: [number, number] = (() => {
+    if (!Array.isArray(centerRaw) && typeof centerRaw === 'object' && centerRaw !== null) {
+      // Object form — toLonLat handles all aliases
+      const normalized = toLonLat(centerRaw);
+      return normalized ?? DEFAULT_CENTER;
+    }
+    // Array form — passed through as-is (legacy [lon, lat])
+    return centerRaw as [number, number];
+  })();
+
+  // Runtime guard: detect probable lat/lon swap.
+  const [cLon, cLat] = center;
+  if (Math.abs(cLat) > 90) {
+    console.warn(
+      `[openlayers] center latitude ${cLat} out of range [-90, 90] — coordinates likely swapped (use { lat, lon } object form to be safe)`,
+    );
+    // Silently swap to recover
+    center = [cLat, cLon];
+  } else if (Math.abs(cLon) > 180) {
+    console.warn(
+      `[openlayers] center longitude ${cLon} out of range [-180, 180] — check your coordinates`,
+    );
+  }
 
   const baseLayers =
     layers && Array.isArray(layers) && layers.length
