@@ -74,3 +74,6 @@ pnpm-lock.yaml
 # Python bytecode (mcp-proxies)
 __pycache__/
 *.pyc
+
+# Race-check / debug artifacts (Playwright sampling outputs)
+.notes/race-check*
