@@ -47,6 +47,8 @@ export interface NotebookCell {
   varname?: string;        // named output (compact)
   hideSource?: boolean;
   hideResult?: boolean;
+  /** view-mode: collapse the console logs panel under the head bar. Default true in view mode. */
+  hideLogs?: boolean;
   runState?: RunState;
   lastMs?: number;
   status?: 'fresh' | 'stale';
@@ -1248,8 +1250,6 @@ const NOTEBOOK_STYLES = `
 
 .nb-root.nb-view-mode .nb-drag-handle,
 .nb-root.nb-view-mode .nb-icon-btn.nb-danger,
-.nb-root.nb-view-mode .nb-toggle-src,
-.nb-root.nb-view-mode .nb-toggle-res,
 .nb-root.nb-view-mode .nb-add-cell,
 .nb-root.nb-view-mode .nbe-cell-actionbar { display: none !important; }
 

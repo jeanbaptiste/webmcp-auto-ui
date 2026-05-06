@@ -79,8 +79,11 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     hidePublishBadge: (data as any).hidePublishBadge === true,
   } as any);
 
-  // Default src visibility per mode (toggle remains usable for per-cell override).
-  for (const c of state.cells) c.hideSource = state.mode === 'view';
+  // Default src + logs visibility per mode (toggle remains usable for per-cell override).
+  for (const c of state.cells) {
+    c.hideSource = state.mode === 'view';
+    if (state.mode === 'view' && c.hideLogs === undefined) c.hideLogs = true;
+  }
 
   // Live mode runtime overlay (created lazily). Never mutates state.
   let overlay: RuntimeOverlay | null = null;
@@ -282,7 +285,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const viewBtn = shell.querySelector('.nb-mode-view') as HTMLElement;
   editBtn.addEventListener('click', () => {
     state.mode = 'edit';
-    for (const c of state.cells) c.hideSource = false;
+    for (const c of state.cells) { c.hideSource = false; c.hideLogs = false; }
     container.classList.remove('nb-view-mode');
     editBtn.classList.add('nb-on'); viewBtn.classList.remove('nb-on');
     // Leaving view: stop live refresh and clear overlay so frozen snapshots show.
@@ -291,7 +294,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   });
   viewBtn.addEventListener('click', () => {
     state.mode = 'view';
-    for (const c of state.cells) c.hideSource = true;
+    for (const c of state.cells) { c.hideSource = true; c.hideLogs = true; }
     container.classList.add('nb-view-mode');
     viewBtn.classList.add('nb-on'); editBtn.classList.remove('nb-on');
     if (state.autoRun === true) bootstrapLive();
@@ -454,17 +457,25 @@ function renderCell(cell: NotebookCell, state: NotebookState, overlay: RuntimeOv
       liveBadge = `<span class="nbe-cell-badge nbe-cell-frozen" title="JS cells are not re-executed in live mode">frozen</span>`;
     }
   }
+  const lastRes = effectiveResult(cell, overlay) ?? cell.lastResult;
+  const logCount = (lastRes?.logs as string[] | undefined)?.length ?? 0;
+  const logsToggle = logCount > 0
+    ? `<button class="nb-icon-btn nb-toggle-logs" title="toggle console">${cell.hideLogs ? '▸' : '▾'} ${logCount}</button>`
+    : '';
   head.innerHTML = `
     <span class="nbe-run-controls"></span>
     <span class="nbe-type-${cell.type}">${cell.type}</span>
     <span class="nbe-meta-info">${escapeHtml(metaInfoFor(cell, overlay))}</span>
     ${liveBadge}
     <div class="nbe-actions">
+      ${logsToggle}
       <button class="nb-icon-btn nb-toggle-src">${cell.hideSource ? '▸ src' : '◂ src'}</button>
       <button class="nb-icon-btn nb-toggle-res">${cell.hideResult ? '▸ res' : '◂ res'}</button>
     </div>`;
   codeCell.appendChild(head);
   mountRunControls(head.querySelector('.nbe-run-controls') as HTMLElement, cell, wrap, state, rerender);
+  const logsBtn = head.querySelector('.nb-toggle-logs') as HTMLElement | null;
+  if (logsBtn) logsBtn.addEventListener('click', () => { cell.hideLogs = !cell.hideLogs; rerender(); });
 
   const body = document.createElement('div');
   body.className = 'nbe-code-body' + (cell.hideSource ? ' nbe-hidden' : '');
@@ -851,8 +862,10 @@ function renderResultInto(el: HTMLElement, cell: NotebookCell, overlay: RuntimeO
     return;
   }
   // Logs panel (shared across all widgets), prepended above the main result
-  const logsEl = renderCellLogs(r);
-  if (logsEl) el.appendChild(logsEl);
+  if (!cell.hideLogs) {
+    const logsEl = renderCellLogs(r);
+    if (logsEl) el.appendChild(logsEl);
+  }
   if (!r.ok) {
     const err = document.createElement('div');
     err.className = 'nbe-result-error';
@@ -1079,6 +1092,30 @@ function injectLayoutStyles(): void {
 .nbe-actions { display: flex; gap: 4px; }
 .nbe-code-body { padding: 14px 16px; }
 .nbe-hidden { display: none !important; }
+
+/* View-mode Option B: chrome hidden by default, revealed on hover in top-right corner. */
+.nb-root.nb-view-mode .nbe-code-cell { position: relative; }
+.nb-root.nb-view-mode .nbe-cell-head {
+  position: absolute; top: 0; right: 0; z-index: 2;
+  padding: 4px 8px; gap: 6px;
+  background: var(--color-surface2);
+  border: 1px solid var(--color-border);
+  border-top: none; border-right: none;
+  border-bottom-left-radius: 6px;
+  opacity: 0; pointer-events: none;
+  transition: opacity 120ms ease;
+  font-size: 9.5px;
+}
+.nb-root.nb-view-mode .nbe-code-cell:hover .nbe-cell-head,
+.nb-root.nb-view-mode .nbe-cell-head:focus-within {
+  opacity: 0.95; pointer-events: auto;
+}
+.nb-root.nb-view-mode .nbe-cell-head .nbe-meta-info,
+.nb-root.nb-view-mode .nbe-cell-head .nbe-type-sql,
+.nb-root.nb-view-mode .nbe-cell-head .nbe-type-js,
+.nb-root.nb-view-mode .nbe-cell-head .nbe-type-md { display: none; }
+.nb-root.nb-view-mode .nbe-code-body { padding: 10px 14px; }
+.nb-root.nb-view-mode .nbe-result { padding: 8px 14px; }
 
 .nbe-result {
   background: var(--color-bg);
