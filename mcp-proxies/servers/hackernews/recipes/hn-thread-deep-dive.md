@@ -96,19 +96,15 @@ The `get-item` tool returns the full nested comment tree — perfect for in-dept
    }
    const allComments = flatten(item);
    const roots = allComments.filter(c => c?.depth === 0).slice(0, 5);
-   const items = roots.map(c => {
-     let date = '—';
-     try {
-       const d = new Date(c?.created_at);
-       if (Number.isFinite(d.getTime())) date = d.toLocaleDateString();
-     } catch {}
+   const cards = roots.map(c => {
+     const date = c?.created_at_i ? new Date(c.created_at_i * 1000).toLocaleDateString() : (c?.created_at ?? '—');
      return {
        title: `${c?.author ?? '—'} · ${c?.points ?? 0} pts`,
        subtitle: date,
        body: ((c?.text ?? '').replace(/<[^>]+>/g, '').slice(0, 300) + '…')
      };
    });
-   await widget('cards', { items: items.length ? items : [{ title: 'No comments', subtitle: '—' }] });
+   await widget('cards', { cards: cards.length ? cards : [{ title: 'No comments', subtitle: '—' }] });
    ```
 
 6. **Comment distribution by depth**:
@@ -125,13 +121,13 @@ The `get-item` tool returns the full nested comment tree — perfect for in-dept
    const allComments = flatten(item);
    const byDepth = {};
    for (const c of allComments) byDepth[c?.depth ?? 0] = (byDepth[c?.depth ?? 0] || 0) + 1;
-   const data = Object.entries(byDepth)
-     .sort(([a], [b]) => +a - +b)
-     .map(([d, n]) => ({ label: `Lvl ${d}`, value: n }));
+   const sortedDepths = Object.keys(byDepth).sort((a, b) => +a - +b);
+   const data = sortedDepths.map(d => ({ label: `Lvl ${d}`, values: [byDepth[d]] }));
    await widget('chart-rich', {
      type: 'bar',
      title: 'Comments per depth level',
-     data: data.length ? data : [{ label: 'Lvl 0', value: 1 }]
+     labels: sortedDepths.map(d => `Lvl ${d}`),
+     data: data.length ? data : [{ label: 'Lvl 0', values: [1] }]
    });
    ```
 
@@ -150,11 +146,11 @@ const comments = flatten(item);
 await widget('stat-card', { label: 'Score', value: Math.max(item?.points ?? 0, 1), icon: 'arrow-up' });
 await widget('stat-card', { label: 'Comments', value: Math.max(comments.length, 1), icon: 'message-circle' });
 await widget('text', { title: item?.title ?? '(untitled)', body: item?.text || item?.url || '(no body)', html: !!item?.text });
-const items = comments.filter(c => c?.depth === 0).slice(0, 5).map(c => ({
+const cards = comments.filter(c => c?.depth === 0).slice(0, 5).map(c => ({
   title: c?.author ?? '—',
   body: (c?.text ?? '').replace(/<[^>]+>/g, '').slice(0, 200)
 }));
-await widget('cards', { items: items.length ? items : [{ title: 'No comments', body: '—' }] });
+await widget('cards', { cards: cards.length ? cards : [{ title: 'No comments', body: '—' }] });
 ```
 
 ### Drill-down on the CrowdStrike outage thread
@@ -165,11 +161,13 @@ function flatten(n, d = 0, acc = []) { for (const c of (n?.children ?? [])) { if
 const all = flatten(item);
 const byDepth = {};
 for (const c of all) byDepth[c?.depth ?? 0] = (byDepth[c?.depth ?? 0] || 0) + 1;
-const data = Object.entries(byDepth).sort(([a], [b]) => +a - +b).map(([d, n]) => ({ label: `Lvl ${d}`, value: n }));
+const sortedDepths = Object.keys(byDepth).sort((a, b) => +a - +b);
+const data = sortedDepths.map(d => ({ label: `Lvl ${d}`, values: [byDepth[d]] }));
 await widget('chart-rich', {
   type: 'bar',
   title: 'CrowdStrike thread depth',
-  data: data.length ? data : [{ label: 'Lvl 0', value: 1 }]
+  labels: sortedDepths.map(d => `Lvl ${d}`),
+  data: data.length ? data : [{ label: 'Lvl 0', values: [1] }]
 });
 ```
 

@@ -33,10 +33,12 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
    const res = await call('get-front-page', { hitsPerPage: 100 });
    const stories = (res?.hits ?? []).filter(s => s);
    if (stories.length === 0) return widget('text', { content: 'No stories to analyze.' });
+   const scalar = v => (v !== null && typeof v === 'object') ? (v.value ?? '') : (v ?? '');
+   const num = v => { const n = Number(scalar(v)); return Number.isFinite(n) ? n : 0; };
    const items = stories.slice(0, 5).map(s => ({
-     title: s?.title ?? '(untitled)',
-     subtitle: `${s?.points ?? 0} pts · ${s?.num_comments ?? 0} comments · by ${s?.author ?? '—'}`,
-     url: s?.url || `https://news.ycombinator.com/item?id=${s?.objectID ?? ''}`
+     title: scalar(s?.title) || '(untitled)',
+     subtitle: `${num(s?.points)} pts · ${num(s?.num_comments)} comments · by ${scalar(s?.author) || '—'}`,
+     url: scalar(s?.url) || `https://news.ycombinator.com/item?id=${s?.objectID ?? ''}`
    }));
    await widget('cards', { items: items.length ? items : [{ title: 'No stories', subtitle: '—' }] });
    ```
@@ -45,8 +47,9 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
    ```js
    const res = await call('get-front-page', { hitsPerPage: 100 });
    const stories = (res?.hits ?? []).filter(s => s);
-   const points = stories.map(s => s?.points || 0).filter(Number.isFinite);
-   const comments = stories.map(s => s?.num_comments || 0).filter(Number.isFinite);
+   const num = v => { const n = Number(typeof v === 'object' && v !== null ? (v.value ?? v) : v); return Number.isFinite(n) ? n : 0; };
+   const points = stories.map(s => num(s?.points));
+   const comments = stories.map(s => num(s?.num_comments));
    const avgScore = points.length > 0 ? Math.round(points.reduce((s, x) => s + x, 0) / points.length) : 0;
    const avgComments = comments.length > 0 ? Math.round(comments.reduce((s, x) => s + x, 0) / comments.length) : 0;
    const sorted = [...points].sort((a, b) => a - b);
@@ -58,8 +61,9 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
    ```js
    const res = await call('get-front-page', { hitsPerPage: 100 });
    const stories = (res?.hits ?? []).filter(s => s);
-   const points = stories.map(s => s?.points || 0).filter(Number.isFinite);
-   const comments = stories.map(s => s?.num_comments || 0).filter(Number.isFinite);
+   const num = v => { const n = Number(typeof v === 'object' && v !== null ? (v.value ?? v) : v); return Number.isFinite(n) ? n : 0; };
+   const points = stories.map(s => num(s?.points));
+   const comments = stories.map(s => num(s?.num_comments));
    const avgScore = points.length > 0 ? Math.round(points.reduce((s, x) => s + x, 0) / points.length) : 0;
    const avgComments = comments.length > 0 ? Math.round(comments.reduce((s, x) => s + x, 0) / comments.length) : 0;
    const sorted = [...points].sort((a, b) => a - b);
@@ -74,15 +78,17 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
    ```js
    const res = await call('get-front-page', { hitsPerPage: 100 });
    const stories = (res?.hits ?? []).filter(s => s);
+   const num = v => { const n = Number(typeof v === 'object' && v !== null ? (v.value ?? v) : v); return Number.isFinite(n) ? n : 0; };
    const buckets = [0, 50, 100, 200, 500, 1000, 5000];
-   const counts = buckets.map((b, i) => stories.filter(s =>
-     (s?.points ?? 0) >= b && (i === buckets.length - 1 || (s?.points ?? 0) < buckets[i + 1])
-   ).length);
+   const counts = buckets.map((b, i) => stories.filter(s => {
+     const pts = num(s?.points);
+     return pts >= b && (i === buckets.length - 1 || pts < buckets[i + 1]);
+   }).length);
    const data = buckets.map((b, i) => ({ label: `${b}+`, value: counts[i] }));
    await widget('chart-rich', {
      type: 'bar',
      title: 'Score distribution',
-     data: data.length ? data : [{ label: '0+', value: 1 }]
+     data: (data.length && !counts.every(c => c === 0)) ? data : [{ label: '0+', value: 1 }]
    });
    ```
 
@@ -90,11 +96,13 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
    ```js
    const res = await call('get-front-page', { hitsPerPage: 100 });
    const stories = (res?.hits ?? []).filter(s => s);
+   const scalar = v => (v !== null && typeof v === 'object') ? (v.value ?? '') : (v ?? '');
    const domains = {};
    for (const s of stories) {
-     if (!s?.url) continue;
+     const rawUrl = scalar(s?.url);
+     if (!rawUrl) continue;
      try {
-       const host = new URL(s.url).hostname.replace(/^www\./, '');
+       const host = new URL(rawUrl).hostname.replace(/^www\./, '');
        domains[host] = (domains[host] || 0) + 1;
      } catch {}
    }
@@ -110,10 +118,12 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
    ```js
    const res = await call('get-front-page', { hitsPerPage: 100 });
    const stories = (res?.hits ?? []).filter(s => s);
+   const scalar = v => (v !== null && typeof v === 'object') ? (v.value ?? '') : (v ?? '');
    const hours = Array(24).fill(0);
    for (const s of stories) {
-     if (!s?.created_at) continue;
-     const d = new Date(s.created_at);
+     const ts = scalar(s?.created_at);
+     if (!ts) continue;
+     const d = new Date(ts);
      if (!Number.isFinite(d.getTime())) continue;
      hours[d.getUTCHours()]++;
    }
@@ -121,7 +131,7 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
    await widget('chart-rich', {
      type: 'line',
      title: 'Publications by hour (UTC)',
-     data: data.length ? data : [{ label: '0h', value: 1 }]
+     data: (data.length && !hours.every(h => h === 0)) ? data : [{ label: '0h', value: 1 }]
    });
    ```
 
@@ -129,10 +139,12 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
    ```js
    const res = await call('get-front-page', { hitsPerPage: 100 });
    const stories = (res?.hits ?? []).filter(s => s);
-   const rows = [...stories].sort((a, b) => (b?.points ?? 0) - (a?.points ?? 0)).slice(0, 10).map((s, i) => {
+   const scalar = v => (v !== null && typeof v === 'object') ? (v.value ?? '') : (v ?? '');
+   const num = v => { const n = Number(scalar(v)); return Number.isFinite(n) ? n : 0; };
+   const rows = [...stories].sort((a, b) => num(b?.points) - num(a?.points)).slice(0, 10).map((s, i) => {
      let host = 'HN';
-     try { if (s?.url) host = new URL(s.url).hostname.replace(/^www\./, ''); } catch {}
-     return [i + 1, s?.title ?? '(untitled)', s?.points ?? 0, s?.num_comments ?? 0, host];
+     try { const rawUrl = scalar(s?.url); if (rawUrl) host = new URL(rawUrl).hostname.replace(/^www\./, ''); } catch {}
+     return [i + 1, scalar(s?.title) || '(untitled)', num(s?.points), num(s?.num_comments), host];
    });
    await widget('data-table', {
      columns: ['Rank', 'Title', 'Points', 'Comments', 'Domain'],

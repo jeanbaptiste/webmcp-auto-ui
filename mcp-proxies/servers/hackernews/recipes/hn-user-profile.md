@@ -81,10 +81,10 @@ This recipe combines `get-user` (static profile) with `search-posts` (their cont
    const createdMs = (user?.created_at_i ?? 0) * 1000;
    const ageYears = createdMs > 0 ? new Date().getFullYear() - new Date(createdMs).getFullYear() : 0;
    const scores = posts.map(p => p?.points || 0).filter(Number.isFinite);
-   await widget('stat-card', { label: 'Karma', value: Math.max(user?.karma ?? 0, 1), icon: 'star' });
-   await widget('stat-card', { label: 'Account age (yrs)', value: Math.max(ageYears, 1), icon: 'calendar' });
-   await widget('stat-card', { label: 'Recent stories', value: Math.max(posts.length, 1), icon: 'file-text' });
-   await widget('stat-card', { label: 'Top score', value: Math.max(scores.length > 0 ? Math.max(...scores) : 0, 1), icon: 'flame' });
+   await widget('stat-card', { label: 'Karma', value: user?.karma ?? 0, icon: 'star' });
+   await widget('stat-card', { label: 'Account age (yrs)', value: ageYears, icon: 'calendar-days' });
+   await widget('stat-card', { label: 'Recent stories', value: posts.length, icon: 'newspaper' });
+   await widget('stat-card', { label: 'Top score', value: scores.length > 0 ? Math.max(...scores) : 0, icon: 'fire' });
    ```
 
 5. **Recent posts table**:
@@ -117,13 +117,13 @@ This recipe combines `get-user` (static profile) with `search-posts` (their cont
      hitsPerPage: 50
    }).catch(() => null);
    const posts = (res?.hits ?? []).filter(p => p);
-   const data = [...posts]
-     .sort((a, b) => (a?.created_at_i ?? 0) - (b?.created_at_i ?? 0))
-     .map(p => ({ label: p?.created_at?.slice(0, 7) ?? '—', value: p?.points ?? 0 }));
+   const agg = {};
+   posts.forEach(p => { const k = p?.created_at?.slice(0, 7) ?? '—'; agg[k] = (agg[k] ?? 0) + (p?.points ?? 0); });
+   const data = Object.entries(agg).sort(([a], [b]) => a.localeCompare(b)).map(([label, value]) => ({ label, value }));
    await widget('chart-rich', {
      type: 'line',
      title: `Score timeline — ${user?.username ?? 'pg'}`,
-     data: data.length ? data : [{ label: '—', value: 1 }]
+     data: data.length ? data : [{ label: '—', value: 0 }]
    });
    ```
 

@@ -6,7 +6,7 @@ when: the user asks to compare engagement between two or more terms or technolog
 servers: [hackernews]
 tools_used: [search-posts]
 data_type: comparison
-components_used: [stat-card, chart-rich, table]
+components_used: [stat-card, chart-rich, text]
 layout:
   type: grid
   columns: 2
@@ -124,11 +124,10 @@ The agent loops over each term, fetches its results, and composes a comparative 
      const avgComments = Math.round(posts.reduce((s, x) => s + (x?.num_comments || 0), 0) / Math.max(posts.length, 1));
      summary.push({ term, count: posts.length, avgPoints, avgComments });
    }
-   const rows = summary.sort((a, b) => b.count - a.count).map(s => [s.term, s.count, s.avgPoints, s.avgComments]);
-   await widget('data-table', {
-     columns: ['Term', 'Posts', 'Avg points', 'Avg comments'],
-     rows: rows.length ? rows : [['—', 0, 0, 0]]
-   });
+   const sorted = summary.sort((a, b) => b.count - a.count);
+   const header = '| Term | Posts | Avg points | Avg comments |\n|------|-------|------------|--------------|';
+   const lines = sorted.map(s => `| ${s.term} | ${s.count} | ${s.avgPoints} | ${s.avgComments} |`);
+   await widget('text', { content: `### Ranked summary\n\n${header}\n${lines.join('\n')}` });
    ```
 
 7. **Top post per term** (optional — quick qualitative anchor):
@@ -139,12 +138,10 @@ The agent loops over each term, fetches its results, and composes a comparative 
      const res = await call('search-posts', { query: term, tags: ['story'], numericFilters: ['points>=100'], hitsPerPage: 50 });
      const posts = (res?.hits ?? []).filter(p => p);
      const top = posts.length > 0 ? [...posts].sort((a, b) => (b?.points ?? 0) - (a?.points ?? 0))[0] : null;
-     rows.push([term, top?.title ?? '—', top?.points ?? 0]);
+     rows.push({ term, title: top?.title ?? '—', points: top?.points ?? 0 });
    }
-   await widget('data-table', {
-     columns: ['Term', 'Top post', 'Points'],
-     rows: rows.length ? rows : [['—', '—', 0]]
-   });
+   const lines = rows.map(r => `- **${r.term}** — ${r.title} (${r.points} pts)`);
+   await widget('text', { content: `### Top post per term\n\n${lines.join('\n')}` });
    ```
 
 ## Examples
@@ -174,11 +171,9 @@ for (const t of terms) {
   const hits = (res?.hits ?? []).filter(p => p);
   summary.push({ term: t, count: hits.length, avg: Math.round(hits.reduce((s, x) => s + (x?.points || 0), 0) / Math.max(hits.length, 1)) });
 }
-const rows = summary.map(s => [s.term, s.count, s.avg]);
-await widget('data-table', {
-  columns: ['Language', 'Posts', 'Avg score'],
-  rows: rows.length ? rows : [['—', 0, 0]]
-});
+const header = '| Language | Posts | Avg score |\n|----------|-------|-----------|';
+const lines = summary.map(s => `| ${s.term} | ${s.count} | ${s.avg} |`);
+await widget('text', { content: `### Language comparison\n\n${header}\n${lines.join('\n')}` });
 ```
 
 ## Common mistakes

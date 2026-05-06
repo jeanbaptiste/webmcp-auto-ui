@@ -31,14 +31,9 @@ The `get-front-page` tool returns 30 stories ranked by the HN algorithm, with ti
 1. **Fetch the front page**:
    ```js
    const res = await call('get-front-page', { hitsPerPage: 30 });
-   const stories = (res?.hits ?? []).filter(s => s);
+   const stories = unwrap(res?.hits ?? res).filter(s => s?.title);
    if (stories.length === 0) return widget('text', { content: 'No stories on the front page right now.' });
-   const items = stories.slice(0, 5).map(s => ({
-     title: s?.title ?? '(untitled)',
-     subtitle: `${s?.points ?? 0} pts · ${s?.num_comments ?? 0} comments · by ${s?.author ?? '—'}`,
-     url: s?.url || `https://news.ycombinator.com/item?id=${s?.objectID ?? ''}`
-   }));
-   await widget('cards', { items: items.length ? items : [{ title: 'No stories', subtitle: '—' }] });
+   await widget('text', { content: `Front page loaded: ${stories.length} stories.` });
    ```
 
 2. **Aggregate KPIs** (total points, total comments, top score):
@@ -55,31 +50,32 @@ The `get-front-page` tool returns 30 stories ranked by the HN algorithm, with ti
 3. **Render stat-cards**:
    ```js
    const res = await call('get-front-page', { hitsPerPage: 30 });
-   const stories = (res?.hits ?? []).filter(s => s);
+   const stories = unwrap(res?.hits ?? res).filter(s => s?.title);
    const totalPoints = stories.reduce((s, x) => s + (x?.points || 0), 0);
    const totalComments = stories.reduce((s, x) => s + (x?.num_comments || 0), 0);
    const topScore = stories.length > 0 ? Math.max(...stories.map(s => s?.points || 0)) : 0;
-   await widget('stat-card', { label: 'Stories', value: Math.max(stories.length, 1), icon: 'list' });
-   await widget('stat-card', { label: 'Total points', value: Math.max(totalPoints, 1), icon: 'arrow-up' });
-   await widget('stat-card', { label: 'Total comments', value: Math.max(totalComments, 1), icon: 'message-circle' });
-   await widget('stat-card', { label: 'Top score', value: Math.max(topScore, 1), icon: 'flame' });
+   await widget('stat-card', { items: [
+     { label: 'Stories',        value: Math.max(stories.length, 1),    icon: 'list'           },
+     { label: 'Total points',   value: Math.max(totalPoints, 1),       icon: 'arrow-up'       },
+     { label: 'Total comments', value: Math.max(totalComments, 1),     icon: 'message-circle' },
+     { label: 'Top score',      value: Math.max(topScore, 1),          icon: 'flame'          },
+   ]});
    ```
 
 4. **Top 5 stories in cards** (visual highlight):
    ```js
    const res = await call('get-front-page', { hitsPerPage: 30 });
-   const stories = (res?.hits ?? []).filter(s => s);
-   const items = stories.slice(0, 5).map(s => {
+   const stories = unwrap(res?.hits ?? res).filter(s => s?.title);
+   const cards = stories.slice(0, 5).map(s => {
      let host = 'news.ycombinator.com';
      try { if (s?.url) host = new URL(s.url).hostname; } catch {}
      return {
        title: s?.title ?? '(untitled)',
        subtitle: `${s?.points ?? 0} pts · ${s?.num_comments ?? 0} comments · by ${s?.author ?? '—'}`,
-       url: s?.url || `https://news.ycombinator.com/item?id=${s?.objectID ?? ''}`,
-       body: host
+       description: host
      };
    });
-   await widget('cards', { items: items.length ? items : [{ title: 'No stories', subtitle: '—' }] });
+   await widget('cards', { cards: cards.length ? cards : [{ title: 'No stories', subtitle: '—' }] });
    ```
 
 5. **Full sortable table** of the 30 stories:
