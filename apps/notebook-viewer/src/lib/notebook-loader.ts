@@ -58,9 +58,19 @@ function normalizeFrontmatterServers(
     .filter((s) => s.name && s.url);
 }
 
-function normalizeWebmcpServers(raw: unknown): string[] {
+function extractStringIds(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter((s): s is string => typeof s === 'string' && s.length > 0);
+}
+
+function normalizeWebmcpServers(rawWebmcp: unknown, rawServers: unknown): string[] {
+  // Tolerate the legacy single-key convention `servers: [autoui, deckgl]`
+  // (strings = bundled webmcp server ids) by merging it into webmcp_servers.
+  const merged = new Set<string>([
+    ...extractStringIds(rawWebmcp),
+    ...extractStringIds(rawServers),
+  ]);
+  return [...merged];
 }
 
 export function parseNotebookMarkdown(markdown: string): {
