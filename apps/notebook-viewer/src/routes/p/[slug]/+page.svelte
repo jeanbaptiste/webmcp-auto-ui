@@ -115,7 +115,10 @@
       id: 'nb-' + slug,
       title: meta.title,
       mode: 'view',
-      autoRun: false,
+      // nb.hyperskills.net is always live — bcf7d30 made this default; the
+      // 33b0ed8 refactor accidentally hardcoded it to false. SQL and JS cells
+      // re-execute at mount via state.executors when state.autoRun + view mode.
+      autoRun: true,
       liveData: true,
       hideLiveToggle: true,
       servers,
