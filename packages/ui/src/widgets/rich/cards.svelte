@@ -15,6 +15,7 @@
   export interface CardsData {
     title?: string;
     cards?: CardItem[];
+    items?: CardItem[];
     minCardWidth?: string;
     gap?: string;
     emptyMessage?: string;
@@ -28,7 +29,8 @@
   let { data = {}, oncardclick }: Props = $props();
 
   const cards = $derived.by<CardItem[]>(() => {
-    if (Array.isArray(data?.cards) && (data!.cards as unknown[]).length) return data!.cards as CardItem[];
+    const list = data?.cards ?? data?.items;
+    if (Array.isArray(list) && (list as unknown[]).length) return list as CardItem[];
     return [];
   });
 </script>

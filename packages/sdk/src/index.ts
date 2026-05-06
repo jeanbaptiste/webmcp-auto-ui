@@ -99,3 +99,6 @@ export { buildShortUrl, getShortToken } from './short-url.js';
 
 // Widget sample-data extractor — parses the `## Example` block of a recipe
 export { extractSampleData } from './widget-sample-data.js';
+
+// MCP response normalizer — flattens common envelope shapes to array
+export { unwrap } from './unwrap.js';

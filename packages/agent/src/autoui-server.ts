@@ -605,13 +605,30 @@ widget: cards
 description: Card grid (results, records, entities).
 schema:
   type: object
-  required:
-    - cards
   properties:
     title:
       type: string
     cards:
       type: array
+      description: List of cards (alias: items)
+      items:
+        type: object
+        required:
+          - title
+        properties:
+          title:
+            type: string
+          description:
+            type: string
+          subtitle:
+            type: string
+          tags:
+            type: array
+            items:
+              type: string
+    items:
+      type: array
+      description: Alias for cards — use either cards or items
       items:
         type: object
         required:
