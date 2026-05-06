@@ -858,12 +858,15 @@ function renderResultInto(el: HTMLElement, cell: NotebookCell, overlay: RuntimeO
   const r = effectiveResult(cell, overlay) ?? cell.lastResult;
   el.innerHTML = '';
   if (!r) {
-    const rtStatus = cellRuntimeStatus(cell, overlay);
     const isView = stateRef?.mode === 'view';
-    if (rtStatus === 'running') {
+    const rtStatus = cellRuntimeStatus(cell, overlay);
+    // In view mode (autoRun), any unresolved cell is effectively loading —
+    // the auto-runner will pick it up shortly. Show a continuous spinner so
+    // users don't see a static "—" placeholder during the idle→running gap.
+    if (isView && rtStatus !== 'frozen') {
       el.innerHTML = `<div class="nbe-result-running"><span class="nbe-spinner"></span> running</div>`;
-    } else if (isView) {
-      el.innerHTML = `<div class="nbe-result-empty">—</div>`;
+    } else if (rtStatus === 'running') {
+      el.innerHTML = `<div class="nbe-result-running"><span class="nbe-spinner"></span> running</div>`;
     } else {
       el.innerHTML = `<div class="nbe-result-empty">press ▶ to run</div>`;
     }
