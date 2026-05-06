@@ -322,17 +322,18 @@ export async function runAutoRefresh(opts: AutoRefreshOptions): Promise<AutoRefr
   onTick?.(overlay);
 
   const summary: AutoRefreshSummary = { rerun: 0, frozen: 0, stale: 0, failed: 0 };
+  const sharedSignal = signal ?? new AbortController().signal;
 
-  for (const cell of state.cells) {
-    if (signal?.aborted) break;
-    if (!isReRunnable(cell)) { summary.frozen++; continue; }
+  const tasks = state.cells.map(async (cell) => {
+    if (sharedSignal.aborted) return;
+    if (!isReRunnable(cell)) { summary.frozen++; return; }
 
     overlay.status.set(cell.id, 'running');
     onCellChange?.(cell.id);
     onTick?.(overlay);
 
     try {
-      const result = await runner(cell, signal ?? new AbortController().signal);
+      const result = await runner(cell, sharedSignal);
       if (result.ok) {
         overlay.outputs.set(cell.id, { result, refreshedAt: Date.now() });
         overlay.status.set(cell.id, 'fresh');
@@ -348,7 +349,9 @@ export async function runAutoRefresh(opts: AutoRefreshOptions): Promise<AutoRefr
     }
     onCellChange?.(cell.id);
     onTick?.(overlay);
-  }
+  });
+
+  await Promise.all(tasks);
 
   overlay.finishedAt = Date.now();
   onTick?.(overlay);
