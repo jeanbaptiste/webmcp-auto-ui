@@ -85,7 +85,7 @@ await widget('chart', {
 });
 
 // 6. Ranking table
-await widget('table', {
+await widget('data-table', {
   columns: ['Rank', 'Site', 'Latitude', 'Annual irradiance (kWh/m²)', 'Avg wind (m/s)'],
   rows: summary.map((s, i) => [i + 1, s.name, s.lat, s.annualIrr.toFixed(0), s.avgWind.toFixed(2)])
 });
@@ -98,7 +98,7 @@ await widget('table', {
 const sites = [{name:'Brest',lat:48.4,lon:-4.5},{name:'Marseille',lat:43.3,lon:5.4},{name:'Lyon',lat:45.75,lon:4.85}];
 const res = await Promise.all(sites.map(s => call('nasa_power', { parameters: 'ALLSKY_SFC_SW_DWN', community: 'RE', latitude: s.lat, longitude: s.lon, start: '20240101', end: '20241231' }).catch(() => null)));
 const sums = sites.map((s, i) => ({ ...s, total: Object.values(res[i]?.properties?.parameter?.ALLSKY_SFC_SW_DWN ?? {}).filter(Number.isFinite).reduce((a, b) => a + b, 0) }));
-await widget('table', { columns: ['City', 'kWh/m²/yr'], rows: sums.map(s => [s.name, s.total.toFixed(0)]) });
+await widget('data-table', { columns: ['City', 'kWh/m²/yr'], rows: sums.map(s => [s.name, s.total.toFixed(0)]) });
 ```
 
 ### Wind sites Atlantic vs Mediterranean

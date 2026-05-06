@@ -72,7 +72,7 @@ if (champ) {
 }
 
 // 6. Full leaderboard table
-await widget('table', {
+await widget('data-table', {
   columns: ['Rank', 'Identifier', 'IDs on taxon', 'Total IDs'],
   rows: idResults.map((r, i) => [
     i + 1,
@@ -90,7 +90,7 @@ await widget('table', {
 const t = (await call('search_taxa', { q: 'Cortinarius', rank: 'genus', per_page: 1 }))?.results?.[0];
 if (!t) { await widget('text', { content: 'Taxon not found.' }); return; }
 const ids = await call('top_identifiers', { taxon_id: t.id, per_page: 10 }).catch(() => ({ results: [] }));
-await widget('table', { columns: ['Rank', 'User', 'IDs'], rows: (ids?.results ?? []).map((r, i) => [i + 1, r.user?.login ?? '—', r.count ?? 0]) });
+await widget('data-table', { columns: ['Rank', 'User', 'IDs'], rows: (ids?.results ?? []).map((r, i) => [i + 1, r.user?.login ?? '—', r.count ?? 0]) });
 ```
 
 ### Top experts for golden eagle

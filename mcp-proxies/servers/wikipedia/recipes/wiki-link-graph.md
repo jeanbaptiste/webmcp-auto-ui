@@ -54,7 +54,7 @@ The user wants the network of references from one article:
        url: `https://en.wikipedia.org/wiki/${encodeURIComponent((s?.title ?? '').replace(/ /g, '_'))}`
      }))
    });
-   await widget('table', {
+   await widget('data-table', {
      columns: ['#', 'Linked article'],
      rows: links.slice(0, 200).map((l, i) => [i + 1, l])
    });
@@ -72,7 +72,7 @@ await widget('stat-card', { label: 'Links', value: links.length, icon: 'link' })
 await widget('cards', {
   items: sums.filter(Boolean).map(s => ({ title: s?.title ?? '—', body: (s?.summary ?? '').slice(0, 120) }))
 });
-await widget('table', { columns: ['#', 'Article'], rows: links.map((l, i) => [i + 1, l]) });
+await widget('data-table', { columns: ['#', 'Article'], rows: links.map((l, i) => [i + 1, l]) });
 ```
 
 ### Internet outgoing links
@@ -80,7 +80,7 @@ await widget('table', { columns: ['#', 'Article'], rows: links.map((l, i) => [i 
 const res = await call('get_links', { title: 'Internet' }).catch(() => null);
 const links = (res?.links ?? []).filter(l => l);
 await widget('stat-card', { label: 'Outgoing', value: links.length, icon: 'link' });
-await widget('table', { columns: ['#', 'Linked article'], rows: links.slice(0, 100).map((l, i) => [i + 1, l]) });
+await widget('data-table', { columns: ['#', 'Linked article'], rows: links.slice(0, 100).map((l, i) => [i + 1, l]) });
 ```
 
 ## Common mistakes

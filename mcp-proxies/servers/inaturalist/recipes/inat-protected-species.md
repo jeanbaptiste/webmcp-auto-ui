@@ -58,7 +58,7 @@ const obs = ids
 if (protectedTaxa.length === 0) {
   await widget('text', { content: 'No protected species found in this region.' });
 } else {
-  await widget('table', {
+  await widget('data-table', {
     columns: ['Species', 'Common name', 'Status', 'Family'],
     rows: protectedTaxa.map(t => [
       t.name ?? '—',
@@ -99,7 +99,7 @@ if (!place) { await widget('text', { content: 'Place not found.' }); return; }
 const top = await call('species_counts', { place_id: place.id, per_page: 50 }).catch(() => ({ results: [] }));
 const det = await Promise.all((top?.results ?? []).slice(0, 30).map(r => call('get_taxon', { id: r.taxon?.id }).catch(() => null)));
 const prot = det.filter(t => t?.conservation_status && t.conservation_status.status !== 'LC');
-await widget('table', { columns: ['Species', 'Status'], rows: prot.map(t => [t.name ?? '—', t.conservation_status?.status_name ?? '—']) });
+await widget('data-table', { columns: ['Species', 'Status'], rows: prot.map(t => [t.name ?? '—', t.conservation_status?.status_name ?? '—']) });
 ```
 
 ### Red list flora in the Alps

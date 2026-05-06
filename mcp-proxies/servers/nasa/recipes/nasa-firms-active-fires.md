@@ -60,7 +60,7 @@ await widget('map', {
 
 // 4. Hottest table
 const hottest = [...fires].sort((a, b) => +(b?.brightness ?? 0) - +(a?.brightness ?? 0)).slice(0, 20);
-await widget('table', {
+await widget('data-table', {
   columns: ['Date', 'Time UTC', 'Lat', 'Lon', 'Brightness (K)', 'FRP (MW)', 'Confidence'],
   rows: hottest.map(f => [f?.acq_date ?? '—', f?.acq_time ?? '—', f?.latitude ?? '—', f?.longitude ?? '—', f?.brightness ?? '—', f?.frp ?? '—', f?.confidence ?? '—'])
 });
@@ -97,7 +97,7 @@ await widget('stat-card', { label: 'Hotspots', value: Math.max(fires.length, 1) 
 const data = await call('nasa_firms', { latitude: 38.0, longitude: 23.7, days: 3 }).catch(() => null);
 const fires = (data?.fires ?? (Array.isArray(data) ? data : [])).filter(f => f);
 const rows = fires.slice(0, 15).map(f => [f?.acq_date ?? '—', f?.latitude ?? '—', f?.longitude ?? '—', f?.frp ?? '—']);
-await widget('table', { columns: ['Date', 'Lat', 'Lon', 'FRP'], rows: rows.length ? rows : [['—', '38.0', '23.7', '—']] });
+await widget('data-table', { columns: ['Date', 'Lat', 'Lon', 'FRP'], rows: rows.length ? rows : [['—', '38.0', '23.7', '—']] });
 ```
 
 ## Common mistakes

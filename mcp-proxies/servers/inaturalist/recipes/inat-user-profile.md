@@ -84,7 +84,7 @@ for (const o of myObs) {
   if (k) counts[k] = (counts[k] || 0) + 1;
 }
 const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 15);
-await widget('table', {
+await widget('data-table', {
   columns: ['Species', 'Observations'],
   rows,
 });

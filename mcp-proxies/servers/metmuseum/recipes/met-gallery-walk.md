@@ -54,7 +54,7 @@ layout:
 4. **Itinerary table** (in walking order):
    ```js
    const rows = display.map(s => [s?.GalleryNumber ?? '—', s?.title ?? '(untitled)', s?.artistDisplayName || '—', s?.objectDate ?? '—']);
-   await widget('table', { columns: ['Gallery', 'Title', 'Artist', 'Date'], rows: rows.length ? rows : [['—', 'No samples', '—', '—']] });
+   await widget('data-table', { columns: ['Gallery', 'Title', 'Artist', 'Date'], rows: rows.length ? rows : [['—', 'No samples', '—', '—']] });
    ```
 
 5. **Cards per stop**:
@@ -87,7 +87,7 @@ const all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primar
 const stops = all.filter(w => w?.GalleryNumber);
 const display = stops.length > 0 ? stops : all;
 const rows = display.map(s => [s?.GalleryNumber ?? '—', s?.title ?? '(untitled)']);
-await widget('table', { columns: ['Gallery', 'Title'], rows: rows.length ? rows : [['—', 'No samples']] });
+await widget('data-table', { columns: ['Gallery', 'Title'], rows: rows.length ? rows : [['—', 'No samples']] });
 ```
 
 ### European masterpieces tour

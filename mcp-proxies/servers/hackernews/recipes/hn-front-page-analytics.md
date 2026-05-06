@@ -33,6 +33,12 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
    const res = await call('get-front-page', { hitsPerPage: 100 });
    const stories = (res?.hits ?? []).filter(s => s);
    if (stories.length === 0) return widget('text', { content: 'No stories to analyze.' });
+   const items = stories.slice(0, 5).map(s => ({
+     title: s?.title ?? '(untitled)',
+     subtitle: `${s?.points ?? 0} pts · ${s?.num_comments ?? 0} comments · by ${s?.author ?? '—'}`,
+     url: s?.url || `https://news.ycombinator.com/item?id=${s?.objectID ?? ''}`
+   }));
+   await widget('cards', { items: items.length ? items : [{ title: 'No stories', subtitle: '—' }] });
    ```
 
 2. **Compute KPIs**:
@@ -128,7 +134,7 @@ This recipe complements `hn-front-page-overview` by transforming the same 30-sto
      try { if (s?.url) host = new URL(s.url).hostname.replace(/^www\./, ''); } catch {}
      return [i + 1, s?.title ?? '(untitled)', s?.points ?? 0, s?.num_comments ?? 0, host];
    });
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Rank', 'Title', 'Points', 'Comments', 'Domain'],
      rows: rows.length ? rows : [[1, '(no data)', 0, 0, '—']]
    });
@@ -168,7 +174,7 @@ const rows = hits.map(s => {
   const ratio = (com / Math.max(pts, 1)).toFixed(2);
   return [s?.title ?? '(untitled)', pts, com, ratio];
 });
-await widget('table', {
+await widget('data-table', {
   columns: ['Title', 'Points', 'Comments', 'C/P ratio'],
   rows: rows.length ? rows : [['(no data)', 0, 0, '0.00']]
 });

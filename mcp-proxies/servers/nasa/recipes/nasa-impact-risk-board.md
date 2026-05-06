@@ -64,7 +64,7 @@ await widget('chart', {
 });
 
 // 5. Ranked table
-await widget('table', {
+await widget('data-table', {
   columns: ['Designation', 'Years', 'IP', 'Palermo', 'Torino', 'H', 'V-inf (km/s)'],
   rows: rows.map(r => [r?.des ?? '—', r?.year_range ?? '—', r?.ip ?? '—', r?.ps_cum ?? '—', r?.ts_max ?? 0, r?.h ?? '—', r?.v_inf ?? '—'])
 });
@@ -87,7 +87,7 @@ const sentry = await call('jpl_sentry', { limit: 50 }).catch(() => null);
 const data = (sentry?.data ?? []).filter(r => r);
 const rows = data.map(r => [r?.des ?? '—', r?.ip ?? '—', r?.ps_cum ?? '—', r?.h ?? '—']);
 await widget('stat-card', { label: 'Sentry list', value: Math.max(data.length, 1) });
-await widget('table', { columns: ['Des', 'IP', 'PS', 'H'], rows: rows.length ? rows : [['101955 Bennu', '5.7e-04', '-1.41', '20.21']] });
+await widget('data-table', { columns: ['Des', 'IP', 'PS', 'H'], rows: rows.length ? rows : [['101955 Bennu', '5.7e-04', '-1.41', '20.21']] });
 ```
 
 ### Filter on Palermo > -3

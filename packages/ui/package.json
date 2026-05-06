@@ -70,6 +70,7 @@
   ],
   "dependencies": {
     "@internationalized/date": "^3.8.1",
+    "@turf/turf": "^7.3.5",
     "@types/d3": "^7.4.3",
     "@webmcp-auto-ui/agent": "*",
     "@webmcp-auto-ui/core": "*",
@@ -78,6 +79,7 @@
     "clsx": "^2.1.1",
     "highlight.js": "^11.10.0",
     "html-to-image": "^1.11.13",
+    "maplibre-gl": "^5.24.0",
     "marked": "^14.1.3",
     "tailwind-merge": "^3.5.0",
     "tailwind-variants": "^3.2.2",

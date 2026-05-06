@@ -61,7 +61,7 @@ This recipe combines short summary, full article context, structured sections li
        { label: 'URL', value: art?.url ?? '—' }
      ]
    });
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Section', 'Level'],
      rows: (secs?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—'])
    });
@@ -86,7 +86,7 @@ await widget('kv', {
     { label: 'Sections', value: (secs?.sections ?? []).length }
   ]
 });
-await widget('table', {
+await widget('data-table', {
   columns: ['Section', 'Level'],
   rows: (secs?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—'])
 });

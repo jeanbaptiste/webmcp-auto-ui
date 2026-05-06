@@ -72,7 +72,7 @@ Many public datasets are distributed at the commune mesh — this recipe makes t
    });
 
    const topRows = rows.length > 0 ? rows.slice(0, 10) : [];
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Rang', 'Commune', 'INSEE', 'Population'],
      rows: topRows.map((r, i) => [i + 1, r.nom_standard ?? r.code_insee ?? '—', r.code_insee ?? '—', Number.isFinite(Number(r.population)) ? Number(r.population).toLocaleString('fr-FR') : '—'])
    });
@@ -133,7 +133,7 @@ const markers = top
   .filter(Boolean);
 
 await widget('map', { center: [46.6, 2.5], zoom: 6, markers, color_field: 'value', color_scale: 'viridis' });
-await widget('table', {
+await widget('data-table', {
   columns: ['Rang', 'Commune', 'INSEE', 'Logements soc.', 'Loyer moy. (€/m²)'],
   rows: rows.slice(0, 10).map((r, i) => [i + 1, r.NCOM ?? '—', r.COM ?? '—', Number(r.TOT21).toLocaleString('fr-FR'), Number(r.LOYERMOY).toFixed(2)])
 });

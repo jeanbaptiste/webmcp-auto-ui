@@ -57,7 +57,7 @@ The Tabular API returns the schema and a paged sample without downloading the fi
 
    const tableCols = sample?.columns ?? [];
    const tableRows = (sample?.rows ?? []).map(r => tableCols.map(c => r[c] ?? '—'));
-   await widget('table', {
+   await widget('data-table', {
      columns: tableCols,
      rows: tableRows
    });
@@ -71,7 +71,7 @@ const resList = await call('list_dataset_resources', { dataset_id: '5cc1b94a634f
 const csvRes = (resList?.resources ?? []).find(r => r.format === 'csv') ?? (resList?.resources ?? [])[0];
 if (!csvRes) { await widget('text', { content: 'Aucune ressource trouvée.' }); return; }
 const sample = await call('query_resource_data', { resource_id: csvRes.id, page_size: 20 }).catch(() => ({ rows: [], columns: [], total: 0 }));
-await widget('table', { columns: sample?.columns ?? [], rows: (sample?.rows ?? []).map(r => (sample.columns ?? []).map(c => r[c] ?? '—')) });
+await widget('data-table', { columns: sample?.columns ?? [], rows: (sample?.rows ?? []).map(r => (sample.columns ?? []).map(c => r[c] ?? '—')) });
 await widget('stat-card', { label: 'Total lignes', value: sample?.total ?? 0 });
 ```
 
@@ -83,7 +83,7 @@ const resList2 = ds_id ? await call('list_dataset_resources', { dataset_id: ds_i
 const csvRes2 = (resList2?.resources ?? []).find(r => r.format === 'csv') ?? (resList2?.resources ?? [])[0];
 const sample2 = csvRes2 ? await call('query_resource_data', { resource_id: csvRes2.id, page_size: 30 }).catch(() => ({ rows: [], columns: [], total: 0 })) : { rows: [], columns: [], total: 0 };
 await widget('text', { title: search?.datasets?.[0]?.title ?? 'Aperçu', content: `${sample2?.total ?? 0} lignes au total` });
-await widget('table', { columns: sample2?.columns ?? [], rows: (sample2?.rows ?? []).map(r => (sample2.columns ?? []).map(c => r[c] ?? '—')) });
+await widget('data-table', { columns: sample2?.columns ?? [], rows: (sample2?.rows ?? []).map(r => (sample2.columns ?? []).map(c => r[c] ?? '—')) });
 ```
 
 ### Preview filtered to a single column value
@@ -93,7 +93,7 @@ const sample3 = await call('query_resource_data', {
   resource_id: '58075a79-8b16-4004-9640-6413c1dc2d60',
   page_size: 25
 }).catch(() => ({ rows: [], columns: [] }));
-await widget('table', { columns: sample3?.columns ?? [], rows: (sample3?.rows ?? []).map(r => (sample3.columns ?? []).map(c => r[c] ?? '—')) });
+await widget('data-table', { columns: sample3?.columns ?? [], rows: (sample3?.rows ?? []).map(r => (sample3.columns ?? []).map(c => r[c] ?? '—')) });
 ```
 
 ## Common mistakes

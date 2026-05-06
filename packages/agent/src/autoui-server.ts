@@ -929,6 +929,63 @@ Pour des visualisations custom, animations, ou prototypes interactifs en JS pur.
 Call widget_display({name: "js-sandbox", params: {code: "document.getElementById('root').innerHTML = '<h1>Hello</h1>'"}}).
 `,
 
+  // ── map ─────────────────────────────────────────────────────────────────
+  `---
+widget: map
+description: Interactive geospatial map (MapLibre GL, light theme) with markers and/or GeoJSON overlay. Auto-fits view to data via Turf bbox.
+group: rich
+schema:
+  type: object
+  properties:
+    markers:
+      type: array
+      description: Points to display as map markers.
+      items:
+        type: object
+        required:
+          - lat
+          - lon
+        properties:
+          lat:
+            type: number
+          lon:
+            type: number
+          label:
+            type: string
+            description: Popup text shown when the marker is clicked.
+          color:
+            type: string
+            description: CSS color for the marker pin (defaults to blue).
+    geojson:
+      type: object
+      description: GeoJSON Feature or FeatureCollection rendered as fill/line/circle layers.
+    center:
+      type: array
+      description: "[lon, lat] center (MapLibre/Turf convention). If omitted, computed from data via Turf bbox."
+      items:
+        type: number
+      minItems: 2
+      maxItems: 2
+    zoom:
+      type: number
+      description: Initial zoom. If omitted, derived by fitting the bbox of the data.
+    height:
+      type: string
+      description: CSS height of the map container (default "400px").
+  required: []
+---
+
+## When to use
+Pour visualiser des donnees geospatiales : positions, itineraires, polygones (zones, regions). Choisir cette carte pour points + popups + overlays GeoJSON sur fond clair (Carto Positron).
+
+## How to use
+Call widget_display({name: "map", params: {markers: [{lat: 48.85, lon: 2.35, label: "Paris"}]}}).
+
+## Common mistakes
+- Coordonnees au format [lon, lat] (PAS [lat, lon]) pour le champ \`center\` et pour les Point GeoJSON — convention Turf/MapLibre.
+- Ne PAS fournir un \`zoom\` sans \`center\` si tu veux l'auto-fit : laisse les deux vides pour que la vue s'adapte automatiquement aux donnees.
+`,
+
 `---
 widget: chat-input
 description: Minimal inline chat bar with a text input and stop button. Use when the agent needs to solicit a short free-form user reply inside the current canvas (e.g. "explain this result").

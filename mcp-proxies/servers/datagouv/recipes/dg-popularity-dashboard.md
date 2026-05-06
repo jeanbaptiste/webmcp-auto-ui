@@ -67,7 +67,7 @@ This recipe is great for public communication and inter-agency benchmarking.
    await widget('stat-card', { label: 'Évol. YoY', value: `${yoy} %`, icon: 'activity' });
 
    const fRows = (resList?.resources ?? []).slice(0, 10).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—']);
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Fichier', 'Format', 'Taille'],
      rows: fRows.length ? fRows : [['—', '—', '—']]
    });

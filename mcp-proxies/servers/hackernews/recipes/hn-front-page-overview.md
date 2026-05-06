@@ -33,6 +33,12 @@ The `get-front-page` tool returns 30 stories ranked by the HN algorithm, with ti
    const res = await call('get-front-page', { hitsPerPage: 30 });
    const stories = (res?.hits ?? []).filter(s => s);
    if (stories.length === 0) return widget('text', { content: 'No stories on the front page right now.' });
+   const items = stories.slice(0, 5).map(s => ({
+     title: s?.title ?? '(untitled)',
+     subtitle: `${s?.points ?? 0} pts · ${s?.num_comments ?? 0} comments · by ${s?.author ?? '—'}`,
+     url: s?.url || `https://news.ycombinator.com/item?id=${s?.objectID ?? ''}`
+   }));
+   await widget('cards', { items: items.length ? items : [{ title: 'No stories', subtitle: '—' }] });
    ```
 
 2. **Aggregate KPIs** (total points, total comments, top score):
@@ -91,7 +97,7 @@ The `get-front-page` tool returns 30 stories ranked by the HN algorithm, with ti
        host
      ];
    });
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Title', 'Points', 'Comments', 'Author', 'Domain'],
      rows: rows.length ? rows : [['(no data)', 0, 0, '—', '—']]
    });
@@ -117,7 +123,7 @@ const items = stories.slice(0, 5).map(s => ({
 await widget('cards', { items: items.length ? items : [{ title: 'No stories', subtitle: '—' }] });
 
 const rows = stories.map(s => [s?.title ?? '(untitled)', s?.points ?? 0, s?.num_comments ?? 0, s?.author ?? '—']);
-await widget('table', {
+await widget('data-table', {
   columns: ['Title', 'Points', 'Comments', 'Author'],
   rows: rows.length ? rows : [['(no data)', 0, 0, '—']]
 });
@@ -128,7 +134,7 @@ await widget('table', {
 const res = await call('get-front-page', { hitsPerPage: 50 });
 const hits = (res?.hits ?? []).filter(s => s);
 const rows = hits.map((s, i) => [i + 1, s?.title ?? '(untitled)', s?.points ?? 0, s?.num_comments ?? 0]);
-await widget('table', {
+await widget('data-table', {
   columns: ['#', 'Title', 'Points', 'Comments'],
   rows: rows.length ? rows : [[1, '(no data)', 0, 0]]
 });

@@ -52,7 +52,7 @@ await widget('cards', {
 });
 
 // 4. Sortable table
-await widget('table', {
+await widget('data-table', {
   columns: ['Short name', 'Version', 'Start', 'End', 'Platforms'],
   rows: items.map(i => [i?.short_name ?? '—', i?.version_id ?? '—', i?.time_start?.slice(0, 10) ?? '—', i?.time_end?.slice(0, 10) || 'ongoing', (i?.platforms ?? []).join(',')])
 });
@@ -88,7 +88,7 @@ await widget('cards', { items: cards.length ? cards : [{ title: 'ICESat-2 datase
 const res = await call('nasa_cmr', { keyword: 'MODIS chlorophyll', search_type: 'granules', format: 'json', limit: 20 }).catch(() => null);
 const items = (res?.feed?.entry ?? []).filter(g => g);
 const rows = items.map(g => [g?.title ?? '—', g?.time_start?.slice(0, 10) ?? '—']);
-await widget('table', { columns: ['Title', 'Start'], rows: rows.length ? rows : [['MODIS chlorophyll granule (preview)', '—']] });
+await widget('data-table', { columns: ['Title', 'Start'], rows: rows.length ? rows : [['MODIS chlorophyll granule (preview)', '—']] });
 ```
 
 ## Common mistakes

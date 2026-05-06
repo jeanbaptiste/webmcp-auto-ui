@@ -69,7 +69,7 @@ await widget('chart-rich', {
   ]
 });
 
-await widget('table', {
+await widget('data-table', {
   title: 'Detail jour par jour',
   columns: ['Jour', 'Tmax', 'Tmin', 'Pluie (mm)', 'Prob. pluie', 'Vent max'],
   rows: (d.time ?? []).map((t, i) => [

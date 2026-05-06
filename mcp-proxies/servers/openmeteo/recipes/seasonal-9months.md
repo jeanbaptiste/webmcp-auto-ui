@@ -90,7 +90,7 @@ await widget('chart-rich', {
   ]
 });
 
-await widget('table', {
+await widget('data-table', {
   columns: ['Mois', 'Tmoy prevue', 'Normale', 'Anomalie'],
   rows: anomalies.map(a => [a.month, `${a.t.toFixed(1)}C`, `${a.normal.toFixed(1)}C`, `${a.anomaly >= 0 ? '+' : ''}${a.anomaly.toFixed(1)}C`])
 });

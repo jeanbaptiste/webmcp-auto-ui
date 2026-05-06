@@ -49,7 +49,7 @@ Note: this recipe assumes the MCP server is running multiple language instances 
    ```js
    await widget('kv', { items: [{ label: 'Title', value: sum?.title ?? '—' }, { label: 'Language', value: conn?.language ?? '—' }] });
    await widget('text', { content: sum?.summary ?? '(no summary)' });
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Section', 'Level'],
      rows: (secs?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—'])
    });
@@ -68,7 +68,7 @@ const [sum, secs] = await Promise.all([
 ]);
 await widget('stat-card', { label: 'Lang', value: conn?.language ?? '—' });
 await widget('text', { content: sum?.summary ?? '(no summary)' });
-await widget('table', { columns: ['Section', 'Level'], rows: (secs?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—']) });
+await widget('data-table', { columns: ['Section', 'Level'], rows: (secs?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—']) });
 ```
 
 ### Sushi article snapshot

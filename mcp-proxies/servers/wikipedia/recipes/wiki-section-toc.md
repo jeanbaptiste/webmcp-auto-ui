@@ -46,7 +46,7 @@ The user wants to see the skeleton of a long article:
    await widget('stat-card', { label: 'Sections', value: n, icon: 'list' });
    await widget('stat-card', { label: 'Top-level', value: topLevel, icon: 'layers' });
    await widget('stat-card', { label: 'Max depth', value: maxLevel, icon: 'arrow-down' });
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Section', 'Level'],
      rows: sections.map(s => [`${'  '.repeat((s?.level || 1) - 1)}${s?.title ?? '—'}`, s?.level ?? 1])
    });
@@ -63,7 +63,7 @@ const [secs, sum] = await Promise.all([
 const sections = secs?.sections ?? [];
 await widget('text', { content: sum?.summary ?? '(no summary)' });
 await widget('stat-card', { label: 'Sections', value: sections.length, icon: 'list' });
-await widget('table', { columns: ['Section', 'Level'], rows: sections.map(s => [s?.title ?? '—', s?.level ?? 1]) });
+await widget('data-table', { columns: ['Section', 'Level'], rows: sections.map(s => [s?.title ?? '—', s?.level ?? 1]) });
 ```
 
 ### String theory plan
@@ -71,7 +71,7 @@ await widget('table', { columns: ['Section', 'Level'], rows: sections.map(s => [
 const secs = await call('get_sections', { title: 'String theory' }).catch(() => null);
 const sections = secs?.sections ?? [];
 await widget('stat-card', { label: 'Sections', value: sections.length, icon: 'list' });
-await widget('table', {
+await widget('data-table', {
   columns: ['#', 'Section', 'Level'],
   rows: sections.map((s, i) => [i + 1, s?.title ?? '—', s?.level ?? 1])
 });

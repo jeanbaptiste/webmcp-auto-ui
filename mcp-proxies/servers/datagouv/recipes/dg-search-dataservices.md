@@ -47,7 +47,7 @@ The user is looking for a programmatic data source:
      }))
    });
 
-   await widget('table', {
+   await widget('data-table', {
      columns: ['API', 'Org.', 'Licence', 'OpenAPI', 'MAJ'],
      rows: services.map(s => [s.title ?? '—', s.organization?.name ?? '—', s.license ?? '—', s.machine_documentation_url ? '✓' : '—', s.last_modified ?? '—'])
    });
@@ -69,7 +69,7 @@ await widget('cards', { items: (res?.dataservices ?? []).map(s => ({ title: s.ti
 ### Find an address API
 ```js
 const res = await call('search_dataservices', { query: 'adresse', page_size: 10 }).catch(() => ({ dataservices: [] }));
-await widget('table', { columns: ['API', 'Org.', 'OpenAPI'], rows: (res?.dataservices ?? []).map(s => [s.title ?? '—', s.organization?.name ?? '—', s.machine_documentation_url ? '✓' : '—']) });
+await widget('data-table', { columns: ['API', 'Org.', 'OpenAPI'], rows: (res?.dataservices ?? []).map(s => [s.title ?? '—', s.organization?.name ?? '—', s.machine_documentation_url ? '✓' : '—']) });
 ```
 
 ### Postal codes API

@@ -30,7 +30,7 @@ The user wants to navigate a long article like a book and jump to a chapter:
 
 2. **Render the table of contents** (so the user sees siblings):
    ```js
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Section', 'Level'],
      rows: sections.map(s => [s?.title ?? '—', s?.level ?? '—'])
    });
@@ -58,7 +58,7 @@ The user wants to navigate a long article like a book and jump to a chapter:
 ```js
 const all = await call('get_sections', { title: 'Internet' }).catch(() => null);
 const sec = await call('summarize_article_section', { title: 'Internet', section_title: 'History', max_length: 250 }).catch(() => null);
-await widget('table', { columns: ['Section', 'Level'], rows: (all?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—']) });
+await widget('data-table', { columns: ['Section', 'Level'], rows: (all?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—']) });
 await widget('kv', { items: [{ label: 'Section', value: sec?.section_title ?? '—' }] });
 await widget('text', { content: sec?.summary ?? '(no section summary)' });
 ```
@@ -67,7 +67,7 @@ await widget('text', { content: sec?.summary ?? '(no section summary)' });
 ```js
 const all = await call('get_sections', { title: 'France' }).catch(() => null);
 const sec = await call('summarize_article_section', { title: 'France', section_title: 'Économie', max_length: 280 }).catch(() => null);
-await widget('table', { columns: ['Section', 'Niveau'], rows: (all?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—']) });
+await widget('data-table', { columns: ['Section', 'Niveau'], rows: (all?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—']) });
 await widget('text', { content: sec?.summary ?? '(no section summary)' });
 ```
 

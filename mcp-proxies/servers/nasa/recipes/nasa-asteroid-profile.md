@@ -85,7 +85,7 @@ if (Number.isFinite(ax) && Number.isFinite(ex)) {
 // 7. Close approaches table
 const cadData = cad?.data ?? [];
 const rows = cadData.slice(0, 20).map(d => [d?.[3] ?? '—', d?.[4] ?? '—', d?.[7] ?? '—', d?.[10] ?? '—']);
-await widget('table', {
+await widget('data-table', {
   columns: ['Body', 'Date (TDB)', 'Distance (au)', 'V-rel (km/s)'],
   rows: rows.length ? rows : [['Earth', '—', '—', '—']]
 });
@@ -112,7 +112,7 @@ const cad  = await call('jpl_cad',  { des: '101955', date_max: '2200-01-01', dis
 const sentry = await call('jpl_sentry', { des: '101955' }).catch(() => null);
 await widget('profile', { name: 'Bennu (101955)', badges: ['NEO', 'PHA', 'Sentry-monitored'] });
 const rows = (cad?.data ?? []).slice(0, 10).map(r => [r?.[3] ?? '—', r?.[4] ?? '—']);
-await widget('table', { columns: ['Date', 'Dist (au)'], rows });
+await widget('data-table', { columns: ['Date', 'Dist (au)'], rows });
 ```
 
 ### Eros (no impact risk)

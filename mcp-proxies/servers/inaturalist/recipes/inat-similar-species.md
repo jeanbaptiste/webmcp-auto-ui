@@ -64,7 +64,7 @@ await widget('cards', {
 });
 
 // 6. Diagnostic table
-await widget('table', {
+await widget('data-table', {
   columns: ['Species', 'Family', 'Observations', 'Conservation'],
   rows: allTaxa.map(t => [
     t.preferred_common_name ?? t.name ?? '—',

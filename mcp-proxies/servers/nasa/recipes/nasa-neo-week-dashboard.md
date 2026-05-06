@@ -62,7 +62,7 @@ await widget('chart', {
 });
 
 // 5. Sortable table
-await widget('table', {
+await widget('data-table', {
   columns: ['Name', 'Approach', 'Distance (LD)', 'Velocity (km/s)', 'Diameter max (m)', 'Hazardous'],
   rows: all.map(n => {
     const ca = n?.close_approach_data?.[0];
@@ -105,7 +105,7 @@ const tableRows = all.map(n => {
   return [n?.name ?? '—', n?.close_approach_data?.[0]?.close_approach_date ?? '—', Number.isFinite(lunar) ? lunar.toFixed(2) : '—'];
 });
 await widget('stat-card', { label: 'NEO', value: Math.max(all.length, 1) });
-await widget('table', { columns: ['Name', 'Date', 'LD'], rows: tableRows.length ? tableRows : [['NEO (preview)', today, '—']] });
+await widget('data-table', { columns: ['Name', 'Date', 'LD'], rows: tableRows.length ? tableRows : [['NEO (preview)', today, '—']] });
 ```
 
 ### A historical week

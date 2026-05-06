@@ -41,6 +41,12 @@ The agent loops over each term, fetches its results, and composes a comparative 
      });
      buckets[term] = (res?.hits ?? []).filter(p => p);
    }
+   const data = terms.map(t => ({ label: t, value: (buckets[t] ?? []).length }));
+   await widget('chart-rich', {
+     type: 'bar',
+     title: 'Posts per term',
+     data: data.length ? data : [{ label: terms[0] ?? '—', value: 1 }]
+   });
    ```
 
 2. **Compute per-term KPIs**:
@@ -119,7 +125,7 @@ The agent loops over each term, fetches its results, and composes a comparative 
      summary.push({ term, count: posts.length, avgPoints, avgComments });
    }
    const rows = summary.sort((a, b) => b.count - a.count).map(s => [s.term, s.count, s.avgPoints, s.avgComments]);
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Term', 'Posts', 'Avg points', 'Avg comments'],
      rows: rows.length ? rows : [['—', 0, 0, 0]]
    });
@@ -135,7 +141,7 @@ The agent loops over each term, fetches its results, and composes a comparative 
      const top = posts.length > 0 ? [...posts].sort((a, b) => (b?.points ?? 0) - (a?.points ?? 0))[0] : null;
      rows.push([term, top?.title ?? '—', top?.points ?? 0]);
    }
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Term', 'Top post', 'Points'],
      rows: rows.length ? rows : [['—', '—', 0]]
    });
@@ -169,7 +175,7 @@ for (const t of terms) {
   summary.push({ term: t, count: hits.length, avg: Math.round(hits.reduce((s, x) => s + (x?.points || 0), 0) / Math.max(hits.length, 1)) });
 }
 const rows = summary.map(s => [s.term, s.count, s.avg]);
-await widget('table', {
+await widget('data-table', {
   columns: ['Language', 'Posts', 'Avg score'],
   rows: rows.length ? rows : [['—', 0, 0]]
 });

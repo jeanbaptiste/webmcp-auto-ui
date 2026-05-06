@@ -55,7 +55,7 @@ The user wants a side-by-side comparison:
    for (let i = 0; i < n; i++) {
      rows.push([`Fact ${i + 1}`, fA[i] ?? '—', fB[i] ?? '—']);
    }
-   await widget('table', { columns: ['#', sumA?.title ?? 'A', sumB?.title ?? 'B'], rows });
+   await widget('data-table', { columns: ['#', sumA?.title ?? 'A', sumB?.title ?? 'B'], rows });
    ```
 
 ## Examples
@@ -72,7 +72,7 @@ await widget('text', { content: a?.summary ?? '(no summary)' });
 await widget('text', { content: b?.summary ?? '(no summary)' });
 const fAll = fa?.facts ?? [];
 const fBall = fb?.facts ?? [];
-await widget('table', {
+await widget('data-table', {
   columns: ['#', a?.title ?? 'A', b?.title ?? 'B'],
   rows: fAll.map((f, i) => [i + 1, f, fBall[i] ?? '—'])
 });

@@ -61,7 +61,7 @@ await widget('kv', {
 });
 
 // 5. Files table
-await widget('table', {
+await widget('data-table', {
   columns: ['File name', 'Category', 'Size (MB)', 'Updated'],
   rows: files.slice(0, 50).map(f => [
     f?.file_name ?? '—',
@@ -79,7 +79,7 @@ await widget('table', {
 const r = await call('nasa_osdr_files', { accession_number: '87' }).catch(() => null);
 const files = ((Object.values(r?.studies ?? {})[0])?.study_files ?? r?.files ?? []).filter(f => f);
 await widget('stat-card', { label: 'OSD-87 files', value: files.length });
-await widget('table', { columns: ['Name', 'Size'], rows: files.slice(0, 30).map(f => [f?.file_name ?? '—', f?.file_size ?? '—']) });
+await widget('data-table', { columns: ['Name', 'Size'], rows: files.slice(0, 30).map(f => [f?.file_name ?? '—', f?.file_size ?? '—']) });
 ```
 
 ### Cross-study summary
@@ -87,7 +87,7 @@ await widget('table', { columns: ['Name', 'Size'], rows: files.slice(0, 30).map(
 const ids = ['87', '102', '120'];
 const all = await Promise.all(ids.map(i => call('nasa_osdr_files', { accession_number: i }).catch(() => null)));
 const counts = ids.map((id, i) => ({ id, n: ((Object.values(all[i]?.studies ?? {})[0])?.study_files ?? all[i]?.files ?? []).length }));
-await widget('table', { columns: ['Study', 'Files'], rows: counts.map(c => [`OSD-${c.id}`, c.n]) });
+await widget('data-table', { columns: ['Study', 'Files'], rows: counts.map(c => [`OSD-${c.id}`, c.n]) });
 ```
 
 ## Common mistakes

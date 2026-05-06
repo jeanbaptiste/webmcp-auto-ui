@@ -90,7 +90,7 @@ await widget('chart-rich', {
   series: [{ label: 'Altitude (m)', data: elevations, color: '#27ae60' }]
 });
 
-await widget('table', {
+await widget('data-table', {
   title: 'Meteo aux waypoints',
   columns: ['Point', 'Altitude (m)', 'T (C)', 'Vent (km/h)', 'Direction'],
   rows: waypoints.map((w, i) => {

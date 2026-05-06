@@ -66,7 +66,7 @@ await widget('chart-rich', {
 });
 
 // 5. Sortable table
-await widget('table', {
+await widget('data-table', {
   columns: ['#', 'Period', 'Jacobi C', 'Stability', 'Amplitude'],
   rows: orbits.slice(0, 30).map((o, i) => [i + 1, o?.period ?? '—', o?.jacobi ?? '—', o?.stability ?? '—', o?.amplitude ?? '—'])
 });
@@ -89,7 +89,7 @@ await widget('kv', {
 ```js
 const fam = await call('jpl_periodic_orbits', { sys: 'sun-earth', family: 'lyapunov', libr: 1 }).catch(() => null);
 await widget('text', { title: 'Sun-Earth L1 Lyapunov', body: 'Planar periodic orbits used for solar observatories like SOHO and DSCOVR.' });
-await widget('table', { columns: ['Period', 'Jacobi'], rows: (fam?.data ?? []).slice(0, 20).map(o => [o?.period ?? '—', o?.jacobi ?? '—']) });
+await widget('data-table', { columns: ['Period', 'Jacobi'], rows: (fam?.data ?? []).slice(0, 20).map(o => [o?.period ?? '—', o?.jacobi ?? '—']) });
 ```
 
 ### Distant Retrograde Orbits (Artemis)

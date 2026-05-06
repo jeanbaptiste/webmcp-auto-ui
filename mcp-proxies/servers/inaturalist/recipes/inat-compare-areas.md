@@ -69,7 +69,7 @@ await widget('stat-card', { label: b.display_name ?? 'Area B', value: (topB?.tot
 await widget('stat-card', { label: 'Shared species', value: shared.length, icon: 'shuffle' });
 
 // 7. Shared / exclusive table
-await widget('table', {
+await widget('data-table', {
   columns: ['Species', 'Status'],
   rows: [
     ...shared.slice(0, 10).map(s => [s, 'shared']),
@@ -102,7 +102,7 @@ const [ca, cb] = await Promise.all([
   call('species_counts', { place_id: a.id, taxon_name: 'Orchidaceae' }).catch(() => ({ total_results: 0 })),
   call('species_counts', { place_id: b.id, taxon_name: 'Orchidaceae' }).catch(() => ({ total_results: 0 })),
 ]);
-await widget('table', { columns: ['Place', 'Orchid species'], rows: [[a.display_name ?? 'A', ca?.total_results ?? 0], [b.display_name ?? 'B', cb?.total_results ?? 0]] });
+await widget('data-table', { columns: ['Place', 'Orchid species'], rows: [[a.display_name ?? 'A', ca?.total_results ?? 0], [b.display_name ?? 'B', cb?.total_results ?? 0]] });
 ```
 
 ## Common mistakes

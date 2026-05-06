@@ -68,7 +68,7 @@ await widget('timeline', {
 });
 
 // 5. Table
-await widget('table', {
+await widget('data-table', {
   columns: ['Date', 'Energy (kt)', 'Altitude (km)', 'Velocity (km/s)', 'Lat', 'Lon'],
   rows: rows.slice(0, 25).map(r => [r?.date ?? '—', r?.['impact-e'] ?? '—', r?.alt ?? '—', r?.vel ?? '—', `${r?.lat ?? '—'}${r?.['lat-dir'] ?? ''}`, `${r?.lon ?? '—'}${r?.['lon-dir'] ?? ''}`])
 });
@@ -92,7 +92,7 @@ await widget('map', { center: [0, 0], zoom: 1, markers: markers.length ? markers
 const d = await call('jpl_fireball', { date_min: '2013-01-01', date_max: '2013-12-31' }).catch(() => null);
 const data = d?.data ?? [];
 const rows = data.map(r => [r?.[0] ?? '—', r?.[8] ?? '—', r?.[2] ?? '—']);
-await widget('table', { columns: ['Date', 'kt', 'Alt'], rows: rows.length ? rows : [['2013-02-15', '~440', '23.3']] });
+await widget('data-table', { columns: ['Date', 'kt', 'Alt'], rows: rows.length ? rows : [['2013-02-15', '~440', '23.3']] });
 ```
 
 ## Common mistakes

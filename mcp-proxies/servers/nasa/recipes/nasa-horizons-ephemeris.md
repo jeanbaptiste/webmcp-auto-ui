@@ -66,7 +66,7 @@ await widget('chart', {
 });
 
 // 5. Daily table
-await widget('table', {
+await widget('data-table', {
   columns: ['Date', 'RA', 'Dec', 'V mag', 'Distance (au)'],
   rows: rows.slice(0, 14).map(c => [c?.[0] ?? '—', (c?.[2] ?? '—') + ' ' + (c?.[3] ?? ''), c?.[4] ?? '—', c?.[5] ?? '—', c?.[6] ?? '—'])
 });

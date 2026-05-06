@@ -87,7 +87,7 @@ await widget('chart-rich', {
   series: [{ label: 'Tmoy annuelle (C)', data: annual.map(a => a.mean), color: '#e74c3c' }]
 });
 
-await widget('table', {
+await widget('data-table', {
   title: 'Derive par decennie vs 2025-2034',
   columns: ['Decennie', 'Tmoy (C)', 'Delta (+ C)'],
   rows: decades.map(d => [d.decade, d.tMean, d.delta === '—' ? '—' : `+${d.delta}`])

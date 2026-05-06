@@ -68,6 +68,7 @@
   import './rich/gallery.svelte';
   import './rich/carousel.svelte';
   import './rich/chat-input.svelte';
+  import './rich/map.svelte';
   // Notebook (1)
   import './notebook/notebook.svelte';
   // Agent browsers (registered as widgets for widget_display)
@@ -81,7 +82,7 @@
     // Rich
     'stat-card', 'profile', 'json-viewer', 'chart-rich', 'sankey', 'hemicycle',
     'data-table', 'timeline', 'trombinoscope', 'cards', 'grid-data',
-    'js-sandbox', 'log', 'gallery', 'carousel', 'chat-input',
+    'js-sandbox', 'log', 'gallery', 'carousel', 'chat-input', 'map',
     // Notebook
     'notebook',
     // Agent browsers

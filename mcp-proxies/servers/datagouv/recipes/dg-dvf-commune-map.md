@@ -82,7 +82,7 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
      await widget('stat-card', { label: 'Prix médian', value: `${Math.round(median).toLocaleString('fr-FR')} €`, icon: 'euro' });
      await widget('stat-card', { label: 'Prix moyen', value: `${Math.round(avg).toLocaleString('fr-FR')} €`, icon: 'trending-up' });
 
-     await widget('table', {
+     await widget('data-table', {
        columns: ['Date', 'Type', 'Surface', 'Prix', 'Adresse'],
        rows: [...rows]
          .sort((a, b) => (Number(b.valeur_fonciere) || 0) - (Number(a.valeur_fonciere) || 0))
@@ -132,7 +132,7 @@ const tx2 = dvfCsv2 ? await call('query_resource_data', {
   page_size: 10
 }).catch(() => ({ rows: [] })) : { rows: [] };
 const rows2 = tx2?.rows ?? [];
-await widget('table', { columns: ['Date', 'Type', 'Prix'], rows: rows2.map(r => [r.date_mutation ?? '—', r.type_local ?? '—', r.valeur_fonciere ?? '—']) });
+await widget('data-table', { columns: ['Date', 'Type', 'Prix'], rows: rows2.map(r => [r.date_mutation ?? '—', r.type_local ?? '—', r.valeur_fonciere ?? '—']) });
 ```
 
 ## Common mistakes

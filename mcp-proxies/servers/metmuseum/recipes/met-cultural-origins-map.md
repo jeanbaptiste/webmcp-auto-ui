@@ -73,7 +73,7 @@ layout:
 5. **Gallery + summary table**:
    ```js
    await widget('gallery', { images: works.map(w => ({ src: w.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: w?.culture || w?.country || '—' })) });
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Title', 'Culture', 'Country', 'Medium'],
      rows: works.map(w => [w?.title ?? '(untitled)', w?.culture || '—', w?.country || '—', w?.medium ?? '—'])
    });
@@ -94,7 +94,7 @@ const r = await call('search-museum-objects', { q: 'mask', departmentId: 6, hasI
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
-await widget('table', { columns: ['Title', 'Culture'], rows: works.map(w => [w?.title ?? '(untitled)', w?.culture ?? '—']) });
+await widget('data-table', { columns: ['Title', 'Culture'], rows: works.map(w => [w?.title ?? '(untitled)', w?.culture ?? '—']) });
 ```
 
 ### Pre-Columbian pottery
@@ -103,7 +103,7 @@ const r = await call('search-museum-objects', { q: 'pottery', departmentId: 5, h
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
-await widget('table', { columns: ['Title', 'Region', 'Culture'], rows: works.map(w => [w?.title ?? '(untitled)', w?.region ?? '—', w?.culture ?? '—']) });
+await widget('data-table', { columns: ['Title', 'Region', 'Culture'], rows: works.map(w => [w?.title ?? '(untitled)', w?.region ?? '—', w?.culture ?? '—']) });
 ```
 
 ## Common mistakes

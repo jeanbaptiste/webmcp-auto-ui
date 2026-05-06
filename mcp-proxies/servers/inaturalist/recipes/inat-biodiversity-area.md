@@ -75,7 +75,7 @@ const rows = Object.entries(counts)
   .sort((a, b) => b[1] - a[1])
   .slice(0, 20)
   .map(([name, n]) => [name, n]);
-await widget('table', { columns: ['Species', 'Observations'], rows });
+await widget('data-table', { columns: ['Species', 'Observations'], rows });
 ```
 
 ## Examples

@@ -34,6 +34,14 @@ This recipe combines `get-user` (static profile) with `search-posts` (their cont
    ```js
    const user = await call('get-user', { username: 'pg' }).catch(() => null);
    if (!user || !user.username) return widget('text', { content: 'User not found.' });
+   const createdMs = (user?.created_at_i ?? 0) * 1000;
+   const since = createdMs > 0 ? new Date(createdMs).getFullYear() : '—';
+   await widget('profile', {
+     name: user?.username ?? 'pg',
+     subtitle: `${user?.karma ?? 0} karma · since ${since}`,
+     body: (user?.about ?? '(no bio)').replace(/<[^>]+>/g, ''),
+     url: `https://news.ycombinator.com/user?id=${user?.username ?? 'pg'}`
+   });
    ```
 
 2. **Fetch their recent stories** via the `author_USERNAME` tag (note `query: 'a'`):
@@ -94,7 +102,7 @@ This recipe combines `get-user` (static profile) with `search-posts` (their cont
      p?.num_comments ?? 0,
      p?.created_at?.slice(0, 10) ?? '—'
    ]);
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Title', 'Points', 'Comments', 'Date'],
      rows: rows.length ? rows : [['(no stories)', 0, 0, '—']]
    });
@@ -138,7 +146,7 @@ await widget('profile', {
 });
 await widget('stat-card', { label: 'Karma', value: Math.max(user?.karma ?? 0, 1), icon: 'star' });
 const rows = hits.slice(0, 20).map(p => [p?.title ?? '(untitled)', p?.points ?? 0, p?.created_at?.slice(0, 10) ?? '—']);
-await widget('table', {
+await widget('data-table', {
   columns: ['Title', 'Points', 'Date'],
   rows: rows.length ? rows : [['(no stories)', 0, '—']]
 });
@@ -160,7 +168,7 @@ const res = await call('search-posts', {
 }).catch(() => null);
 const hits = (res?.hits ?? []).filter(p => p);
 const rows = hits.map(c => [c?.story_title ?? '?', c?.points ?? 0, c?.created_at?.slice(0, 10) ?? '—']);
-await widget('table', {
+await widget('data-table', {
   columns: ['Comment on', 'Points', 'Date'],
   rows: rows.length ? rows : [['(no comments)', 0, '—']]
 });

@@ -65,7 +65,7 @@ await widget('cards', {
     description: (t.wikipedia_summary ?? '').slice(0, 200),
   })),
 });
-await widget('table', {
+await widget('data-table', {
   columns: ['Species', 'Family', 'Conservation', 'Global obs.'],
   rows: detailed.map(t => [
     t.preferred_common_name ?? t.name ?? '—',
@@ -100,7 +100,7 @@ const place = (await call('search_places', { q: 'Pyrenees', per_page: 1 }))?.res
 const orchid = (await call('search_taxa', { q: 'Orchidaceae', rank: 'family', per_page: 1 }))?.results?.[0];
 if (!place || !orchid) { await widget('text', { content: 'Place or clade not found.' }); return; }
 const gap = await call('unobserved_taxa', { taxon_id: orchid.id, place_id: place.id, per_page: 10 }).catch(() => ({ results: [] }));
-await widget('table', { columns: ['Species', 'Common name'], rows: (gap?.results ?? []).map(t => [t.name ?? '—', t.preferred_common_name ?? '—']) });
+await widget('data-table', { columns: ['Species', 'Common name'], rows: (gap?.results ?? []).map(t => [t.name ?? '—', t.preferred_common_name ?? '—']) });
 ```
 
 ## Common mistakes

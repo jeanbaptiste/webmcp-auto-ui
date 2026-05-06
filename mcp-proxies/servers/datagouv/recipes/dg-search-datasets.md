@@ -46,7 +46,7 @@ The user wants to explore the French open data catalog by theme:
      }))
    });
 
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Titre', 'Organisation', 'Tags', 'Fichiers'],
      rows: datasets.map(d => [d.title ?? '—', d.organization?.name ?? '—', (d.tags ?? []).slice(0, 3).join(', ') || '—', d.resources ?? 0])
    });
@@ -74,7 +74,7 @@ await widget('stat-card', { label: 'Datasets', value: res?.total ?? 0 });
 const res = await call('search_datasets', { query: 'pauvreté INSEE', page_size: 20 }).catch(() => ({ datasets: [] }));
 const datasets = res?.datasets ?? [];
 await widget('cards', { items: datasets.slice(0, 8).map(d => ({ title: d.title ?? '—', subtitle: d.organization?.name ?? '', description: d.description ?? '' })) });
-await widget('table', { columns: ['Titre', 'Format', 'MAJ'], rows: datasets.map(d => [d.title ?? '—', d.main_format ?? '—', d.last_modified ?? '—']) });
+await widget('data-table', { columns: ['Titre', 'Format', 'MAJ'], rows: datasets.map(d => [d.title ?? '—', d.main_format ?? '—', d.last_modified ?? '—']) });
 ```
 
 ### Renewable energy datasets, sorted by recency

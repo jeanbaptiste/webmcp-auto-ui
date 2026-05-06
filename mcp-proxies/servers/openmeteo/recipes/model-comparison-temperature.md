@@ -81,7 +81,7 @@ await widget('chart-rich', {
   series: models.map(m => ({ label: m.name, data: m.data.daily.temperature_2m_max ?? [], color: m.color }))
 });
 
-await widget('table', {
+await widget('data-table', {
   title: 'Ecart max entre modeles (C)',
   columns: ['Date', 'Spread Tmax', 'Min', 'Max'],
   rows: days.map((t, i) => {

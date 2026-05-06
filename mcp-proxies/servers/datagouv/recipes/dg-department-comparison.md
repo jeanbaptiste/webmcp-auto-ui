@@ -62,7 +62,7 @@ These questions all share the same shape: one indicator, 101 departments, rankin
      features: rows
    });
 
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Rang', 'Département', 'Code', 'Valeur'],
      rows: rows.slice(0, 10).map((r, i) => [i + 1, r.nom_departement ?? '—', r.code_departement ?? '—', r.taux_pauvrete ?? '—'])
    });
@@ -94,7 +94,7 @@ const rows = (data?.rows ?? [])
   .filter(r => r[col] != null && r[col] !== '')
   .sort((a, b) => Number(b[col]) - Number(a[col]))
   .slice(0, 10);
-await widget('table', { columns: ['Département', 'Code', 'Taux %'], rows: rows.map(r => [r.nom_departement ?? '—', r.code_departement ?? '—', r[col] ?? '—']) });
+await widget('data-table', { columns: ['Département', 'Code', 'Taux %'], rows: rows.map(r => [r.nom_departement ?? '—', r.code_departement ?? '—', r[col] ?? '—']) });
 ```
 
 ### Top 10 departments for renewable energy share

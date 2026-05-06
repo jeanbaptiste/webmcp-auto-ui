@@ -91,7 +91,7 @@ await widget('stat-card', {
   ]
 });
 
-await widget('table', {
+await widget('data-table', {
   columns: ['Ville', 'T (C)', 'Vent (km/h)', 'Pluie 24h (mm)'],
   rows: data.map(d => [d.name, d.temp, d.wind ?? '—', Number.isFinite(d.rain) ? d.rain.toFixed(1) : '—'])
 });

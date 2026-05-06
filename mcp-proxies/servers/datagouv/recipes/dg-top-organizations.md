@@ -53,7 +53,7 @@ This recipe gives an editorial view of the catalog — it valorises producers an
 3. **Render leaderboard, profile and latest cards**:
    ```js
    const top = ranking[0] ?? { name: '—', count: 0, latest: [] };
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Rang', 'Organisation', 'Datasets'],
      rows: ranking.slice(0, 10).map((o, i) => [i + 1, o.name ?? '—', o.count ?? 0])
    });
@@ -85,7 +85,7 @@ for (const d of (res?.datasets ?? [])) {
   }
 }
 const ranking2 = Object.values(acc2).sort((x, y) => y.count - x.count);
-await widget('table', { columns: ['Organisation', 'Datasets'], rows: ranking2.length ? ranking2.slice(0, 10).map(o => [o.name ?? '—', o.count ?? 0]) : [['—', 0]] });
+await widget('data-table', { columns: ['Organisation', 'Datasets'], rows: ranking2.length ? ranking2.slice(0, 10).map(o => [o.name ?? '—', o.count ?? 0]) : [['—', 0]] });
 ```
 
 ### Profile INSEE

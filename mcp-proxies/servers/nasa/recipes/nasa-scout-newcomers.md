@@ -49,7 +49,7 @@ await widget('cards', {
 // 4. Detail call for the most observed candidate (ephemerides)
 const detail = newest?.tdes ? await call('jpl_scout', { tdes: newest.tdes, file: 'summary' }).catch(() => null) : null;
 
-await widget('table', {
+await widget('data-table', {
   columns: ['UT date', 'RA', 'Dec', 'V mag', 'Rate'],
   rows: (detail?.eph ?? []).slice(0, 10).map(e => [e?.utc ?? '—', e?.ra ?? '—', e?.dec ?? '—', e?.vmag ?? '—', e?.rate ?? '—'])
 });
@@ -80,7 +80,7 @@ await widget('cards', { items: items.length ? items : [{ title: 'Scout candidate
 const det = await call('jpl_scout', { tdes: 'P21Eolo', file: 'all' }).catch(() => null);
 const eph = (det?.eph ?? []).filter(e => e);
 const rows = eph.slice(0, 12).map(e => [e?.utc ?? '—', e?.ra ?? '—', e?.dec ?? '—', e?.vmag ?? '—']);
-await widget('table', { columns: ['UT', 'RA', 'Dec', 'V'], rows: rows.length ? rows : [['—', '—', '—', '—']] });
+await widget('data-table', { columns: ['UT', 'RA', 'Dec', 'V'], rows: rows.length ? rows : [['—', '—', '—', '—']] });
 await widget('kv', { items: [{ label: 'Object', value: 'P21Eolo' }, { label: 'Observations', value: det?.nobs ?? '—' }] });
 ```
 

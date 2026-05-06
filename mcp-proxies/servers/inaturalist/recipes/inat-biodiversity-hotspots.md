@@ -84,7 +84,7 @@ await widget('map', {
       };
     }),
 });
-await widget('table', {
+await widget('data-table', {
   columns: ['Rank', 'Place', 'Species'],
   rows: top5.map((r, i) => [i + 1, r.place.display_name ?? '—', r.richness ?? 0]),
 });
@@ -110,7 +110,7 @@ if (!region) { await widget('text', { content: 'Region not found.' }); return; }
 const candidates = await call('nearby_places', { nelat: region.bounding_box_geojson?.coordinates?.[0]?.[2]?.[1], nelng: region.bounding_box_geojson?.coordinates?.[0]?.[2]?.[0], swlat: region.bounding_box_geojson?.coordinates?.[0]?.[0]?.[1], swlng: region.bounding_box_geojson?.coordinates?.[0]?.[0]?.[0], per_page: 10 }).catch(() => ({ results: [] }));
 const ranked = await Promise.all((candidates?.results ?? []).map(async p => { const counts = await call('species_counts', { place_id: p.id, taxon_name: 'Accipitriformes', per_page: 1 }).catch(() => ({ total_results: 0 })); return { place: p, richness: counts?.total_results ?? 0 }; }));
 ranked.sort((a, b) => b.richness - a.richness);
-await widget('table', { columns: ['Place', 'Species'], rows: ranked.slice(0, 8).map((r, i) => [r.place?.display_name ?? '—', r.richness ?? 0]) });
+await widget('data-table', { columns: ['Place', 'Species'], rows: ranked.slice(0, 8).map((r, i) => [r.place?.display_name ?? '—', r.richness ?? 0]) });
 ```
 
 ### Orchid spots in Provence
@@ -118,7 +118,7 @@ await widget('table', { columns: ['Place', 'Species'], rows: ranked.slice(0, 8).
 const region = (await call('search_places', { q: 'Provence', per_page: 1 }))?.results?.[0];
 if (!region) { await widget('text', { content: 'Region not found.' }); return; }
 const counts = await call('species_counts', { place_id: region.id, taxon_name: 'Orchidaceae', per_page: 10 }).catch(() => ({ results: [] }));
-await widget('table', { columns: ['Species', 'Observations'], rows: (counts?.results ?? []).map(r => [r.taxon?.name ?? '—', r.count ?? 0]) });
+await widget('data-table', { columns: ['Species', 'Observations'], rows: (counts?.results ?? []).map(r => [r.taxon?.name ?? '—', r.count ?? 0]) });
 ```
 
 ## Common mistakes

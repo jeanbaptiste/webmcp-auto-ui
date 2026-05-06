@@ -57,7 +57,7 @@ await widget('stat-card', { label: 'Total species', value: total, icon: 'leaf' }
 await widget('stat-card', { label: 'Dominant group', value: dominant?.taxon?.preferred_common_name ?? dominant?.taxon?.name ?? '—', icon: 'star' });
 
 // 7. Top species table
-await widget('table', {
+await widget('data-table', {
   columns: ['Species', 'Common name', 'Observations'],
   rows: (top?.results ?? []).map(r => [r.taxon?.name ?? '—', r.taxon?.preferred_common_name ?? '—', r.count ?? 0]),
 });
@@ -88,7 +88,7 @@ await widget('chart-rich', { type: 'pie', labels: (b?.results ?? []).map(r => r.
 const place = (await call('search_places', { q: 'Camargue', per_page: 1 }))?.results?.[0];
 if (!place) { await widget('text', { content: 'Place not found.' }); return; }
 const b = await call('iconic_taxa_counts', { place_id: place.id, quality_grade: 'research' }).catch(() => ({ results: [] }));
-await widget('table', { columns: ['Group', 'Species'], rows: (b?.results ?? []).map(r => [r.taxon?.preferred_common_name ?? r.taxon?.name ?? 'Unknown', r.count ?? 0]) });
+await widget('data-table', { columns: ['Group', 'Species'], rows: (b?.results ?? []).map(r => [r.taxon?.preferred_common_name ?? r.taxon?.name ?? 'Unknown', r.count ?? 0]) });
 ```
 
 ## Common mistakes

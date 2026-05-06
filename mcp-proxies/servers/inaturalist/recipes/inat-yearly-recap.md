@@ -72,7 +72,7 @@ const galleryImages = (best?.results ?? [])
 await widget('gallery', { images: galleryImages });
 
 // 10. Contributor leaderboard
-await widget('table', {
+await widget('data-table', {
   columns: ['Rank', 'User', 'Species', 'Observations'],
   rows: (board?.results ?? []).map((r, i) => [i + 1, r.user?.login ?? '—', r.species_count ?? 0, r.observation_count ?? 0]),
 });
@@ -94,7 +94,7 @@ await widget('chart-rich', { type: 'bar', labels: Object.keys(m), data: Object.v
 const place = (await call('search_places', { q: 'Cévennes', per_page: 1 }))?.results?.[0];
 if (!place) { await widget('text', { content: 'Place not found.' }); return; }
 const board = await call('observers_leaderboard', { place_id: place.id, d1: '2025-01-01', d2: '2025-12-31', per_page: 10 }).catch(() => ({ results: [] }));
-await widget('table', { columns: ['User', 'Species', 'Obs'], rows: (board?.results ?? []).map(r => [r.user?.login ?? '—', r.species_count ?? 0, r.observation_count ?? 0]) });
+await widget('data-table', { columns: ['User', 'Species', 'Obs'], rows: (board?.results ?? []).map(r => [r.user?.login ?? '—', r.species_count ?? 0, r.observation_count ?? 0]) });
 ```
 
 ## Common mistakes

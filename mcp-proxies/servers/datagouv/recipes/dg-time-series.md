@@ -90,7 +90,7 @@ INSEE and SDES publish many long series on data.gouv.fr — this recipe wraps th
    await widget('stat-card', { label: 'Variation', value: change === 'n/a' ? '—' : `${change} %`, icon: 'trending-up' });
 
    const tableRows = rows.length > 0 ? rows.slice(-10).reverse().map(r => [r[yearCol] ?? '—', r[valueCol] ?? '—']) : [];
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Année', valueCol],
      rows: tableRows
    });
@@ -118,7 +118,7 @@ const last = rows.at(-1);
 const first = rows.at(0);
 const pct = (first && last && Number(first['Effectifs']) !== 0) ? (((Number(last['Effectifs']) - Number(first['Effectifs'])) / Number(first['Effectifs'])) * 100).toFixed(1) : null;
 await widget('stat-card', { label: `${first?.['Année'] ?? '—'} → ${last?.['Année'] ?? '—'}`, value: pct != null ? `${pct} %` : '—', icon: 'trending-up' });
-await widget('table', { columns: ['Année', 'Effectifs'], rows: rows.slice(-10).reverse().map(r => [r['Année'] ?? '—', r['Effectifs'] ?? '—']) });
+await widget('data-table', { columns: ['Année', 'Effectifs'], rows: rows.slice(-10).reverse().map(r => [r['Année'] ?? '—', r['Effectifs'] ?? '—']) });
 ```
 
 ## Common mistakes

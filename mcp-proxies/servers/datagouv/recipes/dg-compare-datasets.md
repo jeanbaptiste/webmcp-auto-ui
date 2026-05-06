@@ -80,7 +80,7 @@ Open data has a lot of overlap — this recipe helps the user pick.
    const tagsA = new Set(A.tags ?? []);
    const tagsB = new Set(B.tags ?? []);
    const allTags = [...new Set([...tagsA, ...tagsB])];
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Tag', 'Dataset A', 'Dataset B'],
      rows: allTags.length ? allTags.map(t => [t, tagsA.has(t) ? '✓' : '—', tagsB.has(t) ? '✓' : '—']) : [['—', '—', '—']]
    });

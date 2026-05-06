@@ -58,7 +58,7 @@ await widget('chart', {
 });
 
 // 4. Sortable table
-await widget('table', {
+await widget('data-table', {
   columns: ['Planet', 'Host', 'Radius (R⊕)', 'Teq (K)', 'Distance (pc)', 'Method', 'Year'],
   rows: planets.map(p => [p?.pl_name ?? '—', p?.hostname ?? '—', p?.pl_rade ?? '—', p?.pl_eqt ?? '—', p?.sy_dist ?? '—', p?.discoverymethod ?? '—', p?.disc_year ?? '—'])
 });
@@ -101,7 +101,7 @@ const res = await call('nasa_exoplanet', {
 }).catch(() => null);
 const list = (Array.isArray(res) ? res : (res?.data ?? [])).filter(p => p);
 const rows = list.map(p => [p?.pl_name ?? '—', p?.sy_dist ?? '—', p?.pl_rade ?? '—']);
-await widget('table', { columns: ['Planet', 'd (pc)', 'R (R⊕)'], rows: rows.length ? rows : [['Super-Earth (preview)', '—', '—']] });
+await widget('data-table', { columns: ['Planet', 'd (pc)', 'R (R⊕)'], rows: rows.length ? rows : [['Super-Earth (preview)', '—', '—']] });
 ```
 
 ## Common mistakes

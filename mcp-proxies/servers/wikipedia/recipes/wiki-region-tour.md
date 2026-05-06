@@ -62,7 +62,7 @@ The user wants a mini guide of an area, encyclopedia-style:
    await widget('cards', {
      items: places.map(p => ({ title: p.title, body: (p.summary || '').slice(0, 160) }))
    });
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Place', 'Lat', 'Lon'],
      rows: places.map(p => [p.title, p.lat.toFixed(3), p.lon.toFixed(3)])
    });

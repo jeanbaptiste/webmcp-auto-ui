@@ -32,6 +32,11 @@ The `get-item` tool returns the full nested comment tree — perfect for in-dept
    ```js
    const item = await call('get-item', { itemId: '38309611' });
    if (!item || item.deleted || item.dead) return widget('text', { content: 'Item unavailable (deleted, dead, or not found).' });
+   await widget('text', {
+     title: item?.title ?? '(untitled)',
+     body: item?.text || (item?.url ? `Link: ${item.url}` : '(no body)'),
+     html: !!item?.text
+   });
    ```
 
 2. **Flatten the comment tree** with depth tracking:

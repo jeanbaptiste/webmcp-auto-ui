@@ -33,6 +33,15 @@ This complements `hn-front-page-overview` (editorial) with a strict reverse-chro
    const res = await call('get-latest-posts', { hitsPerPage: 50 });
    const posts = (res?.hits ?? []).filter(p => p);
    if (posts.length === 0) return widget('text', { content: 'No recent activity (API rate-limited?).' });
+   const events = posts.slice(0, 15).map(p => ({
+     date: p?.created_at ?? new Date().toISOString(),
+     title: p?.title || p?.story_title || '(comment)',
+     description: `by ${p?.author ?? '—'} · ${p?.points ?? 0} pts`,
+     url: p?.url || `https://news.ycombinator.com/item?id=${p?.objectID ?? ''}`
+   }));
+   await widget('timeline', {
+     events: events.length ? events : [{ date: new Date().toISOString(), title: 'No recent items', description: '—' }]
+   });
    ```
 
 2. **Breakdown by content type**:
@@ -88,7 +97,7 @@ This complements `hn-front-page-overview` (editorial) with a strict reverse-chro
      } catch {}
      return [time, tag, p?.title || p?.story_title || '(comment)', p?.author ?? '—'];
    });
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Time', 'Type', 'Title', 'Author'],
      rows: rows.length ? rows : [['—', '?', '(no data)', '—']]
    });
@@ -125,7 +134,7 @@ await widget('timeline', {
   events: events.length ? events : [{ date: new Date().toISOString(), title: 'No stories', description: '—' }]
 });
 const rows = hits.map(p => [p?.title ?? '(untitled)', p?.author ?? '—', p?.created_at?.slice(0, 19).replace('T', ' ') ?? '—']);
-await widget('table', {
+await widget('data-table', {
   columns: ['Title', 'Author', 'Posted'],
   rows: rows.length ? rows : [['(no data)', '—', '—']]
 });

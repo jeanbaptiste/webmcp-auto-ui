@@ -57,7 +57,7 @@ This recipe condenses metadata + files + popularity into a single view so the us
    await widget('stat-card', { label: 'Licence', value: I.license ?? '—', icon: 'shield' });
 
    const fileRows = (resList?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—', r.type ?? '—']);
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Titre', 'Format', 'Taille', 'Type'],
      rows: fileRows.length ? fileRows : [['—', '—', '—', '—']]
    });
@@ -86,7 +86,7 @@ const dvfRes = _dvf[1] ?? { resources: [] };
 const dvfMetrics = _dvf[2] ?? { metrics: [] };
 await widget('text', { title: dvfInfo.title ?? '—', content: dvfInfo.description ?? '' });
 await widget('stat-card', { label: 'Téléchargements 30j', value: dvfMetrics?.metrics?.[0]?.monthly_download ?? 1 });
-await widget('table', { columns: ['Titre', 'Format', 'Taille'], rows: (dvfRes?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—']) });
+await widget('data-table', { columns: ['Titre', 'Format', 'Taille'], rows: (dvfRes?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—']) });
 ```
 
 ### RNA — Répertoire national des associations
@@ -95,7 +95,7 @@ const rna_id = '58e53811c751df03df38f42d';
 const rnaInfo = await call('get_dataset_info', { dataset_id: rna_id }).catch(() => null) ?? {};
 const rnaRes = await call('list_dataset_resources', { dataset_id: rna_id }).catch(() => ({ resources: [] }));
 await widget('text', { title: rnaInfo.title ?? '—', subtitle: rnaInfo.organization?.name ?? '', content: rnaInfo.description ?? '' });
-await widget('table', { columns: ['Fichier', 'Format', 'Type'], rows: (rnaRes?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.type ?? '—']) });
+await widget('data-table', { columns: ['Fichier', 'Format', 'Type'], rows: (rnaRes?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.type ?? '—']) });
 ```
 
 ## Common mistakes

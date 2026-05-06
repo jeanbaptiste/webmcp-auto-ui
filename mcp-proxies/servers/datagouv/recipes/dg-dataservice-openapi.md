@@ -49,7 +49,7 @@ This recipe is the "dev landing page" for a public API.
    });
 
    const endpoints = spec?.endpoints ?? [];
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Méthode', 'Path', 'Description', 'Params'],
      rows: endpoints.map(e => [e.method ?? '—', e.path ?? '—', e.summary ?? '—', (e.parameters ?? []).length])
    });
@@ -80,7 +80,7 @@ const _ex = await Promise.all([
 const sirInfo = _ex[0] ?? {};
 const sirSpec = _ex[1] ?? {};
 await widget('text', { title: sirInfo.title ?? '—', content: sirInfo.description ?? '' });
-await widget('table', { columns: ['Méthode', 'Path', 'Description'], rows: (sirSpec?.endpoints ?? []).map(e => [e.method ?? '—', e.path ?? '—', e.summary ?? '—']) });
+await widget('data-table', { columns: ['Méthode', 'Path', 'Description'], rows: (sirSpec?.endpoints ?? []).map(e => [e.method ?? '—', e.path ?? '—', e.summary ?? '—']) });
 await widget('code', { language: 'bash', code: `curl '${sirInfo.base_api_url ?? ''}/siret/12345678900012' -H 'Authorization: Bearer YOUR_TOKEN'` });
 ```
 
@@ -94,7 +94,7 @@ const _adr = adr_id ? await Promise.all([
 ]) : [null, null];
 const adrInfo = _adr[0] ?? {};
 const adrSpec = _adr[1] ?? {};
-await widget('table', { columns: ['Méthode', 'Path'], rows: (adrSpec?.endpoints ?? []).map(e => [e.method ?? '—', e.path ?? '—']) });
+await widget('data-table', { columns: ['Méthode', 'Path'], rows: (adrSpec?.endpoints ?? []).map(e => [e.method ?? '—', e.path ?? '—']) });
 await widget('code', { language: 'bash', code: `curl '${adrInfo.base_api_url ?? ''}/search/?q=8+rue+de+la+paix+Paris'` });
 ```
 

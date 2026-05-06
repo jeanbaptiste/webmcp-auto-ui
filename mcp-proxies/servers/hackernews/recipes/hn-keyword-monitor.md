@@ -37,6 +37,12 @@ The `search-posts` tool supports keyword + tags + numeric filters, perfect for f
    });
    const posts = (res?.hits ?? []).filter(p => p);
    if (posts.length === 0) return widget('text', { content: 'No posts match your query.' });
+   const items = [...posts].sort((a, b) => (b?.points ?? 0) - (a?.points ?? 0)).slice(0, 5).map(p => ({
+     title: p?.title || p?.story_title || '(comment)',
+     subtitle: `${p?.points ?? 0} pts · ${p?.num_comments ?? 0} comments · by ${p?.author ?? '—'}`,
+     url: p?.url || `https://news.ycombinator.com/item?id=${p?.objectID ?? ''}`
+   }));
+   await widget('cards', { items: items.length ? items : [{ title: 'No matches', subtitle: '—' }] });
    ```
 
 2. **Compute KPIs**:
@@ -118,7 +124,7 @@ The `search-posts` tool supports keyword + tags + numeric filters, perfect for f
      p?.author ?? '—',
      p?.created_at?.slice(0, 10) ?? '—'
    ]);
-   await widget('table', {
+   await widget('data-table', {
      columns: ['Title', 'Points', 'Comments', 'Author', 'Date'],
      rows: rows.length ? rows : [['(no data)', 0, 0, '—', '—']]
    });
@@ -150,7 +156,7 @@ const res = await call('search-posts', {
 });
 const hits = (res?.hits ?? []).filter(p => p);
 const rows = hits.map(p => [p?.title ?? '(untitled)', p?.points ?? 0, p?.num_comments ?? 0, p?.author ?? '—']);
-await widget('table', {
+await widget('data-table', {
   columns: ['Project', 'Points', 'Comments', 'Author'],
   rows: rows.length ? rows : [['(no data)', 0, 0, '—']]
 });

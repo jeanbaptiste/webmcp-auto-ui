@@ -69,7 +69,7 @@ await widget('chart', {
 });
 
 // 6. Sortable table
-await widget('table', {
+await widget('data-table', {
   columns: ['Designation', 'Min Δv (km/s)', 'Min duration (d)', 'H', 'OCC'],
   rows: targets.map(t => [t?.des ?? '—', t?.min_dv?.dv ?? '—', t?.min_dur?.dur ?? '—', t?.h ?? '—', t?.occ ?? '—'])
 });
@@ -98,7 +98,7 @@ await widget('cards', { items: targets.slice(0, 3).map(t => ({ title: t?.des ?? 
 ```js
 const data = await call('jpl_nhats', { dv: 4, dur: 180 }).catch(() => null);
 const targets = (data?.data ?? []).filter(t => t);
-await widget('table', { columns: ['Des', 'Δv', 'Days'], rows: targets.map(t => [t?.des ?? '—', t?.min_dv?.dv ?? '—', t?.min_dur?.dur ?? '—']) });
+await widget('data-table', { columns: ['Des', 'Δv', 'Days'], rows: targets.map(t => [t?.des ?? '—', t?.min_dv?.dv ?? '—', t?.min_dur?.dur ?? '—']) });
 ```
 
 ## Common mistakes
