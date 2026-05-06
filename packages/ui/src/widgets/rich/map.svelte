@@ -10,21 +10,109 @@
     color?: string;
   }
 
+  export interface TileLayer {
+    name?: string;
+    url: string;
+    opacity?: number;
+  }
+
   interface Props {
     markers?: MapMarker[];
     geojson?: GeoJSON.FeatureCollection | GeoJSON.Feature | null;
-    center?: [number, number];
+    center?: [number, number] | { lat: number; lon?: number; lng?: number };
     zoom?: number;
     height?: string;
+    cluster?: boolean;
+    tileLayers?: TileLayer[];
+    // Tolerated unknown props (logged + ignored)
+    title?: unknown;
+    popup?: unknown;
+    radius?: unknown;
+    color_field?: unknown;
+    color_scale?: unknown;
   }
 
   let {
-    markers = [],
-    geojson = null,
-    center,
-    zoom,
-    height = '400px',
+    markers: rawMarkers = [],
+    geojson: rawGeojson = null,
+    center: rawCenter,
+    zoom: rawZoom,
+    height: rawHeight = '400px',
+    cluster: rawCluster = false,
+    tileLayers: rawTileLayers = [],
+    title: _title,
+    popup: _popup,
+    radius: _radius,
+    color_field: _color_field,
+    color_scale: _color_scale,
   }: Props = $props();
+
+  const IGNORED_AT_INIT: Array<[string, unknown]> = [
+    ['title', _title],
+    ['popup', _popup],
+    ['radius', _radius],
+    ['color_field', _color_field],
+    ['color_scale', _color_scale],
+  ];
+  for (const [key, val] of IGNORED_AT_INIT) {
+    if (val !== undefined) {
+      // eslint-disable-next-line no-console
+      console.warn('[auto-map] unknown prop ignored:', key);
+    }
+  }
+
+  function normalizeMarker(raw: unknown): MapMarker | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const o = raw as Record<string, unknown>;
+    const lat = o.lat;
+    const lon = o.lon ?? o.lng;
+    if (typeof lat !== 'number' || !Number.isFinite(lat)) return null;
+    if (typeof lon !== 'number' || !Number.isFinite(lon)) return null;
+    const label = (typeof o.label === 'string' ? o.label : undefined) ??
+                  (typeof o.popup === 'string' ? o.popup : undefined);
+    const color = typeof o.color === 'string' ? o.color : undefined;
+    return { lat, lon, label, color };
+  }
+
+  function normalizeCenter(raw: unknown): [number, number] | undefined {
+    if (raw == null) return undefined;
+    if (Array.isArray(raw) && raw.length >= 2 &&
+        typeof raw[0] === 'number' && Number.isFinite(raw[0]) &&
+        typeof raw[1] === 'number' && Number.isFinite(raw[1])) {
+      return [raw[0], raw[1]];
+    }
+    if (typeof raw === 'object') {
+      const o = raw as Record<string, unknown>;
+      const lat = o.lat;
+      const lon = o.lon ?? o.lng;
+      if (typeof lat === 'number' && typeof lon === 'number' &&
+          Number.isFinite(lat) && Number.isFinite(lon)) {
+        return [lon, lat];
+      }
+    }
+    return undefined;
+  }
+
+  const markers: MapMarker[] = Array.isArray(rawMarkers)
+    ? (rawMarkers as unknown[]).map(normalizeMarker).filter((m): m is MapMarker => m !== null)
+    : [];
+  const geojson = rawGeojson ?? null;
+  const center = normalizeCenter(rawCenter);
+  const zoom = rawZoom;
+  const height = rawHeight;
+  const cluster = rawCluster === true;
+  const tileLayers: TileLayer[] = Array.isArray(rawTileLayers)
+    ? (rawTileLayers as unknown[]).flatMap((t) => {
+        if (!t || typeof t !== 'object') return [];
+        const o = t as Record<string, unknown>;
+        if (typeof o.url !== 'string') return [];
+        return [{
+          url: o.url,
+          name: typeof o.name === 'string' ? o.name : undefined,
+          opacity: typeof o.opacity === 'number' ? o.opacity : undefined,
+        }];
+      })
+    : [];
 
   /** Light, free MapLibre style (Carto Positron, no API key). */
   const STYLE_URL = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
@@ -38,23 +126,8 @@
     return typeof v === 'number' && Number.isFinite(v);
   }
 
-  function sanitizeMarkers(raw: unknown): MapMarker[] {
-    if (!Array.isArray(raw)) return [];
-    return raw.flatMap((m) => {
-      if (!m || typeof m !== 'object') return [];
-      const o = m as Record<string, unknown>;
-      if (!isFiniteNum(o.lat) || !isFiniteNum(o.lon)) return [];
-      return [{
-        lat: o.lat as number,
-        lon: o.lon as number,
-        label: typeof o.label === 'string' ? o.label : undefined,
-        color: typeof o.color === 'string' ? o.color : undefined,
-      }];
-    });
-  }
-
-  const safeMarkers = $derived(sanitizeMarkers(markers));
-  const hasData = $derived(safeMarkers.length > 0 || !!geojson);
+  const safeMarkers = markers;
+  const hasData = safeMarkers.length > 0 || !!geojson || tileLayers.length > 0;
 
   function buildPointsCollection(ms: MapMarker[]): GeoJSON.FeatureCollection {
     return {
@@ -139,15 +212,117 @@
     map.on('load', () => {
       if (destroyed) return;
 
-      // Markers — native MapLibre markers (one per point)
-      for (const m of safeMarkers) {
-        const marker = new maplibregl.Marker({ color: m.color ?? '#3b82f6' })
-          .setLngLat([m.lon, m.lat]);
-        if (m.label) {
-          marker.setPopup(new maplibregl.Popup({ offset: 16 }).setText(m.label));
+      // Raster tile overlays (e.g. NASA GIBS)
+      for (let i = 0; i < tileLayers.length; i++) {
+        const tl = tileLayers[i];
+        const sourceId = `auto-map-tile-src-${i}`;
+        const layerId = `auto-map-tile-layer-${i}`;
+        try {
+          map.addSource(sourceId, {
+            type: 'raster',
+            tiles: [tl.url],
+            tileSize: 256,
+          });
+          map.addLayer({
+            id: layerId,
+            type: 'raster',
+            source: sourceId,
+            paint: { 'raster-opacity': typeof tl.opacity === 'number' ? tl.opacity : 1 },
+          });
+        } catch {
+          // ignore — invalid tile url should not crash the widget
         }
-        marker.addTo(map);
-        mountedMarkers.push(marker);
+      }
+
+      if (cluster && safeMarkers.length > 0) {
+        // Clustered markers via maplibre native cluster API
+        try {
+          map.addSource('auto-map-cluster-src', {
+            type: 'geojson',
+            data: buildPointsCollection(safeMarkers) as any,
+            cluster: true,
+            clusterRadius: 50,
+            clusterMaxZoom: 14,
+          });
+          map.addLayer({
+            id: 'auto-map-clusters',
+            type: 'circle',
+            source: 'auto-map-cluster-src',
+            filter: ['has', 'point_count'],
+            paint: {
+              'circle-color': [
+                'step', ['get', 'point_count'],
+                '#93c5fd', 10, '#60a5fa', 50, '#3b82f6',
+              ],
+              'circle-radius': [
+                'step', ['get', 'point_count'],
+                15, 10, 20, 50, 25,
+              ],
+              'circle-stroke-color': '#ffffff',
+              'circle-stroke-width': 2,
+            },
+          });
+          map.addLayer({
+            id: 'auto-map-cluster-count',
+            type: 'symbol',
+            source: 'auto-map-cluster-src',
+            filter: ['has', 'point_count'],
+            layout: {
+              'text-field': ['get', 'point_count_abbreviated'],
+              'text-size': 12,
+            },
+            paint: { 'text-color': '#ffffff' },
+          });
+          map.addLayer({
+            id: 'auto-map-cluster-points',
+            type: 'circle',
+            source: 'auto-map-cluster-src',
+            filter: ['!', ['has', 'point_count']],
+            paint: {
+              'circle-color': '#3b82f6',
+              'circle-radius': 6,
+              'circle-stroke-color': '#ffffff',
+              'circle-stroke-width': 1.5,
+            },
+          });
+          // Click on cluster → zoom in
+          map.on('click', 'auto-map-clusters', (e: any) => {
+            const features = map.queryRenderedFeatures(e.point, { layers: ['auto-map-clusters'] });
+            const clusterId = features[0]?.properties?.cluster_id;
+            const src = map.getSource('auto-map-cluster-src') as any;
+            if (clusterId != null && src?.getClusterExpansionZoom) {
+              src.getClusterExpansionZoom(clusterId, (err: any, zoomLevel: number) => {
+                if (err) return;
+                map.easeTo({ center: features[0].geometry.coordinates, zoom: zoomLevel });
+              });
+            }
+          });
+          // Click on individual point → popup
+          map.on('click', 'auto-map-cluster-points', (e: any) => {
+            const f = e.features?.[0];
+            if (!f) return;
+            const label = f.properties?.label;
+            if (label) {
+              new maplibregl.Popup({ offset: 12 })
+                .setLngLat(f.geometry.coordinates)
+                .setText(label)
+                .addTo(map);
+            }
+          });
+        } catch {
+          // ignore
+        }
+      } else {
+        // Markers — native MapLibre markers (one per point)
+        for (const m of safeMarkers) {
+          const marker = new maplibregl.Marker({ color: m.color ?? '#3b82f6' })
+            .setLngLat([m.lon, m.lat]);
+          if (m.label) {
+            marker.setPopup(new maplibregl.Popup({ offset: 16 }).setText(m.label));
+          }
+          marker.addTo(map);
+          mountedMarkers.push(marker);
+        }
       }
 
       // GeoJSON layer (lines, polygons, extra points)

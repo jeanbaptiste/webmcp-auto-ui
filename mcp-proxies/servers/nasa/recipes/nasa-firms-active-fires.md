@@ -46,7 +46,7 @@ await widget('stat-card', { label: 'Days', value: 7, icon: 'calendar' });
 
 // 3. Map with markers (size = FRP if available)
 await widget('map', {
-  center: [-3.4, -62.2],
+  center: [-62.2, -3.4],
   zoom: 6,
   markers: fires.filter(f => Number.isFinite(+f?.latitude) && Number.isFinite(+f?.longitude)).map(f => ({
     lat: +f.latitude,
@@ -88,7 +88,7 @@ await widget('cards', {
 const data = await call('nasa_firms', { latitude: -3.4, longitude: -62.2, days: 7 }).catch(() => null);
 const fires = (data?.fires ?? (Array.isArray(data) ? data : [])).filter(f => f);
 const markers = fires.filter(f => Number.isFinite(+f?.latitude)).map(f => ({ lat: +f.latitude, lon: +f.longitude }));
-await widget('map', { center: [-3.4, -62.2], zoom: 5, markers: markers.length ? markers : [{ lat: -3.4, lon: -62.2, label: 'Amazon hotspot (preview)' }] });
+await widget('map', { center: [-62.2, -3.4], zoom: 5, markers: markers.length ? markers : [{ lat: -3.4, lon: -62.2, label: 'Amazon hotspot (preview)' }] });
 await widget('stat-card', { label: 'Hotspots', value: Math.max(fires.length, 1) });
 ```
 

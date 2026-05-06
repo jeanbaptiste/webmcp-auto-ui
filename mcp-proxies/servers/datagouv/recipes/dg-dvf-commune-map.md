@@ -68,7 +68,7 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
      const avg = prices.length > 0 ? prices.reduce((s, x) => s + x, 0) / prices.length : 0;
 
      await widget('map', {
-       center: [43.2930, 5.3949], // Marseille 5e Arrondissement
+       center: [5.3949, 43.2930], // Marseille 5e Arrondissement
        zoom: 13,
        markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({
          lat: Number(r.latitude),
@@ -115,7 +115,7 @@ const tx = dvfCsv ? await call('query_resource_data', {
   page_size: 200
 }).catch(() => ({ rows: [] })) : { rows: [] };
 const rows = tx?.rows ?? [];
-await widget('map', { center: [43.2930, 5.3949], zoom: 13, markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({ lat: Number(r.latitude), lon: Number(r.longitude), label: Number.isFinite(Number(r.valeur_fonciere)) ? `${Math.round(Number(r.valeur_fonciere)).toLocaleString('fr-FR')} €` : '—' })) });
+await widget('map', { center: [5.3949, 43.2930], zoom: 13, markers: rows.filter(r => Number.isFinite(Number(r.latitude)) && Number.isFinite(Number(r.longitude))).map(r => ({ lat: Number(r.latitude), lon: Number(r.longitude), label: Number.isFinite(Number(r.valeur_fonciere)) ? `${Math.round(Number(r.valeur_fonciere)).toLocaleString('fr-FR')} €` : '—' })) });
 ```
 
 ### Top sales in Bordeaux (auto-discovery DVF CSV)

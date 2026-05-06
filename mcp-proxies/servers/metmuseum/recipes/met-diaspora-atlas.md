@@ -46,7 +46,7 @@ layout:
    ```js
    const NAT = { 'French': [46.6, 2.2], 'Italian': [42.8, 12.6], 'Dutch': [52.1, 5.3], 'German': [51.2, 10.5], 'Spanish': [40.4, -3.7], 'British': [54.0, -2.0], 'American': [39.8, -98.6], 'Flemish': [50.5, 4.5], 'Russian': [60, 90], 'Japanese': [36.2, 138.3] };
    const markers = display.map(w => { const c = NAT[w?.artistNationality] || [40, 0]; return { lat: c[0], lon: c[1], label: w?.artistNationality || w?.culture || '—', popup: `${w?.artistDisplayName ?? '—'} — ${w?.title ?? '(untitled)'}` }; });
-   await widget('map', { center: [40, 0], zoom: 2, markers: markers.length ? markers : [{ lat: 40, lon: 0, label: 'No samples', popup: '—' }] });
+   await widget('map', { center: [0, 40], zoom: 2, markers: markers.length ? markers : [{ lat: 40, lon: 0, label: 'No samples', popup: '—' }] });
    ```
 
 4. **Cards of diasporic artists**:

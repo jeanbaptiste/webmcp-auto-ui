@@ -939,20 +939,20 @@ schema:
   properties:
     markers:
       type: array
-      description: Points to display as map markers.
+      description: Points to display as map markers. Aliases tolerated per marker — \`lng\` accepted for \`lon\`, \`popup\` accepted for \`label\`.
       items:
         type: object
         required:
           - lat
-          - lon
         properties:
           lat:
             type: number
           lon:
             type: number
+            description: Longitude. Alias \`lng\` also accepted.
           label:
             type: string
-            description: Popup text shown when the marker is clicked.
+            description: Popup text shown when the marker is clicked. Alias \`popup\` also accepted.
           color:
             type: string
             description: CSS color for the marker pin (defaults to blue).
@@ -960,18 +960,33 @@ schema:
       type: object
       description: GeoJSON Feature or FeatureCollection rendered as fill/line/circle layers.
     center:
-      type: array
-      description: "[lon, lat] center (MapLibre/Turf convention). If omitted, computed from data via Turf bbox."
-      items:
-        type: number
-      minItems: 2
-      maxItems: 2
+      description: "Initial center. Either \`[lon, lat]\` array (MapLibre/Turf convention) OR object \`{lat, lon}\` / \`{lat, lng}\`. If omitted, computed from data via Turf bbox."
     zoom:
       type: number
       description: Initial zoom. If omitted, derived by fitting the bbox of the data.
     height:
       type: string
       description: CSS height of the map container (default "400px").
+    cluster:
+      type: boolean
+      description: When true, group nearby markers into clusters (MapLibre native clustering, clusterRadius 50). Click a cluster to zoom in.
+    tileLayers:
+      type: array
+      description: Raster tile overlays drawn on top of the base style (e.g. NASA GIBS imagery).
+      items:
+        type: object
+        required:
+          - url
+        properties:
+          name:
+            type: string
+            description: Optional human-readable layer name.
+          url:
+            type: string
+            description: Tile URL template with \`{z}/{x}/{y}\` placeholders.
+          opacity:
+            type: number
+            description: Layer opacity 0..1 (default 1).
   required: []
 ---
 

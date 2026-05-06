@@ -50,7 +50,7 @@ const today = new Date().toISOString().slice(0, 10);
 
 // 5. Render map (radius center + place markers + obs)
 await widget('map', {
-  center: [lat, lng],
+  center: [lng, lat],  // [lon, lat] order
   zoom: 13,
   markers: [
     { lat, lon: lng, label: 'You are here', popup: today },
@@ -96,7 +96,7 @@ await widget('stat-card', { label: 'AI suggestions', value: sugg?.results?.lengt
 ```js
 const lat = 47.21, lng = -1.55;
 const obs = await call('search_observations', { lat, lng, radius: 3, per_page: 30, quality_grade: 'research' }).catch(() => ({ results: [] }));
-await widget('map', { center: [lat, lng], zoom: 14, markers: (obs?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0], label: o.species_guess ?? o.taxon?.name ?? '' })) });
+await widget('map', { center: [lng, lat], zoom: 14, markers: (obs?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0], label: o.species_guess ?? o.taxon?.name ?? '' })) });
 ```
 
 ### Trail suggestions in the Vosges

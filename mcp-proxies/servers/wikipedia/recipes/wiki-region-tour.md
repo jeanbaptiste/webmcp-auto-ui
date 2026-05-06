@@ -55,7 +55,7 @@ The user wants a mini guide of an area, encyclopedia-style:
 4. **Render map + cards + table**:
    ```js
    await widget('map', {
-     center: [cLat, cLon],
+     center: [cLon, cLat],
      zoom: 12,
      markers: places.map(p => ({ lat: p.lat, lon: p.lon, label: p.title, popup: (p.summary || '').slice(0, 120) }))
    });
@@ -83,7 +83,7 @@ const places = (await Promise.all(hits.map(async h => {
 }))).filter(Boolean);
 if (places.length === 0) return widget('text', { content: 'No geolocated temples.' });
 await widget('map', {
-  center: [places[0].lat, places[0].lon], zoom: 12,
+  center: [places[0].lon, places[0].lat], zoom: 12,
   markers: places.map(p => ({ lat: p.lat, lon: p.lon, label: p.title }))
 });
 await widget('cards', { items: places.map(p => ({ title: p.title, body: (p.summary || '').slice(0, 160) })) });

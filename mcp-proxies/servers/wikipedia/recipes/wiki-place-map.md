@@ -42,7 +42,7 @@ Combines coordinates with encyclopedic content in a single view.
 3. **Render the map**:
    ```js
    await widget('map', {
-     center: [primary.latitude, primary.longitude],
+     center: [primary.longitude, primary.latitude],
      zoom: 13,
      markers: [{ lat: primary.latitude, lon: primary.longitude, label: c?.title ?? '—', popup: (sum?.summary ?? '').slice(0, 140) }]
    });
@@ -71,7 +71,7 @@ const sum = await call('get_summary', { title: 'Giza pyramid complex' }).catch((
 const p = (c?.coordinates ?? [])[0];
 if (!p) return widget('text', { content: 'Not geolocated.' });
 await widget('map', {
-  center: [p?.latitude, p?.longitude],
+  center: [p?.longitude, p?.latitude],
   zoom: 14,
   markers: [{ lat: p?.latitude, lon: p?.longitude, label: c?.title ?? '—' }]
 });
@@ -89,7 +89,7 @@ const [c, sum, facts] = await Promise.all([
 const coords = c?.coordinates ?? [];
 const p = coords.find(x => x?.primary) || coords[0];
 if (!p) return widget('text', { content: 'Not geolocated.' });
-await widget('map', { center: [p?.latitude, p?.longitude], zoom: 14, markers: [{ lat: p?.latitude, lon: p?.longitude, label: c?.title ?? '—' }] });
+await widget('map', { center: [p?.longitude, p?.latitude], zoom: 14, markers: [{ lat: p?.latitude, lon: p?.longitude, label: c?.title ?? '—' }] });
 await widget('text', { content: sum?.summary ?? '(no summary)' });
 await widget('kv', { items: (facts?.facts ?? []).map((f, i) => ({ label: `Fact ${i + 1}`, value: f })) });
 ```

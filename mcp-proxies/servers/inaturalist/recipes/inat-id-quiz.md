@@ -49,7 +49,7 @@ const detailed = await Promise.all(
 
 // 4. Render context map
 await widget('map', {
-  center: [lat, lng],
+  center: [lng, lat],
   zoom: 10,
   markers: [{ lat, lon: lng, label: 'Your location', popup: observed_on }],
 });

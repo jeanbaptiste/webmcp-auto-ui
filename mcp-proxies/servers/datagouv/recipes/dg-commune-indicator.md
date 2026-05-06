@@ -132,7 +132,7 @@ const markers = top
   })
   .filter(Boolean);
 
-await widget('map', { center: [46.6, 2.5], zoom: 6, markers, color_field: 'value', color_scale: 'viridis' });
+await widget('map', { center: [2.5, 46.6], zoom: 6, markers, color_field: 'value', color_scale: 'viridis' });
 await widget('data-table', {
   columns: ['Rang', 'Commune', 'INSEE', 'Logements soc.', 'Loyer moy. (€/m²)'],
   rows: rows.slice(0, 10).map((r, i) => [i + 1, r.NCOM ?? '—', r.COM ?? '—', Number(r.TOT21).toLocaleString('fr-FR'), Number(r.LOYERMOY).toFixed(2)])

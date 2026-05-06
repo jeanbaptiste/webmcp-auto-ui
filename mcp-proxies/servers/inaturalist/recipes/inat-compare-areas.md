@@ -60,8 +60,8 @@ await widget('chart', {
 // 5. Maps side-by-side
 const locA = a.location?.split(',').map(Number) ?? [];
 const locB = b.location?.split(',').map(Number) ?? [];
-await widget('map', { center: [locA[0], locA[1]], zoom: 9, markers: (obsA?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })), title: a.display_name ?? '' });
-await widget('map', { center: [locB[0], locB[1]], zoom: 9, markers: (obsB?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })), title: b.display_name ?? '' });
+await widget('map', { center: [locA[1], locA[0]], zoom: 9, markers: (obsA?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })), title: a.display_name ?? '' });
+await widget('map', { center: [locB[1], locB[0]], zoom: 9, markers: (obsB?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })), title: b.display_name ?? '' });
 
 // 6. Stats
 await widget('stat-card', { label: a.display_name ?? 'Area A', value: (topA?.total_results ?? 0) + ' species', icon: 'leaf' });
