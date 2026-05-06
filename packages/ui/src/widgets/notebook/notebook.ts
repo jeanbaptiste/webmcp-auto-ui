@@ -43,7 +43,11 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     publishedToken: (data as any).publishedToken,
     webmcpServers: (data as any).webmcpServers,
     chatApiBase: (data as any).chatApiBase,
+    hidePublishBadge: (data as any).hidePublishBadge === true,
   } as any);
+
+  // Default src visibility per mode (toggle remains usable for per-cell override).
+  for (const c of state.cells) c.hideSource = state.mode === 'view';
 
   // Live mode runtime overlay (created lazily). Never mutates state.
   let overlay: RuntimeOverlay | null = null;
@@ -233,7 +237,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   });
   const publishCleanup = createPublishControls(state, {
     buttonSlot: shell.querySelector('.nbe-publish-slot') as HTMLElement,
-    badgeSlot: shell.querySelector('.nbe-publish-badge-slot') as HTMLElement,
+    badgeSlot: state.hidePublishBadge ? undefined : (shell.querySelector('.nbe-publish-badge-slot') as HTMLElement),
     footerSlot: shell.querySelector('.nbe-publish-footer-slot') as HTMLElement,
     onPublished: () => rerender(),
   });
@@ -245,6 +249,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const viewBtn = shell.querySelector('.nb-mode-view') as HTMLElement;
   editBtn.addEventListener('click', () => {
     state.mode = 'edit';
+    for (const c of state.cells) c.hideSource = false;
     container.classList.remove('nb-view-mode');
     editBtn.classList.add('nb-on'); viewBtn.classList.remove('nb-on');
     // Leaving view: stop live refresh and clear overlay so frozen snapshots show.
@@ -253,6 +258,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   });
   viewBtn.addEventListener('click', () => {
     state.mode = 'view';
+    for (const c of state.cells) c.hideSource = true;
     container.classList.add('nb-view-mode');
     viewBtn.classList.add('nb-on'); editBtn.classList.remove('nb-on');
     if (state.autoRun === true) bootstrapLive();

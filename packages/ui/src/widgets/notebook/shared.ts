@@ -80,6 +80,8 @@ export interface NotebookState {
    *  Defaults to '/api/chat' when absent — flex sets '/flex/api/chat' to
    *  match its base path; notebook-viewer keeps the default. */
   chatApiBase?: string;
+  /** Suppress the published-slug chip in the header (notebook-viewer use). */
+  hidePublishBadge?: boolean;
 }
 
 export interface HistoryEntry {
@@ -200,6 +202,7 @@ export function createState(initial?: Partial<NotebookState>): NotebookState {
     publishedToken: initial?.publishedToken,
     webmcpServers: initial?.webmcpServers,
     chatApiBase: initial?.chatApiBase,
+    hidePublishBadge: initial?.hidePublishBadge,
   };
 }
 

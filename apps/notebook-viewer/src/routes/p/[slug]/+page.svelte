@@ -121,6 +121,7 @@
       autoRun: true,
       liveData: true,
       hideLiveToggle: true,
+      hidePublishBadge: true,
       servers,
       cells,
       // Hydrate publish state so the button reads "save" (and updates the
