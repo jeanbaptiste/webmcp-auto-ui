@@ -290,6 +290,7 @@ function createCanvasVanilla() {
 
     if (srv.enabled && !srv.connected && !liveUrls.has(srv.url)) {
       inFlight.add(name);
+      setDataServerMeta(name, { connecting: true, error: undefined });
       try {
         const opts = srv.headers ? { headers: srv.headers } : undefined;
         const { name: actualName, tools } = await multiClient.addServer(srv.url, opts);
