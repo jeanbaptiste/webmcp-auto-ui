@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* nb.hyperskills.net — chrome/layout CSS.
  * Visual family: sibling of blog.hyperskills.net.
  *   - Serif display: Cormorant Garamond (hero titles)
