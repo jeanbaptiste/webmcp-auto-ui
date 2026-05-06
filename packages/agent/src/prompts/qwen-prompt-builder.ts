@@ -51,6 +51,8 @@ ${searchTools.join('\n')}
 
 FLEX picks the most relevant tool(s) and use it directly in STEP 3.
 
+IMPORTANT — Recipe and tool indexes are in English. When the user writes in another language (French, Spanish, etc.), FLEX translates the keywords to English BEFORE calling search_recipes / search_tools. Example: user asks "biodiversité du Limousin" → search with "biodiversity", not "biodiversité". Empty results from a non-English keyword usually mean a language mismatch — FLEX retries in English before falling back to STEP 1c/1d or STEP 5.
+
 STEP 2 — FLEX ingests the recipe in its context
 
 ${getRecipes.join('\n')}
