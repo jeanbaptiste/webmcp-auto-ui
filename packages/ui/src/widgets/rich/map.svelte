@@ -16,7 +16,7 @@
     opacity?: number;
   }
 
-  interface Props {
+  interface MapData {
     markers?: MapMarker[];
     geojson?: GeoJSON.FeatureCollection | GeoJSON.Feature | null;
     center?: [number, number] | { lat: number; lon?: number; lng?: number };
@@ -24,35 +24,31 @@
     height?: string;
     cluster?: boolean;
     tileLayers?: TileLayer[];
-    // Tolerated unknown props (logged + ignored)
     title?: unknown;
     popup?: unknown;
     radius?: unknown;
     color_field?: unknown;
     color_scale?: unknown;
   }
+  interface Props { data?: MapData | null; }
 
-  let {
-    markers: rawMarkers = [],
-    geojson: rawGeojson = null,
-    center: rawCenter,
-    zoom: rawZoom,
-    height: rawHeight = '400px',
-    cluster: rawCluster = false,
-    tileLayers: rawTileLayers = [],
-    title: _title,
-    popup: _popup,
-    radius: _radius,
-    color_field: _color_field,
-    color_scale: _color_scale,
-  }: Props = $props();
+  let { data = {} }: Props = $props();
+
+  const d: MapData = data ?? {};
+  const rawMarkers = d.markers ?? [];
+  const rawGeojson = d.geojson ?? null;
+  const rawCenter = d.center;
+  const rawZoom = d.zoom;
+  const rawHeight = d.height ?? '400px';
+  const rawCluster = d.cluster ?? false;
+  const rawTileLayers = d.tileLayers ?? [];
 
   const IGNORED_AT_INIT: Array<[string, unknown]> = [
-    ['title', _title],
-    ['popup', _popup],
-    ['radius', _radius],
-    ['color_field', _color_field],
-    ['color_scale', _color_scale],
+    ['title', d.title],
+    ['popup', d.popup],
+    ['radius', d.radius],
+    ['color_field', d.color_field],
+    ['color_scale', d.color_scale],
   ];
   for (const [key, val] of IGNORED_AT_INIT) {
     if (val !== undefined) {
