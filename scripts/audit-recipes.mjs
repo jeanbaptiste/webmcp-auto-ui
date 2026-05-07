@@ -9,6 +9,8 @@
 //   node scripts/audit-recipes.mjs              # all servers
 //   node scripts/audit-recipes.mjs hackernews   # one server id
 //   node scripts/audit-recipes.mjs --json       # JSON output to stdout
+//   node scripts/audit-recipes.mjs --no-ux      # skip UX checks (legacy mode)
+//   node scripts/audit-recipes.mjs --strict     # promote warns to errors
 
 const REGISTRY = [
   { id: 'tricoteuses', url: 'https://mcp.code4code.eu/mcp' },
@@ -23,6 +25,8 @@ const REGISTRY = [
 
 const args = process.argv.slice(2);
 const wantJson = args.includes('--json');
+const noUx = args.includes('--no-ux');
+const strict = args.includes('--strict');
 const filter = args.find((a) => !a.startsWith('--'));
 
 // ── .netrc Basic auth lookup (silent — never logs contents) ───────────────
@@ -437,6 +441,171 @@ function isSqlCommentsOnly(code) {
   return stripped.trim().length === 0;
 }
 
+// ── Widget schemas + UX checks ────────────────────────────────────────────
+//
+// Loads widget schemas from autoui-server.ts (YAML frontmatter blocks) and
+// validates the `params` of each `widget(name, params)` call against:
+//   • JSON Schema (via packages/core/dist/validate.js): missing required keys,
+//     unknown top-level keys, type mismatches.
+//   • UX heuristics: garbage strings ("undefined", "[object Object]"…),
+//     placeholder dominance ("—", "(untitled)"…), all-zero numerics,
+//     fallback-fired strings ("No samples", "Aucune MAJ"…).
+//
+// Why: a recipe whose widget call uses the wrong key (items vs events) renders
+// as "No events" silently — execution succeeds but the user sees nothing. JSON
+// Schema validation catches the structural bug; UX heuristics catch the cases
+// where the recipe ran but the output is degraded (all dashes, all zeros).
+
+import yaml from 'js-yaml';
+import { validateJsonSchema } from '../packages/core/dist/validate.js';
+
+const AUTOUI_FILE = path.resolve(__dirname, '..', 'packages', 'agent', 'src', 'autoui-server.ts');
+const WIDGET_SCHEMAS = (() => {
+  const out = {};
+  if (!existsSync(AUTOUI_FILE)) return out;
+  const src = readFileSync(AUTOUI_FILE, 'utf8');
+  // Only match frontmatter blocks whose first non-blank line is `widget:`.
+  // The greedy `---\n...\n---` regex would otherwise pair a closing fence
+  // with the next opening fence, capturing JS comments in between.
+  const re = /---\n(widget:[\s\S]*?)\n---/g;
+  let m;
+  while ((m = re.exec(src)) !== null) {
+    // Strip the widget-level `description:` (the one before `schema:`).
+    // Free-form text there often contains tokens like `[label: string]` or
+    // block scalars (`>` / `|`) that break YAML flow parsing. Property-level
+    // `description:` fields inside `schema:` MUST be left alone (a property
+    // can be named `description`, e.g. timeline event description).
+    const cleaned = (() => {
+      const lines = m[1].split('\n');
+      const out = [];
+      let beforeSchema = true;
+      let stripped = false;
+      let skipIndent = -1;
+      for (const line of lines) {
+        if (skipIndent >= 0) {
+          const indent = line.match(/^ */)[0].length;
+          if (line.trim() === '' || indent > skipIndent) continue;
+          skipIndent = -1;
+        }
+        if (beforeSchema && /^schema\s*:/.test(line)) beforeSchema = false;
+        if (beforeSchema && !stripped) {
+          const inline = line.match(/^(description:\s*)(.*)$/);
+          if (inline) {
+            stripped = true;
+            const val = inline[2].trim();
+            if (val === '>' || val === '|' || val === '>-' || val === '|-') {
+              skipIndent = 0;
+            }
+            out.push('description: ""');
+            continue;
+          }
+        }
+        // Inside schema: drop nested `description: <inline-value>` lines.
+        // These are property-description strings; they cannot harm validation
+        // and their free-form text often breaks YAML. Leave key-only forms
+        // (`description:` followed by an indented child block) untouched —
+        // those declare a property NAMED `description`.
+        if (!beforeSchema) {
+          const nested = line.match(/^(\s+)description:\s+(\S.*)$/);
+          if (nested) {
+            const val = nested[2].trim();
+            if (val === '>' || val === '|' || val === '>-' || val === '|-') {
+              skipIndent = nested[1].length;
+            }
+            continue;
+          }
+        }
+        out.push(line);
+      }
+      return out.join('\n');
+    })();
+    let parsed;
+    try { parsed = yaml.load(cleaned); } catch { continue; }
+    if (parsed && typeof parsed === 'object' && parsed.widget && parsed.schema) {
+      out[parsed.widget] = parsed.schema;
+    }
+  }
+  return out;
+})();
+
+const PLACEHOLDERS = new Set([
+  '—', '–', '-', '?', '??', 'N/A', 'n/a', 'NA',
+  '(untitled)', '(unknown)', '(none)', 'unknown',
+  'TBD', 'TODO', '...', '…',
+  'null', 'undefined',
+]);
+
+const FALLBACK_RE = /^(no\s+(samples?|data|events?|results?|stories|items?|posts?|images?|records?)|aucune?\s+\w+|pas\s+de\s+\w+|n\/?a)\b/i;
+
+const GARBAGE_VALUES = ['undefined', 'null', 'NaN', '[object Object]', 'Infinity', '-Infinity'];
+
+// Walks params and aggregates heuristic counters.
+function walkValues(node, out) {
+  if (node == null) return;
+  if (typeof node === 'string') {
+    out.strings++;
+    const trimmed = node.trim();
+    if (PLACEHOLDERS.has(trimmed)) out.placeholders++;
+    if (FALLBACK_RE.test(trimmed)) out.fallbacks.push(trimmed);
+    if (GARBAGE_VALUES.includes(trimmed)) out.garbage.push(trimmed);
+    return;
+  }
+  if (typeof node === 'number') {
+    if (Number.isNaN(node) || !Number.isFinite(node)) out.garbageNumbers++;
+    out.numbers++;
+    if (node === 0) out.zeros++;
+    return;
+  }
+  if (Array.isArray(node)) { for (const v of node) walkValues(v, out); return; }
+  if (typeof node === 'object') { for (const v of Object.values(node)) walkValues(v, out); return; }
+}
+
+function checkWidgetUX(widgetName, params) {
+  const issues = [];
+  const schema = WIDGET_SCHEMAS[widgetName];
+
+  if (!schema) {
+    issues.push({ level: 'warn', code: 'unknown-widget', detail: widgetName });
+  } else {
+    // JSON Schema validation (typed, full).
+    const r = validateJsonSchema(params ?? {}, schema, widgetName);
+    if (!r.valid) {
+      const critical = r.errors.filter((e) => /required|type/.test(e.keyword));
+      const others = r.errors.filter((e) => !/required|type/.test(e.keyword));
+      if (critical.length) {
+        const sample = critical.slice(0, 3).map((e) => `${e.path}:${e.keyword}`).join(',');
+        issues.push({ level: 'error', code: 'schema', detail: `${critical.length} ${sample}` });
+      }
+      if (others.length) {
+        const sample = others.slice(0, 3).map((e) => `${e.path}:${e.keyword}`).join(',');
+        issues.push({ level: 'warn', code: 'schema-soft', detail: `${others.length} ${sample}` });
+      }
+    }
+  }
+
+  // UX heuristics — deep walk.
+  const acc = { strings: 0, placeholders: 0, numbers: 0, zeros: 0, garbageNumbers: 0, fallbacks: [], garbage: [] };
+  walkValues(params, acc);
+
+  if (acc.garbage.length) {
+    const uniq = [...new Set(acc.garbage)];
+    issues.push({ level: 'error', code: 'garbage', detail: uniq.slice(0, 3).join(',') });
+  }
+  if (acc.garbageNumbers > 0) {
+    issues.push({ level: 'error', code: 'nan-or-infinity', detail: `${acc.garbageNumbers}` });
+  }
+  if (acc.strings >= 5 && acc.placeholders / acc.strings > 0.5) {
+    issues.push({ level: 'warn', code: 'placeholders', detail: `${acc.placeholders}/${acc.strings}` });
+  }
+  if (acc.numbers >= 5 && acc.zeros === acc.numbers) {
+    issues.push({ level: 'warn', code: 'all-zeros', detail: `${acc.zeros} numeric values` });
+  }
+  if (acc.fallbacks.length >= 3) {
+    issues.push({ level: 'warn', code: 'fallback-fired', detail: `${acc.fallbacks.length} hits` });
+  }
+  return issues;
+}
+
 // ── Audit one server ───────────────────────────────────────────────────────
 
 async function auditServer(server) {
@@ -550,17 +719,33 @@ async function auditServer(server) {
         let status = 'ok';
         let reason = `${widgets.length} widget(s)`;
         const empties = [];
+        const allIssues = [];
         for (const w of widgets) {
           const p = w.params ?? {};
-          const arrFields = ['items', 'markers', 'data', 'rows', 'images'];
+          const arrFields = ['items', 'markers', 'data', 'rows', 'images', 'events'];
           for (const f of arrFields) {
             if (Array.isArray(p[f]) && p[f].length === 0) empties.push(`${w.name}.${f}=[]`);
           }
           if (typeof p.value === 'number' && p.value === 0) empties.push(`${w.name}.value=0`);
+          if (!noUx) {
+            const issues = checkWidgetUX(w.name, p);
+            for (const iss of issues) allIssues.push({ widget: w.name, ...iss });
+          }
         }
         if (empties.length) {
           status = 'empty';
           reason += ` — ${empties.join(', ')}`;
+        }
+        if (allIssues.length) {
+          const errors = allIssues.filter((i) => (strict ? true : i.level === 'error'));
+          const warns = allIssues.filter((i) => i.level === 'warn');
+          if (errors.length) status = 'error';
+          else if (warns.length && status !== 'empty') status = 'degraded';
+          const compact = allIssues
+            .map((i) => `${i.widget}.${i.code}=${i.detail}`)
+            .slice(0, 5)
+            .join('; ');
+          reason += ` — ${compact}${allIssues.length > 5 ? ` (+${allIssues.length - 5})` : ''}`;
         }
         rows.push({ server: server.id, recipe: name, block: label, status, reason });
       } catch (err) {
@@ -607,8 +792,8 @@ if (wantJson) {
   }
   // Per-server summary at the end
   console.log('\n## Summary\n');
-  console.log('| server | total | ok | empty | error | skipped | narrative |');
-  console.log('|--------|-------|----|----|----|----|----|');
+  console.log('| server | total | ok | degraded | empty | error | skipped | narrative |');
+  console.log('|--------|-------|----|----|----|----|----|----|');
   const byServer = new Map();
   for (const r of allRows) {
     if (!byServer.has(r.server)) byServer.set(r.server, []);
@@ -618,10 +803,11 @@ if (wantJson) {
   for (const [srv, rows] of byServer) {
     const exec = rows.filter((r) => r.block !== '-');
     const ok = exec.filter((r) => r.status === 'ok').length;
+    const degraded = exec.filter((r) => r.status === 'degraded').length;
     const empty = exec.filter((r) => r.status === 'empty').length;
     const err = exec.filter((r) => r.status === 'error').length;
     const skipped = exec.filter((r) => SKIPS.has(r.status)).length;
     const narrative = rows.filter((r) => r.status === 'no-runnable-blocks').length;
-    console.log(`| ${srv} | ${exec.length} | ${ok} | ${empty} | ${err} | ${skipped} | ${narrative} |`);
+    console.log(`| ${srv} | ${exec.length} | ${ok} | ${degraded} | ${empty} | ${err} | ${skipped} | ${narrative} |`);
   }
 }
