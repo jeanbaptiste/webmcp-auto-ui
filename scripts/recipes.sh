@@ -256,11 +256,12 @@ mode_deploy() {
     return 0
   fi
 
-  # Restart bridges
+  # Restart bridges. NB: under `set -u`, expanding "${arr[@]}" on an empty
+  # array errors out — guard with length check before expanding changed_servers.
   local restart_list=()
   if [ "$force" = "1" ]; then
     restart_list=("${servers[@]}")
-  else
+  elif [ ${#changed_servers[@]} -gt 0 ]; then
     restart_list=("${changed_servers[@]}")
   fi
 
