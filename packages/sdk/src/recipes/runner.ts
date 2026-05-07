@@ -79,6 +79,21 @@ function makeCallHelper(multiClient: McpMultiClient | undefined, ctx: RunnerCtx)
 }
 
 /**
+ * Sandbox-wide `unwrap(r)` helper. Many recipes assume MCP results are
+ * wrapped in `{ data | results | items: [...] }` and unwrap them with this
+ * one-liner. Falls through to the input itself, then to an empty array.
+ */
+const unwrapHelper = (r: unknown): unknown => {
+  if (r && typeof r === 'object') {
+    const o = r as Record<string, unknown>;
+    if (o.data !== undefined) return o.data;
+    if (o.results !== undefined) return o.results;
+    if (o.items !== undefined) return o.items;
+  }
+  return r ?? [];
+};
+
+/**
  * Build the `widget(name, params)` helper. Captures each call into the run
  * context so the host can mount them stacked in the run panel.
  */
@@ -204,11 +219,21 @@ async function runJsLike(
   const wrapped = `return (async () => {\n${preamble}\n${code}\n${writeback}\n})();`;
   const fn = new (AsyncFunction as unknown as new (
     ...args: string[]
-  ) => (call: unknown, widget: unknown, __scope__: Record<string, unknown>) => Promise<unknown>)(
-    'call', 'widget', '__scope__', wrapped,
+  ) => (
+    call: unknown,
+    widget: unknown,
+    unwrap: unknown,
+    __scope__: Record<string, unknown>,
+  ) => Promise<unknown>)(
+    'call', 'widget', 'unwrap', '__scope__', wrapped,
   );
   ctx.log('dispatched (inline async)');
-  const out = await fn(makeCallHelper(multiClient, ctx), makeWidgetHelper(ctx), scope ?? {});
+  const out = await fn(
+    makeCallHelper(multiClient, ctx),
+    makeWidgetHelper(ctx),
+    unwrapHelper,
+    scope ?? {},
+  );
   ctx.log('resolved');
   return out;
 }
