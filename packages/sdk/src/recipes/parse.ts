@@ -18,9 +18,13 @@ export function parseBody(body: string): ParsedSegment[] {
   // Match fenced code blocks with optional language tag.
   // Variable-length fence (≥3 backticks, CommonMark §4.5): the closing fence
   // must use the same number of backticks as the opening — captured via \1.
-  // This allows cells whose content embeds ``` (e.g. widget('text', { content: "...```js..." }))
-  // to be encoded with a longer fence (4+ backticks) without premature closure.
-  const re = /(`{3,})([a-zA-Z0-9_+-]*)\r?\n([\s\S]*?)\r?\n\1[ \t]*(?=\r?\n|$)/g;
+  // The length match is what protects against premature close when cell
+  // content embeds ``` (e.g. widget('text', { content: "...```js..." }))
+  // — pickFence emits 4+ backticks in that case. We deliberately do NOT
+  // require a newline before the closing fence so that indented fences
+  // (common in numbered Markdown lists, where the close is "   ```")
+  // still parse correctly.
+  const re = /(`{3,})([a-zA-Z0-9_+-]*)\r?\n([\s\S]*?)\1/g;
 
   let lastIndex = 0;
   let match: RegExpExecArray | null;
