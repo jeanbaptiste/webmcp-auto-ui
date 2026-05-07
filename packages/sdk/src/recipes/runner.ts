@@ -198,6 +198,62 @@ function extractTopLevelDecls(code: string): string[] {
   return Array.from(out);
 }
 
+/** Same string/comment stripper as extractTopLevelDecls but preserves
+ *  positions (replaces tokens with same-length whitespace) so callers can
+ *  re-locate matches in the original code. */
+function stripJsTokensSameLength(code: string): string {
+  return code
+    .replace(/'(?:\\.|[^'\\])*'/g, (s) => ' '.repeat(s.length))
+    .replace(/"(?:\\.|[^"\\])*"/g, (s) => ' '.repeat(s.length))
+    .replace(/`(?:\\.|[^`\\])*`/g, (s) => ' '.repeat(s.length))
+    .replace(/\/\*[\s\S]*?\*\//g, (s) => s.replace(/[^\n]/g, ' '))
+    .replace(/\/\/[^\n]*/g, (s) => ' '.repeat(s.length));
+}
+
+/** Top-level identifier-form const/let/var decls (subset of
+ *  extractTopLevelDecls — destructuring/function/class excluded). Used to
+ *  hoist these names outside the try block so a finally-clause writeback can
+ *  access them even when the user code returns early. */
+function extractTopLevelHoistableNames(code: string): string[] {
+  const stripped = stripJsTokensSameLength(code);
+  const out = new Set<string>();
+  const re = /^[\t ]*(?:const|let|var)\s+([a-zA-Z_$][\w$]*)/gm;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(stripped)) !== null) {
+    const before = stripped.slice(0, m.index);
+    const opens = (before.match(/\{/g) ?? []).length;
+    const closes = (before.match(/\}/g) ?? []).length;
+    if (opens === closes) out.add(m[1]);
+  }
+  return [...out];
+}
+
+/** Replace top-level `const|let|var ` keywords (+ trailing whitespace) with
+ *  whitespace of identical length, turning declarations into plain
+ *  assignments. Identifier names are preserved untouched. */
+function stripConstLetVarKeywords(code: string, names: Set<string>): string {
+  if (names.size === 0) return code;
+  const stripped = stripJsTokensSameLength(code);
+  const re = /(^|\n)([\t ]*)(const|let|var)(\s+)([a-zA-Z_$][\w$]*)/g;
+  const ranges: { from: number; to: number }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(stripped)) !== null) {
+    if (!names.has(m[5])) continue;
+    const before = stripped.slice(0, m.index);
+    const opens = (before.match(/\{/g) ?? []).length;
+    const closes = (before.match(/\}/g) ?? []).length;
+    if (opens !== closes) continue;
+    const kwStart = m.index + m[1].length + m[2].length;
+    const kwEnd = kwStart + m[3].length + m[4].length;
+    ranges.push({ from: kwStart, to: kwEnd });
+  }
+  let result = code;
+  for (const r of ranges.reverse()) {
+    result = result.slice(0, r.from) + ' '.repeat(r.to - r.from) + result.slice(r.to);
+  }
+  return result;
+}
+
 async function runJsLike(
   code: string,
   ctx: RunnerCtx,
@@ -206,20 +262,37 @@ async function runJsLike(
 ): Promise<unknown> {
   // Wrap user code as the body of an async function that executes itself.
   // Users can use `await`, define vars, and return a final value.
-  // We inject `call` and `widget` helpers as parameters so recipes can
+  // We inject `call`, `widget`, `unwrap` helpers as parameters so recipes can
   // invoke MCP tools and emit widgets without preamble.
-  // When a `scope` object is provided, top-level decls of prior blocks are
-  // re-injected as local consts (preamble), and the current block's top-level
-  // decls are written back at the end so the next block can read them.
-  const currentDecls = new Set(extractTopLevelDecls(code));
+  //
+  // Scope propagation: top-level decls of prior blocks are re-injected as
+  // local consts (preamble), and the current block's top-level decls are
+  // written back so the next block can read them.
+  //
+  // Early-return safety: identifier-form const/let/var decls are HOISTED as
+  // `let` outside a try { ... } finally { writeback } block. Recipes
+  // commonly do `if (!x) return;` after a failed call, which would skip a
+  // post-code writeback. With finally-clause writeback, scope propagates
+  // even when the cell returns early. Destructuring / function / class
+  // decls remain inside the try (writeback at end of try) — they only
+  // propagate on natural fall-through, same as before.
+  const allDecls = new Set(extractTopLevelDecls(code));
+  const hoistable = extractTopLevelHoistableNames(code);
+  const hoistableSet = new Set(hoistable);
+  const innerOnly = [...allDecls].filter((n) => !hoistableSet.has(n));
+  const transformedCode = stripConstLetVarKeywords(code, hoistableSet);
   const priorKeys = scope
-    ? Object.keys(scope).filter((k) => /^[a-zA-Z_$][\w$]*$/.test(k) && !currentDecls.has(k))
+    ? Object.keys(scope).filter((k) => /^[a-zA-Z_$][\w$]*$/.test(k) && !allDecls.has(k))
     : [];
   const preamble = priorKeys.map((k) => `const ${k} = __scope__[${JSON.stringify(k)}];`).join('\n');
-  const writeback = scope
-    ? Array.from(currentDecls).map((k) => `__scope__[${JSON.stringify(k)}] = ${k};`).join('\n')
+  const hoist = hoistable.length ? `let ${hoistable.join(', ')};` : '';
+  const finallyWriteback = scope
+    ? hoistable.map((k) => `try { __scope__[${JSON.stringify(k)}] = ${k}; } catch {}`).join('\n')
     : '';
-  const wrapped = `return (async () => {\n${preamble}\n${code}\n${writeback}\n})();`;
+  const innerWriteback = scope
+    ? innerOnly.map((k) => `try { __scope__[${JSON.stringify(k)}] = ${k}; } catch {}`).join('\n')
+    : '';
+  const wrapped = `return (async () => {\n${preamble}\n${hoist}\ntry {\n${transformedCode}\n${innerWriteback}\n} finally {\n${finallyWriteback}\n}\n})();`;
   const fn = new (AsyncFunction as unknown as new (
     ...args: string[]
   ) => (
