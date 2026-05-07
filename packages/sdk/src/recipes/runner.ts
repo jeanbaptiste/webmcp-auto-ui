@@ -162,7 +162,7 @@ function namesFromPattern(content: string): string[] {
  *  Skips matches that occur inside a `{}` block (e.g. callback bodies) by
  *  counting unbalanced braces before the match position, on a sanitized copy
  *  of the code where strings and comments are blanked out. */
-function extractTopLevelDecls(code: string): string[] {
+export function extractTopLevelDecls(code: string): string[] {
   // Order matters: strings before comments. Otherwise a URL like
   // 'https://x.png' has its `//` consumed as a line comment, leaving an
   // unbalanced quote that cascades into mismatched braces and drops decls.
@@ -196,6 +196,90 @@ function extractTopLevelDecls(code: string): string[] {
     for (const n of namesFromPattern(inner)) out.add(n);
   }
   return Array.from(out);
+}
+
+/** String/comment stripper that PRESERVES template literal interpolations.
+ *  Replaces literal text inside backtick strings with spaces but keeps
+ *  `${...}` expressions intact, so cross-cell dependency detection picks up
+ *  references like `\`Total: ${totalPoints}\``. Single/double-quoted strings
+ *  and comments are blanked entirely. */
+function stripPreservingInterpolations(code: string): string {
+  let out = '';
+  let i = 0;
+  while (i < code.length) {
+    const c = code[i];
+    // Single/double-quoted strings — wholly blanked
+    if (c === "'" || c === '"') {
+      const quote = c;
+      out += ' ';
+      i++;
+      while (i < code.length && code[i] !== quote) {
+        if (code[i] === '\\' && i + 1 < code.length) { out += '  '; i += 2; continue; }
+        out += code[i] === '\n' ? '\n' : ' ';
+        i++;
+      }
+      out += ' ';
+      i++;
+      continue;
+    }
+    // Block comment
+    if (c === '/' && code[i + 1] === '*') {
+      out += '  ';
+      i += 2;
+      while (i < code.length && !(code[i] === '*' && code[i + 1] === '/')) {
+        out += code[i] === '\n' ? '\n' : ' ';
+        i++;
+      }
+      out += '  ';
+      i += 2;
+      continue;
+    }
+    // Line comment
+    if (c === '/' && code[i + 1] === '/') {
+      while (i < code.length && code[i] !== '\n') { out += ' '; i++; }
+      continue;
+    }
+    // Template literal — preserve ${...} interpolations
+    if (c === '`') {
+      out += ' ';
+      i++;
+      while (i < code.length && code[i] !== '`') {
+        if (code[i] === '\\' && i + 1 < code.length) { out += '  '; i += 2; continue; }
+        if (code[i] === '$' && code[i + 1] === '{') {
+          out += '${';
+          i += 2;
+          let depth = 1;
+          while (i < code.length && depth > 0) {
+            if (code[i] === '{') depth++;
+            else if (code[i] === '}') depth--;
+            out += code[i];
+            i++;
+          }
+          continue;
+        }
+        out += code[i] === '\n' ? '\n' : ' ';
+        i++;
+      }
+      out += ' ';
+      i++;
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
+/** Whether `name` appears as a free identifier in `code` — i.e. as a
+ *  standalone token (not part of a longer name) and not as a property
+ *  accessor (`obj.name` does not count). Strings and comments are stripped
+ *  but template-literal interpolations are preserved. */
+export function hasIdentifierReference(code: string, name: string): boolean {
+  if (!name) return false;
+  const stripped = stripPreservingInterpolations(code);
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`(?:^|[^.\\w$])${escaped}(?:[^\\w$]|$)`);
+  return re.test(stripped);
 }
 
 /** Same string/comment stripper as extractTopLevelDecls but preserves

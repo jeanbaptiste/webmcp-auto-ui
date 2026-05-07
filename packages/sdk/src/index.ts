@@ -91,7 +91,7 @@ export type { RemoteMcpRegistryEntry } from './remote-mcp-registry.js';
 // import { canvas } from '@webmcp-auto-ui/sdk/canvas'
 
 // Recipe runner — markdown-fence parser + JS/TS/SQL/etc executor over MCP
-export { parseBody, pickFence, runCode, estimateTokens, safeStringify, findCodeParamName, buildToolArgs, parseWidgetDisplayCall } from './recipes/index.js';
+export { parseBody, pickFence, runCode, estimateTokens, safeStringify, findCodeParamName, buildToolArgs, parseWidgetDisplayCall, extractTopLevelDecls, hasIdentifierReference } from './recipes/index.js';
 export type { ParsedSegment, RunResult, RunLog, RunTab, RecipeData } from './recipes/index.js';
 
 // Short URL — domain-dependent compact token

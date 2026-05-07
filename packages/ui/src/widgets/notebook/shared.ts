@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import { serializeToMarkdown } from './share-handlers.js';
+import { extractTopLevelDecls, hasIdentifierReference } from '@webmcp-auto-ui/sdk';
 
 export const NB_PUBLISH_HOST: string = (() => {
   try {
@@ -329,38 +330,72 @@ export async function runAutoRefresh(opts: AutoRefreshOptions): Promise<AutoRefr
   const summary: AutoRefreshSummary = { rerun: 0, frozen: 0, stale: 0, failed: 0 };
   const sharedSignal = signal ?? new AbortController().signal;
 
-  // Sequential execution — cells often depend on top-level decls of earlier
-  // cells (e.g. `const w = ...` in cell 4 referenced in cell 6). Running them
-  // in parallel races the SDK runner's scope writeback, leaving downstream
-  // cells with an empty scope. Aligns with Jupyter / Observable / RMarkdown.
+  // Build dependency graph: a JS cell depends on the most recent prior cell
+  // that declares a top-level identifier referenced in this cell's body.
+  // Cells with no inter-cell deps run in parallel; dependent cells await
+  // their providers via a Promise map (no batching, no sequential bottleneck).
+  const declToProvider = new Map<string, string>();   // identifier → cell id of latest declarer
+  const cellDeps = new Map<string, string[]>();        // cell id → [provider cell ids]
   for (const cell of state.cells) {
-    if (sharedSignal.aborted) break;
-    if (!isReRunnable(cell)) { summary.frozen++; continue; }
-
-    overlay.status.set(cell.id, 'running');
-    overlay.cellStartedAt.set(cell.id, Date.now());
-    onCellChange?.(cell.id);
-    onTick?.(overlay);
-
-    try {
-      const result = await runner(cell, sharedSignal);
-      if (result.ok) {
-        overlay.outputs.set(cell.id, { result, refreshedAt: Date.now() });
-        overlay.status.set(cell.id, 'fresh');
-        summary.rerun++;
-      } else {
-        overlay.status.set(cell.id, 'stale');
-        summary.stale++;
+    if (!isReRunnable(cell)) continue;
+    const deps = new Set<string>();
+    if (cell.type === 'js') {
+      for (const [name, providerId] of declToProvider) {
+        if (providerId === cell.id) continue;
+        if (hasIdentifierReference(cell.content, name)) deps.add(providerId);
       }
-    } catch (err) {
-      overlay.status.set(cell.id, 'stale');
-      summary.failed++;
-      if (!overlay.error) overlay.error = err instanceof Error ? err.message : String(err);
     }
-    overlay.cellStartedAt.delete(cell.id);
-    onCellChange?.(cell.id);
-    onTick?.(overlay);
+    cellDeps.set(cell.id, [...deps]);
+    // Register this cell's provided names AFTER computing its deps so a cell
+    // doesn't depend on itself when it both reads and re-declares a name.
+    if (cell.type === 'js') {
+      for (const decl of extractTopLevelDecls(cell.content)) {
+        declToProvider.set(decl, cell.id);
+      }
+    } else if (cell.type === 'sql' && cell.varname) {
+      declToProvider.set(cell.varname, cell.id);
+    }
   }
+
+  const cellPromises = new Map<string, Promise<void>>();
+  for (const cell of state.cells) {
+    cellPromises.set(cell.id, (async () => {
+      if (sharedSignal.aborted) return;
+      if (!isReRunnable(cell)) { summary.frozen++; return; }
+
+      // Wait for dependencies before starting.
+      const deps = cellDeps.get(cell.id) ?? [];
+      if (deps.length > 0) {
+        await Promise.all(deps.map((d) => cellPromises.get(d)).filter(Boolean) as Promise<void>[]);
+      }
+      if (sharedSignal.aborted) return;
+
+      overlay.status.set(cell.id, 'running');
+      overlay.cellStartedAt.set(cell.id, Date.now());
+      onCellChange?.(cell.id);
+      onTick?.(overlay);
+
+      try {
+        const result = await runner(cell, sharedSignal);
+        if (result.ok) {
+          overlay.outputs.set(cell.id, { result, refreshedAt: Date.now() });
+          overlay.status.set(cell.id, 'fresh');
+          summary.rerun++;
+        } else {
+          overlay.status.set(cell.id, 'stale');
+          summary.stale++;
+        }
+      } catch (err) {
+        overlay.status.set(cell.id, 'stale');
+        summary.failed++;
+        if (!overlay.error) overlay.error = err instanceof Error ? err.message : String(err);
+      }
+      overlay.cellStartedAt.delete(cell.id);
+      onCellChange?.(cell.id);
+      onTick?.(overlay);
+    })());
+  }
+  await Promise.all([...cellPromises.values()]);
 
   overlay.finishedAt = Date.now();
   onTick?.(overlay);
