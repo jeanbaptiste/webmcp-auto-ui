@@ -163,12 +163,15 @@ function namesFromPattern(content: string): string[] {
  *  counting unbalanced braces before the match position, on a sanitized copy
  *  of the code where strings and comments are blanked out. */
 function extractTopLevelDecls(code: string): string[] {
+  // Order matters: strings before comments. Otherwise a URL like
+  // 'https://x.png' has its `//` consumed as a line comment, leaving an
+  // unbalanced quote that cascades into mismatched braces and drops decls.
   const stripped = code
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n]*/g, '')
     .replace(/'(?:\\.|[^'\\])*'/g, "''")
     .replace(/"(?:\\.|[^"\\])*"/g, '""')
-    .replace(/`(?:\\.|[^`\\])*`/g, '``');
+    .replace(/`(?:\\.|[^`\\])*`/g, '``')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
   const out = new Set<string>();
   // Identifier-form decls (existing behavior)
   const reId = /^[\t ]*(?:const|let|var|function|class)\s+([a-zA-Z_$][\w$]*)/gm;
