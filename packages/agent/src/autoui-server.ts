@@ -106,7 +106,7 @@ schema:
     label:
       type: string
     value:
-      type: string
+      type: [string, number]
     trend:
       type: string
     trendDir:
@@ -441,7 +441,7 @@ schema:
           label:
             type: string
           value:
-            type: string
+            type: [string, number]
     stats:
       type: array
       items:
@@ -453,7 +453,7 @@ schema:
           label:
             type: string
           value:
-            type: string
+            type: [string, number]
 ---
 
 ## When to use
@@ -849,7 +849,7 @@ schema:
     label:
       type: string
     value:
-      type: string
+      type: [string, number]
     unit:
       type: string
       description: Unite affichee apres la valeur (ex "%", "km")
@@ -865,7 +865,7 @@ schema:
       type: string
       enum: [up, down, flat]
     previousValue:
-      type: string
+      type: [string, number]
     variant:
       type: string
       enum: [default, success, warning, error, info]
@@ -883,7 +883,7 @@ schema:
           label:
             type: string
           value:
-            type: string
+            type: [string, number]
           unit:
             type: string
           icon:
@@ -894,7 +894,7 @@ schema:
             type: string
             enum: [up, down, flat]
           previousValue:
-            type: string
+            type: [string, number]
           variant:
             type: string
             enum: [default, success, warning, error, info]
