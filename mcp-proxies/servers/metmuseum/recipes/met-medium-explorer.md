@@ -72,7 +72,7 @@ layout:
 
 6. **KV taxonomy**:
    ```js
-   await widget('kv', { pairs: counts.map(c => [c.medium, `${c.total} objects`]) });
+   await widget('kv', { rows: counts.map(c => [c.medium, String(c.total) + ' objects']) });
    ```
 
 ## Examples
@@ -92,7 +92,7 @@ await widget('chart-rich', { type: 'bar', data });
 ### Japanese prints
 ```js
 const r = await call('search-museum-objects', { q: 'woodblock', departmentId: 6, hasImages: true, pageSize: 1 }).catch(() => null);
-await widget('kv', { pairs: [['Woodblock prints (Asian Art)', `${r?.total ?? 0}`]] });
+await widget('kv', { rows: [['Woodblock prints (Asian Art)', String(r?.total ?? 0)]] });
 ```
 
 ## Common mistakes

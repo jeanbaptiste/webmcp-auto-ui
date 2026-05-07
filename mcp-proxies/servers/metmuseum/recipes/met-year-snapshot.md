@@ -51,10 +51,10 @@ layout:
 4. **Contextual KV** (year significance):
    ```js
    await widget('kv', {
-     pairs: [
+     rows: [
        ['Year', `${year}`],
        ['Hint', '1900 — turn of the century, Belle Époque, beginnings of modern art'],
-       ['Sample size', works.length],
+       ['Sample size', String(works.length)],
        ['First object', works[0]?.title ?? '—']
      ]
    });

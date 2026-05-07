@@ -22,8 +22,9 @@ layout:
 
 ## How to use
 
-1. **Locate one object** with multiple views:
+1–6. **Full deep-dive** — search, fetch, carousel, narrative, KV, sister works:
    ```js
+   // 1. Locate one object with multiple views
    const search = await call('search-museum-objects', {
      q: 'Las Meninas',
      title: true,
@@ -32,41 +33,33 @@ layout:
    const ids = search?.objectIDs ?? [];
    if (ids.length === 0) { await widget('text', { content: 'No matching objects found.' }); return; }
    const top = ids[0];
-   ```
 
-2. **Fetch full record with images**:
-   ```js
+   // 2. Fetch full record with images
    const resp = await call('get-museum-object', { objectId: top, returnImage: true }).catch(() => null);
    const w = resp?.object;
    if (!w || resp?.message) { await widget('text', { content: 'Object not found.' }); return; }
-   ```
 
-3. **Carousel of every view** (primary + additional):
-   ```js
+   // 3. Carousel of every view (primary + additional)
    const images = [w?.primaryImage, ...(w?.additionalImages ?? [])].filter(src => src && typeof src === 'string' && src.length > 0);
    if (images.length > 0) {
      await widget('carousel', {
-       items: images.map((src, i) => ({
+       slides: images.map((src, i) => ({
          src,
-         caption: i === 0 ? 'Primary view' : `Additional view ${i}`
+         title: i === 0 ? 'Primary view' : `Additional view ${i}`
        }))
      });
    }
-   ```
 
-4. **Narrative text** with period/dynasty/reign context:
-   ```js
+   // 4. Narrative text with period/dynasty/reign context
    await widget('text', {
      content: `${w?.title ?? '(untitled)'}, by ${w?.artistDisplayName || w?.culture || '—'}, ${w?.objectDate ?? '—'}. ` +
        `${w?.period ? `Period: ${w.period}. ` : ''}${w?.dynasty ? `Dynasty: ${w.dynasty}. ` : ''}` +
        `${w?.reign ? `Reign of ${w.reign}. ` : ''}${w?.creditLine ?? ''}`
    });
-   ```
 
-5. **KV of detailed fields** (full record):
-   ```js
+   // 5. KV of detailed fields (full record)
    await widget('kv', {
-     pairs: [
+     rows: [
        ['Artist', w?.artistDisplayName],
        ['Bio', w?.artistDisplayBio],
        ['Date', w?.objectDate],
@@ -84,10 +77,8 @@ layout:
        ['Tags', (w?.tags ?? []).map(t => t?.term).filter(Boolean).join(', ')]
      ].filter(([_, v]) => v)
    });
-   ```
 
-6. **Sister works** (same artist):
-   ```js
+   // 6. Sister works (same artist)
    if (w?.artistDisplayName) { const sis = await call('search-museum-objects', { q: w.artistDisplayName, artistOrCulture: true, hasImages: true }).catch(() => null); const sisIds = (sis?.objectIDs ?? []).slice(0, 4).filter(id => id !== top); const sisObjs = await Promise.all(sisIds.map(id => call('get-museum-object', { objectId: id }).catch(() => null))); const items = sisObjs.filter(o => o?.object && !o?.message).map(o => ({ title: o.object?.title ?? '(untitled)', image: o.object?.primaryImageSmall, body: o.object?.objectDate ?? '—' })); if (items.length > 0) await widget('cards', { items }); }
    ```
 
@@ -102,7 +93,7 @@ const resp = await call('get-museum-object', { objectId: ids[0], returnImage: tr
 const w = resp?.object;
 if (!w) { await widget('text', { content: 'Object not found.' }); return; }
 const images = [w?.primaryImage, ...(w?.additionalImages ?? [])].filter(src => src && src.length > 0);
-if (images.length > 0) await widget('carousel', { items: images.map(src => ({ src })) });
+if (images.length > 0) await widget('carousel', { slides: images.map(src => ({ src })) });
 ```
 
 ### Egyptian fragment with reign context
@@ -115,7 +106,7 @@ const w = resp?.object;
 if (!w) { await widget('text', { content: 'Object not found.' }); return; }
 await widget('text', { content: `Reign: ${w?.reign ?? '—'}. Period: ${w?.period ?? '—'}.` });
 const adds = (w?.additionalImages ?? []).filter(src => src && src.length > 0);
-if (adds.length > 0) await widget('carousel', { items: adds.map(src => ({ src })) });
+if (adds.length > 0) await widget('carousel', { slides: adds.map(src => ({ src })) });
 ```
 
 ## Common mistakes

@@ -56,11 +56,11 @@ layout:
 5. **KV of adjacent dynasties** (context):
    ```js
    await widget('kv', {
-     pairs: [
+     rows: [
        ['Previous', 'Yuan (1271-1368)'],
        ['Current', 'Ming (1368-1644)'],
        ['Next', 'Qing (1644-1912)'],
-       ['Objects sampled', works.length]
+       ['Objects sampled', String(works.length)]
      ]
    });
    ```
@@ -68,8 +68,8 @@ layout:
 6. **Chart of media under the dynasty**:
    ```js
    const byMedium = works.reduce((acc, w) => { const m = w?.medium ?? '—'; acc[m] = (acc[m] || 0) + 1; return acc; }, {});
-   const data = Object.entries(byMedium).map(([k, v]) => ({ label: k, value: v }));
-   await widget('chart', { type: 'bar', data: data.length ? data : [{ label: 'sample', value: works.length || 1 }] });
+   const bars = Object.entries(byMedium).map(([k, v]) => [k, v]);
+   await widget('chart', { bars: bars.length ? bars : [['sample', works.length || 1]] });
    ```
 
 ## Examples

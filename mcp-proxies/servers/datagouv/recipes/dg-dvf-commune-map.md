@@ -94,10 +94,10 @@ DVF (Demandes de valeurs foncières, DGFiP) lists every notarised transaction si
      // Price distribution histogram
      if (prices.length > 0) {
        const buckets = [0, 100_000, 250_000, 500_000, 1_000_000, Infinity];
+       const labels = ['<100k', '100-250k', '250-500k', '500k-1M', '>1M'];
        const counts = buckets.slice(0, -1).map((lo, i) => prices.filter(p => p >= lo && p < buckets[i + 1]).length);
        await widget('chart', {
-         type: 'bar',
-         data: { labels: ['<100k', '100-250k', '250-500k', '500k-1M', '>1M'], values: counts }
+         bars: labels.map((l, i) => [l, counts[i]])
        });
      }
    }

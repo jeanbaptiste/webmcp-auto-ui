@@ -43,25 +43,19 @@ const enriched = await Promise.all(
 // 4. KPIs
 const durs = targets.map(t => +(t?.min_dur?.dur ?? Infinity)).filter(Number.isFinite);
 await widget('kv', {
-  items: [
-    { label: 'Targets', value: targets.length },
-    { label: 'Min Δv (km/s)', value: targets[0]?.min_dv?.dv ?? '—' },
-    { label: 'Min duration (d)', value: durs.length > 0 ? Math.min(...durs) : '—' },
-    { label: 'Launch window', value: '2030-2035' }
+  rows: [
+    ['Targets', String(targets.length)],
+    ['Min Δv (km/s)', String(targets[0]?.min_dv?.dv ?? '—')],
+    ['Min duration (d)', String(durs.length > 0 ? Math.min(...durs) : '—')],
+    ['Launch window', '2030-2035']
   ]
 });
 
-// 5. Scatter Δv vs duration
+// 5. Bar chart: top-10 targets by min Δv
+const chartTargets = targets.filter(t => Number.isFinite(+t?.min_dv?.dv)).slice(0, 10);
 await widget('chart', {
-  type: 'scatter',
-  data: targets.filter(t => Number.isFinite(+t?.min_dv?.dv) && Number.isFinite(+t?.min_dur?.dur)).map(t => ({
-    x: +t.min_dv.dv,
-    y: +t.min_dur.dur,
-    label: t?.des ?? '—',
-    color: +t.min_dv.dv < 5 ? '#16a34a' : '#3b82f6'
-  })),
-  xLabel: 'Min total Δv (km/s)',
-  yLabel: 'Min mission duration (days)'
+  title: 'Min Δv by target (km/s)',
+  bars: chartTargets.map(t => [t?.des ?? '—', +t.min_dv.dv])
 });
 
 // 6. Sortable table
@@ -86,7 +80,7 @@ await widget('cards', {
 ```js
 const data = await call('jpl_nhats', { dv: 5, dur: 270 }).catch(() => null);
 const targets = (data?.data ?? []).filter(t => t);
-await widget('kv', { items: [{ label: 'Easy targets', value: targets.length }] });
+await widget('kv', { rows: [['Easy targets', String(targets.length)]] });
 await widget('cards', { items: targets.slice(0, 3).map(t => ({ title: t?.des ?? '—', subtitle: 'Δv ' + (t?.min_dv?.dv ?? '—') })) });
 ```
 

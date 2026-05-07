@@ -64,9 +64,9 @@ layout:
 6. **KV of license clarity**:
    ```js
    await widget('kv', {
-     pairs: [
+     rows: [
        ['Status', 'Public domain (CC0)'],
-       ['Rights', free[0]?.rightsAndReproduction ?? 'Open access'],
+       ['Rights', String(free[0]?.rightsAndReproduction ?? 'Open access')],
        ['Source', 'metmuseum.org'],
        ['Recommended attribution', 'The Metropolitan Museum of Art, New York']
      ]

@@ -46,21 +46,20 @@ const peak = sortedMonths[0];
 const total = months.reduce((s, [, n]) => s + (n ?? 0), 0);
 
 // 4. Render
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 await widget('chart', {
-  type: 'bar',
-  labels: months.map(([m]) => ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(m) - 1] ?? m),
-  data: months.map(([, n]) => n),
   title: `Monthly observations of ${taxon.preferred_common_name ?? taxon.name ?? 'species'}`,
+  bars: months.map(([m, n]) => [MONTH_NAMES[Number(m) - 1] ?? m, Number(n)]),
 });
-await widget('stat-card', { label: 'Peak month', value: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(peak?.[0]) - 1] ?? peak?.[0] ?? '—', icon: 'calendar' });
+await widget('stat-card', { label: 'Peak month', value: MONTH_NAMES[Number(peak?.[0]) - 1] ?? peak?.[0] ?? '—', icon: 'calendar' });
 await widget('stat-card', { label: 'Total observations', value: total, icon: 'eye' });
 await widget('kv', {
   title: taxon.preferred_common_name ?? taxon.name ?? 'Species',
-  items: {
-    'Scientific name': taxon.name ?? '—',
-    Rank: taxon.rank ?? '—',
-    'Conservation': detail?.conservation_status?.status_name ?? 'Least concern',
-  },
+  rows: [
+    ['Scientific name', String(taxon.name ?? '—')],
+    ['Rank', String(taxon.rank ?? '—')],
+    ['Conservation', String(detail?.conservation_status?.status_name ?? 'Least concern')],
+  ],
 });
 await widget('gallery', {
   images: (obs?.results ?? [])
@@ -82,7 +81,7 @@ const t = taxa?.results?.[0];
 if (!place || !t) { await widget('text', { content: 'Place or species not found.' }); return; }
 const hist = await call('observations_histogram', { taxon_id: t.id, place_id: place.id, interval: 'month' }).catch(() => ({ results: { month: {} } }));
 const m = hist?.results?.month ?? {};
-await widget('chart', { type: 'bar', labels: Object.keys(m), data: Object.values(m) });
+await widget('chart', { bars: Object.entries(m).map(([k, v]) => [k, Number(v)]) });
 ```
 
 ### Cicada peak
@@ -91,7 +90,7 @@ const t = (await call('search_taxa', { q: 'Cicadidae', rank: 'family', per_page:
 if (!t) { await widget('text', { content: 'Clade not found.' }); return; }
 const hist = await call('observations_histogram', { taxon_id: t.id, interval: 'month' }).catch(() => ({ results: { month: {} } }));
 const m = hist?.results?.month ?? {};
-await widget('chart', { type: 'bar', labels: Object.keys(m), data: Object.values(m), title: 'Cicadas — global phenology' });
+await widget('chart', { title: 'Cicadas — global phenology', bars: Object.entries(m).map(([k, v]) => [k, Number(v)]) });
 ```
 
 ## Common mistakes

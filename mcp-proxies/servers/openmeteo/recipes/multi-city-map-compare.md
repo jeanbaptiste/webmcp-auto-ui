@@ -60,13 +60,13 @@ const data = points.map((p, i) => {
   const m = meteos[i];
   return {
     name: p.name ?? '—',
-    lat: p.latitude,
-    lng: p.longitude,
+    lat: p.latitude ?? null,
+    lon: p.longitude ?? null,
     temp: m?.current_weather?.temperature,
     wind: m?.current_weather?.windspeed,
     rain: m?.daily?.precipitation_sum?.[0]
   };
-}).filter(d => Number.isFinite(d.temp));
+}).filter(d => Number.isFinite(d.temp) && Number.isFinite(d.lat) && Number.isFinite(d.lon));
 
 if (data.length === 0) {
   await widget('text', { content: 'Donnees meteo indisponibles pour les villes demandees.' });
@@ -75,12 +75,12 @@ if (data.length === 0) {
 
 const center = {
   lat: data.reduce((s, d) => s + d.lat, 0) / data.length,
-  lng: data.reduce((s, d) => s + d.lng, 0) / data.length
+  lon: data.reduce((s, d) => s + d.lon, 0) / data.length
 };
 
-// Zoom dynamique selon la dispersion lat/lng des villes
+// Zoom dynamique selon la dispersion lat/lon des villes
 const latSpan = Math.max(...data.map(d => d.lat)) - Math.min(...data.map(d => d.lat));
-const lngSpan = Math.max(...data.map(d => d.lng)) - Math.min(...data.map(d => d.lng));
+const lngSpan = Math.max(...data.map(d => d.lon)) - Math.min(...data.map(d => d.lon));
 const span = Math.max(latSpan, lngSpan);
 const zoom = span < 3 ? 8 : span < 8 ? 6 : span < 20 ? 5 : 4;
 
@@ -88,7 +88,7 @@ await widget('map', {
   title: 'Meteo actuelle - comparaison villes',
   center, zoom,
   markers: data.map(d => ({
-    lat: d.lat, lng: d.lng, label: d.name,
+    lat: d.lat, lon: d.lon, label: d.name,
     color: tempToColor(d.temp),
     popup: `${d.name} : ${d.temp}C, vent ${d.wind ?? '—'} km/h, pluie 24h ${d.rain ?? '—'} mm`
   }))

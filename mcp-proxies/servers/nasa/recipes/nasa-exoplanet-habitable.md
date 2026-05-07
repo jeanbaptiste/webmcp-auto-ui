@@ -44,17 +44,18 @@ await widget('stat-card', { label: 'Candidates', value: planets.length, icon: 'g
 await widget('stat-card', { label: 'Closest (pc)', value: Number.isFinite(closestDist) ? closestDist.toFixed(1) : '—', icon: 'map-pin' });
 await widget('stat-card', { label: 'Detection methods', value: methods.size, icon: 'eye' });
 
-// 3. Scatter: radius vs equilibrium temperature
+// 3. Bar chart: equilibrium temperature distribution across candidates
+const tempBuckets = { '200–240 K': 0, '240–270 K': 0, '270–300 K': 0, '300–320 K': 0 };
+planets.forEach(p => {
+  const t = +p?.pl_eqt;
+  if (!Number.isFinite(t)) return;
+  if (t < 240) tempBuckets['200–240 K']++;
+  else if (t < 270) tempBuckets['240–270 K']++;
+  else if (t < 300) tempBuckets['270–300 K']++;
+  else tempBuckets['300–320 K']++;
+});
 await widget('chart', {
-  type: 'scatter',
-  data: planets.filter(p => Number.isFinite(+p?.pl_rade) && Number.isFinite(+p?.pl_eqt)).map(p => ({
-    x: +p.pl_rade,
-    y: +p.pl_eqt,
-    label: p?.pl_name ?? '—',
-    color: +p?.sy_dist < 20 ? '#16a34a' : '#3b82f6'
-  })),
-  xLabel: 'Radius (R⊕)',
-  yLabel: 'Equilibrium T (K)'
+  bars: Object.entries(tempBuckets).map(([label, value]) => [label, value])
 });
 
 // 4. Sortable table

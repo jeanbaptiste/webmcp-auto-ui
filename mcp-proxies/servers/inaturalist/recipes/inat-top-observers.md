@@ -61,14 +61,12 @@ await widget('stat-card', { label: '#1 species count', value: boardResults[0].sp
 const champ = boardResults[0].user ?? boardResults[0].observer ?? (boardResults[0].login ? boardResults[0] : null);
 if (champ) {
   await widget('profile', {
-    title: champ.name ?? champ.login ?? 'Observer',
-    subtitle: '@' + (champ.login ?? '—'),
-    image: champ.icon_url,
-    fields: {
-      'Species observed': boardResults[0].species_count ?? 0,
-      Observations: boardResults[0].observation_count ?? 0,
-      Joined: champ.created_at?.slice(0, 10) ?? '—',
-    },
+    name: (champ.name ?? champ.login ?? 'Observer') + ' (@' + (champ.login ?? '—') + ')',
+    fields: [
+      { label: 'Species observed', value: boardResults[0].species_count ?? 0 },
+      { label: 'Observations', value: boardResults[0].observation_count ?? 0 },
+      { label: 'Joined', value: champ.created_at?.slice(0, 10) ?? '—' },
+    ],
   });
 }
 ```

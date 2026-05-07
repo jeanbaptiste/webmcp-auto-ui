@@ -39,8 +39,7 @@ const files = (study?.study_files ?? study?.files ?? res?.files ?? []).filter(f 
 
 // 2. Intro text
 await widget('text', {
-  title: `OSD-${acc}`,
-  body: study?.title || study?.identifier || `NASA Open Science study OSD-${acc}. Listed below are the data files associated with the experiment.`
+  content: study?.title || study?.identifier || `NASA Open Science study OSD-${acc}. Listed below are the data files associated with the experiment.`
 });
 
 // 3. KPI stats
@@ -52,13 +51,13 @@ await widget('stat-card', { label: 'File types', value: types.size, icon: 'layer
 
 // 4. Study metadata kv
 await widget('kv', {
-  items: [
-    { label: 'Accession', value: `OSD-${acc}` },
-    { label: 'Title', value: study?.title },
-    { label: 'Organism', value: study?.organism },
-    { label: 'Mission', value: study?.mission },
-    { label: 'Project type', value: study?.project_type }
-  ].filter(i => i.value)
+  rows: [
+    ['Accession', `OSD-${acc}`],
+    ['Title', study?.title],
+    ['Organism', study?.organism],
+    ['Mission', study?.mission],
+    ['Project type', study?.project_type]
+  ].filter(r => r[1])
 });
 
 // 5. Files table

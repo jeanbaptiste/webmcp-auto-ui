@@ -49,15 +49,14 @@ const top = await call('species_counts', { taxon_id: t.id, per_page: 5 }).catch(
 
 // 5. Render
 await widget('profile', {
-  title: detail.preferred_common_name ?? detail.name ?? 'Unknown species',
+  name: detail.preferred_common_name ?? detail.name ?? 'Unknown species',
   subtitle: detail.name ?? '',
-  image: detail.default_photo?.medium_url,
-  fields: {
-    Rank: detail.rank ?? '—',
-    Family: detail.ancestors?.find(a => a.rank === 'family')?.name ?? '—',
-    'Conservation status': detail.conservation_status?.status_name ?? 'Least concern',
-    'Total observations': detail.observations_count ?? 0,
-  },
+  fields: [
+    { label: 'Rank', value: detail.rank ?? '—' },
+    { label: 'Family', value: detail.ancestors?.find(a => a.rank === 'family')?.name ?? '—' },
+    { label: 'Conservation status', value: detail.conservation_status?.status_name ?? 'Least concern' },
+    { label: 'Total observations', value: detail.observations_count ?? 0 },
+  ],
 });
 await widget('text', { content: detail.wikipedia_summary || 'No Wikipedia summary available.' });
 const mapMarkers = (obs?.results ?? [])
@@ -91,7 +90,7 @@ await widget('stat-card', { label: 'iNat observations', value: detail.observatio
 const t = (await call('search_taxa', { q: 'fire salamander', per_page: 1 }))?.results?.[0];
 if (!t) { await widget('text', { content: 'Species not found.' }); return; }
 const d = await call('get_taxon', { id: t.id });
-await widget('profile', { title: d?.preferred_common_name ?? d?.name ?? 'Unknown', subtitle: d?.name ?? '', image: d?.default_photo?.medium_url, fields: { Rank: d?.rank ?? '—', Conservation: d?.conservation_status?.status_name ?? 'Least concern' } });
+await widget('profile', { name: d?.preferred_common_name ?? d?.name ?? 'Unknown', subtitle: d?.name ?? '', fields: [{ label: 'Rank', value: d?.rank ?? '—' }, { label: 'Conservation', value: d?.conservation_status?.status_name ?? 'Least concern' }] });
 ```
 
 ### Red panda

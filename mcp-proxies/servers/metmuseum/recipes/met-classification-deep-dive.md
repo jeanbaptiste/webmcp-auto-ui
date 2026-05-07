@@ -71,7 +71,7 @@ layout:
 6. **KV taxonomy explanation**:
    ```js
    await widget('kv', {
-     pairs: Object.entries(byClass).map(([k, ws]) => [k, `${ws.length} objects — ex. ${ws[0]?.title ?? '—'}`])
+     rows: Object.entries(byClass).map(([k, ws]) => [k, `${ws.length} objects — ex. ${ws[0]?.title ?? '—'}`])
    });
    ```
 

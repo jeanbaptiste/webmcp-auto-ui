@@ -45,23 +45,22 @@ if (rows.length === 0) return widget('text', { content: 'No ephemeris data parse
 
 // 3. Mission descriptor
 await widget('kv', {
-  items: [
-    { label: 'Target', value: 'Mars (499)' },
-    { label: 'Center', value: 'Geocentric (Earth)' },
-    { label: 'Window', value: '2026-04-29 → 2026-05-06' },
-    { label: 'Step', value: '1 day' }
+  rows: [
+    ['Target', 'Mars (499)'],
+    ['Center', 'Geocentric (Earth)'],
+    ['Window', '2026-04-29 → 2026-05-06'],
+    ['Step', '1 day']
   ]
 });
 
-// 4. Sky-track chart (RA vs Dec)
-await widget('chart', {
-  type: 'line',
-  data: rows.filter(c => Number.isFinite(parseFloat(c?.[2])) && Number.isFinite(parseFloat(c?.[3]))).map(c => ({
-    x: parseFloat(c[2]),  // RA hours (or degrees)
-    y: parseFloat(c[3]),  // Dec degrees
-    label: c?.[0] ?? '—'
-  })),
-  xLabel: 'RA', yLabel: 'Dec'
+// 4. Sky-track chart (RA vs Dec over time)
+const validRows = rows.filter(c => Number.isFinite(parseFloat(c?.[2])) && Number.isFinite(parseFloat(c?.[3])));
+await widget('chart-rich', {
+  data: [
+    { label: 'RA',  values: validRows.map(c => parseFloat(c[2])) },
+    { label: 'Dec', values: validRows.map(c => parseFloat(c[3])) }
+  ],
+  labels: validRows.map(c => c?.[0] ?? '—')
 });
 
 // 5. Daily table
@@ -72,8 +71,7 @@ await widget('data-table', {
 
 // 6. Observation tips
 await widget('text', {
-  title: 'Observation tips',
-  content: 'Mars rises east-southeast around local midnight. With V mag ~0.5 it is visible to the naked eye. A small telescope reveals the polar ice cap at high magnification. Best viewed when more than 30° above the horizon to minimise atmospheric extinction.'
+  content: '**Observation tips**\n\nMars rises east-southeast around local midnight. With V mag ~0.5 it is visible to the naked eye. A small telescope reveals the polar ice cap at high magnification. Best viewed when more than 30° above the horizon to minimise atmospheric extinction.'
 });
 ```
 
@@ -87,7 +85,7 @@ const r = await call('jpl_horizons', {
   CENTER: '500@399',
   START_TIME: '2020-07-10', STOP_TIME: '2020-07-25', STEP_SIZE: '1d'
 }).catch(() => null);
-await widget('kv', { items: [{ label: 'Target', value: 'C/2020 F3 (NEOWISE)' }] });
+await widget('kv', { rows: [['Target', 'C/2020 F3 (NEOWISE)']] });
 ```
 
 ### Jupiter for the upcoming week from a city
@@ -98,7 +96,7 @@ const r = await call('jpl_horizons', {
   CENTER: 'coord@399',
   START_TIME: '2026-05-01', STOP_TIME: '2026-05-08', STEP_SIZE: '12h'
 }).catch(() => null);
-await widget('text', { title: 'Jupiter visibility', content: 'Rises after midnight, magnitude -2, easy naked-eye target.' });
+await widget('text', { content: '**Jupiter visibility**\n\nRises after midnight, magnitude -2, easy naked-eye target.' });
 ```
 
 ## Common mistakes

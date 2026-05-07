@@ -90,10 +90,10 @@ const meanAnom = anomalies.length > 0 ? anomalies.reduce((s, v) => s + v, 0) / a
 await widget('chart-rich', {
   title: 'Tmoy actuelle vs normale 1995-2024 - Paris',
   type: 'line',
-  xAxis: { label: 'Date', data: nowTimes },
-  series: [
-    { label: 'Tmoy actuelle (C)', data: nowMeans, color: '#e74c3c' },
-    { label: 'Normale 30 ans (C)', data: climSeries.map(v => v == null ? null : Number(v.toFixed(2))), color: '#bdc3c7', dashed: true }
+  labels: nowTimes,
+  data: [
+    { label: 'Tmoy actuelle (C)', values: nowMeans.map(v => Number(v)), color: '#e74c3c' },
+    { label: 'Normale 30 ans (C)', values: climSeries.map(v => v == null ? null : Number(v.toFixed(2))), color: '#bdc3c7' }
   ]
 });
 

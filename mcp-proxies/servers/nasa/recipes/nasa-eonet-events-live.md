@@ -53,10 +53,10 @@ await widget('map', {
   center: [20, 0],
   zoom: 2,
   markers: events.map(e => {
-    const geom = e?.geometry ?? [];
-    const g = geom.length > 0 ? geom[geom.length - 1] : null;
+    const geom = (e?.geometry ?? []).filter(g => g != null && g.type != null);
+    const last = geom.length > 0 ? geom[geom.length - 1] : null;
     const cat = e?.categories?.[0]?.title;
-    const c = g?.coordinates;
+    const c = last?.coordinates;
     if (!c || !Array.isArray(c) || c.length < 2) return null;
     return { lat: c[1], lon: c[0], label: e?.title ?? '—', color: COLOR[cat] || '#6b7280', popup: cat ?? '—' };
   }).filter(Boolean)
@@ -73,11 +73,14 @@ await widget('cards', {
 
 // 6. Timeline of starts
 await widget('timeline', {
-  events: events.slice(0, 25).map(e => ({
-    date: e?.geometry?.[0]?.date?.slice(0, 10) ?? '—',
-    title: e?.title ?? '—',
-    description: e?.categories?.[0]?.title ?? '—'
-  }))
+  events: events.slice(0, 25).map(e => {
+    const geom = (e?.geometry ?? []).filter(g => g != null && g.type != null);
+    return {
+      date: geom[0]?.date?.slice(0, 10) ?? '—',
+      title: e?.title ?? '—',
+      description: e?.categories?.[0]?.title ?? '—'
+    };
+  })
 });
 ```
 
@@ -88,7 +91,7 @@ await widget('timeline', {
 const data = await call('nasa_eonet', { category: 'volcanoes', status: 'open', limit: 50 }).catch(() => null);
 const events = (data?.events ?? []).filter(e => e);
 const markers = events.map(e => {
-  const geom = e?.geometry ?? [];
+  const geom = (e?.geometry ?? []).filter(g => g != null && g.type != null);
   const last = geom.length > 0 ? geom[geom.length - 1] : null;
   const c = last?.coordinates;
   if (!c || !Array.isArray(c) || c.length < 2) return null;
@@ -102,7 +105,10 @@ await widget('stat-card', { label: 'Active volcanoes', value: Math.max(events.le
 ```js
 const data = await call('nasa_eonet', { category: 'wildfires', status: 'closed', days: 90, limit: 100 }).catch(() => null);
 const events = (data?.events ?? []).filter(e => e);
-await widget('timeline', { events: events.map(e => ({ date: e?.geometry?.[0]?.date ?? '—', title: e?.title ?? '—' })) });
+await widget('timeline', { events: events.map(e => {
+  const geom = (e?.geometry ?? []).filter(g => g != null && g.type != null);
+  return { date: geom[0]?.date ?? '—', title: e?.title ?? '—' };
+}) });
 ```
 
 ## Common mistakes

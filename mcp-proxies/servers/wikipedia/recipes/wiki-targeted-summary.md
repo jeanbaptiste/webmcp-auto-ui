@@ -41,9 +41,9 @@ The user has a precise sub-question rather than a general lookup:
 3. **Render context + focused answer**:
    ```js
    await widget('kv', {
-     items: [
-       { label: 'Article', value: res?.title ?? '—' },
-       { label: 'Query', value: res?.query ?? '—' }
+     rows: [
+       [String('Article'), String(res?.title ?? '—')],
+       [String('Query'),   String(res?.query ?? '—')]
      ]
    });
    await widget('text', { content: res?.summary ?? '(no targeted summary)' });
@@ -59,7 +59,7 @@ const res = await call('summarize_article_for_query', {
   query: "Shor's algorithm",
   max_length: 280
 }).catch(() => null);
-await widget('kv', { items: [{ label: 'Article', value: res?.title ?? '—' }, { label: 'Query', value: res?.query ?? '—' }] });
+await widget('kv', { rows: [[String('Article'), String(res?.title ?? '—')], [String('Query'), String(res?.query ?? '—')]] });
 await widget('text', { content: res?.summary ?? '(no targeted summary)' });
 ```
 
@@ -69,7 +69,7 @@ const [res, ctx] = await Promise.all([
   call('summarize_article_for_query', { title: 'Photosynthesis', query: 'Calvin cycle', max_length: 250 }).catch(() => null),
   call('get_summary', { title: 'Photosynthesis' }).catch(() => null)
 ]);
-await widget('kv', { items: [{ label: 'Article', value: res?.title ?? '—' }, { label: 'Query', value: res?.query ?? '—' }] });
+await widget('kv', { rows: [[String('Article'), String(res?.title ?? '—')], [String('Query'), String(res?.query ?? '—')]] });
 await widget('text', { content: res?.summary ?? '(no targeted summary)' });
 await widget('text', { content: ctx?.summary ?? '' });
 ```

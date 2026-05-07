@@ -39,12 +39,12 @@ const obs = await call('search_observations', {
 // 2. Map markers (replace "square" thumbnail with "medium" for better photos)
 const results = obs?.results ?? [];
 const markers = results
-  .filter(o => o.geojson?.coordinates)
+  .filter(o => o?.geojson?.coordinates?.length >= 2)
   .map(o => ({
     lat: o.geojson.coordinates[1],
     lon: o.geojson.coordinates[0],
-    label: o.species_guess ?? o.taxon?.preferred_common_name ?? o.taxon?.name ?? '',
-    popup: `${o.species_guess ?? o.taxon?.name ?? 'Unknown'} — ${o.observed_on ?? '—'}`,
+    label: o?.species_guess ?? o?.taxon?.preferred_common_name ?? o?.taxon?.name ?? '',
+    popup: `${o?.species_guess ?? o?.taxon?.name ?? 'Unknown'} — ${o?.observed_on ?? '—'}`,
   }));
 if (markers.length === 0) {
   await widget('text', { content: 'Aucune observation géoréférencée trouvée.' });
@@ -53,37 +53,37 @@ if (markers.length === 0) {
 }
 
 // 3. Stat cards
-const species = new Set(results.map(o => o.taxon?.id).filter(Boolean));
-const observers = new Set(results.map(o => o.user?.id).filter(Boolean));
+const species = new Set(results.map(o => o?.taxon?.id).filter(Boolean));
+const observers = new Set(results.map(o => o?.user?.id).filter(Boolean));
 await widget('data-table', {
   columns: ['Metric', 'Value'],
   rows: [
-    ['Observations', obs?.total_results ?? 0],
-    ['Unique species', species.size],
-    ['Observers', observers.size],
+    ['Observations', String(obs?.total_results ?? 0)],
+    ['Unique species', String(species.size)],
+    ['Observers', String(observers.size)],
   ],
 });
 
 // 4. Photo gallery (medium-sized thumbnails)
 const images = results
-  .filter(o => o.photos?.length > 0 && o.photos[0]?.url)
+  .filter(o => o?.photos?.length > 0 && o?.photos?.[0]?.url)
   .map(o => ({
     src: o.photos[0].url.replace('square', 'medium'),
-    alt: o.species_guess ?? '',
-    caption: `${o.place_guess ?? ''} — ${o.observed_on ?? '—'}`,
+    alt: o?.species_guess ?? '',
+    caption: `${o?.place_guess ?? ''} — ${o?.observed_on ?? '—'}`,
   }));
 await widget('gallery', { images });
 
 // 5. Species summary table
 const counts = {};
 for (const o of results) {
-  const k = o.taxon?.name; if (!k) continue;
+  const k = o?.taxon?.name; if (!k) continue;
   counts[k] = (counts[k] || 0) + 1;
 }
 const rows = Object.entries(counts)
   .sort((a, b) => b[1] - a[1])
   .slice(0, 20)
-  .map(([name, n]) => [name, n]);
+  .map(([name, n]) => [name, String(n)]);
 await widget('data-table', { columns: ['Species', 'Observations'], rows });
 ```
 
@@ -95,7 +95,7 @@ const obs = await call('search_observations', {
   lat: 48.8566, lng: 2.3522, radius: 10,
   taxon_name: 'Aves', quality_grade: 'research', per_page: 100,
 });
-await widget('map', { center: [48.8566, 2.3522], zoom: 12, markers: (obs?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0], label: o.species_guess ?? o.taxon?.name ?? '' })) });
+await widget('map', { center: [48.8566, 2.3522], zoom: 12, markers: (obs?.results ?? []).filter(o => o?.geojson?.coordinates?.length >= 2).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0], label: o?.species_guess ?? o?.taxon?.name ?? '' })) });
 ```
 
 ### Butterflies around Chamonix
@@ -104,13 +104,13 @@ const obs = await call('search_observations', {
   lat: 45.9237, lng: 6.8694, radius: 30,
   taxon_name: 'Lepidoptera', per_page: 100,
 });
-await widget('map', { center: [45.9237, 6.8694], zoom: 10, cluster: true, markers: (obs?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0], label: o.species_guess ?? o.taxon?.name ?? '' })) });
+await widget('map', { center: [45.9237, 6.8694], zoom: 10, cluster: true, markers: (obs?.results ?? []).filter(o => o?.geojson?.coordinates?.length >= 2).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0], label: o?.species_guess ?? o?.taxon?.name ?? '' })) });
 ```
 
 ### Reptiles around Montpellier
 ```js
 const obs = await call('search_observations', { lat: 43.6, lng: 3.9, radius: 20, taxon_name: 'Reptilia', per_page: 80 });
-await widget('gallery', { images: (obs?.results ?? []).filter(o => o.photos?.length > 0 && o.photos[0]?.url).map(o => ({ src: o.photos[0].url.replace('square', 'medium'), caption: o.species_guess ?? o.taxon?.name ?? '' })) });
+await widget('gallery', { images: (obs?.results ?? []).filter(o => o?.photos?.length > 0 && o?.photos?.[0]?.url).map(o => ({ src: o.photos[0].url.replace('square', 'medium'), caption: o?.species_guess ?? o?.taxon?.name ?? '' })) });
 ```
 
 ## Common mistakes

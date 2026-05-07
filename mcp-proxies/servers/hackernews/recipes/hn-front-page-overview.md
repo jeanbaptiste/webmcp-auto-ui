@@ -31,7 +31,7 @@ The `get-front-page` tool returns 30 stories ranked by the HN algorithm, with ti
 1. **Fetch the front page**:
    ```js
    const res = await call('get-front-page', { hitsPerPage: 30 });
-   const stories = unwrap(res?.hits ?? res).filter(s => s?.title);
+   const stories = (res?.hits ?? []).filter(s => s?.title);
    if (stories.length === 0) return widget('text', { content: 'No stories on the front page right now.' });
    await widget('text', { content: `Front page loaded: ${stories.length} stories.` });
    ```
@@ -50,7 +50,7 @@ The `get-front-page` tool returns 30 stories ranked by the HN algorithm, with ti
 3. **Render stat-cards**:
    ```js
    const res = await call('get-front-page', { hitsPerPage: 30 });
-   const stories = unwrap(res?.hits ?? res).filter(s => s?.title);
+   const stories = (res?.hits ?? []).filter(s => s?.title);
    const totalPoints = stories.reduce((s, x) => s + (x?.points || 0), 0);
    const totalComments = stories.reduce((s, x) => s + (x?.num_comments || 0), 0);
    const topScore = stories.length > 0 ? Math.max(...stories.map(s => s?.points || 0)) : 0;
@@ -65,7 +65,7 @@ The `get-front-page` tool returns 30 stories ranked by the HN algorithm, with ti
 4. **Top 5 stories in cards** (visual highlight):
    ```js
    const res = await call('get-front-page', { hitsPerPage: 30 });
-   const stories = unwrap(res?.hits ?? res).filter(s => s?.title);
+   const stories = (res?.hits ?? []).filter(s => s?.title);
    const cards = stories.slice(0, 5).map(s => {
      let host = 'news.ycombinator.com';
      try { if (s?.url) host = new URL(s.url).hostname; } catch {}

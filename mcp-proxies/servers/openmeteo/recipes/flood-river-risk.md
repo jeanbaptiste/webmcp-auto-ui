@@ -47,9 +47,10 @@ const f = await call('flood_forecast', {
   forecast_days: 30
 }).catch(() => null);
 
-const discharge = (f?.daily?.river_discharge ?? []).filter(v => Number.isFinite(v));
-const climato = (f?.daily?.river_discharge_mean ?? []).filter(v => Number.isFinite(v));
-if (discharge.length === 0) {
+const discharge = (f?.daily?.river_discharge ?? []).map(v => Number.isFinite(v) ? v : null);
+const climato = (f?.daily?.river_discharge_mean ?? []).map(v => Number.isFinite(v) ? v : null);
+const dischargeFinite = discharge.filter(v => v !== null);
+if (dischargeFinite.length === 0) {
   await widget('map', {
     title: `Point hydro - ${name ?? ''} (hors couverture GloFAS)`,
     center: { lat: latitude, lng: longitude }, zoom: 11,
@@ -58,20 +59,23 @@ if (discharge.length === 0) {
   await widget('text', { content: `Aucune donnee hydrologique pour ${name}. GloFAS ne couvre que les grands cours d'eau (largeur de bassin suffisante). Essayer un point sur la Seine, la Loire, le Rhone ou le Rhin.` });
   return;
 }
-const peak = Math.max(...discharge);
-const peakIdx = (f.daily.river_discharge ?? []).indexOf(peak);
-const meanClimato = climato.length > 0 ? climato.reduce((a, b) => a + b, 0) / climato.length : null;
+const peak = Math.max(...dischargeFinite);
+const peakIdx = discharge.indexOf(peak);
+const climatoFinite = climato.filter(v => v !== null);
+const meanClimato = climatoFinite.length > 0 ? climatoFinite.reduce((a, b) => a + b, 0) / climatoFinite.length : null;
 const ratio = meanClimato ? peak / meanClimato : null;
 const status = ratio == null ? 'Sans reference' : ratio > 3 ? 'Crue probable' : ratio > 2 ? 'Vigilance' : ratio > 1.3 ? 'Au-dessus normale' : 'Normal';
 
+const times = (f.daily.time ?? []).map(String);
+const p50 = (f.daily.river_discharge_p50 ?? []).map(v => Number.isFinite(v) ? v : null);
 await widget('chart-rich', {
   title: `Debit ${name ?? ''} - prevision 30 jours (m3/s)`,
   type: 'line',
-  xAxis: { label: 'Date', data: f.daily.time ?? [] },
-  series: [
-    { label: 'Prevision', data: f.daily.river_discharge ?? [], color: '#2980b9' },
-    { label: 'Mediane (p50)', data: f.daily.river_discharge_p50 ?? [], color: '#7f8c8d' },
-    { label: 'Climatologie', data: f.daily.river_discharge_mean ?? [], color: '#bdc3c7', dashed: true }
+  labels: times,
+  data: [
+    { label: 'Prevision', values: discharge, color: '#2980b9' },
+    { label: 'Mediane (p50)', values: p50, color: '#7f8c8d' },
+    { label: 'Climatologie', values: climato, color: '#bdc3c7' }
   ]
 });
 

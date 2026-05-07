@@ -61,18 +61,16 @@ await widget('map', {
   })),
 });
 await widget('chart', {
-  type: 'bar',
-  labels: Object.keys(continents),
-  data: Object.values(continents),
   title: 'Observations by continent',
+  bars: Object.entries(continents).map(([label, value]) => [label, value]),
 });
 await widget('kv', {
   title: detail?.preferred_common_name ?? detail?.name ?? t.name ?? 'Species',
-  items: {
-    'Scientific name': detail?.name ?? t.name ?? '—',
-    Family: detail?.ancestors?.find(a => a.rank === 'family')?.name ?? '—',
-    'Conservation status': detail?.conservation_status?.status_name ?? 'Least concern',
-  },
+  rows: [
+    ['Scientific name', detail?.name ?? t.name ?? '—'],
+    ['Family', detail?.ancestors?.find(a => a.rank === 'family')?.name ?? '—'],
+    ['Conservation status', detail?.conservation_status?.status_name ?? 'Least concern'],
+  ],
 });
 await widget('stat-card', { label: 'Plotted observations', value: geoResults.length, icon: 'globe' });
 await widget('stat-card', { label: 'Total iNat observations', value: detail?.observations_count ?? 0, icon: 'eye' });
@@ -94,7 +92,7 @@ const t = (await call('search_taxa', { q: 'red panda', per_page: 1 }))?.results?
 if (!t) { await widget('text', { content: 'Species not found.' }); return; }
 const detail = await call('get_taxon', { id: t.id }).catch(() => null);
 const obs = await call('search_observations', { taxon_id: t.id, per_page: 100, quality_grade: 'research' }).catch(() => ({ results: [] }));
-await widget('kv', { title: detail?.preferred_common_name ?? detail?.name ?? 'Species', items: { 'Conservation': detail?.conservation_status?.status_name ?? 'Least concern' } });
+await widget('kv', { title: detail?.preferred_common_name ?? detail?.name ?? 'Species', rows: [['Conservation', detail?.conservation_status?.status_name ?? 'Least concern']] });
 await widget('map', { zoom: 4, markers: (obs?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })) });
 ```
 

@@ -32,11 +32,8 @@ The `get-item` tool returns the full nested comment tree — perfect for in-dept
    ```js
    const item = await call('get-item', { itemId: '38309611' });
    if (!item || item.deleted || item.dead) return widget('text', { content: 'Item unavailable (deleted, dead, or not found).' });
-   await widget('text', {
-     title: item?.title ?? '(untitled)',
-     body: item?.text || (item?.url ? `Link: ${item.url}` : '(no body)'),
-     html: !!item?.text
-   });
+   const _body1 = item?.text || (item?.url ? `Link: ${item.url}` : '(no body)');
+   await widget('text', { content: `**${item?.title ?? '(untitled)'}**\n\n${_body1}` });
    ```
 
 2. **Flatten the comment tree** with depth tracking:
@@ -76,11 +73,8 @@ The `get-item` tool returns the full nested comment tree — perfect for in-dept
 4. **Story body** (text widget — render HTML when present):
    ```js
    const item = await call('get-item', { itemId: '38309611' });
-   await widget('text', {
-     title: item?.title ?? '(untitled)',
-     body: item?.text || (item?.url ? `Link: ${item.url}` : '(no body)'),
-     html: !!item?.text
-   });
+   const _body4 = item?.text || (item?.url ? `Link: ${item.url}` : '(no body)');
+   await widget('text', { content: `**${item?.title ?? '(untitled)'}**\n\n${_body4}` });
    ```
 
 5. **Top 5 root-level comments** (root-level = direct children of the item):
@@ -145,7 +139,8 @@ const comments = flatten(item);
 
 await widget('stat-card', { label: 'Score', value: Math.max(item?.points ?? 0, 1), icon: 'arrow-up' });
 await widget('stat-card', { label: 'Comments', value: Math.max(comments.length, 1), icon: 'message-circle' });
-await widget('text', { title: item?.title ?? '(untitled)', body: item?.text || item?.url || '(no body)', html: !!item?.text });
+const _bodyEx = item?.text || item?.url || '(no body)';
+await widget('text', { content: `**${item?.title ?? '(untitled)'}**\n\n${_bodyEx}` });
 const cards = comments.filter(c => c?.depth === 0).slice(0, 5).map(c => ({
   title: c?.author ?? '—',
   body: (c?.text ?? '').replace(/<[^>]+>/g, '').slice(0, 200)

@@ -55,18 +55,20 @@ await widget('stat-card', { label: 'Dominant method', value: dominantMethod[0], 
 
 // 4. Year-by-year chart
 await widget('chart', {
-  type: 'bar',
-  data: Object.entries(byYear)
-    .map(([year, n]) => ({ label: year, value: n }))
-    .sort((a, b) => a.label.localeCompare(b.label))
+  bars: Object.entries(byYear)
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([year, n]) => [String(year), Number(n)])
 });
 
 // 5. Rich chart by method
+const methodEntries = Object.entries(byMethod).sort((a, b) => b[1] - a[1]);
+const methodLabels = methodEntries.map(([m]) => m);
 await widget('chart-rich', {
-  type: 'pie',
-  series: [{
-    name: 'Detection methods',
-    data: Object.entries(byMethod).map(([m, v]) => ({ label: m, value: v }))
+  type: 'bar',
+  labels: methodLabels,
+  data: [{
+    label: 'Detection methods',
+    values: methodEntries.map(([, v]) => Number(v))
   }]
 });
 
@@ -85,8 +87,8 @@ const res = await call('nasa_exoplanet', { table: 'ps', select: 'disc_year', whe
 const planets = (Array.isArray(res) ? res : (res?.data ?? res?.rows ?? res?.result ?? [])).filter(p => p);
 const byYear = {};
 for (const p of planets) if (p?.disc_year != null) byYear[p.disc_year] = (byYear[p.disc_year] || 0) + 1;
-const data = Object.entries(byYear).map(([y, n]) => ({ label: y, value: n }));
-await widget('chart', { type: 'bar', data: data.length ? data : [{ label: '2024', value: 1 }] });
+const bars = Object.entries(byYear).sort((a, b) => Number(a[0]) - Number(b[0])).map(([y, n]) => [String(y), Number(n)]);
+await widget('chart', { bars: bars.length ? bars : [['2024', 1]] });
 ```
 
 ### Kepler harvest specifically

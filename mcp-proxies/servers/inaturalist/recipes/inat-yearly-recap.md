@@ -55,8 +55,7 @@ await widget('chart-rich', {
   type: 'bar',
   title: `${place.display_name ?? 'Region'} — observations per month in ${year}`,
   labels: Object.keys(monthData),
-  data: Object.values(monthData),
-  caption: `${allObs?.total_results ?? 0} research-grade observations across the year.`,
+  data: [{ label: 'Observations', values: Object.values(monthData).map(Number) }],
 });
 
 // 9. Best-of gallery
@@ -86,7 +85,7 @@ const place = (await call('search_places', { q: 'Belgium', per_page: 1 }))?.resu
 if (!place) { await widget('text', { content: 'Place not found.' }); return; }
 const hist = await call('observations_histogram', { place_id: place.id, d1: '2024-01-01', d2: '2024-12-31', interval: 'month' }).catch(() => ({ results: { month: {} } }));
 const m = hist?.results?.month ?? {};
-await widget('chart-rich', { type: 'bar', labels: Object.keys(m), data: Object.values(m) });
+await widget('chart-rich', { type: 'bar', labels: Object.keys(m), data: [{ label: 'Observations', values: Object.values(m).map(Number) }] });
 ```
 
 ### Cevennes wrapped

@@ -34,7 +34,10 @@ layout:
    const details = await Promise.all(
      ids.slice(0, 15).map(id => call('get-museum-object', { objectId: id }).catch(() => null))
    );
-   const works = details.filter(d => d?.object).map(d => d.object).filter(o => o?.primaryImageSmall && (o?.culture || o?.country || o?.region));
+   // get-museum-object may return the object directly or wrapped under .object
+   const works = details
+     .map(d => (d == null ? null : (d.object ?? d)))
+     .filter(o => o?.primaryImageSmall && (o?.culture || o?.country || o?.region));
    ```
 
 3. **Geocode** culture/country names (use a static lookup keyed on `culture`):
@@ -53,21 +56,26 @@ layout:
      for (const k of Object.keys(CULTURE_COORDS)) if (label.includes(k)) return CULTURE_COORDS[k];
      return null;
    };
-   const geocoded = works.map(w => ({ ...w, coords: lookupCoords(w?.culture) || lookupCoords(w?.country) || lookupCoords(w?.region) })).filter(w => w?.coords);
+   const geocoded = works
+     .map(w => ({ ...w, coords: lookupCoords(w?.culture) || lookupCoords(w?.country) || lookupCoords(w?.region) }))
+     .filter(w => w?.coords?.lat != null && w?.coords?.lon != null);
    ```
 
 4. **Map of origins**:
    ```js
-   await widget('map', {
-     center: [0, 20],
-     zoom: 2,
-     markers: geocoded.map(w => ({
-       lat: w?.coords?.lat,
-       lon: w?.coords?.lon,
-       label: w?.title ?? '(untitled)',
-       popup: `${w?.title ?? '(untitled)'} — ${w?.culture || w?.country || '—'}`
-     }))
-   });
+   if (geocoded.length === 0) {
+     await widget('text', { content: 'No objects with recognisable geographic origins found.' });
+   } else {
+     await widget('map', {
+       center: [20, 20],
+       zoom: 2,
+       markers: geocoded.map(w => ({
+         lat: w.coords.lat,
+         lon: w.coords.lon,
+         label: `${w?.title ?? '(untitled)'} — ${w?.culture || w?.country || '—'}`
+       }))
+     });
+   }
    ```
 
 5. **Gallery + summary table**:
@@ -93,7 +101,7 @@ layout:
 const r = await call('search-museum-objects', { q: 'mask', departmentId: 6, hasImages: true }).catch(() => null);
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+const works = objs.map(o => (o == null ? null : (o.object ?? o))).filter(w => w?.primaryImageSmall);
 await widget('data-table', { columns: ['Title', 'Culture'], rows: works.map(w => [w?.title ?? '(untitled)', w?.culture ?? '—']) });
 ```
 
@@ -102,7 +110,7 @@ await widget('data-table', { columns: ['Title', 'Culture'], rows: works.map(w =>
 const r = await call('search-museum-objects', { q: 'pottery', departmentId: 5, hasImages: true }).catch(() => null);
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+const works = objs.map(o => (o == null ? null : (o.object ?? o))).filter(w => w?.primaryImageSmall);
 await widget('data-table', { columns: ['Title', 'Region', 'Culture'], rows: works.map(w => [w?.title ?? '(untitled)', w?.region ?? '—', w?.culture ?? '—']) });
 ```
 

@@ -75,33 +75,37 @@ stormHours.forEach((s, i) => {
   else if (!s.storm && epStart >= 0) { stormEpisodes.push({ start: epStart, end: i - 1 }); epStart = -1; }
 });
 
+const timeLabels = (h.time ?? []).map(t => t?.slice(11, 16) ?? '');
+
 await widget('chart-rich', {
   title: `Probabilite orages 48h - ${name ?? ''} — probabilite`,
   type: 'line',
-  xAxis: { label: 'Heure', data: h.time ?? [] },
-  series: [
-    { label: 'Prob. precip (%)', data: h.precipitation_probability ?? [], color: '#3498db' }
+  labels: timeLabels,
+  data: [
+    { label: 'Prob. precip (%)', values: (h.precipitation_probability ?? []).map(v => Number.isFinite(v) ? v : 0), color: '#3498db' }
   ]
 });
 
 await widget('chart-rich', {
   title: `Probabilite orages 48h - ${name ?? ''} — CAPE / precip`,
   type: 'line',
-  xAxis: { label: 'Heure', data: h.time ?? [] },
-  series: [
-    { label: 'CAPE norm (0-100)', data: (h.cape ?? []).map(v => Number.isFinite(v) ? Math.min(100, v / 50) : 0), color: '#e74c3c' },
-    { label: 'Precip (mm)', data: h.precipitation ?? [], color: '#7f8c8d' }
+  labels: timeLabels,
+  data: [
+    { label: 'CAPE norm (0-100)', values: (h.cape ?? []).map(v => Number.isFinite(v) ? Math.min(100, v / 50) : 0), color: '#e74c3c' },
+    { label: 'Precip (mm)', values: (h.precipitation ?? []).map(v => Number.isFinite(v) ? v : 0), color: '#7f8c8d' }
   ]
 });
 
 await widget('timeline', {
   title: 'Creneaux a risque',
-  events: stormEpisodes.map(e => ({
-    date: h.time[e.start] ?? '—',
-    label: 'Risque orage',
-    detail: `${h.time[e.start]?.slice(11, 16) ?? '—'} -> ${h.time[e.end]?.slice(11, 16) ?? '—'}`,
-    color: '#e74c3c'
-  }))
+  events: stormEpisodes.length > 0
+    ? stormEpisodes.map(e => ({
+        date: h.time?.[e.start] ?? '—',
+        title: 'Risque orage',
+        description: `${h.time?.[e.start]?.slice(11, 16) ?? '—'} -> ${h.time?.[e.end]?.slice(11, 16) ?? '—'}`,
+        status: 'active'
+      }))
+    : [{ title: 'Aucun episode orageux detecte', status: 'done' }]
 });
 
 await widget('stat-card', {
@@ -113,7 +117,6 @@ await widget('stat-card', {
 });
 
 await widget('map', {
-  title: name ?? '',
   center: { lat: latitude, lng: longitude }, zoom: 9,
   markers: [{ lat: latitude, lng: longitude, label: name ?? '' }]
 });

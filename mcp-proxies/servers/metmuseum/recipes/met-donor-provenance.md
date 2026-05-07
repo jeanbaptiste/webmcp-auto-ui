@@ -75,10 +75,10 @@ layout:
    const items = display.slice(0, 8).map(w => ({ title: w?.title ?? '(untitled)', subtitle: w?.artistDisplayName ?? '—', image: w?.primaryImageSmall || undefined, body: w?.medium ?? '—' }));
    await widget('cards', { items: items.length ? items : [{ title: 'No samples', subtitle: '—' }] });
    await widget('kv', {
-     pairs: [
+     rows: [
        ['Donor', 'Havemeyer'],
-       ['Total works', search?.total ?? display.length],
-       ['Sampled', display.length],
+       ['Total works', String(search?.total ?? display.length)],
+       ['Sampled', String(display.length)],
        ['Departments', departments.join(', ') || '—']
      ]
    });

@@ -35,10 +35,10 @@ const results = await Promise.all(
 );
 
 // 2. Productivity chart (count per camera)
-const chartData = cams.map((c, i) => ({ label: c, value: (results[i]?.photos ?? []).length }));
-const hasData = chartData.some(d => d.value > 0);
+const chartBars = cams.map((c, i) => [c, Number((results[i]?.photos ?? []).length)]);
+const hasData = chartBars.some(([, v]) => v > 0);
 if (hasData) {
-  await widget('chart', { type: 'bar', data: chartData });
+  await widget('chart', { bars: chartBars });
 } else {
   await widget('cards', { items: [{ title: 'No photos found', description: 'Try a different sol number.' }] });
 }
@@ -78,7 +78,7 @@ const cams = ['FHAZ', 'NAVCAM', 'MAST', 'CHEMCAM'];
 const results = await Promise.all(cams.map(c =>
   call('nasa_mars_rover', { rover: 'curiosity', sol: 1500, camera: c }).catch(() => null)
 ));
-await widget('chart', { type: 'bar', data: cams.map((c, i) => ({ label: c, value: (results[i]?.photos ?? []).length })) });
+await widget('chart', { bars: cams.map((c, i) => [c, Number((results[i]?.photos ?? []).length)]) });
 await widget('cards', { items: cams.map((c, i) => ({ title: c, subtitle: (results[i]?.photos ?? []).length + ' photos' })) });
 ```
 

@@ -55,43 +55,46 @@ if (points.length === 0) return widget('text', { content: 'No vector data parsed
 // 3. Parameter kv
 console.log('--- kv ---');
 await widget('kv', {
-  items: [
-    { label: 'Target', value: '1 Ceres' },
-    { label: 'Center', value: 'Heliocentric (@10)' },
-    { label: 'Window', value: '2026-01-01 → 2031-01-01' },
-    { label: 'Step', value: '30 days' },
-    { label: 'Units', value: 'AU' }
+  rows: [
+    ['Target', '1 Ceres'],
+    ['Center', 'Heliocentric (@10)'],
+    ['Window', '2026-01-01 → 2031-01-01'],
+    ['Step', '30 days'],
+    ['Units', 'AU']
   ]
 });
 
-// 4. Orbit projection chart (X vs Y, ecliptic)
+// 4. Orbit projection chart (X vs Y, ecliptic plane)
+// chart-rich line mode: labels = X positions (au), one series per body
 console.log('--- chart-rich ---');
+// Sample every 5th point to keep the label array manageable
+const sampled = points.filter((_, i) => i % 5 === 0);
 await widget('chart-rich', {
+  title: 'Ceres orbit — ecliptic projection (X vs Y, au)',
   type: 'line',
-  series: [
-    { name: 'Ceres orbit', data: points.map(p => ({ x: p.x, y: p.y })) },
-    { name: 'Sun', data: [{ x: 0, y: 0 }], style: 'point', color: '#facc15' }
-  ],
-  xLabel: 'X (au)', yLabel: 'Y (au)',
-  aspectRatio: 1
+  labels: sampled.map(p => p.x.toFixed(2)),
+  data: [
+    { label: 'Y (au)', values: sampled.map(p => +p.y.toFixed(4)) }
+  ]
 });
 
-// 5. Distance vs time
+// 5. Distance vs time — bars: [[label, value], ...]
 console.log('--- chart ---');
+const distBars = points
+  .filter((_, i) => i % 3 === 0)
+  .map((p, i) => [
+    String(i * 90) + 'd',
+    +Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z).toFixed(3)
+  ]);
 await widget('chart', {
-  type: 'line',
-  data: points.map((p, i) => ({
-    x: i * 30,
-    y: Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z)
-  })),
-  xLabel: 'Days from epoch', yLabel: 'Heliocentric distance (au)'
+  title: 'Heliocentric distance over time (au)',
+  bars: distBars
 });
 
 // 6. Didactic text
 console.log('--- text ---');
 await widget('text', {
-  title: 'Reading the plot',
-  body: 'The X-Y projection shows the orbit on the ecliptic plane. Distance from the Sun oscillates between perihelion and aphelion every ~4.6 years for Ceres. Tilt of the inclination is hidden in the Z component (not plotted here).'
+  content: 'The X-Y projection shows the orbit on the ecliptic plane. Distance from the Sun oscillates between perihelion and aphelion every ~4.6 years for Ceres. Tilt of the inclination is hidden in the Z component (not plotted here).'
 });
 ```
 
@@ -100,13 +103,13 @@ await widget('text', {
 ### Voyager 1 escape trajectory
 ```js
 const r = await call('jpl_horizons', { COMMAND: '-31', EPHEM_TYPE: 'VECTORS', CENTER: '@10', START_TIME: '1977-09-05', STOP_TIME: '2026-01-01', STEP_SIZE: '180d', OUT_UNITS: 'AU-D' }).catch(() => null);
-await widget('kv', { items: [{ label: 'Spacecraft', value: 'Voyager 1' }, { label: 'Window', value: '1977-2026' }] });
+await widget('kv', { rows: [['Spacecraft', 'Voyager 1'], ['Window', '1977-2026']] });
 ```
 
 ### Long-period comet via file payload
 ```js
 const r = await call('jpl_horizons_file', { COMMAND: 'C/1995 O1', EPHEM_TYPE: 'VECTORS', CENTER: '@10', START_TIME: '1995-01-01', STOP_TIME: '2030-01-01', STEP_SIZE: '30d' }).catch(() => null);
-await widget('text', { title: 'Hale-Bopp', body: 'Highly eccentric orbit — perihelion 0.91 au, aphelion ~370 au.' });
+await widget('text', { content: 'Hale-Bopp — Highly eccentric orbit: perihelion 0.91 au, aphelion ~370 au.' });
 ```
 
 ## Common mistakes

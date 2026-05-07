@@ -56,29 +56,30 @@ await widget('stat-card', { label: 'Avg humidity (%)', value: avg(series?.RH2M).
 // 3. Rich irradiance chart
 await widget('chart-rich', {
   type: 'area',
-  series: [{
-    name: 'Surface SW down (kWh/m²/day)',
-    data: dates.map(d => ({ x: d, y: series?.ALLSKY_SFC_SW_DWN?.[d] ?? 0 }))
-  }],
-  xLabel: 'Day', yLabel: 'kWh/m²/day'
+  title: 'Surface SW Down (kWh/m²/day)',
+  labels: dates,
+  data: [{
+    label: 'Surface SW down (kWh/m²/day)',
+    values: dates.map(d => Number(series?.ALLSKY_SFC_SW_DWN?.[d] ?? 0))
+  }]
 });
 
 // 4. Temperature + wind dual chart
-await widget('chart', {
-  type: 'line',
-  series: [
-    { name: 'T2M (°C)',     data: dates.map(d => ({ x: d, y: series?.T2M?.[d] ?? 0 })) },
-    { name: 'Wind (m/s)',   data: dates.map(d => ({ x: d, y: series?.WS10M?.[d] ?? 0 })) }
+await widget('chart-rich', {
+  labels: dates,
+  data: [
+    { label: 'T2M (°C)',   values: dates.map(d => series?.T2M?.[d] ?? 0) },
+    { label: 'Wind (m/s)', values: dates.map(d => series?.WS10M?.[d] ?? 0) }
   ]
 });
 
 // 5. Site descriptor
 await widget('kv', {
-  items: [
-    { label: 'Latitude', value: lat },
-    { label: 'Longitude', value: lon },
-    { label: 'Period', value: '2024-01-01 → 2024-12-31' },
-    { label: 'Community', value: 'Renewable Energy' }
+  rows: [
+    ['Latitude', lat],
+    ['Longitude', lon],
+    ['Period', '2024-01-01 → 2024-12-31'],
+    ['Community', 'Renewable Energy']
   ]
 });
 ```
@@ -89,7 +90,8 @@ await widget('kv', {
 ```js
 const d = await call('nasa_power', { parameters: 'ALLSKY_SFC_SW_DWN', community: 'RE', latitude: 31.6, longitude: -8.0, start: '20240101', end: '20241231' }).catch(() => null);
 const s = d?.properties?.parameter?.ALLSKY_SFC_SW_DWN ?? d?.parameter?.ALLSKY_SFC_SW_DWN ?? {};
-await widget('chart-rich', { type: 'area', series: [{ name: 'Solar', data: Object.entries(s).map(([dd, v]) => ({ x: dd, y: v })) }] });
+const solarDates = Object.keys(s);
+await widget('chart-rich', { type: 'area', labels: solarDates, data: [{ label: 'Solar', values: solarDates.map(dd => Number(s[dd] ?? 0)) }] });
 ```
 
 ### Berlin temperature record

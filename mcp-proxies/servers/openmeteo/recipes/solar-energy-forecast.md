@@ -72,7 +72,7 @@ const hourlyDiffuse = w.hourly?.diffuse_radiation ?? [];
 // Configuration statique independante des donnees meteo — affichee en premier
 await widget('kv', {
   title: 'Configuration optimale (regle de pouce annuelle)',
-  pairs: [
+  rows: [
     ['Inclinaison conseillee', `${optimalTilt}°`],
     ['Azimut conseille', optimalAzimuth],
     ['Latitude', `${latitude.toFixed(2)}°`],
@@ -83,11 +83,11 @@ await widget('kv', {
 await widget('chart-rich', {
   title: 'Radiation solaire 5 jours - Montpellier',
   type: 'line',
-  xAxis: { label: 'Heure', data: dayIdx.map(i => hourlyTime[i]) },
-  series: [
-    { label: 'Globale (W/m2)', data: dayIdx.map(i => hourlyRad[i]), color: '#f39c12' },
-    { label: 'Directe', data: dayIdx.map(i => hourlyDirect[i] ?? 0), color: '#e67e22' },
-    { label: 'Diffuse', data: dayIdx.map(i => hourlyDiffuse[i] ?? 0), color: '#3498db' }
+  labels: dayIdx.map(i => hourlyTime[i]),
+  data: [
+    { label: 'Globale (W/m2)', values: dayIdx.map(i => hourlyRad[i]), color: '#f39c12' },
+    { label: 'Directe', values: dayIdx.map(i => hourlyDirect[i] ?? 0), color: '#e67e22' },
+    { label: 'Diffuse', values: dayIdx.map(i => hourlyDiffuse[i] ?? 0), color: '#3498db' }
   ]
 });
 

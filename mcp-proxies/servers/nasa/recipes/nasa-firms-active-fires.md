@@ -6,7 +6,7 @@ when: the user asks for active fires, wildfires, hotspots, FIRMS data or thermal
 servers: [nasa]
 tools_used: [nasa_firms]
 data_type: thermal hotspot detections
-components_used: [map, stat-card, table, cards]
+components_used: [map, stat-card, chart, table, cards]
 layout:
   type: grid
   columns: 2
@@ -44,28 +44,43 @@ await widget('stat-card', { label: 'High confidence', value: highConf, icon: 'ch
 await widget('stat-card', { label: 'Avg brightness (K)', value: Math.round(avgBright), icon: 'thermometer' });
 await widget('stat-card', { label: 'Days', value: 7, icon: 'calendar' });
 
-// 3. Map with markers (size = FRP if available)
-await widget('map', {
-  center: [-62.2, -3.4],
-  zoom: 6,
-  markers: fires.filter(f => Number.isFinite(+f?.latitude) && Number.isFinite(+f?.longitude)).map(f => ({
+// 3. Map with markers
+const safeMarkers = fires
+  .filter(f => f != null && Number.isFinite(+f?.latitude) && Number.isFinite(+f?.longitude))
+  .map(f => ({
     lat: +f.latitude,
     lon: +f.longitude,
     label: `${f?.acq_date ?? '—'} ${f?.acq_time ?? ''}`,
     color: +(f?.confidence ?? 0) > 80 ? '#dc2626' : '#f97316',
-    radius: Math.max(3, Math.min(15, +(f?.frp ?? 0) / 5))
-  })),
+  }));
+await widget('map', {
+  center: [-62.2, -3.4],
+  zoom: 6,
+  markers: safeMarkers,
   cluster: true
 });
 
-// 4. Hottest table
+// 4. Confidence distribution (bar chart — bars: [[label, count], ...])
+const confBands = { 'High (>80)': 0, 'Medium (30-80)': 0, 'Low (<30)': 0 };
+for (const f of fires) {
+  const c = +(f?.confidence ?? 0);
+  if (c > 80) confBands['High (>80)']++;
+  else if (c >= 30) confBands['Medium (30-80)']++;
+  else confBands['Low (<30)']++;
+}
+await widget('chart', {
+  title: 'Detection confidence',
+  bars: Object.entries(confBands).map(([label, count]) => [label, count]),
+});
+
+// 5. Hottest table
 const hottest = [...fires].sort((a, b) => +(b?.brightness ?? 0) - +(a?.brightness ?? 0)).slice(0, 20);
 await widget('data-table', {
   columns: ['Date', 'Time UTC', 'Lat', 'Lon', 'Brightness (K)', 'FRP (MW)', 'Confidence'],
   rows: hottest.map(f => [f?.acq_date ?? '—', f?.acq_time ?? '—', f?.latitude ?? '—', f?.longitude ?? '—', f?.brightness ?? '—', f?.frp ?? '—', f?.confidence ?? '—'])
 });
 
-// 5. Cluster summary (group by date)
+// 6. Cluster summary (group by date)
 const byDate = {};
 for (const f of fires) {
   const d = f?.acq_date;
@@ -87,7 +102,7 @@ await widget('cards', {
 ```js
 const data = await call('nasa_firms', { latitude: -3.4, longitude: -62.2, days: 7 }).catch(() => null);
 const fires = (data?.fires ?? (Array.isArray(data) ? data : [])).filter(f => f);
-const markers = fires.filter(f => Number.isFinite(+f?.latitude)).map(f => ({ lat: +f.latitude, lon: +f.longitude }));
+const markers = fires.filter(f => f != null && Number.isFinite(+f?.latitude) && Number.isFinite(+f?.longitude)).map(f => ({ lat: +f.latitude, lon: +f.longitude }));
 await widget('map', { center: [-62.2, -3.4], zoom: 5, markers: markers.length ? markers : [{ lat: -3.4, lon: -62.2, label: 'Amazon hotspot (preview)' }] });
 await widget('stat-card', { label: 'Hotspots', value: Math.max(fires.length, 1) });
 ```
@@ -107,3 +122,6 @@ await widget('data-table', { columns: ['Date', 'Lat', 'Lon', 'FRP'], rows: rows.
 - Forgetting clustering on the map — dense regions become unreadable without it
 - Using brightness in Celsius — values are kelvin, conversion confuses readers; keep K and label it
 - Mistaking "detections" for "fires" — one fire can produce many pixels, group by location for a cleaner count
+- Using Chart.js-style `widget('chart', { type: 'bar', data: { labels, datasets } })` — the chart widget uses `{ bars: [[label, value], ...] }` tuples, never a `type` / `data` object shape
+- Passing `radius` or other unsupported fields as marker properties — map markers only accept `lat`, `lon`, `label`, `color`; extra fields are silently ignored and may confuse readers of the code
+- Omitting the longitude check when filtering markers — always guard both `Number.isFinite(+f?.latitude) && Number.isFinite(+f?.longitude)` to prevent NaN coordinates from reaching the map widget

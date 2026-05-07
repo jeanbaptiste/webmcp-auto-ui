@@ -71,18 +71,18 @@ await widget('chart-rich', {
   title: 'Prochaines 48h',
   type: 'line',
   labels: hourly48,
-  datasets: [
-    { label: 'Temperature (C)', data: (hourly.temperature_2m ?? []).slice(0, 48), color: '#e74c3c' },
-    { label: 'Precipitation (mm)', data: (hourly.precipitation ?? []).slice(0, 48), color: '#3498db' }
+  data: [
+    { label: 'Temperature (C)', values: (hourly.temperature_2m ?? []).slice(0, 48), color: '#e74c3c' },
+    { label: 'Precipitation (mm)', values: (hourly.precipitation ?? []).slice(0, 48), color: '#3498db' }
   ]
 });
 
 await widget('kv', {
   title: 'Infos pratiques',
-  pairs: [
-    { key: 'Lever du soleil', value: daily.sunrise?.[0]?.slice(11, 16) ?? '—' },
-    { key: 'Coucher du soleil', value: daily.sunset?.[0]?.slice(11, 16) ?? '—' },
-    { key: 'UV max aujourd\'hui', value: daily.uv_index_max?.[0] != null ? String(daily.uv_index_max[0]) : '—' }
+  rows: [
+    ['Lever du soleil', daily.sunrise?.[0]?.slice(11, 16) ?? '—'],
+    ['Coucher du soleil', daily.sunset?.[0]?.slice(11, 16) ?? '—'],
+    ['UV max aujourd\'hui', daily.uv_index_max?.[0] != null ? String(daily.uv_index_max[0]) : '—']
   ]
 });
 ```

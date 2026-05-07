@@ -69,12 +69,12 @@ await widget('cards', {
 // 6. Rover metadata
 const r = photos[0]?.rover;
 await widget('kv', {
-  items: [
-    { label: 'Rover', value: r?.name ?? '—' },
-    { label: 'Status', value: r?.status ?? '—' },
-    { label: 'Landing', value: r?.landing_date ?? '—' },
-    { label: 'Launch', value: r?.launch_date ?? '—' },
-    { label: 'Total photos', value: r?.total_photos ?? '—' }
+  rows: [
+    ['Rover', r?.name ?? '—'],
+    ['Status', r?.status ?? '—'],
+    ['Landing', r?.landing_date ?? '—'],
+    ['Launch', r?.launch_date ?? '—'],
+    ['Total photos', r?.total_photos ?? '—']
   ]
 });
 ```
@@ -98,7 +98,7 @@ const photos = (data?.photos ?? []).filter(p => p);
 const images = photos.slice(0, 60).filter(p => p?.img_src).map(p => ({ src: p.img_src, alt: p?.camera?.full_name ?? '—' }));
 if (images.length === 0) return widget('text', { content: 'No photos for this date.' });
 await widget('gallery', { images });
-await widget('kv', { items: [{ label: 'Rover', value: 'Perseverance' }, { label: 'Sol', value: photos[0]?.sol ?? '—' }] });
+await widget('kv', { rows: [['Rover', 'Perseverance'], ['Sol', photos[0]?.sol ?? '—']] });
 ```
 
 ## Common mistakes

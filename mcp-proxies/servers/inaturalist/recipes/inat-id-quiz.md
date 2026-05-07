@@ -57,12 +57,12 @@ await widget('map', {
 // 5. Context kv
 await widget('kv', {
   title: 'Suggestion context',
-  items: {
-    Coordinates: `${lat}, ${lng}`,
-    Date: observed_on,
-    'Suggestion source': sugg?.source ?? '—',
-    'Candidates returned': suggResults.length,
-  },
+  rows: [
+    ['Coordinates', `${lat}, ${lng}`],
+    ['Date', observed_on],
+    ['Suggestion source', sugg?.source ?? '—'],
+    ['Candidates returned', String(suggResults.length)],
+  ],
 }).catch(() => null);
 
 // 6. Suggestion cards (with iNat probability/frequency)

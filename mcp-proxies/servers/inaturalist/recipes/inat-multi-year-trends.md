@@ -58,7 +58,7 @@ await widget('chart-rich', {
   type: 'bar',
   title: `${detail?.preferred_common_name ?? detail?.name ?? t.name ?? 'Species'} — annual observations in ${place?.display_name ?? 'region'}`,
   labels: years.map(([y]) => y),
-  data: years.map(([, n]) => n),
+  data: [{ label: 'Observations', values: years.map(([, n]) => Number(n)) }],
   caption: years.length > 1 ? `${growth >= 0 ? '+' : ''}${growth}% from ${years[0][0]} to ${years.at(-1)[0]}.` : 'Insufficient data for a trend.',
 });
 await widget('map', {
@@ -90,7 +90,7 @@ const place = (await call('search_places', { q: 'France', per_page: 1 }))?.resul
 if (!t || !place) { await widget('text', { content: 'Species or place not found.' }); return; }
 const hist = await call('observations_histogram', { taxon_id: t.id, place_id: place.id, interval: 'year', d1: '2010-01-01' }).catch(() => ({ results: { year: {} } }));
 const yr = hist?.results?.year ?? {};
-await widget('chart-rich', { type: 'bar', labels: Object.keys(yr), data: Object.values(yr) });
+await widget('chart-rich', { type: 'bar', labels: Object.keys(yr), data: [{ label: 'Observations', values: Object.values(yr).map(Number) }] });
 ```
 
 ### Otter recovery
@@ -99,7 +99,7 @@ const t = (await call('search_taxa', { q: 'Lutra lutra', per_page: 1 }))?.result
 if (!t) { await widget('text', { content: 'Species not found.' }); return; }
 const hist = await call('observations_histogram', { taxon_id: t.id, interval: 'year', d1: '2015-01-01' }).catch(() => ({ results: { year: {} } }));
 const yr = hist?.results?.year ?? {};
-await widget('chart-rich', { type: 'line', labels: Object.keys(yr), data: Object.values(yr) });
+await widget('chart-rich', { type: 'line', labels: Object.keys(yr), data: [{ label: 'Observations', values: Object.values(yr).map(Number) }] });
 ```
 
 ## Common mistakes

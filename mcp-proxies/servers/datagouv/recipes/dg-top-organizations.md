@@ -60,7 +60,7 @@ This recipe gives an editorial view of the catalog — it valorises producers an
 
    await widget('profile', {
      name: top.name ?? '—',
-     description: `${top.count ?? 0} datasets sur ce thème`
+     fields: [{ label: 'About', value: `${top.count ?? 0} datasets sur ce thème` }]
    });
 
    await widget('stat-card', { label: 'Téléchargements 6 mois (top dataset)', value: totalDl, icon: 'download' });
@@ -97,7 +97,7 @@ if (ranking2.length === 0) {
 const res = await call('search_datasets', { query: 'INSEE', page_size: 50 }).catch(() => ({ datasets: [] }));
 const insee = (res?.datasets ?? []).filter(d => (d.organization?.name ?? '').toLowerCase().includes('insee'));
 try {
-  await widget('profile', { name: 'INSEE', description: `${insee.length} datasets visibles dans cette recherche` });
+  await widget('profile', { name: 'INSEE', fields: [{ label: 'About', value: `${insee.length} datasets visibles dans cette recherche` }] });
   const cardItems = (insee.length ? insee : (res?.datasets ?? [])).slice(0, 5).map(d => ({ title: d.title ?? '—', subtitle: d.organization?.name ?? '' }));
   if (cardItems.length === 0) {
     await widget('text', { content: 'Aucun dataset trouvé.' });

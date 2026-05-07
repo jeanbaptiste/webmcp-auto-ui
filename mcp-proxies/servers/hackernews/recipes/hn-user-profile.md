@@ -167,9 +167,9 @@ const res = await call('search-posts', {
   hitsPerPage: 20
 }).catch(() => null);
 const hits = (res?.hits ?? []).filter(p => p);
-const rows = hits.map(c => [c?.story_title ?? '?', c?.points ?? 0, c?.created_at?.slice(0, 10) ?? '—']);
+const rows = hits.map(c => [c?.story_title ?? '?', c?.num_comments ?? 0, c?.created_at?.slice(0, 10) ?? '—']);
 await widget('data-table', {
-  columns: ['Comment on', 'Points', 'Date'],
+  columns: ['Comment on', 'Replies', 'Date'],
   rows: rows.length ? rows : [['(no comments)', 0, '—']]
 });
 ```

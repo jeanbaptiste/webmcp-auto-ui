@@ -58,8 +58,8 @@ layout:
 5. **Chart of most frequent nationalities**:
    ```js
    const flows = display.reduce((acc, w) => { const flow = w?.artistNationality || w?.culture || 'Unknown'; acc[flow] = (acc[flow] || 0) + 1; return acc; }, {});
-   const data = Object.entries(flows).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => ({ label: k, value: v }));
-   await widget('chart', { type: 'bar', data: data.length ? data : [{ label: 'sample', value: display.length || 1 }] });
+   const bars = Object.entries(flows).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0)).slice(0, 8).map(([k, v]) => [k, v]);
+   await widget('chart', { title: 'Nationalities', bars: bars.length ? bars : [['sample', display.length || 1]] });
    ```
 
 6. **Stats**:
@@ -89,7 +89,7 @@ const r = await call('search-museum-objects', { q: 'modern', hasImages: true }).
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 10).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
-await widget('chart', { type: 'bar', data: [{ label: 'Modernist works', value: works.length }] });
+await widget('chart', { title: 'Modernist works', bars: [['Modernist works', works.length || 0]] });
 ```
 
 ## Common mistakes

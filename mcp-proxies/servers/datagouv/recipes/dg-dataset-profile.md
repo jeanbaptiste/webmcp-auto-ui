@@ -46,9 +46,7 @@ This recipe condenses metadata + files + popularity into a single view so the us
    ```js
    const I = info ?? {};
    await widget('text', {
-     title: I.title ?? '—',
-     subtitle: I.organization?.name ?? '',
-     content: I.description ?? ''
+     content: `**${I.title ?? '—'}**\n\n*${I.organization?.name ?? ''}*\n\n${I.description ?? ''}`
    });
 
    // get_metrics is production-only — fallback to '—' when unavailable
@@ -93,7 +91,7 @@ const _dvf = await Promise.all([
 const dvfInfo = _dvf[0] ?? {};
 const dvfRes = _dvf[1] ?? { resources: [] };
 const dvfMetrics = _dvf[2] ?? { metrics: [] };
-await widget('text', { title: dvfInfo.title ?? '—', content: dvfInfo.description ?? '' });
+await widget('text', { content: `**${dvfInfo.title ?? '—'}**\n\n${dvfInfo.description ?? ''}` });
 await widget('stat-card', { label: 'Téléchargements 30j', value: dvfMetrics?.metrics?.[0]?.monthly_download ?? '—' });
 const dvfRows = (dvfRes?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.size_human ?? '—']);
 if (dvfRows.length) {
@@ -108,7 +106,7 @@ if (dvfRows.length) {
 const rna_id = '58e53811c751df03df38f42d';
 const rnaInfo = await call('get_dataset_info', { dataset_id: rna_id }).catch(() => null) ?? {};
 const rnaRes = await call('list_dataset_resources', { dataset_id: rna_id }).catch(() => ({ resources: [] }));
-await widget('text', { title: rnaInfo.title ?? '—', subtitle: rnaInfo.organization?.name ?? '', content: rnaInfo.description ?? '' });
+await widget('text', { content: `**${rnaInfo.title ?? '—'}**\n\n*${rnaInfo.organization?.name ?? ''}*\n\n${rnaInfo.description ?? ''}` });
 const rnaRows = (rnaRes?.resources ?? []).map(r => [r.title ?? '—', r.format ?? '—', r.type ?? '—']);
 if (rnaRows.length) {
   await widget('data-table', { columns: ['Fichier', 'Format', 'Type'], rows: rnaRows });

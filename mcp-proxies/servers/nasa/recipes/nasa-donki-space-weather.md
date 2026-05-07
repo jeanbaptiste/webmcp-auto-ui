@@ -31,7 +31,9 @@ const raw = await call('nasa_donki', {
   startDate: '2026-04-01',
   endDate:   '2026-04-29'
 }).catch(() => null);
-const events = (Array.isArray(raw) ? raw : (raw?.items ?? raw?.results ?? raw?.events ?? Object.values(raw ?? {})[0] ?? [])).filter(e => e);
+const _unwrap = v => Array.isArray(v) ? v : null;
+const _firstArr = obj => { for (const v of Object.values(obj ?? {})) { if (Array.isArray(v)) return v; } return []; };
+const events = (_unwrap(raw) ?? _unwrap(raw?.items) ?? _unwrap(raw?.results) ?? _unwrap(raw?.events) ?? _firstArr(raw)).filter(e => e);
 if (events.length === 0) return widget('text', { content: 'No DONKI events in this window.' });
 
 // 2. KPI
@@ -83,7 +85,8 @@ await widget('cards', {
 ### Recent CMEs
 ```js
 const raw = await call('nasa_donki', { type: 'CME', startDate: '2024-04-01', endDate: '2024-04-30' }).catch(() => null);
-const cmes = (Array.isArray(raw) ? raw : (raw?.body ?? raw?.items ?? raw?.results ?? Object.values(raw ?? {})[0] ?? [])).filter(c => c);
+const _fa = obj => { for (const v of Object.values(obj ?? {})) { if (Array.isArray(v)) return v; } return []; };
+const cmes = (Array.isArray(raw) ? raw : (Array.isArray(raw?.body) ? raw.body : Array.isArray(raw?.items) ? raw.items : Array.isArray(raw?.results) ? raw.results : _fa(raw))).filter(c => c);
 const events = cmes.map(c => ({ date: c?.startTime?.slice(0, 16) ?? '—', title: 'CME', description: c?.sourceLocation ?? '—' }));
 await widget('stat-card', { label: 'CMEs', value: cmes.length });
 await widget('timeline', { events: events.length ? events : [{ date: '—', title: 'CME (preview)', description: 'Run live for events' }] });

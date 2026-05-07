@@ -57,7 +57,7 @@ layout:
 5. **Map of production centers** (the Met API rarely populates `country` — geocode by `culture` instead):
    ```js
    const CULTURE_COORDS = { 'China': [39.9, 116.4], 'Japan': [35.7, 139.7], 'India': [28.6, 77.2], 'Tibet': [29.65, 91.13], 'Cambodia': [11.55, 104.92], 'Thailand': [13.75, 100.5], 'Korea': [37.57, 126.97] };
-   const places = works.map(w => {
+   const places = works_all.map(w => {
      const key = Object.keys(CULTURE_COORDS).find(k => (w?.culture || '').includes(k) || (w?.country || '').includes(k));
      const c = key ? CULTURE_COORDS[key] : [25, 80];
      return { lat: c[0], lon: c[1], label: w?.culture || w?.country || '—', popup: `${w?.title ?? '(untitled)'} (${w?.culture ?? '—'})` };
@@ -72,7 +72,7 @@ layout:
    const top = Object.entries(tags).length
      ? Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 6)
      : Object.entries(bySchool).slice(0, 6).map(([k, ws]) => [k, `${ws.length} works`]);
-   await widget('kv', { pairs: top.map(([t, n]) => [t, `${n}`]) });
+   await widget('kv', { rows: top.map(([t, n]) => [t, `${n}`]) });
    ```
 
 ## Examples

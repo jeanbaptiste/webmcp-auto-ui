@@ -66,12 +66,12 @@ layout:
 6. **KV summary**:
    ```js
    await widget('kv', {
-     pairs: [
+     rows: [
        ['Department', stops[0]?.department ?? '—'],
        ['Floor', '2 (mostly)'],
-       ['Number of stops', stops.length],
-       ['First gallery', stops[0]?.GalleryNumber ?? '—'],
-       ['Last gallery', stops[stops.length - 1]?.GalleryNumber ?? '—']
+       ['Number of stops', String(stops.length)],
+       ['First gallery', String(stops[0]?.GalleryNumber ?? '—')],
+       ['Last gallery', String(stops[stops.length - 1]?.GalleryNumber ?? '—')]
      ]
    });
    ```

@@ -79,16 +79,16 @@ if (tMaxAbs != null && tMinAbs != null && tMaxAbs - tMinAbs > 15) suitcase.push(
 await widget('chart-rich', {
   title: `Voyage a ${name ?? ''}, ${country ?? ''} - 15 jours`,
   type: 'line',
-  xAxis: { label: 'Date', data: d.time ?? [] },
-  series: [
-    { label: 'Tmax (C)', data: d.temperature_2m_max ?? [], color: '#e74c3c' },
-    { label: 'Tmin (C)', data: d.temperature_2m_min ?? [], color: '#3498db' },
-    { label: 'Pluie (mm)', data: d.precipitation_sum ?? [], type: 'bar', color: '#95a5a6' }
+  labels: d.time ?? [],
+  data: [
+    { label: 'Tmax (C)', values: (d.temperature_2m_max ?? []).map(v => v ?? 0), color: '#e74c3c' },
+    { label: 'Tmin (C)', values: (d.temperature_2m_min ?? []).map(v => v ?? 0), color: '#3498db' },
+    { label: 'Pluie (mm)', values: (d.precipitation_sum ?? []).map(v => v ?? 0), color: '#95a5a6' }
   ]
 });
 
 await widget('stat-card', {
-  stats: [
+  items: [
     { label: 'T moyenne', value: tMean != null ? `${tMean.toFixed(1)}C` : '—', icon: 'thermometer' },
     { label: 'Jours pluvieux', value: `${rainyDays}/${totalDays}`, icon: 'cloud-rain' },
     { label: 'UV max', value: peakUV != null ? `${peakUV.toFixed(0)}` : '—', icon: 'sun' },
@@ -98,11 +98,10 @@ await widget('stat-card', {
 
 await widget('kv', {
   title: 'Conseils valise',
-  pairs: suitcase.length > 0 ? suitcase.map((s, i) => [`${i + 1}`, s]) : [['—', 'Donnees insuffisantes']]
+  rows: suitcase.length > 0 ? suitcase.map((s, i) => [`${i + 1}`, s]) : [['—', 'Donnees insuffisantes']]
 });
 
 await widget('map', {
-  title: name ?? '',
   center: { lat: latitude, lng: longitude }, zoom: 10,
   markers: [{ lat: latitude, lng: longitude, label: name ?? '' }]
 });

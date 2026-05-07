@@ -77,8 +77,8 @@ const verdict = maxSpread < 2 ? 'Forte concordance' : maxSpread < 4 ? 'Concordan
 await widget('chart-rich', {
   title: 'Tmax 7j - modeles compares',
   type: 'line',
-  xAxis: { label: 'Date', data: days },
-  series: models.map(m => ({ label: m.name, data: m.data.daily.temperature_2m_max ?? [], color: m.color }))
+  labels: days,
+  data: models.map(m => ({ label: m.name, values: m.data.daily.temperature_2m_max ?? [], color: m.color }))
 });
 
 await widget('data-table', {
@@ -94,7 +94,7 @@ await widget('data-table', {
 const idxMax = spreads.indexOf(maxSpread);
 await widget('kv', {
   title: 'Consensus',
-  pairs: [
+  rows: [
     ['Verdict', verdict],
     ['Ecart max sur 7j', `${maxSpread.toFixed(1)} C`],
     ['Jour le plus incertain', idxMax >= 0 ? (days[idxMax] ?? '—') : '—']

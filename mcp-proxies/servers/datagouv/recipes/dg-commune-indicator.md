@@ -57,43 +57,81 @@ Many public datasets are distributed at the commune mesh — this recipe makes t
    ```js
    // Dataset: communes France 2025 (dataset 6745d9ae4524d845d2138193)
    // resource f5df602b-3800-44d7-b2df-fa40a0350325 — 34 935 communes, toutes géocodées
-   const markersData = rows
-     .filter(r => Number.isFinite(Number(r.latitude_centre)) && Number.isFinite(Number(r.longitude_centre)))
-     .map(r => ({
-       lat: Number(r.latitude_centre),
-       lon: Number(r.longitude_centre),
-       value: Number(r.population) || 0,
-       label: r.nom_standard ?? r.code_insee ?? '',
-       popup: `${r.nom_standard ?? r.code_insee ?? '—'} · ${Number.isFinite(Number(r.population)) ? Number(r.population).toLocaleString('fr-FR') : '—'} hab.`
-     }));
-   if (markersData.length > 0) {
+
+   // Auto-detect column names from the first row to avoid placeholders
+   const firstRow = rows[0] ?? {};
+   const latKey = ['latitude_centre', 'lat', 'latitude'].find(k => k in firstRow);
+   const lonKey = ['longitude_centre', 'lon', 'longitude'].find(k => k in firstRow);
+   const nameKey = ['nom_standard', 'nom_commune', 'nom', 'libelle', 'NCOM', 'libgeo'].find(k => k in firstRow);
+   const inseeKey = ['code_insee', 'code_commune', 'COM', 'codgeo', 'code_geo'].find(k => k in firstRow);
+   // Pick first numeric-looking column as the indicator value
+   const numericKey = Object.keys(firstRow).find(k =>
+     k !== latKey && k !== lonKey && k !== nameKey && k !== inseeKey &&
+     Number.isFinite(Number(firstRow[k])) && Number(firstRow[k]) > 0
+   ) ?? Object.keys(firstRow).find(k => Number.isFinite(Number(firstRow[k])));
+
+   const markersData = (latKey && lonKey)
+     ? rows
+         .filter(r => Number.isFinite(Number(r[latKey])) && Number.isFinite(Number(r[lonKey])))
+         .map(r => ({
+           lat: Number(r[latKey]),
+           lon: Number(r[lonKey]),
+           value: numericKey ? (Number(r[numericKey]) || 0) : 0,
+           label: nameKey ? (r[nameKey] ?? '') : (inseeKey ? (r[inseeKey] ?? '') : ''),
+           popup: `${nameKey ? (r[nameKey] ?? '—') : (inseeKey ? (r[inseeKey] ?? '—') : '—')}${numericKey ? ' · ' + Number(r[numericKey]).toLocaleString('fr-FR') : ''}`
+         }))
+     : [];
+   // Color markers by value using simple tertile thresholds (viridis-like: blue → orange → red)
+   // (The map widget does not support color_field/color_scale — compute color client-side)
+   const sortedVals = markersData.map(m => m.value).filter(v => v > 0).sort((a, b) => a - b);
+   const q33 = sortedVals[Math.floor(sortedVals.length * 0.33)] ?? 0;
+   const q66 = sortedVals[Math.floor(sortedVals.length * 0.66)] ?? 0;
+   const coloredMarkers = markersData.map(m => ({
+     ...m,
+     color: m.value < q33 ? 'blue' : m.value < q66 ? 'orange' : 'red'
+   }));
+
+   if (coloredMarkers.length > 0) {
      await widget('map', {
-       center: [46.6, 2.5],
+       center: [2.5, 46.6],
        zoom: 6,
-       markers: markersData,
-       color_field: 'value',
-       color_scale: 'viridis'
+       markers: coloredMarkers,
+       cluster: true
      });
    }
 
    const topRows = rows.length > 0 ? rows.slice(0, 10) : [];
+   const colHeaders = [
+     'Rang',
+     nameKey ?? 'Commune',
+     inseeKey ?? 'INSEE',
+     numericKey ?? 'Valeur'
+   ];
    await widget('data-table', {
-     columns: ['Rang', 'Commune', 'INSEE', 'Population'],
-     rows: topRows.map((r, i) => [i + 1, r.nom_standard ?? r.code_insee ?? '—', r.code_insee ?? '—', Number.isFinite(Number(r.population)) ? Number(r.population).toLocaleString('fr-FR') : '—'])
+     columns: colHeaders,
+     rows: topRows.map((r, i) => [
+       i + 1,
+       nameKey ? (r[nameKey] ?? '—') : (inseeKey ? (r[inseeKey] ?? '—') : '—'),
+       inseeKey ? (r[inseeKey] ?? '—') : '—',
+       numericKey && Number.isFinite(Number(r[numericKey])) ? Number(r[numericKey]).toLocaleString('fr-FR') : '—'
+     ])
    });
 
-   const values = rows.map(r => Number(r.population)).filter(Number.isFinite).sort((a, b) => a - b);
+   const values = numericKey
+     ? rows.map(r => Number(r[numericKey])).filter(v => Number.isFinite(v) && v > 0).sort((a, b) => a - b)
+     : [];
    const median = values.length > 0 ? values[Math.floor(values.length / 2)] : 0;
-   await widget('stat-card', { label: 'Médiane nationale', value: median.toLocaleString('fr-FR') + ' hab.', icon: 'target' });
+   await widget('stat-card', { label: 'Médiane', value: median.toLocaleString('fr-FR'), icon: 'target' });
    await widget('stat-card', { label: 'Communes', value: rows.length, icon: 'map-pin' });
    await widget('stat-card', { label: 'Top / médiane', value: (values.length > 0 && median > 0) ? (values.at(-1) / median).toFixed(1) + 'x' : '—', icon: 'gap' });
 
+   // chart widget uses `bars: [[label, value], ...]` tuples (NOT type/data)
    const buckets = [0, 500, 2_000, 10_000, 100_000, Infinity];
+   const bucketLabels = ['<500', '500-2k', '2-10k', '10-100k', '>100k'];
    const counts = buckets.slice(0, -1).map((lo, i) => values.filter(v => v >= lo && v < buckets[i + 1]).length);
    if (values.length > 0) {
      await widget('chart', {
-       type: 'bar',
-       data: { labels: ['<500', '500-2k', '2-10k', '10-100k', '>100k'], values: counts }
+       bars: bucketLabels.map((lbl, i) => [lbl, counts[i]])
      });
    }
    ```
@@ -137,7 +175,12 @@ const markers = top
   })
   .filter(Boolean);
 
-await widget('map', { center: [2.5, 46.6], zoom: 6, markers, color_field: 'value', color_scale: 'viridis' });
+// Color markers by tertile thresholds (map widget does not support color_field/color_scale)
+const vals = markers.map(m => m.value).sort((a, b) => a - b);
+const q33 = vals[Math.floor(vals.length * 0.33)] ?? 0;
+const q66 = vals[Math.floor(vals.length * 0.66)] ?? 0;
+const coloredMarkers = markers.map(m => ({ ...m, color: m.value < q33 ? 'blue' : m.value < q66 ? 'orange' : 'red' }));
+await widget('map', { center: [2.5, 46.6], zoom: 6, markers: coloredMarkers, cluster: true });
 await widget('data-table', {
   columns: ['Rang', 'Commune', 'INSEE', 'Logements soc.', 'Loyer moy. (€/m²)'],
   rows: rows.slice(0, 10).map((r, i) => [i + 1, r.NCOM ?? '—', r.COM ?? '—', Number(r.TOT21).toLocaleString('fr-FR'), Number(r.LOYERMOY).toFixed(2)])

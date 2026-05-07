@@ -64,11 +64,11 @@ const totalRain = rainArr.reduce((s, v) => s + v, 0);
 await widget('chart-rich', {
   title: 'Ete 2003 - Lyon (archive ERA5)',
   type: 'line',
-  xAxis: { label: 'Date', data: a.daily.time ?? [] },
-  series: [
-    { label: 'Tmax (C)', data: a.daily.temperature_2m_max ?? [], color: '#e74c3c' },
-    { label: 'Tmin (C)', data: a.daily.temperature_2m_min ?? [], color: '#3498db' },
-    { label: 'Tmoy (C)', data: a.daily.temperature_2m_mean ?? [], color: '#2c3e50' }
+  labels: a.daily.time ?? [],
+  data: [
+    { label: 'Tmax (C)', values: a.daily.temperature_2m_max ?? [], color: '#e74c3c' },
+    { label: 'Tmin (C)', values: a.daily.temperature_2m_min ?? [], color: '#3498db' },
+    { label: 'Tmoy (C)', values: a.daily.temperature_2m_mean ?? [], color: '#2c3e50' }
   ]
 });
 
@@ -83,7 +83,7 @@ await widget('stat-card', {
 
 const times = a.daily.time ?? [];
 await widget('kv', {
-  pairs: [
+  rows: [
     ['Source', 'ERA5 (Copernicus / ECMWF)'],
     ['Periode', times.length > 0 ? `${times[0]} -> ${times[times.length - 1]}` : '—'],
     ['Nb jours', String(times.length)],

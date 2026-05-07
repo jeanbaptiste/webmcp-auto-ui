@@ -75,16 +75,17 @@ INSEE and SDES publish many long series on data.gouv.fr — this recipe wraps th
 
 3. **Render line chart + KPIs + recent-years table**:
    ```js
+   if (typeof rows === 'undefined' || rows.length === 0) { await widget('text', { content: 'Aucune donnée temporelle.' }); return; }
    const first = rows[0] ?? {};
    const last = rows[rows.length - 1] ?? {};
    const firstVal = Number(first[valueCol]);
    const lastVal = Number(last[valueCol]);
    const change = (Number.isFinite(firstVal) && firstVal !== 0) ? ((lastVal - firstVal) / firstVal * 100).toFixed(1) : 'n/a';
 
-   await widget('chart', {
+   await widget('chart-rich', {
      type: 'line',
-     data: { labels: rows.map(r => r[yearCol] ?? '—'), values: rows.map(r => Number(r[valueCol])) },
-     options: { xLabel: 'Année', yLabel: valueCol }
+     labels: rows.map(r => String(r[yearCol] ?? '—')),
+     data: [{ label: valueCol, values: rows.map(r => Number(r[valueCol])) }]
    });
 
    await widget('stat-card', { label: `Valeur ${first[yearCol] ?? '—'}`, value: first[valueCol] ?? '—', icon: 'flag' });
@@ -119,7 +120,7 @@ if (rows.length === 0) {
   await widget('text', { content: 'Données indisponibles (MCP fail ou resource non tabulaire).' });
   return;
 }
-await widget('chart', { type: 'line', data: { labels: rows.map(r => r['Année'] ?? '—'), values: rows.map(r => Number(r['Effectifs'])) }, options: { xLabel: 'Année', yLabel: 'Effectifs' } });
+await widget('chart-rich', { type: 'line', labels: rows.map(r => String(r['Année'] ?? '—')), data: [{ label: 'Effectifs', values: rows.map(r => Number(r['Effectifs'])) }] });
 const last = rows.at(-1);
 const first = rows.at(0);
 const pct = (first && last && Number(first['Effectifs']) !== 0) ? (((Number(last['Effectifs']) - Number(first['Effectifs'])) / Number(first['Effectifs'])) * 100).toFixed(1) : null;

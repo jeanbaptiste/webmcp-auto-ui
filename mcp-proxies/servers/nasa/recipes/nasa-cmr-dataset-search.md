@@ -64,12 +64,12 @@ await widget('data-table', {
 const top = items[0];
 if (top) {
   await widget('kv', {
-    items: [
-      { label: 'Title', value: top?.title ?? '—' },
-      { label: 'Short name', value: top?.short_name ?? '—' },
-      { label: 'Data center', value: top?.data_center ?? '—' },
-      { label: 'Processing level', value: top?.processing_level_id ?? '—' },
-      { label: 'DOI', value: top?.dataset_id ?? 'n/a' }
+    rows: [
+      ['Title', top?.title ?? '—'],
+      ['Short name', top?.short_name ?? '—'],
+      ['Data center', top?.data_center ?? '—'],
+      ['Processing level', top?.processing_level_id ?? '—'],
+      ['DOI', top?.dataset_id ?? 'n/a']
     ]
   });
 }

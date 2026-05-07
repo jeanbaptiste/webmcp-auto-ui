@@ -63,13 +63,13 @@ if (topTaxon?._rec?.id) {
   if (detail) {
     await widget('kv', {
       title: detail.preferred_common_name ?? detail.name ?? 'Taxon',
-      items: {
-        'Scientific name': detail.name ?? '—',
-        Rank: detail.rank ?? '—',
-        Family: detail.ancestors?.find(a => a.rank === 'family')?.name ?? '—',
-        'Conservation': detail.conservation_status?.status_name ?? 'LC',
-        'iNat observations': detail.observations_count ?? 0,
-      },
+      rows: [
+        ['Scientific name', detail.name ?? '—'],
+        ['Rank', detail.rank ?? '—'],
+        ['Family', detail.ancestors?.find(a => a.rank === 'family')?.name ?? '—'],
+        ['Conservation', detail.conservation_status?.status_name ?? 'LC'],
+        ['iNat observations', detail.observations_count ?? 0],
+      ],
     });
 
     // 5. Sample observations gallery

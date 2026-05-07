@@ -33,35 +33,27 @@ layout:
    if (ids.length === 0) await widget('text', { content: 'No matching motif.' });
    ```
 
-2. **Fetch a sample** (small batch — Met bridge throttles parallel requests):
+2. **Fetch a sample and render all widgets** (small batch — Met bridge throttles parallel requests):
    ```js
    const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
    const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
    if (works.length === 0) { await widget('text', { content: 'No image-bearing records found for this motif. Try a broader search term.' }); return; }
-   ```
 
-3. **Comparison gallery**:
-   ```js
+   // Comparison gallery
    const images = works.map(w => ({ src: w?.primaryImageSmall, alt: w?.title ?? '(untitled)', caption: `${w?.culture || w?.department || '—'} — ${w?.objectDate ?? '—'}` }));
    await widget('gallery', { images });
-   ```
 
-4. **Cards grouped by culture**:
-   ```js
+   // Cards grouped by culture
    const byCulture = works.reduce((acc, w) => { const cult = w?.culture || w?.department || '—'; (acc[cult] = acc[cult] || []).push(w); return acc; }, {});
    const cardItems = Object.entries(byCulture).flatMap(([culture, ws]) => ws.slice(0, 2).map(w => ({ title: w?.title ?? '(untitled)', subtitle: culture, image: w?.primaryImageSmall, body: w?.objectDate ?? '—' })));
    await widget('cards', { items: cardItems });
-   ```
 
-5. **Frequency chart by century**:
-   ```js
+   // Frequency chart by century
    const byCentury = works.reduce((acc, w) => { const century = Math.floor((w?.objectBeginDate || 0) / 100) * 100; acc[century] = (acc[century] || 0) + 1; return acc; }, {});
    const data = Object.entries(byCentury).map(([k, v]) => ({ label: `${Number(k) + 100}s`, value: v }));
-   if (data.length > 0) await widget('chart', { type: 'bar', data });
-   ```
+   if (data.length > 0) await widget('chart', { bars: data.map(d => [d.label, d.value]) });
 
-6. **KV of related AAT/Wikidata terms**:
-   ```js
+   // KV of related AAT/Wikidata terms
    const tags = {};
    for (const w of works) for (const t of (w?.tags ?? [])) { const tg = t?.term; if (tg) tags[tg] = (tags[tg] || 0) + 1; }
    const top = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 8);

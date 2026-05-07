@@ -71,7 +71,7 @@ const MODELS = [
   { key: 'CMCC_CM2_VHR4', label: 'CMCC-CM2-VHR4 (SSP)',  color: '#27ae60' },
 ];
 
-const series = [];
+const data = [];
 let firstAnnual = null;
 
 for (const model of MODELS) {
@@ -81,10 +81,10 @@ for (const model of MODELS) {
   const annual = annualize(c.daily.time, rawValues);
   if (annual.length === 0) continue;
   if (!firstAnnual) firstAnnual = annual;
-  series.push({ label: model.label, data: annual.map(a => a.mean), color: model.color });
+  data.push({ label: model.label, values: annual.map(a => a.mean), color: model.color });
 }
 
-if (series.length === 0) {
+if (data.length === 0) {
   await widget('text', { content: 'Aucune donnee annuelle exploitable.' });
   return;
 }
@@ -103,8 +103,8 @@ const decades = [2030, 2050, 2070, 2090].map(d => {
 await widget('chart-rich', {
   title: 'Temperature moyenne annuelle - Marseille (2025-2100)',
   type: 'line',
-  xAxis: { label: 'Annee', data: annual.map(a => a.year) },
-  series,
+  labels: annual.map(a => String(a.year)),
+  data,
 });
 
 await widget('data-table', {

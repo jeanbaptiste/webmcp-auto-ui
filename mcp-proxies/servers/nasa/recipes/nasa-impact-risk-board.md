@@ -50,18 +50,10 @@ await widget('stat-card', { label: 'Max IP', value: ipMax.toExponential(2), icon
 await widget('stat-card', { label: 'Max Palermo', value: psMax.toFixed(2), icon: 'gauge' });
 await widget('stat-card', { label: 'Within 2050', value: recent, icon: 'calendar' });
 
-// 4. Scatter — size proxy (H magnitude) vs cumulative impact probability
+// 4. Top objects by cumulative impact probability
+const chartRows = rows.filter(r => Number.isFinite(+r?.ip)).slice(0, 15);
 await widget('chart', {
-  type: 'scatter',
-  data: rows.filter(r => Number.isFinite(+r?.h) && Number.isFinite(+r?.ip)).map(r => ({
-    x: +r.h,
-    y: +r.ip,
-    label: r?.des ?? '—',
-    color: +(r?.ps_cum ?? -99) > -2 ? '#dc2626' : '#3b82f6'
-  })),
-  xLabel: 'H (absolute magnitude, smaller = larger object)',
-  yLabel: 'Cumulative impact probability',
-  yLog: true
+  bars: chartRows.map(r => [r?.des ?? '—', +r.ip])
 });
 
 // 5. Ranked table

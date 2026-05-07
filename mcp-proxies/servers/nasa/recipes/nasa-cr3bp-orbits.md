@@ -46,24 +46,26 @@ if (epoch) {
 
 // 3. Didactic text
 await widget('text', {
-  title: 'Earth-Moon L2 halo orbits',
-  body: 'Halo orbits are 3-D periodic trajectories around collinear libration points. Earth-Moon L2 halo orbits underpin the Lunar Gateway design. Stability index < 1 means linearly stable; values >> 1 require frequent station-keeping.'
+  content: 'Earth-Moon L2 halo orbits — Halo orbits are 3-D periodic trajectories around collinear libration points. Earth-Moon L2 halo orbits underpin the Lunar Gateway design. Stability index < 1 means linearly stable; values >> 1 require frequent station-keeping.'
 });
 
-// 4. Family chart (period vs Jacobi constant, colour by stability)
+// 4. Family chart (period vs Jacobi constant, one bar per orbit sampled to ≤20 points)
+// chart-rich expects: labels:[string,...], data:[{label:string, values:[number,...]},...]
+// We plot two series (period and jacobi) across a sample of orbits.
+const sample = orbits.length > 20 ? orbits.filter((_, i) => i % Math.ceil(orbits.length / 20) === 0) : orbits;
+const chartLabels = sample.map((o, i) => o?.id ? String(o.id) : `#${i + 1}`);
+const periodValues = sample.map(o => +(o?.period ?? 0));
+const jacobiValues = sample.map(o => +(o?.jacobi ?? 0));
+const stabilityValues = sample.map(o => +(o?.stability ?? 0));
 await widget('chart-rich', {
-  type: 'scatter',
-  series: [{
-    name: 'Halo L2 N',
-    data: orbits.map(o => ({
-      x: +(o?.period ?? 0),
-      y: +(o?.jacobi ?? 0),
-      label: o?.id || `orbit-${o?.idx ?? '?'}`,
-      color: +(o?.stability ?? 99) < 1.5 ? '#16a34a' : (+(o?.stability ?? 99) < 5 ? '#f59e0b' : '#dc2626')
-    }))
-  }],
-  xLabel: 'Period (TU)', yLabel: 'Jacobi constant',
-  legend: ['stable', 'mild', 'unstable']
+  title: 'Halo L2 North — family overview',
+  type: 'bar',
+  labels: chartLabels,
+  data: [
+    { label: 'Period (TU)', values: periodValues },
+    { label: 'Jacobi constant', values: jacobiValues },
+    { label: 'Stability index', values: stabilityValues }
+  ]
 });
 
 // 5. Sortable table
@@ -80,12 +82,12 @@ if (allDash) {
 
 // 6. kv with epoch helpers
 await widget('kv', {
-  items: [
-    { label: 'System', value: 'Earth-Moon' },
-    { label: 'Family', value: 'Halo (L2, N)' },
-    { label: 'Orbits', value: orbits.length },
-    { label: 'Reference epoch (JD)', value: epoch ?? 'n/a' },
-    { label: 'Reference epoch (cal)', value: calDate ?? 'n/a' }
+  rows: [
+    ['System', 'Earth-Moon'],
+    ['Family', 'Halo (L2, N)'],
+    ['Orbits', String(orbits.length)],
+    ['Reference epoch (JD)', String(epoch ?? 'n/a')],
+    ['Reference epoch (cal)', String(calDate ?? 'n/a')]
   ]
 });
 ```
@@ -95,7 +97,7 @@ await widget('kv', {
 ### Sun-Earth L1 Lyapunov
 ```js
 const fam = await call('jpl_periodic_orbits', { sys: 'sun-earth', family: 'lyapunov', libr: 1 }).catch(() => null);
-await widget('text', { title: 'Sun-Earth L1 Lyapunov', body: 'Planar periodic orbits used for solar observatories like SOHO and DSCOVR.' });
+await widget('text', { content: 'Sun-Earth L1 Lyapunov — Planar periodic orbits used for solar observatories like SOHO and DSCOVR.' });
 const lyapunovRows = (fam?.data ?? []).slice(0, 20).map(o => [o?.period ?? '—', o?.jacobi ?? '—']);
 if (!Array.isArray(fam?.data) || fam.data.length === 0) {
   await widget('text', { content: 'No Lyapunov orbit data returned for Sun-Earth L1. The API may require different field names for this family.' });
@@ -108,12 +110,8 @@ if (!Array.isArray(fam?.data) || fam.data.length === 0) {
 ```js
 const fam = await call('jpl_periodic_orbits', { sys: 'earth-moon', family: 'dro' }).catch(() => null);
 const cal = await call('jpl_jd_cal', { jd: String(fam?.epoch_jd ?? 2460676.5) }).catch(() => null);
-const kvItems = [{ label: 'Family', value: 'Earth-Moon DRO' }, { label: 'Epoch', value: cal?.cd ?? '—' }].filter(item => item.value !== undefined && item.value !== null);
-if (kvItems.length > 0) {
-  await widget('kv', { items: kvItems });
-} else {
-  await widget('text', { content: 'DRO family loaded but no displayable metadata.' });
-}
+const kvRows = [['Family', 'Earth-Moon DRO'], ['Epoch', String(cal?.cd ?? '—')]];
+await widget('kv', { rows: kvRows });
 ```
 
 ## Common mistakes

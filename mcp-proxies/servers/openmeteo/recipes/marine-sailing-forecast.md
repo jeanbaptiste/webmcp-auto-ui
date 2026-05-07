@@ -74,14 +74,19 @@ await widget('stat-card', {
   ]
 });
 
+const timeLabels = (marine.hourly.time ?? []).map(t => {
+  const d = new Date(t);
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}h`;
+});
+
 await widget('chart-rich', {
   title: 'Vagues et vent sur 72h',
   type: 'line',
-  xAxis: { label: 'Heure', data: marine.hourly.time ?? [] },
-  series: [
-    { label: 'Hauteur vagues (m)', data: marine.hourly.wave_height ?? [], color: '#3498db' },
-    { label: 'Vent (km/h)', data: atmo?.hourly?.wind_speed_10m ?? [], color: '#e67e22' },
-    { label: 'Rafales (km/h)', data: atmo?.hourly?.wind_gusts_10m ?? [], color: '#c0392b' }
+  labels: timeLabels,
+  data: [
+    { label: 'Hauteur vagues (m)', values: (marine.hourly.wave_height ?? []).map(v => Number.isFinite(v) ? v : 0), color: '#3498db' },
+    { label: 'Vent (km/h)', values: (atmo?.hourly?.wind_speed_10m ?? []).map(v => Number.isFinite(v) ? v : 0), color: '#e67e22' },
+    { label: 'Rafales (km/h)', values: (atmo?.hourly?.wind_gusts_10m ?? []).map(v => Number.isFinite(v) ? v : 0), color: '#c0392b' }
   ]
 });
 

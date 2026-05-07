@@ -35,7 +35,7 @@ The most common encyclopedic scenario — a quick lookup:
    ```js
    await widget('text', { content: sum?.summary ?? 'No summary available' });
    await widget('kv', {
-     items: (facts?.facts ?? []).map((f, i) => ({ label: `Fact ${i + 1}`, value: f }))
+     rows: (facts?.facts ?? []).map((f, i) => [`Fact ${i + 1}`, String(f)])
    });
    ```
 
@@ -48,7 +48,7 @@ const [sum, facts] = await Promise.all([
   call('extract_key_facts', { title: 'Photosynthesis', count: 3 }).catch(() => null)
 ]);
 await widget('text', { content: sum?.summary ?? 'No summary available' });
-await widget('kv', { items: (facts?.facts ?? []).map((f, i) => ({ label: `Fact ${i + 1}`, value: f })) });
+await widget('kv', { rows: (facts?.facts ?? []).map((f, i) => [`Fact ${i + 1}`, String(f)]) });
 ```
 
 ### Mitose
@@ -56,7 +56,7 @@ await widget('kv', { items: (facts?.facts ?? []).map((f, i) => ({ label: `Fact $
 const sum = await call('get_summary', { title: 'Mitosis' }).catch(() => null);
 const facts = await call('extract_key_facts', { title: 'Mitosis', count: 3 }).catch(() => null);
 await widget('text', { content: sum?.summary ?? 'No summary available' });
-await widget('kv', { items: (facts?.facts ?? []).map((f, i) => ({ label: `Fait ${i + 1}`, value: f })) });
+await widget('kv', { rows: (facts?.facts ?? []).map((f, i) => [`Fait ${i + 1}`, String(f)]) });
 ```
 
 ### Blockchain definition

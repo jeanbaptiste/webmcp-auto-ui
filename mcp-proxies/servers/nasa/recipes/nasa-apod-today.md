@@ -44,16 +44,15 @@ if (heroSrc) {
 
 // 3. The scientific explanation as prose
 await widget('text', {
-  title: apod?.title ?? 'APOD',
-  body: apod?.explanation ?? '(no explanation available)'
+  content: (apod?.title ? apod.title + '\n\n' : '') + (apod?.explanation ?? '(no explanation available)')
 });
 
 // 4. Metadata block (date, credits, media type)
 await widget('kv', {
-  items: [
-    { label: 'Date', value: apod?.date ?? '—' },
-    { label: 'Media', value: apod?.media_type ?? '—' },
-    { label: 'Copyright', value: apod?.copyright ?? 'Public domain' }
+  rows: [
+    ['Date', apod?.date ?? '—'],
+    ['Media', apod?.media_type ?? '—'],
+    ['Copyright', apod?.copyright ?? 'Public domain']
   ]
 });
 ```
@@ -68,8 +67,8 @@ const apod = await call('nasa_apod', { date: new Date().toISOString().slice(0, 1
 if (!apod) return widget('text', { content: 'APOD unavailable.' });
 const src = apod?.hdurl || apod?.url;
 if (src) await widget('gallery', { images: [{ src, alt: apod?.title ?? 'APOD', caption: apod?.title ?? 'APOD' }] });
-await widget('text', { title: apod?.title ?? 'APOD', body: apod?.explanation ?? '' });
-await widget('kv', { items: [{ label: 'Date', value: apod?.date ?? '—' }, { label: 'Copyright', value: apod?.copyright ?? 'Public domain' }] });
+await widget('text', { content: (apod?.title ? apod.title + '\n\n' : '') + (apod?.explanation ?? '') });
+await widget('kv', { rows: [['Date', apod?.date ?? '—'], ['Copyright', apod?.copyright ?? 'Public domain']] });
 ```
 
 ### A specific date (video APOD)
@@ -78,7 +77,7 @@ const apod = await call('nasa_apod', { date: '2024-12-25', thumbs: true }).catch
 if (!apod) return widget('text', { content: 'APOD unavailable.' });
 const src = apod?.media_type === 'video' ? apod?.thumbnail_url : (apod?.hdurl || apod?.url);
 if (src) await widget('gallery', { images: [{ src, alt: apod?.title ?? 'APOD', caption: apod?.title ?? 'APOD' }] });
-await widget('text', { title: apod?.title ?? 'APOD', body: apod?.explanation ?? '' });
+await widget('text', { content: (apod?.title ? apod.title + '\n\n' : '') + (apod?.explanation ?? '') });
 ```
 
 ## Common mistakes

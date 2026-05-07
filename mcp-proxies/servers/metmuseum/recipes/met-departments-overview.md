@@ -43,9 +43,13 @@ layout:
 
 4. **Chart of volume per department**:
    ```js
+   // Use short names (≤20 chars) to avoid overflow; full names appear in the KV below.
    await widget('chart', {
-     type: 'bar',
-     data: stats.map(d => ({ label: d?.displayName ?? '—', value: d?.total ?? 0 }))
+     title: 'Highlight objects per department',
+     bars: stats.map(d => {
+       const name = (d?.displayName ?? '—').replace(/^The /, '').slice(0, 22);
+       return [name, d?.total ?? 0];
+     })
    });
    ```
 
@@ -53,19 +57,31 @@ layout:
    ```js
    const sampled = stats.filter(d => d?.sampleId);
    const samples = await Promise.all(sampled.map(d => call('get-museum-object', { objectId: d.sampleId }).catch(() => null)));
-   await widget('cards', {
-     items: samples.map((s, i) => ({
-       title: sampled[i]?.displayName ?? '—',
-       subtitle: s?.object?.title ?? '—',
-       image: s?.object?.primaryImageSmall,
-       body: `${s?.object?.objectDate || '—'}`
-     }))
-   });
+   const cardItems = samples
+     .map((s, i) => {
+       const deptName = sampled[i]?.displayName;
+       const objTitle = s?.object?.title;
+       const objDate  = s?.object?.objectDate;
+       // Skip cards where both dept name and object title are missing
+       if (!deptName && !objTitle) return null;
+       return {
+         title: deptName || objTitle || 'Unknown department',
+         subtitle: objTitle && objTitle !== deptName ? objTitle : undefined,
+         description: objDate || undefined,
+         tags: objDate ? [objDate] : undefined
+       };
+     })
+     .filter(Boolean);
+   if (cardItems.length > 0) {
+     await widget('cards', { title: 'Signature pieces by department', cards: cardItems });
+   } else {
+     await widget('text', { content: 'No signature pieces available for these departments.' });
+   }
    ```
 
 6. **KV directory**:
    ```js
-   await widget('kv', { pairs: stats.map(d => [d?.displayName ?? '—', `${d?.total ?? 0} highlights`]) });
+   await widget('kv', { title: 'Departments', rows: stats.map(d => [d?.displayName ?? '—', `${d?.total ?? 0} highlights`]) });
    ```
 
 ## Examples
@@ -75,15 +91,15 @@ layout:
 const resp = await call('list-departments', {}).catch(() => null);
 const departments = resp?.departments ?? [];
 const stats = await Promise.all(departments.map(async d => { const res = await call('search-museum-objects', { q: '*', departmentId: d?.departmentId, isHighlight: true, pageSize: 1 }).catch(() => null); return { ...d, total: res?.total ?? 0 }; }));
-await widget('chart', { type: 'bar', data: stats.map(d => ({ label: d?.displayName ?? '—', value: d?.total ?? 0 })) });
-await widget('kv', { pairs: stats.map(d => [d?.displayName ?? '—', `${d?.total ?? 0}`]) });
+await widget('chart', { title: 'Highlight objects per department', bars: stats.map(d => [(d?.displayName ?? '—').replace(/^The /, '').slice(0, 22), d?.total ?? 0]) });
+await widget('kv', { title: 'Departments', rows: stats.map(d => [d?.displayName ?? '—', `${d?.total ?? 0}`]) });
 ```
 
 ### Pick a department to dive into
 ```js
 const resp = await call('list-departments', {}).catch(() => null);
 const departments = resp?.departments ?? [];
-await widget('cards', { items: departments.map(d => ({ title: d?.displayName ?? '—', body: `Department #${d?.departmentId ?? '—'}` })) });
+await widget('cards', { cards: departments.map(d => ({ title: d?.displayName ?? '—', description: `Department #${d?.departmentId ?? '—'}` })) });
 ```
 
 ## Common mistakes

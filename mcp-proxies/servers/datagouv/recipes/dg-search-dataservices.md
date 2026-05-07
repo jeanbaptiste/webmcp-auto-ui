@@ -48,8 +48,8 @@ The user is looking for a programmatic data source:
    });
 
    await widget('data-table', {
-     columns: ['API', 'Org.', 'Licence', 'OpenAPI', 'MAJ'],
-     rows: services.map(s => [s.title ?? '—', s.organization?.name ?? '—', s.license ?? '—', s.machine_documentation_url ? '✓' : '—', s.last_modified ?? '—'])
+     columns: ['API', 'Org.', 'Accès', 'Licence', 'OpenAPI'],
+     rows: services.map(s => [s.title ?? '—', s.organization?.name ?? '—', s.access_type ?? '—', s.license ?? '—', s.machine_documentation_url ? '✓' : '—'])
    });
 
    const withSpec = services.filter(s => s.machine_documentation_url).length;

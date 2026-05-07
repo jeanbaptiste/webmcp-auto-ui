@@ -74,14 +74,9 @@ await widget('map', {
 // 4. Headline stat-card (top site)
 await widget('stat-card', { label: 'Top solar site', value: summary[0].name, icon: 'sun' });
 
-// 5. Overlaid chart
+// 5. Annual irradiance bar chart (one bar per site)
 await widget('chart', {
-  type: 'line',
-  series: summary.map(s => ({
-    name: s.name,
-    data: Object.entries(s.irrSeries).map(([d, v]) => ({ x: d, y: v })).filter(p => p.y > -990)
-  })),
-  xLabel: 'Day', yLabel: 'kWh/m²/day'
+  bars: summary.map(s => [s.name, Number(s.annualIrr.toFixed(1))])
 });
 
 // 6. Ranking table
@@ -107,10 +102,13 @@ const [a, m] = await Promise.all([
   call('nasa_power', { parameters: 'WS50M', community: 'RE', latitude: 47.5, longitude: -4.0, start: '20240101', end: '20241231', format: 'json' }).catch(() => null),
   call('nasa_power', { parameters: 'WS50M', community: 'RE', latitude: 43.0, longitude: 4.5,  start: '20240101', end: '20241231', format: 'json' }).catch(() => null)
 ]);
-await widget('chart', { type: 'line', series: [
-  { name: 'Atlantic', data: Object.entries(a?.properties?.parameter?.WS50M ?? {}).map(([d, v]) => ({ x: d, y: v })).filter(p => p.y > -990) },
-  { name: 'Med.',     data: Object.entries(m?.properties?.parameter?.WS50M ?? {}).map(([d, v]) => ({ x: d, y: v })).filter(p => p.y > -990) }
-]});
+const avg = (obj) => { const vals = Object.values(obj ?? {}).filter(v => Number.isFinite(v) && v > -990); return vals.length > 0 ? Number((vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(2)) : 0; };
+await widget('chart', {
+  bars: [
+    ['Atlantic', avg(a?.properties?.parameter?.WS50M)],
+    ['Med.',     avg(m?.properties?.parameter?.WS50M)]
+  ]
+});
 ```
 
 ## Common mistakes

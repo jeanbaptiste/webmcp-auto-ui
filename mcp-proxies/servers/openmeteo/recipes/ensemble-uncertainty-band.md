@@ -82,11 +82,11 @@ const peakRainProb = probRain5mm.length > 0 ? Math.max(...probRain5mm) : 0;
 await widget('chart-rich', {
   title: 'Temperature - bande d\'incertitude (ensemble)',
   type: 'line',
-  xAxis: { label: 'Heure', data: stats.map(s => s.time) },
-  series: [
-    { label: 'Max membres', data: stats.map(s => s.max), color: '#e74c3c' },
-    { label: 'Mediane', data: stats.map(s => s.median), color: '#2c3e50' },
-    { label: 'Min membres', data: stats.map(s => s.min), color: '#3498db' }
+  labels: stats.map(s => s.time),
+  data: [
+    { label: 'Max membres', values: stats.map(s => Number(s.max)), color: '#e74c3c' },
+    { label: 'Mediane', values: stats.map(s => Number(s.median)), color: '#2c3e50' },
+    { label: 'Min membres', values: stats.map(s => Number(s.min)), color: '#3498db' }
   ]
 });
 

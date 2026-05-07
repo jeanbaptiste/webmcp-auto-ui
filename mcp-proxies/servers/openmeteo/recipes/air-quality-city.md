@@ -71,12 +71,12 @@ const sliceEvery6h = (arr) => (arr ?? []).filter((_, i) => i % 6 === 0);
 await widget('chart-rich', {
   title: 'Pollens sur 5 jours (grains/m3)',
   type: 'line',
-  xAxis: { label: 'Heure', data: timesEvery6h.map(t => t.slice(5, 16).replace('T', ' ')) },
-  series: [
-    { label: 'Graminees', data: sliceEvery6h(hourly.grass_pollen), color: '#27ae60' },
-    { label: 'Bouleau', data: sliceEvery6h(hourly.birch_pollen), color: '#8e44ad' },
-    { label: 'Olivier', data: sliceEvery6h(hourly.olive_pollen), color: '#f39c12' },
-    { label: 'Ambroisie', data: sliceEvery6h(hourly.ragweed_pollen), color: '#c0392b' }
+  labels: timesEvery6h.map(t => t.slice(5, 16).replace('T', ' ')),
+  data: [
+    { label: 'Graminees', values: sliceEvery6h(hourly.grass_pollen), color: '#27ae60' },
+    { label: 'Bouleau', values: sliceEvery6h(hourly.birch_pollen), color: '#8e44ad' },
+    { label: 'Olivier', values: sliceEvery6h(hourly.olive_pollen), color: '#f39c12' },
+    { label: 'Ambroisie', values: sliceEvery6h(hourly.ragweed_pollen), color: '#c0392b' }
   ]
 });
 
@@ -94,7 +94,7 @@ if (noonIdx.length === 0) {
 }
 await widget('kv', {
   title: 'UV index midi (5j)',
-  pairs: noonIdx.map(i => {
+  rows: noonIdx.map(i => {
     const v = uvSeries[i];
     const label = !Number.isFinite(v) ? '—' : `${v} (${v < 3 ? 'faible' : v < 6 ? 'modere' : v < 8 ? 'fort' : 'tres fort'})`;
     return [times[i].slice(0, 10), label];

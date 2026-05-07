@@ -83,10 +83,10 @@ const peak = anomalies.reduce((a, b) => Math.abs(a.anomaly) > Math.abs(b.anomaly
 await widget('chart-rich', {
   title: 'Tendance saisonniere 9 mois - Bordeaux',
   type: 'line',
-  xAxis: { label: 'Mois', data: anomalies.map(a => a.month) },
-  series: [
-    { label: 'Tmoy prevue', data: anomalies.map(a => a.t.toFixed(1)), color: '#e74c3c' },
-    { label: 'Normale', data: anomalies.map(a => a.normal.toFixed(1)), color: '#bdc3c7', dashed: true }
+  labels: anomalies.map(a => a.month),
+  data: [
+    { label: 'Tmoy prevue', values: anomalies.map(a => parseFloat(a.t.toFixed(1))), color: '#e74c3c' },
+    { label: 'Normale', values: anomalies.map(a => parseFloat(a.normal.toFixed(1))), color: '#bdc3c7' }
   ]
 });
 

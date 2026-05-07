@@ -41,8 +41,8 @@ apods.sort((a, b) => (a?.date ?? '').localeCompare(b?.date ?? ''));
 
 // 2. Carousel: HD images, large rotation (skip videos)
 await widget('carousel', {
-  items: apods.filter(a => a?.media_type === 'image').map(a => ({
-    image: a?.hdurl || a?.url,
+  slides: apods.filter(a => a?.media_type === 'image').map(a => ({
+    src: a?.hdurl || a?.url,
     title: a?.title ?? '(untitled)',
     subtitle: a?.date ?? '—'
   }))
@@ -79,9 +79,9 @@ const raw = await call('nasa_apod', {
   end_date:   today.toISOString().slice(0, 10)
 }).catch(() => null);
 const apods = (Array.isArray(raw) ? raw : []).filter(a => a);
-const carItems = apods.filter(a => a?.media_type === 'image' && a?.hdurl).map(a => ({ image: a.hdurl, title: a?.title ?? '(untitled)', subtitle: a?.date ?? '—' }));
+const carItems = apods.filter(a => a?.media_type === 'image' && a?.hdurl).map(a => ({ src: a.hdurl, title: a?.title ?? '(untitled)', subtitle: a?.date ?? '—' }));
 const cardItems = apods.map(a => ({ title: a?.title ?? '(untitled)', image: a?.url, subtitle: a?.date ?? '—' }));
-await widget('carousel', { items: carItems.length ? carItems : [{ title: 'APOD week (preview)', subtitle: 'Run live to see images' }] });
+await widget('carousel', { slides: carItems.length ? carItems : [{ title: 'APOD week (preview)', subtitle: 'Run live to see images' }] });
 await widget('cards', { items: cardItems.length ? cardItems : [{ title: 'Chargement échoué', subtitle: 'Relance en live pour voir les images' }] });
 ```
 
@@ -89,9 +89,9 @@ await widget('cards', { items: cardItems.length ? cardItems : [{ title: 'Chargem
 ```js
 const raw = await call('nasa_apod', { count: 15 }).catch(() => null);
 const apods = (Array.isArray(raw) ? raw : []).filter(a => a);
-const carItems = apods.filter(a => a?.media_type === 'image' && a?.hdurl).map(a => ({ image: a.hdurl, title: a?.title ?? '(untitled)' }));
+const carItems = apods.filter(a => a?.media_type === 'image' && a?.hdurl).map(a => ({ src: a.hdurl, title: a?.title ?? '(untitled)' }));
 const cardItems = apods.map(a => ({ title: a?.title ?? '(untitled)', image: a?.url, subtitle: a?.date ?? '—' }));
-await widget('carousel', { items: carItems.length ? carItems : [{ title: 'Random APODs (preview)', subtitle: 'Run live to see images' }] });
+await widget('carousel', { slides: carItems.length ? carItems : [{ title: 'Random APODs (preview)', subtitle: 'Run live to see images' }] });
 await widget('cards', { items: cardItems.length ? cardItems : [{ title: 'Random APODs (preview)', subtitle: 'Run live to see images' }] });
 ```
 

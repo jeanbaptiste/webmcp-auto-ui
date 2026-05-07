@@ -39,13 +39,12 @@ const dateParts = firstDate.slice(0, 10).split('-');
 const baseUrl = dateParts.length === 3 ? `https://epic.gsfc.nasa.gov/archive/natural/${dateParts[0]}/${dateParts[1]}/${dateParts[2]}/png` : '';
 
 // 2. Carousel of frames (chronological)
-await widget('carousel', {
-  items: frames.filter(f => f?.image && baseUrl).map(f => ({
-    image: `${baseUrl}/${f.image}.png`,
-    title: f?.caption || 'Earth — DSCOVR/EPIC',
-    subtitle: f?.date ?? '—'
-  }))
-});
+const slides = frames.filter(f => f != null && f.image && baseUrl).map(f => ({
+  src: `${baseUrl}/${f.image}.png`,
+  title: f.caption || 'Earth — DSCOVR/EPIC',
+  subtitle: f.date ?? '—'
+}));
+await widget('carousel', { slides: slides.length ? slides : [{ title: 'No frames available', subtitle: '' }] });
 
 // 3. Map with sub-solar centroid markers
 await widget('map', {
@@ -61,11 +60,11 @@ await widget('map', {
 
 // 4. Metadata
 await widget('kv', {
-  items: [
-    { label: 'Frames', value: frames.length },
-    { label: 'Collection', value: 'natural' },
-    { label: 'First image', value: frames[0]?.date ?? '—' },
-    { label: 'Last image', value: frames[frames.length - 1]?.date ?? '—' }
+  rows: [
+    ['Frames', String(frames.length)],
+    ['Collection', 'natural'],
+    ['First image', frames[0]?.date ?? '—'],
+    ['Last image', frames[frames.length - 1]?.date ?? '—']
   ]
 });
 ```
@@ -81,9 +80,9 @@ const epicUrl = (f, col = 'natural') => {
 const today = new Date().toISOString().slice(0, 10);
 const raw = await call('nasa_epic', { collection: 'natural', date: today }).catch(() => null);
 const frames = (Array.isArray(raw) ? raw : []).filter(f => f);
-const carItems = frames.map(f => ({ image: epicUrl(f), subtitle: f?.date ?? '—' }));
+const carItems = frames.map(f => ({ src: epicUrl(f), subtitle: f?.date ?? '—' }));
 const markers = frames.filter(f => Number.isFinite(f?.centroid_coordinates?.lat)).map(f => ({ lat: f.centroid_coordinates.lat, lon: f.centroid_coordinates.lon }));
-await widget('carousel', { items: carItems.length ? carItems : [{ title: 'EPIC natural (preview)', subtitle: today }] });
+await widget('carousel', { slides: carItems.length ? carItems : [{ title: 'EPIC natural (preview)', subtitle: today }] });
 await widget('map', { center: [0, 0], zoom: 1, markers: markers.length ? markers : [{ lat: 0, lon: 0, label: 'EPIC sub-solar (preview)' }] });
 ```
 
@@ -95,9 +94,9 @@ const epicUrl = (f, col = 'natural') => {
 };
 const raw = await call('nasa_epic', { collection: 'enhanced', date: '2024-12-21' }).catch(() => null);
 const frames = (Array.isArray(raw) ? raw : []).filter(f => f);
-const carItems = frames.map(f => ({ image: epicUrl(f, 'enhanced'), title: f?.date ?? '—' }));
-await widget('carousel', { items: carItems.length ? carItems : [{ title: 'EPIC enhanced 2024-12-21 (preview)', subtitle: 'Run live to see frames' }] });
-await widget('kv', { items: [{ label: 'Solstice', value: '2024-12-21' }, { label: 'Frames', value: frames.length }] });
+const carItems = frames.map(f => ({ src: epicUrl(f, 'enhanced'), title: f?.date ?? '—' }));
+await widget('carousel', { slides: carItems.length ? carItems : [{ title: 'EPIC enhanced 2024-12-21 (preview)', subtitle: 'Run live to see frames' }] });
+await widget('kv', { rows: [['Solstice', '2024-12-21'], ['Frames', String(frames.length)]] });
 ```
 
 ## Common mistakes

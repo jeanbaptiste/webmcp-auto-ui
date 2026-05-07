@@ -1,16 +1,16 @@
 ---
 id: wiki-section-deepdive
 name: Wikipedia section deep-dive
-description: Plongée dans une section spécifique d'un article — sommaire complet + résumé condensé.
+description: Plongée dans une section spécifique d'un article — sommaire complet + contenu de la section ciblée.
 when: the user asks for a specific section of an article, the history part, or wants to skip to a chapter
 servers: [wikipedia]
-tools_used: [get_sections, summarize_article_section]
+tools_used: [search, readArticle]
 data_type: text
-components_used: [text, table, kv]
+components_used: [text, data-table, kv]
 layout:
   type: grid
   columns: 2
-  arrangement: sections table on the left, focused section summary on the right
+  arrangement: sections table on the left, focused section content on the right
 ---
 
 ## When to use
@@ -22,60 +22,169 @@ The user wants to navigate a long article like a book and jump to a chapter:
 
 ## How to use
 
-1. **List all sections** to confirm the target exists:
+1. **Search to get the canonical title**:
    ```js
-   const all = await call('get_sections', { title: 'Internet' }).catch(() => null);
-   const sections = all?.sections ?? [];
+   const results = await call('search', { query: 'Internet' }).catch(() => null);
+   if (!results || results.length === 0) return widget('text', { content: 'No article found.' });
+   const firstText = results[0]?.text ?? '';
+   const titleMatch = firstText.match(/^\*\*(.+?)\*\*/);
+   const title = titleMatch ? titleMatch[1] : 'Internet';
    ```
 
-2. **Render the table of contents** (so the user sees siblings):
+2. **Fetch the full article**:
    ```js
-   await widget('data-table', {
-     columns: ['Section', 'Level'],
-     rows: sections.map(s => [s?.title ?? '—', s?.level ?? '—'])
-   });
+   const article = await call('readArticle', { title }).catch(() => null);
+   if (!article) return widget('text', { content: 'Article not found.' });
+   const extract = typeof article === 'string' ? article : (article?.extract ?? '');
+   const url = article?.url ?? null;
    ```
 
-3. **Summarize the targeted section**:
+3. **Parse headings from the markdown extract**:
    ```js
-   const sec = await call('summarize_article_section', {
-     title: 'Internet',
-     section_title: 'History',
-     max_length: 220
-   }).catch(() => null);
+   const lines = extract.split('\n');
+   const headings = lines
+     .filter(l => /^#{1,6}\s/.test(l))
+     .map(l => {
+       const m = l.match(/^(#{1,6})\s+(.+)/);
+       return m ? [m[2].trim(), String(m[1].length)] : null;
+     })
+     .filter(Boolean);
+   ```
+
+4. **Render the table of contents** (so the user sees siblings):
+   ```js
    await widget('kv', {
-     items: [
-       { label: 'Article', value: sec?.title ?? '—' },
-       { label: 'Section', value: sec?.section_title ?? '—' }
+     rows: [
+       ['Article', title],
+       ['URL', url ?? '—'],
+       ['Sections', String(headings.length)]
      ]
    });
-   await widget('text', { content: sec?.summary ?? '(no section summary)' });
+   if (headings.length > 0) {
+     await widget('data-table', {
+       columns: ['Section', 'Level'],
+       rows: headings
+     });
+   }
+   ```
+
+5. **Extract and display the targeted section content**:
+   ```js
+   const targetSection = 'History'; // replace with user-requested section
+   // Find the heading line index
+   const headingIdx = lines.findIndex(l => {
+     const m = l.match(/^#{1,6}\s+(.+)/);
+     return m && m[1].trim().toLowerCase() === targetSection.toLowerCase();
+   });
+   if (headingIdx === -1) {
+     await widget('text', { content: `Section "${targetSection}" not found in this article.` });
+   } else {
+     const headingLevel = (lines[headingIdx].match(/^(#{1,6})/)?.[1] ?? '#').length;
+     // Collect lines until next heading of same or higher level
+     const sectionLines = [];
+     for (let i = headingIdx + 1; i < lines.length; i++) {
+       const m = lines[i].match(/^(#{1,6})\s/);
+       if (m && m[1].length <= headingLevel) break;
+       sectionLines.push(lines[i]);
+     }
+     const sectionText = sectionLines.join('\n').trim();
+     await widget('text', { content: sectionText || '(empty section)' });
+   }
    ```
 
 ## Examples
 
 ### History of Internet
 ```js
-const all = await call('get_sections', { title: 'Internet' }).catch(() => null);
-const sec = await call('summarize_article_section', { title: 'Internet', section_title: 'History', max_length: 250 }).catch(() => null);
-await widget('data-table', { columns: ['Section', 'Level'], rows: (all?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—']) });
-await widget('kv', { items: [{ label: 'Section', value: sec?.section_title ?? '—' }] });
-await widget('text', { content: sec?.summary ?? '(no section summary)' });
+const results = await call('search', { query: 'Internet' }).catch(() => null);
+if (!results || results.length === 0) return widget('text', { content: 'No article found.' });
+const firstText = results[0]?.text ?? '';
+const titleMatch = firstText.match(/^\*\*(.+?)\*\*/);
+const title = titleMatch ? titleMatch[1] : 'Internet';
+
+const article = await call('readArticle', { title }).catch(() => null);
+if (!article) return widget('text', { content: 'Article not found.' });
+const extract = typeof article === 'string' ? article : (article?.extract ?? '');
+const url = article?.url ?? null;
+
+const lines = extract.split('\n');
+const headings = lines
+  .filter(l => /^#{1,6}\s/.test(l))
+  .map(l => { const m = l.match(/^(#{1,6})\s+(.+)/); return m ? [m[2].trim(), String(m[1].length)] : null; })
+  .filter(Boolean);
+
+await widget('kv', {
+  rows: [
+    ['Article', title],
+    ['URL', url ?? '—'],
+    ['Sections', String(headings.length)]
+  ]
+});
+if (headings.length > 0) {
+  await widget('data-table', { columns: ['Section', 'Level'], rows: headings });
+}
+
+const targetSection = 'History';
+const headingIdx = lines.findIndex(l => { const m = l.match(/^#{1,6}\s+(.+)/); return m && m[1].trim().toLowerCase() === targetSection.toLowerCase(); });
+if (headingIdx === -1) {
+  await widget('text', { content: `Section "${targetSection}" not found.` });
+} else {
+  const headingLevel = (lines[headingIdx].match(/^(#{1,6})/)?.[1] ?? '#').length;
+  const sectionLines = [];
+  for (let i = headingIdx + 1; i < lines.length; i++) {
+    const m = lines[i].match(/^(#{1,6})\s/);
+    if (m && m[1].length <= headingLevel) break;
+    sectionLines.push(lines[i]);
+  }
+  await widget('text', { content: sectionLines.join('\n').trim() || '(empty section)' });
+}
 ```
 
 ### Économie de la France
 ```js
-const all = await call('get_sections', { title: 'France' }).catch(() => null);
-const sec = await call('summarize_article_section', { title: 'France', section_title: 'Économie', max_length: 280 }).catch(() => null);
-await widget('data-table', { columns: ['Section', 'Niveau'], rows: (all?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—']) });
-await widget('text', { content: sec?.summary ?? '(no section summary)' });
+const results = await call('search', { query: 'France' }).catch(() => null);
+if (!results || results.length === 0) return widget('text', { content: 'No article found.' });
+const firstText = results[0]?.text ?? '';
+const titleMatch = firstText.match(/^\*\*(.+?)\*\*/);
+const title = titleMatch ? titleMatch[1] : 'France';
+
+const article = await call('readArticle', { title }).catch(() => null);
+if (!article) return widget('text', { content: 'Article not found.' });
+const extract = typeof article === 'string' ? article : (article?.extract ?? '');
+
+const lines = extract.split('\n');
+const headings = lines
+  .filter(l => /^#{1,6}\s/.test(l))
+  .map(l => { const m = l.match(/^(#{1,6})\s+(.+)/); return m ? [m[2].trim(), String(m[1].length)] : null; })
+  .filter(Boolean);
+
+await widget('kv', { rows: [['Article', title], ['Sections', String(headings.length)]] });
+if (headings.length > 0) {
+  await widget('data-table', { columns: ['Section', 'Niveau'], rows: headings });
+}
+
+const targetSection = 'Économie';
+const headingIdx = lines.findIndex(l => { const m = l.match(/^#{1,6}\s+(.+)/); return m && m[1].trim().toLowerCase() === targetSection.toLowerCase(); });
+if (headingIdx === -1) {
+  await widget('text', { content: `Section "${targetSection}" non trouvée.` });
+} else {
+  const headingLevel = (lines[headingIdx].match(/^(#{1,6})/)?.[1] ?? '#').length;
+  const sectionLines = [];
+  for (let i = headingIdx + 1; i < lines.length; i++) {
+    const m = lines[i].match(/^(#{1,6})\s/);
+    if (m && m[1].length <= headingLevel) break;
+    sectionLines.push(lines[i]);
+  }
+  await widget('text', { content: sectionLines.join('\n').trim() || '(section vide)' });
+}
 ```
 
 ## Common mistakes
 
-- **Passing a section title that doesn't exist**: `summarize_article_section` returns a generic message — always call `get_sections` first to validate
-- **Mismatched casing**: `History` vs `history` may differ depending on language ; copy the exact casing from `get_sections`
-- **Translating the section title**: the section_title must match the article's language (e.g. `Économie` not `Economy` for fr.wikipedia)
-- **Setting `max_length: 50`**: too short to convey a section — minimum 150
-- **Skipping the TOC**: showing only the focused summary loses navigation context
-- **Calling both tools sequentially when only one is needed**: if the user names an explicit section, you can skip `get_sections` after first validation
+- **Using non-existent tools** (`get_sections`, `summarize_article_section`): only `search` and `readArticle` exist in this server
+- **Treating `readArticle` result as a plain string**: it returns `{title, extract, pageid, url}` — use `.extract` for the markdown content
+- **Using `items: [{label, value}]` for kv widget**: the schema requires `rows: [[string, string], ...]` — each row is a 2-element array
+- **Forgetting to coerce numbers to strings in kv rows**: all values must be strings — use `String(count)`
+- **Case-insensitive matching**: use `.toLowerCase()` on both sides when searching for a section heading
+- **Skipping the TOC**: showing only the focused section loses navigation context
+- **Not guarding null returns**: both `search` and `readArticle` can fail — always `.catch(() => null)` and check before rendering

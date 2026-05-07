@@ -44,6 +44,9 @@ const gap = await call('unobserved_taxa', {
 
 const gapResults = gap?.results ?? [];
 
+// Build a lookup for observations_count from unobserved_taxa results (field is reliable here)
+const obsCountById = Object.fromEntries(gapResults.map(t => [t.id, t.observations_count ?? 0]));
+
 // 4. Hydrate each missing species with photos
 await widget('text', { content: 'Hydrating species data…' });
 const detailed = (await Promise.all(
@@ -72,7 +75,7 @@ await widget('data-table', {
     t.preferred_common_name ?? t.name ?? '—',
     t.ancestors?.find(a => a.rank === 'family')?.name ?? '—',
     t.conservation_status?.status_name ?? 'LC',
-    t.observations_count ?? 0,
+    obsCountById[t.id] ?? t.observations_count ?? 0,
   ]),
 });
 await widget('gallery', {

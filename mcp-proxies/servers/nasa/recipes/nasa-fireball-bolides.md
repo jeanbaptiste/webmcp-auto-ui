@@ -31,30 +31,36 @@ const data = await call('jpl_fireball', {
   limit: 100
 }).catch(() => null);
 const fields = data?.fields ?? [];
-const rows = (data?.data ?? []).map(r => Object.fromEntries(fields.map((f, i) => [f, r?.[i]])));
+const rows = (data?.data ?? []).filter(Boolean).map(r => Object.fromEntries(fields.map((f, i) => [f, r?.[i] ?? null])));
 if (rows.length === 0) return widget('text', { content: 'No fireball events.' });
 
 // 2. Stats
 const totalE = rows.reduce((s, r) => s + (+r?.['energy'] || 0), 0);
-const biggest = rows.reduce((b, r) => +(r?.['impact-e'] || 0) > +(b?.['impact-e'] || 0) ? r : b, null);
+const biggest = rows.reduce((b, r) => +(r?.['impact-e'] || 0) > +(b?.['impact-e'] || 0) ? r : b, rows[0]);
 const biggestE = +(biggest?.['impact-e'] ?? 0);
 await widget('stat-card', { label: 'Fireballs', value: rows.length, icon: 'meteor' });
 await widget('stat-card', { label: 'Total energy (kt TNT)', value: totalE.toFixed(1), icon: 'zap' });
 await widget('stat-card', { label: 'Biggest (kt)', value: (Number.isFinite(biggestE) ? biggestE : 0).toFixed(2), icon: 'maximize' });
 
 // 3. World map (size = energy)
-await widget('map', {
-  center: [0, 0],
-  zoom: 1,
-  markers: rows
-    .filter(r => r?.lat && r?.lon)
-    .map(r => ({
-      lat: parseFloat(r.lat) * (r['lat-dir'] === 'S' ? -1 : 1),
-      lon: parseFloat(r.lon) * (r['lon-dir'] === 'W' ? -1 : 1),
+const markers = rows
+  .map(r => {
+    const lat = parseFloat(r?.lat) * (r?.['lat-dir'] === 'S' ? -1 : 1);
+    const lon = parseFloat(r?.lon) * (r?.['lon-dir'] === 'W' ? -1 : 1);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return {
+      lat,
+      lon,
       radius: Math.max(3, Math.min(20, Math.log10((+r['impact-e'] || 0.01) + 0.1) * 5 + 5)),
       label: r?.date ?? '—',
       color: '#dc2626'
-    }))
+    };
+  })
+  .filter(Boolean);
+await widget('map', {
+  center: [0, 0],
+  zoom: 1,
+  markers
 });
 
 // 4. Top events table (largest first)
@@ -84,8 +90,8 @@ void 0;
 const start = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
 const d = await call('jpl_fireball', { date_min: start, limit: 200 }).catch(() => null);
 const fields = d?.fields ?? [];
-const rows = (d?.data ?? []).map(r => Object.fromEntries(fields.map((f, i) => [f, r?.[i]])));
-const markers = rows.filter(r => r?.lat).map(r => ({ lat: +r.lat, lon: +r.lon }));
+const rows = (d?.data ?? []).filter(Boolean).map(r => Object.fromEntries(fields.map((f, i) => [f, r?.[i] ?? null])));
+const markers = rows.map(r => { const lat = +r?.lat, lon = +r?.lon; return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null; }).filter(Boolean);
 await widget('stat-card', { label: 'Yearly fireballs', value: Math.max(rows.length, 1) });
 await widget('map', { center: [0, 0], zoom: 1, markers: markers.length ? markers : [{ lat: 55.15, lon: 61.41, label: 'Chelyabinsk (preview)' }] });
 ```

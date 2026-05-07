@@ -1,7 +1,7 @@
 ---
 id: dg-department-comparison
 name: Department-level indicator comparison
-description: Pull a national indicator with one row per French department, render a choropleth map, a top-10/flop-10 table and a bar chart of disparities
+description: Pull a national indicator with one row per French department, render a bar chart of top-15 departments, a top-10/flop-10 table and a ranking chart
 when: the user asks for a per-department comparison of a single indicator (poverty, unemployment, renewable energy, etc.)
 servers: [datagouv]
 tools_used: [search_datasets, list_dataset_resources, query_resource_data]
@@ -10,7 +10,7 @@ components_used: [table, chart, map]
 layout:
   type: grid
   columns: 2
-  arrangement: full-width choropleth on top, table top-10 + bar chart below
+  arrangement: full-width bar chart on top, table top-10 + ranking chart below
 ---
 
 ## When to use
@@ -63,32 +63,22 @@ These questions all share the same shape: one indicator, 101 departments, rankin
    if (rows.length === 0) {
      await widget('text', { content: 'Aucune donnée à afficher.' });
    } else {
-     await widget('map', {
-       mode: 'choropleth',
-       geo_level: 'department',
-       code_field: codeCol,
-       value_field: valueCol,
-       features: rows
-     });
+     // The map widget does not support choropleth — render a bar chart of top-15 instead,
+     // then the ranking table below. This preserves the spatial signal via the chart + table.
+     const chartRows = rows.slice(0, 15);
+     const chartValues = chartRows.map(r => Number(r[valueCol])).filter(Number.isFinite);
+     if (chartValues.length > 0) {
+       await widget('chart', {
+         bars: chartRows.map(r => [r[nameCol] ?? r[codeCol] ?? '—', Number(r[valueCol])])
+       });
+     } else {
+       await widget('text', { content: `Impossible de tracer le graphique : la colonne "${valueCol}" ne contient pas de valeurs numériques. Colonnes disponibles : ${keys.join(', ')}` });
+     }
 
      await widget('data-table', {
        columns: ['Rang', 'Département', 'Code', 'Valeur'],
        rows: rows.slice(0, 10).map((r, i) => [i + 1, r[nameCol] ?? '—', r[codeCol] ?? '—', r[valueCol] ?? '—'])
      });
-
-     const chartValues = rows.slice(0, 15).map(r => Number(r[valueCol])).filter(Number.isFinite);
-     if (chartValues.length > 0) {
-       await widget('chart', {
-         type: 'bar',
-         data: {
-           labels: rows.slice(0, 15).map(r => r[nameCol] ?? '—'),
-           values: chartValues
-         },
-         options: { xLabel: 'Département', yLabel: 'Valeur' }
-       });
-     } else {
-       await widget('text', { content: `Impossible de tracer le graphique : la colonne "${valueCol}" ne contient pas de valeurs numériques. Colonnes disponibles : ${keys.join(', ')}` });
-     }
    }
    ```
 
@@ -132,10 +122,10 @@ if (rows.length === 0) {
   const codeCol = keys.find(k => /code.dep/i.test(k)) ?? 'code_dep';
   const nameCol = keys.find(k => /nom.dep/i.test(k)) ?? 'nom_dep';
   const valueCol = keys.find(k => /part_enr/i.test(k)) ?? keys[keys.length - 1];
-  await widget('map', { mode: 'choropleth', geo_level: 'department', code_field: codeCol, value_field: valueCol, features: rows });
+  // The map widget does not support choropleth — use a bar chart of top-10 for visual ranking
   const chartValues = rows.slice(0, 10).map(r => Number(r[valueCol])).filter(Number.isFinite);
   if (chartValues.length > 0) {
-    await widget('chart', { type: 'bar', data: { labels: rows.slice(0, 10).map(r => r[nameCol] ?? '—'), values: chartValues } });
+    await widget('chart', { bars: rows.slice(0, 10).map(r => [r[nameCol] ?? '—', Number(r[valueCol])]) });
   } else {
     await widget('text', { content: `Colonne valeur "${valueCol}" non numérique. Colonnes : ${keys.join(', ')}` });
   }

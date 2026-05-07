@@ -50,35 +50,34 @@ const sentry = des ? await call('jpl_sentry', { des }).catch(() => null) : null;
 // 4. Profile header
 await widget('profile', {
   name: sbdb?.object?.fullname || target,
-  subtitle: `${sbdb?.object?.orbit_class?.name ?? ''} — ${sbdb?.object?.kind ?? 'asteroid'}`,
-  badges: [sbdb?.object?.neo ? 'NEO' : null, sbdb?.object?.pha ? 'PHA' : null, sentry ? 'Sentry-monitored' : null].filter(Boolean)
+  fields: [
+    { label: 'Class', value: `${sbdb?.object?.orbit_class?.name ?? ''} — ${sbdb?.object?.kind ?? 'asteroid'}` },
+    { label: 'Flags', value: [sbdb?.object?.neo ? 'NEO' : null, sbdb?.object?.pha ? 'PHA' : null, sentry ? 'Sentry-monitored' : null].filter(Boolean).join(', ') || 'none' }
+  ]
 });
 
 // 5. Orbital + physical kv
 await widget('kv', {
-  items: [
-    { label: 'Semi-major axis (au)', value: get(orb, 'a') ?? '—' },
-    { label: 'Eccentricity', value: get(orb, 'e') ?? '—' },
-    { label: 'Inclination (deg)', value: get(orb, 'i') ?? '—' },
-    { label: 'Period (yr)', value: get(orb, 'per_y') || get(orb, 'per') || '—' },
-    { label: 'Diameter (km)', value: get(phys, 'diameter') ?? '—' },
-    { label: 'Albedo', value: get(phys, 'albedo') ?? '—' }
+  rows: [
+    ['Semi-major axis (au)', String(get(orb, 'a') ?? '—')],
+    ['Eccentricity',         String(get(orb, 'e') ?? '—')],
+    ['Inclination (deg)',    String(get(orb, 'i') ?? '—')],
+    ['Period (yr)',          String(get(orb, 'per_y') || get(orb, 'per') || '—')],
+    ['Diameter (km)',        String(get(phys, 'diameter') ?? '—')],
+    ['Albedo',               String(get(phys, 'albedo') ?? '—')]
   ]
 });
 
-// 6. Orbit chart (a vs e simple plot, plus markers for inner planets)
+// 6. Orbit chart — semi-major axis (au) per body as bar chart
 const ax = +(get(orb, 'a') ?? NaN);
-const ex = +(get(orb, 'e') ?? NaN);
-if (Number.isFinite(ax) && Number.isFinite(ex)) {
+if (Number.isFinite(ax)) {
   await widget('chart', {
-    type: 'scatter',
-    data: [
-      { x: ax, y: ex, label: target, color: '#dc2626' },
-      { x: 1.0,   y: 0.017, label: 'Earth',  color: '#3b82f6' },
-      { x: 1.524, y: 0.093, label: 'Mars',   color: '#a16207' },
-      { x: 0.387, y: 0.206, label: 'Mercury', color: '#6b7280' }
-    ],
-    xLabel: 'a (au)', yLabel: 'eccentricity'
+    bars: [
+      ['Mercury', 0.387],
+      ['Earth',   1.0],
+      ['Mars',    1.524],
+      [target,    ax]
+    ]
   });
 }
 
@@ -95,11 +94,10 @@ const sentryData = sentry?.data ?? [];
 if (sentryData.length > 0) {
   const top = sentryData[0];
   await widget('text', {
-    title: 'Sentry impact risk',
-    body: `Cumulative impact probability: ${top?.ip ?? '—'}. Palermo Scale: ${top?.ps_cum ?? '—'}. Torino Scale: ${top?.ts_max ?? 0}. ${top?.n_imp ?? 0} virtual impactors monitored.`
+    content: `Sentry impact risk — Cumulative impact probability: ${top?.ip ?? '—'}. Palermo Scale: ${top?.ps_cum ?? '—'}. Torino Scale: ${top?.ts_max ?? 0}. ${top?.n_imp ?? 0} virtual impactors monitored.`
   });
 } else {
-  await widget('text', { title: 'Sentry impact risk', body: 'Not currently in the Sentry monitoring list — no credible impact threat over the next century.' });
+  await widget('text', { content: 'Sentry impact risk — Not currently in the Sentry monitoring list — no credible impact threat over the next century.' });
 }
 ```
 
@@ -110,7 +108,7 @@ if (sentryData.length > 0) {
 const sbdb = await call('jpl_sbdb', { sstr: 'Bennu', cad: true }).catch(() => null);
 const cad  = await call('jpl_cad',  { des: '101955', date_max: '2200-01-01', dist_max: '0.2' }).catch(() => null);
 const sentry = await call('jpl_sentry', { des: '101955' }).catch(() => null);
-await widget('profile', { name: 'Bennu (101955)', badges: ['NEO', 'PHA', 'Sentry-monitored'] });
+await widget('profile', { name: 'Bennu (101955)', fields: [{ label: 'Flags', value: 'NEO, PHA, Sentry-monitored' }] });
 const rows = (cad?.data ?? []).slice(0, 10).map(r => [r?.[3] ?? '—', r?.[4] ?? '—']);
 await widget('data-table', { columns: ['Date', 'Dist (au)'], rows });
 ```
@@ -121,8 +119,8 @@ const sbdb = await call('jpl_sbdb', { sstr: '433' }).catch(() => null);
 if (!sbdb) return widget('text', { content: 'Eros not found.' });
 await widget('profile', { name: '433 Eros' });
 const a = (sbdb?.orbit?.elements ?? []).find(e => e?.name === 'a')?.value ?? '—';
-await widget('kv', { items: [{ label: 'a (au)', value: a }] });
-await widget('text', { title: 'Sentry', body: 'Eros is not Earth-crossing on relevant timescales.' });
+await widget('kv', { rows: [['a (au)', String(a)]] });
+await widget('text', { content: 'Sentry — Eros is not Earth-crossing on relevant timescales.' });
 ```
 
 ## Common mistakes

@@ -54,8 +54,8 @@ layout:
    ```js
    const buckets = {};
    for (const w of works) { const century = Math.floor((w?.objectBeginDate || 0) / 100) * 100; buckets[century] = (buckets[century] || 0) + 1; }
-   const chartData = Object.entries(buckets).map(([k, v]) => ({ label: `${k}`, value: v }));
-   await widget('chart', { type: 'bar', data: chartData.length ? chartData : [{ label: 'sampled', value: works.length || 1 }] });
+   const chartBars = Object.entries(buckets).map(([k, v]) => [String(k), Number(v)]);
+   await widget('chart', { bars: chartBars.length ? chartBars : [['sampled', Number(works.length) || 1]] });
    ```
 
 5. **Stats** (span covered, cultures represented):

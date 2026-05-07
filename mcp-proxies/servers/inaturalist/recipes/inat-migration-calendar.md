@@ -63,10 +63,8 @@ await widget('timeline', {
   })),
 });
 await widget('chart', {
-  type: 'line',
   title: `${detail?.preferred_common_name ?? detail?.name ?? t.name ?? 'Species'} — weekly observations`,
-  labels: Object.keys(weekObj),
-  data: Object.values(weekObj),
+  bars: Object.entries(weekObj).map(([k, v]) => [k, Number(v)]),
 });
 await widget('map', {
   zoom: 6,
@@ -93,7 +91,7 @@ const place = (await call('search_places', { q: 'France', per_page: 1 }))?.resul
 if (!t || !place) { await widget('text', { content: 'Species or place not found.' }); return; }
 const hist = await call('observations_histogram', { taxon_id: t.id, place_id: place.id, interval: 'week' }).catch(() => ({ results: { week: {} } }));
 const week = hist?.results?.week ?? hist?.results ?? {};
-await widget('chart', { type: 'line', labels: Object.keys(week), data: Object.values(week) });
+await widget('chart', { bars: Object.entries(week).map(([k, v]) => [k, Number(v)]) });
 ```
 
 ### Bee-eater calendar

@@ -56,10 +56,10 @@ await widget('data-table', {
 
 // 5. Selection criteria + caveats
 await widget('kv', {
-  items: [
-    { label: 'Source', value: 'Minor Planet Center NEOCP' },
-    { label: 'Confirmation horizon', value: '48-72h typical' },
-    { label: 'Caveat', value: 'Orbits are preliminary' }
+  rows: [
+    ['Source', 'Minor Planet Center NEOCP'],
+    ['Confirmation horizon', '48-72h typical'],
+    ['Caveat', 'Orbits are preliminary']
   ]
 });
 ```
@@ -81,7 +81,7 @@ const det = await call('jpl_scout', { tdes: 'P21Eolo', file: 'all' }).catch(() =
 const eph = (det?.eph ?? []).filter(e => e);
 const rows = eph.slice(0, 12).map(e => [e?.utc ?? '—', e?.ra ?? '—', e?.dec ?? '—', e?.vmag ?? '—']);
 await widget('data-table', { columns: ['UT', 'RA', 'Dec', 'V'], rows: rows.length ? rows : [['—', '—', '—', '—']] });
-await widget('kv', { items: [{ label: 'Object', value: 'P21Eolo' }, { label: 'Observations', value: det?.nobs ?? '—' }] });
+await widget('kv', { rows: [['Object', 'P21Eolo'], ['Observations', String(det?.nobs ?? '—')]] });
 ```
 
 ## Common mistakes

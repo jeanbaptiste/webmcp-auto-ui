@@ -4,7 +4,7 @@ name: Wikipedia section TOC
 description: Sommaire hiérarchisé d'un article + intro + statistiques de structure.
 when: the user asks for the table of contents, the plan of an article, or a structural overview before reading
 servers: [wikipedia]
-tools_used: [get_sections, get_summary]
+tools_used: [readArticle, get_summary]
 data_type: structure
 components_used: [table, text, stat-card]
 layout:
@@ -23,21 +23,25 @@ The user wants to see the skeleton of a long article:
 
 ## How to use
 
-1. **Fetch sections + summary in parallel**:
+1. **Fetch article + summary in parallel**:
    ```js
-   const [secs, sum] = await Promise.all([
-     call('get_sections', { title: 'JavaScript' }).catch(() => null),
+   const [article, sum] = await Promise.all([
+     call('readArticle', { title: 'JavaScript' }).catch(() => null),
      call('get_summary', { title: 'JavaScript' }).catch(() => null)
    ]);
-   const sections = secs?.sections ?? [];
+   const lines = (article ?? '').split('\n');
+   const sections = lines.filter(l => /^#{1,6}\s/.test(l)).map(l => {
+     const m = l.match(/^(#+)\s+(.+)$/);
+     return { level: m[1].length, title: m[2].trim() };
+   });
    ```
 
 2. **Compute structure stats**:
    ```js
    const n = sections.length;
-   const levels = sections.map(s => s?.level || 1).filter(Number.isFinite);
+   const levels = sections.map(s => s.level);
    const maxLevel = levels.length > 0 ? Math.max(...levels) : 1;
-   const topLevel = sections.filter(s => s?.level === 1).length;
+   const topLevel = sections.filter(s => s.level === 1).length;
    ```
 
 3. **Render**:
@@ -48,7 +52,7 @@ The user wants to see the skeleton of a long article:
    await widget('stat-card', { label: 'Max depth', value: maxLevel, icon: 'arrow-down' });
    await widget('data-table', {
      columns: ['Section', 'Level'],
-     rows: sections.map(s => [`${'  '.repeat((s?.level || 1) - 1)}${s?.title ?? '—'}`, s?.level ?? 1])
+     rows: sections.map(s => [`${'  '.repeat(s.level - 1)}${s.title}`, s.level])
    });
    ```
 
@@ -56,24 +60,30 @@ The user wants to see the skeleton of a long article:
 
 ### JavaScript
 ```js
-const [secs, sum] = await Promise.all([
-  call('get_sections', { title: 'JavaScript' }).catch(() => null),
+const [article, sum] = await Promise.all([
+  call('readArticle', { title: 'JavaScript' }).catch(() => null),
   call('get_summary', { title: 'JavaScript' }).catch(() => null)
 ]);
-const sections = secs?.sections ?? [];
+const sections = (article ?? '').split('\n').filter(l => /^#{1,6}\s/.test(l)).map(l => {
+  const m = l.match(/^(#+)\s+(.+)$/);
+  return { level: m[1].length, title: m[2].trim() };
+});
 await widget('text', { content: sum?.summary ?? '(no summary)' });
 await widget('stat-card', { label: 'Sections', value: sections.length, icon: 'list' });
-await widget('data-table', { columns: ['Section', 'Level'], rows: sections.map(s => [s?.title ?? '—', s?.level ?? 1]) });
+await widget('data-table', { columns: ['Section', 'Level'], rows: sections.map(s => [s.title, s.level]) });
 ```
 
 ### String theory plan
 ```js
-const secs = await call('get_sections', { title: 'String theory' }).catch(() => null);
-const sections = secs?.sections ?? [];
+const article = await call('readArticle', { title: 'String theory' }).catch(() => null);
+const sections = (article ?? '').split('\n').filter(l => /^#{1,6}\s/.test(l)).map(l => {
+  const m = l.match(/^(#+)\s+(.+)$/);
+  return { level: m[1].length, title: m[2].trim() };
+});
 await widget('stat-card', { label: 'Sections', value: sections.length, icon: 'list' });
 await widget('data-table', {
   columns: ['#', 'Section', 'Level'],
-  rows: sections.map((s, i) => [i + 1, s?.title ?? '—', s?.level ?? 1])
+  rows: sections.map((s, i) => [i + 1, s.title, s.level])
 });
 ```
 
@@ -84,4 +94,4 @@ await widget('data-table', {
 - **Using level 0 as default**: Wikipedia sections start at level 1 — coerce missing levels to 1
 - **Truncating to top 10**: the whole point is the full plan — keep all rows
 - **Skipping the summary**: pure TOC is dry ; the intro gives meaning to the structure
-- **Non-numeric `level`**: defensive code only — Wikipedia returns integers
+- **Non-numeric `level`**: not an issue with markdown parsing — heading depth is always an integer derived from `#` count

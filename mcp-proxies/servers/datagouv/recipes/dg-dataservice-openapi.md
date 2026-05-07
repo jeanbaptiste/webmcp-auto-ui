@@ -43,9 +43,7 @@ This recipe is the "dev landing page" for a public API.
    ```js
    const I = info ?? {};
    await widget('text', {
-     title: I.title ?? '—',
-     subtitle: I.organization?.name ?? '',
-     content: I.description ?? ''
+     content: `**${I.title ?? '—'}**${I.organization?.name ? `\n\n*${I.organization.name}*` : ''}\n\n${I.description ?? ''}`
    });
 
    const endpoints = spec?.endpoints ?? (spec?.paths
@@ -71,7 +69,7 @@ This recipe is the "dev landing page" for a public API.
      : I.base_api_url
        ? `curl '${I.base_api_url}'`
        : '# base_api_url non disponible — vérifier la fiche dataservice';
-   await widget('code', { language: 'bash', code: curlCmd });
+   await widget('code', { lang: 'bash', content: curlCmd });
 
    await widget('cards', {
      items: (spec?.common_errors ?? [
@@ -92,9 +90,9 @@ const _ex = await Promise.all([
 ]);
 const sirInfo = _ex[0] ?? {};
 const sirSpec = _ex[1] ?? {};
-await widget('text', { title: sirInfo.title ?? '—', content: sirInfo.description ?? '' });
+await widget('text', { content: `**${sirInfo.title ?? '—'}**\n\n${sirInfo.description ?? ''}` });
 await widget('data-table', { columns: ['Méthode', 'Path', 'Description'], rows: (sirSpec?.endpoints ?? []).map(e => [e.method ?? '—', e.path ?? '—', e.summary ?? '—']) });
-await widget('code', { language: 'bash', code: `curl '${sirInfo.base_api_url ?? ''}/siret/12345678900012' -H 'Authorization: Bearer YOUR_TOKEN'` });
+await widget('code', { lang: 'bash', content: `curl '${sirInfo.base_api_url ?? ''}/siret/12345678900012' -H 'Authorization: Bearer YOUR_TOKEN'` });
 ```
 
 ### Discover an adresse-related API
@@ -108,7 +106,7 @@ const _adr = adr_id ? await Promise.all([
 const adrInfo = _adr[0] ?? {};
 const adrSpec = _adr[1] ?? {};
 await widget('data-table', { columns: ['Méthode', 'Path'], rows: (adrSpec?.endpoints ?? []).map(e => [e.method ?? '—', e.path ?? '—']) });
-await widget('code', { language: 'bash', code: `curl '${adrInfo.base_api_url ?? ''}/search/?q=8+rue+de+la+paix+Paris'` });
+await widget('code', { lang: 'bash', content: `curl '${adrInfo.base_api_url ?? ''}/search/?q=8+rue+de+la+paix+Paris'` });
 ```
 
 ## Common mistakes

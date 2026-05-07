@@ -80,10 +80,10 @@ const heatDays = tmax.filter(t => Number.isFinite(t) && t > heatThreshold).lengt
 await widget('chart-rich', {
   title: 'Tmax 16j - seuil canicule (32 C)',
   type: 'line',
-  xAxis: { label: 'Date', data: times },
-  series: [
-    { label: 'Tmax (C)', data: tmax, color: '#e74c3c' },
-    { label: 'Seuil canicule', data: times.map(() => heatThreshold), color: '#f39c12', dashed: true }
+  labels: times,
+  data: [
+    { label: 'Tmax (C)', values: tmax, color: '#e74c3c' },
+    { label: 'Seuil canicule', values: times.map(() => heatThreshold), color: '#f39c12' }
   ]
 });
 
@@ -91,18 +91,18 @@ await widget('timeline', {
   title: 'Episodes detectes',
   events: [
     ...heatEps.map(e => ({
-      date: times[e.start] ?? '—',
-      label: `Canicule ${e.length}j`,
-      detail: `${times[e.start] ?? '—'} -> ${times[e.end] ?? '—'}`,
-      color: '#e74c3c'
+      date: times[e.start] ?? '',
+      title: `Canicule ${e.length}j`,
+      description: `${times[e.start] ?? '—'} -> ${times[e.end] ?? '—'}`,
+      status: 'active'
     })),
     ...coldEps.map(e => ({
-      date: times[e.start] ?? '—',
-      label: `Froid ${e.length}j`,
-      detail: `${times[e.start] ?? '—'} -> ${times[e.end] ?? '—'}`,
-      color: '#3498db'
+      date: times[e.start] ?? '',
+      title: `Froid ${e.length}j`,
+      description: `${times[e.start] ?? '—'} -> ${times[e.end] ?? '—'}`,
+      status: 'pending'
     }))
-  ]
+  ].filter(e => e.title)
 });
 
 await widget('stat-card', {

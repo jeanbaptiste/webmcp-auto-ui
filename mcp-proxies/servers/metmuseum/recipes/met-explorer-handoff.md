@@ -49,7 +49,7 @@ layout:
 4. **KV of pre-selected filters**:
    ```js
    await widget('kv', {
-     pairs: [
+     rows: [
        ['Query', 'ukiyo-e'],
        ['Department', dept?.displayName || 'All'],
        ['With images', 'Yes'],

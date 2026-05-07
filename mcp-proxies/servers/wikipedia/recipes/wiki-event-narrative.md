@@ -50,7 +50,7 @@ The user wants a structured retelling, not a raw article:
    });
    await widget('text', { content: art?.summary ?? '' });
    await widget('kv', {
-     items: enriched.map(p => ({ label: p.title, value: (p.summary || '').slice(0, 200) + '…' }))
+     rows: enriched.map(p => [String(p.title), String((p.summary || '').slice(0, 200) + '…')])
    });
    ```
 

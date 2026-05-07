@@ -76,18 +76,25 @@ await widget('map', {
   markers: waypoints.map((w, i) => {
     const t = meteos[i]?.current?.temperature_2m;
     return {
-      lat: w.lat, lng: w.lon, label: w.name,
+      lat: w.lat, lon: w.lon, label: w.name,
       popup: `${w.name} - alt ${elevations[i] ?? '—'}m, T ${Number.isFinite(t) ? t : '—'}C`
     };
   }),
-  paths: [{ points: waypoints.map(w => [w.lat, w.lon]), color: '#e74c3c' }]
+  geojson: {
+    type: 'Feature',
+    geometry: {
+      type: 'LineString',
+      coordinates: waypoints.map(w => [w.lon, w.lat])
+    },
+    properties: { color: '#e74c3c' }
+  }
 });
 
 await widget('chart-rich', {
   title: 'Profil d\'altitude',
   type: 'line',
-  xAxis: { label: 'Distance (km)', data: distances.map(d => d.toFixed(1)) },
-  series: [{ label: 'Altitude (m)', data: elevations, color: '#27ae60' }]
+  labels: distances.map(d => d.toFixed(1) + ' km'),
+  data: [{ label: 'Altitude (m)', values: elevations.map(e => e ?? 0), color: '#27ae60' }]
 });
 
 await widget('data-table', {

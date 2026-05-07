@@ -58,8 +58,8 @@ layout:
 5. **Chart of departments touched**:
    ```js
    const byDept = works.reduce((acc, w) => { const d = w?.department ?? '—'; acc[d] = (acc[d] || 0) + 1; return acc; }, {});
-   const data = Object.entries(byDept).map(([k, v]) => ({ label: k, value: v }));
-   await widget('chart', { type: 'bar', data: data.length ? data : [{ label: 'sample', value: works.length || 1 }] });
+   const bars = Object.entries(byDept).map(([k, v]) => [k, v]);
+   await widget('chart', { bars: bars.length ? bars : [['sample', works.length || 1]] });
    ```
 
 6. **KV of shared tags**:
@@ -67,7 +67,7 @@ layout:
    const tagCount = {};
    for (const w of works) for (const t of (w?.tags ?? [])) { const tg = t?.term; if (tg) tagCount[tg] = (tagCount[tg] || 0) + 1; }
    const topTags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 8);
-   await widget('kv', { pairs: topTags.map(([tg, n]) => [tg, `${n} objects`]) });
+   await widget('kv', { rows: topTags.map(([tg, n]) => [tg, `${n} objects`]) });
    ```
 
 ## Examples
@@ -91,7 +91,7 @@ const r = await call('search-museum-objects', { q: 'horse', hasImages: true, pag
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 15).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object);
-await widget('chart', { type: 'bar', data: [{ label: 'Asian', value: 6 }, { label: 'European', value: 4 }, { label: 'Greek', value: 3 }] });
+await widget('chart', { bars: [['Asian', 6], ['European', 4], ['Greek', 3]] });
 ```
 
 ## Common mistakes

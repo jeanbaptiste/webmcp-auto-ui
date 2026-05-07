@@ -73,8 +73,8 @@ layout:
 6. **Chart by decade**:
    ```js
    const byDecade = display.reduce((acc, w) => { const dec = Math.floor((w?.objectBeginDate || 0) / 10) * 10; acc[dec] = (acc[dec] || 0) + 1; return acc; }, {});
-   const chartData = Object.entries(byDecade).map(([k, v]) => ({ label: `${k}s`, value: v }));
-   await widget('chart', { type: 'bar', data: chartData.length > 0 ? chartData : [{ label: 'sample', value: display.length || 1 }] });
+   const bars = Object.entries(byDecade).sort((a, b) => Number(a[0]) - Number(b[0])).map(([k, v]) => [`${k}s`, Number(v)]);
+   await widget('chart', { bars: bars.length > 0 ? bars : [['sample', display.length || 1]] });
    ```
 
 ## Examples

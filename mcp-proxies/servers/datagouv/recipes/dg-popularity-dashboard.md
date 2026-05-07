@@ -58,11 +58,11 @@ This recipe is great for public communication and inter-agency benchmarking.
      await widget('text', { content: 'Métriques indisponibles pour ce dataset.' });
    } else {
      await widget('chart-rich', {
-       type: 'area-stacked',
+       type: 'area',
        labels: series.map(x => x.month),
-       series: [
-         { name: 'Visites', values: series.map(x => x.monthly_visit ?? 0) },
-         { name: 'Téléchargements', values: series.map(x => x.monthly_download ?? 0) }
+       data: [
+         { label: 'Visites', values: series.map(x => x.monthly_visit ?? 0) },
+         { label: 'Téléchargements', values: series.map(x => x.monthly_download ?? 0) }
        ]
      });
 
@@ -82,11 +82,11 @@ This recipe is great for public communication and inter-agency benchmarking.
    }
 
    await widget('kv', {
-     items: [
-       { key: 'Titre', value: I.title ?? '—' },
-       { key: 'Organisation', value: I.organization?.name ?? '—' },
-       { key: 'Licence', value: I.license ?? '—' },
-       { key: 'Fréquence', value: I.frequency ?? '—' }
+     rows: [
+       ['Titre', I.title ?? '—'],
+       ['Organisation', I.organization?.name ?? '—'],
+       ['Licence', I.license ?? '—'],
+       ['Fréquence', I.frequency ?? '—']
      ]
    });
    ```
@@ -102,11 +102,11 @@ if (!series.length) {
   await widget('text', { content: 'Métriques indisponibles pour ce dataset.' });
 } else {
   await widget('chart-rich', {
-    type: 'area-stacked',
+    type: 'area',
     labels: series.map(m => m.month ?? '—'),
-    series: [
-      { name: 'Visites', values: series.map(m => m.monthly_visit ?? 0) },
-      { name: 'Téléchargements', values: series.map(m => m.monthly_download ?? 0) }
+    data: [
+      { label: 'Visites', values: series.map(m => m.monthly_visit ?? 0) },
+      { label: 'Téléchargements', values: series.map(m => m.monthly_download ?? 0) }
     ]
   });
 }

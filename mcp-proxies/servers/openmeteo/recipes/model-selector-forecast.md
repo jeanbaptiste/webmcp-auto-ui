@@ -74,10 +74,10 @@ const rain = (w.daily.precipitation_sum ?? []).filter(v => Number.isFinite(v));
 await widget('chart-rich', {
   title: `Previsions Tokyo - ${m.label}`,
   type: 'line',
-  xAxis: { label: 'Date', data: w.daily.time ?? [] },
-  series: [
-    { label: 'Tmax (C)', data: w.daily.temperature_2m_max ?? [], color: '#e74c3c' },
-    { label: 'Tmin (C)', data: w.daily.temperature_2m_min ?? [], color: '#3498db' }
+  labels: w.daily.time ?? [],
+  data: [
+    { label: 'Tmax (C)', values: w.daily.temperature_2m_max ?? [], color: '#e74c3c' },
+    { label: 'Tmin (C)', values: w.daily.temperature_2m_min ?? [], color: '#3498db' }
   ]
 });
 
@@ -91,7 +91,7 @@ await widget('stat-card', {
 
 await widget('kv', {
   title: 'Modele utilise',
-  pairs: [
+  rows: [
     ['Nom', m.label],
     ['Resolution typique', m.resolution],
     ['Tool MCP', m.tool]

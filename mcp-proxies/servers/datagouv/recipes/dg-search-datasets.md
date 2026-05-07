@@ -48,7 +48,7 @@ The user wants to explore the French open data catalog by theme:
 
    await widget('data-table', {
      columns: ['Titre', 'Organisation', 'Tags', 'Fichiers'],
-     rows: datasets.map(d => [d.title ?? '—', d.organization?.name ?? '—', (d.tags ?? []).slice(0, 3).join(', ') || '—', d.resources ?? 0])
+     rows: datasets.map(d => [d.title ?? '—', d.organization?.name ?? '—', (d.tags ?? []).slice(0, 3).join(', ') || '—', Array.isArray(d.resources) ? d.resources.length : (d.nb_resources ?? 0)])
    });
 
    const orgs = new Set(datasets.map(d => d.organization?.name).filter(Boolean));

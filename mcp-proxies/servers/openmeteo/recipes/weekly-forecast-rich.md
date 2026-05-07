@@ -61,19 +61,19 @@ const totalRain = (d.precipitation_sum ?? []).filter(v => Number.isFinite(v)).re
 await widget('chart-rich', {
   title: 'Temperatures 7 jours - Toulouse',
   type: 'line',
-  xAxis: { label: 'Date', data: d.time ?? [] },
-  series: [
-    { label: 'Tmax (C)', data: d.temperature_2m_max ?? [], color: '#e74c3c' },
-    { label: 'Tmin (C)', data: d.temperature_2m_min ?? [], color: '#3498db' }
+  labels: (d.time ?? []).map(String),
+  data: [
+    { label: 'Tmax (C)', values: (d.temperature_2m_max ?? []).map(Number), color: '#e74c3c' },
+    { label: 'Tmin (C)', values: (d.temperature_2m_min ?? []).map(Number), color: '#3498db' }
   ]
 });
 
 await widget('chart-rich', {
   title: 'Precipitations 7 jours - Toulouse',
   type: 'bar',
-  xAxis: { label: 'Date', data: d.time ?? [] },
-  series: [
-    { label: 'Pluie (mm)', data: d.precipitation_sum ?? [], color: '#95a5a6' }
+  labels: (d.time ?? []).map(String),
+  data: [
+    { label: 'Pluie (mm)', values: (d.precipitation_sum ?? []).map(Number), color: '#95a5a6' }
   ]
 });
 

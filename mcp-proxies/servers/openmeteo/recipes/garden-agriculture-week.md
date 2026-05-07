@@ -87,18 +87,17 @@ await widget('stat-card', {
 const chartDates = (d.time ?? []).filter(v => v != null);
 await widget('chart-rich', {
   title: 'Tmin nocturne et precipitations',
-  type: 'line',
-  xAxis: { label: 'Date', data: chartDates },
-  series: [
-    { label: 'Tmin (C)', data: tmin, color: '#3498db' },
-    { label: 'Pluie (mm)', data: rain, type: 'bar', color: '#27ae60' },
-    { label: 'Seuil gel', data: chartDates.map(() => 0), color: '#e74c3c', style: 'dashed' }
+  type: 'bar',
+  labels: chartDates,
+  data: [
+    { label: 'Tmin (C)', values: tmin, color: '#3498db' },
+    { label: 'Pluie (mm)', values: rain, color: '#27ae60' }
   ]
 });
 
 await widget('kv', {
   title: 'Conseils',
-  pairs: advice.length ? advice.map((s, i) => [`#${i+1}`, s]) : [['Statut', 'RAS, conditions normales']]
+  rows: advice.length ? advice.map((s, i) => [`#${i+1}`, s]) : [['Statut', 'RAS, conditions normales']]
 });
 ```
 

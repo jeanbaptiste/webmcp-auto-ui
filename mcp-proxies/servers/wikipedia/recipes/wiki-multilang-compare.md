@@ -41,17 +41,18 @@ Note: this recipe assumes the MCP server is running multiple language instances 
 3. **Render connectivity + headline stats**:
    ```js
    await widget('stat-card', { label: 'Language', value: conn?.language ?? '—', icon: 'globe' });
-   await widget('stat-card', { label: 'Sections', value: (secs?.sections ?? []).length, icon: 'list' });
+   const sections = secs?.sections ?? [];
+   await widget('stat-card', { label: 'Sections', value: sections.length > 0 ? String(sections.length) : '0', icon: 'list' });
    await widget('stat-card', { label: 'Server', value: conn?.server ?? '—', icon: 'server' });
    ```
 
 4. **Render summary + sections table**:
    ```js
-   await widget('kv', { items: [{ label: 'Title', value: sum?.title ?? '—' }, { label: 'Language', value: conn?.language ?? '—' }] });
+   await widget('kv', { rows: [['Title', sum?.title ?? '—'], ['Language', conn?.language ?? '—']] });
    await widget('text', { content: sum?.summary ?? '(no summary)' });
    await widget('data-table', {
      columns: ['Section', 'Level'],
-     rows: (secs?.sections ?? []).map(s => [s?.title ?? '—', s?.level ?? '—'])
+     rows: (secs?.sections ?? []).map(s => [s?.title ?? '—', String(s?.level ?? '—')])
    });
    ```
 
@@ -75,7 +76,7 @@ await widget('data-table', { columns: ['Section', 'Level'], rows: (secs?.section
 ```js
 const conn = await call('test_wikipedia_connectivity', {}).catch(() => null);
 const sum = await call('get_summary', { title: 'Sushi' }).catch(() => null);
-await widget('kv', { items: [{ label: 'Lang', value: conn?.language ?? '—' }, { label: 'Title', value: sum?.title ?? '—' }] });
+await widget('kv', { rows: [['Lang', conn?.language ?? '—'], ['Title', sum?.title ?? '—']] });
 await widget('text', { content: sum?.summary ?? '(no summary)' });
 ```
 

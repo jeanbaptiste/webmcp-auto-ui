@@ -22,61 +22,51 @@ layout:
 
 ## How to use
 
-1. **Search a relevant universe** (e.g. sculptures with measurements):
-   ```js
-   const search = await call('search-museum-objects', {
-     q: 'sculpture',
-     departmentId: 13,
-     hasImages: true,
-     pageSize: 60
-   }).catch(() => null);
-   const ids = search?.objectIDs ?? [];
-   if (ids.length === 0) { await widget('text', { content: 'No objects.' }); return; }
-   ```
+```js
+// 1. Search a relevant universe (e.g. sculptures with measurements)
+const search = await call('search-museum-objects', {
+  q: 'sculpture',
+  departmentId: 13,
+  hasImages: true,
+  pageSize: 60
+}).catch(() => null);
+const ids = search?.objectIDs ?? [];
+if (ids.length === 0) { await widget('text', { content: 'No objects.' }); return; }
 
-2. **Fetch a sample** (small batch — the Met bridge throttles parallel requests):
-   ```js
-   const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
-   const all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
-   const works = all.filter(w => w?.measurements);
-   const display = works.length > 0 ? works : all;
-   ```
+// 2. Fetch a sample (small batch — the Met bridge throttles parallel requests)
+const objs = await Promise.all(ids.slice(0, 12).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
+const all = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
+const works = all.filter(w => w?.measurements);
+const display = works.length > 0 ? works : all;
 
-3. **Compute extremes** from `measurements[].elementMeasurements`:
-   ```js
-   const sizeOf = w => { const elt = w?.measurements?.[0]?.elementMeasurements; if (!elt) return 0; const nums = Object.values(elt).filter(Number.isFinite); return nums.length > 0 ? Math.max(...nums) : 0; };
-   const records = {
-     largest: [...display].sort((a, b) => sizeOf(b) - sizeOf(a))[0],
-     smallest: [...display].sort((a, b) => sizeOf(a) - sizeOf(b))[0],
-     oldest: [...display].sort((a, b) => (a?.objectBeginDate || 0) - (b?.objectBeginDate || 0))[0],
-     newest: [...display].sort((a, b) => (b?.objectBeginDate || 0) - (a?.objectBeginDate || 0))[0]
-   };
-   ```
+// 3. Compute extremes from measurements[].elementMeasurements
+const sizeOf = w => { const elt = w?.measurements?.[0]?.elementMeasurements; if (!elt) return 0; const nums = Object.values(elt).filter(Number.isFinite); return nums.length > 0 ? Math.max(...nums) : 0; };
+const records = {
+  largest: [...display].sort((a, b) => sizeOf(b) - sizeOf(a))[0],
+  smallest: [...display].sort((a, b) => sizeOf(a) - sizeOf(b))[0],
+  oldest: [...display].sort((a, b) => (a?.objectBeginDate || 0) - (b?.objectBeginDate || 0))[0],
+  newest: [...display].sort((a, b) => (b?.objectBeginDate || 0) - (a?.objectBeginDate || 0))[0]
+};
 
-4. **Top-5 cards**:
-   ```js
-   const cardItems = Object.entries(records).filter(([_, w]) => w?.primaryImageSmall).map(([label, w]) => ({ title: label.toUpperCase(), subtitle: w?.title ?? '(untitled)', image: w?.primaryImageSmall, body: w?.dimensions ?? '—' }));
-   if (cardItems.length === 0) { await widget('text', { content: 'Not enough objects with images to show record cards.' }); } else { await widget('cards', { items: cardItems }); }
-   ```
+// 4. Top-5 cards
+const cardItems = Object.entries(records).filter(([_, w]) => w?.primaryImageSmall).map(([label, w]) => ({ title: label.toUpperCase(), subtitle: w?.title ?? '(untitled)', image: w?.primaryImageSmall, body: w?.dimensions ?? '—' }));
+if (cardItems.length === 0) { await widget('text', { content: 'Not enough objects with images to show record cards.' }); } else { await widget('cards', { items: cardItems }); }
 
-5. **KV of precise figures**:
-   ```js
-   await widget('kv', {
-     pairs: [
-       ['Largest', `${records.largest?.title ?? '—'} — ${records.largest?.dimensions ?? '—'}`],
-       ['Smallest', `${records.smallest?.title ?? '—'} — ${records.smallest?.dimensions ?? '—'}`],
-       ['Oldest', `${records.oldest?.title ?? '—'} — ${records.oldest?.objectDate ?? '—'}`],
-       ['Newest', `${records.newest?.title ?? '—'} — ${records.newest?.objectDate ?? '—'}`]
-     ]
-   });
-   ```
+// 5. KV of precise figures
+await widget('kv', {
+  pairs: [
+    ['Largest', `${records.largest?.title ?? '—'} — ${records.largest?.dimensions ?? '—'}`],
+    ['Smallest', `${records.smallest?.title ?? '—'} — ${records.smallest?.dimensions ?? '—'}`],
+    ['Oldest', `${records.oldest?.title ?? '—'} — ${records.oldest?.objectDate ?? '—'}`],
+    ['Newest', `${records.newest?.title ?? '—'} — ${records.newest?.objectDate ?? '—'}`]
+  ]
+});
 
-6. **Distribution chart** (size in cm):
-   ```js
-   const chartItems = display.slice(0, 10).map(w => ({ label: (w?.title || 'work').slice(0, 20), value: sizeOf(w) })).filter(item => item.value > 0);
-   if (chartItems.length >= 2) { await widget('chart', { type: 'bar', data: chartItems }); } else { await widget('text', { content: 'Size data unavailable for charting — measurements missing from sampled objects.' }); }
-   await widget('stat-card', { label: 'Sample size', value: Math.max(display.length, 1), icon: 'archive' });
-   ```
+// 6. Distribution chart (size in cm)
+const chartItems = display.slice(0, 10).map(w => ({ label: (w?.title || 'work').slice(0, 20), value: sizeOf(w) })).filter(item => item.value > 0);
+if (chartItems.length >= 2) { await widget('chart', { bars: chartItems.map(item => [item.label, item.value]) }); } else { await widget('text', { content: 'Size data unavailable for charting — measurements missing from sampled objects.' }); }
+await widget('stat-card', { label: 'Sample size', value: Math.max(display.length, 1), icon: 'archive' });
+```
 
 ## Examples
 

@@ -59,13 +59,21 @@ Open data has a lot of overlap — this recipe helps the user pick.
      ]
    });
 
+   const labelA = (A.title ?? 'A').slice(0, 20);
+   const labelB = (B.title ?? 'B').slice(0, 20);
    await widget('kv', {
-     items: [
-       { key: 'Licence', valueA: A.license ?? '—', valueB: B.license ?? '—' },
-       { key: 'Fréquence', valueA: A.frequency ?? '—', valueB: B.frequency ?? '—' },
-       { key: 'Fichiers', valueA: resA?.resources?.length ?? 0, valueB: resB?.resources?.length ?? 0 },
-       { key: 'Créé', valueA: A.created ?? '—', valueB: B.created ?? '—' },
-       { key: 'MAJ', valueA: A.last_modified ?? '—', valueB: B.last_modified ?? '—' }
+     title: `${labelA} vs ${labelB}`,
+     rows: [
+       ['Licence A', A.license ?? '—'],
+       ['Licence B', B.license ?? '—'],
+       ['Fréquence A', A.frequency ?? '—'],
+       ['Fréquence B', B.frequency ?? '—'],
+       ['Fichiers A', String(resA?.resources?.length ?? 0)],
+       ['Fichiers B', String(resB?.resources?.length ?? 0)],
+       ['Créé A', A.created ?? '—'],
+       ['Créé B', B.created ?? '—'],
+       ['MAJ A', A.last_modified ?? '—'],
+       ['MAJ B', B.last_modified ?? '—']
      ]
    });
 
@@ -73,9 +81,8 @@ Open data has a lot of overlap — this recipe helps the user pick.
    const dlB = (mB?.metrics ?? []).reduce((s, x) => s + (x.monthly_download ?? 0), 0);
    if (dlA || dlB) {
      await widget('chart', {
-       type: 'bar',
-       data: { labels: [A.title ?? 'A', B.title ?? 'B'], values: [dlA, dlB] },
-       options: { yLabel: 'Téléchargements 12 mois' }
+       title: 'Téléchargements 12 mois',
+       bars: [[A.title ?? 'A', Number(dlA)], [B.title ?? 'B', Number(dlB)]]
      });
    } else {
      await widget('text', { content: 'Données de téléchargement indisponibles.' });
@@ -101,7 +108,7 @@ const _ex1 = await Promise.all([
 const ex_a = _ex1[0] ?? {};
 const ex_b = _ex1[1] ?? {};
 await widget('cards', { items: [{ title: ex_a.title ?? '—', subtitle: ex_a.organization?.name ?? '' }, { title: ex_b.title ?? '—', subtitle: ex_b.organization?.name ?? '' }] });
-await widget('kv', { items: [{ key: 'Licence', valueA: ex_a.license ?? '—', valueB: ex_b.license ?? '—' }, { key: 'Fréquence', valueA: ex_a.frequency ?? '—', valueB: ex_b.frequency ?? '—' }] });
+await widget('kv', { rows: [['Licence A', ex_a.license ?? '—'], ['Licence B', ex_b.license ?? '—'], ['Fréquence A', ex_a.frequency ?? '—'], ['Fréquence B', ex_b.frequency ?? '—']] });
 ```
 
 ### DVF vs RNA, downloads
@@ -121,7 +128,7 @@ const ex2_mB = _m[1];
 const ex2_dlA = (ex2_mA?.metrics ?? []).reduce((s, x) => s + (x.monthly_download ?? 0), 0);
 const ex2_dlB = (ex2_mB?.metrics ?? []).reduce((s, x) => s + (x.monthly_download ?? 0), 0);
 if (ex2_dlA || ex2_dlB) {
-  await widget('chart', { type: 'bar', data: { labels: [ex2_a.title ?? 'A', ex2_b.title ?? 'B'], values: [ex2_dlA, ex2_dlB] } });
+  await widget('chart', { bars: [[ex2_a.title ?? 'A', Number(ex2_dlA)], [ex2_b.title ?? 'B', Number(ex2_dlB)]] });
 } else {
   await widget('text', { content: 'Données de téléchargement indisponibles.' });
 }

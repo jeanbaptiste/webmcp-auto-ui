@@ -61,8 +61,10 @@ const [obsA, obsB] = await Promise.all([
 // 5. Maps side-by-side
 const locA = a.location?.split(',').map(Number) ?? [];
 const locB = b.location?.split(',').map(Number) ?? [];
-await widget('map', { center: [locA[1], locA[0]], zoom: 9, markers: (obsA?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })), title: a.display_name ?? '' });
-await widget('map', { center: [locB[1], locB[0]], zoom: 9, markers: (obsB?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })), title: b.display_name ?? '' });
+await widget('text', { content: '## ' + (a.display_name ?? 'Area A') });
+await widget('map', { center: locA.length >= 2 ? [locA[1], locA[0]] : undefined, zoom: 9, markers: (obsA?.results ?? []).filter(o => o?.geojson?.type && o.geojson.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })) });
+await widget('text', { content: '## ' + (b.display_name ?? 'Area B') });
+await widget('map', { center: locB.length >= 2 ? [locB[1], locB[0]] : undefined, zoom: 9, markers: (obsB?.results ?? []).filter(o => o?.geojson?.type && o.geojson.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0] })) });
 
 // 6. Stats
 await widget('stat-card', { label: a.display_name ?? 'Area A', value: (topA?.total_results ?? 0) + ' species', icon: 'leaf' });

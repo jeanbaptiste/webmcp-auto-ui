@@ -42,15 +42,14 @@ const myObs = (obs?.results ?? []).slice(0, 50);
 
 // 3. Profile
 await widget('profile', {
-  title: user.name ?? user.login ?? 'User',
+  name: user.name ?? user.login ?? 'User',
   subtitle: '@' + (user.login ?? '—'),
-  image: user.icon_url ?? user.icon,
-  fields: {
-    'Joined': user.created_at?.slice(0, 10) ?? '—',
-    'Total observations': user.observations_count ?? 0,
-    'Identifications': user.identifications_count ?? 0,
-    'Species observed': user.species_count ?? 0,
-  },
+  fields: [
+    { label: 'Joined', value: user.created_at?.slice(0, 10) ?? '—' },
+    { label: 'Total observations', value: user.observations_count ?? 0 },
+    { label: 'Identifications', value: user.identifications_count ?? 0 },
+    { label: 'Species observed', value: user.species_count ?? 0 },
+  ],
 });
 
 // 4. Map of their hotspots
@@ -97,7 +96,7 @@ await widget('data-table', {
 const res = await call('search', { q: 'jb-photo', sources: 'users', per_page: 1 }).catch(() => ({ results: [] }));
 const u = res?.results?.[0];
 if (!u) { await widget('text', { content: 'User not found.' }); return; }
-await widget('profile', { title: u.name ?? u.login ?? 'User', subtitle: '@' + (u.login ?? '—'), image: u.icon_url, fields: { Joined: u.created_at?.slice(0, 10) ?? '—', 'Total obs': u.observations_count ?? 0 } });
+await widget('profile', { name: u.name ?? u.login ?? 'User', subtitle: '@' + (u.login ?? '—'), fields: [{ label: 'Joined', value: u.created_at?.slice(0, 10) ?? '—' }, { label: 'Total obs', value: u.observations_count ?? 0 }] });
 ```
 
 ### Map a user's hotspots

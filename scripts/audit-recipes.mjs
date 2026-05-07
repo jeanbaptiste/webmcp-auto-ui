@@ -27,6 +27,7 @@ const args = process.argv.slice(2);
 const wantJson = args.includes('--json');
 const noUx = args.includes('--no-ux');
 const strict = args.includes('--strict');
+const noExecute = args.includes('--no-execute');
 const filter = args.find((a) => !a.startsWith('--'));
 
 // ── .netrc Basic auth lookup (silent — never logs contents) ───────────────
@@ -757,6 +758,190 @@ async function auditServer(server) {
   return rows;
 }
 
+// ── Static (no-execute) auditor ───────────────────────────────────────────
+//
+// Reads recipes from the local filesystem (mcp-proxies/servers/*/recipes),
+// extracts `widget('NAME', { ... })` calls via balanced-brace scan, and runs
+// schema/UX checks on the literal params. No MCP, no network, no JS exec.
+// Intended for fast preflight: catches mismatched key names, unknown widgets,
+// missing required keys. Cannot catch runtime issues (variable values, bridge
+// errors).
+
+import { readdirSync, statSync } from 'node:fs';
+
+function findWidgetCalls(source) {
+  // Find `widget('NAME', { ... })` or `widget("NAME", { ... })`.
+  // Balance-counts braces inside the second arg; ignores braces inside strings.
+  const out = [];
+  const re = /\bwidget\s*\(\s*['"]([a-z0-9_-]+)['"]\s*,\s*/gi;
+  let m;
+  while ((m = re.exec(source)) !== null) {
+    const start = m.index + m[0].length;
+    if (source[start] !== '{') continue;
+    let depth = 0;
+    let inStr = null;
+    let escape = false;
+    let end = -1;
+    for (let i = start; i < source.length; i++) {
+      const c = source[i];
+      if (escape) { escape = false; continue; }
+      if (inStr) {
+        if (c === '\\') { escape = true; continue; }
+        if (c === inStr) inStr = null;
+        else if (inStr === '`' && c === '$' && source[i + 1] === '{') { depth++; i++; }
+        continue;
+      }
+      if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
+      if (c === '{') depth++;
+      else if (c === '}') { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (end < 0) continue;
+    const literal = source.slice(start, end + 1);
+    const keys = extractTopLevelKeys(literal);
+    out.push({ name: m[1], keys, literal, offset: m.index });
+  }
+  return out;
+}
+
+function extractTopLevelKeys(literal) {
+  // literal: `{ key: ..., 'k2': ..., ...spread }`. Returns [{ key, type }].
+  // type is one of 'literal-array' | 'literal-object' | 'literal-string'
+  // | 'literal-number' | 'literal-boolean' | 'expr' (variable / call).
+  const out = [];
+  if (literal[0] !== '{' || literal[literal.length - 1] !== '}') return out;
+  const inner = literal.slice(1, -1);
+  let depth = 0;
+  let inStr = null;
+  let escape = false;
+  let segStart = 0;
+  const segs = [];
+  for (let i = 0; i <= inner.length; i++) {
+    const c = inner[i];
+    if (escape) { escape = false; continue; }
+    if (inStr) {
+      if (c === '\\') { escape = true; continue; }
+      if (c === inStr) inStr = null;
+      else if (inStr === '`' && c === '$' && inner[i + 1] === '{') { depth++; i++; }
+      continue;
+    }
+    if (i === inner.length || (c === ',' && depth === 0)) {
+      const seg = inner.slice(segStart, i).trim();
+      if (seg) segs.push(seg);
+      segStart = i + 1;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
+    if (c === '{' || c === '[' || c === '(') depth++;
+    else if (c === '}' || c === ']' || c === ')') depth--;
+  }
+  for (const seg of segs) {
+    if (seg.startsWith('...')) { out.push({ key: '__spread__', type: 'spread' }); continue; }
+    // Shorthand: `{ images }` — key is the identifier, type is unknown expr.
+    const sh = seg.match(/^([A-Za-z_$][\w$]*)\s*$/);
+    if (sh) { out.push({ key: sh[1], type: 'expr', value: sh[1] }); continue; }
+    // key: value, with key as identifier, "string", or [computed]
+    const km = seg.match(/^(?:(['"])([^'"]*)\1|([A-Za-z_$][\w$]*))\s*:\s*([\s\S]*)$/);
+    if (!km) continue;
+    const key = km[2] ?? km[3];
+    const value = km[4].trim();
+    let type = 'expr';
+    if (value.startsWith('[')) type = 'literal-array';
+    else if (value.startsWith('{')) type = 'literal-object';
+    else if (/^['"`]/.test(value)) type = 'literal-string';
+    else if (/^-?\d/.test(value)) type = 'literal-number';
+    else if (value === 'true' || value === 'false') type = 'literal-boolean';
+    out.push({ key, type, value });
+  }
+  return out;
+}
+
+function checkWidgetStatic(name, keys) {
+  // Returns array of { level, code, detail }.
+  const issues = [];
+  const schema = WIDGET_SCHEMAS[name];
+  if (!schema) {
+    issues.push({ level: 'error', code: 'unknown-widget', detail: name });
+    return issues;
+  }
+  const props = schema.properties ?? {};
+  const allowed = new Set(Object.keys(props));
+  const required = Array.isArray(schema.required) ? schema.required : [];
+  const hasSpread = keys.some((k) => k.key === '__spread__');
+  const seen = new Set(keys.filter((k) => k.key !== '__spread__').map((k) => k.key));
+  if (!hasSpread) {
+    for (const r of required) {
+      if (!seen.has(r)) issues.push({ level: 'error', code: 'missing-required', detail: r });
+    }
+  }
+  for (const k of keys) {
+    if (k.key === '__spread__') continue;
+    if (!allowed.has(k.key)) {
+      issues.push({ level: 'error', code: 'unknown-key', detail: k.key });
+    }
+  }
+  return issues;
+}
+
+function listRecipeFiles(serverId) {
+  const dir = path.resolve(__dirname, '..', 'mcp-proxies', 'servers', serverId, 'recipes');
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => f.endsWith('.md'))
+    .map((f) => ({ name: f.replace(/\.md$/, ''), path: path.join(dir, f) }));
+}
+
+function auditServerStatic(server) {
+  const rows = [];
+  const files = listRecipeFiles(server.id);
+  if (files.length === 0) {
+    rows.push({ server: server.id, recipe: '-', block: '-', status: 'no-recipes', reason: 'no local recipe files' });
+    return rows;
+  }
+  for (const f of files) {
+    let body;
+    try { body = readFileSync(f.path, 'utf8'); } catch (err) {
+      rows.push({ server: server.id, recipe: f.name, block: '-', status: 'read-fail', reason: String(err.message ?? err) });
+      continue;
+    }
+    const segs = parseBody(body);
+    const codeBlocks = segs.filter((s) => s.type === 'code' && JS_LANGS.has(s.lang));
+    if (codeBlocks.length === 0) {
+      rows.push({ server: server.id, recipe: f.name, block: '-', status: 'no-runnable-blocks', reason: 'no js/ts blocks' });
+      continue;
+    }
+    for (let i = 0; i < codeBlocks.length; i++) {
+      const blk = codeBlocks[i];
+      const label = `${blk.lang}#${i + 1}`;
+      const calls = findWidgetCalls(blk.content);
+      if (calls.length === 0) {
+        rows.push({ server: server.id, recipe: f.name, block: label, status: 'no-widget', reason: 'block has no widget(...) calls' });
+        continue;
+      }
+      const allIssues = [];
+      for (const c of calls) {
+        const iss = checkWidgetStatic(c.name, c.keys);
+        for (const x of iss) allIssues.push({ widget: c.name, ...x });
+      }
+      if (allIssues.length === 0) {
+        rows.push({ server: server.id, recipe: f.name, block: label, status: 'ok', reason: `${calls.length} widget(s)` });
+      } else {
+        const compact = allIssues
+          .map((i) => `${i.widget}.${i.code}=${i.detail}`)
+          .slice(0, 5)
+          .join('; ');
+        rows.push({
+          server: server.id,
+          recipe: f.name,
+          block: label,
+          status: 'error',
+          reason: `${calls.length} widget(s) — ${compact}${allIssues.length > 5 ? ` (+${allIssues.length - 5})` : ''}`,
+        });
+      }
+    }
+  }
+  return rows;
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 const targets = filter ? REGISTRY.filter((s) => s.id === filter) : REGISTRY;
@@ -767,8 +952,8 @@ if (targets.length === 0) {
 
 const allRows = [];
 for (const s of targets) {
-  process.stderr.write(`▸ ${s.id}\n`);
-  const rows = await auditServer(s);
+  process.stderr.write(`▸ ${s.id}${noExecute ? ' (static)' : ''}\n`);
+  const rows = noExecute ? auditServerStatic(s) : await auditServer(s);
   allRows.push(...rows);
   // One-line per-server summary on stderr
   const ok = rows.filter((r) => r.status === 'ok').length;

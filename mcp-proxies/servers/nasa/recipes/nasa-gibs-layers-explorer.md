@@ -51,7 +51,7 @@ const tileLayers = responses.map((r, i) => ({
 if (tileLayers.length === 0) {
   // Fallback: show raw response so the correct key is visible
   await widget('kv', {
-    items: [{ label: 'Debug — raw response[0]', value: JSON.stringify(responses[0]) }]
+    rows: [['Debug — raw response[0]', JSON.stringify(responses[0])]]
   });
 } else {
   await widget('map', {
@@ -72,11 +72,11 @@ await widget('cards', {
 
 // 4. Technical metadata
 await widget('kv', {
-  items: [
-    { label: 'Date', value: date },
-    { label: 'Format', value: 'png' },
-    { label: 'Resolution', value: '250 px/deg' },
-    { label: 'Layers loaded', value: layers.length }
+  rows: [
+    ['Date', date],
+    ['Format', 'png'],
+    ['Resolution', '250 px/deg'],
+    ['Layers loaded', String(layers.length)]
   ]
 });
 ```
@@ -87,12 +87,12 @@ await widget('kv', {
 ```js
 const r = await call('nasa_gibs', { layer: 'MODIS_Terra_CorrectedReflectance_TrueColor', date: '2026-04-28' }).catch(() => null);
 // Always show metadata first — independent of tile URL availability
-await widget('kv', { items: [{ label: 'Layer', value: 'MODIS Terra TrueColor' }, { label: 'Date', value: '2026-04-28' }] });
+await widget('kv', { rows: [['Layer', 'MODIS Terra TrueColor'], ['Date', '2026-04-28']] });
 const url = r?.tile_url || r?.tileUrl || r?.wmsUrl || r?.url;
 if (url) {
   await widget('map', { center: [0, 0], zoom: 2, tileLayers: [{ name: 'True colour', url }] });
 } else {
-  await widget('kv', { items: [{ label: 'Debug — raw response', value: JSON.stringify(r) }] });
+  await widget('kv', { rows: [['Debug — raw response', JSON.stringify(r)]] });
 }
 ```
 
@@ -106,9 +106,9 @@ const tileLayers = [
   getUrl(fires) ? { name: 'Fires',   url: getUrl(fires), opacity: 1.0 } : null
 ].filter(Boolean);
 if (tileLayers.length === 0) {
-  await widget('kv', { items: [
-    { label: 'Debug — fires response',  value: JSON.stringify(fires) },
-    { label: 'Debug — aerosol response', value: JSON.stringify(aero) }
+  await widget('kv', { rows: [
+    ['Debug — fires response',   JSON.stringify(fires)],
+    ['Debug — aerosol response', JSON.stringify(aero)]
   ]});
 } else {
   await widget('map', { center: [-5, 25], zoom: 4, tileLayers });

@@ -61,23 +61,23 @@ await widget('map', {
 });
 
 // 6. Recent observations gallery
-await widget('gallery', {
-  images: (obs?.results ?? [])
-    .filter(o => o.photos?.[0]?.photo?.url ?? o.taxon?.default_photo?.medium_url)
-    .slice(0, 12)
-    .map(o => ({
-      src: (o.photos?.[0]?.photo?.url ?? o.taxon?.default_photo?.medium_url ?? '').replace('square', 'medium'),
-      caption: `${o.species_guess ?? o.taxon?.name ?? 'Unknown'} — ${o.observed_on ?? '—'}`,
-    })),
-});
+const galleryImages = (obs?.results ?? [])
+  .map(o => {
+    const src = (o?.photos?.[0]?.url ?? o?.photos?.[0]?.photo?.url ?? o?.taxon?.default_photo?.medium_url ?? '').replace('square', 'medium');
+    return src ? { src, alt: o?.species_guess ?? o?.taxon?.name ?? 'Unknown', caption: `${o?.species_guess ?? o?.taxon?.name ?? 'Unknown'} — ${o?.observed_on ?? '—'}` } : null;
+  })
+  .filter(img => img !== null)
+  .slice(0, 12);
+if (galleryImages.length > 0) {
+  await widget('gallery', { images: galleryImages });
+}
 
 // 7. AI suggestions cards
 await widget('cards', {
-  items: (sugg?.results ?? []).filter(s => s.taxon).map(s => ({
-    title: s.taxon?.preferred_common_name ?? s.taxon?.name ?? 'Unknown',
-    subtitle: s.taxon?.name ?? '',
-    image: s.taxon?.default_photo?.medium_url,
-    description: `Frequency: ${s.frequency_score?.toFixed(2) ?? '—'}`,
+  items: (sugg?.results ?? []).filter(s => s?.taxon).map(s => ({
+    title: s?.taxon?.preferred_common_name ?? s?.taxon?.name ?? 'Unknown',
+    subtitle: s?.taxon?.name ?? '',
+    description: `Frequency: ${s?.frequency_score?.toFixed(2) ?? '—'}`,
   })),
 });
 
@@ -93,13 +93,13 @@ await widget('stat-card', { label: 'AI suggestions', value: sugg?.results?.lengt
 ```js
 const lat = 47.21, lng = -1.55;
 const obs = await call('search_observations', { lat, lng, radius: 3, per_page: 30, quality_grade: 'research' }).catch(() => ({ results: [] }));
-await widget('map', { center: [lng, lat], zoom: 14, markers: (obs?.results ?? []).filter(o => o.geojson?.coordinates).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0], label: o.species_guess ?? o.taxon?.name ?? '' })) });
+await widget('map', { center: [lng, lat], zoom: 14, markers: (obs?.results ?? []).filter(o => o?.geojson?.coordinates?.length >= 2).map(o => ({ lat: o.geojson.coordinates[1], lon: o.geojson.coordinates[0], label: o?.species_guess ?? o?.taxon?.name ?? '' })) });
 ```
 
 ### Trail suggestions in the Vosges
 ```js
 const sugg = await call('taxon_suggestions', { lat: 48.27, lng: 7.10, observed_on: '2025-06-12', limit: 8 }).catch(() => ({ results: [] }));
-await widget('cards', { items: (sugg?.results ?? []).filter(s => s.taxon).map(s => ({ title: s.taxon?.preferred_common_name ?? s.taxon?.name ?? 'Unknown', subtitle: s.taxon?.name ?? '', image: s.taxon?.default_photo?.medium_url })) });
+await widget('cards', { items: (sugg?.results ?? []).filter(s => s?.taxon).map(s => ({ title: s?.taxon?.preferred_common_name ?? s?.taxon?.name ?? 'Unknown', subtitle: s?.taxon?.name ?? '' })) });
 ```
 
 ## Common mistakes

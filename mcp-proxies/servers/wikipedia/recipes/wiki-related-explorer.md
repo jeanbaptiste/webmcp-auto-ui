@@ -45,7 +45,7 @@ The user wants a learning path around a topic, not just one article:
 
 4. **Render context + cards**:
    ```js
-   await widget('kv', { items: [{ label: 'Source', value: sum?.title ?? '—' }] });
+   await widget('kv', { rows: [['Source', String(sum?.title ?? '—')]] });
    await widget('text', { content: sum?.summary ?? '(no summary)' });
    await widget('cards', {
      items: summaries.filter(Boolean).map(s => ({

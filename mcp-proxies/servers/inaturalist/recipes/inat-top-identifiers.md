@@ -43,12 +43,12 @@ const idResults = ids?.results ?? [];
 // 4. Render summary kv
 await widget('kv', {
   title: detail?.preferred_common_name ?? detail?.name ?? target.name ?? 'Taxon',
-  items: {
-    Rank: detail?.rank ?? target.rank ?? '—',
-    Family: detail?.ancestors?.find(a => a.rank === 'family')?.name ?? '—',
-    'Total observations': detail?.observations_count ?? 0,
-    'Total identifiers ranked': idResults.length,
-  },
+  rows: [
+    ['Rank', detail?.rank ?? target.rank ?? '—'],
+    ['Family', detail?.ancestors?.find(a => a.rank === 'family')?.name ?? '—'],
+    ['Total observations', String(detail?.observations_count ?? 0)],
+    ['Total identifiers ranked', String(idResults.length)],
+  ],
 });
 
 if (idResults.length === 0) {
@@ -60,14 +60,13 @@ if (idResults.length === 0) {
 const champ = idResults[0]?.user;
 if (champ) {
   await widget('profile', {
-    title: champ.name ?? champ.login ?? 'Identifier',
+    name: champ.name ?? champ.login ?? 'Identifier',
     subtitle: '@' + (champ.login ?? '—'),
-    image: champ.icon_url,
-    fields: {
-      'Identifications on this taxon': idResults[0]?.count ?? 0,
-      'Total iNat IDs': champ.identifications_count ?? 0,
-      Joined: champ.created_at?.slice(0, 10) ?? '—',
-    },
+    fields: [
+      { label: 'Identifications on this taxon', value: idResults[0]?.count ?? 0 },
+      { label: 'Total iNat IDs', value: champ.identifications_count ?? 0 },
+      { label: 'Joined', value: champ.created_at?.slice(0, 10) ?? '—' },
+    ],
   });
 }
 
@@ -100,7 +99,7 @@ if (!t) { await widget('text', { content: 'Taxon not found.' }); return; }
 const ids = await call('top_identifiers', { taxon_id: t.id, per_page: 5, quality_grade: 'research' }).catch(() => ({ results: [] }));
 const top = ids?.results?.[0]?.user;
 if (!top) { await widget('text', { content: 'No top identifier found.' }); return; }
-await widget('profile', { title: top.name ?? top.login ?? 'Identifier', subtitle: '@' + (top.login ?? '—'), image: top.icon_url });
+await widget('profile', { name: top.name ?? top.login ?? 'Identifier', subtitle: '@' + (top.login ?? '—') });
 ```
 
 ## Common mistakes
