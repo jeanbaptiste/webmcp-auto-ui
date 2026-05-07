@@ -339,12 +339,28 @@ export async function render(container: HTMLElement, data: Record<string, unknow
     rerender();
   }
 
+  // Real-time elapsed timer for running cells. Updates every 200ms in-place
+  // (no full rerender) by reading data-running-since attributes.
+  const tickRunningTimers = () => {
+    const els = container.querySelectorAll<HTMLElement>('.nbe-running-time[data-running-since]');
+    if (els.length === 0) return;
+    const now = Date.now();
+    els.forEach((el) => {
+      const since = Number(el.getAttribute('data-running-since'));
+      if (!since) return;
+      const ms = now - since;
+      el.textContent = ms < 1000 ? `running ${ms}ms` : `running ${(ms / 1000).toFixed(1)}s`;
+    });
+  };
+  const runningTimerHandle = setInterval(tickRunningTimers, 200);
+
   return () => {
     unsubHistory();
     canvasUnsub?.();
     pane.destroy();
     publishCleanup();
     liveCleanup?.();
+    clearInterval(runningTimerHandle);
   };
 }
 
@@ -450,7 +466,8 @@ function renderCell(cell: NotebookCell, state: NotebookState, overlay: RuntimeOv
   let liveBadge = '';
   if (showLive) {
     if (rtStatus === 'running') {
-      liveBadge = `<span class="nbe-cell-badge nbe-cell-running" title="re-executing"><span class="nbe-spinner"></span>running</span>`;
+      const startedAt = overlay?.cellStartedAt.get(cell.id) ?? Date.now();
+      liveBadge = `<span class="nbe-cell-badge nbe-cell-running" title="re-executing"><span class="nbe-spinner"></span><span class="nbe-running-time" data-running-since="${startedAt}">running</span></span>`;
     } else if (rtStatus === 'stale') {
       liveBadge = `<span class="nbe-cell-badge nbe-cell-stale" title="last live refresh failed">stale</span>`;
     } else if (rtStatus === 'frozen') {
@@ -860,13 +877,13 @@ function renderResultInto(el: HTMLElement, cell: NotebookCell, overlay: RuntimeO
   if (!r) {
     const isView = stateRef?.mode === 'view';
     const rtStatus = cellRuntimeStatus(cell, overlay);
+    const startedAt = overlay?.cellStartedAt.get(cell.id);
+    const sinceAttr = startedAt != null ? ` data-running-since="${startedAt}"` : '';
     // In view mode (autoRun), any unresolved cell is effectively loading —
     // the auto-runner will pick it up shortly. Show a continuous spinner so
     // users don't see a static "—" placeholder during the idle→running gap.
-    if (isView && rtStatus !== 'frozen') {
-      el.innerHTML = `<div class="nbe-result-running"><span class="nbe-spinner"></span> running</div>`;
-    } else if (rtStatus === 'running') {
-      el.innerHTML = `<div class="nbe-result-running"><span class="nbe-spinner"></span> running</div>`;
+    if ((isView && rtStatus !== 'frozen') || rtStatus === 'running') {
+      el.innerHTML = `<div class="nbe-result-running"><span class="nbe-spinner"></span> <span class="nbe-running-time"${sinceAttr}>running</span></div>`;
     } else {
       el.innerHTML = `<div class="nbe-result-empty">press ▶ to run</div>`;
     }

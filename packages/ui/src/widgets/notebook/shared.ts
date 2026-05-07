@@ -247,6 +247,8 @@ export interface RuntimeOverlay {
   outputs: Map<string, { result: CellResult; refreshedAt: number }>;
   /** Per-cell status during/after the refresh cycle. */
   status: Map<string, CellRuntimeStatus>;
+  /** Per-cell start timestamp — set when status flips to 'running', cleared on completion. */
+  cellStartedAt: Map<string, number>;
   startedAt: number | null;
   finishedAt: number | null;
   /** Last fatal reason (e.g. "no reachable server"). */
@@ -257,6 +259,7 @@ export function createRuntimeOverlay(): RuntimeOverlay {
   return {
     outputs: new Map(),
     status: new Map(),
+    cellStartedAt: new Map(),
     startedAt: null,
     finishedAt: null,
     error: null,
@@ -326,11 +329,16 @@ export async function runAutoRefresh(opts: AutoRefreshOptions): Promise<AutoRefr
   const summary: AutoRefreshSummary = { rerun: 0, frozen: 0, stale: 0, failed: 0 };
   const sharedSignal = signal ?? new AbortController().signal;
 
-  const tasks = state.cells.map(async (cell) => {
-    if (sharedSignal.aborted) return;
-    if (!isReRunnable(cell)) { summary.frozen++; return; }
+  // Sequential execution — cells often depend on top-level decls of earlier
+  // cells (e.g. `const w = ...` in cell 4 referenced in cell 6). Running them
+  // in parallel races the SDK runner's scope writeback, leaving downstream
+  // cells with an empty scope. Aligns with Jupyter / Observable / RMarkdown.
+  for (const cell of state.cells) {
+    if (sharedSignal.aborted) break;
+    if (!isReRunnable(cell)) { summary.frozen++; continue; }
 
     overlay.status.set(cell.id, 'running');
+    overlay.cellStartedAt.set(cell.id, Date.now());
     onCellChange?.(cell.id);
     onTick?.(overlay);
 
@@ -349,11 +357,10 @@ export async function runAutoRefresh(opts: AutoRefreshOptions): Promise<AutoRefr
       summary.failed++;
       if (!overlay.error) overlay.error = err instanceof Error ? err.message : String(err);
     }
+    overlay.cellStartedAt.delete(cell.id);
     onCellChange?.(cell.id);
     onTick?.(overlay);
-  });
-
-  await Promise.all(tasks);
+  }
 
   overlay.finishedAt = Date.now();
   onTick?.(overlay);
