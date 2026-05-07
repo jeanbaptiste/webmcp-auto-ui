@@ -43,8 +43,8 @@ layout:
 
 3. **Timeline within the dynasty**:
    ```js
-   const items = [...works].sort((a, b) => (a?.objectBeginDate || 0) - (b?.objectBeginDate || 0)).map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall || w?.primaryImage, description: w?.medium ?? '—' }));
-   await widget('timeline', { items: items.length ? items : [{ date: '—', title: 'No samples returned' }] });
+   const events = [...works].sort((a, b) => (a?.objectBeginDate || 0) - (b?.objectBeginDate || 0)).map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', description: w?.medium ?? '—' }));
+   await widget('timeline', { events: events.length ? events : [{ date: '—', title: 'No samples returned' }] });
    ```
 
 4. **Gallery**:
@@ -80,8 +80,8 @@ const r = await call('search-museum-objects', { q: 'porcelain', dateBegin: 1368,
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 15).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const ming = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall || w?.primaryImage);
-const items = ming.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall || w?.primaryImage }));
-await widget('timeline', { items: items.length ? items : [{ date: '—', title: 'No samples returned' }] });
+const events = ming.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)' }));
+await widget('timeline', { events: events.length ? events : [{ date: '—', title: 'No samples returned' }] });
 ```
 
 ### Reign of Akhenaten

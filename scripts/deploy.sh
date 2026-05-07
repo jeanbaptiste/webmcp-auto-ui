@@ -17,6 +17,7 @@ set -euo pipefail
 #   ./scripts/deploy.sh --json           # JSON events on stderr
 #   ./scripts/deploy.sh --stats          # show ETA cache stats and exit
 #   ./scripts/deploy.sh --reset-cache    # reset ETA cache and exit
+#   ./scripts/deploy.sh --no-recipes     # skip MCP recipes deploy
 #   ./scripts/deploy.sh --help           # show this help
 #
 # IMPORTANT: each app has its own deploy path; never use scp manually.
@@ -51,6 +52,7 @@ JSON=0
 SHOW_STATS=0
 RESET_CACHE=0
 SHOW_HELP=0
+NO_RECIPES=0
 REAL_ARGS=()
 
 print_help() {
@@ -69,6 +71,7 @@ while [ $# -gt 0 ]; do
     --json) JSON=1; shift ;;
     --stats) SHOW_STATS=1; shift ;;
     --reset-cache) RESET_CACHE=1; shift ;;
+    --no-recipes) NO_RECIPES=1; shift ;;
     -h|--help) SHOW_HELP=1; shift ;;
     *) REAL_ARGS+=("$1"); shift ;;
   esac
@@ -648,6 +651,11 @@ fi
 if $WITH_DOCS && [ "$DRY_RUN" != "1" ]; then
   say "Updating documentation..."
   "$SCRIPT_DIR/docs-update.sh" --all -y
+fi
+
+if [ "$NO_RECIPES" != "1" ] && [ "$DRY_RUN" != "1" ]; then
+  say "Deploying MCP recipes..."
+  bash "$SCRIPT_DIR/recipes.sh" deploy || warn "✗ recipes deploy failed (apps already deployed)"
 fi
 
 exit 0

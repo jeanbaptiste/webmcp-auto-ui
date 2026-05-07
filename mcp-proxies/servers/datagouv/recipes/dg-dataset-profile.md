@@ -68,14 +68,14 @@ This recipe condenses metadata + files + popularity into a single view so the us
      await widget('text', { content: 'Aucun fichier disponible.' });
    }
 
-   const tlItems = (metrics?.metrics ?? []).map(x => ({
+   const tlEvents = (metrics?.metrics ?? []).map(x => ({
      date: x.month ?? '—',
-     label: `${x.monthly_visit ?? 0} visites · ${x.monthly_download ?? 0} téléchargements`
+     title: `${x.monthly_visit ?? 0} visites · ${x.monthly_download ?? 0} téléchargements`
    }));
-   if (tlItems.length) {
-     await widget('timeline', { items: tlItems });
+   if (tlEvents.length) {
+     await widget('timeline', { events: tlEvents });
    } else if (I.last_modified) {
-     await widget('timeline', { items: [{ date: I.last_modified, label: 'Dernière MAJ' }] });
+     await widget('timeline', { events: [{ date: I.last_modified, title: 'Dernière MAJ' }] });
    }
    // else: skip timeline entirely when no metrics and no last_modified
    ```

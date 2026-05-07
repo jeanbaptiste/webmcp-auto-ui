@@ -43,7 +43,7 @@ Useful for editorial dashboards and SHS researchers tracking publication pattern
      month_key = (d.last_modified ?? '').slice(0, 7);
      if (month_key) byMonth[month_key] = (byMonth[month_key] ?? 0) + 1;
    }
-   const timeline = Object.entries(byMonth).sort().map(([month, count]) => ({ date: month, label: `${count} MAJ` }));
+   const timeline = Object.entries(byMonth).sort().map(([month, count]) => ({ date: month, title: `${count} MAJ` }));
    ```
 
 3. **Render** (safe fallback if search fails):
@@ -62,7 +62,7 @@ Useful for editorial dashboards and SHS researchers tracking publication pattern
      }))
    });
 
-   await widget('timeline', { items: timeline.length ? timeline : [{ date: '—', label: 'Aucune MAJ' }] });
+   await widget('timeline', { events: timeline.length ? timeline : [{ date: '—', title: 'Aucune MAJ' }] });
 
    const allTags = new Set(sorted.flatMap(d => d.tags ?? []));
    await widget('stat-card', { label: 'Datasets', value: sorted.length, icon: 'database' });

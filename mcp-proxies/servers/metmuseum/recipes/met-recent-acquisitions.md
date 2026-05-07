@@ -51,8 +51,8 @@ layout:
 
 4. **Acquisition timeline**:
    ```js
-   const tlItems = [...recent].sort((a, b) => Number(a?.accessionYear || 0) - Number(b?.accessionYear || 0)).map(w => ({ date: w?.accessionYear ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall, description: w?.creditLine ?? '—' }));
-   await widget('timeline', { items: tlItems.length ? tlItems : [{ date: '—', title: 'No samples returned' }] });
+   const tlEvents = [...recent].sort((a, b) => Number(a?.accessionYear || 0) - Number(b?.accessionYear || 0)).map(w => ({ date: w?.accessionYear ?? '—', title: w?.title ?? '(untitled)', description: w?.creditLine ?? '—' }));
+   await widget('timeline', { events: tlEvents.length ? tlEvents : [{ date: '—', title: 'No samples returned' }] });
    ```
 
 5. **Cards of new arrivals**:
@@ -93,8 +93,8 @@ const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object
 const all = objs.filter(o => o?.object).map(o => o.object);
 const withYear = all.filter(w => Number(w?.accessionYear));
 const recent = [...(withYear.length ? withYear : all)].sort((a, b) => Number(b.accessionYear || 0) - Number(a.accessionYear || 0)).slice(0, 8);
-const items = recent.map(w => ({ date: w?.accessionYear ?? '—', title: w?.title ?? '(untitled)' }));
-await widget('timeline', { items: items.length ? items : [{ date: '—', title: 'No samples' }] });
+const events = recent.map(w => ({ date: w?.accessionYear ?? '—', title: w?.title ?? '(untitled)' }));
+await widget('timeline', { events: events.length ? events : [{ date: '—', title: 'No samples' }] });
 ```
 
 ## Common mistakes

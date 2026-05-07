@@ -46,8 +46,8 @@ layout:
 
 3. **Timeline** sorted by `objectBeginDate`:
    ```js
-   const timelineItems = [...works].sort((a, b) => (a?.objectBeginDate || 0) - (b?.objectBeginDate || 0)).map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', description: w?.medium ?? '—', image: w?.primaryImageSmall }));
-   await widget('timeline', { items: timelineItems.length ? timelineItems : [{ date: '—', title: 'No samples returned', description: '—' }] });
+   const timelineEvents = [...works].sort((a, b) => (a?.objectBeginDate || 0) - (b?.objectBeginDate || 0)).map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', description: w?.medium ?? '—' }));
+   await widget('timeline', { events: timelineEvents.length ? timelineEvents : [{ date: '—', title: 'No samples returned', description: '—' }] });
    ```
 
 4. **Distribution by century** in a chart:
@@ -80,8 +80,8 @@ const r = await call('search-museum-objects', { q: 'Italy', departmentId: 11, da
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
-const items = works.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall }));
-await widget('timeline', { items: items.length ? items : [{ date: '—', title: 'No samples' }] });
+const events = works.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)' }));
+await widget('timeline', { events: events.length ? events : [{ date: '—', title: 'No samples' }] });
 ```
 
 ### Tang dynasty

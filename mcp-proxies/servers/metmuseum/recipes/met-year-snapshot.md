@@ -68,8 +68,8 @@ layout:
 
 6. **Timeline + cards by nationality**:
    ```js
-   const tlItems = works.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)', image: w?.primaryImageSmall }));
-   if (tlItems.length) { await widget('timeline', { items: tlItems }); } else { await widget('text', { content: 'No timeline items available for this year.' }); }
+   const tlEvents = works.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)' }));
+   if (tlEvents.length) { await widget('timeline', { events: tlEvents }); } else { await widget('text', { content: 'No timeline items available for this year.' }); }
    const byNat = works.reduce((acc, w) => { const k = w?.artistNationality || w?.culture || 'Unknown'; (acc[k] = acc[k] || []).push(w); return acc; }, {});
    const cardsItems = Object.entries(byNat).flatMap(([c, ws]) => ws.slice(0, 1).map(w => ({ title: c, subtitle: w?.title ?? '(untitled)', image: w?.primaryImageSmall, body: w?.artistDisplayName || w?.culture || '—' })));
    if (cardsItems.length) { await widget('cards', { items: cardsItems }); } else { await widget('text', { content: 'No cards to display for this year.' }); }
@@ -93,8 +93,8 @@ const r = await call('search-museum-objects', { q: 'painting', dateBegin: 1840, 
 const ids = r?.objectIDs ?? [];
 const objs = await Promise.all(ids.slice(0, 8).map(id => call('get-museum-object', { objectId: id }).catch(() => null)));
 const works = objs.filter(o => o?.object).map(o => o.object).filter(w => w?.primaryImageSmall);
-const items = works.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)' }));
-if (items.length) { await widget('timeline', { items }); } else { await widget('text', { content: 'No timeline items available for this year.' }); }
+const events = works.map(w => ({ date: w?.objectDate ?? '—', title: w?.title ?? '(untitled)' }));
+if (events.length) { await widget('timeline', { events }); } else { await widget('text', { content: 'No timeline items available for this year.' }); }
 ```
 
 ## Common mistakes
