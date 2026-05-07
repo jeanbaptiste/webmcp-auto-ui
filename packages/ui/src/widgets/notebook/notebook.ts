@@ -878,12 +878,12 @@ function renderResultInto(el: HTMLElement, cell: NotebookCell, overlay: RuntimeO
     const isView = stateRef?.mode === 'view';
     const rtStatus = cellRuntimeStatus(cell, overlay);
     const startedAt = overlay?.cellStartedAt.get(cell.id);
-    const sinceAttr = startedAt != null ? ` data-running-since="${startedAt}"` : '';
-    // In view mode (autoRun), any unresolved cell is effectively loading —
-    // the auto-runner will pick it up shortly. Show a continuous spinner so
-    // users don't see a static "—" placeholder during the idle→running gap.
-    if ((isView && rtStatus !== 'frozen') || rtStatus === 'running') {
-      el.innerHTML = `<div class="nbe-result-running"><span class="nbe-spinner"></span> <span class="nbe-running-time"${sinceAttr}>running</span></div>`;
+    if (rtStatus === 'running' && startedAt != null) {
+      el.innerHTML = `<div class="nbe-result-running"><span class="nbe-spinner"></span> <span class="nbe-running-time" data-running-since="${startedAt}">running</span></div>`;
+    } else if (isView && (rtStatus === 'pending' || rtStatus === 'idle')) {
+      // Queued: cell will run sequentially after upstream cells finish.
+      // Spinner without timer — there's nothing to count yet.
+      el.innerHTML = `<div class="nbe-result-running"><span class="nbe-spinner"></span> queued</div>`;
     } else {
       el.innerHTML = `<div class="nbe-result-empty">press ▶ to run</div>`;
     }
