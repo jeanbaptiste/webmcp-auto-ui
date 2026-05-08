@@ -54,6 +54,11 @@ TOOLS = [
         "inputSchema": {"type": "object", "properties": OBS_PROPS},
     },
     {
+        "name": "search_observations_gallery",
+        "description": "Compact gallery projection of observations — same filters as search_observations, but each result is reduced to {id, observed_on, place_guess, taxon_id, common_name, scientific_name, photo_url, uri}. Use this when the recipe only needs to render a photo grid (no map, no identifications, no taxonomy tree). ~20x smaller payload than search_observations.",
+        "inputSchema": {"type": "object", "properties": OBS_PROPS},
+    },
+    {
         "name": "species_counts",
         "description": "Top species observed in an area/taxon ranked by observation count. Returns `results[].count` and `results[].taxon` (full taxon object with `id`, `name`, `preferred_common_name`, `rank`, `iconic_taxon_name`, `default_photo`).",
         "inputSchema": {"type": "object", "properties": {**OBS_PROPS, "include_ancestors": {"type": "boolean"}}},
@@ -234,6 +239,33 @@ def handle(name, a):
 
     if name == "search_observations":
         return api_get("/observations", _cap_per_page(_obs_params(a)))
+
+    if name == "search_observations_gallery":
+        d = api_get("/observations", _cap_per_page(_obs_params(a)))
+        results = d.get("results", []) if isinstance(d, dict) else []
+        slim = []
+        for o in results:
+            photos = o.get("photos") or []
+            photo_url = photos[0].get("url") if photos else None
+            if photo_url:
+                photo_url = photo_url.replace("square", "large")
+            taxon = o.get("taxon") or {}
+            slim.append({
+                "id": o.get("id"),
+                "observed_on": o.get("observed_on"),
+                "place_guess": o.get("place_guess"),
+                "taxon_id": taxon.get("id"),
+                "common_name": taxon.get("preferred_common_name"),
+                "scientific_name": taxon.get("name"),
+                "photo_url": photo_url,
+                "uri": o.get("uri"),
+            })
+        return {
+            "total_results": d.get("total_results"),
+            "page": d.get("page"),
+            "per_page": d.get("per_page"),
+            "results": slim,
+        }
 
     if name == "species_counts":
         return api_get("/observations/species_counts",
