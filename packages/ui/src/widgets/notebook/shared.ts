@@ -519,12 +519,21 @@ interface CanvasLike {
   callTool: (name: string, toolName: string, args: unknown) => Promise<unknown>;
 }
 
-async function waitForEnabledServers(canvas: CanvasLike, timeoutMs: number): Promise<void> {
+async function waitForEnabledServers(
+  canvas: CanvasLike,
+  timeoutMs: number,
+  expectedCount: number,
+): Promise<void> {
+  // expectedCount = number of servers declared by the notebook frontmatter.
+  // Without this, an empty canvas.dataServers (autoConnect lost a race against
+  // canvas.__canvasVanilla being set, or a notify loop hasn't fired yet)
+  // would return immediately and the runner would execute against zero servers.
   const deadline = Date.now() + Math.max(0, timeoutMs);
   while (Date.now() < deadline) {
     const enabled = (canvas.dataServers ?? []).filter((s) => s.enabled !== false);
-    if (enabled.length === 0) return;
-    if (enabled.every((s) => s.connected)) return;
+    // Notebook declared no servers — nothing to wait for.
+    if (expectedCount === 0 && enabled.length === 0) return;
+    if (enabled.length >= expectedCount && enabled.every((s) => s.connected)) return;
     await new Promise((r) => setTimeout(r, 100));
   }
 }
@@ -544,7 +553,10 @@ export function bootstrapLiveRefresh(opts: BootstrapLiveRefreshOptions): () => v
         onTick?.(overlay);
         return;
       }
-      await waitForEnabledServers(canvas, timeoutMs ?? 5000);
+      const declaredServers = Array.isArray((data as { servers?: unknown }).servers)
+        ? (data as { servers: unknown[] }).servers.length
+        : 0;
+      await waitForEnabledServers(canvas, timeoutMs ?? 10_000, declaredServers);
 
       const sqlRunner = createBridgeSqlRunner(
         canvas.callTool.bind(canvas),
