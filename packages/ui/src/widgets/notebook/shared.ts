@@ -379,8 +379,8 @@ export async function runAutoRefresh(opts: AutoRefreshOptions): Promise<AutoRefr
 
       try {
         const result = await runner(cell, sharedSignal);
+        overlay.outputs.set(cell.id, { result, refreshedAt: Date.now() });
         if (result.ok) {
-          overlay.outputs.set(cell.id, { result, refreshedAt: Date.now() });
           overlay.status.set(cell.id, 'fresh');
           summary.rerun++;
         } else {
@@ -388,9 +388,14 @@ export async function runAutoRefresh(opts: AutoRefreshOptions): Promise<AutoRefr
           summary.stale++;
         }
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        overlay.outputs.set(cell.id, {
+          result: { ok: false, error: message, errorKind: 'runtime', durationMs: 0 },
+          refreshedAt: Date.now(),
+        });
         overlay.status.set(cell.id, 'stale');
         summary.failed++;
-        if (!overlay.error) overlay.error = err instanceof Error ? err.message : String(err);
+        if (!overlay.error) overlay.error = message;
       }
       overlay.cellStartedAt.delete(cell.id);
       onCellChange?.(cell.id);
@@ -1367,6 +1372,7 @@ const NOTEBOOK_STYLES = `
 }
 .nbe-agent-bar auto-chat-input { display: block; }
 .nbe-actions-sep { color: var(--color-border, #c8c2b4); margin: 0 4px; user-select: none; }
+.nb-cell-chat-active { outline: 2px solid var(--color-accent, #1d6f5f); outline-offset: 4px; border-radius: 6px; }
 .nbe-agent-status {
   font-family: var(--font-mono, monospace); font-size: 11px;
   color: var(--color-text2, #645d4f);
