@@ -11,6 +11,8 @@ export interface Recipe {
   when: string;
   servers?: string[];
   body: string;
+  /** Frontmatter `widget:` — when set, JSON example fences are widget params. */
+  widget?: string;
 }
 
 export interface McpRecipe {

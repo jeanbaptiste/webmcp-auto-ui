@@ -35,6 +35,7 @@ export function parseRecipe(raw: string, fileKey?: string): Recipe {
     when: (frontmatter.when as string) ?? '',
     servers: parseStringArray(frontmatter.servers),
     body: body.trim(),
+    widget: frontmatter.widget as string | undefined,
   };
 }
 
