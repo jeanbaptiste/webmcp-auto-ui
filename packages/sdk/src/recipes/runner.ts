@@ -382,15 +382,27 @@ async function runJsLike(
   ) => (
     call: unknown,
     widget: unknown,
+    widget_display: unknown,
     unwrap: unknown,
     __scope__: Record<string, unknown>,
   ) => Promise<unknown>)(
-    'call', 'widget', 'unwrap', '__scope__', wrapped,
+    'call', 'widget', 'widget_display', 'unwrap', '__scope__', wrapped,
   );
   ctx.log('dispatched (inline async)');
+  // widget_display is an alias for widget that accepts either ({name,params}) or (name, params).
+  // LLMs trained on the autoui MCP tool sometimes emit it directly in JS cells.
+  const widgetHelper = makeWidgetHelper(ctx);
+  const widgetDisplayAlias = async (a: unknown, b?: unknown) => {
+    if (a && typeof a === 'object' && 'name' in (a as object)) {
+      const o = a as { name?: unknown; params?: unknown };
+      return widgetHelper(String(o.name ?? ''), (o.params as Record<string, unknown>) ?? {});
+    }
+    return widgetHelper(String(a ?? ''), (b as Record<string, unknown>) ?? {});
+  };
   const out = await fn(
     makeCallHelper(multiClient, ctx),
-    makeWidgetHelper(ctx),
+    widgetHelper,
+    widgetDisplayAlias,
     unwrapHelper,
     scope ?? {},
   );

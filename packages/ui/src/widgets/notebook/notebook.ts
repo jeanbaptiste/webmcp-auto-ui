@@ -788,12 +788,8 @@ async function runAgentForCell(
     progress.classList.add('nbe-progress-done');
     fill.textContent = '▰▰▰▰▰▰▰▰';
     label.textContent = `done · ${((Date.now() - startedAt) / 1000).toFixed(1)}s`;
-    // In view mode, auto-close the chat bar once the edit succeeds.
-    // Edit mode keeps it open since users typically chain prompts there.
-    if (state.mode === 'view') {
-      cell.chatOpen = false;
-      rerender();
-    }
+    // Auto-close happens earlier inside update_cell.execute (avoids the lag of
+    // Haiku's trailing assistant turn). Nothing to do here.
   } catch (err) {
     clearInterval(interval);
     progress.classList.add('nbe-progress-error');
@@ -865,6 +861,10 @@ function buildAgentLayerForCell(state: NotebookState, cell: NotebookCell, rerend
         // render lingers until the next bootstrapLive (= view-edit-view).
         overlay?.outputs.delete(cell.id);
         overlay?.status.delete(cell.id);
+        // Close the chat bar immediately on success in view mode — waiting for
+        // runAgentLoop to fully resolve adds a 1-2s lag from Haiku's trailing
+        // assistant turn ("Done!") after the tool result.
+        if (state.mode === 'view') cell.chatOpen = false;
         rerender();
         // Re-run so the result panel reflects the new content.
         if (cell.type !== 'md' && state.executors?.[cell.type]) {
@@ -927,6 +927,7 @@ function buildAgentSystemPromptForCell(state: NotebookState, cell: NotebookCell)
       '  1. Call get_current_cell to read the cell content.',
       '  2. Call update_cell with the rewritten content.',
       'Always rewrite the existing cell. Never insert new cells.',
+      'For JS cells: use the `widget(name, params)` helper to render widgets — `widget_display` is not available as a global.',
       'Be terse. One or two tool calls is enough. Do not explain at length.',
     ].join('\n');
   }
