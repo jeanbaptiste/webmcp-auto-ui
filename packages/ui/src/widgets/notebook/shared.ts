@@ -1390,6 +1390,16 @@ const NOTEBOOK_STYLES = `
   color: var(--color-text2, #645d4f);
   padding: 0 4px;
 }
+.nbe-agent-progress {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-mono, monospace); font-size: 11px;
+  color: var(--color-text2, #645d4f);
+  padding: 0 4px;
+}
+.nbe-progress-track { letter-spacing: 1px; color: var(--color-accent, #1d6f5f); }
+.nbe-progress-fill { display: inline-block; }
+.nbe-agent-progress.nbe-progress-done .nbe-progress-track { color: var(--color-accent, #1d6f5f); }
+.nbe-agent-progress.nbe-progress-error .nbe-progress-track { color: #b54141; }
 /* Run controls (.nb-ctl-pill) remain active in view mode — users can execute cells
  * even when the notebook is read-only; only editing the source is locked. */
 .nb-root.nb-view-mode textarea,

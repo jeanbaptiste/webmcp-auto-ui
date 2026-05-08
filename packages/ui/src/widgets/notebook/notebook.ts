@@ -532,8 +532,8 @@ function renderCell(cell: NotebookCell, state: NotebookState, overlay: RuntimeOv
   if (chatBtn) chatBtn.addEventListener('click', () => { cell.chatOpen = !cell.chatOpen; rerender(); });
 
   if (state.mode === 'view' && cell.chatOpen) {
-    codeCell.classList.add('nb-cell-chat-active');
-    mountAgentBarAbove(codeCell, state, cell, rerender);
+    wrap.classList.add('nb-cell-chat-active');
+    mountAgentBarAbove(codeCell, state, cell, rerender, overlay);
   }
 
   if (state.mode !== 'view') wrap.appendChild(renderCellActionBar(state, cell, rerender));
@@ -707,15 +707,20 @@ function toggleAgentBar(host: HTMLElement, state: NotebookState, cell: NotebookC
  * and persists open state via cell.chatOpen so the bar survives the rerender
  * triggered by `update_cell`. Reuses runAgentForCell unchanged.
  */
-function mountAgentBarAbove(codeCell: HTMLElement, state: NotebookState, cell: NotebookCell, rerender: () => void): void {
+function mountAgentBarAbove(codeCell: HTMLElement, state: NotebookState, cell: NotebookCell, rerender: () => void, overlay: RuntimeOverlay | null): void {
   const bar = document.createElement('div');
   bar.className = 'nbe-agent-bar';
   bar.innerHTML = `
     <auto-chat-input placeholder="ask agent — e.g. 'filter rows where votes > 50' / 'add a sankey of this'"></auto-chat-input>
-    <div class="nbe-agent-status" hidden></div>`;
+    <div class="nbe-agent-progress" hidden>
+      <span class="nbe-progress-track"><span class="nbe-progress-fill"></span></span>
+      <span class="nbe-progress-label"></span>
+    </div>`;
   codeCell.insertAdjacentElement('beforebegin', bar);
   const input = bar.querySelector('auto-chat-input') as HTMLElement & { disabled?: boolean };
-  const status = bar.querySelector('.nbe-agent-status') as HTMLElement;
+  const progress = bar.querySelector('.nbe-agent-progress') as HTMLElement;
+  const fill = bar.querySelector('.nbe-progress-fill') as HTMLElement;
+  const label = bar.querySelector('.nbe-progress-label') as HTMLElement;
   let aborter: AbortController | null = null;
   input.addEventListener('widget:interact', (e: Event) => {
     const detail = (e as CustomEvent).detail ?? {};
@@ -725,7 +730,7 @@ function mountAgentBarAbove(codeCell: HTMLElement, state: NotebookState, cell: N
     e.stopPropagation();
     const text = ((detail as { payload?: { text?: string } }).payload?.text ?? '').trim();
     if (!text) return;
-    void runAgentForCell(text, state, cell, rerender, status, input, () => aborter ??= new AbortController());
+    void runAgentForCell(text, state, cell, rerender, progress, fill, label, input, () => aborter ??= new AbortController(), overlay);
   });
 }
 
@@ -734,22 +739,40 @@ async function runAgentForCell(
   state: NotebookState,
   cell: NotebookCell,
   rerender: () => void,
-  status: HTMLElement,
+  progress: HTMLElement,
+  fill: HTMLElement,
+  label: HTMLElement,
   input: HTMLElement & { disabled?: boolean },
   getAborter: () => AbortController,
+  overlay: RuntimeOverlay | null,
 ): Promise<void> {
-  status.hidden = false;
-  status.textContent = '…';
+  progress.hidden = false;
+  progress.classList.remove('nbe-progress-error', 'nbe-progress-done');
+  let currentTool = '…';
+  const startedAt = Date.now();
+  // Indeterminate slide: a 3-block fill traverses the 8-block track.
+  const TRACK = 8;
+  const FILL = 3;
+  let pos = 0;
+  const tick = () => {
+    const cells: string[] = [];
+    for (let i = 0; i < TRACK; i++) {
+      const inFill = i >= pos && i < pos + FILL;
+      cells.push(inFill ? '▰' : '▱');
+    }
+    fill.textContent = cells.join('');
+    label.textContent = `${currentTool} · ${((Date.now() - startedAt) / 1000).toFixed(1)}s`;
+    pos = (pos + 1) % (TRACK - FILL + 1 + 2); // small pause at each end
+  };
+  tick();
+  const interval = setInterval(tick, 120);
   input.disabled = true;
   const aborter = getAborter();
   try {
-    // Lazy import to keep notebook bundle slim when agent is unused.
     const { RemoteLLMProvider, runAgentLoop } = await import('@webmcp-auto-ui/agent');
-    // Host injects chatApiBase via data (flex serves under /flex, notebook-viewer
-    // at root). Default '/api/chat' kept for hosts mounting at the root.
     const proxyUrl = (state as { chatApiBase?: string }).chatApiBase ?? '/api/chat';
     const provider = new RemoteLLMProvider({ proxyUrl, model: 'haiku' });
-    const layer = buildAgentLayerForCell(state, cell, rerender);
+    const layer = buildAgentLayerForCell(state, cell, rerender, overlay);
     const systemPrompt = buildAgentSystemPromptForCell(state, cell);
     await runAgentLoop(prompt, {
       provider,
@@ -758,12 +781,24 @@ async function runAgentForCell(
       maxIterations: 6,
       signal: aborter.signal,
       callbacks: {
-        onToolCall: (call: { name?: string }) => { status.textContent = `· ${call?.name ?? '?'}…`; },
+        onToolCall: (call: { name?: string }) => { currentTool = call?.name ?? '?'; },
       },
     });
-    status.textContent = '✓ done';
+    clearInterval(interval);
+    progress.classList.add('nbe-progress-done');
+    fill.textContent = '▰▰▰▰▰▰▰▰';
+    label.textContent = `done · ${((Date.now() - startedAt) / 1000).toFixed(1)}s`;
+    // In view mode, auto-close the chat bar once the edit succeeds.
+    // Edit mode keeps it open since users typically chain prompts there.
+    if (state.mode === 'view') {
+      cell.chatOpen = false;
+      rerender();
+    }
   } catch (err) {
-    status.textContent = 'error: ' + String((err as { message?: unknown })?.message ?? err);
+    clearInterval(interval);
+    progress.classList.add('nbe-progress-error');
+    fill.textContent = '▱▱▱▱▱▱▱▱';
+    label.textContent = 'error: ' + String((err as { message?: unknown })?.message ?? err);
   } finally {
     input.disabled = false;
   }
@@ -774,7 +809,7 @@ async function runAgentForCell(
  * shared helpers (addImportedCells, logHistory) so revert via ⟲ history works
  * exactly like a manual edit.
  */
-function buildAgentLayerForCell(state: NotebookState, cell: NotebookCell, rerender: () => void) {
+function buildAgentLayerForCell(state: NotebookState, cell: NotebookCell, rerender: () => void, overlay: RuntimeOverlay | null) {
   const idx = () => state.cells.findIndex((c) => c.id === cell.id);
   // View-mode chat is per-cell and meant to TRANSFORM the targeted cell.
   // Drop insert_cell_after + list_widgets so Haiku can't fall back to "add a new cell"
@@ -825,10 +860,13 @@ function buildAgentLayerForCell(state: NotebookState, cell: NotebookCell, rerend
             snapshot: { cellId: cell.id, before, after: next },
           } as never);
         } catch { /* ignore — best-effort */ }
+        // Drop the live-overlay cache for this cell. effectiveResult prefers
+        // overlay.outputs over cell.lastResult, so without this the pre-edit
+        // render lingers until the next bootstrapLive (= view-edit-view).
+        overlay?.outputs.delete(cell.id);
+        overlay?.status.delete(cell.id);
         rerender();
-        // Re-run the cell so the result panel reflects the new content.
-        // Without this, in view mode the cached lastResult/overlay output
-        // keeps showing the pre-edit render.
+        // Re-run so the result panel reflects the new content.
         if (cell.type !== 'md' && state.executors?.[cell.type]) {
           startRun(cell, state, rerender);
         }
