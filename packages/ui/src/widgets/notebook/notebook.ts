@@ -13,7 +13,7 @@ import {
   renderCellLogs, uid, defaultCellContent,
   createPublishControls, autoConnectFrontmatterServers,
   createRuntimeOverlay, effectiveResult, cellRuntimeStatus,
-  lastRefreshedAt, bootstrapLiveRefresh, fmtRelTime, preserveScrollAround,
+  lastRefreshedAt, bootstrapLiveRefresh, fmtRelTime, preserveScrollAround, startRun,
   type NotebookState, type NotebookCell, type CellResult, type CellExecContext,
   type RuntimeOverlay,
 } from './shared.js';
@@ -285,7 +285,7 @@ export async function render(container: HTMLElement, data: Record<string, unknow
   const viewBtn = shell.querySelector('.nb-mode-view') as HTMLElement;
   editBtn.addEventListener('click', () => {
     state.mode = 'edit';
-    for (const c of state.cells) { c.hideSource = false; c.hideLogs = false; }
+    for (const c of state.cells) { c.hideSource = false; c.hideLogs = false; c.chatOpen = false; }
     container.classList.remove('nb-view-mode');
     editBtn.classList.add('nb-on'); viewBtn.classList.remove('nb-on');
     // Leaving view: stop live refresh and clear overlay so frozen snapshots show.
@@ -531,7 +531,10 @@ function renderCell(cell: NotebookCell, state: NotebookState, overlay: RuntimeOv
   const chatBtn = head.querySelector('.nb-toggle-chat') as HTMLElement | null;
   if (chatBtn) chatBtn.addEventListener('click', () => { cell.chatOpen = !cell.chatOpen; rerender(); });
 
-  if (state.mode === 'view' && cell.chatOpen) mountAgentBarAbove(codeCell, state, cell, rerender);
+  if (state.mode === 'view' && cell.chatOpen) {
+    codeCell.classList.add('nb-cell-chat-active');
+    mountAgentBarAbove(codeCell, state, cell, rerender);
+  }
 
   if (state.mode !== 'view') wrap.appendChild(renderCellActionBar(state, cell, rerender));
 
@@ -773,6 +776,10 @@ async function runAgentForCell(
  */
 function buildAgentLayerForCell(state: NotebookState, cell: NotebookCell, rerender: () => void) {
   const idx = () => state.cells.findIndex((c) => c.id === cell.id);
+  // View-mode chat is per-cell and meant to TRANSFORM the targeted cell.
+  // Drop insert_cell_after + list_widgets so Haiku can't fall back to "add a new cell"
+  // when the user explicitly chatted on this cell.
+  const transformOnly = state.mode === 'view';
   const tools = [
     {
       name: 'get_current_cell',
@@ -819,6 +826,12 @@ function buildAgentLayerForCell(state: NotebookState, cell: NotebookCell, rerend
           } as never);
         } catch { /* ignore — best-effort */ }
         rerender();
+        // Re-run the cell so the result panel reflects the new content.
+        // Without this, in view mode the cached lastResult/overlay output
+        // keeps showing the pre-edit render.
+        if (cell.type !== 'md' && state.executors?.[cell.type]) {
+          startRun(cell, state, rerender);
+        }
         return { ok: true };
       },
     },
@@ -861,10 +874,24 @@ function buildAgentLayerForCell(state: NotebookState, cell: NotebookCell, rerend
       },
     },
   ];
-  return { protocol: 'webmcp' as const, serverName: 'notebook-editor', tools, recipes: [] };
+  const filtered = transformOnly
+    ? tools.filter((t) => t.name !== 'insert_cell_after' && t.name !== 'list_widgets')
+    : tools;
+  return { protocol: 'webmcp' as const, serverName: 'notebook-editor', tools: filtered, recipes: [] };
 }
 
-function buildAgentSystemPromptForCell(_state: NotebookState, cell: NotebookCell): string {
+function buildAgentSystemPromptForCell(state: NotebookState, cell: NotebookCell): string {
+  if (state.mode === 'view') {
+    return [
+      'You are an in-notebook editing assistant. The user invoked you on a specific cell to TRANSFORM it.',
+      `The current cell is of type "${cell.type}".`,
+      'Workflow:',
+      '  1. Call get_current_cell to read the cell content.',
+      '  2. Call update_cell with the rewritten content.',
+      'Always rewrite the existing cell. Never insert new cells.',
+      'Be terse. One or two tool calls is enough. Do not explain at length.',
+    ].join('\n');
+  }
   return [
     'You are an in-notebook editing assistant. The user invoked you on a specific cell.',
     'Your job: rewrite that cell, OR insert a follow-up cell after it, based on the user\'s prompt.',
