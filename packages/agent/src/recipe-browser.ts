@@ -1,8 +1,15 @@
 // recipe-browser — pure utility functions for browsing/filtering/exporting recipes
 
 /**
- * Case-insensitive filter on name and description fields.
+ * Case-insensitive filter on name, description, server, and id fields.
  * Empty query returns all recipes.
+ *
+ * Match semantics: word-start. The query must start at a word boundary
+ * (start of string, after non-word char, or after a `\b`). This drops
+ * spurious substring matches like "hn" inside "technical" but keeps
+ * meaningful ones like "hn" inside "HN" (standalone abbreviation) or
+ * "hn-front-page" (id prefix). It also matches "hacker" inside
+ * "HackerNews" since "Hacker" begins at the start of the word.
  */
 export function filterRecipes<T extends { name: string; description?: string }>(
   recipes: T[],
@@ -10,14 +17,17 @@ export function filterRecipes<T extends { name: string; description?: string }>(
 ): T[] {
   const q = query.trim().toLowerCase();
   if (!q) return recipes;
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`\\b${escaped}`, 'i');
   return recipes.filter((r) => {
-    const srv = ((r as Record<string, unknown>).server as string | undefined)
-             ?? ((r as Record<string, unknown>).serverName as string | undefined)
-             ?? '';
+    const obj = r as Record<string, unknown>;
+    const srv = (obj.server as string | undefined) ?? (obj.serverName as string | undefined) ?? '';
+    const id = (obj.id as string | undefined) ?? '';
     return (
-      r.name.toLowerCase().includes(q) ||
-      (r.description && r.description.toLowerCase().includes(q)) ||
-      srv.toLowerCase().includes(q)
+      re.test(r.name) ||
+      (r.description ? re.test(r.description) : false) ||
+      re.test(srv) ||
+      re.test(id)
     );
   });
 }
