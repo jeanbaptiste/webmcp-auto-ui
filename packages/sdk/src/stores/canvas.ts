@@ -294,40 +294,46 @@ function createCanvasVanilla() {
       try {
         const opts = srv.headers ? { headers: srv.headers } : undefined;
         const { name: actualName, tools } = await multiClient.addServer(srv.url, opts);
-        let recipes: { name: string; description?: string; body?: string }[] = [];
-        if (tools.some((t: McpTool) => t.name === 'list_recipes')) {
-          try {
-            const res = await multiClient.callToolOn(srv.url, 'list_recipes', {});
-            recipes = parseRecipesFromToolResponse(res) ?? [];
-          } catch { /* no recipes */ }
-        }
-        // Prefetch full bodies in parallel so apps can render markdown / run
-        // code blocks without re-calling get_recipe per surface.
-        if (recipes.length && tools.some((t: McpTool) => t.name === 'get_recipe')) {
-          recipes = await Promise.all(recipes.map(async (r) => {
-            try {
-              const res = await multiClient.callToolOn(srv.url, 'get_recipe', { name: r.name, id: r.name });
-              const text = (res as { content?: { type?: string; text?: string }[] })
-                .content?.find((c) => c?.type === 'text')?.text;
-              if (!text) return r;
-              let body = text;
-              try {
-                const p = JSON.parse(text);
-                if (p && typeof p === 'object' && typeof (p as { content?: unknown }).content === 'string') {
-                  body = (p as { content: string }).content;
-                }
-              } catch { /* raw markdown */ }
-              return { ...r, body };
-            } catch { return r; }
-          }));
-        }
+        // Flip connected as soon as tools are available — downstream consumers
+        // (SQL runner, tool dispatch) only need tools, not recipe bodies.
         setDataServerMeta(name, {
           connected: true, connecting: false,
           tools: tools as McpToolInfo[],
-          recipes,
           serverName: actualName,
           error: undefined,
         });
+        // Recipe metadata + full-body prefetch run async in the background;
+        // they update the store via setDataServerMeta when ready, no gating.
+        void (async () => {
+          let recipes: { name: string; description?: string; body?: string }[] = [];
+          if (tools.some((t: McpTool) => t.name === 'list_recipes')) {
+            try {
+              const res = await multiClient.callToolOn(srv.url, 'list_recipes', {});
+              recipes = parseRecipesFromToolResponse(res) ?? [];
+            } catch { /* no recipes */ }
+          }
+          if (recipes.length && tools.some((t: McpTool) => t.name === 'get_recipe')) {
+            // Publish list-only metadata first so UI can render names quickly.
+            setDataServerMeta(name, { recipes });
+            recipes = await Promise.all(recipes.map(async (r) => {
+              try {
+                const res = await multiClient.callToolOn(srv.url, 'get_recipe', { name: r.name, id: r.name });
+                const text = (res as { content?: { type?: string; text?: string }[] })
+                  .content?.find((c) => c?.type === 'text')?.text;
+                if (!text) return r;
+                let body = text;
+                try {
+                  const p = JSON.parse(text);
+                  if (p && typeof p === 'object' && typeof (p as { content?: unknown }).content === 'string') {
+                    body = (p as { content: string }).content;
+                  }
+                } catch { /* raw markdown */ }
+                return { ...r, body };
+              } catch { return r; }
+            }));
+          }
+          setDataServerMeta(name, { recipes });
+        })();
       } catch (err) {
         setDataServerMeta(name, {
           connected: false, connecting: false,
