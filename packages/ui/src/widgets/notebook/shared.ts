@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import { serializeToMarkdown } from './share-handlers.js';
-import { extractTopLevelDecls, hasIdentifierReference } from '@webmcp-auto-ui/sdk';
+import { extractTopLevelDecls, hasIdentifierReference, findCodeParamName, buildToolArgs } from '@webmcp-auto-ui/sdk';
 
 export const NB_PUBLISH_HOST: string = (() => {
   try {
@@ -427,15 +427,15 @@ export function createBridgeSqlRunner(
   const PATTERN_PRIMARY = /^.*query_sql$/i;
   const PATTERN_FALLBACK = /^(query|run|execute)(_sql)?$/i;
 
-  function findSqlTool(servers: DataServerDescriptor[]): { serverName: string; toolName: string } | null {
+  function findSqlTool(servers: DataServerDescriptor[]): { serverName: string; toolName: string; tool: DataServerTool } | null {
     for (const srv of servers) {
       for (const t of srv.tools ?? []) {
-        if (PATTERN_PRIMARY.test(t.name)) return { serverName: srv.name, toolName: t.name };
+        if (PATTERN_PRIMARY.test(t.name)) return { serverName: srv.name, toolName: t.name, tool: t };
       }
     }
     for (const srv of servers) {
       for (const t of srv.tools ?? []) {
-        if (PATTERN_FALLBACK.test(t.name)) return { serverName: srv.name, toolName: t.name };
+        if (PATTERN_FALLBACK.test(t.name)) return { serverName: srv.name, toolName: t.name, tool: t };
       }
     }
     return null;
@@ -483,7 +483,11 @@ export function createBridgeSqlRunner(
     if (!hit) {
       return { ok: false, error: 'No SQL tool exposed by reachable servers', errorKind: 'schema', durationMs: 0 };
     }
-    const raw = await callTool(hit.serverName, hit.toolName, { sql: cell.content });
+    const sql = (cell.content ?? '').trim();
+    const codeParam = findCodeParamName(hit.tool.inputSchema) ?? 'sql';
+    const args: Record<string, unknown> = { ...buildToolArgs(hit.tool.inputSchema, codeParam, sql, 'sql'), ...(cell.args ?? {}) };
+    args[codeParam] = sql;
+    const raw = await callTool(hit.serverName, hit.toolName, args);
     return parseResult(raw, startedAt);
   };
 }

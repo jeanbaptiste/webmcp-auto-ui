@@ -45,6 +45,18 @@ export class NotebookLoadError extends Error {
   }
 }
 
+// Legacy URLs baked into older notebook payloads → current bridge URLs.
+// Necessary because the URL is embedded in the HyperSkills payload at publish time;
+// without rewriting, old notebooks point at servers that now require auth (Tricoteuses)
+// or have moved.
+const URL_REWRITES: Record<string, string> = {
+  'https://mcp.code4code.eu/mcp': 'https://demos.hyperskills.net/mcp-code4code/mcp',
+};
+
+function rewriteServerUrl(url: string): string {
+  return URL_REWRITES[url] ?? url;
+}
+
 function normalizeFrontmatterServers(
   raw: unknown,
 ): Array<{ name: string; url: string }> {
@@ -53,7 +65,7 @@ function normalizeFrontmatterServers(
     .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object')
     .map((s) => ({
       name: typeof s.name === 'string' ? s.name : '',
-      url: typeof s.url === 'string' ? s.url : '',
+      url: typeof s.url === 'string' ? rewriteServerUrl(s.url) : '',
     }))
     .filter((s) => s.name && s.url);
 }
