@@ -145,6 +145,10 @@ export class DiscoveryCache {
           ((r as Record<string, unknown>).id as string | undefined)?.toLowerCase() === key
         );
         if (!recipe) return JSON.stringify({ error: `Recipe "${key}" not found` });
+        // Body is fetched lazily — fall through to live MCP dispatch when
+        // we only have name+description. Returning the metadata-only entry
+        // would feed the agent a body-less recipe and trigger fabrication.
+        if (!recipe.body) return null;
         return JSON.stringify(recipe);
       }
 
