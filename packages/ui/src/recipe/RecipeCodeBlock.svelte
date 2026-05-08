@@ -26,6 +26,12 @@
      * written back so subsequent blocks can read them. Owner: the host modal.
      */
     scope?: Record<string, unknown>;
+    /**
+     * Recipe-level widget hint (from frontmatter `widget:`). When set and
+     * lang === 'json', the JSON content is treated as widget params instead
+     * of being dispatched as a script.
+     */
+    widget?: string;
   }
 
   let {
@@ -34,6 +40,7 @@
     actions = undefined,
     onrun,
     scope,
+    widget,
   }: Props = $props();
 
   let editable = $state('');
@@ -93,7 +100,15 @@
     startTimer(t0);
 
     const multi = canvas.multiClient as McpMultiClient | undefined;
-    const result = await runCode(editable, lang, multi, scope);
+    // For widget recipes (frontmatter `widget:`), JSON fences carry params —
+    // wrap as widget_display(...) so runCode renders the widget instead of
+    // dispatching the JSON to run_script.
+    const isJsonWidgetParams = widget && /^json\b/i.test(lang);
+    const runCodeStr = isJsonWidgetParams
+      ? `widget_display({name: ${JSON.stringify(widget)}, params: ${editable}})`
+      : editable;
+    const runLang = isJsonWidgetParams ? 'text' : lang;
+    const result = await runCode(runCodeStr, runLang, multi, scope);
 
     stopTimer();
     lastDuration = result.durationMs;

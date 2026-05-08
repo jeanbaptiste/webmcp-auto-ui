@@ -121,7 +121,13 @@
     };
     runs = [...runs];
     const multi = canvas.multiClient as Parameters<typeof runCode>[2];
-    const result = await runCode(tab.code, tab.lang, multi, runScope);
+    const widget = (recipe as { widget?: string } | null)?.widget;
+    const isJsonWidgetParams = widget && /^json\b/i.test(tab.lang);
+    const runCodeStr = isJsonWidgetParams
+      ? `widget_display({name: ${JSON.stringify(widget)}, params: ${tab.code}})`
+      : tab.code;
+    const runLang = isJsonWidgetParams ? 'text' : tab.lang;
+    const result = await runCode(runCodeStr, runLang, multi, runScope);
     runs[idx] = { ...tab, result };
     runs = [...runs];
   }
@@ -227,6 +233,7 @@
                       code={seg.content}
                       lang={seg.lang ?? 'text'}
                       scope={runScope}
+                      widget={(recipe as { widget?: string } | null)?.widget}
                       onrun={(payload) => handleBlockRun(i, payload)}
                     />
                   {/if}

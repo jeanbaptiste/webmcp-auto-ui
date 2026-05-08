@@ -101,7 +101,7 @@ export interface HistoryEntry {
 // ---------------------------------------------------------------------------
 
 /**
- * Strip leading SQL preamble — `--` line comments, `/* ... */` block comments,
+ * Strip leading SQL preamble — line comments and block comments,
  * BOM, and whitespace — so the first non-trivial token is the real keyword.
  * Some upstream MCP SQL servers (Tricoteuses) enforce a strict
  * `^(SELECT|WITH)` regex on the raw string; a comment header would fail.
