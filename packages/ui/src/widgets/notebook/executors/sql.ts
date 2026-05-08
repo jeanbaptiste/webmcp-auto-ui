@@ -1,5 +1,6 @@
 import { canvas } from '@webmcp-auto-ui/sdk/canvas';
 import { findCodeParamName, buildToolArgs } from '@webmcp-auto-ui/sdk';
+import { stripSqlPreamble } from '../shared.js';
 import type { CellExecutor, CellExecContext, CellResult, DataServerDescriptor, DataServerTool } from '../shared.js';
 
 const PATTERN_PRIMARY = /^.*query_sql$/i;
@@ -24,7 +25,7 @@ export function createSqlExecutor(getServers: () => DataServerDescriptor[]): Cel
       return { ok: false, error: 'No SQL tool available on connected servers.', errorKind: 'schema', durationMs: Date.now() - startedAt };
     }
     const { srv, tool } = hit;
-    const sql = (ctx.cell.content ?? '').trim();
+    const sql = stripSqlPreamble((ctx.cell.content ?? '').trim());
     if (!sql) return { ok: true, kind: 'empty', durationMs: Date.now() - startedAt };
 
     // Build args from the tool's inputSchema:

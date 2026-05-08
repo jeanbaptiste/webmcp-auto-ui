@@ -808,9 +808,9 @@ async function runAgentForCell(
 function buildAgentLayerForCell(state: NotebookState, cell: NotebookCell, rerender: () => void, overlay: RuntimeOverlay | null) {
   const idx = () => state.cells.findIndex((c) => c.id === cell.id);
   // View-mode chat is per-cell and meant to TRANSFORM the targeted cell.
-  // Drop insert_cell_after + list_widgets so Haiku can't fall back to "add a new cell"
-  // when the user explicitly chatted on this cell.
-  const transformOnly = state.mode === 'view';
+  // Exception: when the cell is `sql`, the natural follow-up is "add a chart on
+  // top of these rows", so we keep insert_cell_after + list_widgets available.
+  const transformOnly = state.mode === 'view' && cell.type !== 'sql';
   const tools = [
     {
       name: 'get_current_cell',
@@ -920,6 +920,21 @@ function buildAgentLayerForCell(state: NotebookState, cell: NotebookCell, rerend
 
 function buildAgentSystemPromptForCell(state: NotebookState, cell: NotebookCell): string {
   if (state.mode === 'view') {
+    if (cell.type === 'sql') {
+      return [
+        'You are an in-notebook editing assistant. The user invoked you on a SQL cell.',
+        'Two valid actions:',
+        '  - TRANSFORM: rewrite this SQL cell. Call get_current_cell, then update_cell.',
+        '  - FOLLOW-UP (chart/viz/widget): insert a JS cell after this one that renders a widget on top of the rows.',
+        'For a follow-up widget:',
+        '  1. Call get_current_cell to read this cell\'s `varname` (the rows of this SQL are bound to that name in cross-cell scope).',
+        '  2. Call list_widgets to discover available widget names.',
+        '  3. Call insert_cell_after with type="js" and content like: `return widget("<name>", { data: <varname>, x: "...", y: ["..."] });`',
+        'For JS cells: use the `widget(name, params)` helper. `widget_display` is not available as a global.',
+        'Never write a JS cell that re-issues the SQL — reuse the varname from cross-cell scope.',
+        'Be terse. Two or three tool calls is enough. Do not explain at length.',
+      ].join('\n');
+    }
     return [
       'You are an in-notebook editing assistant. The user invoked you on a specific cell to TRANSFORM it.',
       `The current cell is of type "${cell.type}".`,
@@ -928,6 +943,7 @@ function buildAgentSystemPromptForCell(state: NotebookState, cell: NotebookCell)
       '  2. Call update_cell with the rewritten content.',
       'Always rewrite the existing cell. Never insert new cells.',
       'For JS cells: use the `widget(name, params)` helper to render widgets — `widget_display` is not available as a global.',
+      'Call `widget(...)` once with the final result; do NOT also call `widget_display(...)` after.',
       'Be terse. One or two tool calls is enough. Do not explain at length.',
     ].join('\n');
   }

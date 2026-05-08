@@ -393,6 +393,12 @@ async function runJsLike(
   // LLMs trained on the autoui MCP tool sometimes emit it directly in JS cells.
   const widgetHelper = makeWidgetHelper(ctx);
   const widgetDisplayAlias = async (a: unknown, b?: unknown) => {
+    // Dedup the common LLM pattern `widget_display(widget(...))` /
+    // `const r = await widget(...); widget_display(r)`. The argument is then
+    // the exact `{name, params}` object that widget() just pushed; re-pushing
+    // would render the widget twice.
+    const last = ctx.widgets[ctx.widgets.length - 1];
+    if (last && a === last) return last;
     if (a && typeof a === 'object' && 'name' in (a as object)) {
       const o = a as { name?: unknown; params?: unknown };
       return widgetHelper(String(o.name ?? ''), (o.params as Record<string, unknown>) ?? {});

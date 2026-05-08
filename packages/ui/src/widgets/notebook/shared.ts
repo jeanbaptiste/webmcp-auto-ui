@@ -100,6 +100,25 @@ export interface HistoryEntry {
 // Utilities
 // ---------------------------------------------------------------------------
 
+/**
+ * Strip leading SQL preamble — `--` line comments, `/* ... */` block comments,
+ * BOM, and whitespace — so the first non-trivial token is the real keyword.
+ * Some upstream MCP SQL servers (Tricoteuses) enforce a strict
+ * `^(SELECT|WITH)` regex on the raw string; a comment header would fail.
+ */
+export function stripSqlPreamble(sql: string): string {
+  let s = sql.replace(/^﻿/, '');
+  // Repeat: there can be a mix of line + block comments + blank lines.
+  for (;;) {
+    const before = s;
+    s = s.replace(/^[\s]+/, '');
+    s = s.replace(/^--[^\n]*\n?/, '');
+    s = s.replace(/^\/\*[\s\S]*?\*\//, '');
+    if (s === before) break;
+  }
+  return s;
+}
+
 export function uid(): string {
   return 'c_' + Math.random().toString(36).slice(2, 9);
 }
@@ -488,7 +507,7 @@ export function createBridgeSqlRunner(
     if (!hit) {
       return { ok: false, error: 'No SQL tool exposed by reachable servers', errorKind: 'schema', durationMs: 0 };
     }
-    const sql = (cell.content ?? '').trim();
+    const sql = stripSqlPreamble((cell.content ?? '').trim());
     const codeParam = findCodeParamName(hit.tool.inputSchema) ?? 'sql';
     const args: Record<string, unknown> = { ...buildToolArgs(hit.tool.inputSchema, codeParam, sql, 'sql'), ...(cell.args ?? {}) };
     args[codeParam] = sql;
