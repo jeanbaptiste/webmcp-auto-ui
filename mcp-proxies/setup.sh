@@ -158,6 +158,9 @@ generate_passthrough_unit() {
     local name="$1"
     local upstream="$2"
     local port="$3"
+    local auth_tokens_file="${4:-}"
+    local auth_token_endpoint="${5:-}"
+    local auth_client_id="${6:-}"
     local unit_file="/etc/systemd/system/mcp-${name}.service"
 
     local recipes_flag=""
@@ -165,6 +168,11 @@ generate_passthrough_unit() {
         recipes_flag="--recipes-dir $BRIDGE_DIR/recipes/${name}"
     elif [[ -f "$BRIDGE_DIR/recipes/${name}.json" ]]; then
         recipes_flag="--recipes $BRIDGE_DIR/recipes/${name}.json"
+    fi
+
+    local auth_flags=""
+    if [[ -n "$auth_tokens_file" && -n "$auth_token_endpoint" && -n "$auth_client_id" ]]; then
+        auth_flags="--auth-tokens-file $auth_tokens_file --auth-token-endpoint $auth_token_endpoint --auth-client-id $auth_client_id"
     fi
 
     cat > "$unit_file" <<EOF
@@ -177,7 +185,7 @@ Type=simple
 User=${BRIDGE_USER}
 Group=${BRIDGE_USER}
 EnvironmentFile=${BRIDGE_DIR}/.env
-ExecStart=/usr/bin/python3 ${BRIDGE_DIR}/mcp-http-passthrough.py --upstream "${upstream}" --port ${port} ${recipes_flag}
+ExecStart=/usr/bin/python3 ${BRIDGE_DIR}/mcp-http-passthrough.py --upstream "${upstream}" --port ${port} ${recipes_flag} ${auth_flags}
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
@@ -205,6 +213,10 @@ generate_unit "wikipedia"   "wikipedia-mcp"                                     
 generate_unit "inaturalist" "python3 ${BRIDGE_DIR}/inaturalist-mcp.py"            9007
 generate_unit "nasa"        "npx -y @programcomputer/nasa-mcp-server@latest"      9008 "Environment=NASA_API_KEY=\${NASA_API_KEY}"
 generate_passthrough_unit "datagouv" "https://mcp.data.gouv.fr/mcp"               9009
+generate_passthrough_unit "code4code" "https://mcp.code4code.eu/mcp" 9010 \
+    "/opt/mcp-bridge/code4code/tokens.json" \
+    "https://auth.code4code.eu/realms/code4code/protocol/openid-connect/token" \
+    "9e36ef22-15a5-497b-8128-b47d75522e9b"
 
 systemctl daemon-reload
 
@@ -228,7 +240,7 @@ fi
 
 green "[6/7] Starting/restarting services..."
 
-SERVICES=(mcp-hackernews mcp-metmuseum mcp-openmeteo mcp-wikipedia mcp-inaturalist mcp-nasa mcp-datagouv)
+SERVICES=(mcp-hackernews mcp-metmuseum mcp-openmeteo mcp-wikipedia mcp-inaturalist mcp-nasa mcp-datagouv mcp-code4code)
 
 for svc in "${SERVICES[@]}"; do
     systemctl enable "$svc" --now 2>/dev/null
@@ -253,6 +265,7 @@ declare -A ENDPOINTS=(
     [inaturalist]=9007
     [nasa]=9008
     [datagouv]=9009
+    [code4code]=9010
 )
 
 PAYLOAD='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'

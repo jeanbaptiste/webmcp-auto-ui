@@ -13,7 +13,7 @@
 //   node scripts/audit-recipes.mjs --strict     # promote warns to errors
 
 const REGISTRY = [
-  { id: 'tricoteuses', url: 'https://mcp.code4code.eu/mcp' },
+  { id: 'code4code', url: 'https://demos.hyperskills.net/mcp-code4code/mcp' },
   { id: 'hackernews', url: 'https://demos.hyperskills.net/mcp-hackernews/mcp' },
   { id: 'metmuseum', url: 'https://demos.hyperskills.net/mcp-metmuseum/mcp' },
   { id: 'openmeteo', url: 'https://demos.hyperskills.net/mcp-openmeteo/mcp' },

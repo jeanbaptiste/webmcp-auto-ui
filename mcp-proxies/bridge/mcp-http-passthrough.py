@@ -19,8 +19,10 @@ import json
 import os
 import re
 import sys
+import tempfile
 import threading
 import time
+import urllib.parse
 import urllib.request
 import urllib.error
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -671,22 +673,155 @@ def _first_text(content):
     return None
 
 
+# ── OAuth / TokenManager ──────────────────────────────────────────────────────
+
+class TokenManager:
+    """Gère l'obtention et le rafraîchissement d'un token Bearer Keycloak.
+
+    Charge les tokens depuis tokens_file, rafraîchit automatiquement quand
+    l'access token expire dans moins de 60 secondes, et persiste le nouveau
+    token de manière atomique.
+    """
+
+    def __init__(self, tokens_file, token_endpoint, client_id):
+        self.tokens_file = tokens_file
+        self.token_endpoint = token_endpoint
+        self.client_id = client_id
+        self.lock = threading.Lock()
+        self.cache = None  # dict: access_token, refresh_token, expires_at, scope, obtained_at
+
+    # ── Lecture / écriture fichier ─────────────────────────────────────────
+
+    def _load_file(self):
+        """Charge tokens.json depuis le disque. Retourne None si absent/invalide."""
+        try:
+            with open(self.tokens_file) as fh:
+                return json.load(fh)
+        except (OSError, json.JSONDecodeError) as e:
+            print("[token_manager] impossible de charger %s: %s" % (self.tokens_file, e), file=sys.stderr)
+            return None
+
+    def _write_file(self, data):
+        """Écriture atomique : NamedTemporaryFile dans le même répertoire + os.replace."""
+        dirpath = os.path.dirname(os.path.abspath(self.tokens_file))
+        fd, tmp_path = tempfile.mkstemp(dir=dirpath, suffix=".tmp")
+        try:
+            with os.fdopen(fd, 'w') as fh:
+                json.dump(data, fh, indent=2)
+            os.chmod(tmp_path, 0o600)
+            os.replace(tmp_path, self.tokens_file)
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
+
+    # ── Rafraîchissement Keycloak ──────────────────────────────────────────
+
+    def _do_refresh(self, refresh_token):
+        """Effectue un POST grant_type=refresh_token. Retourne le dict Keycloak."""
+        body = urllib.parse.urlencode({
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": self.client_id,
+        }).encode()
+        req = urllib.request.Request(
+            self.token_endpoint,
+            data=body,
+            method='POST',
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read().decode())
+
+    def _apply_token_response(self, payload, old_refresh_token=None):
+        """Construit le dict cache à partir de la réponse Keycloak et le persiste."""
+        now = int(time.time())
+        expires_in = int(payload.get("expires_in", 300))
+        new_refresh = payload.get("refresh_token") or old_refresh_token
+        entry = {
+            "access_token": payload["access_token"],
+            "refresh_token": new_refresh,
+            "expires_at": now + expires_in,
+            "scope": payload.get("scope", ""),
+            "obtained_at": now,
+        }
+        self._write_file(entry)
+        self.cache = entry
+        return entry
+
+    # ── API publique ───────────────────────────────────────────────────────
+
+    def get_bearer(self):
+        """Retourne l'access_token courant, rafraîchi si nécessaire.
+
+        Lève une exception si le rafraîchissement échoue (le caller fera 503).
+        """
+        with self.lock:
+            if self.cache is None:
+                self.cache = self._load_file()
+                if self.cache is None:
+                    raise RuntimeError("tokens.json absent ou invalide — appeler /admin/save-tokens d'abord")
+
+            # Rafraîchir si expire dans moins de 60 secondes
+            if self.cache.get("expires_at", 0) < int(time.time()) + 60:
+                print("[token_manager] access token expiré, rafraîchissement…", file=sys.stderr)
+                payload = self._do_refresh(self.cache["refresh_token"])
+                self._apply_token_response(payload, old_refresh_token=self.cache["refresh_token"])
+
+            return self.cache["access_token"]
+
+    def invalidate_access(self):
+        """Force un rafraîchissement au prochain get_bearer (utilisé après 401 upstream)."""
+        with self.lock:
+            if self.cache is not None:
+                # Mettre expires_at dans le passé
+                self.cache["expires_at"] = 0
+
+    def save_initial(self, refresh_token):
+        """Initialise les tokens à partir d'un refresh_token externe (endpoint /admin/save-tokens).
+
+        Effectue un échange Keycloak, persiste tokens.json et retourne le payload
+        pour confirmation. Lève une exception si Keycloak refuse.
+        """
+        with self.lock:
+            try:
+                payload = self._do_refresh(refresh_token)
+            except urllib.error.HTTPError as e:
+                detail = e.read().decode(errors='replace')
+                raise RuntimeError("Keycloak %d: %s" % (e.code, detail))
+            entry = self._apply_token_response(payload, old_refresh_token=refresh_token)
+            print("[token_manager] tokens initiaux sauvegardés dans %s" % self.tokens_file, file=sys.stderr)
+            return {
+                "ok": True,
+                "scope": entry["scope"],
+                "expires_in": payload.get("expires_in"),
+                "expires_at": entry["expires_at"],
+            }
+
+
 # ── Upstream forwarding ───────────────────────────────────────────────────────
 
-def forward_to_upstream(upstream_url, request_body, accept_header):
+def forward_to_upstream(upstream_url, request_body, accept_header, bearer_token=None):
     """POST the JSON-RPC request to the upstream MCP server, return parsed response.
 
     Handles both `application/json` and `text/event-stream` (SSE) responses by
     extracting the first JSON object found in the body.
+
+    Si bearer_token est fourni, ajoute un header Authorization: Bearer <token>.
     """
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': accept_header or 'application/json, text/event-stream',
+    }
+    if bearer_token:
+        headers['Authorization'] = 'Bearer ' + bearer_token
     req = urllib.request.Request(
         upstream_url,
         data=request_body,
         method='POST',
-        headers={
-            'Content-Type': 'application/json',
-            'Accept': accept_header or 'application/json, text/event-stream',
-        },
+        headers=headers,
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
         raw = resp.read().decode('utf-8', errors='replace')
@@ -702,8 +837,47 @@ def forward_to_upstream(upstream_url, request_body, accept_header):
 
 class PassthroughHandler(BaseHTTPRequestHandler):
     upstream = ""
+    token_manager = None  # TokenManager instance si --auth-* activé, sinon None
 
     def do_POST(self):
+        # ── Endpoint admin : sauvegarde du refresh_token initial ─────────
+        if self.path == "/admin/save-tokens":
+            if self.token_manager is None:
+                self.send_error(404, "OAuth not configured")
+                return
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length)
+            try:
+                data = json.loads(body)
+            except json.JSONDecodeError:
+                self.send_error(400, "Invalid JSON")
+                return
+            rt = data.get("refresh_token", "").strip()
+            if not rt:
+                payload = json.dumps({"error": "missing_field", "detail": "refresh_token requis et non vide"}).encode()
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+            try:
+                result = self.token_manager.save_initial(rt)
+                payload = json.dumps(result).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+            except Exception as e:
+                payload = json.dumps({"error": "token_exchange_failed", "detail": str(e)}).encode()
+                self.send_response(503)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+            return
+
         if self.path != "/mcp":
             self.send_error(404)
             return
@@ -721,11 +895,16 @@ class PassthroughHandler(BaseHTTPRequestHandler):
         params = request.get("params", {})
         is_notification = "id" not in request
 
+        # Obtenir le bearer courant si OAuth activé (une seule fois avant le try).
+        tm = self.token_manager
+        accept_hdr = self.headers.get('Accept', '')
+
         try:
             # Notifications: forward fire-and-forget, return 202.
             if is_notification:
                 try:
-                    forward_to_upstream(self.upstream, body, self.headers.get('Accept', ''))
+                    bearer = tm.get_bearer() if tm else None
+                    forward_to_upstream(self.upstream, body, accept_hdr, bearer_token=bearer)
                 except Exception:
                     pass
                 self.send_response(202)
@@ -743,8 +922,24 @@ class PassthroughHandler(BaseHTTPRequestHandler):
                     self._respond(response)
                     return
 
-            # Forward to upstream MCP server.
-            response = forward_to_upstream(self.upstream, body, self.headers.get('Accept', ''))
+            # ── Forward to upstream MCP server (avec retry 401 si OAuth) ─
+            def _forward():
+                bearer = tm.get_bearer() if tm else None
+                return forward_to_upstream(self.upstream, body, accept_hdr, bearer_token=bearer)
+
+            try:
+                response = _forward()
+            except urllib.error.HTTPError as e:
+                if e.code == 401 and tm is not None:
+                    # Token peut-être révoqué côté upstream — invalider et réessayer une fois.
+                    print("[passthrough] 401 upstream, rafraîchissement forcé…", file=sys.stderr)
+                    tm.invalidate_access()
+                    try:
+                        response = _forward()
+                    except urllib.error.HTTPError as e2:
+                        raise e2  # Propagé vers le handler extérieur
+                else:
+                    raise
 
             # ── Inject recipe tools into tools/list response ─────────────
             if recipes_data and method == "tools/list":
@@ -814,7 +1009,19 @@ def main():
     parser.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
     parser.add_argument("--recipes", default=None, help="Path to recipes JSON file")
     parser.add_argument("--recipes-dir", default=None, help="Path to directory of .md recipe files with YAML frontmatter")
+    # ── OAuth / Token manager ──────────────────────────────────────────────────
+    parser.add_argument("--auth-tokens-file", default=None, metavar="PATH",
+                        help="Chemin vers tokens.json (lu/écrit par le bridge)")
+    parser.add_argument("--auth-token-endpoint", default=None, metavar="URL",
+                        help="URL Keycloak /protocol/openid-connect/token")
+    parser.add_argument("--auth-client-id", default=None, metavar="ID",
+                        help="client_id OIDC public (sans secret)")
     args = parser.parse_args()
+
+    # Validation : les 3 flags OAuth doivent être fournis ensemble ou pas du tout.
+    auth_flags = [args.auth_tokens_file, args.auth_token_endpoint, args.auth_client_id]
+    if any(auth_flags) and not all(auth_flags):
+        parser.error("--auth-tokens-file, --auth-token-endpoint et --auth-client-id doivent être fournis ensemble")
 
     global recipes_data
     if args.recipes_dir:
@@ -830,6 +1037,17 @@ def main():
             print("Loaded %d recipes from %s" % (len(recipes_data), args.recipes), file=sys.stderr)
         except Exception as e:
             print("Warning: could not load recipes from %s: %s" % (args.recipes, e), file=sys.stderr)
+
+    # Wiring OAuth : instancier TokenManager si les 3 flags sont présents.
+    if all(auth_flags):
+        PassthroughHandler.token_manager = TokenManager(
+            args.auth_tokens_file, args.auth_token_endpoint, args.auth_client_id
+        )
+        print("[passthrough] OAuth activé — tokens: %s, endpoint: %s, client_id: %s" % (
+            args.auth_tokens_file, args.auth_token_endpoint, args.auth_client_id,
+        ), file=sys.stderr)
+    else:
+        PassthroughHandler.token_manager = None
 
     PassthroughHandler.upstream = args.upstream
     server = HTTPServer((args.host, args.port), PassthroughHandler)
