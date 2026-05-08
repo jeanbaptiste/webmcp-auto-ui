@@ -901,19 +901,32 @@ function buildAgentLayerForCell(state: NotebookState, cell: NotebookCell, rerend
     },
     {
       name: 'list_widgets',
-      description: 'List widgets exposed by the connected WebMCP servers — pickable in JS cells via widget(name, params).',
+      description: 'List widgets exposed by the connected WebMCP servers, with one usage example each. Pickable in JS cells via widget(name, params).',
       inputSchema: { type: 'object', properties: {} },
       execute: async () => {
-        const out: Array<{ server: string; name: string; description?: string }> = [];
+        const out: Array<{ server: string; name: string; description?: string; example?: string }> = [];
         for (const s of state.webmcpServers ?? []) {
-          for (const r of s.layer().recipes ?? []) out.push({ server: s.name, name: r.name, description: r.description });
+          for (const r of s.layer().recipes ?? []) {
+            const body = (r as { body?: string }).body ?? '';
+            // First fenced block in the recipe body is the canonical example,
+            // showing the exact param keys the renderer expects.
+            const m = /```[a-zA-Z]*\n([\s\S]*?)\n```/.exec(body);
+            out.push({
+              server: s.name,
+              name: r.name,
+              description: r.description,
+              ...(m ? { example: m[1] } : {}),
+            });
+          }
         }
         return out;
       },
     },
   ];
+  // list_widgets is read-only and essential — without it, the agent hallucinates
+  // widget names. Only insert_cell_after is dropped in transformOnly.
   const filtered = transformOnly
-    ? tools.filter((t) => t.name !== 'insert_cell_after' && t.name !== 'list_widgets')
+    ? tools.filter((t) => t.name !== 'insert_cell_after')
     : tools;
   return { protocol: 'webmcp' as const, serverName: 'notebook-editor', tools: filtered, recipes: [] };
 }
@@ -928,8 +941,8 @@ function buildAgentSystemPromptForCell(state: NotebookState, cell: NotebookCell)
         '  - FOLLOW-UP (chart/viz/widget): insert a JS cell after this one that renders a widget on top of the rows.',
         'For a follow-up widget:',
         '  1. Call get_current_cell to read this cell\'s `varname` (the rows of this SQL are bound to that name in cross-cell scope).',
-        '  2. Call list_widgets to discover available widget names.',
-        '  3. Call insert_cell_after with type="js" and content like: `return widget("<name>", { data: <varname>, x: "...", y: ["..."] });`',
+        '  2. Call list_widgets to discover the exact widget name + the example showing the required param keys. NEVER invent a widget name.',
+        '  3. Call insert_cell_after with type="js" and content like: `return widget("<name>", { ...params per the example, with rows substituted for <varname> });`',
         'For JS cells: use the `widget(name, params)` helper. `widget_display` is not available as a global.',
         'Never write a JS cell that re-issues the SQL — reuse the varname from cross-cell scope.',
         'Be terse. Two or three tool calls is enough. Do not explain at length.',
@@ -940,11 +953,11 @@ function buildAgentSystemPromptForCell(state: NotebookState, cell: NotebookCell)
       `The current cell is of type "${cell.type}".`,
       'Workflow:',
       '  1. Call get_current_cell to read the cell content.',
-      '  2. Call update_cell with the rewritten content.',
+      '  2. If the user asks for a chart/widget/viz, call list_widgets to learn the exact widget names + the example showing the required param keys. NEVER invent a widget name.',
+      '  3. Call update_cell with the rewritten content.',
       'Always rewrite the existing cell. Never insert new cells.',
-      'For JS cells: use the `widget(name, params)` helper to render widgets — `widget_display` is not available as a global.',
-      'Call `widget(...)` once with the final result; do NOT also call `widget_display(...)` after.',
-      'Be terse. One or two tool calls is enough. Do not explain at length.',
+      'For JS cells: use the `widget(name, params)` helper. `widget_display` is not available as a global. Call widget once with the final result; do NOT also call widget_display after.',
+      'Be terse. Two tool calls is usually enough. Do not explain at length.',
     ].join('\n');
   }
   return [
