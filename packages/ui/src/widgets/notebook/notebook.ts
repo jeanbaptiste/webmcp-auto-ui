@@ -488,6 +488,7 @@ function renderCell(cell: NotebookCell, state: NotebookState, overlay: RuntimeOv
       ${logsToggle}
       <button class="nb-icon-btn nb-toggle-src">${cell.hideSource ? '▸ src' : '◂ src'}</button>
       <button class="nb-icon-btn nb-toggle-res">${cell.hideResult ? '▸ res' : '◂ res'}</button>
+      ${state.mode === 'view' ? `<span class="nbe-actions-sep">│</span><button class="nb-icon-btn nb-toggle-chat">${cell.chatOpen ? '◂ chat' : '▸ chat'}</button>` : ''}
     </div>`;
   codeCell.appendChild(head);
   mountRunControls(head.querySelector('.nbe-run-controls') as HTMLElement, cell, wrap, state, rerender);
@@ -527,6 +528,10 @@ function renderCell(cell: NotebookCell, state: NotebookState, overlay: RuntimeOv
 
   (head.querySelector('.nb-toggle-src') as HTMLElement).addEventListener('click', () => { cell.hideSource = !cell.hideSource; rerender(); });
   (head.querySelector('.nb-toggle-res') as HTMLElement).addEventListener('click', () => { cell.hideResult = !cell.hideResult; rerender(); });
+  const chatBtn = head.querySelector('.nb-toggle-chat') as HTMLElement | null;
+  if (chatBtn) chatBtn.addEventListener('click', () => { cell.chatOpen = !cell.chatOpen; rerender(); });
+
+  if (state.mode === 'view' && cell.chatOpen) mountAgentBarAbove(codeCell, state, cell, rerender);
 
   if (state.mode !== 'view') wrap.appendChild(renderCellActionBar(state, cell, rerender));
 
@@ -685,6 +690,33 @@ function toggleAgentBar(host: HTMLElement, state: NotebookState, cell: NotebookC
     // Prevent the event bubbling to the host (flex/etc.) — otherwise their
     // own widget-interaction handler would launch a SECOND, unconstrained
     // agent loop that renders widgets outside the notebook (canvas blocks).
+    if (action === 'stop') { e.stopPropagation(); aborter?.abort(); return; }
+    if (action !== 'submit') return;
+    e.stopPropagation();
+    const text = ((detail as { payload?: { text?: string } }).payload?.text ?? '').trim();
+    if (!text) return;
+    void runAgentForCell(text, state, cell, rerender, status, input, () => aborter ??= new AbortController());
+  });
+}
+
+/**
+ * View-mode variant — renders the agent bar ABOVE the code cell (beforebegin)
+ * and persists open state via cell.chatOpen so the bar survives the rerender
+ * triggered by `update_cell`. Reuses runAgentForCell unchanged.
+ */
+function mountAgentBarAbove(codeCell: HTMLElement, state: NotebookState, cell: NotebookCell, rerender: () => void): void {
+  const bar = document.createElement('div');
+  bar.className = 'nbe-agent-bar';
+  bar.innerHTML = `
+    <auto-chat-input placeholder="ask agent — e.g. 'filter rows where votes > 50' / 'add a sankey of this'"></auto-chat-input>
+    <div class="nbe-agent-status" hidden></div>`;
+  codeCell.insertAdjacentElement('beforebegin', bar);
+  const input = bar.querySelector('auto-chat-input') as HTMLElement & { disabled?: boolean };
+  const status = bar.querySelector('.nbe-agent-status') as HTMLElement;
+  let aborter: AbortController | null = null;
+  input.addEventListener('widget:interact', (e: Event) => {
+    const detail = (e as CustomEvent).detail ?? {};
+    const action = (detail as { action?: string }).action;
     if (action === 'stop') { e.stopPropagation(); aborter?.abort(); return; }
     if (action !== 'submit') return;
     e.stopPropagation();

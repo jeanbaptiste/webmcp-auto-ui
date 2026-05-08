@@ -14,6 +14,7 @@
     status?: 'idle' | 'running' | 'done' | 'error' | 'stale';
     hideSource?: boolean;
     hideResult?: boolean;
+    chatOpen?: boolean;
     lastResult?: unknown;
     lastMs?: number;
   }

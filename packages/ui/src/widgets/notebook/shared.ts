@@ -48,6 +48,8 @@ export interface NotebookCell {
   varname?: string;        // named output (compact)
   hideSource?: boolean;
   hideResult?: boolean;
+  /** view-mode: agent chat bar opened above this cell (persists across rerender). */
+  chatOpen?: boolean;
   /** view-mode: collapse the console logs panel under the head bar. Default true in view mode. */
   hideLogs?: boolean;
   runState?: RunState;
@@ -1360,6 +1362,7 @@ const NOTEBOOK_STYLES = `
   display: flex; flex-direction: column; gap: 6px;
 }
 .nbe-agent-bar auto-chat-input { display: block; }
+.nbe-actions-sep { color: var(--color-border, #c8c2b4); margin: 0 4px; user-select: none; }
 .nbe-agent-status {
   font-family: var(--font-mono, monospace); font-size: 11px;
   color: var(--color-text2, #645d4f);
