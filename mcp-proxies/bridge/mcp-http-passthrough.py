@@ -803,13 +803,15 @@ class TokenManager:
 
 # ── Upstream forwarding ───────────────────────────────────────────────────────
 
-def forward_to_upstream(upstream_url, request_body, accept_header, bearer_token=None):
-    """POST the JSON-RPC request to the upstream MCP server, return parsed response.
+def forward_to_upstream(upstream_url, request_body, accept_header, bearer_token=None, client_session_id=None):
+    """POST the JSON-RPC request to the upstream MCP server, return (parsed_response, upstream_session_id).
 
     Handles both `application/json` and `text/event-stream` (SSE) responses by
     extracting the first JSON object found in the body.
 
     Si bearer_token est fourni, ajoute un header Authorization: Bearer <token>.
+    Si client_session_id est fourni, le forward au upstream via Mcp-Session-Id.
+    Retourne aussi le Mcp-Session-Id renvoyé par l'upstream (présent sur initialize).
     """
     headers = {
         'Content-Type': 'application/json',
@@ -817,6 +819,8 @@ def forward_to_upstream(upstream_url, request_body, accept_header, bearer_token=
     }
     if bearer_token:
         headers['Authorization'] = 'Bearer ' + bearer_token
+    if client_session_id:
+        headers['Mcp-Session-Id'] = client_session_id
     req = urllib.request.Request(
         upstream_url,
         data=request_body,
@@ -825,14 +829,15 @@ def forward_to_upstream(upstream_url, request_body, accept_header, bearer_token=
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
         raw = resp.read().decode('utf-8', errors='replace')
+        upstream_sid = resp.headers.get('Mcp-Session-Id') or resp.headers.get('mcp-session-id')
     # SSE responses prefix with `data: ` lines — extract the JSON payload.
     if raw.lstrip().startswith('event:') or 'data:' in raw[:200]:
         for line in raw.splitlines():
             if line.startswith('data:'):
                 payload = line[len('data:'):].strip()
                 if payload.startswith('{'):
-                    return json.loads(payload)
-    return json.loads(raw)
+                    return json.loads(payload), upstream_sid
+    return json.loads(raw), upstream_sid
 
 
 class PassthroughHandler(BaseHTTPRequestHandler):
@@ -898,13 +903,15 @@ class PassthroughHandler(BaseHTTPRequestHandler):
         # Obtenir le bearer courant si OAuth activé (une seule fois avant le try).
         tm = self.token_manager
         accept_hdr = self.headers.get('Accept', '')
+        client_sid = self.headers.get('Mcp-Session-Id') or self.headers.get('mcp-session-id')
+        upstream_sid = None
 
         try:
             # Notifications: forward fire-and-forget, return 202.
             if is_notification:
                 try:
                     bearer = tm.get_bearer() if tm else None
-                    forward_to_upstream(self.upstream, body, accept_hdr, bearer_token=bearer)
+                    forward_to_upstream(self.upstream, body, accept_hdr, bearer_token=bearer, client_session_id=client_sid)
                 except Exception:
                     pass
                 self.send_response(202)
@@ -919,23 +926,23 @@ class PassthroughHandler(BaseHTTPRequestHandler):
                 if tool_name in ("list_recipes", "get_recipe", "search_recipes"):
                     result = handle_recipe_call(tool_name, params.get("arguments", {}))
                     response = {"jsonrpc": "2.0", "id": request.get("id"), "result": result}
-                    self._respond(response)
+                    self._respond(response, session_id_override=client_sid)
                     return
 
             # ── Forward to upstream MCP server (avec retry 401 si OAuth) ─
             def _forward():
                 bearer = tm.get_bearer() if tm else None
-                return forward_to_upstream(self.upstream, body, accept_hdr, bearer_token=bearer)
+                return forward_to_upstream(self.upstream, body, accept_hdr, bearer_token=bearer, client_session_id=client_sid)
 
             try:
-                response = _forward()
+                response, upstream_sid = _forward()
             except urllib.error.HTTPError as e:
                 if e.code == 401 and tm is not None:
                     # Token peut-être révoqué côté upstream — invalider et réessayer une fois.
                     print("[passthrough] 401 upstream, rafraîchissement forcé…", file=sys.stderr)
                     tm.invalidate_access()
                     try:
-                        response = _forward()
+                        response, upstream_sid = _forward()
                     except urllib.error.HTTPError as e2:
                         raise e2  # Propagé vers le handler extérieur
                 else:
@@ -977,14 +984,17 @@ class PassthroughHandler(BaseHTTPRequestHandler):
                 "error": {"code": -32603, "message": str(e)},
             }
 
-        self._respond(response)
+        # Propage la session ID upstream (si présente) ou rebondit celle du client.
+        sid_out = upstream_sid or client_sid
+        self._respond(response, session_id_override=sid_out)
 
-    def _respond(self, response):
+    def _respond(self, response, session_id_override=None):
         payload = json.dumps(response).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
-        self.send_header("Mcp-Session-Id", session_id)
+        sid = session_id_override or session_id
+        self.send_header("Mcp-Session-Id", sid)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Expose-Headers", "Mcp-Session-Id")
         self.end_headers()

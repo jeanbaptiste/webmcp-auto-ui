@@ -93,12 +93,13 @@ chmod 755 "$BRIDGE_DIR"
 
 if [[ ! -f "$BRIDGE_DIR/.env" ]]; then
     cat > "$BRIDGE_DIR/.env" <<'ENVEOF'
-# MCP bridge environment variables
-# NASA_API_KEY=YOUR_NASA_API_KEY
+# MCP bridge environment variables. Loaded by every mcp-*.service via
+# EnvironmentFile=. Add real values here — units MUST NOT hardcode secrets.
+NASA_API_KEY=
 ENVEOF
     chmod 600 "$BRIDGE_DIR/.env"
     chown root:root "$BRIDGE_DIR/.env"
-    yellow "  Created $BRIDGE_DIR/.env -- edit it to add your NASA_API_KEY."
+    yellow "  Created $BRIDGE_DIR/.env — edit it to set NASA_API_KEY and any other secrets."
 else
     echo "  $BRIDGE_DIR/.env already exists, not overwriting."
 fi
@@ -111,7 +112,9 @@ generate_unit() {
     local name="$1"
     local cmd="$2"
     local port="$3"
-    local extra_env="${4:-}"
+    # Secrets MUST live in $BRIDGE_DIR/.env (loaded via EnvironmentFile below)
+    # NEVER hardcode them in unit files: setup.sh regenerates units on each run
+    # and would silently overwrite them with empty values from the calling shell.
     local unit_file="/etc/systemd/system/mcp-${name}.service"
 
     local recipes_flag=""
@@ -129,10 +132,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=${BRIDGE_USER}
-Group=${BRIDGE_USER}
 EnvironmentFile=${BRIDGE_DIR}/.env
-${extra_env}
 ExecStart=/usr/bin/python3 ${BRIDGE_DIR}/mcp-stdio-bridge.py --cmd "${cmd}" --port ${port} ${recipes_flag}
 Restart=on-failure
 RestartSec=5
@@ -140,11 +140,8 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=mcp-${name}
 
-# Security hardening
+# Security hardening (minimal — services run as root pending isolation refactor)
 NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=${BRIDGE_DIR}
 PrivateTmp=yes
 
 [Install]
@@ -182,8 +179,6 @@ After=network.target
 
 [Service]
 Type=simple
-User=${BRIDGE_USER}
-Group=${BRIDGE_USER}
 EnvironmentFile=${BRIDGE_DIR}/.env
 ExecStart=/usr/bin/python3 ${BRIDGE_DIR}/mcp-http-passthrough.py --upstream "${upstream}" --port ${port} ${recipes_flag} ${auth_flags}
 Restart=on-failure
@@ -192,11 +187,8 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=mcp-${name}
 
-# Security hardening
+# Security hardening (minimal — services run as root pending isolation refactor)
 NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=${BRIDGE_DIR}
 PrivateTmp=yes
 
 [Install]
@@ -211,7 +203,7 @@ generate_unit "metmuseum"   "npx -y metmuseum-mcp"                              
 generate_unit "openmeteo"   "npx -y open-meteo-mcp"                               9002
 generate_unit "wikipedia"   "wikipedia-mcp"                                       9005
 generate_unit "inaturalist" "python3 ${BRIDGE_DIR}/inaturalist-mcp.py"            9007
-generate_unit "nasa"        "npx -y @programcomputer/nasa-mcp-server@latest"      9008 "Environment=NASA_API_KEY=\${NASA_API_KEY}"
+generate_unit "nasa"        "npx -y @programcomputer/nasa-mcp-server@latest"      9008
 generate_passthrough_unit "datagouv" "https://mcp.data.gouv.fr/mcp"               9009
 generate_passthrough_unit "code4code" "https://mcp.code4code.eu/mcp" 9010 \
     "/opt/mcp-bridge/code4code/tokens.json" \
