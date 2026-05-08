@@ -19,7 +19,7 @@
 
   // ── State ─────────────────────────────────────────────────────────────
   let input = $state('');
-  let mcpUrl = $state('https://mcp.code4code.eu/mcp');
+  let mcpUrl = $state('https://demos.hyperskills.net/mcp-code4code/mcp');
   let conversationHistory = $state<ChatMessage[]>([]);
   let chatTimer = $state(0);
   let chatToolCount = $state(0);

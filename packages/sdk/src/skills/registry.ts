@@ -99,7 +99,7 @@ export function loadSkills(skills: Skill[]): void {
 const DEMO_SKILLS: Omit<Skill, 'id' | 'createdAt' | 'updatedAt'>[] = [
   {
     name: 'weather-dashboard',
-    mcp: 'https://mcp.code4code.eu/mcp',
+    mcp: 'https://demos.hyperskills.net/mcp-code4code/mcp',
     mcpName: 'tricoteuses',
     description: 'Local weather with temperature, conditions, and forecasts',
     tags: ['weather', 'dashboard'],
@@ -111,7 +111,7 @@ const DEMO_SKILLS: Omit<Skill, 'id' | 'createdAt' | 'updatedAt'>[] = [
   },
   {
     name: 'kpi-overview',
-    mcp: 'https://mcp.code4code.eu/mcp',
+    mcp: 'https://demos.hyperskills.net/mcp-code4code/mcp',
     mcpName: 'tricoteuses',
     description: 'KPI overview: revenue, users, churn',
     tags: ['kpi', 'dashboard'],
@@ -124,7 +124,7 @@ const DEMO_SKILLS: Omit<Skill, 'id' | 'createdAt' | 'updatedAt'>[] = [
   },
   {
     name: 'status-monitor',
-    mcp: 'https://mcp.code4code.eu/mcp',
+    mcp: 'https://demos.hyperskills.net/mcp-code4code/mcp',
     mcpName: 'tricoteuses',
     description: 'Service status monitoring',
     tags: ['ops', 'monitoring'],

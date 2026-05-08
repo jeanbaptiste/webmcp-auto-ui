@@ -74,7 +74,7 @@ describe('loadDemoSkills', () => {
     loadDemoSkills();
     const skills = listSkills();
     expect(skills.length).toBe(3);
-    expect(skills.every(s => s.mcp === 'https://mcp.code4code.eu/mcp')).toBe(true);
+    expect(skills.every(s => s.mcp === 'https://demos.hyperskills.net/mcp-code4code/mcp')).toBe(true);
     expect(skills.every(s => s.mcpName === 'tricoteuses')).toBe(true);
   });
 

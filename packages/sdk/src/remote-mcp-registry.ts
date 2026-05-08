@@ -18,7 +18,7 @@ export const REMOTE_MCP_REGISTRY: RemoteMcpRegistryEntry[] = [
     id: 'tricoteuses',
     label: 'Tricoteuses',
     description: 'French parliamentary database — amendments, votes, MPs, political groups.',
-    url: 'https://mcp.code4code.eu/mcp',
+    url: 'https://demos.hyperskills.net/mcp-code4code/mcp',
     tags: ['politics', 'france', 'parliament', 'open-data'],
   },
   {
