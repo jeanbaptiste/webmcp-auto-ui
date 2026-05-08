@@ -100,8 +100,10 @@ const unwrapHelper = (r: unknown): unknown => {
 function makeWidgetHelper(ctx: RunnerCtx) {
   return async (name: string, params: Record<string, unknown> = {}) => {
     ctx.log(`widget(${name})`);
-    ctx.widgets.push({ name, params });
-    return { name, params };
+    // Push and return the SAME reference so widget_display(r) can dedup via ===.
+    const entry = { name, params };
+    ctx.widgets.push(entry);
+    return entry;
   };
 }
 
